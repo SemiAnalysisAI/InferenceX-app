@@ -1,17 +1,29 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { cn } from '@/lib/shared/utils';
 import {
+  compareConfigs,
+  configId,
+  defaultPairing,
   pairedGroup,
   parseStage,
   promptKey,
@@ -92,7 +104,8 @@ const STRINGS = {
       'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; hover it for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.',
     gpu: (n: number) => (n === 1 ? '1 GPU' : `${n} GPUs`),
     official: 'official',
-    compareWith: 'Compare with',
+    compare: 'Compare',
+    with: 'with',
     lossless: 'lossless',
     twin: (hardware: string) => `${hardware} lossless`,
     noTwin: 'This run has no lossless config with the same engine and server layout.',
@@ -143,7 +156,8 @@ const STRINGS = {
       'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。速度是两个测量单元 p50 之比，出片时间只是当前 prompt 这一次请求的时长。每条视频成本按所选成本档位和记录的 GPU 数量估算参与 GPU 的 TCO，每视频秒成本按有效输出的实际解码时长分摊；悬停该格可查看按分配 GPU 估算的口径。每条视频能耗是所选测量单元的平均值。以无损对照为基准的配对评分仍在计划中，目前还没有评分器计算。',
     gpu: (n: number) => `${n} 张 GPU`,
     official: '官方',
-    compareWith: '对比',
+    compare: '对比',
+    with: '对照',
     lossless: '无损',
     twin: (hardware: string) => `${hardware} 无损对照`,
     noTwin: '该运行中没有引擎和服务器布局都相同的无损配置。',
@@ -171,11 +185,13 @@ export interface VideoResultsClipsProps {
   /** The chart points the two sides play, for the chart's Playing and Baseline badges. */
   onPairChange?: (pair: StagePair) => void;
   /**
-   * `StageOption.value` the reader picked; one the subject lacks shows the reference. Page state,
-   * so "See what changes" in the chart legend can pick the lossless twin.
+   * `StageOption.value` the reader picked, or null for the subject's `defaultPairing`; one the
+   * subject lacks shows the reference. Page state, so the chart can reset it with a new subject.
    */
-  against: string;
+  against: string | null;
   onAgainstChange: (value: string) => void;
+  /** Plays the chart point with this key, as a chart click does. */
+  onSubjectChange: (clipKey: string) => void;
   /** Plays a point against a `StageOption.value` in Wipe and asks for a reveal. */
   onShow: (point: VideoPoint, against: string) => void;
   /** Counts reveal requests; each scrolls the stage into view and focuses it once its reads land. */
@@ -194,10 +210,10 @@ const GAP = 8;
 const MAX_TILES = 3;
 /** The longest the stage holds the last pair for the next pair's first frames, in ms. */
 const FRAME_WAIT_MS = 800;
-/** What the stage shows: `r_clip`, the Compare row's choice and `r_prompt`. */
+/** What the stage shows: `r_clip`, the pairing choice and `r_prompt`. */
 interface Selection {
   clip: string | null;
-  against: string;
+  against: string | null;
   prompt: string | null;
 }
 
@@ -236,11 +252,13 @@ export default function VideoResultsClips({
   onPairChange,
   against,
   onAgainstChange,
+  onSubjectChange,
   onShow,
   reveal,
   peek = null,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
+  const isPhone = useIsMobileViewport();
   const stage = parseStage(useClientSearch());
   // Callers pick one clip per hardware, which may be a lossy named run's.
   const selected = useMemo(() => points.filter(onRoster), [points]);
@@ -257,8 +275,13 @@ export default function VideoResultsClips({
     if (cache.current.has(key)) return cache.current.get(key) ?? null;
     return failedKeys.has(key) ? null : undefined;
   };
+  /** The official lead on a candidate run's own GPU; null for an official point. */
+  const ownLead = (p: VideoPoint) =>
+    p.runId === unofficialRun
+      ? (officialLeads.find((lead) => lead.hardwareKey === p.hardwareKey) ?? null)
+      : null;
   /** The subject a selection plays, and the side it is compared with. */
-  const pairFor = (clipKey: string | null, value: string) => {
+  const pairFor = (clipKey: string | null, value: string | null) => {
     const picked = clipKey ? drawn.find((p) => stagePointKey(p) === clipKey) : undefined;
     const subject = stageSubject(
       [...opening, ...(picked && !opening.includes(picked) ? [picked] : [])].map((point) => ({
@@ -269,12 +292,10 @@ export default function VideoResultsClips({
       clipKey,
     );
     // A candidate run is read against production: the official lead on its own GPU.
-    const own =
-      subject && subject.point.runId === unofficialRun
-        ? (officialLeads.find((p) => p.hardwareKey === subject.point.hardwareKey) ?? null)
-        : null;
+    const own = subject ? ownLead(subject.point) : null;
     const options = subject ? stageOptions(subject.point, selected, deployments, own) : [];
-    const option = options.find((item) => item.value === value) ?? options[0];
+    const pairing = value ?? (subject ? defaultPairing(subject.point, own) : 'reference');
+    const option = options.find((item) => item.value === pairing) ?? options[0];
     return { picked, subject, options, option, other: option?.point ?? null };
   };
   type Pair = ReturnType<typeof pairFor>;
@@ -554,14 +575,42 @@ export default function VideoResultsClips({
             url: '',
             empty: s.noTwin,
           };
-  // The Compare row offers the next pair's options, and its twin is the next subject's.
-  const twinColor = next.subject ? colorOf(next.subject.point) : null;
+  // The Compare row and its pairing follow the reader's pick at once, not the held pair.
+  const configs = compareConfigs(opening, drawn, unofficialRun);
+  const nextHardware = next.subject?.point.hardwareKey ?? '';
+  const active = next.subject && configId(next.subject.point, unofficialRun);
+  const configLabel = (p: VideoPoint) =>
+    [hardwareLabel(p.hardwareKey ?? ''), lossyVariant(p)].filter(Boolean).join(' · ');
+  const pickConfig = (p: VideoPoint) => {
+    track('video_results_compare_selected', {
+      subject: configId(p, unofficialRun),
+      pairing: defaultPairing(p, ownLead(p)),
+    });
+    onSubjectChange(stagePointKey(p));
+  };
+  /** ←/→ on a focused segment plays the previous or next config; the phone select has its own. */
+  const cycleConfigs = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0 || configs.length < 2 || !(event.target instanceof HTMLButtonElement)) return;
+    event.preventDefault();
+    const index = configs.findIndex((p) => configId(p, unofficialRun) === active);
+    const target =
+      index === -1
+        ? step > 0
+          ? 0
+          : configs.length - 1
+        : (index + step + configs.length) % configs.length;
+    event.currentTarget.querySelectorAll('button')[target]?.focus();
+    pickConfig(configs[target]);
+  };
   const optionLabel = (item: StageOption) =>
     item.kind === 'reference'
       ? s.referenceShort
       : item.kind === 'twin'
-        ? s.twin(hardwareLabel(next.subject?.point.hardwareKey ?? ''))
-        : hardwareLabel(item.value);
+        ? s.twin(hardwareLabel(nextHardware))
+        : item.value === nextHardware
+          ? `${hardwareLabel(item.value)} ${s.official}`
+          : hardwareLabel(item.value);
   return (
     <section
       id="comparison-clips"
@@ -626,42 +675,65 @@ export default function VideoResultsClips({
               </InfoHelp>
             </div>
           </PromptRow>
-          {next.options.length > 1 && next.option && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="text-xs font-medium">{s.compareWith}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="text-xs font-medium">{s.compare}</span>
+            <div className={isPhone ? 'min-w-0 flex-1' : 'min-w-0'} onKeyDown={cycleConfigs}>
               <SegmentedToggle
                 role="group"
-                ariaLabel={s.compareWith}
-                testId="video-results-compare"
-                value={next.option.value}
+                ariaLabel={s.compare}
+                testId="video-results-config"
+                value={active ?? ''}
                 size="sm"
-                options={next.options.map((item) => ({
-                  value: item.value,
-                  label: optionLabel(item),
-                  icon: (
-                    <SideDot
-                      color={
-                        item.kind === 'reference'
-                          ? null
-                          : item.point
-                            ? colorOf(item.point)
-                            : twinColor
-                      }
-                    />
-                  ),
-                  testId: `video-results-compare-${item.value}`,
+                variant={isPhone ? 'select' : 'segments'}
+                options={configs.map((p) => ({
+                  value: configId(p, unofficialRun),
+                  label: configLabel(p),
+                  title: p.participating === null ? undefined : s.gpu(p.participating),
+                  icon: <SideDot color={colorOf(p)} />,
+                  testId: `video-results-config-${configId(p, unofficialRun)}`,
                 }))}
                 onValueChange={(value) => {
-                  const choice = next.options.find((item) => item.value === value);
-                  track('video_results_compare_selected', {
-                    against: choice?.kind,
-                    gpu: choice?.point?.hardwareKey ?? null,
-                  });
-                  onAgainstChange(value);
+                  const config = configs.find((p) => configId(p, unofficialRun) === value);
+                  if (config) pickConfig(config);
                 }}
               />
             </div>
-          )}
+            {next.option && (
+              <label
+                className={cn(
+                  'flex items-center gap-1 text-xs text-muted-foreground',
+                  isPhone ? 'basis-full justify-end' : 'ml-auto',
+                )}
+              >
+                {s.with}
+                <span className="relative inline-flex items-center">
+                  <select
+                    data-testid="video-results-against"
+                    value={next.option.value}
+                    onChange={(event) => {
+                      const choice = next.options.find((item) => item.value === event.target.value);
+                      track('video_results_against_selected', {
+                        against: choice?.kind,
+                        gpu: choice?.point?.hardwareKey ?? null,
+                      });
+                      onAgainstChange(event.target.value);
+                    }}
+                    className="cursor-pointer appearance-none rounded-sm bg-transparent py-0.5 pr-4 font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {next.options.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {optionLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="pointer-events-none absolute right-0 size-3"
+                  />
+                </span>
+              </label>
+            )}
+          </div>
           <div
             className="motion-stale space-y-3"
             data-stale={stale || undefined}

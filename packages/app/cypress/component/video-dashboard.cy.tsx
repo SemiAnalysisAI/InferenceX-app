@@ -98,6 +98,8 @@ const playing = () => points('[data-clip-role="playing"]');
 const gpusOf = (node: Element) =>
   (node as unknown as { __data__: { cell: { point: VideoPoint } } }).__data__.cell.point
     .participating;
+/** The pairing control: what the playing config is compared with. */
+const against = () => cy.get('[data-testid="video-results-against"]');
 const stagePill = (side: 'a' | 'b') =>
   cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
 /** The stage and its transport sit fully inside the viewport. */
@@ -783,8 +785,8 @@ describe('VideoGenX results', () => {
     searchParam('r_clip').should('match', /^34342452354:/u);
 
     // An official subject is never offered its own GPU.
-    cy.get('[data-testid="video-results-compare-h200"]').should('not.exist');
-    cy.get('[data-testid="video-results-compare-b200"]').click();
+    against().find('option[value="h200"]').should('not.exist');
+    against().select('b200');
     stagePill('b').should('contain', 'B200').and('contain', 'Unofficial run');
     points('[data-clip-role="baseline"]').should('have.attr', 'data-overlay', 'true');
 
@@ -797,9 +799,8 @@ describe('VideoGenX results', () => {
     );
     stagePill('a').should('contain', 'Unofficial run');
     searchParam('r_clip').should('match', new RegExp(`^${namedRun}:`, 'u'));
-    // The unofficial subject is offered the official lead on its own GPU.
-    cy.get('[data-testid="video-results-compare-reference"]').click();
-    cy.get('[data-testid="video-results-compare-b200"]').click();
+    // A new subject drops the H200 pick: the unofficial run pairs with the official lead on its GPU.
+    against().should('have.value', 'b200');
     stagePill('b').should('contain', 'B200').and('not.contain', 'Unofficial run');
     // Both sides are B200, so the readout names the baseline as the official run.
     cy.get('[data-testid="video-results-readout"] [data-readout-side="b200"]')
@@ -862,17 +863,13 @@ describe('VideoGenX results', () => {
         );
       },
     });
-    cy.get('[data-testid="video-results-compare-h200"]').click();
+    against().select('h200');
     cy.get('[data-testid="video-results-quality-method"] summary').click();
     // The button sits below the stage; once it tops the viewport the stage is out of view above.
     cy.get('[data-testid="video-results-quality-show-me"]')
       .scrollIntoView()
       .click({ scrollBehavior: false });
-    cy.get('[data-testid="video-results-compare-reference"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
+    against().should('have.value', 'reference');
     cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
     searchParam('r_clip').should('match', new RegExp(`^${run}:[^-]+$`, 'u'));
     stageInView();
@@ -883,17 +880,58 @@ describe('VideoGenX results', () => {
       .scrollIntoView()
       .click({ scrollBehavior: false });
     searchParam('r_clip').should('match', new RegExp(`^${run}:.+-fbc$`, 'u'));
-    cy.get('[data-testid="video-results-compare-twin"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
+    against().should('have.value', 'twin');
     stagePill('a').should('contain', 'FirstBlockCache');
     cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
     // The lossy cell's own read restores the prompt row above the stage; the stage stays in view.
     cy.get('[data-testid="video-results-prompt"]').should('exist');
     stageInView();
     cy.focused().should('have.attr', 'data-testid', 'video-results-stage');
+  });
+
+  it('plays the Compare row’s config against its default pairing and cycles it with ←/→', () => {
+    // No run stored clips; the row and its pairing still follow the pick.
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    mount({
+      search: '?r_y=videosPerGpuHour&r_lossy=1',
+      editPage: (page) => {
+        for (const entry of page.entries) {
+          entry.publishedAt = '2026-11-01T00:00:00.000Z';
+          for (const source of entry.sources)
+            source.observations = source.observations.flatMap((observation) => [
+              { ...observation, results: evidence(observation) },
+              {
+                ...observation,
+                id: `${observation.id}-fbc`,
+                results: { ...evidence(observation), optimizations: ['first-block-cache'] },
+              },
+            ]);
+        }
+      },
+    });
+    cy.get('[data-testid="video-results-config-h200"]').click();
+    playing().should('have.attr', 'data-hardware', 'h200');
+    searchParam('r_clip').should('match', /^34342452354:[^-]+$/u);
+    against().should('have.value', 'reference');
+    stagePill('b').should('contain', 'Diffusers reference');
+    // A lossy config pairs with its lossless twin.
+    cy.get('[data-testid^="video-results-config-h200+"]').click();
+    searchParam('r_clip').should('match', /^34342452354:.+-fbc$/u);
+    against().should('have.value', 'twin');
+    stagePill('b').should('contain', 'H200').and('contain', 'lossless');
+
+    cy.get('[data-testid="video-results-config-h200"]').click();
+    cy.get('[data-testid="video-results-config-h200"]')
+      .next()
+      .then(($next) => {
+        cy.focused().type('{rightarrow}');
+        cy.wrap($next).should('have.attr', 'aria-pressed', 'true').and('have.focus');
+      });
+    cy.focused().type('{leftarrow}');
+    cy.get('[data-testid="video-results-config-h200"]')
+      .should('have.attr', 'aria-pressed', 'true')
+      .and('have.focus');
+    playing().should('have.attr', 'data-hardware', 'h200');
   });
 
   it('opens the stage on the middle of the B200 frontier, not its most efficient end', () => {
@@ -1209,8 +1247,9 @@ describe('VideoGenX results', () => {
       points('[data-labelled]').then(($points) =>
         [...$points].map((point) => `${point.dataset.hardware}:${point.dataset.overlay}`),
       );
-    // The unofficial run plays; only its other deployment is labelled, once.
+    // The unofficial run plays against the reference; only its other deployment is labelled, once.
     playing().should('have.attr', 'data-overlay', 'true');
+    against().select('reference');
     labelled().should('deep.equal', ['b200:true']);
     cy.get('[data-testid="video-results-chart"]').should(($chart) => {
       const labels = [

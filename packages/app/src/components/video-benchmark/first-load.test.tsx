@@ -63,6 +63,7 @@ it.each([true, false])(
             colorFor={() => 'black'}
             against="reference"
             onAgainstChange={() => {}}
+            onSubjectChange={() => {}}
             onShow={() => {}}
             reveal={0}
           />
@@ -137,6 +138,7 @@ it('shows a newly read clip while another selected source is still pending', asy
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
         onShow={() => {}}
         reveal={0}
       />,
@@ -177,6 +179,7 @@ it('holds the prompt row and stage with a skeleton while the subject is read', (
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
         onShow={() => {}}
         reveal={0}
       />,
@@ -220,6 +223,7 @@ it('waits for a newly wanted side before a reveal scrolls, even after an earlier
       colorFor={() => 'black'}
       against="reference"
       onAgainstChange={() => {}}
+      onSubjectChange={() => {}}
       onShow={() => {}}
       reveal={reveal}
     />

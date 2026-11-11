@@ -298,8 +298,8 @@ export default function VideoDashboard({
     baseline: null,
     posters: {},
   });
-  /** What the stage compares its subject with, by `StageOption.value`. */
-  const [against, setAgainst] = useState('reference');
+  /** What the stage compares its subject with, by `StageOption.value`; null pairs it by default. */
+  const [against, setAgainst] = useState<string | null>(null);
   /** Whether the reader has picked a clip yet; until then playable chart points pulse. */
   const [picked, setPicked] = useState(false);
   /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
@@ -311,6 +311,12 @@ export default function VideoDashboard({
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
   const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
+  /** Plays the chart point with this key against its default pairing. */
+  const pickClip = useCallback((key: string) => {
+    setPicked(true);
+    setAgainst(null);
+    writeStage({ ...parseStage(location.search), clip: key });
+  }, []);
   /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
   const showOnStage = useCallback(
     (point: VideoPoint, compare: string) => {
@@ -336,14 +342,11 @@ export default function VideoDashboard({
     () => ({
       ...stagePair,
       pulse: !picked,
-      onSelect: (key) => {
-        setPicked(true);
-        writeStage({ ...parseStage(location.search), clip: key });
-      },
+      onSelect: pickClip,
       onPeek: setPeek,
       onReveal: requestReveal,
     }),
-    [stagePair, picked, requestReveal],
+    [stagePair, picked, pickClip, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
@@ -1008,6 +1011,7 @@ export default function VideoDashboard({
               onPairChange={onStagePair}
               against={against}
               onAgainstChange={pickAgainst}
+              onSubjectChange={pickClip}
               onShow={showOnStage}
               peek={peek}
               reveal={reveal}

@@ -1,5 +1,5 @@
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { losslessTwin } from './deployment';
+import { isQueueing, losslessTwin, runtimeKey } from './deployment';
 import type { VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
 import { RESULTS_HARDWARE } from './results';
@@ -165,6 +165,47 @@ export function stageOptions(
     ...(isLossy(subject)
       ? [{ value: 'twin', kind: 'twin' as const, point: losslessTwin(subject, deployments) }]
       : []),
+  ];
+}
+
+/**
+ * The option a subject pairs with until the reader picks another: a lossy config's lossless twin,
+ * an unofficial run's official lead on its own GPU (`own`), else the Diffusers reference.
+ */
+export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
+  isLossy(subject) ? 'twin' : (own?.hardwareKey ?? 'reference');
+
+/** A config's Compare-row id: its hardware, its runtime when lossy, and whether it is `namedRun`'s. */
+export const configId = (p: VideoPoint, namedRun?: string) =>
+  `${p.hardwareKey ?? ''}${isLossy(p) ? `+${runtimeKey(p)}` : ''}${p.runId === namedRun ? '-overlay' : ''}`;
+
+/**
+ * The configs the Compare row plays: each hardware's opening deployment, then each drawn lossy
+ * config that may have clips, at its lower-median latency deployment as a lead's opening is.
+ */
+export function compareConfigs(
+  openings: readonly VideoPoint[],
+  drawn: readonly VideoPoint[],
+  namedRun?: string,
+): VideoPoint[] {
+  const offered = new Set(openings.map((p) => configId(p, namedRun)));
+  const lossy = Map.groupBy(
+    drawn.filter(
+      (p) =>
+        isLossy(p) &&
+        mayHaveClips(p) &&
+        p.p50 !== null &&
+        !isQueueing(p) &&
+        !offered.has(configId(p, namedRun)),
+    ),
+    (p) => configId(p, namedRun),
+  );
+  return [
+    ...openings,
+    ...[...lossy.values()].map((config) => {
+      const byLatency = config.toSorted((a, b) => a.p50! - b.p50!);
+      return byLatency[Math.floor((byLatency.length - 1) / 2)];
+    }),
   ];
 }
 

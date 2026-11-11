@@ -1,5 +1,6 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { useState } from 'react';
+import { parseStage, writeStage } from '@/components/video-benchmark/clip-stage';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
@@ -292,7 +293,7 @@ function mountResultsClips(
   const selectedPoints = leads ?? keys.map(c1);
   function Clips() {
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-    const [against, setAgainst] = useState('reference');
+    const [against, setAgainst] = useState<string | null>(null);
     return (
       <PathnameContext.Provider value={pathname}>
         <button onClick={() => setHidden(hidden.size > 0 ? new Set() : new Set(['b200']))}>
@@ -311,6 +312,10 @@ function mountResultsClips(
           unofficialRun={unofficialRun}
           against={against}
           onAgainstChange={setAgainst}
+          onSubjectChange={(clip) => {
+            setAgainst(null);
+            writeStage({ ...parseStage(window.location.search), clip });
+          }}
           onShow={() => {}}
           reveal={0}
         />
@@ -335,7 +340,6 @@ function mountLossyPair(twinP50: number | null) {
     deployments: [lossy, ...twins],
     costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
   });
-  cy.get('[data-testid="video-results-compare-twin"]').click();
 }
 
 describe('Video results clip stage', () => {
@@ -514,7 +518,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-side="a"]').should('contain', 'H200');
     expectDifference((rgba) => expect(rgba).to.deep.equal([0, 0, 0, 255]));
     // Compared with H100 instead, the other side plays H100's clip of the same prompt.
-    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get('[data-testid="video-results-against"]').select('h100');
     cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
     expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
   });
@@ -789,7 +793,7 @@ describe('Video results clip stage', () => {
 
   it('reads out both sides against another GPU and names the unofficial one', () => {
     mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
-    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get('[data-testid="video-results-against"]').select('h100');
     cy.get(readout).should('have.attr', 'data-pair', 'lead');
     // Speed leads, so no sixth cell strands on a second row.
     readoutOrder(['speed', 'psnr', 'wall', 'cost', 'energy']);
