@@ -881,11 +881,9 @@ export default function VideoDashboard({
               </div>
             </div>
           </Card>
-          {loading && (
-            <p role="status" className="text-sm text-muted-foreground">
-              {s.loading}
-            </p>
-          )}
+          <p role="status" className="sr-only">
+            {loading ? s.loading : ''}
+          </p>
           {error && (
             <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
               <span>{s.error}</span>
@@ -959,7 +957,11 @@ export default function VideoDashboard({
               link.click();
             }}
           >
-            <div className="flex min-w-0 flex-col gap-6" data-testid="video-results-chart-card">
+            <div
+              className="motion-stale flex min-w-0 flex-col gap-6"
+              data-testid="video-results-chart-card"
+              data-stale={(loading && deploymentCells.length > 0) || undefined}
+            >
               <VideoResultsChart
                 cells={deploymentCells}
                 history={chipHistory ? projection.history : null}
@@ -973,6 +975,7 @@ export default function VideoDashboard({
                 onUpdate={updateSeries}
                 onOpen={openPoint}
                 clipLink={clipLink}
+                loading={loading}
                 heading={heading}
                 lossyNote={
                   <LossyQualityHint

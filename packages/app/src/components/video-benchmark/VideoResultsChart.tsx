@@ -1,11 +1,20 @@
 'use client';
 
-import { curveLinear, select, type ScaleContinuousNumeric } from 'd3';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { curveLinear, select, timer, type ScaleContinuousNumeric, type Timer } from 'd3';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { D3Chart, type D3ChartHandle } from '@/lib/d3-chart/D3Chart';
 import type {
   LayerConfig,
@@ -221,6 +230,10 @@ function drawHollow(root: Element) {
 }
 
 const PILLS = 'series-pills';
+/** How long points and lines glide to new data, as on the inference scatter chart. */
+const TRANSITION_MS = 300;
+/** One display frame, so the marks' last redraw lands after the points' last step. */
+const FRAME_MS = 20;
 /** Plot width, in px, below which only focus overlay lines get a pill. */
 const NARROW_PLOT = 480;
 
@@ -481,6 +494,7 @@ export default function VideoResultsChart({
   heading,
   footer,
   lossyNote,
+  loading = false,
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
@@ -502,6 +516,8 @@ export default function VideoResultsChart({
   footer?: ReactNode;
   /** Under the legend's lossy line key, shown while a lossy line is charted. */
   lossyNote?: ReactNode;
+  /** The cohort is still loading: an empty plot shows a skeleton, not the no-data note. */
+  loading?: boolean;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -522,6 +538,14 @@ export default function VideoResultsChart({
   const peekTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(peekTimer.current), []);
   const size = useRef<PlotSize>({ width: 0, height: 0 });
+  const [transition] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      ? 0
+      : TRANSITION_MS,
+  );
+  /** Redraws the marks while points glide, since the marks copy the points' transforms. */
+  const follow = useRef<Timer | null>(null);
+  useEffect(() => () => follow.current?.stop(), []);
   // Hidden hardware is dropped after ranking, so its legend entry still names its engine.
   const ranked = useMemo(() => resultsPlotSeries(cells, history, state), [cells, history, state]);
   const series = useMemo(
@@ -667,14 +691,23 @@ export default function VideoResultsChart({
     if (url) box.outerHTML = chartHoverCardImage(url);
     else box.closest('[data-hover-media]')?.remove();
   }, [posters]);
-  // Runs after the plot raises its points, so the badges stay in front.
+  // Runs after the plot raises its points, so the badges stay in front, and on every frame
+  // of the points' glide to new data, so the badges and pills move with them.
   const onRender = useCallback(
     ({ layout, width, height }: RenderContext) => {
       size.current = { width, height };
       const root = layout.zoomGroup.node();
-      if (root) drawMarks(root, size.current, marks.current, s);
+      if (!root) return;
+      drawMarks(root, size.current, marks.current, s);
+      follow.current?.stop();
+      if (transition === 0) return;
+      follow.current = timer((elapsed) => {
+        // After the frame's transition ticks, which run later in the same timer flush.
+        queueMicrotask(() => drawMarks(root, size.current, marks.current, s));
+        if (elapsed >= transition + FRAME_MS) follow.current?.stop();
+      });
     },
-    [s],
+    [s, transition],
   );
   // An image export renders a resized clone, so it must not overwrite the live plot size.
   const onExportRender = useCallback(
@@ -1003,7 +1036,7 @@ export default function VideoResultsChart({
       // right edge at 320 px in DM Sans.
       margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
       watermark="logo"
-      transitionDuration={0}
+      transitionDuration={transition}
       xScale={xScale}
       yScale={yScale}
       xAxis={
@@ -1034,9 +1067,16 @@ export default function VideoResultsChart({
       instructions={s.controls}
       noDataOverlay={
         plotted.length === 0 ? (
-          <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
-            {s.noData}
-          </EmptyState>
+          loading ? (
+            <Skeleton
+              data-testid="video-results-chart-skeleton"
+              className="pointer-events-none absolute inset-0"
+            />
+          ) : (
+            <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
+              {s.noData}
+            </EmptyState>
+          )
         ) : undefined
       }
       caption={heading}

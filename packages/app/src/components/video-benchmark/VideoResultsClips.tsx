@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -41,7 +42,7 @@ import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
 import VideoClipReadout from './VideoClipReadout';
-import VideoClipStage, { SideDot, type StageClip } from './VideoClipStage';
+import VideoClipStage, { SideDot, STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
 
 const STRINGS = {
   en: {
@@ -191,6 +192,14 @@ const MORE = 40;
 const GAP = 8;
 /** The most tiles the collapsed strip shows, so the prompt beside it stays the row's subject. */
 const MAX_TILES = 3;
+/** The longest the stage holds the last pair for the next pair's first frames, in ms. */
+const FRAME_WAIT_MS = 800;
+/** What the stage shows: `r_clip`, the Compare row's choice and `r_prompt`. */
+interface Selection {
+  clip: string | null;
+  against: string;
+  prompt: string | null;
+}
 
 /** "FirstBlockCache + Sol-Attn" for a lossy side, so it never reads as its lossless twin. */
 const lossyVariant = (p: VideoPoint) => (isLossy(p) ? (lossyLabel(optimizationsOf(p)) ?? '') : '');
@@ -236,7 +245,6 @@ export default function VideoResultsClips({
   // Callers pick one clip per hardware, which may be a lossy named run's.
   const selected = useMemo(() => points.filter(onRoster), [points]);
   const opening = useMemo(() => (openings ?? points).filter(onRoster), [openings, points]);
-  const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
   /** Sources whose last read failed; a source added since is still pending, not missing. */
@@ -249,31 +257,121 @@ export default function VideoResultsClips({
     if (cache.current.has(key)) return cache.current.get(key) ?? null;
     return failedKeys.has(key) ? null : undefined;
   };
-  const subject = useMemo(
-    () =>
-      stageSubject(
-        [...opening, ...(picked && !opening.includes(picked) ? [picked] : [])].map((point) => ({
-          point,
-          side: sideOf(point),
-        })),
-        unofficialRun,
-        stage.clip,
-      ),
-    [opening, picked, revision, failedKeys, unofficialRun, stage.clip],
-  );
-  const options = useMemo(() => {
-    if (!subject) return [];
+  /** The subject a selection plays, and the side it is compared with. */
+  const pairFor = (clipKey: string | null, value: string) => {
+    const picked = clipKey ? drawn.find((p) => stagePointKey(p) === clipKey) : undefined;
+    const subject = stageSubject(
+      [...opening, ...(picked && !opening.includes(picked) ? [picked] : [])].map((point) => ({
+        point,
+        side: sideOf(point),
+      })),
+      unofficialRun,
+      clipKey,
+    );
     // A candidate run is read against production: the official lead on its own GPU.
     const own =
-      subject.point.runId === unofficialRun
+      subject && subject.point.runId === unofficialRun
         ? (officialLeads.find((p) => p.hardwareKey === subject.point.hardwareKey) ?? null)
         : null;
-    return stageOptions(subject.point, selected, deployments, own);
-  }, [subject, selected, deployments, officialLeads, unofficialRun]);
-  const option = options.find((item) => item.value === against) ?? options[0];
-  const other = option?.point ?? null;
+    const options = subject ? stageOptions(subject.point, selected, deployments, own) : [];
+    const option = options.find((item) => item.value === value) ?? options[0];
+    return { picked, subject, options, option, other: option?.point ?? null };
+  };
+  type Pair = ReturnType<typeof pairFor>;
+  const ready = ({ subject, other }: Pair) =>
+    subject !== null && !subject.pending && (other === null || sideOf(other) !== undefined);
+  // The reader's pick: the chart's badges and the Compare row follow it at once.
+  const next = useMemo(
+    () => pairFor(stage.clip, against),
+    [
+      opening,
+      drawn,
+      revision,
+      failedKeys,
+      unofficialRun,
+      selected,
+      deployments,
+      officialLeads,
+      stage.clip,
+      against,
+    ],
+  );
+  const nextReady = ready(next);
+  /** The first frames a pair shows for a prompt. */
+  const framesOf = (
+    { subject: shown, option: choice, other: paired }: Pair,
+    prompt: string | null,
+  ) => {
+    const shownGroup = stagePrompt(shown?.groups ?? [], prompt);
+    const own = shown?.side ? shownGroup?.clips.get(shown.side.hardwareKey)?.posterUrl : undefined;
+    const pairedSide = paired ? sideOf(paired) : null;
+    const pairs =
+      !choice || choice.kind === 'reference'
+        ? resultsClipReference(shownGroup, new Set())?.posterUrl
+        : pairedSide
+          ? pairedGroup(resultsClipGroups([pairedSide]), shownGroup)?.clips.get(
+              pairedSide.hardwareKey,
+            )?.posterUrl
+          : undefined;
+    return [own, pairs].filter((url): url is string => Boolean(url));
+  };
+  const nextFrames = nextReady ? framesOf(next, stage.prompt) : [];
+  const nextFramesKey = nextFrames.join('\n');
+  /** First frames that loaded, failed or ran out of time; the stage waits for no others. */
+  const [settledFrames, setSettledFrames] = useState<ReadonlySet<string>>(new Set());
+  const requestedFrames = useRef(new Set<string>());
+  const frameTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => frameTimers.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    for (const url of nextFramesKey.split('\n')) {
+      if (!url || requestedFrames.current.has(url)) continue;
+      requestedFrames.current.add(url);
+      const settle = () => setSettledFrames((previous) => new Set([...previous, url]));
+      const image = new Image();
+      image.addEventListener('load', settle, { once: true });
+      image.addEventListener('error', settle, { once: true });
+      image.src = url;
+      // A slow frame shows black for a moment rather than hold the last pair.
+      frameTimers.current.push(setTimeout(settle, FRAME_WAIT_MS));
+    }
+  }, [nextFramesKey]);
+  // The stage and readout keep the last pair whose reads landed until the next pair's land, as
+  // the inference chart keeps its data while it refetches, dimmed by `motion-stale`. They also
+  // keep it, undimmed, until the next pair's first frames load. A switch so never blanks the
+  // stage or collapses the prompt row above it.
+  const shownNext = nextReady && nextFrames.every((url) => settledFrames.has(url));
+  const [held, setHeld] = useState<Selection | null>(null);
+  if (
+    shownNext &&
+    (!held || held.clip !== stage.clip || held.against !== against || held.prompt !== stage.prompt)
+  )
+    setHeld({ clip: stage.clip, against, prompt: stage.prompt });
+  const heldPair = useMemo(
+    () => (!shownNext && held ? pairFor(held.clip, held.against) : null),
+    [
+      shownNext,
+      held,
+      opening,
+      drawn,
+      revision,
+      failedKeys,
+      unofficialRun,
+      selected,
+      deployments,
+      officialLeads,
+    ],
+  );
+  const holding = heldPair !== null && ready(heldPair);
+  const stale = holding && !nextReady;
+  const { subject, option, other } = holding ? heldPair : next;
+  const shownPrompt = holding && held ? held.prompt : stage.prompt;
   const wantedPoints = [
-    ...new Set([...selected, ...opening, ...(picked ? [picked] : []), ...(other ? [other] : [])]),
+    ...new Set([
+      ...selected,
+      ...opening,
+      ...(next.picked ? [next.picked] : []),
+      ...(next.other ? [next.other] : []),
+    ]),
   ];
   // Callers rebuild `points` on every render; reads restart only when the set of sides changes.
   const wantedKey = wantedPoints.map(sourceKey).join('\n');
@@ -340,10 +438,10 @@ export default function VideoResultsClips({
   /** Web renditions that failed to load; their sides play the sealed original instead. */
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());
   const groups = subject?.groups ?? [];
-  const group = stagePrompt(groups, stage.prompt);
+  const group = stagePrompt(groups, shownPrompt);
   const diagnostic = group?.scope === 'matched-noise-diagnostic';
-  const playing = subject ? stagePointKey(subject.point) : null;
-  const baseline = other ? stagePointKey(other) : null;
+  const playing = next.subject ? stagePointKey(next.subject.point) : null;
+  const baseline = next.other ? stagePointKey(next.other) : null;
   // Each read point lends its first frame of the shown prompt, or null when it has none.
   const postersJson = useMemo(
     () =>
@@ -438,11 +536,13 @@ export default function VideoResultsClips({
             url: '',
             empty: s.noTwin,
           };
+  // The Compare row offers the next pair's options, and its twin is the next subject's.
+  const twinColor = next.subject ? colorOf(next.subject.point) : null;
   const optionLabel = (item: StageOption) =>
     item.kind === 'reference'
       ? s.referenceShort
       : item.kind === 'twin'
-        ? s.twin(hardwareLabel(hardware))
+        ? s.twin(hardwareLabel(next.subject?.point.hardwareKey ?? ''))
         : hardwareLabel(item.value);
   return (
     <section
@@ -451,11 +551,9 @@ export default function VideoResultsClips({
       data-testid="video-results-clips"
       className="min-w-0 scroll-mt-24 space-y-3"
     >
-      {loading && (
-        <p role="status" className="text-sm text-muted-foreground">
-          {s.loading}
-        </p>
-      )}
+      <p role="status" className="sr-only">
+        {loading ? s.loading : ''}
+      </p>
       {failed && (
         <div role="status" className="flex flex-wrap items-center gap-3 text-sm">
           <span>{s.error}</span>
@@ -471,11 +569,13 @@ export default function VideoResultsClips({
           </Button>
         </div>
       )}
-      {a && point ? (
+      {subject?.pending ? (
+        <ClipsSkeleton />
+      ) : a && point ? (
         <>
           <PromptRow
             groups={groups}
-            group={group}
+            group={stagePrompt(groups, stage.prompt)}
             s={s}
             onPick={(item, index, poster) => {
               track('video_results_prompt_selected', { index, case: caseOf(item), poster });
@@ -508,16 +608,16 @@ export default function VideoResultsClips({
               </InfoHelp>
             </div>
           </PromptRow>
-          {options.length > 1 && option && (
+          {next.options.length > 1 && next.option && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="text-xs font-medium">{s.compareWith}</span>
               <SegmentedToggle
                 role="group"
                 ariaLabel={s.compareWith}
                 testId="video-results-compare"
-                value={option.value}
+                value={next.option.value}
                 size="sm"
-                options={options.map((item) => ({
+                options={next.options.map((item) => ({
                   value: item.value,
                   label: optionLabel(item),
                   icon: (
@@ -527,52 +627,59 @@ export default function VideoResultsClips({
                           ? null
                           : item.point
                             ? colorOf(item.point)
-                            : a.color
+                            : twinColor
                       }
                     />
                   ),
                   testId: `video-results-compare-${item.value}`,
                 }))}
                 onValueChange={(value) => {
-                  const next = options.find((item) => item.value === value);
+                  const choice = next.options.find((item) => item.value === value);
                   track('video_results_compare_selected', {
-                    against: next?.kind,
-                    gpu: next?.point?.hardwareKey ?? null,
+                    against: choice?.kind,
+                    gpu: choice?.point?.hardwareKey ?? null,
                   });
                   onAgainstChange(value);
                 }}
               />
             </div>
           )}
-          <VideoClipStage
-            ref={stageRef}
-            a={a}
-            b={b}
-            view={stage.view}
-            selection={JSON.stringify([a.source, b.source, group?.key ?? null])}
-            prompt={group?.prompt}
-            fps={resultMetadata(point).fps}
-            frames={point.frameCount}
-            onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
-          />
-          <VideoClipReadout
-            kind={option?.kind ?? 'reference'}
-            a={{
-              name: a.label,
-              pill: a,
-              point,
-              clip: subject?.pending ? undefined : clip,
-              cost: costs?.[point.id],
-            }}
-            b={{
-              name: option?.kind === 'twin' ? s.twin(hardwareLabel(hardware)) : b.label,
-              pill: b,
-              point: other,
-              clip: other && otherSide === undefined ? undefined : otherClip,
-              cost: other ? costs?.[other.id] : undefined,
-            }}
-            diagnostic={diagnostic}
-          />
+          <div
+            className="motion-stale space-y-3"
+            data-stale={stale || undefined}
+            aria-busy={stale || undefined}
+            data-testid="video-results-pair"
+          >
+            <VideoClipStage
+              ref={stageRef}
+              a={a}
+              b={b}
+              view={stage.view}
+              selection={JSON.stringify([a.source, b.source, group?.key ?? null])}
+              prompt={group?.prompt}
+              fps={resultMetadata(point).fps}
+              frames={point.frameCount}
+              onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
+            />
+            <VideoClipReadout
+              kind={option?.kind ?? 'reference'}
+              a={{
+                name: a.label,
+                pill: a,
+                point,
+                clip: subject?.pending ? undefined : clip,
+                cost: costs?.[point.id],
+              }}
+              b={{
+                name: option?.kind === 'twin' ? s.twin(hardwareLabel(hardware)) : b.label,
+                pill: b,
+                point: other,
+                clip: other && otherSide === undefined ? undefined : otherClip,
+                cost: other ? costs?.[other.id] : undefined,
+              }}
+              diagnostic={diagnostic}
+            />
+          </div>
           <QualityMethod
             leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
             namedRun={unofficialRun}
@@ -666,6 +773,27 @@ export default function VideoResultsClips({
         !loading && <p className="text-sm text-muted-foreground">{s.noPair}</p>
       )}
     </section>
+  );
+}
+
+/** The prompt row, stage and transport, held in place until the first pair's reads land. */
+function ClipsSkeleton() {
+  return (
+    <div aria-hidden="true" className="space-y-3" data-testid="video-results-clips-skeleton">
+      <div className="flex items-start gap-2">
+        {Array.from({ length: MAX_TILES }, (_, index) => (
+          <Skeleton key={index} className="aspect-[1344/768] w-23 shrink-0" />
+        ))}
+        <div className="flex min-w-0 flex-1 flex-col gap-2 pl-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      </div>
+      <div className="mx-auto w-full space-y-3" style={{ maxWidth: STAGE_FIT_WIDTH.overlay }}>
+        <Skeleton className="aspect-video w-full rounded-lg" />
+        <Skeleton className="h-8 w-full" />
+      </div>
+    </div>
   );
 }
 
@@ -878,6 +1006,12 @@ function PromptTile({
   const focus = 'group-focus-visible/tile:ring-2 group-focus-visible/tile:ring-ring';
   const [previewing, setPreviewing] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [loadedPoster, setLoadedPoster] = useState<string | undefined>(undefined);
+  const image = useRef<HTMLImageElement>(null);
+  // A poster cached before hydration loaded before React listened for it.
+  useLayoutEffect(() => {
+    if (image.current?.complete && image.current.naturalWidth > 0) setLoadedPoster(poster);
+  }, [poster]);
   const start = () => {
     if (preview && !matchMedia('(prefers-reduced-motion: reduce)').matches) setPreviewing(true);
   };
@@ -903,7 +1037,8 @@ function PromptTile({
         <>
           <span
             className={cn(
-              'relative block aspect-[1344/768] overflow-hidden rounded-md bg-muted',
+              'relative block aspect-[1344/768] overflow-hidden rounded-md bg-accent',
+              loadedPoster !== poster && 'animate-pulse',
               pressed
                 ? 'ring-2 ring-foreground'
                 : 'ring-1 ring-border-alt group-hover/tile:ring-2 group-hover/tile:ring-muted-foreground',
@@ -911,13 +1046,16 @@ function PromptTile({
             )}
           >
             <img
+              ref={image}
               src={poster}
               alt={caseId}
+              data-loaded={loadedPoster === poster}
+              onLoad={() => setLoadedPoster(poster)}
               width={TILE}
               height={Math.round((TILE * 768) / 1344)}
               loading="lazy"
               decoding="async"
-              className="absolute inset-0 size-full object-cover"
+              className="motion-media absolute inset-0 size-full object-cover"
               onError={() => onPosterError(poster)}
             />
             {previewing && (

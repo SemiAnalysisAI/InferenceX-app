@@ -165,7 +165,7 @@ const SPLIT_STEP = 5;
 // The Compare row, stage, transport and readout fit under the sticky header together: a picture is at
 // most the window's height less 18rem, and the block narrows to match, one 16:9 frame wide or two
 // side by side.
-const FIT_WIDTH = {
+export const STAGE_FIT_WIDTH = {
   overlay: 'max(20rem, calc((100dvh - 18rem) * 16 / 9))',
   side: 'max(20rem, calc((100dvh - 18rem) * 32 / 9 + 0.75rem))',
 };
@@ -498,7 +498,7 @@ export default function VideoClipStage({
     <div
       id={STAGE_ID}
       className="mx-auto w-full min-w-0 scroll-mt-24 space-y-3"
-      style={{ maxWidth: overlay ? FIT_WIDTH.overlay : FIT_WIDTH.side }}
+      style={{ maxWidth: overlay ? STAGE_FIT_WIDTH.overlay : STAGE_FIT_WIDTH.side }}
     >
       <div
         ref={ref}

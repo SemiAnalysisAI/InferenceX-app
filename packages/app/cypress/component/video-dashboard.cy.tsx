@@ -4,6 +4,7 @@ import type {
   VideoHistoryObservation,
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
+import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
@@ -94,6 +95,9 @@ const lineColor = (hardware: string) =>
     .find('.visible-shape')
     .then(($shape) => getComputedStyle($shape[0]).stroke);
 const playing = () => points('[data-clip-role="playing"]');
+const gpusOf = (node: Element) =>
+  (node as unknown as { __data__: { cell: { point: VideoPoint } } }).__data__.cell.point
+    .participating;
 const stagePill = (side: 'a' | 'b') =>
   cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
 /** The stage and its transport sit fully inside the viewport. */
@@ -114,6 +118,38 @@ const plottedY = (hardware: string) =>
   points(`[data-hardware="${hardware}"][data-overlay="false"]`).then(
     ($group) => ($group[0] as unknown as { __data__: { y: number } }).__data__.y,
   );
+
+const B200_RUN = '34341996789';
+const FRAME = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
+/**
+ * Adds 1-, 2- and 8-GPU points to the B200 run, drawn and playable but neither its lead nor where
+ * the stage opens, and serves the run's published clips with first frames as `@b200`. Returns the
+ * read's URL.
+ */
+const b200Frontier = (page: VideoHistoryPage, delay = 0) => {
+  for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+  const source = page.entries.find((entry) => entry.runId === B200_RUN)!.sources[0];
+  const lead = source.observations.find((observation) => observation.concurrency === 1)!;
+  for (const [gpus, p50] of [
+    [1, 300],
+    [2, 150],
+    [8, 40],
+  ])
+    source.observations.push({ ...lead, id: `${lead.id}-g${gpus}`, participating: gpus, p50 });
+  const point = videoPoints([page]).find((item) => item.id === lead.id)!;
+  const saved = servingArtifact(Number(B200_RUN), point.artifactId, 'NVIDIA B200');
+  saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+    path,
+    path === 'manifest.json' ? lead.id.split(':')[0] : sha,
+  ]);
+  saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
+    path,
+    { ...asset, posterUrl: FRAME },
+  ]);
+  const read = `/api/video-runs?run=${B200_RUN}&artifact=${point.artifactId}&format=published`;
+  cy.intercept('GET', read, (request) => request.reply({ body: saved, delay })).as('b200');
+  return read;
+};
 
 /** Adds an unapproved re-export of the B200 run, so the official B200 line stays drawn. */
 const NAMED_RUN = '90000000003';
@@ -179,6 +215,9 @@ describe('VideoGenX results', () => {
       </PathnameContext.Provider>,
     );
     cy.get('[role="status"]').should('contain', 'Loading video results');
+    // The plot waits under a skeleton, never under the note for an empty selection.
+    cy.get('[data-testid="video-results-chart-skeleton"]').should('be.visible');
+    cy.get('[data-testid="video-results-chart"]').should('not.contain', 'No visible hardware');
     cy.get('[data-testid="video-results"]').should('be.visible');
     cy.get('@history.all').should('have.length', 0);
     focusFirstControl(false);
@@ -920,41 +959,13 @@ describe('VideoGenX results', () => {
   });
 
   it('reads a point the pointer rests on, so its hover card shows its first frame', () => {
-    const run = '34341996789';
     let read = '';
-    const frame = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
     mount({
       edit: (observation) => {
         observation.results = evidence(observation);
       },
       editPage: (page) => {
-        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
-        const source = page.entries.find((entry) => entry.runId === run)!.sources[0];
-        const lead = source.observations.find((observation) => observation.concurrency === 1)!;
-        // Drawn and playable, but neither the lead nor where the stage opens.
-        for (const [gpus, p50] of [
-          [1, 300],
-          [2, 150],
-          [8, 40],
-        ])
-          source.observations.push({
-            ...lead,
-            id: `${lead.id}-g${gpus}`,
-            participating: gpus,
-            p50,
-          });
-        const point = videoPoints([page]).find((item) => item.id === lead.id)!;
-        const saved = servingArtifact(Number(run), point.artifactId, 'NVIDIA B200');
-        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
-          path,
-          path === 'manifest.json' ? lead.id.split(':')[0] : sha,
-        ]);
-        saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
-          path,
-          { ...asset, posterUrl: frame },
-        ]);
-        read = `/api/video-runs?run=${run}&artifact=${point.artifactId}&format=published`;
-        cy.intercept('GET', read, saved).as('b200');
+        read = b200Frontier(page);
       },
     });
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
@@ -963,7 +974,7 @@ describe('VideoGenX results', () => {
       offStage('b200').first().trigger('mouseenter', { force: true });
       // The card keeps the frame's box while the point's clips are read.
       cy.get(`${tooltip} [data-hover-image-pending]`).should('exist');
-      cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', frame);
+      cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', FRAME);
       cy.get('@b200.all').should('have.length', before.length + 1);
     });
     // A read that fails closes the box instead of leaving the card waiting.
@@ -973,6 +984,62 @@ describe('VideoGenX results', () => {
     cy.get(`${tooltip} [data-hover-image-pending]`).should('exist');
     cy.wait('@failed');
     cy.get(tooltip).should('contain', 'B200').find('[data-hover-media]').should('not.exist');
+  });
+
+  it('keeps the pair on screen, dimmed, while a clicked point’s clips are read', () => {
+    mount({
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: (page) => b200Frontier(page, 1500),
+    });
+    const pair = '[data-testid="video-results-pair"]';
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    cy.get('[data-prompt]').its('length').as('tiles', { type: 'static' });
+    stagePill('a').invoke('text').as('before', { type: 'static' });
+    // The fastest B200 point: neither the lead, read with the page, nor where the stage opens.
+    offStage('b200')
+      .filter((_, node) => gpusOf(node) === 8)
+      .then(($point) => {
+        cy.wrap($point).find('.visible-shape').click({ force: true });
+        // The chart follows the click at once; the stage keeps the last pair until the read lands.
+        playing().should(($playing) => expect(gpusOf($playing[0])).to.equal(8));
+        cy.get<string>('@before').then((before) => stagePill('a').should('have.text', before));
+        cy.get<number>('@tiles').then((tiles) =>
+          cy.get('[data-prompt]').should('have.length', tiles),
+        );
+        cy.get(pair).should('have.attr', 'data-stale', 'true');
+        cy.get('[data-testid="video-results-clips"] [role="status"]').should(
+          'have.class',
+          'sr-only',
+        );
+        cy.get(pair).should('not.have.attr', 'data-stale');
+        stagePill('a').should('contain', '8 GPUs');
+      });
+  });
+
+  it('glides points to new data, with the playing badge on its point every frame', () => {
+    mount();
+    playing().should('exist');
+    const frames: [string | null, string | null][] = [];
+    cy.window().then((win) => {
+      const chart = win.document.querySelector('[data-testid="video-results-chart"]')!;
+      const start = win.performance.now();
+      const tick = () => {
+        frames.push([
+          chart.querySelector('[data-clip-role="playing"]')?.getAttribute('transform') ?? null,
+          chart.querySelector('[data-clip-badge="playing"]')?.getAttribute('transform') ?? null,
+        ]);
+        if (win.performance.now() - start < 1500) win.requestAnimationFrame(tick);
+      };
+      win.requestAnimationFrame(tick);
+    });
+    // Hiding H100 rescales the plot, so the B200 point moves.
+    toggleHardware('h100');
+    cy.wait(1600).then(() => {
+      expect(new Set(frames.map(([point]) => point)).size, 'positions').to.be.greaterThan(3);
+      for (const [point, badge] of frames) expect(badge).to.equal(point);
+    });
   });
 
   it('pulses playable points until the first clip is picked', () => {

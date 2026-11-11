@@ -82,7 +82,10 @@ export function chartHoverCardImage(url: string): string {
 export interface ChartHoverCardContent {
   /** Image URL shown above the title, such as a clip's first frame. */
   image?: string;
-  /** Reserves the image's box until its URL is known; the caller swaps in `chartHoverCardImage`. */
+  /**
+   * Reserves the image's box, pulsing like `Skeleton`, until its URL is known; the caller swaps in
+   * `chartHoverCardImage`.
+   */
   imagePending?: boolean;
   title: string;
   subtitle?: string;
@@ -120,7 +123,7 @@ export function chartHoverCard(
   // Inline-size containment keeps the image from widening the card; it fills the card's width.
   const framed = image || imagePending;
   const media = framed
-    ? `<div data-hover-media style="contain: inline-size; margin-bottom: 8px;">${image ? chartHoverCardImage(image) : `<div data-hover-image-pending style="${HOVER_IMAGE_STYLE}"></div>`}</div>`
+    ? `<div data-hover-media style="contain: inline-size; margin-bottom: 8px;">${image ? chartHoverCardImage(image) : `<div data-hover-image-pending class="animate-pulse" style="${HOVER_IMAGE_STYLE} background: var(--accent);"></div>`}</div>`
     : '';
   return chartTooltipShell(
     `${warning ? `<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(warning)}</div>` : ''}${media}${chartTooltipTitle(heading, color)}${values ? `<div style="display: flex; flex-wrap: wrap; gap: 4px 20px;">${values}</div>` : ''}${body ? `<div style="margin-top: 6px;">${body}</div>` : ''}${summary ? `<div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(summary)}</div>` : ''}`,
