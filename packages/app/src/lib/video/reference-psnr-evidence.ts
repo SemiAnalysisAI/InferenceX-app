@@ -6,6 +6,7 @@ import {
   VIDEO_HISTORY_MAX_PAGES,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
+import { isLossy } from '@/components/video-benchmark/optimizations';
 import { videoPoints } from '@/components/video-benchmark/points';
 import {
   referencePsnrScores,
@@ -54,7 +55,19 @@ async function runHistory(runId: string): Promise<VideoHistoryPage | null> {
 async function readScores(runId: string): Promise<ReferencePsnrScores[] | null> {
   const history = await runHistory(runId);
   if (!history) return null;
-  const points = videoPoints([history]);
+  // One lossless cell per GPU: the strip, the tiles and the table each give a GPU one row.
+  const points = [
+    ...Map.groupBy(
+      videoPoints([history]).filter((point) => !isLossy(point)),
+      (point) => point.hardwareKey,
+    ).values(),
+  ].map(
+    (cells) =>
+      cells.toSorted(
+        (a, b) =>
+          (a.concurrency ?? Infinity) - (b.concurrency ?? Infinity) || a.id.localeCompare(b.id),
+      )[0],
+  );
   const artifacts = new Map<number, Promise<StoredArtifact>>();
   const leads = await Promise.all(
     points.map(async (point) => {

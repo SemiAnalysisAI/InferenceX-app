@@ -20,10 +20,14 @@ const H100 = published(8, 'NVIDIA H100', 'b'.repeat(64));
 /** Published but never approved for the dashboard. */
 const H200 = published(9, 'NVIDIA H200', 'c'.repeat(64));
 
-const entry = (saved: typeof B200) => ({
-  ...videoHistoryEntry(saved, null),
-  approved: saved !== H200,
-});
+/** B200 also carries a second cell, which must not draw a second B200 row. */
+const entry = (saved: typeof B200) => {
+  const history = { ...videoHistoryEntry(saved, null), approved: saved !== H200 };
+  const [source] = history.sources;
+  if (saved === B200)
+    source.observations.push({ ...source.observations[0], id: 'second-cell', concurrency: 2 });
+  return history;
+};
 
 /** History newest first: the pinned run's B200 artifact has aged past the first window. */
 function respond(query: URLSearchParams, failing?: number) {
