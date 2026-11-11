@@ -1367,7 +1367,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/comparison-cache.ts',
-    sourceSha256: '039cf08b30c801022aef7589b941b606c847bee71ee9a9b235cfc34d57614692',
+    sourceSha256: 'eb62677903b25c2cede9fcec334a8b7ba2394d6c05af9686f0a51c41cfdcce43',
     reviewArea: {
       en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
       zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',

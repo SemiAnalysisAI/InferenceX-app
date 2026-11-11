@@ -147,6 +147,14 @@ interface AttentionWork {
 const CACHE_BYTES = (dtype: unknown): number =>
   typeof dtype === 'string' && dtype.startsWith('fp8') ? 1 : 2;
 
+/**
+ * The attention core's math precision. The schema states no QK/PV operand types, only the
+ * cache's (`kv_cache_dtype`), so the core is taken to run in that format: an fp8 cache permits
+ * fp8 QK and PV, as Blackwell's TRT-LLM kernels do with an fp8 query.
+ */
+const corePrecision = (dtype: unknown): ComputePrecision =>
+  typeof dtype === 'string' && dtype.startsWith('fp8') ? 'fp8' : 'bf16';
+
 function attentionWork(type: string, a: Args): AttentionWork | null {
   const gs = groups(a);
   const h = num(a.hidden);
@@ -569,6 +577,7 @@ function attentionOpWork(type: string, a: Args): OpWork | null {
   if (!work) return null;
   const [tokens, h] = [attentionTokens(a) ?? 0, num(a.hidden) ?? 0];
   const { tp, dcp } = parallelAxes(a);
+  const recurrent = type === 'gdn' || type === 'kda';
   const parts: WorkPart[] = work.proj.map(([name, i, o]) => {
     const pair = projOperands(a, name);
     return {
@@ -579,10 +588,11 @@ function attentionOpWork(type: string, a: Args): OpWork | null {
     };
   });
   parts.push({
-    name: type === 'gdn' || type === 'kda' ? 'recurrence' : 'attention core',
+    name: recurrent ? 'recurrence' : 'attention core',
     flops: work.core,
     bytes: work.cache + 2 * tokens * h * 2,
-    precision: 'bf16',
+    // a linear recurrence updates a bf16/fp32 state, whatever its cache
+    precision: recurrent ? 'bf16' : corePrecision(a.kv_cache_dtype),
   });
   // dcp: each rank holds 1/dcp of the cache for dcp× the heads; queries gathered, outputs merged
   const merged = (tokens * work.merge * dcp * 2) / tp;
