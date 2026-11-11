@@ -942,6 +942,8 @@ describe('VideoGenX results', () => {
       },
     });
     playing().should('have.attr', 'data-overlay', 'true');
+    // The row names which B200 plays, so it never reads "B200 compare B200 official".
+    config().find('option:selected').should('have.text', 'B200 · unofficial run');
     against().should('have.value', 'b200');
     points('[data-clip-role="baseline"]').should('have.attr', 'data-overlay', 'false');
     points('[data-clip-role]').should(($points) => {

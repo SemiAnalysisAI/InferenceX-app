@@ -96,6 +96,7 @@ const STRINGS = {
       'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; hover it for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.',
     gpu: (n: number) => (n === 1 ? '1 GPU' : `${n} GPUs`),
     official: 'official',
+    unofficial: 'unofficial run',
     compare: 'compare',
     playingConfig: 'Config that plays',
     pairing: 'Compared with',
@@ -149,6 +150,7 @@ const STRINGS = {
       'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。速度是两个测量单元 p50 之比，出片时间只是当前 prompt 这一次请求的时长。每条视频成本按所选成本档位和记录的 GPU 数量估算参与 GPU 的 TCO，每视频秒成本按有效输出的实际解码时长分摊；悬停该格可查看按分配 GPU 估算的口径。每条视频能耗是所选测量单元的平均值。以无损对照为基准的配对评分仍在计划中，目前还没有评分器计算。',
     gpu: (n: number) => `${n} 张 GPU`,
     official: '官方',
+    unofficial: '非官方运行',
     compare: '对比',
     playingConfig: '播放的配置',
     pairing: '对照对象',
@@ -570,7 +572,13 @@ export default function VideoResultsClips({
   const nextHardware = next.subject?.point.hardwareKey ?? '';
   const active = next.subject && configId(next.subject.point, unofficialRun);
   const configLabel = (p: VideoPoint) =>
-    [hardwareLabel(p.hardwareKey ?? ''), lossyVariant(p)].filter(Boolean).join(' · ');
+    [
+      hardwareLabel(p.hardwareKey ?? ''),
+      lossyVariant(p),
+      !diagnostic && unofficialRun !== undefined && p.runId === unofficialRun ? s.unofficial : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
   const pickConfig = (p: VideoPoint) => {
     track('video_results_compare_selected', {
       subject: configId(p, unofficialRun),
