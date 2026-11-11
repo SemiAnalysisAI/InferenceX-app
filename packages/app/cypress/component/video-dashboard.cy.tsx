@@ -98,7 +98,8 @@ const playing = () => points('[data-clip-role="playing"]');
 const gpusOf = (node: Element) =>
   (node as unknown as { __data__: { cell: { point: VideoPoint } } }).__data__.cell.point
     .participating;
-/** The pairing control: what the playing config is compared with. */
+/** The Compare row's two selects: the config that plays, and what it is compared with. */
+const config = () => cy.get('[data-testid="video-results-config"]');
 const against = () => cy.get('[data-testid="video-results-against"]');
 const stagePill = (side: 'a' | 'b') =>
   cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
@@ -889,7 +890,7 @@ describe('VideoGenX results', () => {
     cy.focused().should('have.attr', 'data-testid', 'video-results-stage');
   });
 
-  it('plays the Compare row’s config against its default pairing and cycles it with ←/→', () => {
+  it('plays the config picked in the Compare row against its default pairing', () => {
     // No run stored clips; the row and its pairing still follow the pick.
     cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
     mount({
@@ -909,36 +910,20 @@ describe('VideoGenX results', () => {
         }
       },
     });
-    cy.get('[data-testid="video-results-config-h200"]').click();
+    // The first select picks what plays, and the second follows it.
+    config().select('h200');
     playing().should('have.attr', 'data-hardware', 'h200');
     searchParam('r_clip').should('match', /^34342452354:[^-]+$/u);
     against().should('have.value', 'reference');
     stagePill('b').should('contain', 'Diffusers reference');
     // A lossy config pairs with its lossless twin.
-    cy.get('[data-testid^="video-results-config-h200+"]').click();
+    config()
+      .find('option[value^="h200+"]')
+      .then(($option) => config().select(String($option.val())));
     searchParam('r_clip').should('match', /^34342452354:.+-fbc$/u);
+    cy.get('[data-testid="video-results-compare"]').should('contain', 'compare');
     against().should('have.value', 'twin');
     stagePill('b').should('contain', 'H200').and('contain', 'lossless');
-
-    cy.get('[data-testid="video-results-config-h200"]').click();
-    cy.get('[data-testid="video-results-config-h200"]')
-      .next()
-      .then(($next) => {
-        cy.focused().type('{rightarrow}');
-        cy.wrap($next).should('have.attr', 'aria-pressed', 'true').and('have.focus');
-      });
-    cy.focused().type('{leftarrow}');
-    cy.get('[data-testid="video-results-config-h200"]')
-      .should('have.attr', 'aria-pressed', 'true')
-      .and('have.focus');
-    playing().should('have.attr', 'data-hardware', 'h200');
-    // The keys step from the focused segment, not from the one that plays.
-    cy.get('[data-testid="video-results-config-h100"]').click();
-    cy.get('[data-testid="video-results-config-b200"]').focus().type('{rightarrow}');
-    cy.get('[data-testid="video-results-config-b200"]')
-      .next()
-      .should('have.attr', 'aria-pressed', 'true')
-      .and('have.focus');
   });
 
   it('pairs an unofficial run with the official cell of the same deployment', () => {

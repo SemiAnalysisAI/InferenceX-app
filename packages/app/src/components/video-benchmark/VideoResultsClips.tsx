@@ -1,21 +1,12 @@
 'use client';
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { ChevronRight } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -55,7 +46,7 @@ import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
 import VideoClipReadout from './VideoClipReadout';
-import VideoClipStage, { SideDot, STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
+import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
 
 const STRINGS = {
   en: {
@@ -105,8 +96,9 @@ const STRINGS = {
       'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; hover it for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.',
     gpu: (n: number) => (n === 1 ? '1 GPU' : `${n} GPUs`),
     official: 'official',
-    compare: 'Compare',
-    with: 'with',
+    compare: 'compare',
+    playingConfig: 'Config that plays',
+    pairing: 'Compared with',
     lossless: 'lossless',
     twin: (hardware: string) => `${hardware} lossless`,
     noTwin: 'This run has no lossless config with the same engine and server layout.',
@@ -158,7 +150,8 @@ const STRINGS = {
     gpu: (n: number) => `${n} 张 GPU`,
     official: '官方',
     compare: '对比',
-    with: '对照',
+    playingConfig: '播放的配置',
+    pairing: '对照对象',
     lossless: '无损',
     twin: (hardware: string) => `${hardware} 无损对照`,
     noTwin: '该运行中没有引擎和服务器布局都相同的无损配置。',
@@ -259,7 +252,6 @@ export default function VideoResultsClips({
   peek = null,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
-  const isPhone = useIsMobileViewport();
   const stage = parseStage(useClientSearch());
   // Callers pick one clip per hardware, which may be a lossy named run's.
   const selected = useMemo(() => points.filter(onRoster), [points]);
@@ -586,16 +578,6 @@ export default function VideoResultsClips({
     });
     onSubjectChange(stagePointKey(p));
   };
-  /** ←/→ on a focused segment plays its previous or next config; the phone select has its own. */
-  const cycleConfigs = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0 || configs.length < 2 || !(event.target instanceof HTMLButtonElement)) return;
-    event.preventDefault();
-    const segments = [...event.currentTarget.querySelectorAll('button')];
-    const target = (segments.indexOf(event.target) + step + configs.length) % configs.length;
-    segments[target]?.focus();
-    pickConfig(configs[target]);
-  };
   const optionLabel = (item: StageOption) =>
     item.kind === 'reference'
       ? s.referenceShort
@@ -668,63 +650,48 @@ export default function VideoResultsClips({
               </InfoHelp>
             </div>
           </PromptRow>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="text-xs font-medium">{s.compare}</span>
-            <div className={isPhone ? 'min-w-0 flex-1' : 'min-w-0'} onKeyDown={cycleConfigs}>
+          {/* Capped like the stage below, so the row starts at the picture's left edge. */}
+          <div
+            className="mx-auto flex w-full flex-wrap items-center gap-2"
+            style={{
+              maxWidth: stage.view === 'side' ? STAGE_FIT_WIDTH.side : STAGE_FIT_WIDTH.overlay,
+            }}
+            data-testid="video-results-compare"
+          >
+            <SegmentedToggle
+              variant="select"
+              ariaLabel={s.playingConfig}
+              testId="video-results-config"
+              value={active ?? ''}
+              options={configs.map((p) => ({
+                value: configId(p, unofficialRun),
+                label: configLabel(p),
+              }))}
+              onValueChange={(value) => {
+                const config = configs.find((p) => configId(p, unofficialRun) === value);
+                if (config) pickConfig(config);
+              }}
+            />
+            <span className="text-sm text-muted-foreground">{s.compare}</span>
+            {next.option && (
               <SegmentedToggle
-                role="group"
-                ariaLabel={s.compare}
-                testId="video-results-config"
-                value={active ?? ''}
-                size="sm"
-                variant={isPhone ? 'select' : 'segments'}
-                options={configs.map((p) => ({
-                  value: configId(p, unofficialRun),
-                  label: configLabel(p),
-                  title: p.participating === null ? undefined : s.gpu(p.participating),
-                  icon: <SideDot color={colorOf(p)} />,
-                  testId: `video-results-config-${configId(p, unofficialRun)}`,
+                variant="select"
+                ariaLabel={s.pairing}
+                testId="video-results-against"
+                value={next.option.value}
+                options={next.options.map((item) => ({
+                  value: item.value,
+                  label: optionLabel(item),
                 }))}
                 onValueChange={(value) => {
-                  const config = configs.find((p) => configId(p, unofficialRun) === value);
-                  if (config) pickConfig(config);
+                  const choice = next.options.find((item) => item.value === value);
+                  track('video_results_against_selected', {
+                    against: choice?.kind,
+                    gpu: choice?.point?.hardwareKey ?? null,
+                  });
+                  onAgainstChange(value);
                 }}
               />
-            </div>
-            {next.option && (
-              <label
-                className={cn(
-                  'flex items-center gap-1 text-xs text-muted-foreground',
-                  isPhone ? 'basis-full justify-end' : 'ml-auto',
-                )}
-              >
-                {s.with}
-                <span className="relative inline-flex items-center">
-                  <select
-                    data-testid="video-results-against"
-                    value={next.option.value}
-                    onChange={(event) => {
-                      const choice = next.options.find((item) => item.value === event.target.value);
-                      track('video_results_against_selected', {
-                        against: choice?.kind,
-                        gpu: choice?.point?.hardwareKey ?? null,
-                      });
-                      onAgainstChange(event.target.value);
-                    }}
-                    className="cursor-pointer appearance-none rounded-sm bg-transparent py-0.5 pr-4 font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {next.options.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {optionLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className="pointer-events-none absolute right-0 size-3"
-                  />
-                </span>
-              </label>
             )}
           </div>
           <div
