@@ -1,5 +1,5 @@
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { isQueueing, losslessTwin, runtimeKey } from './deployment';
+import { deploymentKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import type { VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
 import { RESULTS_HARDWARE } from './results';
@@ -169,8 +169,31 @@ export function stageOptions(
 }
 
 /**
+ * The official side a `namedRun` subject is read against: the official cell of the same
+ * deployment and concurrency on its GPU, so a 4-GPU candidate meets production's 4 GPUs, else that
+ * GPU's official lead. Null for an official subject.
+ */
+export function officialCounterpart(
+  subject: VideoPoint,
+  deployments: readonly VideoPoint[],
+  leads: readonly VideoPoint[],
+  namedRun?: string,
+): VideoPoint | null {
+  if (!namedRun || subject.runId !== namedRun) return null;
+  const same = deployments.find(
+    (p) =>
+      p.runId !== namedRun &&
+      p.hardwareKey === subject.hardwareKey &&
+      p.concurrency === subject.concurrency &&
+      deploymentKey(p) === deploymentKey(subject) &&
+      mayHaveClips(p),
+  );
+  return same ?? leads.find((p) => p.hardwareKey === subject.hardwareKey) ?? null;
+}
+
+/**
  * The option a subject pairs with until the reader picks another: a lossy config's lossless twin,
- * an unofficial run's official lead on its own GPU (`own`), else the Diffusers reference.
+ * an unofficial run's `officialCounterpart` (`own`), else the Diffusers reference.
  */
 export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
   isLossy(subject) ? 'twin' : (own?.hardwareKey ?? 'reference');

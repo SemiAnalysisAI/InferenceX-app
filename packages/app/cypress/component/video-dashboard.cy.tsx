@@ -934,6 +934,26 @@ describe('VideoGenX results', () => {
     playing().should('have.attr', 'data-hardware', 'h200');
   });
 
+  it('pairs an unofficial run with the official cell of the same deployment', () => {
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,
+      editPage: (page) => {
+        b200Frontier(page);
+        addNamedRun(page);
+        // Without its lead's deployment the named run opens on another of its GPU counts.
+        const named = page.entries.find((entry) => entry.runId === NAMED_RUN)!.sources[0];
+        named.observations = named.observations.filter((item) => /-g\d+$/u.test(item.id));
+      },
+    });
+    playing().should('have.attr', 'data-overlay', 'true');
+    against().should('have.value', 'b200');
+    points('[data-clip-role="baseline"]').should('have.attr', 'data-overlay', 'false');
+    points('[data-clip-role]').should(($points) => {
+      const [first, second] = [...$points].map(gpusOf);
+      expect(second, 'baseline GPUs').to.equal(first);
+    });
+  });
+
   it('opens the stage on the middle of the B200 frontier, not its most efficient end', () => {
     mount({
       edit: (observation) => {

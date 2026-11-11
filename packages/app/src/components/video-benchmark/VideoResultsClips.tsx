@@ -24,6 +24,7 @@ import {
   compareConfigs,
   configId,
   defaultPairing,
+  officialCounterpart,
   pairedGroup,
   parseStage,
   promptKey,
@@ -275,11 +276,8 @@ export default function VideoResultsClips({
     if (cache.current.has(key)) return cache.current.get(key) ?? null;
     return failedKeys.has(key) ? null : undefined;
   };
-  /** The official lead on a candidate run's own GPU; null for an official point. */
   const ownLead = (p: VideoPoint) =>
-    p.runId === unofficialRun
-      ? (officialLeads.find((lead) => lead.hardwareKey === p.hardwareKey) ?? null)
-      : null;
+    officialCounterpart(p, deployments, officialLeads, unofficialRun);
   /** The subject a selection plays, and the side it is compared with. */
   const pairFor = (clipKey: string | null, value: string | null) => {
     const picked = clipKey ? drawn.find((p) => stagePointKey(p) === clipKey) : undefined;
@@ -291,7 +289,7 @@ export default function VideoResultsClips({
       unofficialRun,
       clipKey,
     );
-    // A candidate run is read against production: the official lead on its own GPU.
+    // A candidate run is read against production on its own GPU.
     const own = subject ? ownLead(subject.point) : null;
     const options = subject ? stageOptions(subject.point, selected, deployments, own) : [];
     const pairing = value ?? (subject ? defaultPairing(subject.point, own) : 'reference');
