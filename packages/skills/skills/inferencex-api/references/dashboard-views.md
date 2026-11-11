@@ -5,6 +5,18 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+## A100 unofficial runs
+
+Use `gpus=a100` with `model=DeepSeek-V4.1-Flash&sequence=agentic-traces&unofficialrun=42940055863`
+on `/api/v1/views/inference` to inspect the A100 overlay. The shared hardware registry
+normalizes both `cluster:a100-cw` benchmark rows and `CLUSTER:A100-CW` evaluation rows
+to `a100`; `/api/v1/views/options` exposes the same hardware and hourly assumptions
+used by the dashboard. Ownership (`h`) uses the requested $0.78 per GPU-hour.
+This is an assumed rate, not a market quote. Rental (`r=9.99`) and modeled all-in
+power (`9.99` kW) are unverified placeholders required by the entity-registration
+policy; do not use them for rental or modeled-energy comparisons. Measured GPU
+power from the artifacts is independent of that all-in-power placeholder.
+
 The Chip reliability dashboard page has been retired in English and Chinese.
 Use `/api/v1/views/reliability` for aggregated run success rates or
 `/api/v1/reliability` for raw counts; both API contracts remain unchanged.

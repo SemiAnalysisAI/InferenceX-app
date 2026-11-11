@@ -397,6 +397,38 @@ describe('normalizeArtifactRows', () => {
 });
 
 describe('normalizeEvalArtifactRows', () => {
+  it('retains uppercase A100 cluster identities in unofficial evaluations', () => {
+    const { rows } = normalizeEvalArtifactRows(
+      [
+        rawEvalRow({
+          hw: 'CLUSTER:A100-CW',
+          model: 'deepseek-ai/DeepSeek-V4.1-Flash',
+          model_prefix: 'dsv41flash',
+          framework: 'vllm',
+          precision: 'fp4',
+          spec_decoding: 'mtp',
+          disagg: false,
+          conc: 28,
+          em_strict: 0.9727065959059894,
+          score: 0.9727065959059894,
+        }),
+      ],
+      '2026-11-11',
+      '2026-11-11T06:50:22Z',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42940055863',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      hardware: 'a100',
+      model: 'dsv41flash',
+      framework: 'vllm',
+      precision: 'fp4',
+      conc: 28,
+      task: 'gsm8k',
+      metrics: { em_strict: 0.9727065959059894 },
+    });
+  });
+
   it('converts aggregate eval rows to EvalRow shape with synthetic config ids', () => {
     const { rows, maxConfigId } = normalizeEvalArtifactRows(
       [rawEvalRow({ task: 'gsm8k', conc: 16 }), rawEvalRow({ task: 'mmlu', conc: 32 })],

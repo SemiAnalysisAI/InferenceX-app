@@ -73,7 +73,11 @@ const responseSchema = objectSchema(
           ...numberSchema,
           description: 'Per-chip rated TDP in watts, shared with chip pages. B300 uses 1100 W.',
         },
-        costPerHour: objectSchema({ h: numberSchema, r: numberSchema }),
+        costPerHour: {
+          ...objectSchema({ h: numberSchema, r: numberSchema }),
+          description:
+            'USD per chip-hour: h is hyperscaler ownership, r is committed rental. A100 h=0.78 is a user-supplied assumption; its r=9.99 is an unverified placeholder, not a rental quote.',
+        },
       }),
     ),
     frameworks: arraySchema(
