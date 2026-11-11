@@ -1,5 +1,5 @@
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { losslessTwin } from './deployment';
+import { deploymentKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import type { VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
 import { RESULTS_HARDWARE } from './results';
@@ -138,33 +138,102 @@ export function stageSubject(
 
 /** What the stage's second side shows, and the point it plays; null for the reference. */
 export interface StageOption {
-  /** `reference`, `twin`, or the hardware key of the lead it plays. */
+  /** `reference`, `twin`, or the hardware key of the opening it plays. */
   value: string;
-  kind: 'reference' | 'lead' | 'twin';
+  kind: 'reference' | 'hardware' | 'twin';
   /** Null for the reference, and for a twin the subject's run does not have. */
   point: VideoPoint | null;
 }
 
 /**
  * What the subject can be compared with: its Diffusers reference (the default), each other
- * visible hardware's lead, `own` in place of its own hardware's lead, and, for a lossy
- * subject, its lossless twin from `deployments`. Without `own` its hardware is not offered.
+ * visible hardware's stage opening, the deployment the Compare row plays for that hardware,
+ * `own` in place of its own hardware's, and, for a lossy subject, its lossless twin from
+ * `deployments`. Without `own` its hardware is not offered.
  */
 export function stageOptions(
   subject: VideoPoint,
-  leads: readonly VideoPoint[],
+  openings: readonly VideoPoint[],
   deployments: readonly VideoPoint[],
   own: VideoPoint | null = null,
 ): StageOption[] {
   return [
     { value: 'reference', kind: 'reference', point: null },
-    ...leads
-      .map((lead) => (lead.hardwareKey === subject.hardwareKey ? own : lead))
-      .filter((lead) => lead !== null)
-      .map((lead) => ({ value: lead.hardwareKey ?? '', kind: 'lead' as const, point: lead })),
+    ...openings
+      .map((opening) => (opening.hardwareKey === subject.hardwareKey ? own : opening))
+      .filter((opening) => opening !== null)
+      .map((opening) => ({
+        value: opening.hardwareKey ?? '',
+        kind: 'hardware' as const,
+        point: opening,
+      })),
     ...(isLossy(subject)
       ? [{ value: 'twin', kind: 'twin' as const, point: losslessTwin(subject, deployments) }]
       : []),
+  ];
+}
+
+/**
+ * The official side a `namedRun` subject is read against: the official cell of the same
+ * deployment and concurrency on its GPU, so a 4-GPU candidate meets production's 4 GPUs, else that
+ * GPU's official stage opening. Null for an official subject.
+ */
+export function officialCounterpart(
+  subject: VideoPoint,
+  deployments: readonly VideoPoint[],
+  openings: readonly VideoPoint[],
+  namedRun?: string,
+): VideoPoint | null {
+  if (!namedRun || subject.runId !== namedRun) return null;
+  const same = deployments.find(
+    (p) =>
+      p.runId !== namedRun &&
+      p.hardwareKey === subject.hardwareKey &&
+      p.concurrency === subject.concurrency &&
+      deploymentKey(p) === deploymentKey(subject) &&
+      mayHaveClips(p),
+  );
+  return same ?? openings.find((p) => p.hardwareKey === subject.hardwareKey) ?? null;
+}
+
+/**
+ * The option a subject pairs with until the reader picks another: a lossy config's lossless twin,
+ * an unofficial run's `officialCounterpart` (`own`), else the Diffusers reference.
+ */
+export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
+  isLossy(subject) ? 'twin' : (own?.hardwareKey ?? 'reference');
+
+/** A config's Compare-row id: its hardware, its runtime when lossy, and whether it is `namedRun`'s. */
+export const configId = (p: VideoPoint, namedRun?: string) =>
+  `${p.hardwareKey ?? ''}${isLossy(p) ? `+${runtimeKey(p)}` : ''}${p.runId === namedRun ? '-overlay' : ''}`;
+
+/**
+ * The configs the Compare row plays: each hardware's opening deployment, then each drawn lossy
+ * config that may have clips, at its lower-median latency deployment as a lead's opening is.
+ */
+export function compareConfigs(
+  openings: readonly VideoPoint[],
+  drawn: readonly VideoPoint[],
+  namedRun?: string,
+): VideoPoint[] {
+  const offered = new Set(openings.map((p) => configId(p, namedRun)));
+  const lossy = Map.groupBy(
+    drawn.filter(
+      (p) =>
+        isLossy(p) &&
+        mayHaveClips(p) &&
+        p.p50 !== null &&
+        !isQueueing(p) &&
+        !offered.has(configId(p, namedRun)),
+    ),
+    (p) => configId(p, namedRun),
+  );
+  return [
+    ...openings,
+    ...[...lossy.values()].map((config) => {
+      const byLatency = config.toSorted((a, b) => a.p50! - b.p50!);
+      return byLatency[Math.floor((byLatency.length - 1) / 2)];
+    }),
   ];
 }
 
@@ -188,4 +257,6 @@ export function speedVs(subject: number | null, pair: number | null): Speed | nu
 export interface StagePair {
   playing: string | null;
   baseline: string | null;
+  /** First frames of the shown prompt by chart point key for read points; null when one has none. */
+  posters: Readonly<Record<string, string | null>>;
 }

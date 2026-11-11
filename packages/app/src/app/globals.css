@@ -959,6 +959,32 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   }
 }
 
+/* VideoGenX: a ring spreading from each playable chart point until the reader picks a clip. */
+@keyframes video-clip-pulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.55);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.video-clip-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: video-clip-pulse 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-clip-pulse {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 @keyframes star-glow {
   0%,
   100% {

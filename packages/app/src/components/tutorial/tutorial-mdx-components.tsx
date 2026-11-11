@@ -4,14 +4,17 @@ import { createMdxComponents } from '@/components/blog/mdx-components';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { TutorialCallout, type TutorialCalloutProps } from './tutorial-callout';
-import { POWERX_TUTORIAL_WIDGETS, type PowerXTutorialWidgetName } from './widgets';
+import type { TutorialWidgets } from './widget-chrome';
 
 /**
  * The blog component map plus the tutorial-only overrides. H2s carry a running section number,
- * `<Callout>` renders a quiet aside, and `<Widget name>` mounts a registered client widget at
- * its declared layout.
+ * `<Callout>` renders a quiet aside, and `<Widget name>` mounts a widget from `widgets` at its
+ * declared layout.
  */
-export function createPowerXTutorialComponents(locale: Locale): Record<string, ComponentType<any>> {
+export function createTutorialComponents(
+  locale: Locale,
+  widgets: TutorialWidgets,
+): Record<string, ComponentType<any>> {
   const base = createMdxComponents(locale);
   const BaseH2 = base.h2;
   let section = 0;
@@ -38,8 +41,8 @@ export function createPowerXTutorialComponents(locale: Locale): Record<string, C
     Callout: (props: Omit<TutorialCalloutProps, 'locale'>) => (
       <TutorialCallout {...props} locale={locale} />
     ),
-    Widget: ({ name, alt }: { name: PowerXTutorialWidgetName; alt: string }) => {
-      const { component: Widget, layout } = POWERX_TUTORIAL_WIDGETS[name];
+    Widget: ({ name, alt }: { name: string; alt: string }) => {
+      const { component: Widget, layout } = widgets[name];
       return (
         <div
           data-layout={layout}

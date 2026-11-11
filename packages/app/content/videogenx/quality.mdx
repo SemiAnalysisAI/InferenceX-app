@@ -1,0 +1,57 @@
+---
+title: 'How we score the quality of a lossy speedup'
+description: 'Cross-step caching and sparse attention speed up video generation by skipping work, so the output changes. Each lossy config will be scored against the same engine’s lossless output on the same GPU, and the dashboard will show the scores without a pass line.'
+updated: '2026-11-11'
+---
+
+<Widget
+  name="reference-psnr"
+  alt="Strip chart of reference PSNR for every lossless clip of one published run, one row per GPU, against an example 10 to 17 dB cut-off"
+/>
+
+## Why there is no PSNR cut-off
+
+Today the dashboard scores each clip by PSNR against the official Diffusers reference, with the same prompt and seed, over every decoded frame. A simple rule would grade lossy configs on that scale, for example by treating 10 to 17 dB as poor.
+
+The chart above shows why that rule fails. No clip in it uses a lossy optimization, yet many fall inside the example band. Both GPU models ran the same engine, SGLang, and each one alone spans most of the range. Most prompts also land at nearly the same score on both GPUs. The spread follows the prompt more than the hardware.
+
+Different engines and parallel layouts also produce different pixels from the same prompt and seed. A fixed cut-off against the reference would grade the prompt and the implementation, not the optimization.
+
+## The method
+
+Pair each lossy run with the same engine's lossless run. The GPU, engine, server layout, prompt and seed stay fixed and only the lossy options change, so any difference in the output comes from the optimization.
+
+<Widget
+  name="method"
+  alt="Diagram: what is held fixed, the lossless and lossy runs, scoring every decoded frame, and the report per config"
+/>
+
+Each config reports PSNR, SSIM and LPIPS, each as two numbers: the median clip and the worst clip over the scored prompts. The lossless config also runs twice. The gap between those two runs is the noise floor for the pair, so a difference smaller than that gap is not read as a change from the optimization.
+
+Two rules apply when the scores launch:
+
+- **Scores, no pass line.** Each lossy config shows its scores next to its speed, and readers weigh the trade.
+- **A threshold comes later, if at all.** Any threshold would first be calibrated against a lossy change people already accept, such as FP8.
+
+<Callout kind="note">
+
+This method is planned. No scorer computes paired scores yet, so the dashboard does not show them.
+
+</Callout>
+
+## Finding the sweet spot
+
+Each lossy config becomes one point: its speedup over the lossless twin against how close its clips stay to that twin. The twin anchors the chart at 1.0× and identical. Configs from one engine join into a line, so an engine that submits several cache thresholds draws a curve. Points further up and to the right are faster and closer to lossless.
+
+<Widget
+  name="tradeoff"
+  alt="Illustrative chart of speedup against a quality score for two example lossy configs and their lossless twin"
+/>
+
+The chart uses placeholder numbers to show how it will read. Switch the score to compare PSNR, SSIM and LPIPS. The LPIPS axis is reversed, so right is always closer. Hover over or select a point to see its numbers.
+
+## Where the scores show up
+
+On the [VideoGenX dashboard](/vgx), the Lossy optimizations option draws lossy configs as dashed lines, each with the lossless line of the same run, engine and layout to compare with. "See what changes" plays a lossy clip against its lossless twin. Once paired scores exist, they will appear in the lossy line's legend, the point tooltip and the clip readout. Until then, the readout's Paired scores row shows Planned.
+
+**Data.** The strip chart reads the published reference PSNR of the run linked under it when the page is generated. The [video-generation README](https://github.com/SemiAnalysisAI/InferenceX/blob/main/video-generation/README.md#reference-psnr) describes the scorer and how each score is verified. The sweet-spot chart is illustrative.

@@ -140,3 +140,14 @@
     transform: none;
   }
 }
+
+/* An image that fades in once it loads: `data-loaded` starts false and its load event flips it. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-media {
+    transition: opacity var(--motion-dur-base) var(--motion-ease-enter);
+  }
+
+  .motion-media[data-loaded='false'] {
+    opacity: 0;
+  }
+}

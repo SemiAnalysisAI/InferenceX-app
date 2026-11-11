@@ -19,14 +19,9 @@ import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { CATEGORY_TITLES } from './strings';
-import {
-  formatWatts,
-  GrammarSwatch,
-  useHydrated,
-  useWidgetHash,
-  WidgetFrame,
-  type WidgetProps,
-} from './widget-chrome';
+import { WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { formatWatts, GrammarSwatch, useHydrated, useWidgetHash } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -85,7 +80,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
   const shownFraction = shown.gpu / sweep.tdpWatts;
 
   return (
-    <WidgetFrame name="load" alt={alt}>
+    <WidgetFrame scope="powerx" name="load" alt={alt}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex min-w-0 flex-1 basis-64 items-center gap-3">
           <span className="shrink-0 text-sm font-medium text-foreground">{t.slider}</span>

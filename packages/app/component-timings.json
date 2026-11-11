@@ -3592,6 +3592,28 @@
           "attempts": 1
         }
       ]
+    },
+    {
+      "spec": "cypress/component/video-quality-guide.cy.tsx",
+      "duration": 1788,
+      "tests": [
+        {
+          "title": [
+            "VideoGenX quality guide widgets",
+            "never move the page while hovering clips or switching scores at 390px"
+          ],
+          "duration": 897,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VideoGenX quality guide widgets",
+            "never move the page while hovering clips or switching scores at 1280px"
+          ],
+          "duration": 891,
+          "attempts": 1
+        }
+      ]
     }
   ]
 }

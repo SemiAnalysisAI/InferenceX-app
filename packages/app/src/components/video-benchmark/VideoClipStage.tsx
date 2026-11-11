@@ -109,6 +109,8 @@ export interface StageClip {
   /** Hardware key or `reference`; analytics and test hooks. */
   id: string;
   label: string;
+  /** Serving engine, which the pill names after the hardware. */
+  engine?: string;
   meta: string;
   /** Pill dot; null draws the reference's outlined dot. */
   color: string | null;
@@ -116,6 +118,8 @@ export interface StageClip {
   url: string;
   /** Lighter web rendition of `url` for the other views. */
   previewUrl?: string;
+  /** First frame of `url`, shown before Play; loading it requests no clip media. */
+  posterUrl?: string;
   /** Why the side shows no clip while `url` is empty. */
   empty: string;
   unofficial?: boolean;
@@ -135,14 +139,14 @@ export function SideDot({ color }: { color: string | null }) {
 export interface VideoClipStageProps {
   /** The focusable stage, which takes the Space and T shortcuts. */
   ref?: Ref<HTMLDivElement>;
-  /** Subject, on the left (or top). */
+  /** Subject, on the right (or bottom). */
   a: StageClip;
-  /** Its pair, on the right (or bottom). */
+  /** Its pair, the baseline, on the left (or top). */
   b: StageClip;
   view: StageView;
   /** Changes with the prompt or the compared sources; pauses the clips. */
   selection: string;
-  /** Prompt text on the idle frame shown before the first Play. */
+  /** Prompt text on the idle frame, which replaces the posters' split before the first Play. */
   prompt?: string;
   /** Frame rate both sides were generated at; null disables frame stepping. */
   fps: number | null;
@@ -150,6 +154,8 @@ export interface VideoClipStageProps {
   frames: number | null;
   /** A side's web rendition failed to load; the caller drops it so the side plays the original. */
   onPreviewError: (previewUrl: string) => void;
+  /** First frames the caller already loaded, so a swap to them never paints the idle frame. */
+  loadedFrames?: ReadonlySet<string>;
 }
 
 type Role = 'a' | 'b';
@@ -158,6 +164,13 @@ const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
 const SPLIT_STEP = 5;
+// The Compare row, stage, transport and readout fit under the sticky header together: a picture is at
+// most the window's height less 18rem, and the block narrows to match, one 16:9 frame wide or two
+// side by side.
+export const STAGE_FIT_WIDTH = {
+  overlay: 'max(20rem, calc((100dvh - 18rem) * 16 / 9))',
+  side: 'max(20rem, calc((100dvh - 18rem) * 32 / 9 + 0.75rem))',
+};
 const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;
 
@@ -171,6 +184,7 @@ export default function VideoClipStage({
   fps,
   frames,
   onPreviewError,
+  loadedFrames,
 }: VideoClipStageProps) {
   const s = STRINGS[useLocale()];
   const clips = { a, b };
@@ -192,6 +206,23 @@ export default function VideoClipStage({
   const [inspect, setInspect] = useState(false);
   /** One zoom and pan, in percent of a side, applied to both sides and the Difference canvas. */
   const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
+  /** First frames that have loaded; a poster that fails never counts as a picture to split. */
+  const [loadedPosters, setLoadedPosters] = useState<ReadonlySet<string>>(new Set());
+  // Before paint: a frame already loaded is complete as soon as its source is set, so a swap to
+  // frames the clips layer loaded never paints the idle overlay over them.
+  useLayoutEffect(() => {
+    const loaded = (url: string) =>
+      setLoadedPosters((previous) => (previous.has(url) ? previous : new Set([...previous, url])));
+    const images = [a.posterUrl, b.posterUrl].flatMap((url) => {
+      if (!url) return [];
+      const image = new Image();
+      image.addEventListener('load', () => loaded(url));
+      image.src = url;
+      if (image.complete && image.naturalWidth > 0) loaded(url);
+      return [image];
+    });
+    return () => images.forEach((image) => image.removeAttribute('src'));
+  }, [a.posterUrl, b.posterUrl]);
   /**
    * One pan gesture. `from` is the lens it started on while the pointer is held; `moved` outlives
    * the release, so the click that ends a pan is not a lock or flip.
@@ -226,12 +257,24 @@ export default function VideoClipStage({
   const both = playable.length === 2;
   const shown: Role = peek ? OTHER[toggled] : toggled;
   const overlay = view !== 'side';
-  /** Before the first Play: the idle frame replaces the split until there is a picture to split. */
-  const idle = !armed && playable.length > 0;
-  /** The split stays hidden until the first Play, so before then it neither follows the pointer nor locks. */
+  /**
+   * Before the first Play, the idle frame replaces the split until there is a picture to split:
+   * both sides' loaded posters in a view that shows them (Difference hides them behind its
+   * canvas), or else the clips themselves.
+   */
+  const postersShown =
+    both &&
+    view !== 'diff' &&
+    playable.every((role) => {
+      const url = clips[role].posterUrl ?? '';
+      return loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
+    });
+  const idle = !armed && playable.length > 0 && !postersShown;
+  /** While idle the split stays hidden, so it neither follows the pointer nor locks. */
   const wiping = view === 'wipe' && !idle;
   const original = view === 'diff';
-  const onLeft = (role: Role) => (role === 'a') !== swapped;
+  /** The baseline sits on the left and the subject on the right until Swap. */
+  const onLeft = (role: Role) => (role === 'b') !== swapped;
   const clock = frameClock(duration, fps, frames);
   const lensStyle =
     lens.zoom > 1
@@ -277,22 +320,22 @@ export default function VideoClipStage({
       frame = requestAnimationFrame(draw);
       if (!context || now - lastDraw < 100) return;
       lastDraw = now;
-      const left = videos.current.get('a'),
-        right = videos.current.get('b'),
+      const subject = videos.current.get('a'),
+        pair = videos.current.get('b'),
         target = canvas.current;
-      if (!left || !right || !target || left.readyState < 2 || right.readyState < 2) return;
-      if (right.videoWidth === 0) return;
-      if (left.videoWidth !== right.videoWidth || left.videoHeight !== right.videoHeight) {
+      if (!subject || !pair || !target || subject.readyState < 2 || pair.readyState < 2) return;
+      if (pair.videoWidth === 0) return;
+      if (subject.videoWidth !== pair.videoWidth || subject.videoHeight !== pair.videoHeight) {
         setDifferenceFailed(true);
         return;
       }
-      if (Math.abs(left.currentTime - right.currentTime) > DIFFERENCE_SYNC_SECONDS) return;
-      buffer.width = right.videoWidth;
-      buffer.height = right.videoHeight;
+      if (Math.abs(subject.currentTime - pair.currentTime) > DIFFERENCE_SYNC_SECONDS) return;
+      buffer.width = pair.videoWidth;
+      buffer.height = pair.videoHeight;
       try {
-        context.drawImage(right, 0, 0);
+        context.drawImage(pair, 0, 0);
         const base = context.getImageData(0, 0, buffer.width, buffer.height);
-        context.drawImage(left, 0, 0);
+        context.drawImage(subject, 0, 0);
         const candidate = context.getImageData(0, 0, buffer.width, buffer.height);
         target.width = buffer.width;
         target.height = buffer.height;
@@ -459,7 +502,11 @@ export default function VideoClipStage({
   );
 
   return (
-    <div id={STAGE_ID} className="min-w-0 scroll-mt-24 space-y-3">
+    <div
+      id={STAGE_ID}
+      className="mx-auto w-full min-w-0 scroll-mt-24 space-y-3"
+      style={{ maxWidth: overlay ? STAGE_FIT_WIDTH.overlay : STAGE_FIT_WIDTH.side }}
+    >
       <div
         ref={ref}
         data-testid="video-results-stage"
@@ -469,9 +516,8 @@ export default function VideoClipStage({
         aria-label={s.stage(a.label, b.label)}
         className={cn(
           'relative isolate touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          // The stage and its transport fit a laptop viewport below the chart.
           overlay
-            ? 'mx-auto aspect-video w-full max-w-[calc((100svh-10rem)*16/9)] overflow-hidden rounded-lg bg-black'
+            ? 'aspect-video w-full overflow-hidden rounded-lg bg-black'
             : 'grid gap-3 min-[640px]:grid-cols-2',
           wiping && !locked && 'cursor-ew-resize',
           lens.zoom > 1 && 'cursor-grab touch-none',
@@ -531,6 +577,7 @@ export default function VideoClipStage({
                   <video
                     ref={group.register(role)}
                     src={srcOf(clip)}
+                    poster={clip.posterUrl}
                     crossOrigin="anonymous"
                     muted
                     playsInline
@@ -590,7 +637,12 @@ export default function VideoClipStage({
                 )}
               >
                 <SideDot color={clip.color} />
-                <b className="min-w-0 truncate font-semibold">{clip.label}</b>
+                <b className="min-w-0 truncate font-semibold">
+                  {clip.label}
+                  {clip.engine && (
+                    <span className={cn(overlay && 'max-sm:hidden')}> · {clip.engine}</span>
+                  )}
+                </b>
                 {/* The GPU count and tag start from a zero basis, so they take only the width the name leaves. */}
                 {clip.meta && (
                   <span
@@ -692,7 +744,7 @@ export default function VideoClipStage({
             aria-label={s.shown}
             className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 overflow-hidden rounded-lg bg-black/70"
           >
-            {(swapped ? (['b', 'a'] as const) : ROLES).map((role) => (
+            {(swapped ? ROLES : (['b', 'a'] as const)).map((role) => (
               <button
                 key={role}
                 type="button"

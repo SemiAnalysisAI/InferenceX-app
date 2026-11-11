@@ -354,14 +354,8 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
     for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
-    expect(parseResultsState('r_compare=1&r_lossy=1')).toMatchObject({
-      compareEngines: true,
-      lossy: true,
-    });
-    expect(parseResultsState('r_engine=sglang&r_compare=1')).toMatchObject({
-      engine: 'sglang',
-      compareEngines: false,
-    });
+    // Retired engine comparison: an old link still plots the best engine per GPU.
+    expect(parseResultsState('r_compare=1&r_lossy=1')).toEqual({ ...state(), lossy: true });
     expect(
       parseResultsState(
         'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',

@@ -7,7 +7,7 @@ import {
   type ValidityCheckId,
 } from '@/lib/powerx/validity-rules';
 
-import { WidgetFrame, type WidgetProps } from './widget-chrome';
+import { WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
 
 const STRINGS = {
   en: {
@@ -78,7 +78,7 @@ const STRINGS = {
 export function ValidityWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
   return (
-    <WidgetFrame name="validity" alt={alt}>
+    <WidgetFrame scope="powerx" name="validity" alt={alt}>
       <ol className="divide-y divide-border/60 border-y border-border/60">
         {VALIDITY_CHECKS.map((check, index) => {
           const copy = t.checks[check.id as ValidityCheckId];

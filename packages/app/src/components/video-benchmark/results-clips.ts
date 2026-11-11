@@ -141,6 +141,8 @@ export interface ResultsClip {
   url: string;
   /** Lighter web rendition of `url` for Clip view playback. */
   previewUrl?: string;
+  /** JPEG of the first decoded frame of `url`; presentation only. */
+  posterUrl?: string;
   quality: ClipQuality | DiagnosticPair | null;
   unscored?: ClipUnscored;
 }
@@ -189,6 +191,7 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
         record,
         url: media?.url ?? '',
         previewUrl: media?.previewUrl,
+        posterUrl: media?.posterUrl,
         quality: quality ?? null,
         ...(unscored ? { unscored } : {}),
       });

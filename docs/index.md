@@ -18,6 +18,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [D3 Charts](./d3-charts.md) covers render phases, zoom and tooltip behavior, animation, and Pareto highlights.
 - [Video History](./video-history.md) covers the read-only published H3 catalog, source identity, metric boundaries, and retained-data replay.
 - [VideoGenX dashboard](./videogenx-dashboard.md) covers shared workload selection, deployment metrics, Compare, and missing-data rules.
+- [VideoGenX Quality Guide](./videogenx-quality-guide.md) covers `/vgx/quality`, its pinned reference PSNR read, the illustrative sweet-spot chart, and layout stability.
 - [Data Pipeline](./data-pipeline.md) covers DB schema and migration rules, ETL design, audited purges and backfills, and agentic and PowerX storage.
 - [Ingesting Runs](./ingesting-runs.md) is the runbook for manually ingesting a GitHub Actions benchmark run.
 - [Deployment Configuration](./deployment-configuration.md) lists the environment variables, GitHub variables, and GitHub secrets the app and workflows read, and which of them are required.

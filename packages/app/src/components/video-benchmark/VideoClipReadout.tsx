@@ -154,7 +154,7 @@ type Metric = 'speed' | 'paired' | SideMetric;
  */
 const ROWS: Record<StageOption['kind'], readonly Metric[]> = {
   reference: ['psnr', 'wall', 'cost', 'energy'],
-  lead: ['speed', 'psnr', 'wall', 'cost', 'energy'],
+  hardware: ['speed', 'psnr', 'wall', 'cost', 'energy'],
   twin: ['speed', 'paired', 'psnr', 'cost', 'energy'],
 };
 

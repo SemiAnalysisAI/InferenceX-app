@@ -62,7 +62,6 @@ const selection = (change: Partial<ResultsChartSelection> = {}): ResultsChartSel
   tier: 'h',
   optimal: false,
   hidden: [],
-  compareEngines: false,
   lossy: false,
   ...change,
 });
@@ -182,13 +181,6 @@ describe('resultsChartSeries', () => {
       ['vllm-omni', true, ['named:c1']],
     ]);
     expect(comparesEngines(best)).toBe(false);
-    const compared = plotted({ compareEngines: true });
-    expect(compared.map((s) => [s.engine, s.overlay])).toEqual([
-      ['sglang', false],
-      ['vllm-omni', false],
-      ['vllm-omni', true],
-    ]);
-    expect(comparesEngines(compared)).toBe(true);
     // Cards and clips stand for a GPU with the engine the chart draws, even when
     // another engine rates more videos per GPU-hour.
     const rated = [

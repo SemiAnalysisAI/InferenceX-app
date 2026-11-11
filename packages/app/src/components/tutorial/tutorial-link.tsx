@@ -4,19 +4,19 @@ import Link from 'next/link';
 
 import { track } from '@/lib/analytics/analytics';
 
-interface PowerXTutorialLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
+interface TutorialLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
   href: string;
-  analyticsEvent: 'powerx_tutorial_returned' | 'powerx_tutorial_section_opened';
+  analyticsEvent: string;
   analyticsTarget?: string;
 }
 
-export function PowerXTutorialLink({
+export function TutorialLink({
   href,
   analyticsEvent,
   analyticsTarget,
   onClick,
   ...props
-}: PowerXTutorialLinkProps) {
+}: TutorialLinkProps) {
   return (
     <Link
       {...props}

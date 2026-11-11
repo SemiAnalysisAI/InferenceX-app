@@ -62,6 +62,7 @@ it('keeps playing when the prime from the play gesture settles after the buffere
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
         onShow={() => {}}
         reveal={0}
       />,
