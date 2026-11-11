@@ -308,7 +308,7 @@ describe('prepareTraceReplay', () => {
         .join('\n'),
     );
 
-    const prepared = await prepareTraceReplay(profile, null);
+    const prepared = await prepareTraceReplay(profile, null, null, {}, Buffer.from('test-key'));
     const expected = await computeRequestTimeline(gzipSync(profile));
 
     expect(prepared.timelineRequests).toBe(2);

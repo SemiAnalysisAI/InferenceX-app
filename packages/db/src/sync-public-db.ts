@@ -16,7 +16,9 @@
  * selected runs. Values already in the target are not refreshed, so
  * public backfills of existing rows (e.g. recomputed `aggregate_stats`) do not
  * propagate. Source columns the target schema lacks (newer public migrations)
- * are skipped and reported.
+ * are skipped and reported. Copied server-log text and chart-series endpoint
+ * identifiers are redacted with one key per invocation, as ingest does, so a
+ * source holding rows from before redaction never publishes their addresses.
  *
  * Each run commits in its own transaction, so an interrupted sync resumes by
  * rerunning the command.
@@ -42,8 +44,10 @@ import type postgres from 'postgres';
 
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, type Sql } from './etl/db-utils.js';
+import { processRedactionKey, redactText } from './etl/log-redaction.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
 import { purgeRuns } from './lib/run-purge';
+import { redactStoredChartSeries } from './lib/stored-redaction.js';
 import {
   configKey,
   findDriftedRuns,
@@ -375,7 +379,10 @@ async function copyServerLog(
     select ${source(columns.server_logs)} from server_logs where id = ${sourceLogId}
   `;
   if (!log) throw new Error(`source server_logs row ${sourceLogId} vanished`);
-  const id = await insertReturningId(db, 'server_logs', log);
+  const id = await insertReturningId(db, 'server_logs', {
+    ...log,
+    server_log: redactText(String(log.server_log), processRedactionKey),
+  });
   logIds.set(sourceLogId, id);
   await copyServerLogFiles(db, sourceLogId, id);
   return id;
@@ -404,7 +411,11 @@ async function copyServerLogFiles(db: Db, sourceLogId: string, targetLogId: stri
     await insertRows(
       db,
       'server_log_files',
-      rows.map((row) => ({ ...row, server_log_id: targetLogId })),
+      rows.map((row) => ({
+        ...row,
+        server_log_id: targetLogId,
+        log_text: redactText(String(row.log_text), processRedactionKey),
+      })),
     );
   }
 }
@@ -546,6 +557,9 @@ async function copyTraceReplayPayloads(
       select ${source(column)} from agentic_trace_replay where id = ${sourceId}
     `;
     await db`update agentic_trace_replay set ${db(payload!, column)} where id = ${targetId}`;
+  }
+  if (payloads.includes('chart_series') || payloads.includes('chart_series_summary_gz')) {
+    await redactStoredChartSeries(db, targetId, processRedactionKey, true);
   }
 }
 

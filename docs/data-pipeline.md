@@ -616,6 +616,41 @@ once on N connections; each file is its own transaction, so an interrupted run r
 Point `DATABASE_WRITE_URL` at the direct endpoint (no `-pooler` in the host): the pooler closed
 connections at 16 and above. Each connection holds up to about 1 GB while it compacts a large file.
 
+#### Redaction of addresses and credentials
+
+Stored logs and trace-server metrics are public, so ingest redacts IP addresses, Oracle VCN
+domains and credentials before it stores them. The rules, their order and the tag format are
+shared with InferenceX's artifact uploader. `etl/log-redaction.ts` implements them, and
+`etl/log-redaction.vectors.json` is a byte-identical copy of the vectors both repositories test
+against. An address becomes `***REDACTED-<hex6>***`, an HMAC of the address under a random key
+that one process creates and never stores. The port and surrounding text stay. Tags are
+consistent within one ingest (trace workers get the parent's key), so a host keeps one tag across
+a run's files and points. Tags from different runs cannot be linked. Node names, cluster names,
+paths, GPU ids, MAC addresses and image references are kept for debugging.
+
+Ingest redacts each server-log file after capping it and before writing the text column and the
+blocks, so both copies hold the same text. A tag is longer than the address it replaces, so a file
+at the cap can be stored slightly over it. For chart series, the endpoint URL, source id,
+worker id and engine labels are redacted after the series are computed from the raw addresses.
+Grouping and order therefore stay as they were, and `10.3.10.34:9405` and `10.3.10.35:9405` keep
+distinct tags. Every `chart_series` writer applies it, namely ingest, `db:backfill-chart-series`
+and the route's self-heal. `sync-public-db` (including `--to-public` promotion) redacts the log text and
+chart series it copies, so a downstream database with older rows cannot republish them. The raw
+`server_metrics_json_gz` and `server_metrics_csv` stay as uploaded. No public route returns them.
+
+`bun run admin:db:backfill-log-redaction` redacts rows stored before this. It is a dry run that
+counts the server-log files, `chart_series` and `chart_series_summary_gz` values that would
+change. `--write` applies it, `--run-id <id>` limits it to one run, and `--limit` and
+`--concurrency` work as in `compact-server-logs`. Each log file is one transaction that replaces
+the text column and rebuilds the file's blocks, if it has any, so offsets, sizes and bloom filters
+describe the redacted text. Chart series and summaries are rewritten only while they still hold
+what was read, so a concurrent recompute is never overwritten. Redacted text has nothing left to
+match, so an interrupted run resumes by rerunning it. Files written before the interruption keep
+the earlier run's tags. Nothing else needs a recompute. KV-cache capacity and speculative-decoding
+metadata come from numbers and model names that redaction leaves alone. Stored logs are cached for
+a year under `serverLogCacheTag`, so purge it after a write with
+`bun run admin:cache:invalidate -- <app-url> --immediate`.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.

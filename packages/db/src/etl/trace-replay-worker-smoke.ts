@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, inflateSync } from 'node:zlib';
 
+import { processRedactionKey } from './log-redaction';
 import { prepareTraceReplay, type PreparedTraceReplay } from './trace-replay-ingest';
 import { TraceReplayWorkerPool } from './trace-replay-worker-pool';
 
@@ -69,6 +70,7 @@ const job = {
   serverMetricsCsv,
   serverMetricsJson,
   metricsContext: {},
+  redactionKey: processRedactionKey,
 };
 let consumers = 0;
 let release!: () => void;
@@ -78,7 +80,13 @@ const gate = new Promise<void>((resolve) => {
 
 try {
   const direct = fingerprint(
-    await prepareTraceReplay(profileExportJsonl, serverMetricsCsv, serverMetricsJson),
+    await prepareTraceReplay(
+      profileExportJsonl,
+      serverMetricsCsv,
+      serverMetricsJson,
+      {},
+      processRedactionKey,
+    ),
   );
   const tasks = Array.from({ length: 5 }, () =>
     pool.run(job, async (prepared) => {

@@ -18,6 +18,7 @@ import {
   type KvMetricSource,
   type MetricSourceDescriptor,
 } from '../etl/chart-series-summary';
+import { redactChartSeriesSources } from '../etl/chart-series-redaction';
 import {
   CHART_SERIES_VERSION,
   computeChartSeries,
@@ -26,6 +27,7 @@ import {
   type QueueDepthPoint,
   type TimeSeriesPoint,
 } from '../etl/compute-chart-series';
+import { processRedactionKey } from '../etl/log-redaction';
 
 import type { DbClient } from '../connection.js';
 import { writeBackChartSeries } from './agentic-shared';
@@ -283,6 +285,7 @@ export async function getTraceServerMetrics(
     disagg: row.disagg,
   });
   if (!series) return null;
+  redactChartSeriesSources(series, processRedactionKey);
 
   writeBackChartSeries(sql, row.trace_replay_id, series);
 
@@ -339,6 +342,7 @@ export async function getTraceServerMetricSource(
     disagg: row.disagg,
   });
   if (!series) return null;
+  redactChartSeriesSources(series, processRedactionKey);
   writeBackChartSeries(sql, row.trace_replay_id, series);
   return series.metricSources.find(({ source }) => source.id === sourceId) ?? null;
 }

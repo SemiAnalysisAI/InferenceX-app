@@ -15,6 +15,7 @@ import {
 } from '../queries/request-chart-data.js';
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
+import { redactChartSeriesSources } from './chart-series-redaction.js';
 import { CHART_SERIES_SUMMARY_VERSION, encodeChartSeriesSummary } from './chart-series-summary.js';
 import type { PromptTokenTotals } from './compute-chart-series.js';
 import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
@@ -48,6 +49,8 @@ type TraceReplayUploadField =
 export interface TraceReplayIngestOptions {
   metricsContext?: ServerMetricsContext;
   progressLabel?: string;
+  /** One key for the whole ingest, so a host keeps one tag across points. */
+  redactionKey: Uint8Array;
 }
 
 export interface PreparedTraceReplay {
@@ -170,8 +173,9 @@ export async function findUnlinkedTraceReplayIds(
 export async function prepareTraceReplay(
   profileExportJsonl: TraceReplayInput,
   serverMetricsCsv: TraceReplayInput,
-  serverMetricsJson: TraceReplayInput = null,
-  metricsContext: ServerMetricsContext = {},
+  serverMetricsJson: TraceReplayInput,
+  metricsContext: ServerMetricsContext,
+  redactionKey: Uint8Array,
 ): Promise<PreparedTraceReplay> {
   const compressionStart = Date.now();
   const [profile, csv, metricsJson] = await Promise.all([
@@ -188,6 +192,7 @@ export async function prepareTraceReplay(
   const requestChartDataGz = requestTimelineGz
     ? encodeRequestChartColumns(await requestChartDataFromTimelineGz(requestTimelineGz))
     : null;
+  if (chartSeries) redactChartSeriesSources(chartSeries, redactionKey);
   const chartSeriesJson = jsonBuffer(chartSeries);
   const chartSeriesSummaryGz = chartSeriesJson
     ? encodeChartSeriesSummary(chartSeriesJson.toString('utf8'))
@@ -439,10 +444,10 @@ export async function insertTraceReplay(
   benchmarkResultIds: number[],
   profileExportJsonl: TraceReplayInput,
   serverMetricsCsv: TraceReplayInput,
-  serverMetricsJson: TraceReplayInput = null,
-  options: TraceReplayIngestOptions = {},
+  serverMetricsJson: TraceReplayInput,
+  options: TraceReplayIngestOptions,
 ): Promise<void> {
-  const { metricsContext = {}, progressLabel } = options;
+  const { metricsContext = {}, progressLabel, redactionKey } = options;
   const log = (message: string): void => {
     if (progressLabel) console.log(`    trace_replay ${progressLabel}: ${message}`);
   };
@@ -465,6 +470,7 @@ export async function insertTraceReplay(
     serverMetricsCsv,
     serverMetricsJson,
     metricsContext,
+    redactionKey,
   );
   log(
     `compressed profile=${formatBytes(prepared.profileSize)} -> ${formatBytes(prepared.profileGz?.length)}, ` +

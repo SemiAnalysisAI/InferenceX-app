@@ -64,6 +64,7 @@ import {
   bulkUpsertAvailability,
   insertServerLogFilePaths,
 } from './etl/benchmark-ingest';
+import { processRedactionKey } from './etl/log-redaction';
 import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
   resolveTraceReplayWorkerCount,
@@ -810,7 +811,7 @@ async function main(): Promise<void> {
                     `    server_logs ${configKey}: ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
                   );
                   await withTransientDbRetry(`server_logs for ${configKey}`, () =>
-                    insertServerLogFilePaths(sql, insertedIds, logFiles),
+                    insertServerLogFilePaths(sql, insertedIds, logFiles, processRedactionKey),
                   );
                   console.log(`    server_logs ${configKey}: linked (${elapsed(serverLogStart)})`);
                 })
@@ -868,6 +869,7 @@ async function main(): Promise<void> {
                           framework: toInsert[0]?.config.framework,
                           disagg: toInsert[0]?.config.disagg,
                         },
+                        redactionKey: processRedactionKey,
                       },
                       // oxlint-disable-next-line no-loop-func -- each callback closes over this iteration's block-scoped trace metadata
                       async (prepared) => {

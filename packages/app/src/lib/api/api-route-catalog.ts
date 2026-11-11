@@ -2212,7 +2212,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '37209bcbb9589f3c582285596881e9e7d21ee1f52bc8952ec8c0745aa0f66fbd',
+    // Reviewed for endpoint redaction: the self-heal path redacts addresses in
+    // source descriptors and engine labels before it returns or stores them, as
+    // ingest does. Field names, types and units are unchanged, so the docs stand.
+    sourceSha256: '0c00c0fc01d589e580c542461f1578ea062b880019e4f642b18a97501dc92b0f',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

@@ -14,6 +14,8 @@ import {
 } from './benchmark-ingest';
 import * as blockWriter from './server-log-block-writer';
 
+const REDACTION_KEY = Buffer.from('test-key');
+
 const blocksWritten = vi.hoisted((): string[] => []);
 vi.mock('./server-log-block-writer', async (importOriginal) => ({
   ...(await importOriginal<typeof blockWriter>()),
@@ -160,7 +162,7 @@ describe('insertServerLogFiles', () => {
 
   it('stores server.log as primary and every other filename as a child row', async () => {
     const { sql, calls } = fakeTransactionSql(null);
-    await insertServerLogFiles(sql, [42], files);
+    await insertServerLogFiles(sql, [42], files, REDACTION_KEY);
 
     const primaryInsert = calls.find((call) => call.text.includes('insert into server_logs'));
     expect(primaryInsert?.values).toEqual(['server', 'results/server.log']);
@@ -173,7 +175,7 @@ describe('insertServerLogFiles', () => {
 
   it('idempotently adds missing filenames to an existing linked bundle', async () => {
     const { sql, calls } = fakeTransactionSql(7);
-    await insertServerLogFiles(sql, [42], files);
+    await insertServerLogFiles(sql, [42], files, REDACTION_KEY);
 
     expect(calls.filter((call) => call.text.includes('insert into server_logs'))).toHaveLength(0);
     expect(calls.filter((call) => call.text.includes('insert into server_log_files'))).toHaveLength(
@@ -198,6 +200,7 @@ describe('insertServerLogFiles', () => {
           { fileName: 'router.log', path: routerPath },
           { fileName: 'server.log', path: serverPath },
         ],
+        REDACTION_KEY,
       );
 
       const childNames = calls
@@ -224,6 +227,7 @@ describe('insertServerLogFiles', () => {
           { fileName: 'router.log', path: routerPath },
           { fileName: 'server.log', path: serverPath },
         ],
+        REDACTION_KEY,
       );
 
       const primaryInsert = calls.find((call) => call.text.includes('insert into server_logs'));
@@ -248,6 +252,7 @@ describe('insertServerLogFiles', () => {
           { fileName: 'server.log', logText: 'server' },
           { fileName: 'cn08_decode_w0.out', logText: big },
         ],
+        REDACTION_KEY,
       );
 
       const childInsert = calls.find((call) => call.text.includes('insert into server_log_files'));
@@ -280,7 +285,7 @@ describe('insertServerLogFiles block copies', () => {
     vi.stubEnv('SERVER_LOG_BLOCKS', '1');
     const { sql } = fakeTransactionSql(null, [], ['results/router.log']);
 
-    await insertServerLogFiles(sql, [42], files);
+    await insertServerLogFiles(sql, [42], files, REDACTION_KEY);
 
     expect(blocksWritten).toEqual(['results/server.log', 'results/benchmark.log']);
     expect(
@@ -291,11 +296,42 @@ describe('insertServerLogFiles block copies', () => {
     ]);
   });
 
+  it('stores and blocks only the redacted text, so both copies match', async () => {
+    vi.stubEnv('SERVER_LOG_BLOCKS', '1');
+    const { sql, calls } = fakeTransactionSql(null, [], []);
+    const server = 'connect http://***REDACTED-f58c3e***:8000/v1\n';
+    const router = 'HF_TOKEN=***REDACTED*** peer ***REDACTED-51671e***:9405\n';
+
+    await insertServerLogFiles(
+      sql,
+      [42],
+      [
+        { fileName: 'results/server.log', logText: 'connect http://172.29.37.221:8000/v1\n' },
+        {
+          fileName: 'results/router.log',
+          logText: 'HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyzABCDEF12 peer 10.3.10.34:9405\n',
+        },
+      ],
+      REDACTION_KEY,
+    );
+
+    const primaryInsert = calls.find((call) => call.text.includes('insert into server_logs'));
+    expect(primaryInsert?.values).toEqual([server, 'results/server.log']);
+    const childInsert = calls.find((call) => call.text.includes('insert into server_log_files'));
+    expect(childInsert?.values).toEqual([99, 'results/router.log', router]);
+    expect(
+      vi.mocked(blockWriter.writeTextAsBlocks).mock.calls.map((call) => call.slice(1)),
+    ).toEqual([
+      [99, 'results/server.log', server],
+      [99, 'results/router.log', router],
+    ]);
+  });
+
   it('writes child blocks into an existing bundle without rewriting its primary', async () => {
     vi.stubEnv('SERVER_LOG_BLOCKS', '1');
     const { sql } = fakeTransactionSql(7, [], []);
 
-    await insertServerLogFiles(sql, [42], files);
+    await insertServerLogFiles(sql, [42], files, REDACTION_KEY);
 
     expect(blocksWritten).toEqual(['results/benchmark.log', 'results/router.log']);
   });
@@ -303,7 +339,7 @@ describe('insertServerLogFiles block copies', () => {
   it('writes no blocks unless SERVER_LOG_BLOCKS=1', async () => {
     const { sql } = fakeTransactionSql(null, [], []);
 
-    await insertServerLogFiles(sql, [42], files);
+    await insertServerLogFiles(sql, [42], files, REDACTION_KEY);
 
     expect(blockWriter.writeTextAsBlocks).not.toHaveBeenCalled();
   });

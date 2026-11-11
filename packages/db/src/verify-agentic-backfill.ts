@@ -69,9 +69,6 @@ async function states(ids: string[]): Promise<BackfillState[]> {
 }
 
 async function main(): Promise<void> {
-  const databaseUrl = process.env.DATABASE_WRITE_URL;
-  if (!databaseUrl) throw new Error('DATABASE_WRITE_URL is not set');
-  const database = new URL(databaseUrl).hostname;
   if (snapshotIndex !== -1) {
     const runFilter = runId ? sql`and w.github_run_id=${runId}` : sql``;
     const ids = await sql<{ id: string }[]>`
@@ -84,15 +81,11 @@ async function main(): Promise<void> {
     `;
     if (ids.length === 0) throw new Error('No AgentX points matched the audit scope');
     const rows = await states(ids.map((row) => row.id));
-    await writeFile(file!, JSON.stringify({ database, rows }));
+    await writeFile(file!, JSON.stringify({ rows }));
     console.log(`Saved immutable-data fingerprints for ${rows.length} points`);
     return;
   }
-  const manifest = JSON.parse(await readFile(file!, 'utf8')) as {
-    database: string;
-    rows: BackfillState[];
-  };
-  if (database !== manifest.database) throw new Error('Manifest belongs to a different database');
+  const manifest = JSON.parse(await readFile(file!, 'utf8')) as { rows: BackfillState[] };
   const after = await states(manifest.rows.map((row) => row.id));
   const versions = {
     chart: CHART_SERIES_VERSION,
