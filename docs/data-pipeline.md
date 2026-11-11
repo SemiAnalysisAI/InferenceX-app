@@ -551,6 +551,14 @@ put the job's `logs/` directory, including the server worker log `<host>_agg_w0.
 under `srt-single-node-logs/` next to the root files; artifacts without the archive read as
 before.
 
+The same walk also keeps the launch files srtctl and the engines write next to the logs:
+`recipe.lock.yaml` and srtctl's `config.yaml` (the resolved recipe), `fingerprint_<role>_w<N>.json`
+(each worker's driver, CUDA, NCCL, framework build and packages), `trtllm_config_*.yaml` and
+SGLang's `*_config.json` (engine config files the launch command points at), and the client's
+`benchmark_command.txt` (`isLaunchFileName` in `etl/launch-files.ts`). They are stored like any
+other bundle file, never become the primary file, and the log viewer hides them. Run the
+backfill below with `--force` to add them to bundles stored before the reader kept them.
+
 The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
 extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
 primary file's original path, and `files_complete` distinguishes fully scanned bundles from

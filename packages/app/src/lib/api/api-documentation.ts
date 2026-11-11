@@ -2599,8 +2599,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log',
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
-      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
-      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
+      'Returns one stored file for a benchmark result ID: a .log/.out file or a launch file such as recipe.lock.yaml. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
+      '返回某个基准测试结果 ID 对应的一份已存储文件：.log/.out 文件，或 recipe.lock.yaml 等启动文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2715,8 +2715,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-search',
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
-      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
-      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
+      'Runs a literal, case-insensitive search across every stored file for one benchmark result, launch files included. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
+      '在某个基准测试结果对应的所有已存储文件（包括启动文件）中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2811,8 +2811,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-files',
     summary: text('List stored benchmark log files', '列出已存储的基准测试日志文件'),
     description: text(
-      'Lists every .log and .out filename retained from the matching server-log artifact. Paths are returned relative to the artifact root, with the primary file first.',
-      '列出匹配服务器日志产物中保留的所有 .log 和 .out 文件名。路径相对于产物根目录返回，主文件排在首位。',
+      'Lists every file retained from the matching server-log artifact: each .log and .out file, plus the launch files srtctl and the engines write (recipe.lock.yaml, srtctl config.yaml, fingerprint_<role>_w<N>.json, trtllm_config_*.yaml, SGLang *_config.json and benchmark_command.txt). Paths are returned relative to the artifact root, with the primary log file first. Bundles ingested before launch files were kept list only logs until they are backfilled.',
+      '列出匹配服务器日志产物中保留的所有文件：每个 .log 和 .out 文件，以及 srtctl 和推理引擎写出的启动文件（recipe.lock.yaml、srtctl 的 config.yaml、fingerprint_<role>_w<N>.json、trtllm_config_*.yaml、SGLang 的 *_config.json 和 benchmark_command.txt）。路径相对于产物根目录返回，主日志文件排在首位。在开始保留启动文件之前导入的文件集合，回填之前只列出日志。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2830,8 +2830,8 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Artifact-relative .log/.out filenames.',
-        '相对于产物根目录的 .log/.out 文件名。',
+        'Artifact-relative log and launch filenames.',
+        '相对于产物根目录的日志和启动文件名。',
         arraySchema(stringSchema),
         ['results/server.log', 'results/benchmark.log', 'results/router.log'],
       ),

@@ -988,7 +988,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log-files',
-    sourceSha256: '859f7d2320c81c20385fc3cf2dd68412ebec2ac34f1ab330ecf67b4182ae6fc7',
+    sourceSha256: '8e7ff48404adac898c77813131b04881cc853eb6526b0c474c2ce43dca39c1ec',
   },
   {
     source: 'src/app/api/v1/server-log-search/route.ts',
