@@ -20,8 +20,8 @@ export interface RedactableChartSeries {
 }
 
 /**
- * Redact endpoint addresses in source identities and engine labels in place.
- * The series are computed from raw addresses first, so grouping and ordering
+ * Sanitize source identities and engine labels in place.
+ * The series are computed from raw values first, so grouping and ordering
  * do not change. Returns the number of values that changed.
  */
 export function redactChartSeriesSources(series: RedactableChartSeries, key: Uint8Array): number {

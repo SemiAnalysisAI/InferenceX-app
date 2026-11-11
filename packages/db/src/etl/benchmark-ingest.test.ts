@@ -299,17 +299,17 @@ describe('insertServerLogFiles block copies', () => {
   it('stores and blocks only the redacted text, so both copies match', async () => {
     vi.stubEnv('SERVER_LOG_BLOCKS', '1');
     const { sql, calls } = fakeTransactionSql(null, [], []);
-    const server = 'connect http://***REDACTED-f58c3e***:8000/v1\n';
-    const router = 'HF_TOKEN=***REDACTED*** peer ***REDACTED-51671e***:9405\n';
+    const server = 'connect http://***REDACTED-842ff3***:8000/v1\n';
+    const router = 'HF_TOKEN=***REDACTED*** peer ***REDACTED-95c83f***:9100\n';
 
     await insertServerLogFiles(
       sql,
       [42],
       [
-        { fileName: 'results/server.log', logText: 'connect http://172.29.37.221:8000/v1\n' },
+        { fileName: 'results/server.log', logText: 'connect http://10.0.0.11:8000/v1\n' },
         {
           fileName: 'results/router.log',
-          logText: 'HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyzABCDEF12 peer 10.3.10.34:9405\n',
+          logText: 'HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyzABCDEF12 peer 10.0.0.21:9100\n',
         },
       ],
       REDACTION_KEY,

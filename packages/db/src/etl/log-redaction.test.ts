@@ -35,8 +35,8 @@ describe('redactText', () => {
   });
 
   it('gives an address unlinkable tags under different keys', () => {
-    const a = redactText('10.3.10.34', key);
-    const b = redactText('10.3.10.34', processRedactionKey);
+    const a = redactText('10.0.0.21', key);
+    const b = redactText('10.0.0.21', processRedactionKey);
     expect(a).toMatch(TAG);
     expect(b).toMatch(TAG);
     expect(b).not.toBe(a);

@@ -2212,9 +2212,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    // Reviewed for endpoint redaction: the self-heal path redacts addresses in
-    // source descriptors and engine labels before it returns or stores them, as
-    // ingest does. Field names, types and units are unchanged, so the docs stand.
+    // Self-heal sanitizes source labels as ingest does; shapes are unchanged.
     sourceSha256: '0c00c0fc01d589e580c542461f1578ea062b880019e4f642b18a97501dc92b0f',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',

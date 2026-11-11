@@ -17,8 +17,8 @@
  * public backfills of existing rows (e.g. recomputed `aggregate_stats`) do not
  * propagate. Source columns the target schema lacks (newer public migrations)
  * are skipped and reported. Copied server-log text and chart-series endpoint
- * identifiers are redacted with one key per invocation, as ingest does, so a
- * source holding rows from before redaction never publishes their addresses.
+ * identifiers are redacted with one key per invocation, as ingest does, so
+ * rows stored before sanitization are sanitized on copy.
  *
  * Each run commits in its own transaction, so an interrupted sync resumes by
  * rerunning the command.

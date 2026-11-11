@@ -1,5 +1,5 @@
 /**
- * Redact IP addresses, Oracle VCN domains and credentials already stored in
+ * Sanitize values already stored in
  * server logs and trace-replay chart series, with the rules ingest applies.
  *
  * Dry run by default: it reads every file and chart series in scope and

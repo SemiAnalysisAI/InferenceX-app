@@ -10,11 +10,8 @@ import { redactStoredChartSeries, redactStoredServerLogFile } from './stored-red
 import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
 
 const KEY = Buffer.from('test-key');
-const RAW =
-  'peer 10.3.10.34:9405 ready\n' +
-  'remote=[watchtower-navy-cn16.sub07252334101.gb200manual.oraclevcn.com]:29501\n';
-const REDACTED =
-  'peer ***REDACTED-51671e***:9405 ready\nremote=[watchtower-navy-cn16.***REDACTED***]:29501\n';
+const RAW = 'peer 10.0.0.21:9100 ready\nremote=[node-a.subnet1.vcn1.oraclevcn.com]:29501\n';
+const REDACTED = 'peer ***REDACTED-95c83f***:9100 ready\nremote=[node-a.***REDACTED***]:29501\n';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -166,14 +163,14 @@ function chartSeries(prefillUrl: string, decodeUrl: string, labels: string[]): C
 }
 
 describe('redactStoredChartSeries', () => {
-  const raw = chartSeries('http://10.3.10.34:9405/metrics', 'http://10.3.10.35:9405/metrics', [
-    '10.3.10.34:9405',
-    '10.3.10.35:9405',
+  const raw = chartSeries('http://10.0.0.21:9100/metrics', 'http://10.0.0.22:9100/metrics', [
+    '10.0.0.21:9100',
+    '10.0.0.22:9100',
   ]);
   const expected = chartSeries(
-    'http://***REDACTED-51671e***:9405/metrics',
-    'http://***REDACTED-050a41***:9405/metrics',
-    ['***REDACTED-51671e***:9405', '***REDACTED-050a41***:9405'],
+    'http://***REDACTED-95c83f***:9100/metrics',
+    'http://***REDACTED-9b0b8d***:9100/metrics',
+    ['***REDACTED-95c83f***:9100', '***REDACTED-9b0b8d***:9100'],
   );
 
   beforeEach(async () => {
@@ -203,8 +200,8 @@ describe('redactStoredChartSeries', () => {
     expect(series).toEqual(expected);
     expect(summary.metricSources).toEqual(expected.metricSources.map(({ source }) => ({ source })));
     expect(summary.kvCacheUsageByEngine.map((engine) => engine.engineLabel)).toEqual([
-      '***REDACTED-51671e***:9405',
-      '***REDACTED-050a41***:9405',
+      '***REDACTED-95c83f***:9100',
+      '***REDACTED-9b0b8d***:9100',
     ]);
     expect(await redactStoredChartSeries(sql, 5, KEY, true)).toEqual({
       series: false,

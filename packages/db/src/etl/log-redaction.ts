@@ -3,8 +3,7 @@ import { isIPv6 } from 'node:net';
 
 /**
  * Redaction shared with InferenceX's Python uploader (contract v1, test vectors
- * in `log-redaction.vectors.json`). Only values that let an outsider reach a
- * machine or log in are replaced. Node names, paths, ports and GPU ids stay.
+ * in `log-redaction.vectors.json`).
  */
 
 /** One key per process, never stored, so tags cannot be linked across invocations. */

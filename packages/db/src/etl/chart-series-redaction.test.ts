@@ -24,8 +24,8 @@ describe('prepareTraceReplay endpoint redaction', () => {
       metrics: {
         trtllm_kv_cache_utilization: {
           series: [
-            kvSeries('http://10.3.10.34:9405/metrics', 'prefill', 0.2),
-            kvSeries('http://10.3.10.35:9405/metrics', 'decode', 0.6),
+            kvSeries('http://10.0.0.21:9100/metrics', 'prefill', 0.2),
+            kvSeries('http://10.0.0.22:9100/metrics', 'decode', 0.6),
           ],
         },
       },
@@ -43,17 +43,17 @@ describe('prepareTraceReplay endpoint redaction', () => {
     const summaryJson = gunzipSync(prepared.chartSeriesSummaryGz!).toString('utf8');
     const series = JSON.parse(seriesJson) as ChartSeries;
     expect(series.metricSources.map(({ source }) => [source.role, source.endpointUrl])).toEqual([
-      ['prefill', 'http://***REDACTED-51671e***:9405/metrics'],
-      ['decode', 'http://***REDACTED-050a41***:9405/metrics'],
+      ['prefill', 'http://***REDACTED-95c83f***:9100/metrics'],
+      ['decode', 'http://***REDACTED-9b0b8d***:9100/metrics'],
     ]);
     expect(series.metricSources.map(({ source }) => source.id)).toEqual([
-      'trtllm|prefill|http://***REDACTED-51671e***:9405/metrics',
-      'trtllm|decode|http://***REDACTED-050a41***:9405/metrics',
+      'trtllm|prefill|http://***REDACTED-95c83f***:9100/metrics',
+      'trtllm|decode|http://***REDACTED-9b0b8d***:9100/metrics',
     ]);
     expect(JSON.parse(summaryJson).metricSources).toEqual(
       series.metricSources.map(({ source }) => ({ source })),
     );
-    expect(seriesJson).not.toContain('10.3.10.');
-    expect(summaryJson).not.toContain('10.3.10.');
+    expect(seriesJson).not.toContain('10.0.0.');
+    expect(summaryJson).not.toContain('10.0.0.');
   });
 });
