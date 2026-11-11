@@ -357,7 +357,7 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 4,
       // A100 is now recognized by the shared hardware registry.
-      sources: 'e3f94af7b62a5de2118677f1f76298c0e19fc0f040ec745ffabadf792db5ea54',
+      sources: '4eb19848170182e1b9ed9a69f5932a9fc5066e4ac4f84a63649b1fc4f74f0153',
     });
   });
 });

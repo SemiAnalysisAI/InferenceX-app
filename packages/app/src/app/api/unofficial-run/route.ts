@@ -122,6 +122,7 @@ export function normalizeArtifactRows(
       tracker,
       undefined,
       artifactRunId(runUrl),
+      { allowUnregistered: true },
     );
     if (!params) continue;
     const { config } = params;

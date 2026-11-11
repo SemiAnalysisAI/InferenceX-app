@@ -570,6 +570,24 @@ describe('mapBenchmarkRow', () => {
       expect(tracker.unmappedModels.has('nonexistent_model_xyz')).toBe(true);
     });
 
+    it('keeps an unregistered model and hardware under their raw identities only when allowed', () => {
+      const row = makeV1Row({
+        infmax_model_prefix: 'nonexistent_model_xyz',
+        model: undefined,
+        hw: 'cluster:imaginary9-lab',
+      });
+      expect(mapBenchmarkRow(row, createSkipTracker())).toBeNull();
+
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(row, tracker, undefined, undefined, {
+        allowUnregistered: true,
+      });
+      expect(result?.config.model).toBe('nonexistent_model_xyz');
+      expect(result?.config.hardware).toBe('imaginary9');
+      expect(tracker.skips.unmappedModel).toBe(0);
+      expect(tracker.skips.unmappedHw).toBe(0);
+    });
+
     it('skips and counts unmapped hardware', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(makeV1Row({ hw: 'imaginary-gpu-999' }), tracker);
