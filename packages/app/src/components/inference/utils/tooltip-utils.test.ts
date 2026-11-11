@@ -621,7 +621,20 @@ describe('buildPointDetails', () => {
       'view-logs',
       'view-power-telemetry',
       'view-power-trace',
+      'reproduce',
     ]);
+  });
+
+  it('offers Reproduce on unofficial overlay points that lack stored-result actions', () => {
+    const details = buildPointDetails(
+      tooltipConfig({
+        hasTrace: true,
+        hasLog: true,
+        showPowerTelemetry: true,
+        data: pt({ id: undefined, benchmark_type: 'agentic_traces' }),
+      }),
+    );
+    expect(details.links.map((link) => link.action)).toEqual(['reproduce']);
   });
 
   it('includes date, xLabel, and yLabel', () => {

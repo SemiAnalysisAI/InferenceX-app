@@ -244,6 +244,14 @@ const FixedSequenceLogDialog = dynamic(
   { ssr: false },
 );
 
+const ReproduceDrawer = dynamic(
+  () =>
+    import('@/components/inference/reproduce/ReproduceDrawer').then(
+      (module) => module.ReproduceDrawer,
+    ),
+  { ssr: false },
+);
+
 const QuickFiltersDialog = dynamic(
   () =>
     import('@/components/inference/ui/QuickFiltersDialog').then(
@@ -1253,6 +1261,7 @@ const ScatterGraph = React.memo(
       useBenchmarkPresence(hasPersistedPoint);
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
+    const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
 
     const openPowerTrace = usePowerTraceAction(chartRef);
 
@@ -2383,6 +2392,9 @@ const ScatterGraph = React.memo(
           setPowerTelemetryPoint(d);
           chartRef.current?.dismissTooltip();
           track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
+        } else if (action === 'reproduce') {
+          setReproducePoint(d);
+          chartRef.current?.dismissTooltip();
         } else if (action === 'view-logs' && typeof d.id === 'number') {
           if (d.benchmark_type !== 'agentic_traces') {
             event.preventDefault();
@@ -4752,6 +4764,13 @@ const ScatterGraph = React.memo(
             onOpenChange={(open) => {
               if (!open) setFixedLogPointId(null);
             }}
+          />
+        )}
+        {reproducePoint === null ? null : (
+          <ReproduceDrawer
+            point={reproducePoint}
+            source="scatter"
+            onClose={() => setReproducePoint(null)}
           />
         )}
       </div>

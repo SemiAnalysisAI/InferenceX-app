@@ -953,6 +953,14 @@ export const apiRouteCatalog = [
     sourceSha256: '2fc7e52dd60a3dcb19e73beebad561b9f989444267f72812c97a480bf2957415',
   },
   {
+    source: 'src/app/api/v1/reproduce/route.ts',
+    path: '/api/v1/reproduce',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-reproduce',
+    sourceSha256: '2a03d5808e361e4ab7489025d4dcfe5ed73757cb0829b0248a792a23fa68316b',
+  },
+  {
     source: 'src/app/api/v1/request-chart-data/route.ts',
     path: '/api/v1/request-chart-data',
     method: 'GET',

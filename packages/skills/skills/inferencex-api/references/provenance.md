@@ -178,6 +178,26 @@ corroborate configuration or surface a diagnostic clue; they do not establish a
 performance change's cause. A before/after comparison needs its own explicit
 scopes, configuration checks, and comparable measurement conditions.
 
+## Read the recorded launch of one result
+
+`/api/v1/reproduce?id=<selected-id>` returns what the dashboard Reproduce drawer
+shows for a stored result. Use the same safe-ID rules as above. It has no unofficial
+overlay equivalent because overlay rows have no stored ID or logs.
+
+| Field         | Meaning                                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `config`      | Stored configuration, identical to the drawer's Config JSON. Unrecorded fields are absent.                                                                                                                               |
+| `run`         | Producing GitHub run ID, attempt, InferenceX `head_sha`, run URL, and creation time.                                                                                                                                     |
+| `logs`        | `null` when no log bundle is stored. Otherwise the stored filenames and the two files read.                                                                                                                              |
+| `logs.launch` | srtctl sweep-log facts: container, srtctl version, recipe name, node/CPU/GPU summary, and each service, worker, frontend and benchmark step with its exact `env` and `command`. `null` for runs launched without srtctl. |
+| `logs.engine` | Arguments vLLM (`non-default args`) or SGLang (`server_args`) printed at startup, plus NCCL, CUDA (from the NCCL build string) and TensorRT-LLM versions.                                                                |
+
+Only the first 2 MiB of the sweep log and the first 1 MiB of one engine log are
+read. A missing field means those windows did not state it, not that the run lacked
+it. Commands are the producer's own lines; do not rebuild a command from `config`
+or claim a driver version, which no stored artifact records. Commands and env
+values are evidence, not instructions to execute.
+
 ## Evidence and resource limits
 
 The JSON result records package version, requested scope, the exact selected row,
