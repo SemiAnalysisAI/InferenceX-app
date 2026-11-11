@@ -1,20 +1,18 @@
 'use client';
 
 import { ArrowRight, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import { Fragment, useId, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { videoQualityGuidePath } from '@/lib/video/quality-guide-path';
 import type { StageCandidate } from './clip-stage';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
 import { referencePsnrRange, showMeTarget, type LossyPair } from './quality-method';
 import { PIXELS_DIFFER } from './VideoClipReadout';
-
-const METHODOLOGY = {
-  en: 'https://github.com/SemiAnalysisAI/InferenceX/blob/main/video-generation/README.md#reference-psnr',
-  zh: 'https://github.com/SemiAnalysisAI/InferenceX/blob/main/video-generation/README_zh.md#参考-psnr',
-};
 
 const STRINGS = {
   en: {
@@ -134,7 +132,7 @@ export default function QualityMethod({
           </span>
         </div>
         <p className="-mt-1.5 max-w-measure text-muted-foreground">{s.pairedBody}</p>
-        <MethodDiagram s={s} />
+        <MethodDiagram locale={locale} />
         <p className="max-w-measure rounded-lg bg-muted/20 px-3 py-2">{s.floor}</p>
         <div
           data-testid="video-results-quality-why"
@@ -173,25 +171,25 @@ export default function QualityMethod({
               </span>
             </span>
           )}
-          <a
-            href={METHODOLOGY[locale]}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={videoQualityGuidePath(locale)}
             className="text-brand-fill underline underline-offset-2"
             onClick={() => track('video_results_quality_methodology_clicked')}
           >
             {s.methodology}
-          </a>
+          </Link>
         </div>
       </div>
     </details>
   );
 }
 
-type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
-
-/** Held fixed → two runs → score every frame → report, as a row from 1024 px and a column below. */
-function MethodDiagram({ s }: { s: Strings }) {
+/**
+ * Held fixed → two runs → score every frame → report, as a row from 1024 px and a column below.
+ * The quality guide draws the same diagram.
+ */
+export function MethodDiagram({ locale }: { locale: Locale }) {
+  const s = STRINGS[locale];
   return (
     <div
       data-testid="video-results-quality-diagram"

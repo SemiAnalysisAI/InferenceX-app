@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';
-import { referencePsnrRange, seeChangesPair, showMeTarget } from './quality-method';
+import {
+  referencePsnrRange,
+  referencePsnrScores,
+  seeChangesPair,
+  showMeTarget,
+} from './quality-method';
 import type { ClipQuality } from './reference-quality';
 import type { ResultsClipSide } from './results-clips';
 import type { ResultsEvidence } from './results-evidence';
@@ -42,6 +47,7 @@ const side = (
   ),
   diagnostics,
 });
+const crane = (psnrDb: number) => ({ caseId: 'crane', prompt: 'crane prompt', psnrDb });
 const lossyResults = { engine: 'sglang', optimizations: ['first-block-cache'] };
 const point = (hardwareKey: string, lossy = false, runId = 'official') =>
   ({
@@ -70,7 +76,7 @@ const cell = (id: string, runId: string, lossy: boolean, publishedAt: string | n
   }) as unknown as VideoPoint;
 
 describe('quality method', () => {
-  it('ranges reference PSNR over lossless CI clips with a finite score only', () => {
+  it('scores and ranges reference PSNR over lossless CI clips with a finite score only', () => {
     const rerun = {
       ...pair('measured', 50),
       scope: 'matched-noise-diagnostic',
@@ -101,6 +107,11 @@ describe('quality method', () => {
       hardware: ['b200', 'h200'],
     });
     expect(referencePsnrRange(leads.slice(1, 2))).toBeNull();
+    // The same case on two GPUs stays two scores, one per hardware.
+    expect(referencePsnrScores(leads)).toEqual([
+      { hardwareKey: 'b200', scores: [crane(20.04)] },
+      { hardwareKey: 'h200', scores: [crane(12.84)] },
+    ]);
   });
 
   it('shows B200 against its reference, else the first lossless lead that has one', () => {
