@@ -1,3 +1,4 @@
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBenchmarks, type BenchmarkRow } from '@/lib/api/api';
@@ -29,7 +30,10 @@ export function benchmarkQueryOptions(
       ...(scope ? (['scope', scope] as const) : []),
     ] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view),
+      // A model seen only in an unofficial-run overlay has no published rows, and the API rejects it.
+      DISPLAY_MODEL_TO_DB[model]
+        ? fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view)
+        : Promise.resolve<BenchmarkRow[]>([]),
     enabled: enabled && Boolean(model),
     ...(initialData ? { initialData } : {}),
     ...(keepPreviousForModel

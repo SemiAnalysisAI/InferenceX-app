@@ -141,11 +141,13 @@ describe('parseAvailableModelsAndSequences', () => {
     ]);
   });
 
-  it('skips keys with unknown model names', () => {
+  it('keeps keys whose model is unregistered under the raw identity', () => {
     const chartData = {
       'UnknownModel_1k/1k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
-    expect(parseAvailableModelsAndSequences(chartData)).toEqual([]);
+    expect(parseAvailableModelsAndSequences(chartData)).toEqual([
+      { model: 'UnknownModel', sequence: Sequence.OneK_OneK, precisions: [] },
+    ]);
   });
 
   it('skips keys without underscores', () => {
@@ -163,6 +165,32 @@ describe('parseAvailableModelsAndSequences', () => {
     ]);
     const result = parseAvailableModelsAndSequences(chartData);
     expect(result).toHaveLength(1);
+  });
+});
+
+describe('unofficial run with an unregistered model and hardware', () => {
+  it('normalizes, groups and plots the artifact rows under raw identities', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawPowerArtifact({ infmax_model_prefix: 'futuremodel9', hw: 'cluster:zx9-lab', conc: 64 }),
+        rawPowerArtifact({ infmax_model_prefix: 'futuremodel9', hw: 'cluster:zx9-lab', conc: 128 }),
+      ],
+      '2026-11-11',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/900000001',
+    );
+    expect(rows.map((row) => [row.model, row.hardware, row.conc])).toEqual([
+      ['futuremodel9', 'zx9', 64],
+      ['futuremodel9', 'zx9', 128],
+    ]);
+
+    const chartData = buildChartData(rows);
+    expect(parseAvailableModelsAndSequences(chartData)).toEqual([
+      { model: 'futuremodel9', sequence: Sequence.OneK_OneK, precisions: ['fp8'] },
+    ]);
+    const { data, gpus } = chartData['futuremodel9_1k/1k'].interactivity;
+    expect(data.map((point) => point.conc).toSorted((a, b) => a - b)).toEqual([64, 128]);
+    expect(new Set(data.map((point) => point.hwKey))).toEqual(new Set(['zx9_sglang']));
+    expect(gpus.zx9_sglang).toMatchObject({ label: 'ZX9', suffix: '(SGLang)' });
   });
 });
 

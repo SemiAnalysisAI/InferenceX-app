@@ -106,6 +106,7 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
   isModelDeprecated,
+  isRegisteredModel,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import {
@@ -124,7 +125,7 @@ import {
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
-import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase, isKnownGpu } from '@/lib/catalog/constants';
 import { plottedChipBases } from '@/components/ui/editable-tco-badges';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -203,6 +204,9 @@ const STRINGS = {
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
+    unregisteredModel: ' (unregistered model) ',
+    unregisteredHardware: (hw: string) =>
+      `Unregistered hardware ${hw} is labeled by its raw runner name.`,
   },
   zh: {
     inferencePerformance: '推理性能',
@@ -230,6 +234,8 @@ const STRINGS = {
     },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
+    unregisteredModel: '（未注册模型）',
+    unregisteredHardware: (hw: string) => `未注册硬件 ${hw} 以其原始 runner 名称标注。`,
   },
 } as const;
 
@@ -645,6 +651,15 @@ export default function ChartDisplay({
     chipBasis,
     compareGpuPair,
   ]);
+  const unregisteredOverlayHardware = useMemo(() => {
+    const bases = new Set<string>();
+    for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
+      for (const hwKey of Object.keys(overlay?.hardwareConfig ?? {})) {
+        if (!isKnownGpu(hwKey)) bases.add(hwKey.split('_')[0].toUpperCase());
+      }
+    }
+    return [...bases].toSorted().join(', ');
+  }, [overlayDataByChartType]);
 
   const overlayScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
@@ -1233,7 +1248,14 @@ export default function ChartDisplay({
                               level="card"
                               logo={<ModelLogo model={graph.model as Model} className="size-6" />}
                             >
-                              {getModelLabel(graph.model as Model)}{' '}
+                              {getModelLabel(graph.model as Model)}
+                              {isRegisteredModel(graph.model) ? (
+                                ' '
+                              ) : (
+                                <span data-testid="unregistered-model-label">
+                                  {t.unregisteredModel}
+                                </span>
+                              )}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}
                               <HeadingQualifier>
@@ -1286,6 +1308,14 @@ export default function ChartDisplay({
                               </OptionInfo>
                             )}
                           </div>
+                          {unregisteredOverlayHardware && (
+                            <p
+                              data-testid="unregistered-hardware-label"
+                              className="text-muted-foreground text-sm"
+                            >
+                              {t.unregisteredHardware(unregisteredOverlayHardware)}
+                            </p>
+                          )}
                         </>
                       );
                       const chartContext = (

@@ -12,6 +12,7 @@ import { hasRealPoolSplit, perPoolThroughputPatch } from './disagg-throughput';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
   resolveModelKey,
+  hwBaseKey,
   hwToGpuKey,
   normalizeFramework,
   normalizePrecision,
@@ -139,6 +140,11 @@ export interface BenchmarkParams {
   powerAudit?: PowerAudit;
 }
 
+export interface MapBenchmarkRowOptions {
+  /** Unofficial-run overlays keep rows whose model or hardware has no registry entry, keyed by the raw identity. */
+  allowUnregistered?: boolean;
+}
+
 export function isAgenticRow(row: Record<string, unknown>): boolean {
   return String(row.scenario_type ?? '').startsWith('agentic');
 }
@@ -148,6 +154,7 @@ export function mapBenchmarkRow(
   tracker: SkipTracker,
   islOslFallback?: { isl: number; osl: number } | null,
   runId?: string | number | null,
+  options: MapBenchmarkRowOptions = {},
 ): BenchmarkParams | null {
   row = normalizeLegacyTpuRow(flattenAgenticAggRow(row), runId);
   if (row.benchmark_outcome?.status === 'failed') {
@@ -155,7 +162,8 @@ export function mapBenchmarkRow(
     return null;
   }
 
-  const modelKey = resolveModelKey(row);
+  const modelKey =
+    resolveModelKey(row) ?? (options.allowUnregistered ? unregisteredModelKey(row) : null);
   if (!modelKey) {
     tracker.skips.unmappedModel++;
     const raw = String(row.infmax_model_prefix ?? row.model ?? '');
@@ -163,11 +171,11 @@ export function mapBenchmarkRow(
     return null;
   }
 
-  const gpuKey = hwToGpuKey(String(row.hw ?? ''));
+  const hw = String(row.hw ?? '');
+  const gpuKey = hwToGpuKey(hw) ?? (options.allowUnregistered ? hwBaseKey(hw) || null : null);
   if (!gpuKey) {
     tracker.skips.unmappedHw++;
-    const raw = String(row.hw ?? '');
-    if (raw) tracker.unmappedHws.add(raw);
+    if (hw) tracker.unmappedHws.add(hw);
     return null;
   }
 
@@ -279,6 +287,11 @@ export function mapBenchmarkRow(
     powerInvalidReasons,
     powerAudit,
   };
+}
+
+function unregisteredModelKey(row: Record<string, any>): string | null {
+  const raw = String(row.infmax_model_prefix ?? row.model_prefix ?? row.model ?? '').trim();
+  return raw || null;
 }
 
 function captureNumericMetrics(

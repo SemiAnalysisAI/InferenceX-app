@@ -36,7 +36,7 @@ A loaded unofficial run contributes an extra bar per (hardware × run) to the ba
 
 Both paths share one row → `GPUDataPoint` mapper, `buildGpuGroups`, so an overlay bar and its official twin can never differ because of a mapping drift. Group identity is carried in `gpuGroupMeta` / `overlayGroupMeta` rather than re-parsed out of the key string; `CostTargetPanel` still splits keys itself, which is safe because it only receives official keys.
 
-Overlay rows arrive unfiltered by model (the unofficial-run API returns every model in the run, while `/api/v1/benchmarks` is already model-scoped), so the hook filters them with `DB_MODEL_TO_DISPLAY`.
+Overlay rows arrive unfiltered by model (the unofficial-run API returns every model in the run, while `/api/v1/benchmarks` is already model-scoped), so the hook filters them with `DB_MODEL_TO_DISPLAY`. A model missing from that map is matched by its raw key, which is also its display name, so overlay rows for an unregistered model still reach the bar chart. The dashboard's `benchmarkQueryOptions` resolves such a model's official rows to an empty list without calling `/api/v1/benchmarks`, which would reject the unknown model.
 
 **Only the bar chart and its legend show overlay data.** The table view, CSV export, and cost-target panel deliberately stay official-only. An exported sheet or an MW projection that silently blends in numbers from an unmerged branch is worse than one that omits them. This is why `barResults` (official + overlay) exists separately from `results` (official) and only reaches `ThroughputBarChart`.
 

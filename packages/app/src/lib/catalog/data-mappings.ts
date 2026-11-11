@@ -303,6 +303,11 @@ export function hasExclusion(model: Model | string | null | undefined): boolean 
   return getModelExclusion(model).length > 0;
 }
 
+/** False for a model that only an unofficial-run overlay carries, identified by its raw prefix. */
+export function isRegisteredModel(model: string): model is Model {
+  return Object.hasOwn(MODEL_CONFIG, model);
+}
+
 export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
   return isUnofficialRun ? 'unofficial' : 'logo';
 }

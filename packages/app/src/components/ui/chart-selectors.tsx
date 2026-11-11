@@ -30,6 +30,7 @@ import {
   getSequenceCategoryForModel,
   getSequenceLabel,
   groupByCategory,
+  isRegisteredModel,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -63,6 +64,9 @@ const STRINGS = {
     deprecatedModelReason: 'Model is no longer actively benchmarked.',
     deprecatedSequenceReason:
       'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
+    unregisteredModels: 'Unregistered models',
+    unregisteredModelReason:
+      'Only present in an unofficial run. InferenceX has no registry entry for it, so it is shown by its raw model prefix.',
   },
   zh: {
     model: '模型',
@@ -89,6 +93,9 @@ const STRINGS = {
     deprecated: '已弃用',
     deprecatedModelReason: '该模型已不再进行活跃基准测试。',
     deprecatedSequenceReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
+    unregisteredModels: '未注册模型',
+    unregisteredModelReason:
+      '仅出现在非官方运行中。InferenceX 的模型注册表中尚无该模型，因此直接显示其原始模型前缀。',
   },
 } as const;
 
@@ -154,7 +161,10 @@ export function ModelSelector({
   modelDetails,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
-  const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
+  const groups = groupByCategory(availableModels.filter(isRegisteredModel), (m) =>
+    getModelCategory(m),
+  );
+  const unregistered = availableModels.filter((m) => !isRegisteredModel(m));
   const optionFor = (model: string) =>
     toOption(
       model,
@@ -206,6 +216,21 @@ export function ModelSelector({
               />
             ),
             options: groups.deprecated.map(optionFor),
+          },
+        ]
+      : []),
+    ...(unregistered.length > 0
+      ? [
+          {
+            id: 'unregistered',
+            header: (
+              <CategorySectionTitle
+                id="unregistered"
+                label={t.unregisteredModels}
+                reason={t.unregisteredModelReason}
+              />
+            ),
+            options: unregistered.map(optionFor),
           },
         ]
       : []),
