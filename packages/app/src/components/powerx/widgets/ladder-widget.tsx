@@ -18,14 +18,9 @@ import { cn } from '@/lib/shared/utils';
 
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
-import {
-  Chips,
-  GrammarLegend,
-  useHydrated,
-  useView,
-  WidgetFrame,
-  type WidgetProps,
-} from './widget-chrome';
+import { Chips, WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { GrammarLegend, useHydrated, useView } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -93,7 +88,7 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
   const loading = view.status === 'loading';
 
   return (
-    <WidgetFrame name="ladder" alt={alt}>
+    <WidgetFrame scope="powerx" name="ladder" alt={alt}>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <Chips<LadderHardware>
           label={t.hardware}

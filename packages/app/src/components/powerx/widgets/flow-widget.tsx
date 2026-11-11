@@ -13,7 +13,9 @@ import {
   flowLayout,
   FlowSvg,
 } from './flow-svg';
-import { GrammarLegend, WidgetFrame, type WidgetProps } from './widget-chrome';
+import { WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { GrammarLegend } from './widget-chrome';
 
 const VERTICAL_BELOW_PX = 640;
 /** The diagram's height depends only on its orientation, so CSS can reserve it before measuring. */
@@ -32,7 +34,7 @@ export function FlowWidget({ locale, alt }: WidgetProps) {
   const captionId = useId();
 
   return (
-    <WidgetFrame name="flow" alt={alt}>
+    <WidgetFrame scope="powerx" name="flow" alt={alt}>
       <div
         ref={setContainerRef}
         className="@container min-w-0"

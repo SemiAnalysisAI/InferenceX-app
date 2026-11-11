@@ -18,15 +18,9 @@ import { cn } from '@/lib/shared/utils';
 import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
-import {
-  formatWatts,
-  GrammarSwatch,
-  type Provenance,
-  useHydrated,
-  useView,
-  WidgetFrame,
-  type WidgetProps,
-} from './widget-chrome';
+import { WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { formatWatts, GrammarSwatch, type Provenance, useHydrated, useView } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -112,7 +106,7 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
     : null;
 
   return (
-    <WidgetFrame name="worked-example" alt={alt}>
+    <WidgetFrame scope="powerx" name="worked-example" alt={alt}>
       {/* Two lines on phones, where the loaded point wraps. */}
       <p
         className="font-mono text-xs text-muted-foreground max-sm:min-h-8"

@@ -1,8 +1,12 @@
 # PowerX Tutorial
 
 `/pwx/tutorial` and `/zh/pwx/tutorial` render `packages/app/content/powerx/tutorial.mdx` and
-`zh/tutorial.mdx` through `compileBlogMdx(raw, locale, createPowerXTutorialComponents(locale))`.
-The pages are the only rendering target; the files are not written for GitHub.
+`zh/tutorial.mdx` through
+`compileBlogMdx(raw, locale, createTutorialComponents(locale, POWERX_TUTORIAL_WIDGETS))`. The pages
+are the only rendering target; the files are not written for GitHub. The article shell, MDX map,
+callout, widget frame and chips are shared with other guides under `src/components/tutorial/`,
+and the loader, metadata and JSON-LD under `src/lib/tutorial/tutorial-content.ts`; PowerX
+supplies its `POWERX_TUTORIAL` config (`src/lib/powerx/tutorial.ts`) and widgets.
 
 ## Syntax
 
@@ -18,12 +22,12 @@ The pages are the only rendering target; the files are not written for GitHub.
 The page is one reading column (`max-w-5xl` container, 72ch prose) with wider section rhythm than
 the blog. The body opens with the ladder widget before the first H2, so the hero (eyebrow, title,
 dek from front matter) is followed by the first visual. Every H2 gets a running number from the
-`h2` override in `tutorial-mdx-components.tsx`; there is no "On this page" list.
+`h2` override in `components/tutorial/tutorial-mdx-components.tsx`; there is no "On this page" list.
 
 ## One visual grammar
 
 Every chart, diagram and readout uses the same three fills, declared by `GrammarLegend` and drawn by
-`GrammarSwatch` (`widget-chrome.tsx`): **solid** = measured telemetry, **outlined** (hairline stroke,
+`GrammarSwatch` (`powerx/widgets/widget-chrome.tsx`): **solid** = measured telemetry, **outlined** (hairline stroke,
 14 % wash) = modeled by the power model, **dashed** = rated or assumed (TDP, all-in provisioned,
 PUE). Hue carries the chip and comes from `useThemeColors().resolveColor(hwKey)`; the flow diagram
 has no chip and uses `--brand`. Do not add a palette.
@@ -66,9 +70,10 @@ example's box. `cypress/component/powerx-tutorial-layout.cy.tsx` fails on any re
 shift.
 
 To add one: write the pure model in `src/lib/powerx/<name>.ts`, build the component
-on `widget-chrome.tsx` (`WidgetFrame`, `Chips`, `CopyButton`, `GrammarLegend`, `useView`,
-`useWidgetHash`), register it with a layout in `widgets/index.ts`, add the `<Widget>` line to
-both `.mdx` files, and add it to the layout spec.
+on the shared `components/tutorial/widget-chrome.tsx` (`WidgetFrame`, `Chips`) and the PowerX
+`widgets/widget-chrome.tsx` (`CopyButton`, `GrammarLegend`, `useView`, `useWidgetHash`), register it
+with a layout in `widgets/index.ts`, add the `<Widget>` line to both `.mdx` files, and add it to
+the layout spec.
 
 Both pages stay `noindex` until the PowerX tab is indexable; flip
-`robots` in `tutorial.ts` and add the pair to the sitemap together.
+`robots` in `lib/tutorial/tutorial-content.ts` and add the pair to the sitemap together.
