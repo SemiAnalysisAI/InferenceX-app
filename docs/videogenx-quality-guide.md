@@ -29,7 +29,9 @@ results at render time.
 
 `loadReferencePsnrEvidence()` (`src/lib/video/reference-psnr-evidence.ts`) reads the published
 History and the run's published artifacts through the in-process `/api/video-runs` transport, the
-same read the dashboard's first document uses. It keeps approved observations of the pinned run,
+same read the dashboard's first document uses. History is newest first and the dashboard reads only
+its first window, which the pinned run leaves as newer runs publish, so the loader follows
+`nextPage` to the end. It keeps approved observations of the pinned run,
 builds each side with `publishedResultsSide`, and extracts scores with `referencePsnrScores`
 (`quality-method.ts`). `referencePsnrRange`, which the dashboard panel shows, derives from the same
 function, so lossy leads, the matched-noise rerun and identical or unscored pairs are excluded in
@@ -38,8 +40,9 @@ both places.
 The run is pinned (`REFERENCE_PSNR_RUN_ID`) because the argument needs one engine across GPUs.
 Hardware labels come from the data. Any failed or incomplete read returns `hardware: null`, and the
 widget shows a "published scores unavailable" box at the chart's height instead of failing the page.
-The loader rethrows Next's dynamic-rendering signal (`unstable_rethrow`), so a prerender never
-bakes in the unavailable state by accident. The pages export `revalidate = 3600` as a ceiling; the
+The loader rethrows Next's dynamic-rendering signal (`unstable_rethrow`), so a dynamic bailout is
+not mistaken for a failed read. A real failed read, such as a storage error, does render the
+unavailable box, and that page stays cached until the next revalidation. The pages export `revalidate = 3600` as a ceiling; the
 video read cache (`VIDEO_CACHE_REVALIDATE_SECONDS`, five minutes) sets the actual window, so the
 build lists them at 5m. The plotted run never changes, so a refresh only retries a failed read and
 is otherwise a cache hit.

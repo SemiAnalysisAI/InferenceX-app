@@ -20,16 +20,19 @@ const H100 = published(8, 'NVIDIA H100', 'b'.repeat(64));
 /** Published but never approved for the dashboard. */
 const H200 = published(9, 'NVIDIA H200', 'c'.repeat(64));
 
+const entry = (saved: typeof B200) => ({
+  ...videoHistoryEntry(saved, null),
+  approved: saved !== H200,
+});
+
+/** History newest first: the pinned run's B200 artifact has aged past the first window. */
 function respond(query: URLSearchParams, failing?: number) {
   if (query.get('format') === 'history')
-    return Response.json({
-      schemaVersion: 1,
-      nextPage: null,
-      entries: [B200, H100, H200].map((saved) => ({
-        ...videoHistoryEntry(saved, null),
-        approved: saved !== H200,
-      })),
-    });
+    return Response.json(
+      query.get('page') === '1'
+        ? { schemaVersion: 1, nextPage: 6, entries: [H100, H200].map(entry) }
+        : { schemaVersion: 1, nextPage: null, entries: [entry(B200)] },
+    );
   const id = Number(query.get('artifact'));
   if (id === failing) return new Response(null, { status: 503 });
   return Response.json([B200, H100, H200].find((saved) => saved.artifact.id === id));
@@ -44,7 +47,7 @@ function serve({ failing }: { failing?: number } = {}) {
 const drum = { caseId: 'drum-taps', prompt: 'A drummer taps a snare drum.', psnrDb: 25 };
 
 describe('reference PSNR evidence', () => {
-  it('reads the pinned run’s approved published scores, one entry per GPU', async () => {
+  it('reads the pinned run’s approved published scores from every History page, one entry per GPU', async () => {
     serve();
     expect(await loadReferencePsnrEvidence()).toEqual({
       runId: REFERENCE_PSNR_RUN_ID,

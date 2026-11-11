@@ -30,17 +30,31 @@ function videoRunsRead(params: Record<string, string>) {
   return videoRuns(new NextRequest(url));
 }
 
+/**
+ * Every History page, read until `nextPage` runs out, keeping only `runId`'s entries. The pinned
+ * run ages out of the dashboard's newest-first window, so the guide cannot read just that window.
+ */
+async function runHistory(runId: string): Promise<VideoHistoryPage | null> {
+  const entries: VideoHistoryPage['entries'] = [];
+  for (let page: number | null = 1; page !== null;) {
+    const response = await videoRunsRead({
+      format: 'history',
+      page: String(page),
+      pages: String(VIDEO_HISTORY_MAX_PAGES),
+    });
+    if (!response.ok || response.headers.get('x-videogenx-incomplete') === '1') return null;
+    const history: VideoHistoryPage = await response.json();
+    if (history.schemaVersion !== 1 || !Array.isArray(history.entries)) return null;
+    entries.push(...history.entries.filter((entry) => entry.runId === runId));
+    page = history.nextPage !== null && history.nextPage > page ? history.nextPage : null;
+  }
+  return { schemaVersion: 1, entries, nextPage: null };
+}
+
 async function readScores(runId: string): Promise<ReferencePsnrScores[] | null> {
-  const historyResponse = await videoRunsRead({
-    format: 'history',
-    page: '1',
-    pages: String(VIDEO_HISTORY_MAX_PAGES),
-  });
-  if (!historyResponse.ok || historyResponse.headers.get('x-videogenx-incomplete') === '1')
-    return null;
-  const history: VideoHistoryPage = await historyResponse.json();
-  if (history.schemaVersion !== 1 || !Array.isArray(history.entries)) return null;
-  const points = videoPoints([history]).filter((point) => point.runId === runId);
+  const history = await runHistory(runId);
+  if (!history) return null;
+  const points = videoPoints([history]);
   const artifacts = new Map<number, Promise<StoredArtifact>>();
   const leads = await Promise.all(
     points.map(async (point) => {
