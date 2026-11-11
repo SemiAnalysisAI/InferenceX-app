@@ -136,7 +136,7 @@ describe('parsePrecisionCompareSlug — alias model slugs', () => {
 
 describe('parsePrecisionCompareSlug — rejection cases', () => {
   it('returns null for unknown GPU keys', () => {
-    expect(parsePrecisionCompareSlug('deepseek-r1-a100-fp8-vs-bf16')).toBeNull();
+    expect(parsePrecisionCompareSlug('deepseek-r1-unknown-gpu-fp8-vs-bf16')).toBeNull();
   });
 
   it('returns null for unknown precision tokens', () => {
@@ -301,7 +301,7 @@ describe('parseSpecDecodeCompareSlug — alias models', () => {
 
 describe('parseSpecDecodeCompareSlug — rejection cases', () => {
   it('returns null for unknown GPU keys', () => {
-    expect(parseSpecDecodeCompareSlug('deepseek-r1-a100-fp8-mtp-vs-none')).toBeNull();
+    expect(parseSpecDecodeCompareSlug('deepseek-r1-unknown-gpu-fp8-mtp-vs-none')).toBeNull();
   });
 
   it('returns null for unknown methods', () => {

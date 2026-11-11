@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 
 import { buildChartData } from './unofficial-chart-data';
 import {
@@ -166,6 +167,67 @@ describe('parseAvailableModelsAndSequences', () => {
 });
 
 describe('buildChartData', () => {
+  it('keeps A100 AgentX artifacts and prices overlay and official points identically', () => {
+    const rows = normalizeArtifactRows(
+      [
+        {
+          hw: 'cluster:a100-cw',
+          model: 'deepseek-ai/DeepSeek-V4.1-Flash',
+          infmax_model_prefix: 'dsv41flash',
+          framework: 'vllm',
+          precision: 'fp4',
+          spec_decoding: 'mtp',
+          scenario_type: 'agentic-coding',
+          conc: 28,
+          tp: 8,
+          ep: 1,
+          num_gpus: 8,
+          disagg: false,
+          is_multinode: false,
+          request_metrics: {
+            latency: {
+              full_response_itl: { p50: 0.00775, p90: 0.01509 },
+              e2el: { p50: 3.92612 },
+            },
+            throughput: {
+              per_gpu: {
+                total_tput_tps: 21089.85878,
+                output_tput_tps: 135.93515,
+                input_tput_tps: 20953.92363,
+              },
+            },
+          },
+        },
+      ],
+      '2026-11-11',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42940055863',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      hardware: 'a100',
+      model: 'dsv41flash',
+      framework: 'vllm',
+      benchmark_type: 'agentic_traces',
+      conc: 28,
+      num_decode_gpu: 8,
+    });
+    const data = buildChartData(rows)['DeepSeek-V4.1-Flash_agentic-traces'];
+    expect(data.interactivity.data).toHaveLength(1);
+    const point = data.interactivity.data[0];
+    expect(point.hwKey).toBe('a100_vllm');
+    expect(point.tpPerGpu.y).toBe(21089.85878);
+    expect(point.costh.y).toBeCloseTo(0.78 / (21089.85878 * 3600 * 1e-6));
+    expect(point.tokensPerDollarH?.y).toBeCloseTo((21089.85878 * 3600) / 0.78);
+    const official = transformBenchmarkRows(rows, 'median', 'external');
+    const officialPoint = official.chartData.flat().find((p) => p.hwKey === 'a100_vllm')!;
+    expect(officialPoint.tokensPerDollarH?.y).toBe(point.tokensPerDollarH?.y);
+    expect(
+      parseAvailableModelsAndSequences({ 'DeepSeek-V4.1-Flash_agentic-traces': data }),
+    ).toEqual([
+      { model: Model.DeepSeek_V4_1_Flash, sequence: Sequence.AgenticTraces, precisions: ['fp4'] },
+    ]);
+  });
+
   it('rescales agentic overlay token rates on the uncached basis', () => {
     const rows = [
       stubRow({

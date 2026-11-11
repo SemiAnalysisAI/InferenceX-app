@@ -355,9 +355,9 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 3,
-      // Only the unrelated reliability dashboard route was removed; video entries are unchanged.
-      sources: '8084b02f777fe7666d52280a9a9e2ee1fe052eac5b658411cabe35550d6b0e4c',
+      projection: 4,
+      // A100 is now recognized by the shared hardware registry.
+      sources: 'e3f94af7b62a5de2118677f1f76298c0e19fc0f040ec745ffabadf792db5ea54',
     });
   });
 });
