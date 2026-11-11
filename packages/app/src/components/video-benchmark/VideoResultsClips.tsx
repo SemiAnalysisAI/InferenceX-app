@@ -586,19 +586,14 @@ export default function VideoResultsClips({
     });
     onSubjectChange(stagePointKey(p));
   };
-  /** ←/→ on a focused segment plays the previous or next config; the phone select has its own. */
+  /** ←/→ on a focused segment plays its previous or next config; the phone select has its own. */
   const cycleConfigs = (event: KeyboardEvent<HTMLDivElement>) => {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
     if (step === 0 || configs.length < 2 || !(event.target instanceof HTMLButtonElement)) return;
     event.preventDefault();
-    const index = configs.findIndex((p) => configId(p, unofficialRun) === active);
-    const target =
-      index === -1
-        ? step > 0
-          ? 0
-          : configs.length - 1
-        : (index + step + configs.length) % configs.length;
-    event.currentTarget.querySelectorAll('button')[target]?.focus();
+    const segments = [...event.currentTarget.querySelectorAll('button')];
+    const target = (segments.indexOf(event.target) + step + configs.length) % configs.length;
+    segments[target]?.focus();
     pickConfig(configs[target]);
   };
   const optionLabel = (item: StageOption) =>

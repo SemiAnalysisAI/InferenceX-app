@@ -932,6 +932,13 @@ describe('VideoGenX results', () => {
       .should('have.attr', 'aria-pressed', 'true')
       .and('have.focus');
     playing().should('have.attr', 'data-hardware', 'h200');
+    // The keys step from the focused segment, not from the one that plays.
+    cy.get('[data-testid="video-results-config-h100"]').click();
+    cy.get('[data-testid="video-results-config-b200"]').focus().type('{rightarrow}');
+    cy.get('[data-testid="video-results-config-b200"]')
+      .next()
+      .should('have.attr', 'aria-pressed', 'true')
+      .and('have.focus');
   });
 
   it('pairs an unofficial run with the official cell of the same deployment', () => {
