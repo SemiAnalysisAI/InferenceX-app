@@ -34,7 +34,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
-          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+          [ "$GITHUB_REPOSITORY" != SemiAnalysisAI/InferenceX-app ] || : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           : "${APP_URL:?APP_URL repository variable is not set}"
           : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
@@ -113,7 +113,7 @@ jobs:
           done
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() && github.repository == 'SemiAnalysisAI/InferenceX-app'
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

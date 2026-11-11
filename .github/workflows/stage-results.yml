@@ -72,7 +72,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           PAT_PRESENT: ${{ secrets.PAT != '' }}
         run: |
-          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+          [ "$GITHUB_REPOSITORY" != SemiAnalysisAI/InferenceX-app ] || : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           if [ "$PAT_PRESENT" != true ]; then
             echo "::error::PAT secret is not set"
             exit 1

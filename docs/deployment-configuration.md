@@ -128,9 +128,10 @@ project, redeploy for the new value to take effect.
 
 ### Secrets
 
-`GITHUB_TOKEN` is provided by GitHub and is not listed. `SLACK_WEBHOOK_URL` is the
-failure alarm, so `ingest-results`, `ingest-operatorx`, `ingest-collectivex`, and `stage-results` check it
-before doing any other work. `stage-results` also checks `PAT` up front.
+`GITHUB_TOKEN` is provided by GitHub and is not listed. In `SemiAnalysisAI/InferenceX-app`,
+`SLACK_WEBHOOK_URL` is the failure alarm, so `ingest-results`, `ingest-operatorx`, `ingest-collectivex`, and
+`stage-results` check it before doing any other work. Other repositories send no Slack alerts and
+do not need it. `stage-results` also checks `PAT` up front.
 `ingest-operatorx` checks `APP_URL`, `VERCEL_INVALIDATE_SECRET`,
 `DATABASE_OPERATORX_WRITE_URL`, and `INFX_MAIN_PAT` in its first step, and
 `ingest-collectivex` checks `APP_URL`, `VERCEL_INVALIDATE_SECRET`, and
@@ -141,7 +142,7 @@ before writing to the production database.
 
 | Secret                            | Required                                                 | Used for                                                                                                                                    | Workflows                                                                                                                                                                                                                                                                |
 | --------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SLACK_WEBHOOK_URL`               | yes                                                      | Incoming webhook for ingest failure and unmapped-entity alerts.                                                                             | `ingest-results`, `ingest-operatorx`, `ingest-collectivex`, `stage-results` (passed to `ingest-results`)                                                                                                                                                                 |
+| `SLACK_WEBHOOK_URL`               | yes, in `SemiAnalysisAI/InferenceX-app`                  | Incoming webhook for ingest failure and unmapped-entity alerts.                                                                             | `ingest-results`, `ingest-operatorx`, `ingest-collectivex`, `stage-results` (passed to `ingest-results`)                                                                                                                                                                 |
 | `DATABASE_WRITE_URL`              | yes, for writes to the production database               | Production database write connection.                                                                                                       | `apply-run-overrides`, `ingest-results` on the `production` target, `backfill-server-log-files` and `recompute-agentic-metrics` without `neon-branch`, `sync-run-from-public-db`, `promote-to-public`                                                                    |
 | `PUBLIC_DATABASE_READONLY_URL`    | yes, by `sync-run-from-public-db`; optional otherwise    | Read-only connection to the public InferenceX database. The sync copies runs from it; on its own it turns on the hourly `Cache Refresh`.    | `sync-run-from-public-db`, `cache-refresh` (scheduled runs)                                                                                                                                                                                                              |
 | `PUBLIC_DATABASE_WRITE_URL`       | yes, by `promote-to-public`, in `public-promotion`       | Write connection to the public InferenceX database that promoted runs are copied into, with the public ingest role's privileges.            | `promote-to-public`                                                                                                                                                                                                                                                      |
@@ -165,7 +166,8 @@ block.
 secret and invalidate `APP_URL`. Recompute and `Backfill Server Log Files` write that
 database only from the repository's default branch. `check-skills-api`, `publish-skills`,
 `sync-staging-database`, and `h3-media` operate the public site and its staging database,
-so they run only in `SemiAnalysisAI/InferenceX-app`. `sync-run-from-public-db` copies runs
+so they run only in `SemiAnalysisAI/InferenceX-app`, as do the nightly `tests-e2e` run and
+the Slack alerts. `sync-run-from-public-db` copies runs
 from the public database into a downstream deployment's `DATABASE_WRITE_URL`, and
 `promote-to-public` moves runs the other way, so both run everywhere except
 `SemiAnalysisAI/InferenceX-app`.
