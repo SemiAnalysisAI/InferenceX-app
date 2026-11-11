@@ -7,6 +7,9 @@ export interface WorkloadSource {
   label: string;
 }
 
+/** Shapes from no checkpoint: source operatorx/Synthetic-Shapes/n<N>_k<K>. */
+const SYNTHETIC = 'Synthetic-Shapes';
+
 export function modelFamily(name: string): string {
   const repo = name.split(':')[0].split('/').pop() ?? name;
   return repo
@@ -25,15 +28,23 @@ const familyKeys = new Map<string, string>([
 ]);
 
 export function topLevelModel(id: string): string {
+  if (modelFamily(id) === SYNTHETIC) return 'Synthetic Shapes';
   const key = MODEL_TO_KEY[id] ?? familyKeys.get(modelFamily(id));
   return (key && DB_MODEL_TO_DISPLAY[key]) ?? modelFamily(id);
 }
 
+/** Versions of one architecture share a workload: their cases are largely the same shapes. */
+const VERSION_GROUPS: { match: RegExp; id: string; label: string }[] = [
+  { match: /^DeepSeek-V4-Pro(?:-\d+)?$/u, id: 'DeepSeek-V4-Pro', label: 'DeepSeek-V4-Pro' },
+  { match: /^GLM-5(?:\.\d+)?$/u, id: 'GLM-5', label: 'GLM-5.x' },
+  { match: /^Kimi-K2(?:\.\d+)?$/u, id: 'Kimi-K2', label: 'Kimi-K2.x' },
+  { match: /^gpt-oss-120b(?:-w-a)?$/u, id: 'gpt-oss-120b', label: 'gpt-oss-120b' },
+  { match: /^Synthetic-Shapes$/u, id: SYNTHETIC, label: 'Synthetic Shapes' },
+];
+
 const TESTLIST_LABELS: Record<string, string> = {
   gemm: 'InferenceX GEMM shapes',
   gemm_perf: 'GEMM smoke shapes',
-  gemm_serving_8k1k_min: 'DeepSeek-V4 serving GEMMs (8k/1k)',
-  gemm_serving_all_min: 'DeepSeek-V4 serving GEMMs (all scenarios)',
 };
 
 export function workloadSources(
@@ -41,10 +52,13 @@ export function workloadSources(
   testlist: string,
   checkpoints: string[],
 ): WorkloadSource[] {
-  const suffix = { moe: 'MoE', attention: 'attention' }[opType] ?? opType.toUpperCase();
-  if (checkpoints.length > 0) {
-    const families = [...new Set(checkpoints.map(modelFamily))];
-    return families.map((f) => ({ id: `${opType}:${f}`, label: `${f} ${suffix}` }));
+  if (checkpoints.length === 0)
+    return [{ id: `${opType}:testlist:${testlist}`, label: TESTLIST_LABELS[testlist] ?? testlist }];
+  const sources = new Map<string, WorkloadSource>();
+  for (const family of new Set(checkpoints.map(modelFamily))) {
+    const group = VERSION_GROUPS.find((g) => g.match.test(family));
+    const id = group?.id ?? family;
+    sources.set(id, { id: `${opType}:${id}`, label: group?.label ?? family });
   }
-  return [{ id: `${opType}:testlist:${testlist}`, label: TESTLIST_LABELS[testlist] ?? testlist }];
+  return [...sources.values()];
 }
