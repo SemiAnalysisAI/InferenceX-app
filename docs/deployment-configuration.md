@@ -167,10 +167,12 @@ secret and invalidate `APP_URL`. Recompute and `Backfill Server Log Files` write
 database only from the repository's default branch. `check-skills-api`, `publish-skills`,
 `sync-staging-database`, and `h3-media` operate the public site and its staging database,
 so they run only in `SemiAnalysisAI/InferenceX-app`, as do the nightly `tests-e2e` run and
-the Slack alerts. `sync-run-from-public-db` copies runs
+the Slack alerts. `Apply Run Overrides` also runs only there: its overrides name public runs,
+which a downstream database never holds. `sync-run-from-public-db` copies runs
 from the public database into a downstream deployment's `DATABASE_WRITE_URL`, and
 `promote-to-public` moves runs the other way, so both run everywhere except
-`SemiAnalysisAI/InferenceX-app`.
+`SemiAnalysisAI/InferenceX-app`. `Warm After Deploy` skips the video History snapshot on a
+deployment without video storage and the OperatorX APIs on one without an OperatorX database.
 
 ### Staging prerequisites
 

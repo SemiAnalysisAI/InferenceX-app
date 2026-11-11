@@ -14,6 +14,7 @@ import {
   writeCacheHitMetrics,
 } from './etl/trace-replay-ingest.js';
 import {
+  jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
   requireBackfillPayload,
@@ -127,7 +128,7 @@ async function main(): Promise<void> {
       const json = JSON.stringify(series);
       await sql`
         update agentic_trace_replay
-        set chart_series = ${json}::jsonb,
+        set chart_series = ${jsonbParam(sql, series)},
             chart_series_summary_gz = ${encodeChartSeriesSummary(json)},
             chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
         where id = ${id}
