@@ -319,6 +319,8 @@ export default function VideoResultsClips({
   const nextFramesKey = nextFrames.join('\n');
   /** First frames that loaded, failed or ran out of time; the stage waits for no others. */
   const [settledFrames, setSettledFrames] = useState<ReadonlySet<string>>(new Set());
+  /** First frames that loaded, which the stage's idle frame never covers. */
+  const [loadedFrames, setLoadedFrames] = useState<ReadonlySet<string>>(new Set());
   const requestedFrames = useRef(new Set<string>());
   const frameTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => () => frameTimers.current.forEach(clearTimeout), []);
@@ -328,7 +330,14 @@ export default function VideoResultsClips({
       requestedFrames.current.add(url);
       const settle = () => setSettledFrames((previous) => new Set([...previous, url]));
       const image = new Image();
-      image.addEventListener('load', settle, { once: true });
+      image.addEventListener(
+        'load',
+        () => {
+          setLoadedFrames((previous) => new Set([...previous, url]));
+          settle();
+        },
+        { once: true },
+      );
       image.addEventListener('error', settle, { once: true });
       image.src = url;
       // A slow frame shows black for a moment rather than hold the last pair.
@@ -341,9 +350,13 @@ export default function VideoResultsClips({
   // stage or collapses the prompt row above it.
   const shownNext = nextReady && nextFrames.every((url) => settledFrames.has(url));
   const [held, setHeld] = useState<Selection | null>(null);
+  // The first ready pair is on screen as soon as it is read, so it is held at once; only a switch
+  // away from a held pair waits for frames.
   if (
-    shownNext &&
-    (!held || held.clip !== stage.clip || held.against !== against || held.prompt !== stage.prompt)
+    (nextReady && !held) ||
+    (shownNext &&
+      held &&
+      (held.clip !== stage.clip || held.against !== against || held.prompt !== stage.prompt))
   )
     setHeld({ clip: stage.clip, against, prompt: stage.prompt });
   const heldPair = useMemo(
@@ -665,6 +678,7 @@ export default function VideoResultsClips({
               fps={resultMetadata(point).fps}
               frames={point.frameCount}
               onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
+              loadedFrames={loadedFrames}
             />
             <VideoClipReadout
               kind={option?.kind ?? 'reference'}

@@ -154,6 +154,8 @@ export interface VideoClipStageProps {
   frames: number | null;
   /** A side's web rendition failed to load; the caller drops it so the side plays the original. */
   onPreviewError: (previewUrl: string) => void;
+  /** First frames the caller already loaded, so a swap to them never paints the idle frame. */
+  loadedFrames?: ReadonlySet<string>;
 }
 
 type Role = 'a' | 'b';
@@ -182,6 +184,7 @@ export default function VideoClipStage({
   fps,
   frames,
   onPreviewError,
+  loadedFrames,
 }: VideoClipStageProps) {
   const s = STRINGS[useLocale()];
   const clips = { a, b };
@@ -205,16 +208,17 @@ export default function VideoClipStage({
   const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
   /** First frames that have loaded; a poster that fails never counts as a picture to split. */
   const [loadedPosters, setLoadedPosters] = useState<ReadonlySet<string>>(new Set());
-  useEffect(() => {
+  // Before paint: a frame already loaded is complete as soon as its source is set, so a swap to
+  // frames the clips layer loaded never paints the idle overlay over them.
+  useLayoutEffect(() => {
+    const loaded = (url: string) =>
+      setLoadedPosters((previous) => (previous.has(url) ? previous : new Set([...previous, url])));
     const images = [a.posterUrl, b.posterUrl].flatMap((url) => {
       if (!url) return [];
       const image = new Image();
-      image.addEventListener('load', () =>
-        setLoadedPosters((previous) =>
-          previous.has(url) ? previous : new Set([...previous, url]),
-        ),
-      );
+      image.addEventListener('load', () => loaded(url));
       image.src = url;
+      if (image.complete && image.naturalWidth > 0) loaded(url);
       return [image];
     });
     return () => images.forEach((image) => image.removeAttribute('src'));
@@ -261,7 +265,10 @@ export default function VideoClipStage({
   const postersShown =
     both &&
     view !== 'diff' &&
-    playable.every((role) => loadedPosters.has(clips[role].posterUrl ?? ''));
+    playable.every((role) => {
+      const url = clips[role].posterUrl ?? '';
+      return loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
+    });
   const idle = !armed && playable.length > 0 && !postersShown;
   /** While idle the split stays hidden, so it neither follows the pointer nor locks. */
   const wiping = view === 'wipe' && !idle;

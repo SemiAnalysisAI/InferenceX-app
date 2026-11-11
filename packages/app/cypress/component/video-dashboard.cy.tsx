@@ -126,7 +126,7 @@ const FRAME = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w
  * the stage opens, and serves the run's published clips with first frames as `@b200`. Returns the
  * read's URL.
  */
-const b200Frontier = (page: VideoHistoryPage, delay = 0) => {
+const b200Frontier = (page: VideoHistoryPage, delay = 0, frame = FRAME) => {
   for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
   const source = page.entries.find((entry) => entry.runId === B200_RUN)!.sources[0];
   const lead = source.observations.find((observation) => observation.concurrency === 1)!;
@@ -144,7 +144,7 @@ const b200Frontier = (page: VideoHistoryPage, delay = 0) => {
   ]);
   saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
     path,
-    { ...asset, posterUrl: FRAME },
+    { ...asset, posterUrl: frame },
   ]);
   const read = `/api/video-runs?run=${B200_RUN}&artifact=${point.artifactId}&format=published`;
   cy.intercept('GET', read, (request) => request.reply({ body: saved, delay })).as('b200');
@@ -991,8 +991,16 @@ describe('VideoGenX results', () => {
       edit: (observation) => {
         observation.results = evidence(observation);
       },
-      editPage: (page) => b200Frontier(page, 1500),
+      // The opening's first frame is still loading when the point is picked.
+      editPage: (page) => b200Frontier(page, 1500, '/slow-frame.svg'),
     });
+    cy.intercept('GET', '/slow-frame.svg', (request) =>
+      request.reply({
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>',
+        headers: { 'content-type': 'image/svg+xml' },
+        delay: 2500,
+      }),
+    );
     const pair = '[data-testid="video-results-pair"]';
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     cy.get('[data-prompt]').its('length').as('tiles', { type: 'static' });
