@@ -427,7 +427,7 @@ export function chartedCells(
 /**
  * The deployment the clip stage opens on in place of each clip lead: the lower-median latency
  * point of the lead's frontier, so the stage starts mid-curve (B200's 4 GPUs among 1, 2, 4 and 8)
- * instead of at the efficient end `leadCell` picks for cards and comparisons, or at the costliest
+ * instead of at the efficient end `leadCell` picks for cards, or at the costliest
  * fastest end. A lead whose series the chart does not draw opens as itself.
  */
 export function stageOpenings(

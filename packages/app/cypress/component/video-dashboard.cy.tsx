@@ -921,6 +921,10 @@ describe('VideoGenX results', () => {
     against().should('have.value', 'reference');
     stagePill('b').should('contain', 'Diffusers reference');
     cy.get('[data-testid="video-results-compare"]').should('contain', 'compare');
+    // A click on the playing point keeps the reader's pairing.
+    against().select('h100');
+    playing().find('.visible-shape').click({ force: true });
+    against().should('have.value', 'h100');
     // A lossy config pairs with its lossless twin.
     config()
       .find('option[value^="h200+"]')
@@ -952,7 +956,7 @@ describe('VideoGenX results', () => {
     });
   });
 
-  it('opens the stage on the middle of the B200 frontier, not its most efficient end', () => {
+  it('opens and pairs B200 on the middle of its frontier, not its most efficient end', () => {
     mount({
       edit: (observation) => {
         observation.results = evidence(observation);
@@ -963,6 +967,10 @@ describe('VideoGenX results', () => {
     });
     hardwarePoints('b200').should('have.length', 4);
     stagePill('a').should('contain', '4 GPUs').find('b').should('have.text', 'B200 · SGLang');
+    // Compared with another GPU, B200 plays the deployment the first select plays for it.
+    config().select('h100');
+    against().select('b200');
+    points('[data-clip-role="baseline"]').should(($point) => expect(gpusOf($point[0])).to.equal(4));
   });
 
   it('shows a point’s first frame in its hover card, reading clips the pointer rests on', () => {

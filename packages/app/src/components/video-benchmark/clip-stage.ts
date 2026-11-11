@@ -138,30 +138,35 @@ export function stageSubject(
 
 /** What the stage's second side shows, and the point it plays; null for the reference. */
 export interface StageOption {
-  /** `reference`, `twin`, or the hardware key of the lead it plays. */
+  /** `reference`, `twin`, or the hardware key of the opening it plays. */
   value: string;
-  kind: 'reference' | 'lead' | 'twin';
+  kind: 'reference' | 'hardware' | 'twin';
   /** Null for the reference, and for a twin the subject's run does not have. */
   point: VideoPoint | null;
 }
 
 /**
  * What the subject can be compared with: its Diffusers reference (the default), each other
- * visible hardware's lead, `own` in place of its own hardware's lead, and, for a lossy
- * subject, its lossless twin from `deployments`. Without `own` its hardware is not offered.
+ * visible hardware's stage opening, the deployment the Compare row plays for that hardware,
+ * `own` in place of its own hardware's, and, for a lossy subject, its lossless twin from
+ * `deployments`. Without `own` its hardware is not offered.
  */
 export function stageOptions(
   subject: VideoPoint,
-  leads: readonly VideoPoint[],
+  openings: readonly VideoPoint[],
   deployments: readonly VideoPoint[],
   own: VideoPoint | null = null,
 ): StageOption[] {
   return [
     { value: 'reference', kind: 'reference', point: null },
-    ...leads
-      .map((lead) => (lead.hardwareKey === subject.hardwareKey ? own : lead))
-      .filter((lead) => lead !== null)
-      .map((lead) => ({ value: lead.hardwareKey ?? '', kind: 'lead' as const, point: lead })),
+    ...openings
+      .map((opening) => (opening.hardwareKey === subject.hardwareKey ? own : opening))
+      .filter((opening) => opening !== null)
+      .map((opening) => ({
+        value: opening.hardwareKey ?? '',
+        kind: 'hardware' as const,
+        point: opening,
+      })),
     ...(isLossy(subject)
       ? [{ value: 'twin', kind: 'twin' as const, point: losslessTwin(subject, deployments) }]
       : []),
@@ -171,12 +176,12 @@ export function stageOptions(
 /**
  * The official side a `namedRun` subject is read against: the official cell of the same
  * deployment and concurrency on its GPU, so a 4-GPU candidate meets production's 4 GPUs, else that
- * GPU's official lead. Null for an official subject.
+ * GPU's official stage opening. Null for an official subject.
  */
 export function officialCounterpart(
   subject: VideoPoint,
   deployments: readonly VideoPoint[],
-  leads: readonly VideoPoint[],
+  openings: readonly VideoPoint[],
   namedRun?: string,
 ): VideoPoint | null {
   if (!namedRun || subject.runId !== namedRun) return null;
@@ -188,7 +193,7 @@ export function officialCounterpart(
       deploymentKey(p) === deploymentKey(subject) &&
       mayHaveClips(p),
   );
-  return same ?? leads.find((p) => p.hardwareKey === subject.hardwareKey) ?? null;
+  return same ?? openings.find((p) => p.hardwareKey === subject.hardwareKey) ?? null;
 }
 
 /**

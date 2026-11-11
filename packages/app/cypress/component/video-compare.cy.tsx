@@ -794,7 +794,7 @@ describe('Video results clip stage', () => {
   it('reads out both sides against another GPU and names the unofficial one', () => {
     mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
     cy.get('[data-testid="video-results-against"]').select('h100');
-    cy.get(readout).should('have.attr', 'data-pair', 'lead');
+    cy.get(readout).should('have.attr', 'data-pair', 'hardware');
     // Speed leads, so no sixth cell strands on a second row.
     readoutOrder(['speed', 'psnr', 'wall', 'cost', 'energy']);
     cy.get(`${readout} [data-readout-side="b200"]`)

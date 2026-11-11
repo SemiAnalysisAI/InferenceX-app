@@ -170,8 +170,8 @@ export interface VideoResultsClipsProps {
   drawn?: readonly VideoPoint[];
   /** Every deployment of the workload, where a lossy subject finds its lossless twin. */
   deployments?: readonly VideoPoint[];
-  /** One official lead per hardware, which a subject from `unofficialRun` is compared with. */
-  officialLeads?: readonly VideoPoint[];
+  /** Each hardware's official stage opening, which a subject from `unofficialRun` falls back to. */
+  officialOpenings?: readonly VideoPoint[];
   /** Hardware color; a side from `unofficialRun` takes the overlay color. */
   colorFor: (key: string) => string;
   /** Modelled TCO of every point by `VideoPoint.id`, for the readout's per-clip cost. */
@@ -240,7 +240,7 @@ export default function VideoResultsClips({
   openings,
   drawn = NO_POINTS,
   deployments = NO_POINTS,
-  officialLeads = NO_POINTS,
+  officialOpenings = NO_POINTS,
   colorFor,
   costs,
   unofficialRun,
@@ -271,7 +271,7 @@ export default function VideoResultsClips({
     return failedKeys.has(key) ? null : undefined;
   };
   const ownLead = (p: VideoPoint) =>
-    officialCounterpart(p, deployments, officialLeads, unofficialRun);
+    officialCounterpart(p, deployments, officialOpenings, unofficialRun);
   /** The subject a selection plays, and the side it is compared with. */
   const pairFor = (clipKey: string | null, value: string | null) => {
     const picked = clipKey ? drawn.find((p) => stagePointKey(p) === clipKey) : undefined;
@@ -285,7 +285,7 @@ export default function VideoResultsClips({
     );
     // A candidate run is read against production on its own GPU.
     const own = subject ? ownLead(subject.point) : null;
-    const options = subject ? stageOptions(subject.point, selected, deployments, own) : [];
+    const options = subject ? stageOptions(subject.point, opening, deployments, own) : [];
     const pairing = value ?? (subject ? defaultPairing(subject.point, own) : 'reference');
     const option = options.find((item) => item.value === pairing) ?? options[0];
     return { picked, subject, options, option, other: option?.point ?? null };
@@ -304,7 +304,7 @@ export default function VideoResultsClips({
       unofficialRun,
       selected,
       deployments,
-      officialLeads,
+      officialOpenings,
       stage.clip,
       against,
     ],
@@ -384,7 +384,7 @@ export default function VideoResultsClips({
       unofficialRun,
       selected,
       deployments,
-      officialLeads,
+      officialOpenings,
     ],
   );
   const holding = heldPair !== null && ready(heldPair);

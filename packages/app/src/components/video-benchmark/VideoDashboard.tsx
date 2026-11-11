@@ -308,12 +308,15 @@ export default function VideoDashboard({
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
   const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
-  /** Plays the chart point with this key against its default pairing. */
-  const pickClip = useCallback((key: string) => {
-    setPicked(true);
-    setAgainst(null);
-    writeStage({ ...parseStage(location.search), clip: key });
-  }, []);
+  /** Plays the chart point with this key; a new subject returns to its default pairing. */
+  const pickClip = useCallback(
+    (key: string) => {
+      setPicked(true);
+      if (key !== stagePair.playing) setAgainst(null);
+      writeStage({ ...parseStage(location.search), clip: key });
+    },
+    [stagePair.playing],
+  );
   /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
   const showOnStage = useCallback(
     (point: VideoPoint, compare: string) => {
@@ -561,6 +564,7 @@ export default function VideoDashboard({
     { tier: state.costTier },
   );
   const stageClipPoints = stageOpenings(projection, state, clipPoints);
+  const officialOpenings = stageOpenings(projection, state, officialClipPoints);
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {
@@ -1000,7 +1004,7 @@ export default function VideoDashboard({
               openings={stageClipPoints}
               drawn={drawnPoints}
               deployments={deploymentPoints}
-              officialLeads={officialClipPoints}
+              officialOpenings={officialOpenings}
               onPairChange={onStagePair}
               against={against}
               onAgainstChange={pickAgainst}
