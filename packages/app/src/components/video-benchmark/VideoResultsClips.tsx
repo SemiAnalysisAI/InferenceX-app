@@ -362,7 +362,12 @@ export default function VideoResultsClips({
     ],
   );
   const holding = heldPair !== null && ready(heldPair);
-  const stale = holding && !nextReady;
+  // A hold that waited on a read stays dimmed through its first frames, so the last pair never
+  // brightens just before the next replaces it.
+  const [reading, setReading] = useState(false);
+  if (holding && !nextReady && !reading) setReading(true);
+  if (!holding && reading) setReading(false);
+  const stale = holding && (reading || !nextReady);
   const { subject, option, other } = holding ? heldPair : next;
   const shownPrompt = holding && held ? held.prompt : stage.prompt;
   const wantedPoints = [
