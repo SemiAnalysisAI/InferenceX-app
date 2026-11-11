@@ -126,7 +126,8 @@ const B200_RUN = '34341996789';
 const FRAME = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
 /**
  * Adds 1-, 2- and 8-GPU points to the B200 run, drawn and playable but neither its lead nor where
- * the stage opens, and serves the run's published clips with first frames as `@b200`. Returns the
+ * the stage opens: 1 and 2 GPUs are slower but more efficient, 8 GPUs is the fastest, costliest
+ * end. Serves the run's published clips with first frames as `@b200`. Returns the
  * read's URL.
  */
 const b200Frontier = (page: VideoHistoryPage, delay = 0, frame = FRAME) => {
@@ -955,63 +956,14 @@ describe('VideoGenX results', () => {
         observation.results = evidence(observation);
       },
       editPage: (page) => {
-        const source = page.entries.find((entry) => entry.runId === '34341996789')!.sources[0];
-        const lead = source.observations.find((observation) => observation.concurrency === 1)!;
-        // 1 and 2 GPUs are slower but more efficient; 8 GPUs is the fastest, costliest end.
-        for (const [gpus, p50] of [
-          [1, 300],
-          [2, 150],
-          [8, 40],
-        ])
-          source.observations.push({
-            ...lead,
-            id: `${lead.id}-g${gpus}`,
-            participating: gpus,
-            p50,
-          });
+        b200Frontier(page);
       },
     });
     hardwarePoints('b200').should('have.length', 4);
     stagePill('a').should('contain', '4 GPUs').find('b').should('have.text', 'B200 · SGLang');
   });
 
-  it('shows a read clip’s first frame in the hover card, and none for a point without one', () => {
-    const run = '34341996789';
-    const frame = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
-    mount({
-      editPage: (page) => {
-        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
-        const lead = videoPoints([page]).find(
-          (item) => item.runId === run && item.concurrency === 1,
-        )!;
-        const saved = servingArtifact(Number(run), lead.artifactId, 'NVIDIA B200');
-        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
-          path,
-          path === 'manifest.json' ? lead.id.split(':')[0] : sha,
-        ]);
-        saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
-          path,
-          { ...asset, posterUrl: frame },
-        ]);
-        cy.intercept(
-          'GET',
-          `/api/video-runs?run=${run}&artifact=${lead.artifactId}&format=published`,
-          saved,
-        ).as('b200');
-      },
-    });
-    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
-    const tooltip = '[data-chart-tooltip="video-results-chart"]';
-    hardwarePoints('b200').trigger('mouseenter', { force: true });
-    cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', frame);
-    hardwarePoints('b200').trigger('mouseleave', { force: true });
-    // H100's read answered without media, so its card keeps text only.
-    hardwarePoints('h100').trigger('mouseenter', { force: true });
-    cy.get(tooltip).should('contain', 'H100').find('[data-hover-image]').should('not.exist');
-    cy.get('@b200.all').should('have.length', 1);
-  });
-
-  it('reads a point the pointer rests on, so its hover card shows its first frame', () => {
+  it('shows a point’s first frame in its hover card, reading clips the pointer rests on', () => {
     let read = '';
     mount({
       edit: (observation) => {
@@ -1023,6 +975,17 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     const tooltip = '[data-chart-tooltip="video-results-chart"]';
+    // The playing point's clips were read with the stage, so its card needs no second read.
+    cy.get('@b200.all').then((before) => {
+      playing().trigger('mouseenter', { force: true });
+      cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', FRAME);
+      cy.get('@b200.all').should('have.length', before.length);
+    });
+    playing().trigger('mouseleave', { force: true });
+    // H100's read answered without media, so its card keeps text only.
+    hardwarePoints('h100').trigger('mouseenter', { force: true });
+    cy.get(tooltip).should('contain', 'H100').find('[data-hover-image]').should('not.exist');
+    hardwarePoints('h100').trigger('mouseleave', { force: true });
     cy.get('@b200.all').then((before) => {
       offStage('b200').first().trigger('mouseenter', { force: true });
       // The card keeps the frame's box while the point's clips are read.
