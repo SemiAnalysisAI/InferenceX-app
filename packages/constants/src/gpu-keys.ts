@@ -31,6 +31,17 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costh: 1.17,
     costr: 2,
   },
+  a100: {
+    vendor: 'NVIDIA',
+    arch: 'Ampere',
+    label: 'A100',
+    sort: 7.5,
+    tdp: 400,
+    // All-in power and rental pricing are unverified placeholders, per adding-entities.md.
+    power: 9.99,
+    costh: 0.78,
+    costr: 9.99,
+  },
   h200: {
     vendor: 'NVIDIA',
     arch: 'Hopper',

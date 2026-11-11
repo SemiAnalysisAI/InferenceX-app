@@ -145,8 +145,8 @@ describe('parseCompareSlug — legacy bare slug (PR #351 backward compat)', () =
 
 describe('parseCompareSlug — rejection cases', () => {
   it('returns null for unknown GPU keys', () => {
-    expect(parseCompareSlug('a100-vs-h100')).toBeNull();
-    expect(parseCompareSlug('deepseek-r1-a100-vs-h100')).toBeNull();
+    expect(parseCompareSlug('unknown-gpu-vs-h100')).toBeNull();
+    expect(parseCompareSlug('deepseek-r1-unknown-gpu-vs-h100')).toBeNull();
   });
 
   it('returns null when both sides are the same GPU', () => {

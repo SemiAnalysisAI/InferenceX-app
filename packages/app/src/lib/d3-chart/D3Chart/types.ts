@@ -19,6 +19,8 @@ export type ScaleConfig =
   | { type: 'band'; domain: string[]; padding?: number }
   | { type: 'linear'; domain: [number, number]; nice?: boolean }
   | { type: 'log'; domain: [number, number]; nice?: boolean }
+  /** Square-root axis: compresses the low end less than log, spreading out the top. */
+  | { type: 'sqrt'; domain: [number, number]; nice?: boolean }
   | { type: 'time'; domain: [Date, Date]; nice?: boolean };
 
 interface LayerBase {

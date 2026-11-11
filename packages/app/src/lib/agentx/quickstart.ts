@@ -1,4 +1,4 @@
-export const AGENTX_INSTALL = "pip install 'agentx-harness==1.0.7'";
+export const AGENTX_INSTALL = "pip install 'agentx-harness==1.0.13'";
 
 export const AGENTX_PROFILE = `agentx profile \\
   --url "http://127.0.0.1:8000" --endpoint /v1/chat/completions \\

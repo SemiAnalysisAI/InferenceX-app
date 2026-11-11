@@ -91,6 +91,33 @@ describe('server-log artifact discovery', () => {
     expect(await readServerLogArtifact(artifact)).toEqual(files);
   });
 
+  it('keeps launch files from a multinode bundle without making one the primary file', async () => {
+    const artifactDir = tempRoot();
+    writeLogsArchive(path.join(artifactDir, 'multinode_server_logs.tar.gz'), {
+      'config.yaml': 'name: recipe\n',
+      'fingerprint_prefill_w0.json': '{"gpu":{"driver":"580.126.20"}}',
+      'host-1_prefill_w0.out': 'prefill\n',
+      'trtllm_config_prefill.yaml': 'max_batch_size: 8\n',
+      'host-1_config.json': '{}',
+      'otel-collector.yaml': 'receivers: {}\n',
+      'resource_snapshot.json': '{}',
+      'power/manifest.json': '{}',
+    });
+
+    const files = await readServerLogArtifact({
+      artifactName: 'multinode_server_logs_config-a',
+      artifactDir,
+    });
+    expect(files.map((file) => file.fileName)).toEqual([
+      'config.yaml',
+      'fingerprint_prefill_w0.json',
+      'host-1_config.json',
+      'host-1_prefill_w0.out',
+      'trtllm_config_prefill.yaml',
+    ]);
+    expect(primaryServerLogFile(files)?.fileName).toBe('host-1_prefill_w0.out');
+  });
+
   it('reads legacy single-node artifacts without an archive unchanged', async () => {
     const artifactDir = tempRoot();
     fs.mkdirSync(path.join(artifactDir, 'results'));

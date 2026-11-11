@@ -1,4 +1,5 @@
 import type { DbClient } from '../connection.js';
+import { isLaunchFileName } from '../etl/launch-files';
 import { readServerLogBlocks } from '../server-log-blocks';
 import {
   type BlockSearchIndex,
@@ -535,7 +536,9 @@ export async function searchServerLogs(
         files: new Map(),
       };
     }
-    const { fileNames, files: blockFiles } = index;
+    const { files: blockFiles } = index;
+    // Launch files are config, not logs; scanning them first would spend the match limit.
+    const fileNames = index.fileNames.filter((fileName) => !isLaunchFileName(fileName));
     const fetchBlocks = createBlockFetcher(sql, [...blockFiles.values()]);
     const matches: ServerLogSearchMatch[] = [];
     let scannedBeforeFile = 0;

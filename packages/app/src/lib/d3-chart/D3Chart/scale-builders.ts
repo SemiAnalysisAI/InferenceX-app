@@ -29,6 +29,12 @@ export function buildScale(config: ScaleConfig, range: [number, number]): BuiltS
       return config.nice === false ? l : l.nice();
     }
 
+    case 'sqrt': {
+      // ScalePower has ScaleLinear's interface, so continuous-scale callers take it as one.
+      const q: d3.ScaleLinear<number, number> = d3.scaleSqrt().domain(config.domain).range(range);
+      return config.nice === false ? q : q.nice();
+    }
+
     case 'time': {
       const t = d3.scaleTime().domain(config.domain).range(range);
       return config.nice === false ? t : t.nice();
