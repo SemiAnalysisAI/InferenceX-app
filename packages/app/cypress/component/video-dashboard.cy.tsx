@@ -631,7 +631,7 @@ describe('VideoGenX results', () => {
     plottedY('b200').should('be.closeTo', 301.1, 0.1);
   });
 
-  it('plots each GPU’s best lossless engine and asks before showing two engines', () => {
+  it('plots each GPU’s best lossless engine or one engine, and asks before showing two', () => {
     // Every deployment also ran on vLLM-Omni with identical numbers and on Sol with caching.
     mount({
       editPage: (page) => {
@@ -659,21 +659,24 @@ describe('VideoGenX results', () => {
     // A tie keeps the engine listed first; the cached Sol run never competes.
     engines().should('deep.equal', ['sglang']);
     cy.get('label[for="checkbox-b200"]').should('contain', 'B200 (SGLang)');
-    chooseEngine('All');
-    cy.get('[data-testid="engine-comparison-confirmation"]').contains('button', 'Cancel').click();
-    searchParam('r_compare').should('equal', null);
+    // Best or one engine: no option draws every engine at once.
+    cy.get('[data-testid="results-engine"]').contains('button', /^All$/u).should('not.exist');
+    chooseEngine('vLLM-Omni');
+    searchParam('r_engine').should('equal', 'vllm-omni');
+    engines().should('deep.equal', ['vllm-omni']);
+    chooseEngine('Best');
     engines().should('deep.equal', ['sglang']);
-    chooseEngine('All');
+    cy.get('[data-testid="results-lossy-key"]').should('not.exist');
+    // The lossy Sol line beside SGLang puts two engines on one GPU, so it asks first.
+    cy.get('#video-results-lossy').click();
+    cy.get('[data-testid="engine-comparison-confirmation"]').contains('button', 'Cancel').click();
+    searchParam('r_lossy').should('equal', null);
+    cy.get('#video-results-lossy').click();
     cy.get('[data-testid="engine-comparison-confirmation"]')
       .contains('button', 'I agree, show both')
       .click();
-    searchParam('r_compare').should('equal', '1');
-    engines().should('deep.equal', ['sglang', 'vllm-omni']);
-    cy.get('label[for="checkbox-b200"]').should('contain', 'B200 (SGLang, vLLM-Omni)');
-    cy.get('[data-testid="results-lossy-key"]').should('not.exist');
-    cy.get('#video-results-lossy').click();
     searchParam('r_lossy').should('equal', '1');
-    engines().should('deep.equal', ['sglang', 'vllm-omni', 'sol-engine']);
+    engines().should('deep.equal', ['sglang', 'sol-engine']);
     cy.get('[data-testid="results-lossy-key"]').should(
       'contain',
       'B200 (NVIDIA Sol Engine · FirstBlockCache + Sol-Attn)',
@@ -916,12 +919,12 @@ describe('VideoGenX results', () => {
     searchParam('r_clip').should('match', /^34342452354:[^-]+$/u);
     against().should('have.value', 'reference');
     stagePill('b').should('contain', 'Diffusers reference');
+    cy.get('[data-testid="video-results-compare"]').should('contain', 'compare');
     // A lossy config pairs with its lossless twin.
     config()
       .find('option[value^="h200+"]')
       .then(($option) => config().select(String($option.val())));
     searchParam('r_clip').should('match', /^34342452354:.+-fbc$/u);
-    cy.get('[data-testid="video-results-compare"]').should('contain', 'compare');
     against().should('have.value', 'twin');
     stagePill('b').should('contain', 'H200').and('contain', 'lossless');
   });

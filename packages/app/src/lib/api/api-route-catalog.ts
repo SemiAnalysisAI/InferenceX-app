@@ -1560,7 +1560,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '8d6559a4955c51ba1d98c9672b13ef0d0e236ce3a7e2cae2b939160d013ff7e1',
+    sourceSha256: '0e92ce3863fa78900eb99b21debf3ee83f3c3bbbd7786ec76d9f1d17f5d2665d',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'd23f54d31e8861556bfbbce427d6b5781eb24bb568f46a835c219ec9b5a572de',
+    sourceSha256: '7a82e20a6bf9528ba3dc621fb1c6324325d3c942b54261703546b1a0ff07acd7',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',

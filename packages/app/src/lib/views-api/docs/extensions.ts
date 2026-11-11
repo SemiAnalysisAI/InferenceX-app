@@ -505,8 +505,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '记录的引擎名称（如 sglang 或 vllm-omni），与 runtime revision 分开。将数据点、运行和芯片配置限定为该引擎。',
   ],
   r_compare: [
-    'Compare engines: 1 plots every engine’s lossless series on each hardware; otherwise only the one with the largest Pareto frontier area. Presentation only.',
-    '对比引擎：为 1 时在每种硬件上绘制所有引擎的无损曲线，否则只绘制 Pareto 前沿面积最大的一条。仅影响展示。',
+    'Retired engine comparison, accepted but ignored. Each hardware plots the lossless series with the largest Pareto frontier area, or the r_engine series.',
+    '已停用的引擎对比参数，仍可传入但会被忽略。每种硬件只绘制 Pareto 前沿面积最大的无损曲线，或 r_engine 指定引擎的曲线。',
   ],
   r_lossy: [
     'Lossy optimizations: 1 also plots series whose declared optimizations skip or approximate computation, such as cross-step caching or sparse attention. They never compete for a hardware’s default series. Presentation only.',

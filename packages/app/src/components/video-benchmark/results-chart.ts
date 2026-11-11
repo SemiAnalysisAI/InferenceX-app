@@ -181,7 +181,6 @@ export interface ResultsChartSelection extends ResultsMetricContext {
   y: ResultsYMetric;
   optimal: boolean;
   hidden: readonly string[];
-  compareEngines: boolean;
   lossy: boolean;
 }
 
@@ -192,7 +191,6 @@ export const resultsSelection = (state: ResultsState): ResultsChartSelection => 
   tier: state.costTier,
   optimal: state.optimal,
   hidden: state.hidden,
-  compareEngines: state.compareEngines,
   lossy: state.lossy,
 });
 
@@ -321,7 +319,7 @@ export function resultsChartSeries(
   });
   const lossless = series.filter((item) => !item.lossy);
   const lossy = selection.lossy ? series.filter((item) => item.lossy) : [];
-  const shown = selection.compareEngines ? lossless : bestPerHardware(lossless, selection);
+  const shown = bestPerHardware(lossless, selection);
   // A lossy line keeps the lossless line it is compared with, even where another engine leads.
   const pool = cells.map((cell) => cell.point);
   const twinKeys = new Set(

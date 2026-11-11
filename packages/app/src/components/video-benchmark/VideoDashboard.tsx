@@ -104,10 +104,9 @@ const STRINGS = {
     secondaryControls: 'More chart controls',
     changed: 'changed',
     engine: 'Engine',
-    all: 'All',
     bestEngine: 'Best',
     engineHelp:
-      'Best shows the lossless engine with the largest Pareto frontier area on each GPU. All shows every engine. Lossy optimizations are never ranked.',
+      'Best shows the lossless engine with the largest Pareto frontier area on each GPU. Lossy optimizations are never ranked.',
     engineComparison: {
       title: 'Show two engines on the same GPU?',
       description:
@@ -179,10 +178,8 @@ const STRINGS = {
     secondaryControls: '更多图表设置',
     changed: '项已更改',
     engine: '引擎',
-    all: '全部',
     bestEngine: '最优',
-    engineHelp:
-      '「最优」显示每张 GPU 上 Pareto 前沿面积最大的无损引擎，「全部」显示所有引擎。有损优化不参与评选。',
+    engineHelp: '「最优」显示每张 GPU 上 Pareto 前沿面积最大的无损引擎。有损优化不参与评选。',
     engineComparison: {
       title: '在同一 GPU 上显示两个引擎？',
       description:
@@ -609,7 +606,7 @@ export default function VideoDashboard({
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
-    state.engine !== null || state.compareEngines,
+    state.engine !== null,
     state.date !== null || state.run !== null,
     chipHistory,
   ].filter(Boolean).length;
@@ -751,10 +748,9 @@ export default function VideoDashboard({
                         <LabelWithTooltip label={s.engine} tooltip={s.engineHelp} />
                         <SegmentedToggle
                           role="group"
-                          value={state.compareEngines ? 'all' : (state.engine ?? 'best')}
+                          value={state.engine ?? 'best'}
                           options={[
                             { value: 'best', label: s.bestEngine },
-                            { value: 'all', label: s.all },
                             ...options.engines.map((engine) => ({
                               value: engine,
                               label: engineLabel(engine),
@@ -762,10 +758,7 @@ export default function VideoDashboard({
                           ]}
                           onValueChange={(value) => {
                             track('video_results_engine_selected', { engine: value });
-                            updateSeries({
-                              engine: value === 'best' || value === 'all' ? null : value,
-                              compareEngines: value === 'all',
-                            });
+                            updateSeries({ engine: value === 'best' ? null : value });
                           }}
                           ariaLabel={s.engine}
                           testId="results-engine"
