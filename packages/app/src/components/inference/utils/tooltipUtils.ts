@@ -742,12 +742,14 @@ const ACTION_STRINGS = {
     logs: 'View logs',
     powerTelemetry: 'View PowerX',
     powerTrace: 'View power trace',
+    reproduce: 'Reproduce',
   },
   zh: {
     charts: '查看图表',
     logs: '查看日志',
     powerTelemetry: '查看 PowerX',
     powerTrace: '查看功耗曲线',
+    reproduce: '复现',
   },
 } as const;
 
@@ -756,7 +758,8 @@ export type PointDetailAction =
   | 'view-charts'
   | 'view-logs'
   | 'view-power-telemetry'
-  | 'view-power-trace';
+  | 'view-power-trace'
+  | 'reproduce';
 
 export interface PointDetailLink {
   action: PointDetailAction;
@@ -782,6 +785,19 @@ interface PointLinksInput {
   locale: Locale;
 }
 
+/** Server-log page for a stored point. Agentic points open their detail page on the logs view. */
+export function pointLogHref(
+  pointId: number,
+  benchmarkType: string | undefined,
+  locale: Locale,
+): string {
+  if (benchmarkType === 'agentic_traces') {
+    const agenticHref = agenticDetailHref(pointId, locale);
+    return `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`;
+  }
+  return `${locale === 'zh' ? '/zh' : ''}${getDashboardRoute('inference').path}/logs/${pointId}`;
+}
+
 const pointLinks = ({
   point,
   runUrl,
@@ -800,16 +816,19 @@ const pointLinks = ({
   const isAgentic = point.benchmark_type === 'agentic_traces';
   const showCharts = isAgentic && hasTraceData;
   if (isPersistedBenchmarkId(pointId) && (showCharts || hasLogData)) {
-    const prefix = locale === 'zh' ? '/zh' : '';
-    const agenticHref = agenticDetailHref(pointId, locale);
     if (showCharts) {
-      links.push({ action: 'view-charts', label: t.charts, href: agenticHref });
+      links.push({
+        action: 'view-charts',
+        label: t.charts,
+        href: agenticDetailHref(pointId, locale),
+      });
     }
     if (hasLogData) {
-      const logHref = isAgentic
-        ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
-        : `${prefix}${getDashboardRoute('inference').path}/logs/${pointId}`;
-      links.push({ action: 'view-logs', label: t.logs, href: logHref });
+      links.push({
+        action: 'view-logs',
+        label: t.logs,
+        href: pointLogHref(pointId, point.benchmark_type, locale),
+      });
     }
   }
   if (showPowerTelemetry && isPersistedBenchmarkId(pointId)) {
@@ -825,6 +844,7 @@ const pointLinks = ({
           : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY }),
     });
   }
+  links.push({ action: 'reproduce', label: t.reproduce });
   return links;
 };
 
