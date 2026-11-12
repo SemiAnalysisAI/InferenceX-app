@@ -18,6 +18,7 @@ export function isPublicRepository(repository: string): Promise<boolean> {
       );
     });
     visibility.set(repository, result);
+    result.catch(() => visibility.delete(repository));
   }
   return result;
 }

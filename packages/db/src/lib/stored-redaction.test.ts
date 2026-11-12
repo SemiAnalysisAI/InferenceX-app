@@ -38,7 +38,7 @@ function redactStored(file: StoredServerLogFile, write: boolean) {
 }
 
 function redactFile(fileName: string, primary: boolean, write: boolean) {
-  return redactStored({ logId: '1', fileName, primary, repositories: [] }, write);
+  return redactStored({ logId: '1', fileName, primary, shadowed: false, repositories: [] }, write);
 }
 
 async function storedLogs() {
@@ -113,6 +113,47 @@ describe('redactStoredServerLogFile', () => {
       blockBacked: false,
     });
   });
+
+  it("keeps the primary's blocks when a child shares its name", async () => {
+    const child = 'child 203.0.113.9\n';
+    await sql`
+      insert into server_log_files (server_log_id, file_name, log_text)
+      values (1, 'results/server.log', ${child})
+    `;
+    await sql.begin((tx) =>
+      writeTextAsBlocks(tx as unknown as TransactionSql, 1, 'results/server.log', RAW),
+    );
+
+    const files = await listStoredServerLogFiles(sql, undefined);
+    expect(files.map(({ fileName, primary, shadowed }) => [fileName, primary, shadowed])).toEqual([
+      ['results/server.log', true, false],
+      ['results/router.log', false, false],
+      ['results/server.log', false, true],
+    ]);
+    for (const file of files) await redactStored(file, true);
+
+    const blocks = await sql<
+      { char_offset: number; char_count: number; ascii: boolean; data: Uint8Array }[]
+    >`
+      select char_offset, char_count, ascii, data from server_log_blocks
+      where server_log_id = 1 and file_name = 'results/server.log'
+      order by block_index
+    `;
+    const decoded = readServerLogBlocks(
+      blocks.map((block) => ({
+        charOffset: block.char_offset,
+        charCount: block.char_count,
+        ascii: block.ascii,
+        data: block.data,
+      })),
+      0,
+      REDACTED.length,
+    );
+    expect(decoded).toBe(REDACTED);
+    expect(
+      await sql`select log_text from server_log_files where file_name = 'results/server.log'`,
+    ).toEqual([{ log_text: 'child ***REDACTED***\n' }]);
+  });
 });
 
 const PRIVATE_URL = 'https://github.com/example-org/private-repo/actions/runs/101';
@@ -177,17 +218,25 @@ describe('backfill of runs from repositories that are not public', () => {
   it('sanitizes the logs and run URL of a private run and leaves a public run untouched', async () => {
     const files = await listStoredServerLogFiles(sql, undefined);
     expect(files).toEqual([
-      { logId: '2', fileName: 'results/server.log', primary: true, repositories: [] },
+      {
+        logId: '2',
+        fileName: 'results/server.log',
+        primary: true,
+        shadowed: false,
+        repositories: [],
+      },
       {
         logId: '1',
         fileName: 'results/server.log',
         primary: true,
+        shadowed: false,
         repositories: ['example-org/private-repo'],
       },
       {
         logId: '1',
         fileName: 'results/router.log',
         primary: false,
+        shadowed: false,
         repositories: ['example-org/private-repo'],
       },
     ]);
@@ -217,7 +266,13 @@ describe('backfill of runs from repositories that are not public', () => {
 
   it('writes nothing in a dry run and honors --run-id', async () => {
     expect(await listStoredServerLogFiles(sql, 102)).toEqual([
-      { logId: '2', fileName: 'results/server.log', primary: true, repositories: [] },
+      {
+        logId: '2',
+        fileName: 'results/server.log',
+        primary: true,
+        shadowed: false,
+        repositories: [],
+      },
     ]);
     const before = await stored();
     const changed = [];

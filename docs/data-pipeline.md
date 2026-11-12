@@ -628,7 +628,8 @@ connections at 16 and above. Each connection holds up to about 1 GB while it com
 
 Ingest and `sync-public-db` sanitize server-log text with `etl/log-redaction.ts`, and
 `sync-public-db` also sanitizes runs from repositories that are not public.
-`bun run admin:db:backfill-log-redaction` applies it to rows stored earlier: dry run by default,
+`bun run admin:db:backfill-log-redaction` applies it to rows stored earlier in the public database
+(point `DATABASE_WRITE_URL` at it): dry run by default,
 `--write` to apply, `--run-id` to scope it, safe to rerun. Purge the log cache afterwards with
 `bun run admin:cache:invalidate -- <app-url> --immediate`.
 

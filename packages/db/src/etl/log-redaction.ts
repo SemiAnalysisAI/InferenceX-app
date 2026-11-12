@@ -15,7 +15,7 @@ const SECRET_PATTERNS = [
   /\bxox[abprs]-[A-Za-z0-9-]{10,}/gu,
   /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}/gu,
 ];
-const URL_PASSWORD = /(?<userinfo>\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@/]+@/gu;
+const URL_PASSWORD = /(?<userinfo>\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@"',;<>]*:)[^\s@/"',;<>]+@/gu;
 const ORACLE_VCN =
   /\b(?<host>[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)(?:\.[A-Za-z0-9-]+)*\.oraclevcn\.com\b/giu;
 const ORACLE_VCN_HINT = /oraclevcn\.com/iu;

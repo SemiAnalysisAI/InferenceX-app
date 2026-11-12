@@ -9,6 +9,8 @@ export interface StoredServerLogFile {
   fileName: string;
   /** The file lives in `server_logs.server_log` rather than `server_log_files`. */
   primary: boolean;
+  /** A child sharing its primary's name, whose blocks belong to the primary. */
+  shadowed: boolean;
   /** Repositories that are not public among the runs using the log. */
   repositories: string[];
 }
@@ -19,7 +21,13 @@ export async function listStoredServerLogFiles(
   runId: number | undefined,
 ): Promise<StoredServerLogFile[]> {
   const files = await sql<
-    { log_id: string; file_name: string; is_primary: boolean; run_urls: string[] }[]
+    {
+      log_id: string;
+      file_name: string;
+      is_primary: boolean;
+      shadowed: boolean;
+      run_urls: string[];
+    }[]
   >`
     with scoped as (
       select s.id, s.file_name from server_logs s
@@ -33,10 +41,10 @@ export async function listStoredServerLogFiles(
       where br.server_log_id is not null and wr.html_url is not null
       group by br.server_log_id
     )
-    select log_id, file_name, is_primary, coalesce(urls.run_urls, '{}') as run_urls from (
-      select id::text as log_id, file_name, true as is_primary, id from scoped
+    select log_id, file_name, is_primary, shadowed, coalesce(urls.run_urls, '{}') as run_urls from (
+      select id::text as log_id, file_name, true as is_primary, false as shadowed, id from scoped
       union all
-      select f.server_log_id::text, f.file_name, false, f.server_log_id
+      select f.server_log_id::text, f.file_name, false, f.file_name = scoped.file_name, f.server_log_id
       from server_log_files f join scoped on scoped.id = f.server_log_id
     ) files left join urls using (id)
     order by id desc, is_primary desc, file_name
@@ -48,6 +56,7 @@ export async function listStoredServerLogFiles(
         logId: file.log_id,
         fileName: file.file_name,
         primary: file.is_primary,
+        shadowed: file.shadowed,
         repositories: repositories.filter((repository) => repository !== null),
       };
     }),
@@ -90,20 +99,23 @@ export async function redactStoredServerLogFile(
   file: StoredServerLogFile,
   write: boolean,
 ): Promise<ServerLogRedaction> {
-  const { logId, fileName, primary, repositories } = file;
+  const { logId, fileName, primary, shadowed, repositories } = file;
+  const lock = write ? tx`for update` : tx``;
   const [row] = primary
     ? await tx<{ text: string }[]>`
-        select server_log as text from server_logs where id = ${logId} for update`
+        select server_log as text from server_logs where id = ${logId} ${lock}`
     : await tx<{ text: string }[]>`
         select log_text as text from server_log_files
-        where server_log_id = ${logId} and file_name = ${fileName} for update`;
+        where server_log_id = ${logId} and file_name = ${fileName} ${lock}`;
   if (!row) return { changed: false, blockBacked: false };
   const redacted = sanitizeLogText(row.text, repositories);
   if (redacted === row.text) return { changed: false, blockBacked: false };
-  const [marker] = await tx`
-    select 1 from server_log_block_files
-    where server_log_id = ${logId} and file_name = ${fileName}
-  `;
+  const [marker] = shadowed
+    ? []
+    : await tx`
+        select 1 from server_log_block_files
+        where server_log_id = ${logId} and file_name = ${fileName}
+      `;
   if (!write) return { changed: true, blockBacked: Boolean(marker) };
   await (primary
     ? tx`update server_logs set server_log = ${redacted} where id = ${logId}`
