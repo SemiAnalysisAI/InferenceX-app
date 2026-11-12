@@ -29,6 +29,9 @@ it.each(['/infx/inference', '/zh/infx/inference'])(
     expect(container.querySelector('[data-testid="model-selector"]')?.textContent).toContain(
       'Muse Spark 1.3/Open 816B',
     );
+    expect(container.querySelector('[data-testid="model-selector"] img')?.getAttribute('src')).toBe(
+      '/logos/meta-color.svg',
+    );
     const options = [...container.querySelectorAll('[role="option"]')];
     expect(options).toHaveLength(1);
     expect(options[0].textContent).toContain('Kimi K3');
