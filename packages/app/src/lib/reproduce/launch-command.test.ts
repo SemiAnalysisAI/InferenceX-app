@@ -10,6 +10,9 @@ const logs = (overrides: Partial<ReproduceLogs>): ReproduceLogs => ({
   engine_file: null,
   launch: null,
   engine: null,
+  config_files: [],
+  fingerprints: [],
+  benchmark_command: null,
   ...overrides,
 });
 
@@ -42,6 +45,7 @@ describe('buildLaunchCommand', () => {
             },
           ],
         },
+        benchmark_command: 'agentx profile --concurrency 8',
       }),
     );
     expect(command).toEqual({
@@ -51,6 +55,7 @@ describe('buildLaunchCommand', () => {
         '# Container: lmsysorg/sglang:v0.5.22\n# srtctl 2.59.1\n# Recipe: inferencex-mi355x_06',
         '# prefill worker 0 on a, b\nenv \\\n  DYN_LOG=info,x=warn \\\n  HF_HOME=/hf \\\n  python3 -m sglang.launch_server --tp 8',
         '# sglang-router 0 on a\npython -m sglang_router.launch_router --pd-disaggregation',
+        '# benchmark client\nagentx profile --concurrency 8',
       ].join('\n\n'),
     });
   });
