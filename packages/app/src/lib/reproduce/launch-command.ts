@@ -41,10 +41,11 @@ export function buildLaunchCommand(logs: ReproduceLogs | null): LaunchCommand {
       launch.recipe && `# Recipe: ${launch.recipe}`,
     ].filter(Boolean);
     const blocks = launch.steps.map((step) => [stepHeading(step), ...stepLines(step)].join('\n'));
+    const client = logs.benchmark_command && `# benchmark client\n${logs.benchmark_command}`;
     return {
       kind: 'recorded',
       file: logs.launch_file,
-      script: [header.join('\n'), ...blocks].filter(Boolean).join('\n\n'),
+      script: [header.join('\n'), ...blocks, client].filter(Boolean).join('\n\n'),
     };
   }
   const args = logs.engine?.engine_args;

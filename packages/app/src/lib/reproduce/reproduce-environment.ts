@@ -5,14 +5,18 @@ import type { ReproducePayload } from './reproduce-payload';
 
 export type EnvironmentKey =
   | 'gpu_sku'
+  | 'gpu_model'
   | 'container_image'
   | 'launched_container'
   | 'framework'
+  | 'framework_build'
   | 'framework_commit'
   | 'tensorrt_llm_version'
   | 'nccl_version'
   | 'cuda_version'
   | 'driver_version'
+  | 'python_version'
+  | 'os'
   | 'router'
   | 'kv_offload_backend'
   | 'nodes'
@@ -47,10 +51,17 @@ const ALWAYS_SHOWN: Partial<Record<EnvironmentKey, true>> = {
   workflow_run: true,
 };
 
+/** Every distinct value the workers reported, so a mixed deployment shows each one. */
+function distinct(values: readonly (string | null | undefined)[]): string | null {
+  const unique = [...new Set(values.filter((value): value is string => Boolean(value)))];
+  return unique.length > 0 ? unique.join(', ') : null;
+}
+
 /**
- * Environment facts for one point, from its row and, for stored results, the run
- * metadata and log facts in `/api/v1/reproduce`. Driver and CUDA stay null unless a
- * stored log states them, because no artifact records the host driver.
+ * Environment facts for one point, from its row and, for stored results, the run metadata,
+ * worker fingerprints and log facts in `/api/v1/reproduce`. Worker fingerprints are the
+ * first source for driver, CUDA, NCCL and framework build; engine-log banners fill in for
+ * bundles stored without them.
  */
 export function buildReproduceEnvironment(
   point: InferenceData,
@@ -58,20 +69,38 @@ export function buildReproduceEnvironment(
 ): EnvironmentRow[] {
   const launch = payload?.logs?.launch ?? null;
   const versions = payload?.logs?.engine?.versions;
+  const fingerprints = payload?.logs?.fingerprints ?? [];
   const run = payload?.run;
   const runUrl = run?.run_url ?? point.run_url ?? null;
   const repo = runUrl ? GITHUB_REPO.exec(runUrl)?.groups?.repo : undefined;
   const commit = point.image ? nightlyCommit(point.image) : null;
   const rows: EnvironmentRow[] = [
     { key: 'gpu_sku', value: point.hw ?? null },
+    { key: 'gpu_model', value: distinct(fingerprints.map((print) => print.gpu)) },
     { key: 'container_image', value: point.image ?? null },
     { key: 'launched_container', value: launch?.container ?? null },
     { key: 'framework', value: point.framework ?? null },
+    {
+      key: 'framework_build',
+      value: distinct(
+        fingerprints.flatMap((print) =>
+          Object.entries(print.frameworks).map(([name, version]) => `${name} ${version}`),
+        ),
+      ),
+    },
     { key: 'framework_commit', value: commit },
     { key: 'tensorrt_llm_version', value: versions?.tensorrt_llm ?? null },
-    { key: 'nccl_version', value: versions?.nccl ?? null },
-    { key: 'cuda_version', value: versions?.cuda ?? null },
-    { key: 'driver_version', value: null },
+    {
+      key: 'nccl_version',
+      value: distinct(fingerprints.map((print) => print.nccl)) ?? versions?.nccl ?? null,
+    },
+    {
+      key: 'cuda_version',
+      value: distinct(fingerprints.map((print) => print.cuda)) ?? versions?.cuda ?? null,
+    },
+    { key: 'driver_version', value: distinct(fingerprints.map((print) => print.driver)) },
+    { key: 'python_version', value: distinct(fingerprints.map((print) => print.python)) },
+    { key: 'os', value: distinct(fingerprints.map((print) => print.os)) },
     { key: 'router', value: withVersion(point.router_name, point.router_version) },
     {
       key: 'kv_offload_backend',

@@ -33,6 +33,73 @@ export interface EngineLogFacts {
   versions: { nccl: string | null; cuda: string | null; tensorrt_llm: string | null };
 }
 
+/** One stored launch file: a recipe, engine config, or client command. */
+export interface LaunchFile {
+  file: string;
+  text: string;
+}
+
+/** The environment a worker recorded at startup in its `fingerprint_<role>_w<N>.json`. */
+export interface WorkerFingerprint {
+  file: string;
+  hostname: string | null;
+  os: string | null;
+  arch: string | null;
+  cpu: string | null;
+  gpu: string | null;
+  gpu_count: number | null;
+  driver: string | null;
+  cuda: string | null;
+  nccl: string | null;
+  python: string | null;
+  frameworks: Record<string, string>;
+}
+
+function nonEmpty(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * Summarize a worker fingerprint. `nvcc --version` output becomes its version number and
+ * NCCL's `(2, 30, 7)` tuple becomes `2.30.7`. Returns null for text that is not a JSON object.
+ */
+export function parseFingerprint(file: string, raw: string): WorkerFingerprint | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const record = parsed as Record<string, unknown>;
+  const gpu = (record.gpu ?? {}) as Record<string, unknown>;
+  const gpus = Array.isArray(gpu.gpus) ? (gpu.gpus as Record<string, unknown>[]) : [];
+  const cuda = nonEmpty(record.cuda_version);
+  const nccl = nonEmpty(record.nccl_version);
+  const ncclParts = nccl?.match(/\d+/gu);
+  const frameworks: Record<string, string> = {};
+  for (const [name, value] of Object.entries(
+    (record.frameworks ?? {}) as Record<string, unknown>,
+  )) {
+    const version = nonEmpty(value);
+    if (version) frameworks[name] = version;
+  }
+  return {
+    file,
+    hostname: nonEmpty(record.hostname),
+    os: nonEmpty(record.os),
+    arch: nonEmpty(record.arch),
+    cpu: nonEmpty((record.cpu as Record<string, unknown> | undefined)?.model),
+    gpu: nonEmpty(gpus[0]?.name),
+    gpu_count: gpus.length > 0 ? gpus.length : null,
+    driver: nonEmpty(gpu.driver) ?? nonEmpty(gpus[0]?.driver),
+    cuda: cuda ? (/\bV(?<v>\d[\w.]*)/u.exec(cuda)?.groups?.v ?? cuda) : null,
+    nccl: nccl?.startsWith('(') && ncclParts ? ncclParts.join('.') : nccl,
+    python: nonEmpty(record.python_version),
+    frameworks,
+  };
+}
+
 // oxlint-disable-next-line no-control-regex -- terminal logs intentionally contain ANSI controls
 const ANSI = /\u001B\[[0-9;]*m/gu;
 const INFO = /^\S+ \S+ \[INFO\] (?<body>.*)$/u;

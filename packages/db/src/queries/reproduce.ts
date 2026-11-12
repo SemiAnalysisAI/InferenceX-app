@@ -1,10 +1,14 @@
 import type { DbClient } from '../connection.js';
 import { withStoredPerPoolBasis } from '../etl/disagg-throughput';
+import { isLaunchFileName } from '../etl/launch-files';
 import {
   type EngineLogFacts,
+  type LaunchFile,
   parseEngineLog,
+  parseFingerprint,
   parseSrtctlSweepLog,
   type SrtctlLaunch,
+  type WorkerFingerprint,
 } from '../lib/launch-record';
 import type { BenchmarkRow } from './benchmarks';
 import { getServerLogChunk, getServerLogFileNames } from './server-logs';
@@ -25,6 +29,12 @@ export interface ReproduceLogs {
   engine_file: string | null;
   launch: SrtctlLaunch | null;
   engine: EngineLogFacts | null;
+  /** srtctl recipe and engine config files stored with the logs, deduplicated by content. */
+  config_files: LaunchFile[];
+  /** One summary per worker fingerprint file. */
+  fingerprints: WorkerFingerprint[];
+  /** The benchmark client command line, when recorded. */
+  benchmark_command: string | null;
 }
 
 export interface ReproduceSource {
@@ -37,6 +47,8 @@ export interface ReproduceSource {
 export const LAUNCH_LOG_CHARACTERS = 2 * 1024 * 1024;
 /** Characters read from the engine log. Startup args and NCCL banners land well inside. */
 export const ENGINE_LOG_CHARACTERS = 1024 * 1024;
+/** Characters read from each launch file. Recipes and engine configs are a few KB to 50 KB. */
+export const LAUNCH_FILE_CHARACTERS = 256 * 1024;
 
 const SWEEP_LOG = /(?:^|\/)sweep_\d+\.log$/u;
 const FIRST_WORKER_LOG = /_(?:agg|prefill|decode)_w0\.out$/u;
@@ -55,13 +67,59 @@ export function selectLaunchLogFiles(files: readonly string[]): {
   return { launch, engine };
 }
 
+const CONFIG_FILE_ORDER = [
+  /(?:^|\/)config\.yaml$/u,
+  /(?:^|\/)recipe\.lock\.yaml$/u,
+  /(?:^|\/)trtllm_config_[^/]+\.yaml$/u,
+  /_config\.json$/u,
+];
+const FINGERPRINT = /(?:^|\/)fingerprint_[^/]+\.json$/u;
+const BENCHMARK_COMMAND = /(?:^|\/)benchmark_command\.txt$/u;
+
+/**
+ * Split a bundle's launch files into config files (deduplicated by content, in the order a
+ * reader wants them), parsed worker fingerprints, and the benchmark client command.
+ */
+export function groupLaunchFiles(files: readonly LaunchFile[]): {
+  config_files: LaunchFile[];
+  fingerprints: WorkerFingerprint[];
+  benchmark_command: string | null;
+} {
+  const seen = new Set<string>();
+  const config_files = CONFIG_FILE_ORDER.flatMap((pattern) =>
+    files
+      .filter((file) => pattern.test(file.file) && !FINGERPRINT.test(file.file))
+      .toSorted((a, b) => a.file.localeCompare(b.file)),
+  ).filter((file) => {
+    if (seen.has(file.text)) return false;
+    seen.add(file.text);
+    return true;
+  });
+  return {
+    config_files,
+    fingerprints: files
+      .filter((file) => FINGERPRINT.test(file.file))
+      .toSorted((a, b) => a.file.localeCompare(b.file))
+      .flatMap((file) => parseFingerprint(file.file, file.text) ?? []),
+    benchmark_command: files.find((file) => BENCHMARK_COMMAND.test(file.file))?.text.trim() || null,
+  };
+}
+
 async function readLogs(sql: DbClient, id: number): Promise<ReproduceLogs | null> {
   const files = await getServerLogFileNames(sql, id);
   if (!files) return null;
   const selected = selectLaunchLogFiles(files);
-  const [launchText, engineText] = await Promise.all([
+  const [launchText, engineText, launchFiles] = await Promise.all([
     selected.launch ? getServerLogChunk(sql, id, 0, LAUNCH_LOG_CHARACTERS, selected.launch) : null,
     selected.engine ? getServerLogChunk(sql, id, 0, ENGINE_LOG_CHARACTERS, selected.engine) : null,
+    Promise.all(
+      files
+        .filter((file) => isLaunchFileName(file))
+        .map(async (file) => {
+          const chunk = await getServerLogChunk(sql, id, 0, LAUNCH_FILE_CHARACTERS, file);
+          return chunk ? { file, text: chunk.serverLog } : null;
+        }),
+    ),
   ]);
   return {
     files,
@@ -69,6 +127,7 @@ async function readLogs(sql: DbClient, id: number): Promise<ReproduceLogs | null
     engine_file: selected.engine,
     launch: launchText ? parseSrtctlSweepLog(launchText.serverLog) : null,
     engine: engineText ? parseEngineLog(engineText.serverLog) : null,
+    ...groupLaunchFiles(launchFiles.filter((file) => file !== null)),
   };
 }
 

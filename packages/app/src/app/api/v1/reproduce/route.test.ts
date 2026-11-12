@@ -85,6 +85,9 @@ const source: ReproduceSource = {
     engine_file: 'im-gb300-r03-c001_prefill_w0.out',
     launch: null,
     engine: { engine_args: null, versions: { nccl: null, cuda: null, tensorrt_llm: '1.4.0rc2' } },
+    config_files: [{ file: 'config.yaml', text: 'name: inferencex-gb300-nv_19\n' }],
+    fingerprints: [],
+    benchmark_command: null,
   },
 };
 
