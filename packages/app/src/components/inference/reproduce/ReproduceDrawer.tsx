@@ -32,7 +32,7 @@ const STRINGS = {
     description:
       'How this benchmark point was produced, from its stored configuration, run metadata, and logs.',
     unofficial: 'Unofficial run',
-    tabs: { command: 'Command', config: 'Config JSON', environment: 'Environment' },
+    tabs: { command: 'Command', config: 'Config', environment: 'Environment' },
     copy: 'Copy',
     copied: 'Copied',
     copyFailed: 'Could not copy. Select the text to copy it manually.',
@@ -46,25 +46,31 @@ const STRINGS = {
       `This run's logs record no launch command. These are the arguments ${engine} printed at startup in ${file}.`,
     noLogs: 'No logs are stored for this result, so its launch command is unknown.',
     notRecorded:
-      'This framework did not log its launch command or arguments for this run. The Config JSON tab has the stored configuration.',
+      'This framework did not log its launch command or arguments for this run. The Config tab has the stored configuration.',
     configNote:
       'Stored configuration of this result, identical to the config /api/v1/reproduce returns.',
+    storedConfig: 'Stored config (JSON)',
+    fileNote: (file: string) => `File saved with the run's logs: ${file}.`,
     overlay:
-      'Launch logs are only stored for ingested results. The Config JSON and Environment tabs show what this unofficial run reported.',
-    seeConfig: 'See Config JSON',
+      'Launch logs are only stored for ingested results. The Config and Environment tabs show what this unofficial run reported.',
+    seeConfig: 'See Config',
     notRecordedValue: 'Not recorded',
     environmentNote:
-      'Values come from the stored result, its workflow run, and its logs. “Not recorded” means no stored artifact states the value.',
+      'Values come from the stored result, its workflow run, worker fingerprints, and logs. “Not recorded” means no stored artifact states the value.',
     rows: {
       gpu_sku: 'GPU SKU',
+      gpu_model: 'GPU model',
       container_image: 'Container image',
       launched_container: 'Launched container',
       framework: 'Framework',
+      framework_build: 'Framework build',
       framework_commit: 'Framework commit (from image tag)',
       tensorrt_llm_version: 'TensorRT-LLM version',
       nccl_version: 'NCCL version',
-      cuda_version: 'CUDA version (NCCL build)',
+      cuda_version: 'CUDA version',
       driver_version: 'Driver version',
+      python_version: 'Python version',
+      os: 'OS',
       router: 'Router',
       kv_offload_backend: 'KV offload backend',
       nodes: 'Nodes',
@@ -80,7 +86,7 @@ const STRINGS = {
     title: '复现该结果',
     description: '根据已存储的配置、运行元数据和日志，展示该基准测试数据点的产生方式。',
     unofficial: '非官方运行',
-    tabs: { command: '命令', config: 'Config JSON', environment: '运行环境' },
+    tabs: { command: '命令', config: '配置', environment: '运行环境' },
     copy: '复制',
     copied: '已复制',
     copyFailed: '复制失败。请选中文本后手动复制。',
@@ -92,24 +98,30 @@ const STRINGS = {
     engineArgs: (engine: string, file: string) =>
       `该运行的日志未记录启动命令。以下是 ${engine} 启动时在 ${file} 中输出的参数。`,
     noLogs: '该结果没有已存储的日志，因此无法得知其启动命令。',
-    notRecorded: '该框架在本次运行中未输出启动命令或参数。已存储的配置见 Config JSON 标签页。',
+    notRecorded: '该框架在本次运行中未输出启动命令或参数。已存储的配置见“配置”标签页。',
     configNote: '该结果已存储的配置，与 /api/v1/reproduce 返回的 config 完全一致。',
+    storedConfig: '已存储配置（JSON）',
+    fileNote: (file: string) => `运行时随日志保存的原始文件：${file}。`,
     overlay:
-      '只有已导入的结果才会存储启动日志。Config JSON 和运行环境标签页展示的是该非官方运行上报的信息。',
-    seeConfig: '查看 Config JSON',
+      '只有已导入的结果才会存储启动日志。“配置”和“运行环境”标签页展示的是该非官方运行上报的信息。',
+    seeConfig: '查看配置',
     notRecordedValue: '未记录',
     environmentNote:
-      '数值来自已存储的结果、对应的工作流运行及其日志。“未记录”表示没有任何已存储的产物包含该值。',
+      '数值来自已存储的结果、对应的工作流运行、worker 环境指纹及日志。“未记录”表示没有任何已存储的产物包含该值。',
     rows: {
       gpu_sku: 'GPU SKU',
+      gpu_model: 'GPU 型号',
       container_image: '容器镜像',
       launched_container: '实际启动的容器',
       framework: '框架',
+      framework_build: '框架构建版本',
       framework_commit: '框架 commit（取自镜像标签）',
       tensorrt_llm_version: 'TensorRT-LLM 版本',
       nccl_version: 'NCCL 版本',
-      cuda_version: 'CUDA 版本（NCCL 构建）',
+      cuda_version: 'CUDA 版本',
       driver_version: '驱动版本',
+      python_version: 'Python 版本',
+      os: '操作系统',
       router: 'Router',
       kv_offload_backend: 'KV offload 后端',
       nodes: '节点',
@@ -185,6 +197,7 @@ function commandText(command: LaunchCommand | null): string | null {
 }
 
 const TABS = ['command', 'config', 'environment'] as const;
+const STORED_CONFIG = 'stored';
 
 interface Props {
   point: InferenceData | null;
@@ -196,6 +209,7 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [tab, setTab] = useState<ReproduceTab>('command');
+  const [configId, setConfigId] = useState<string | null>(null);
   const persistedId = point && isPersistedBenchmarkId(point.id) ? point.id : null;
   const { data: payload, isPending, isError } = useReproduce(persistedId, persistedId !== null);
   const open = point !== null;
@@ -205,6 +219,7 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
   useEffect(() => {
     if (!point) return;
     setTab('command');
+    setConfigId(null);
     track('inference_reproduce_opened', {
       source,
       id: point.id,
@@ -230,9 +245,8 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
     persistedId !== null && payload !== undefined
       ? buildLaunchCommand(payload?.logs ?? null)
       : null;
-  const copyText: Record<ReproduceTab, string | null> = {
+  const copyText: Record<'command' | 'environment', string | null> = {
     command: commandText(command),
-    config: configText,
     environment: environmentText,
   };
   const runUrl = payload?.run.run_url ?? point.run_url;
@@ -274,12 +288,23 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
       </EmptyState>
     );
   }
+  const configSources = [
+    ...(payload?.logs?.config_files ?? []).map((file) => ({
+      id: file.file,
+      label: file.file.slice(file.file.lastIndexOf('/') + 1),
+      text: file.text,
+      note: t.fileNote(file.file),
+    })),
+    { id: STORED_CONFIG, label: t.storedConfig, text: configText, note: t.configNote },
+  ];
+  const selectedConfig =
+    configSources.find((option) => option.id === configId) ?? configSources[0]!;
   const footerNote: Record<ReproduceTab, string | null> = {
     command: commandNote,
-    config: t.configNote,
+    config: selectedConfig.note,
     environment: t.environmentNote,
   };
-  const activeCopy = copyText[tab];
+  const activeCopy = tab === 'config' ? selectedConfig.text : copyText[tab];
 
   return (
     <Dialog
@@ -376,7 +401,7 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
             {activeCopy && (
               <div className="ml-auto">
                 <CopyButton
-                  key={tab}
+                  key={tab === 'config' ? `config:${selectedConfig.id}` : tab}
                   text={activeCopy}
                   onCopied={() => track('inference_reproduce_copied', { tab, framework, source })}
                 />
@@ -388,7 +413,26 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
               {commandBody}
             </TabsPrimitive.Content>
             <TabsPrimitive.Content value="config" className="outline-none">
-              <CodeBlock label={t.tabs.config}>{configText}</CodeBlock>
+              {configSources.length > 1 && (
+                <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label={t.tabs.config}>
+                  {configSources.map((option) => (
+                    <Button
+                      key={option.id}
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      aria-pressed={option.id === selectedConfig.id}
+                      data-testid="reproduce-config-file"
+                      title={option.id}
+                      onClick={() => setConfigId(option.id)}
+                      className="font-mono"
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              <CodeBlock label={selectedConfig.label}>{selectedConfig.text}</CodeBlock>
             </TabsPrimitive.Content>
             <TabsPrimitive.Content value="environment" className="outline-none">
               <dl className="divide-y divide-border/50 rounded-md border border-border/70 bg-card/30">
