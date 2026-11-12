@@ -624,6 +624,15 @@ once on N connections; each file is its own transaction, so an interrupted run r
 Point `DATABASE_WRITE_URL` at the direct endpoint (no `-pooler` in the host): the pooler closed
 connections at 16 and above. Each connection holds up to about 1 GB while it compacts a large file.
 
+#### Log sanitization
+
+Ingest and `sync-public-db` sanitize server-log text with `etl/log-redaction.ts`, and
+`sync-public-db` also sanitizes runs from repositories that are not public.
+`bun run admin:db:backfill-log-redaction` applies it to rows stored earlier in the public database
+(point `DATABASE_WRITE_URL` at it): dry run by default,
+`--write` to apply, `--run-id` to scope it, safe to rerun. Purge the log cache afterwards with
+`bun run admin:cache:invalidate -- <app-url> --immediate`.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.

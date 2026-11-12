@@ -232,7 +232,7 @@ jobs:
                 echo "::error::Resolved database host does not belong to the requested child branch"
                 exit 1
               fi
-              echo "Verified child database: $NEON_BRANCH_NAME ($branch_id), host $database_host"
+              echo "Verified child database: $NEON_BRANCH_NAME ($branch_id)"
               cache_invalidate_url="${PREVIEW_SITE_URL%/}/api/v1/invalidate"
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"

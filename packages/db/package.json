@@ -32,6 +32,7 @@
     "db:backfill-dataset-stats": "bun --env-file=../../.env src/backfill-dataset-stats.ts",
     "db:backfill-gpu-metrics": "bun --env-file=../../.env src/backfill-gpu-metrics.ts",
     "db:backfill-gpu-sample-blobs": "bun --env-file=../../.env src/backfill-gpu-sample-blobs.ts",
+    "db:backfill-log-redaction": "bun --env-file=../../.env src/backfill-log-redaction.ts",
     "db:backfill-power-series": "bun --env-file=../../.env src/backfill-power-series.ts",
     "db:backfill-full-response-interactivity": "bun --env-file=../../.env src/backfill-full-response-interactivity.ts",
     "db:backfill-request-chart-data": "bun --env-file=../../.env src/backfill-request-chart-data.ts",
