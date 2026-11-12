@@ -1,10 +1,15 @@
 import type { PGlite } from '@electric-sql/pglite';
 import type { TransactionSql } from 'postgres';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { writeTextAsBlocks } from '../etl/server-log-block-writer';
 import { readServerLogBlocks } from '../server-log-blocks';
-import { redactStoredServerLogFile } from './stored-redaction';
+import {
+  listStoredServerLogFiles,
+  redactStoredServerLogFile,
+  sanitizeRunUrls,
+  type StoredServerLogFile,
+} from './stored-redaction';
 import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
 
 const RAW =
@@ -28,14 +33,12 @@ beforeEach(async () => {
   await db.exec('TRUNCATE server_logs RESTART IDENTITY CASCADE');
 });
 
+function redactStored(file: StoredServerLogFile, write: boolean) {
+  return sql.begin((tx) => redactStoredServerLogFile(tx as unknown as TransactionSql, file, write));
+}
+
 function redactFile(fileName: string, primary: boolean, write: boolean) {
-  return sql.begin((tx) =>
-    redactStoredServerLogFile(
-      tx as unknown as TransactionSql,
-      { logId: '1', fileName, primary },
-      write,
-    ),
-  );
+  return redactStored({ logId: '1', fileName, primary, repositories: [] }, write);
 }
 
 async function storedLogs() {
@@ -109,5 +112,126 @@ describe('redactStoredServerLogFile', () => {
       changed: false,
       blockBacked: false,
     });
+  });
+});
+
+const PRIVATE_URL = 'https://github.com/example-org/private-repo/actions/runs/101';
+const PUBLIC_URL = 'https://github.com/example-org/public-repo/actions/runs/102';
+const PRIVATE_LOG =
+  'clone https://github.com/example-org/private-repo\ncd /_work/private-repo/private-repo\n';
+const PRIVATE_CHILD =
+  'pip install private-repo-tools\n/_work/private-repo/private-repo/router.py\n';
+const PUBLIC_LOG = 'cd /_work/public-repo/public-repo\n';
+
+async function stored() {
+  return {
+    runs: await sql`select github_run_id::int, html_url from workflow_runs order by id`,
+    logs: await sql`select server_log from server_logs order by id`,
+    files: await sql`select log_text from server_log_files`,
+  };
+}
+
+describe('backfill of runs from repositories that are not public', () => {
+  beforeEach(async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(
+          url === 'https://api.github.com/repos/example-org/public-repo'
+            ? Response.json({ private: false })
+            : new Response(null, { status: 404 }),
+        ),
+      ),
+    );
+    await db.exec('TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE');
+    await sql`
+      insert into workflow_runs (id, github_run_id, run_attempt, name, created_at, date, html_url)
+      values (1, 101, 1, 'Run Sweep', '2026-11-01T00:00:00Z', '2026-11-01', ${PRIVATE_URL}),
+        (2, 102, 1, 'Run Sweep', '2026-11-01T00:00:00Z', '2026-11-01', ${PUBLIC_URL})
+    `;
+    await db.exec(`
+      insert into configs (id, model, hardware, framework, precision, spec_method, disagg,
+        is_multinode, prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
+      values (1, 'dsv4', 'gb200', 'dynamo-vllm', 'fp4', 'none', true, true, 4, 8, 8, 16)
+    `);
+    await sql`
+      insert into server_logs (server_log, file_name, files_complete)
+      values (${PRIVATE_LOG}, 'results/server.log', true), (${PUBLIC_LOG}, 'results/server.log', true)
+    `;
+    await sql`
+      insert into server_log_files (server_log_id, file_name, log_text)
+      values (1, 'results/router.log', ${PRIVATE_CHILD})
+    `;
+    await db.exec(`
+      insert into benchmark_results
+        (workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, metrics, server_log_id)
+      values (1, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{}', 1),
+        (2, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{}', 2)
+    `);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sanitizes the logs and run URL of a private run and leaves a public run untouched', async () => {
+    const files = await listStoredServerLogFiles(sql, undefined);
+    expect(files).toEqual([
+      { logId: '2', fileName: 'results/server.log', primary: true, repositories: [] },
+      {
+        logId: '1',
+        fileName: 'results/server.log',
+        primary: true,
+        repositories: ['example-org/private-repo'],
+      },
+      {
+        logId: '1',
+        fileName: 'results/router.log',
+        primary: false,
+        repositories: ['example-org/private-repo'],
+      },
+    ]);
+    for (const file of files) await redactStored(file, true);
+    expect(await sanitizeRunUrls(sql, undefined, true)).toBe(1);
+
+    expect(await stored()).toEqual({
+      runs: [
+        { github_run_id: 101, html_url: null },
+        { github_run_id: 102, html_url: PUBLIC_URL },
+      ],
+      logs: [
+        {
+          server_log:
+            'clone https://github.com/***REDACTED***\ncd /_work/***REDACTED***/***REDACTED***\n',
+        },
+        { server_log: PUBLIC_LOG },
+      ],
+      files: [
+        {
+          log_text:
+            'pip install private-repo-tools\n/_work/***REDACTED***/***REDACTED***/router.py\n',
+        },
+      ],
+    });
+  });
+
+  it('writes nothing in a dry run and honors --run-id', async () => {
+    expect(await listStoredServerLogFiles(sql, 102)).toEqual([
+      { logId: '2', fileName: 'results/server.log', primary: true, repositories: [] },
+    ]);
+    const before = await stored();
+    const changed = [];
+    for (const file of await listStoredServerLogFiles(sql, undefined)) {
+      const result = await redactStored(file, false);
+      changed.push(result.changed);
+    }
+    expect(changed).toEqual([false, true, true]);
+    expect(await sanitizeRunUrls(sql, undefined, false)).toBe(1);
+    expect(await sanitizeRunUrls(sql, 102, true)).toBe(0);
+    expect(await stored()).toEqual(before);
+    expect(before.runs).toEqual([
+      { github_run_id: 101, html_url: PRIVATE_URL },
+      { github_run_id: 102, html_url: PUBLIC_URL },
+    ]);
   });
 });

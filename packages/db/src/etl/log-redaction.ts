@@ -5,7 +5,7 @@ import { isIPv6 } from 'node:net';
  * `log-redaction.vectors.json`).
  */
 
-const REDACTED = '***REDACTED***';
+export const REDACTED = '***REDACTED***';
 
 const SECRET_PATTERNS = [
   /\bhf_[A-Za-z0-9]{30,}\b/gu,

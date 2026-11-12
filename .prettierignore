@@ -14,6 +14,5 @@ packages/app/src/lib/power/power-model.parity.json
 # The native H3 bundle fixture is a checksum-sealed copy of the InferenceX producer's
 # output: SHA256SUMS and the manifest bind every byte, so reformatting breaks the seal.
 packages/app/src/components/video-benchmark/fixtures/native-serving-bundle/
-# Log-redaction test vectors are shared byte for byte with InferenceX's Python
-# implementation, so both repositories test against the same file.
+# Shared byte for byte with InferenceX's Python tests.
 packages/db/src/etl/log-redaction.vectors.json
