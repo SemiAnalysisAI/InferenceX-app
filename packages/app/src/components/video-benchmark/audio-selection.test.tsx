@@ -51,6 +51,7 @@ it('keeps one clip audible, including after the overview is hidden and revealed'
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
         onShow={() => {}}
         reveal={0}
       />

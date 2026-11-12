@@ -22,16 +22,9 @@ import {
   pairSeries,
 } from '@/lib/powerx/measured-vs-modeled';
 
-import {
-  Chips,
-  CopyButton,
-  GrammarLegend,
-  GrammarSwatch,
-  useView,
-  useWidgetHash,
-  WidgetFrame,
-  type WidgetProps,
-} from './widget-chrome';
+import { Chips, WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { CopyButton, GrammarLegend, GrammarSwatch, useView, useWidgetHash } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -221,7 +214,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
       .join(' ');
 
   return (
-    <WidgetFrame name="measured-vs-modeled" alt={alt}>
+    <WidgetFrame scope="powerx" name="measured-vs-modeled" alt={alt}>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <Chips<MmView>
           label={t.view}

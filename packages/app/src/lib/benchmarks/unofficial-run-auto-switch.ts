@@ -15,11 +15,15 @@ export function computeAutoSwitchDecision(
   if (unofficialAvailable.length === 0) {
     return { nextKey: '', modelToSet: null };
   }
-  if (urlModel) {
-    return { nextKey: lastKey, modelToSet: null };
-  }
   const sortedModels = [...new Set(unofficialAvailable.map((a) => a.model))].toSorted();
   const key = sortedModels.join(',');
+  if (urlModel) {
+    // URL parsing restores only registered models, so a pinned unregistered overlay model is applied here.
+    const pinned = sortedModels.find((model) => model === urlModel);
+    return pinned && pinned !== selectedModel && lastKey !== key
+      ? { nextKey: key, modelToSet: pinned }
+      : { nextKey: lastKey, modelToSet: null };
+  }
   if (lastKey === key) {
     return { nextKey: lastKey, modelToSet: null };
   }

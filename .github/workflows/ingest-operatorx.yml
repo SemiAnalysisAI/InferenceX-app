@@ -97,7 +97,32 @@ jobs:
           fi
           curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
 
+      - name: Notify Slack on failure
+        if: failure() && github.repository == 'SemiAnalysisAI/InferenceX-app'
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: *Ingest OperatorX workflow failed*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
+
+  # Many sweeps can land at once. Warm-ups run one at a time across all ingests, and while one
+  # runs only the newest waiting warm-up is kept: it covers every run stored so far.
+  warm:
+    name: Warm OperatorX comparisons
+    needs: ingest
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions: {}
+    concurrency:
+      group: ingest-operatorx-warm
+      cancel-in-progress: false
+    steps:
       - name: Warm default OperatorX comparisons
+        # best effort: the run is stored either way
+        continue-on-error: true
         env:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
@@ -111,14 +136,3 @@ jobs:
             curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
               "${APP_URL%/}/api/v1/operatorx/compare?op=$op" "${headers[@]}" -o /dev/null
           done
-
-      - name: Notify Slack on failure
-        if: failure() && github.repository == 'SemiAnalysisAI/InferenceX-app'
-        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "text": ":rotating_light: *Ingest OperatorX workflow failed*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
-            }

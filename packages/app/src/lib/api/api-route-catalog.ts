@@ -75,7 +75,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: '590dcd902592e1b8daf605f35bd907c14767c1180fadf735e67dd815842e6667',
+    sourceSha256: '20eb387588dd0abb151c534dbafdf7b532cd93e1771b2cfb2a93ccec680bd1fe',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
@@ -655,10 +655,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
-      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
+      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Rows whose model or hardware has no registry entry are kept, with the raw model prefix and the raw runner base as their model and hardware identities; official ingest still skips them. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
+      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。模型或硬件尚未注册的行也会保留，分别以原始模型前缀和原始 runner 名称作为模型和硬件标识；正式入库仍会跳过这些行。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
     },
-    sourceSha256: 'c5178f61e3b47290019285247aeec0f429d41feafe73e58e6e89cfb0d89327d9',
+    sourceSha256: 'e062bb87a87a1e65189ca681d0fb582456d67ae5a869340f73c5173cab20a5bb',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -953,6 +953,14 @@ export const apiRouteCatalog = [
     sourceSha256: '2fc7e52dd60a3dcb19e73beebad561b9f989444267f72812c97a480bf2957415',
   },
   {
+    source: 'src/app/api/v1/reproduce/route.ts',
+    path: '/api/v1/reproduce',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-reproduce',
+    sourceSha256: '2a03d5808e361e4ab7489025d4dcfe5ed73757cb0829b0248a792a23fa68316b',
+  },
+  {
     source: 'src/app/api/v1/request-chart-data/route.ts',
     path: '/api/v1/request-chart-data',
     method: 'GET',
@@ -988,7 +996,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log-files',
-    sourceSha256: '859f7d2320c81c20385fc3cf2dd68412ebec2ac34f1ab330ecf67b4182ae6fc7',
+    sourceSha256: '8e7ff48404adac898c77813131b04881cc853eb6526b0c474c2ce43dca39c1ec',
   },
   {
     source: 'src/app/api/v1/server-log-search/route.ts',
@@ -1560,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '8d6559a4955c51ba1d98c9672b13ef0d0e236ce3a7e2cae2b939160d013ff7e1',
+    sourceSha256: '0e92ce3863fa78900eb99b21debf3ee83f3c3bbbd7786ec76d9f1d17f5d2665d',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1568,7 +1576,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: '3643a1e3c3557a10c4c01545ebac189063ae9a9eb9d574efef60d8f30de276c3',
+    sourceSha256: 'a591229828b27d56b5b4e4793b97e90a9b956857b3180341f6c4ac6299c487b2',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1648,7 +1656,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-clips.ts',
-    sourceSha256: 'e236ca3ac18f6722d4b0816b177c829ecc4d18daf33904a99073e6e14f73cc0f',
+    sourceSha256: 'b1eb590d36107baba009104c68c1bbbdcddd16db7b633914c659b2e9e6d09186',
     reviewArea: {
       en: 'Exact candidate/reference pairing, unscored reasons and per-clip quality projection shared by Results and the overview API, including PSNR without media for an unstored named run.',
       zh: 'Results 与 overview API 共用的精确候选/参考配对、未评分原因及逐条质量投影，包括未存储的指定运行在无媒体时的 PSNR。',
@@ -2099,7 +2107,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: '6cf88477d4aec60e6a2d276637281dbffe39bc42d37256511e10e6c741fa10a8',
+    sourceSha256: 'd067f4cdf79aca553bcc42d3e29de096beb6f978831d1bb3f36471b507ae11c4',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
@@ -2131,7 +2139,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: 'e4771fecf43cc7902000c5d11053e2a89e97ec4f56775e6fc974312c18a365b7',
+    sourceSha256: '0d53ab244496628373742f1575e415d58974905dc0254a33afa284ba59da4e26',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',
@@ -2184,7 +2192,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '05691469c87acdbca68886a2d4a0c7ccb12c1a79470fdfab0edc56ee16190860',
+    sourceSha256: 'fead36e0c8e39cb48b5e4121e9d3a728aee7604eaa6b357dbe7ad2ec6060b5d0',
     reviewArea: {
       en: 'Log filename discovery, size-capped selected-file reads, bounded chunk metadata, budgeted complete-file search, availability, and legacy-schema fallback.',
       zh: '日志文件名发现、有大小上限的指定文件读取、有界分块元数据、有扫描预算的完整文件搜索、可用性以及旧版 schema 回退行为。',
@@ -2213,7 +2221,7 @@ export const apiContractSourceDigests = [
   {
     source: '../db/src/queries/trace-server-metrics.ts',
     // Self-heal sanitizes source labels as ingest does; shapes are unchanged.
-    sourceSha256: '0c00c0fc01d589e580c542461f1578ea062b880019e4f642b18a97501dc92b0f',
+    sourceSha256: '2b372a3baa0cd94ec9c81c9a14ed1b1463f7d356cdce62df387e042709c18026',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

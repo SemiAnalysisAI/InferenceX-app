@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import type postgres from 'postgres';
 import {
+  isLogFileName,
   readCappedServerLogFile,
   type ServerLogFile,
   type ServerLogFilePath,
@@ -152,7 +153,7 @@ function primaryDeferredServerLogFile(
 ): DeferredServerLogFile | null {
   return (
     files.find((file) => path.posix.basename(file.fileName).toLowerCase() === 'server.log') ??
-    files[0] ??
+    files.find((file) => isLogFileName(file.fileName)) ??
     null
   );
 }

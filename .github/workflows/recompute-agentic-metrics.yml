@@ -63,8 +63,8 @@ jobs:
               echo '::error::Artifact recovery and ATOM capacity require a specific run'
               exit 1
             fi
-            echo 'shards=[0,1,2,3,4,5,6,7]' >> "$GITHUB_OUTPUT"
-            echo 'count=8' >> "$GITHUB_OUTPUT"
+            echo 'shards=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]' >> "$GITHUB_OUTPUT"
+            echo 'count=16' >> "$GITHUB_OUTPUT"
           elif [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo 'shards=[0]' >> "$GITHUB_OUTPUT"
             echo 'count=1' >> "$GITHUB_OUTPUT"
@@ -161,10 +161,13 @@ jobs:
           bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --snapshot "$manifest"
           rebuild=("${args[@]}")
           if [[ "$RUN_ID" != all && "$STALE_ONLY" == false ]]; then rebuild+=(--force); fi
-          bun run --cwd packages/db db:backfill-chart-series "${rebuild[@]}"
-          bun run --cwd packages/db db:backfill-aggregate-stats "${rebuild[@]}"
-          bun run --cwd packages/db db:backfill-request-timeline "${args[@]}"
-          bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --verify "$manifest"
+          # One failing trace must not leave the shard's later derived payloads stale.
+          status=0
+          bun run --cwd packages/db db:backfill-chart-series "${rebuild[@]}" || status=1
+          bun run --cwd packages/db db:backfill-aggregate-stats "${rebuild[@]}" || status=1
+          bun run --cwd packages/db db:backfill-request-timeline "${args[@]}" || status=1
+          bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --verify "$manifest" || status=1
+          exit "$status"
       - name: Retain integrity evidence
         if: ${{ always() && inputs.atom-kv-capacity-only != true }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

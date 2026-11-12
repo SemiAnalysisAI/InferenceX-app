@@ -335,6 +335,27 @@ describe('searchServerLogs across block-backed files', () => {
   });
 });
 
+describe('searchServerLogs with launch files', () => {
+  const sql = blockBackedSql(
+    {
+      'a.out': 'needle in the primary log',
+      'config.yaml': 'needle needle needle',
+      'fingerprint_agg_w0.json': 'needle needle',
+      'host_prefill_w0.out': 'worker needle',
+    },
+    [],
+  );
+
+  it('spends the match limit on logs only', async () => {
+    const result = await searchServerLogs(sql, 42, 'needle', 2);
+    expect(result.matches.map((m) => [m.fileName, m.offset])).toEqual([
+      ['a.out', 0],
+      ['host_prefill_w0.out', 7],
+    ]);
+    expect(result.truncated).toBe(false);
+  });
+});
+
 describe('searchServerLogs at block and slice edges', () => {
   const block = SERVER_LOG_BLOCK_CHARS;
   const sql = blockBackedSql({

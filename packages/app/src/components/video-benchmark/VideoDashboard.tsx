@@ -67,6 +67,7 @@ import {
   resultsPlotSeries,
   resultsPointKey,
   resultsSelection,
+  stageOpenings,
 } from './results-chart';
 import { optimizationsOf, runtimeLabel } from './optimizations';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
@@ -103,10 +104,9 @@ const STRINGS = {
     secondaryControls: 'More chart controls',
     changed: 'changed',
     engine: 'Engine',
-    all: 'All',
     bestEngine: 'Best',
     engineHelp:
-      'Best shows the lossless engine with the largest Pareto frontier area on each GPU. All shows every engine. Lossy optimizations are never ranked.',
+      'Best shows the lossless engine with the largest Pareto frontier area on each GPU. Lossy optimizations are never ranked.',
     engineComparison: {
       title: 'Show two engines on the same GPU?',
       description:
@@ -178,10 +178,8 @@ const STRINGS = {
     secondaryControls: '更多图表设置',
     changed: '项已更改',
     engine: '引擎',
-    all: '全部',
     bestEngine: '最优',
-    engineHelp:
-      '「最优」显示每张 GPU 上 Pareto 前沿面积最大的无损引擎，「全部」显示所有引擎。有损优化不参与评选。',
+    engineHelp: '「最优」显示每张 GPU 上 Pareto 前沿面积最大的无损引擎。有损优化不参与评选。',
     engineComparison: {
       title: '在同一 GPU 上显示两个引擎？',
       description:
@@ -292,15 +290,37 @@ export default function VideoDashboard({
   const [labels, setLabels] = useState(true);
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
-  const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
-  /** What the stage compares its subject with, by `StageOption.value`. */
-  const [against, setAgainst] = useState('reference');
+  const [stagePair, setStagePair] = useState<StagePair>({
+    playing: null,
+    baseline: null,
+    posters: {},
+  });
+  /** What the stage compares its subject with, by `StageOption.value`; null pairs it by default. */
+  const [against, setAgainst] = useState<string | null>(null);
+  /** Whether the reader has picked a clip yet; until then playable chart points pulse. */
+  const [picked, setPicked] = useState(false);
+  /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
+  const [peek, setPeek] = useState<string | null>(null);
+  const pickAgainst = useCallback((value: string) => {
+    setPicked(true);
+    setAgainst(value);
+  }, []);
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
   const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
+  /** Plays the chart point with this key; a new subject returns to its default pairing. */
+  const pickClip = useCallback(
+    (key: string) => {
+      setPicked(true);
+      if (key !== stagePair.playing) setAgainst(null);
+      writeStage({ ...parseStage(location.search), clip: key });
+    },
+    [stagePair.playing],
+  );
   /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
   const showOnStage = useCallback(
     (point: VideoPoint, compare: string) => {
+      setPicked(true);
       setAgainst(compare);
       writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
       requestReveal();
@@ -310,17 +330,23 @@ export default function VideoDashboard({
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
-        previous.playing === pair.playing && previous.baseline === pair.baseline ? previous : pair,
+        previous.playing === pair.playing &&
+        previous.baseline === pair.baseline &&
+        JSON.stringify(previous.posters) === JSON.stringify(pair.posters)
+          ? previous
+          : pair,
       ),
     [],
   );
   const clipLink = useMemo<ClipLink>(
     () => ({
       ...stagePair,
-      onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
+      pulse: !picked,
+      onSelect: pickClip,
+      onPeek: setPeek,
       onReveal: requestReveal,
     }),
-    [stagePair, requestReveal],
+    [stagePair, picked, pickClip, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
@@ -537,6 +563,8 @@ export default function VideoDashboard({
     charted.filter((c) => !c.overlay),
     { tier: state.costTier },
   );
+  const stageClipPoints = stageOpenings(projection, state, clipPoints);
+  const officialOpenings = stageOpenings(projection, state, officialClipPoints);
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {
@@ -582,7 +610,7 @@ export default function VideoDashboard({
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
-    state.engine !== null || state.compareEngines,
+    state.engine !== null,
     state.date !== null || state.run !== null,
     chipHistory,
   ].filter(Boolean).length;
@@ -724,10 +752,9 @@ export default function VideoDashboard({
                         <LabelWithTooltip label={s.engine} tooltip={s.engineHelp} />
                         <SegmentedToggle
                           role="group"
-                          value={state.compareEngines ? 'all' : (state.engine ?? 'best')}
+                          value={state.engine ?? 'best'}
                           options={[
                             { value: 'best', label: s.bestEngine },
-                            { value: 'all', label: s.all },
                             ...options.engines.map((engine) => ({
                               value: engine,
                               label: engineLabel(engine),
@@ -735,10 +762,7 @@ export default function VideoDashboard({
                           ]}
                           onValueChange={(value) => {
                             track('video_results_engine_selected', { engine: value });
-                            updateSeries({
-                              engine: value === 'best' || value === 'all' ? null : value,
-                              compareEngines: value === 'all',
-                            });
+                            updateSeries({ engine: value === 'best' ? null : value });
                           }}
                           ariaLabel={s.engine}
                           testId="results-engine"
@@ -857,11 +881,9 @@ export default function VideoDashboard({
               </div>
             </div>
           </Card>
-          {loading && (
-            <p role="status" className="text-sm text-muted-foreground">
-              {s.loading}
-            </p>
-          )}
+          <p role="status" className="sr-only">
+            {loading ? s.loading : ''}
+          </p>
           {error && (
             <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
               <span>{s.error}</span>
@@ -935,7 +957,11 @@ export default function VideoDashboard({
               link.click();
             }}
           >
-            <div className="flex min-w-0 flex-col gap-6" data-testid="video-results-chart-card">
+            <div
+              className="motion-stale flex min-w-0 flex-col gap-6"
+              data-testid="video-results-chart-card"
+              data-stale={(loading && deploymentCells.length > 0) || undefined}
+            >
               <VideoResultsChart
                 cells={deploymentCells}
                 history={chipHistory ? projection.history : null}
@@ -949,6 +975,7 @@ export default function VideoDashboard({
                 onUpdate={updateSeries}
                 onOpen={openPoint}
                 clipLink={clipLink}
+                loading={loading}
                 heading={heading}
                 lossyNote={
                   <LossyQualityHint
@@ -970,24 +997,26 @@ export default function VideoDashboard({
                 }
               />
             </div>
-          </ChartSection>
-          <Card>
+            <hr className="my-6 border-border-alt" />
             <VideoResultsClips
               initialSides={initialData?.sides}
               points={clipPoints}
+              openings={stageClipPoints}
               drawn={drawnPoints}
               deployments={deploymentPoints}
-              officialLeads={officialClipPoints}
+              officialOpenings={officialOpenings}
               onPairChange={onStagePair}
               against={against}
-              onAgainstChange={setAgainst}
+              onAgainstChange={pickAgainst}
+              onSubjectChange={pickClip}
               onShow={showOnStage}
+              peek={peek}
               reveal={reveal}
               colorFor={colorFor}
               costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}
             />
-          </Card>
+          </ChartSection>
           <Card>
             <section
               className="flex min-w-0 flex-col gap-3"

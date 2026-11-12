@@ -89,6 +89,25 @@ it('selects one-way host or read-plus-write HBM ceilings and deduplicates visibl
   expect(swapRooflines([], 'h2d')).toEqual([]);
 });
 
+it('draws the H100 pool at its PCIe 4.0 host link and every other x86 pool at PCIe 5.0', () => {
+  const pools = ['h100-dgxc', 'h200-dgxc', 'b200-nscale', 'b300', 'mi300x', 'mi325x', 'mi355x'];
+  const points = pools.map((sku) => ({ sku }));
+  // h100-dgxc is AWS p5.48xlarge: its hosts are PCIe 4.0, half the PCIe 5.0 link of the others.
+  expect(
+    swapRooflines(points, 'h2d').map((r) => [r.id, r.path, r.gbps, r.devices.join(',')]),
+  ).toEqual([
+    ['PCIe-4-0-x16-32', 'PCIe 4.0 x16', 32, 'H100 SXM'],
+    ['PCIe-5-0-x16-64', 'PCIe 5.0 x16', 64, 'H200 SXM,B200 SXM,B300 SXM,MI300X,MI325X,MI355X'],
+  ]);
+  // The same link bounds GPU-to-host copies; a same-GPU copy never crosses it.
+  expect(swapRooflines([{ sku: 'h100-dgxc' }], 'd2h').map((r) => [r.path, r.gbps])).toEqual([
+    ['PCIe 4.0 x16', 32],
+  ]);
+  expect(swapRooflines([{ sku: 'h100-dgxc' }], 'd2d').map((r) => [r.path, r.gbps])).toEqual([
+    ['HBM / 2', 1675],
+  ]);
+});
+
 it('applies AMD rooflines to current Slurm pool names', () => {
   const points = [{ sku: 'mi300x' }, { sku: 'mi325x' }];
   expect(swapRooflines(points, 'h2d').map((r) => [r.gbps, r.devices])).toEqual([

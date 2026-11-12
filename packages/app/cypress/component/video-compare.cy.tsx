@@ -1,5 +1,6 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { useState } from 'react';
+import { parseStage, writeStage } from '@/components/video-benchmark/clip-stage';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
@@ -62,10 +63,34 @@ const expectAudio = (side: 'a' | 'b' | null) =>
       expect(video.muted, role).to.equal(role !== side);
     }
   });
-/** The Wipe split, read from the right side's clip-path. */
-const splitOf = ($media: JQuery<HTMLElement>) =>
-  Number(/(?<split>[\d.]+)%/u.exec($media[0].style.clipPath)?.groups?.split);
+/** The Wipe split, read from the baseline's clip-path: its right inset on the left, else its left inset. */
+const splitOf = ($media: JQuery<HTMLElement>) => {
+  const insets = /inset\((?<insets>[^)]*)\)/u
+    .exec($media[0].style.clipPath)
+    ?.groups?.insets.split(' ');
+  const side = insets?.findIndex((inset) => inset.endsWith('%'));
+  const percent = Number.parseFloat(insets?.[side ?? -1] ?? '');
+  return side === 1 ? 100 - percent : percent;
+};
+/** Distinct first-frame stand-ins; data URIs load without a request. */
+const poster = (fill: string) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"><rect width="16" height="9" fill="${fill}"/></svg>`)}`;
 const WIPE_MEDIA = '[data-side="b"] > div';
+const TILE_PREVIEW = '[data-testid="video-results-prompt-preview"]';
+/** Pills, wipe and clip-path agree on which side the baseline (side b) sits. */
+const expectBaselineLeft = (left: boolean) => {
+  cy.get('[data-testid="video-results-pill"]').should(($pills) => {
+    const [a, b] = [...$pills].map((pill) => pill.getBoundingClientRect().left);
+    expect(b < a, 'reference pill on the left').to.equal(left);
+  });
+  cy.get(WIPE_MEDIA).should(($media) =>
+    expect($media[0].style.clipPath).to.match(
+      left
+        ? /^inset\(0(?:px)? [\d.]+% 0(?:px)? 0(?:px)?\)$/u
+        : /^inset\(0(?:px)? 0(?:px)? 0(?:px)? [\d.]+%\)$/u,
+    ),
+  );
+};
 /** Two animation frames, so a throttled split update would have landed. */
 const nextFrames = () =>
   cy.window().then(
@@ -128,11 +153,17 @@ function mountResultsClips(
     leads,
     deployments,
     costs = {},
+    takes,
+    posters = {},
   }: {
     /** Replace the C1 leads of `keys`, which still serve the media. */
     leads?: VideoPoint[];
     deployments?: VideoPoint[];
     costs?: Record<string, ResultCell['cost']>;
+    /** Takes of the one prompt each artifact holds; 4 by default. */
+    takes?: number;
+    /** Poster URLs by measurement slot (`measurement-r001`) or `reference`. */
+    posters?: Record<string, string>;
   } = {},
 ) {
   const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
@@ -172,6 +203,7 @@ function mountResultsClips(
             Number(point.runId),
             point.artifactId,
             `NVIDIA ${key.toUpperCase()}`,
+            takes,
           );
           saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
             path,
@@ -179,9 +211,12 @@ function mountResultsClips(
           ]);
           saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
             path,
-            previews.includes(key)
-              ? { ...asset, url, previewUrl: referenceMedia.previewUrl }
-              : { ...asset, url },
+            {
+              ...asset,
+              url,
+              ...(previews.includes(key) ? { previewUrl: referenceMedia.previewUrl } : {}),
+              posterUrl: posters[/measurement-r\d+/u.exec(path)?.[0] ?? ''],
+            },
           ]);
           cy.wrap(url).as(`original-${key}`);
           const qualityFixture = referenceQualityFixture();
@@ -201,6 +236,7 @@ function mountResultsClips(
           quality.reference.url = referenceMedia.url;
           if (previews.includes('reference'))
             quality.reference.previewUrl = referenceMedia.previewUrl;
+          quality.reference.posterUrl = posters.reference;
           saved.quality = [quality];
           if (diagnostics) {
             const diagnosticUrl = win.URL.createObjectURL(
@@ -257,7 +293,7 @@ function mountResultsClips(
   const selectedPoints = leads ?? keys.map(c1);
   function Clips() {
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-    const [against, setAgainst] = useState('reference');
+    const [against, setAgainst] = useState<string | null>(null);
     return (
       <PathnameContext.Provider value={pathname}>
         <button onClick={() => setHidden(hidden.size > 0 ? new Set() : new Set(['b200']))}>
@@ -276,6 +312,10 @@ function mountResultsClips(
           unofficialRun={unofficialRun}
           against={against}
           onAgainstChange={setAgainst}
+          onSubjectChange={(clip) => {
+            setAgainst(null);
+            writeStage({ ...parseStage(window.location.search), clip });
+          }}
           onShow={() => {}}
           reveal={0}
         />
@@ -300,7 +340,6 @@ function mountLossyPair(twinP50: number | null) {
     deployments: [lossy, ...twins],
     costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
   });
-  cy.get('[data-testid="video-results-compare-twin"]').click();
 }
 
 describe('Video results clip stage', () => {
@@ -352,7 +391,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-view-side"]').click();
     cy.get('[data-testid="video-results-clip"]').should(($sides) => {
       const [a, b] = [...$sides].map((side) => side.getBoundingClientRect());
-      expect(b.top, 'stacked below 640 px').to.be.at.least(a.bottom);
+      expect(a.top, 'subject stacked under the baseline below 640 px').to.be.at.least(b.bottom);
     });
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
@@ -479,9 +518,104 @@ describe('Video results clip stage', () => {
     cy.get('[data-side="a"]').should('contain', 'H200');
     expectDifference((rgba) => expect(rgba).to.deep.equal([0, 0, 0, 255]));
     // Compared with H100 instead, the other side plays H100's clip of the same prompt.
-    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get('[data-testid="video-results-against"]').select('h100');
     cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
     expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
+  });
+
+  it('names a take only when another take shares the prompt and seed', () => {
+    mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], { takes: 1 });
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('contain', 'seed 11')
+      .and('not.contain', 'take');
+    mountResultsClips(['b200']);
+    cy.get('[data-testid="video-results-prompt"]').should('contain', 'seed 11 · take 1');
+    cy.get('[data-prompt="drum-taps"]').should('contain', 'take 1');
+    cy.get('[data-prompt="drum-taps~2"]').should('contain', 'take 2');
+  });
+
+  it('shows first frames on the strip and the stage before Play, and a text tile without one', () => {
+    const reference = poster('red');
+    const subject = poster('blue');
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, [], false, [], {
+      posters: {
+        reference,
+        'measurement-r001': subject,
+        'measurement-r002': subject,
+        'measurement-r003': 'data:image/png;base64,AAAA',
+      },
+    });
+    // The prompt's reference frame first, then the subject's, then text once neither loads.
+    cy.get('[data-prompt="drum-taps"] img')
+      .should('have.attr', 'src', reference)
+      .and('have.attr', 'alt', 'drum-taps')
+      .and('have.attr', 'loading', 'lazy');
+    cy.get('[data-prompt="drum-taps~2"] img').should('have.attr', 'src', subject);
+    cy.get('[data-prompt="drum-taps~3"]')
+      .should('contain', 'seed 11')
+      .find('img')
+      .should('not.exist');
+    cy.get('[data-testid="video-results-prompts-more"]').should('have.text', '+1').click();
+    cy.get('[data-prompt="drum-taps~4"]')
+      .should('contain', 'seed 11 · take 4')
+      .find('img')
+      .should('not.exist');
+
+    sideVideo('a').should('have.attr', 'poster', subject);
+    sideVideo('b').should('have.attr', 'poster', reference);
+    cy.get<HTMLVideoElement>('[data-testid="video-results-stage"] video').each(($video) =>
+      expect(($video[0] as HTMLVideoElement).preload, 'no media before Play').to.equal('none'),
+    );
+    // Both frames are there to compare, so the split works before Play and no idle frame covers it.
+    cy.get('[data-testid="video-results-start"]').should('not.exist');
+    pointAt(0.25);
+    cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(25, 0.5));
+    // Difference hides both frames behind its empty canvas, so Play comes back.
+    cy.get('[data-testid="video-results-view-diff"]').click();
+    cy.get('[data-testid="video-results-start"]').should('be.visible');
+  });
+
+  it('fits the stage in a short window, also with two frames Side by side', () => {
+    cy.viewport(1280, 600);
+    mountResultsClips(['b200', 'h200'], '/vgx', false);
+    // 600px less the 18rem kept for the header, Compare row, transport and readout.
+    cy.get('[data-testid="video-results-stage"]').should(($stage) =>
+      expect($stage[0].getBoundingClientRect().height).to.be.closeTo(312, 1),
+    );
+    cy.get('[data-testid="video-results-view-side"]').click();
+    cy.get('[data-testid="video-results-clip"]').should(($clips) =>
+      expect($clips[0].getBoundingClientRect().height).to.be.closeTo(312, 1),
+    );
+  });
+
+  it('loops a tile’s preview while the mouse rests on it, and fetches nothing before', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, ['reference'], false, [], {
+      posters: { reference: poster('red') },
+    });
+    const tile = '[data-prompt="drum-taps"]';
+    cy.get(tile).find('img').should('exist');
+    cy.get(tile).find(TILE_PREVIEW).should('not.exist');
+    // A touch picks the prompt; it never starts a download.
+    cy.get(tile).trigger('pointerover', { pointerType: 'touch' });
+    cy.get(tile).find(TILE_PREVIEW).should('not.exist');
+    cy.get(tile).trigger('pointerover', { pointerType: 'mouse' });
+    cy.get<string>('@preview-url').then((url) =>
+      cy
+        .get(tile)
+        .find(TILE_PREVIEW)
+        .should('have.attr', 'src', url)
+        .and('have.css', 'opacity', '1'),
+    );
+    cy.get(tile).trigger('pointerout', { pointerType: 'mouse' });
+    cy.get(tile).find(TILE_PREVIEW).should('not.exist');
+  });
+
+  it('keeps Play on the stage while a first frame fails to load', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, [], false, [], {
+      posters: { reference: poster('red'), 'measurement-r001': 'data:image/png;base64,AAAA' },
+    });
+    sideVideo('a').should('have.attr', 'poster', 'data:image/png;base64,AAAA');
+    cy.get('[data-testid="video-results-start"]').should('be.visible');
   });
 
   it('cannot draw a difference after the reference decoder fails', () => {
@@ -621,14 +755,10 @@ describe('Video results clip stage', () => {
     });
     cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
 
+    // The baseline plays on the left and the subject on the right, as in board E; Swap flips them.
+    expectBaselineLeft(true);
     cy.get('[data-testid="video-results-swap"]').click();
-    cy.get('[data-testid="video-results-pill"]').then(($pills) => {
-      const [a, b] = [...$pills].map((pill) => pill.getBoundingClientRect().left);
-      expect(b, 'reference pill moved left').to.be.lessThan(a);
-    });
-    cy.get(WIPE_MEDIA).should(($media) =>
-      expect($media[0].style.clipPath).to.match(/^inset\(0(?:px)? [\d.]+% 0(?:px)? 0(?:px)?\)$/u),
-    );
+    expectBaselineLeft(false);
     cy.get('[data-testid="video-results-stage"]').should(
       'have.attr',
       'aria-label',
@@ -663,8 +793,8 @@ describe('Video results clip stage', () => {
 
   it('reads out both sides against another GPU and names the unofficial one', () => {
     mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
-    cy.get('[data-testid="video-results-compare-h100"]').click();
-    cy.get(readout).should('have.attr', 'data-pair', 'lead');
+    cy.get('[data-testid="video-results-against"]').select('h100');
+    cy.get(readout).should('have.attr', 'data-pair', 'hardware');
     // Speed leads, so no sixth cell strands on a second row.
     readoutOrder(['speed', 'psnr', 'wall', 'cost', 'energy']);
     cy.get(`${readout} [data-readout-side="b200"]`)

@@ -37,8 +37,6 @@ export interface ResultsState {
   gpuCount: number | null;
   /** Limits cells to one engine; null keeps every engine. */
   engine: string | null;
-  /** Plot every engine's lossless series per hardware, not only the best one. */
-  compareEngines: boolean;
   /** Also plot lossy-optimization series; they never compete for a hardware's default line. */
   lossy: boolean;
   /** As-of execution date: each deployment's latest run measured on or before it. */
@@ -72,7 +70,6 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   steps: null,
   gpuCount: null,
   engine: null,
-  compareEngines: false,
   lossy: false,
   date: null,
   run: null,
@@ -103,6 +100,7 @@ export const RESULTS_QUERY_PARAMS = [
   'r_steps',
   'r_gpus',
   'r_engine',
+  // Retired engine comparison: accepted so old links and API calls still work, then ignored.
   'r_compare',
   'r_lossy',
   'r_date',
@@ -147,8 +145,6 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     // Retired overview controls cannot be restored by an old shared link.
     gpuCount: null,
     engine: s.get('r_engine') || null,
-    // One selected engine leaves nothing to compare.
-    compareEngines: !s.get('r_engine') && s.get('r_compare') === '1',
     lossy: s.get('r_lossy') === '1',
     date: s.get('r_date') || null,
     run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
@@ -187,7 +183,6 @@ export function resultsSearch(state: ResultsState): string {
     r_mode: state.mode,
     r_steps: state.steps,
     r_engine: state.engine,
-    r_compare: state.compareEngines ? 1 : null,
     r_lossy: state.lossy ? 1 : null,
     r_date: state.date,
     r_run: state.run,

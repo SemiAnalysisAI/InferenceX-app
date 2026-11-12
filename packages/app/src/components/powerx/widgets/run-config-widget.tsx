@@ -21,7 +21,9 @@ import {
   type RunWorkload,
 } from '@/lib/powerx/run-config';
 
-import { Chips, CopyButton, useWidgetHash, WidgetFrame, type WidgetProps } from './widget-chrome';
+import { Chips, WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { CopyButton, useWidgetHash } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -112,7 +114,7 @@ export function RunConfigWidget({ locale, alt }: WidgetProps) {
   };
 
   return (
-    <WidgetFrame name="run-config" alt={alt}>
+    <WidgetFrame scope="powerx" name="run-config" alt={alt}>
       <div className="grid gap-x-8 gap-y-3 sm:grid-cols-[auto_1fr]">
         <span className="pt-2 text-sm font-medium text-foreground sm:w-20">{t.platform}</span>
         <Chips<RunPlatform>

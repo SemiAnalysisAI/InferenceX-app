@@ -1,9 +1,10 @@
 import { frontierArea } from '@/components/inference/utils/best-series-per-sku';
-import { chipConfigKey, losslessTwin, runtimeKey } from './deployment';
+import { chipConfigKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import { engineSort } from './engines';
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
 import { isLossy, optimizationsOf } from './optimizations';
+import type { VideoPoint } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 
 export type CostBasis = 'participating' | 'allocated';
@@ -180,7 +181,6 @@ export interface ResultsChartSelection extends ResultsMetricContext {
   y: ResultsYMetric;
   optimal: boolean;
   hidden: readonly string[];
-  compareEngines: boolean;
   lossy: boolean;
 }
 
@@ -191,7 +191,6 @@ export const resultsSelection = (state: ResultsState): ResultsChartSelection => 
   tier: state.costTier,
   optimal: state.optimal,
   hidden: state.hidden,
-  compareEngines: state.compareEngines,
   lossy: state.lossy,
 });
 
@@ -320,7 +319,7 @@ export function resultsChartSeries(
   });
   const lossless = series.filter((item) => !item.lossy);
   const lossy = selection.lossy ? series.filter((item) => item.lossy) : [];
-  const shown = selection.compareEngines ? lossless : bestPerHardware(lossless, selection);
+  const shown = bestPerHardware(lossless, selection);
   // A lossy line keeps the lossless line it is compared with, even where another engine leads.
   const pool = cells.map((cell) => cell.point);
   const twinKeys = new Set(
@@ -423,4 +422,29 @@ export function chartedCells(
     (cell) =>
       !channels.has(channelKey(cell.point.hardwareKey, cell.overlay)) || drawn.has(seriesKey(cell)),
   );
+}
+
+/**
+ * The deployment the clip stage opens on in place of each clip lead: the lower-median latency
+ * point of the lead's frontier, so the stage starts mid-curve (B200's 4 GPUs among 1, 2, 4 and 8)
+ * instead of at the efficient end `leadCell` picks for cards, or at the costliest
+ * fastest end. A lead whose series the chart does not draw opens as itself.
+ */
+export function stageOpenings(
+  projection: Record<'deploymentCells' | 'overlayDeploymentCells', readonly ResultCell[]>,
+  state: ResultsState,
+  leads: readonly VideoPoint[],
+): VideoPoint[] {
+  const series = resultsChartSeries(
+    [...projection.deploymentCells, ...projection.overlayDeploymentCells],
+    { ...resultsSelection(state), hidden: [] },
+  );
+  return leads.map((lead) => {
+    const key = seriesKey({ point: lead, overlay: lead.runId === state.unofficialRun });
+    const frontier = (series.find((item) => !item.twin && item.key === key)?.frontier ?? [])
+      .map(({ cell }) => cell.point)
+      .filter((point) => point.p50 !== null && !isQueueing(point))
+      .toSorted((a, b) => a.p50! - b.p50!);
+    return frontier[Math.floor((frontier.length - 1) / 2)] ?? lead;
+  });
 }

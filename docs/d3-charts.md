@@ -32,6 +32,12 @@ roofline) and static category keys. Grouped GPU legends (`GPUGraph`, PowerX
 run comparison) keep their row order with `disableActiveSort`, and embedded
 charts with minimal chrome pass `readOnly`.
 
+The expanded panel is capped at 384px below `lg` and 575px from `lg` up. The
+series list absorbs overflow first. The display controls (switches, the
+Advanced section and key indicators) scroll inside their own region, capped at
+the panel limit minus 6rem, so expanding Advanced never pushes a switch past the
+panel border and the toolbar plus at least one series row stay visible.
+
 Line swatches are behind `SERIES_LINE_PATTERNS` in
 `lib/charts/framework-dash.ts`, which is currently `false`. While it is off,
 `ChartLegendItem` ignores `lineDasharray` and every legend shows dot swatches.

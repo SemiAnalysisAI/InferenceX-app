@@ -163,6 +163,9 @@ when a duration is requested, compute and label elapsed or inclusive days.
 - **A result's producer, configuration, image, or bounded log:** read
   [provenance](references/provenance.md), then use `inferencex result inspect`.
   Keep the original producer separate from the snapshot carrying the row.
+- **How a result was launched (command, environment, versions):** read the
+  reproduce section of [provenance](references/provenance.md), then request
+  `/api/v1/reproduce?id=<selected-id>`. It returns only what stored logs recorded.
 - **Cost comparison:** read [TCO](references/tco.md). For a median interactivity
   target with explicit USD/GPU-hour prices, use `inferencex tco compare`; with
   missing prices, use the offline `tco-summary.mjs` recipe. For a P99 ITL constraint,

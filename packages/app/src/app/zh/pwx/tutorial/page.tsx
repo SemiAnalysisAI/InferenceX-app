@@ -1,32 +1,38 @@
 import type { Metadata } from 'next';
 
-import { PowerXTutorialArticle } from '@/components/powerx/powerx-tutorial-article';
-import { createPowerXTutorialComponents } from '@/components/powerx/tutorial-mdx-components';
-import { JsonLd } from '@/components/seo/json-ld';
 import { PowerXFeatureGate } from '@/components/powerx/powerx-feature-gate';
+import { POWERX_TUTORIAL_WIDGETS } from '@/components/powerx/widgets';
+import { JsonLd } from '@/components/seo/json-ld';
+import { TutorialArticle } from '@/components/tutorial/tutorial-article';
+import { createTutorialComponents } from '@/components/tutorial/tutorial-mdx-components';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
+import { POWERX_TUTORIAL } from '@/lib/powerx/tutorial';
 import {
-  buildPowerXTutorialJsonLd,
-  getPowerXTutorial,
-  powerxTutorialMetadata,
-} from '@/lib/powerx/tutorial';
+  buildTutorialJsonLd,
+  getTutorial,
+  tutorialMetadata,
+} from '@/lib/tutorial/tutorial-content';
 
 const LOCALE = 'zh';
 
 export function generateMetadata(): Metadata {
-  return powerxTutorialMetadata(getPowerXTutorial(LOCALE).meta, LOCALE);
+  return tutorialMetadata(POWERX_TUTORIAL, getTutorial(POWERX_TUTORIAL, LOCALE).meta, LOCALE);
 }
 
 export default async function PowerXTutorialPageZh() {
-  const { meta, raw } = getPowerXTutorial(LOCALE);
-  const { content } = await compileBlogMdx(raw, LOCALE, createPowerXTutorialComponents(LOCALE));
+  const { meta, raw } = getTutorial(POWERX_TUTORIAL, LOCALE);
+  const { content } = await compileBlogMdx(
+    raw,
+    LOCALE,
+    createTutorialComponents(LOCALE, POWERX_TUTORIAL_WIDGETS),
+  );
 
   return (
     <PowerXFeatureGate locale={LOCALE}>
       <main className="relative">
-        <JsonLd data={buildPowerXTutorialJsonLd(meta, LOCALE)} />
+        <JsonLd data={buildTutorialJsonLd(POWERX_TUTORIAL, meta, LOCALE)} />
         <div className="container mx-auto max-w-5xl px-4 pb-24 lg:px-8">
-          <PowerXTutorialArticle locale={LOCALE} meta={meta} content={content} />
+          <TutorialArticle locale={LOCALE} meta={meta} content={content} guide={POWERX_TUTORIAL} />
         </div>
       </main>
     </PowerXFeatureGate>

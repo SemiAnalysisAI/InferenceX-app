@@ -1,11 +1,20 @@
 'use client';
 
-import { curveLinear, select, type ScaleContinuousNumeric } from 'd3';
-import { useCallback, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { curveLinear, select, timer, type ScaleContinuousNumeric, type Timer } from 'd3';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { D3Chart, type D3ChartHandle } from '@/lib/d3-chart/D3Chart';
 import type {
   LayerConfig,
@@ -14,7 +23,7 @@ import type {
   TooltipConfig,
 } from '@/lib/d3-chart/D3Chart/types';
 import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
-import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { axisLabelUnit, chartHoverCard, chartHoverCardImage } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -190,13 +199,22 @@ type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
 export interface ClipLink {
   playing: string | null;
   baseline: string | null;
+  /** First frames of the stage's prompt by point key, for the hover card; null once read without one. */
+  posters: Readonly<Record<string, string | null>>;
+  /** Playable points pulse until the reader first picks a clip. */
+  pulse: boolean;
   onSelect: (pointKey: string) => void;
+  /** The reader rests on a point whose first frame is unknown, so its clips can be read ahead. */
+  onPeek: (pointKey: string) => void;
   /** Brings the stage into view. */
   onReveal: () => void;
 }
 
 const LOSSY_DASH = '6 4';
 const BADGES = 'clip-badges';
+const PULSE = 'video-clip-pulse';
+/** How long the pointer rests on a point before its clips are read for the hover card, in ms. */
+const PEEK_DELAY = 250;
 
 /** Points without clips draw hollow; that depends on the data only, so it follows each plot render. */
 function drawHollow(root: Element) {
@@ -212,6 +230,10 @@ function drawHollow(root: Element) {
 }
 
 const PILLS = 'series-pills';
+/** How long points and lines glide to new data, as on the inference scatter chart. */
+const TRANSITION_MS = 300;
+/** One display frame, so the marks' last redraw lands after the points' last step. */
+const FRAME_MS = 20;
 /** Plot width, in px, below which only focus overlay lines get a pill. */
 const NARROW_PLOT = 480;
 
@@ -330,6 +352,28 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
   boxes.forEach(({ group }, index) =>
     group.attr('transform', `translate(${spread[index].x},${spread[index].y})`),
   );
+
+  // Pulses live inside each point, so a redraw on hover or zoom does not restart them.
+  for (const node of points) {
+    const point = select<SVGGElement, PlotPoint>(node).datum();
+    const on =
+      link?.pulse && point.clips && point.key !== link.playing && point.key !== link.baseline;
+    let ring = node.querySelector<SVGCircleElement>(`:scope > .${PULSE}`);
+    if (!on) {
+      ring?.remove();
+      continue;
+    }
+    if (!ring) {
+      ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.classList.add(PULSE);
+      ring.setAttribute('r', '10');
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke-width', '2');
+      ring.setAttribute('pointer-events', 'none');
+      node.prepend(ring);
+    }
+    ring.setAttribute('stroke', point.color);
+  }
 
   if (!link) return;
   const layer = select(host as SVGGElement)
@@ -450,6 +494,7 @@ export default function VideoResultsChart({
   heading,
   footer,
   lossyNote,
+  loading = false,
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
@@ -471,6 +516,8 @@ export default function VideoResultsChart({
   footer?: ReactNode;
   /** Under the legend's lossy line key, shown while a lossy line is charted. */
   lossyNote?: ReactNode;
+  /** The cohort is still loading: an empty plot shows a skeleton, not the no-data note. */
+  loading?: boolean;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -486,7 +533,19 @@ export default function VideoResultsChart({
   const link = useRef(clipLink);
   link.current = clipLink;
   const hover = useRef<string | null>(null);
+  /** The point under the pointer, whose hover card may still wait for its first frame. */
+  const hovered = useRef<string | null>(null);
+  const peekTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(peekTimer.current), []);
   const size = useRef<PlotSize>({ width: 0, height: 0 });
+  const [transition] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      ? 0
+      : TRANSITION_MS,
+  );
+  /** Redraws the marks while points glide, since the marks copy the points' transforms. */
+  const follow = useRef<Timer | null>(null);
+  useEffect(() => () => follow.current?.stop(), []);
   // Hidden hardware is dropped after ranking, so its legend entry still names its engine.
   const ranked = useMemo(() => resultsPlotSeries(cells, history, state), [cells, history, state]);
   const series = useMemo(
@@ -613,26 +672,51 @@ export default function VideoResultsChart({
     [lines, lineColors, lineDashes, plotted, labels, s, history, byEngine, labelsRepeatX],
   );
   const playing = clipLink?.playing ?? null,
-    baseline = clipLink?.baseline ?? null;
+    baseline = clipLink?.baseline ?? null,
+    pulse = clipLink?.pulse ?? false,
+    posters = clipLink?.posters;
   const redraw = useCallback(() => {
     const svg = chart.current?.getSvgElement();
     if (svg) drawMarks(svg, size.current, marks.current, s);
   }, [s]);
-  useLayoutEffect(redraw, [playing, baseline, pills, redraw]);
-  // Runs after the plot raises its points, so the badges stay in front.
+  useLayoutEffect(redraw, [playing, baseline, pulse, pills, redraw]);
+  // A first frame read after its card opened fills the box the card reserved for it.
+  useEffect(() => {
+    const key = hovered.current;
+    const box = chart.current
+      ?.getTooltipElement()
+      ?.querySelector<HTMLElement>('[data-hover-image-pending]');
+    if (!key || !box || !posters || !(key in posters)) return;
+    const url = posters[key];
+    if (url) box.outerHTML = chartHoverCardImage(url);
+    else box.closest('[data-hover-media]')?.remove();
+  }, [posters]);
+  // Runs after the plot raises its points, so the badges stay in front, and on every frame
+  // of the points' glide to new data, so the badges and pills move with them.
   const onRender = useCallback(
     ({ layout, width, height }: RenderContext) => {
       size.current = { width, height };
       const root = layout.zoomGroup.node();
-      if (root) drawMarks(root, size.current, marks.current, s);
+      if (!root) return;
+      drawMarks(root, size.current, marks.current, s);
+      follow.current?.stop();
+      if (transition === 0) return;
+      follow.current = timer((elapsed) => {
+        // After the frame's transition ticks, which run later in the same timer flush.
+        queueMicrotask(() => drawMarks(root, size.current, marks.current, s));
+        if (elapsed >= transition + FRAME_MS) follow.current?.stop();
+      });
     },
-    [s],
+    [s, transition],
   );
   // An image export renders a resized clone, so it must not overwrite the live plot size.
   const onExportRender = useCallback(
     ({ layout, width, height }: RenderContext) => {
       const root = layout.zoomGroup.node();
-      if (root) drawMarks(root, { width, height }, { ...marks.current, hover: null }, s);
+      if (!root) return;
+      const { link: live } = marks.current;
+      const still = { ...marks.current, hover: null, link: live && { ...live, pulse: false } };
+      drawMarks(root, { width, height }, still, s);
     },
     [s],
   );
@@ -672,6 +756,8 @@ export default function VideoResultsChart({
                 ? s.tipClick
                 : s.tipHollow);
         return chartHoverCard({
+          image: pair?.posters[plot.key] ?? undefined,
+          imagePending: Boolean(pair && plot.clips && !(plot.key in pair.posters)),
           title: d.title,
           subtitle: [d.subtitle, history ? d.date : null].filter(Boolean).join(' · ') || undefined,
           color: plot.color,
@@ -815,12 +901,19 @@ export default function VideoResultsChart({
       onHoverStart: (target, point) => {
         target.attr('opacity', 0.8);
         hover.current = point.series;
+        hovered.current = point.key;
+        clearTimeout(peekTimer.current);
+        const pair = link.current;
+        if (pair && point.clips && !(point.key in pair.posters))
+          peekTimer.current = setTimeout(() => link.current?.onPeek(point.key), PEEK_DELAY);
         marks.current = { ...marks.current, hover: point.series };
         redraw();
       },
       onHoverEnd: (target) => {
         target.attr('opacity', 1);
         hover.current = null;
+        hovered.current = null;
+        clearTimeout(peekTimer.current);
         marks.current = { ...marks.current, hover: null };
         redraw();
       },
@@ -943,7 +1036,7 @@ export default function VideoResultsChart({
       // right edge at 320 px in DM Sans.
       margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
       watermark="logo"
-      transitionDuration={0}
+      transitionDuration={transition}
       xScale={xScale}
       yScale={yScale}
       xAxis={
@@ -974,9 +1067,16 @@ export default function VideoResultsChart({
       instructions={s.controls}
       noDataOverlay={
         plotted.length === 0 ? (
-          <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
-            {s.noData}
-          </EmptyState>
+          loading ? (
+            <Skeleton
+              data-testid="video-results-chart-skeleton"
+              className="pointer-events-none absolute inset-0"
+            />
+          ) : (
+            <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
+              {s.noData}
+            </EmptyState>
+          )
         ) : undefined
       }
       caption={heading}

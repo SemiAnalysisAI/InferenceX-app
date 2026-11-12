@@ -66,12 +66,13 @@ const UNKNOWN_HARDWARE: HardwareEntry = {
 
 function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null {
   const base = hwKey.split('_')[0];
+  if (!base || base === UNKNOWN_HARDWARE.name) return null;
   const reg = HW_REGISTRY[base];
-  if (!reg) return null;
 
   const parts = hwKey.split('_').slice(1);
-  const label = reg.label;
   const gpuName = base.toUpperCase();
+  // Unofficial-run overlays can carry hardware with no registry entry, labeled by its raw runner base.
+  const label = reg?.label ?? gpuName;
   const isJulyRubinSnapshot = base === 'vr200' && parts[0] === 'rubin-july';
   const partLabels =
     base === 'vr200' && parts[0] === 'coreweave-vera-rubin'
@@ -82,7 +83,7 @@ function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null
     name: hwKey.replaceAll('_', '-'),
     label,
     suffix: partLabels.length > 0 ? `(${partLabels.join(', ')})` : '',
-    gpu: [getVendorPrefix(base), gpuName, ...partLabels].join(' '),
+    gpu: [...(reg ? [getVendorPrefix(base)] : []), gpuName, ...partLabels].join(' '),
     ...(isJulyRubinSnapshot ? { alwaysShowPrecision: true } : {}),
   };
 }

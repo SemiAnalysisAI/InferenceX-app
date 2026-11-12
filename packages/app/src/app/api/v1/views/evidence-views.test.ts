@@ -23,6 +23,7 @@ vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases })
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
+  collectiveXCacheTag: () => 'collectivex',
 }));
 const request = (view: string, query: string) =>
   new NextRequest(`http://localhost/api/v1/views/${view}?${query}`);

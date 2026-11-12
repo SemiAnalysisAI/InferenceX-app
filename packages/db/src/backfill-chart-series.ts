@@ -16,6 +16,7 @@ import {
   writeCacheHitMetrics,
 } from './etl/trace-replay-ingest.js';
 import {
+  jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
   requireBackfillPayload,
@@ -23,6 +24,7 @@ import {
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
+import { readServerMetricsGz } from './lib/server-metrics-storage.js';
 
 const flags = parseLimitForceFlags();
 const githubRunId = parseRunIdFlag();
@@ -86,13 +88,12 @@ async function main(): Promise<void> {
     async (id) => {
       const [row] = await sql<
         {
-          server_metrics_json_gz: Buffer | null;
           framework: string | null;
           disagg: boolean | null;
           chart_series: ChartSeries | null;
         }[]
       >`
-        select atr.server_metrics_json_gz, atr.chart_series, source.framework, source.disagg
+        select atr.chart_series, source.framework, source.disagg
         from agentic_trace_replay atr
         left join lateral (
           select c.framework, c.disagg
@@ -110,7 +111,7 @@ async function main(): Promise<void> {
       }
 
       const { series, promptTokenTotals } = requireBackfillPayload(
-        await computeChartData(row.server_metrics_json_gz, {
+        await computeChartData(await readServerMetricsGz(sql, id), {
           framework: row.framework,
           disagg: row.disagg ?? false,
         }),
@@ -130,7 +131,7 @@ async function main(): Promise<void> {
       const json = JSON.stringify(series);
       await sql`
         update agentic_trace_replay
-        set chart_series = ${json}::jsonb,
+        set chart_series = ${jsonbParam(sql, series)},
             chart_series_summary_gz = ${encodeChartSeriesSummary(json)},
             chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
         where id = ${id}

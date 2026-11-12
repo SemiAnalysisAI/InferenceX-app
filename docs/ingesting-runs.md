@@ -220,6 +220,8 @@ INFERENCEX_SOURCE_REPOS="$REPO" GITHUB_TOKEN="$(gh auth token)" \
 
 The official curves still need `DATABASE_READONLY_URL`.
 
+A run whose model or GPU is not registered yet still previews. The overlay keeps the raw model prefix and runner base as identities and labels them as unregistered, and the official curves for such a model are empty. See [Adding Entities](./adding-entities.md) for what the overlay does and why ingest still skips those rows.
+
 ## Behavior to expect
 
 - **Dates:** A run is dated by its `created_at`, not by when a later attempt ran.

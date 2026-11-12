@@ -98,9 +98,13 @@ parser) and refuses the upload unless every PR has an entry, the entries select 
 and the results' `source_sha` is one of each PR's commits or contains its merge commit (GitHub API,
 `GITHUB_TOKEN` when set). Each entry is stored in `cx_changelog_entries` against the run, with
 `changes`: the previous and new status, kernel generation, library version and pair-period p50 of
-every selected case the run changed. `--link-run <run_id> --pr <n>` links a stored run, comparing
-it with the run before it, and only warns on a provenance gap. `GET /api/v1/collectivex/changelog`
-serves the entries, and the CollectiveX page lists them under the support matrix.
+every selected case the run changed. A case changed when its document differs by value from the
+previous run's; key order does not count, because jsonb returns a stored document with its keys
+reordered. `--link-run <run_id> --pr <n>` links a stored run, comparing it with the run before it,
+and only warns on a provenance gap. `GET /api/v1/collectivex/changelog` serves the entries that
+changed at least one case, and the CollectiveX page lists them under the support matrix. An entry
+whose run changed none of its selected cases stays stored, so a later `--link-run` can rewrite it,
+but is not served or listed.
 
 ## Operator runbook
 
@@ -127,7 +131,8 @@ case instead, upload its corrected result: the new run replaces that case and ke
   response cached right after an upload's purge never comes from a lagging replica.
   `DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes.
 - **Caching**: responses use the default API cache headers (`max-age=60`, a one-day
-  `s-maxage` and `stale-while-revalidate`, plus an ETag) under the `collectivex` CDN tag.
+  `s-maxage` and `stale-while-revalidate`, plus an ETag) under the `collectivex` CDN tag,
+  including the `/api/v1/views/collectivex` projection.
   The ingest CLI and workflow purge only that tag through
   `POST /api/v1/invalidate?scope=collectivex`. An upload marks it stale, so the CDN serves
   the previous response once while it refreshes. A deletion passes `immediate=true` so the
@@ -142,9 +147,11 @@ case instead, upload its corrected result: the new run replaces that case and ke
   earlier one stays listed in the API.
 - **One run on the page**: `/colx` shows only the newest stored run with at least one
   measured case; there is no run table or multi-run overlay. The header's Suites control picks
-  the one section shown: `EP` (the default) shows the EP chart controls and chart, `KV` the
-  kv-transfer section, and `swap_blocks` the swap_blocks section. KV and swap_blocks are offered
-  only when the shown run carries them, and a run without EP series opens on its first suite.
+  the one section shown: `EP` (the default) shows the EP chart controls and chart, and
+  `swap_blocks` the swap_blocks section. swap_blocks is offered only when the shown run carries
+  it, and a run without EP series opens on its first suite. The kv-transfer suite was archived on
+  2026-11-10 and has no section: a stored run that still carries kv cases keeps them in the API
+  (`kv`, `kv_cases`), and the page does not show them.
 - **Run list**: `/api/v1/collectivex/runs` always reports `discovery_complete: true`; the
   field stays for existing clients.
 - **No deletion or ingest in the app**: the app exposes no CollectiveX mutation. Runs are
@@ -214,7 +221,9 @@ including submission and CUDA synchronization, counting payload once even for d2
 Both `/colx` and `/zh/colx` expose the controls and tooltips.
 
 Bandwidth charts draw dashed nominal hardware rooflines for visible GPUs. Host transfers use **64 GB/s one-way PCIe 5.0 x16** on the
-registered x86 pools (including HGX B300's CPU uplink). GB200/GB300 use **225 GB/s per GPU
+registered x86 pools (including HGX B300's CPU uplink), except `h100-dgxc`: it runs on AWS
+p5.48xlarge, whose AMD Milan hosts are PCIe 4.0, so its roofline is
+**32 GB/s one-way PCIe 4.0 x16**. GB200/GB300 use **225 GB/s per GPU
 per direction**: the 900 GB/s bidirectional Grace C2C link is split across two GPUs.
 Same-GPU copies use half the GPU Specs HBM bandwidth because each payload byte is read
 and written. These are hardware references, not measured limits: warm-cache copies may

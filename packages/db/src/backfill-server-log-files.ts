@@ -241,7 +241,7 @@ async function main(): Promise<void> {
           const logFiles = root ? listServerLogFilePaths(root) : [];
           if (logFiles.length === 0) {
             emptyArtifacts++;
-            console.warn(`  [WARN] ${pair.serverLogs.name}: no .log/.out files`);
+            console.warn(`  [WARN] ${pair.serverLogs.name}: no log or launch files`);
             continue;
           }
           await insertServerLogFilePaths(sql, resultIds, logFiles, processRedactionKey);

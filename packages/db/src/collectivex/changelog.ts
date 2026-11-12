@@ -176,6 +176,33 @@ function byCase(docs: unknown[]): Map<string, unknown> {
   return map;
 }
 
+/**
+ * Whether two parsed JSON documents hold the same value. Object key order does not count: a stored
+ * document comes back from jsonb with its keys reordered (and -0 as 0), so comparing JSON text
+ * reports every re-uploaded document as changed.
+ */
+function sameJson(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (typeof left !== 'object' || typeof right !== 'object' || left === null || right === null) {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((item, index) => sameJson(item, right[index]))
+    );
+  }
+  const a = left as Record<string, unknown>;
+  const b = right as Record<string, unknown>;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && sameJson(a[key], b[key]))
+  );
+}
+
 /** One cx_changelog_entries row. */
 export interface ChangelogLinkRow {
   run_id: string;
@@ -212,7 +239,7 @@ export function linkRows(
       const doc = afterDocs.get(key);
       const previous = beforeDocs.get(key);
       if (!selects(entry, requested) || doc === undefined) return [];
-      if (previous !== undefined && JSON.stringify(previous) === JSON.stringify(doc)) return [];
+      if (previous !== undefined && sameJson(previous, doc)) return [];
       return [
         {
           sku: requested.sku,

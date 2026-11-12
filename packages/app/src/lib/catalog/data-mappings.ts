@@ -80,7 +80,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Muse Spark 1.3/Open 816B',
     prefix: 'musespark',
     category: 'default',
-    logo: 'muse-mascot.webp',
+    logo: 'meta-color.svg',
   },
   [Model.DeepSeek_V4_Pro]: {
     label: 'DeepSeek V4 Pro 0813 1.6T',
@@ -301,6 +301,11 @@ export function getModelExclusion(model: Model | string | null | undefined): Exc
 
 export function hasExclusion(model: Model | string | null | undefined): boolean {
   return getModelExclusion(model).length > 0;
+}
+
+/** False for a model that only an unofficial-run overlay carries, identified by its raw prefix. */
+export function isRegisteredModel(model: string): model is Model {
+  return Object.hasOwn(MODEL_CONFIG, model);
 }
 
 export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {

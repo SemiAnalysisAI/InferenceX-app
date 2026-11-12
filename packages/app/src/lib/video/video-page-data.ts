@@ -11,7 +11,7 @@ import {
 } from '@/components/video-benchmark/initial-data';
 import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
-import { chartedCells } from '@/components/video-benchmark/results-chart';
+import { chartedCells, stageOpenings } from '@/components/video-benchmark/results-chart';
 import {
   publishedResultsSide,
   resultsClipPoints,
@@ -65,7 +65,9 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
       state,
       namedRunPoints(pages, state.unofficialRun),
     );
-    const points = resultsClipPoints(chartedCells(projection, state), { tier: state.costTier });
+    const leads = resultsClipPoints(chartedCells(projection, state), { tier: state.costTier });
+    // The stage opens on its own deployment, which the first render must not fetch again.
+    const points = [...new Set([...leads, ...stageOpenings(projection, state, leads)])];
     const artifacts = new Map<string, Promise<StoredArtifact | null>>();
     const sides = await Promise.allSettled(
       points.map(async (point) => {

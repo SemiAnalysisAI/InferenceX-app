@@ -325,17 +325,17 @@ describe('normalizeArtifactRows', () => {
     expect(rows[0].disagg).toBe(true);
   });
 
-  it('skips rows with unmapped model', () => {
+  it('keeps a row with an unregistered model under its raw model identity', () => {
     const rows = normalizeArtifactRows(
       [rawRow({ infmax_model_prefix: undefined, model: 'unknown/model' })],
       '2026-03-01',
     );
-    expect(rows).toHaveLength(0);
+    expect(rows.map((row) => row.model)).toEqual(['unknown/model']);
   });
 
-  it('skips rows with unmapped hardware', () => {
-    const rows = normalizeArtifactRows([rawRow({ hw: 'unknown-gpu' })], '2026-03-01');
-    expect(rows).toHaveLength(0);
+  it('keeps a row with unregistered hardware under its raw runner base', () => {
+    const rows = normalizeArtifactRows([rawRow({ hw: 'cluster:unknowngpu-lab' })], '2026-03-01');
+    expect(rows.map((row) => row.hardware)).toEqual(['unknowngpu']);
   });
 
   it('skips rows missing ISL/OSL', () => {
@@ -343,7 +343,7 @@ describe('normalizeArtifactRows', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('processes multiple rows, skipping invalid ones', () => {
+  it('processes multiple rows, keeping registered keys canonical', () => {
     const rows = normalizeArtifactRows(
       [
         rawRow({ infmax_model_prefix: 'dsr1' }),
@@ -352,9 +352,7 @@ describe('normalizeArtifactRows', () => {
       ],
       '2026-03-01',
     );
-    expect(rows).toHaveLength(2);
-    expect(rows[0].model).toBe('dsr1');
-    expect(rows[1].model).toBe('gptoss120b');
+    expect(rows.map((row) => row.model)).toEqual(['dsr1', 'unknown/bad', 'gptoss120b']);
   });
 
   it('sets the provided date on all rows', () => {

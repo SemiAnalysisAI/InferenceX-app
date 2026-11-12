@@ -71,8 +71,16 @@ jobs:
           if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
-          curl -sSf --retry 2 --retry-delay 5 --max-time 300 -X POST \
-            "${APP_URL%/}/api/video-runs" "${headers[@]}" -d '{"history":"backfill"}'
+          status=$(curl -sS --retry 2 --retry-delay 5 --max-time 300 -X POST \
+            -o "$RUNNER_TEMP/video-history.json" -w '%{http_code}' \
+            "${APP_URL%/}/api/video-runs" "${headers[@]}" -d '{"history":"backfill"}')
+          if [ "$status" = 503 ] && grep -q 'Video storage is not configured' "$RUNNER_TEMP/video-history.json"; then
+            echo '::notice::This deployment has no video storage; skipped the History snapshot'
+          elif [ "$status" != 200 ]; then
+            cat "$RUNNER_TEMP/video-history.json"
+            echo "::error::Video History backfill returned HTTP $status"
+            exit 1
+          fi
 
       - name: Warm OperatorX and top pages
         env:
@@ -86,9 +94,24 @@ jobs:
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           # Consume each full response: a streamed body that is cut off is not cached.
-          for path in / /zh /inference /zh/inference /historical /evaluation \
-            /operatorx /zh/operatorx /api/v1/operatorx/runs \
-            '/api/v1/operatorx/compare?op=gemm' '/api/v1/operatorx/compare?op=moe'; do
+          for path in / /zh /inference /zh/inference /historical /evaluation /operatorx /zh/operatorx; do
+            curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
+              -o /dev/null -w "%{http_code} %{time_total}s $path\n" \
+              "${APP_URL%/}$path" "${headers[@]}"
+          done
+          status=$(curl -sS --retry 2 --retry-delay 2 --max-time 300 --compressed \
+            -o "$RUNNER_TEMP/operatorx-runs.json" -w '%{http_code}' \
+            "${APP_URL%/}/api/v1/operatorx/runs" "${headers[@]}")
+          if [ "$status" = 503 ] && grep -q 'The OperatorX database is not configured' "$RUNNER_TEMP/operatorx-runs.json"; then
+            echo '::notice::This deployment has no OperatorX database; skipped its APIs'
+            exit 0
+          fi
+          if [ "$status" != 200 ]; then
+            cat "$RUNNER_TEMP/operatorx-runs.json"
+            echo "::error::/api/v1/operatorx/runs returned HTTP $status"
+            exit 1
+          fi
+          for path in '/api/v1/operatorx/compare?op=gemm' '/api/v1/operatorx/compare?op=moe'; do
             curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
               -o /dev/null -w "%{http_code} %{time_total}s $path\n" \
               "${APP_URL%/}$path" "${headers[@]}"

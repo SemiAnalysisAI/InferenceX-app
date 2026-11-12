@@ -142,6 +142,14 @@ const FixedSequenceLogDialog = dynamic(() =>
   ),
 );
 
+const ReproduceDrawer = dynamic(
+  () =>
+    import('@/components/inference/reproduce/ReproduceDrawer').then(
+      (module) => module.ReproduceDrawer,
+    ),
+  { ssr: false },
+);
+
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
 
 const OVERLAY_SERIES_PREFIX = 'overlay-run';
@@ -459,6 +467,7 @@ const GPUGraph = React.memo(
     presenceRef.current = presence;
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
+    const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
     useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
     useDialogCloseTracking(fixedLogPointId !== null, 'gpu_timeseries_logs_closed');
     useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
@@ -1534,6 +1543,9 @@ const GPUGraph = React.memo(
                     gpu: d.hwKey,
                     conc: d.conc,
                   });
+                } else if (action === 'reproduce') {
+                  setReproducePoint(d);
+                  chartRef.current?.dismissTooltip();
                 } else if (action === 'view-logs' && typeof d.id === 'number') {
                   if (d.benchmark_type !== 'agentic_traces') {
                     event.preventDefault();
@@ -1813,6 +1825,13 @@ const GPUGraph = React.memo(
             onOpenChange={(open) => {
               if (!open) setPowerTelemetryPoint(null);
             }}
+          />
+        )}
+        {reproducePoint === null ? null : (
+          <ReproduceDrawer
+            point={reproducePoint}
+            source="gpu_graph"
+            onClose={() => setReproducePoint(null)}
           />
         )}
         {chart}

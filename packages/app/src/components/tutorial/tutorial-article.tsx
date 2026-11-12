@@ -4,15 +4,15 @@ import { BLOG_PROSE_CLASS } from '@/components/blog/blog-prose';
 import { HashScroll } from '@/components/blog/hash-scroll';
 import { formatBlogDate } from '@/lib/blog/blog';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
-import type { PowerXTutorialMeta } from '@/lib/powerx/tutorial';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { cn } from '@/lib/shared/utils';
+import type { TutorialGuide, TutorialMeta } from '@/lib/tutorial/tutorial-content';
 
-import { PowerXTutorialLink } from './powerx-tutorial-link';
+import { TutorialLink } from './tutorial-link';
 
 const STRINGS = {
-  en: { eyebrow: 'Tutorial', back: '← PowerX', updated: 'Updated' },
-  zh: { eyebrow: '教程', back: '← PowerX', updated: '更新于' },
+  en: { updated: 'Updated' },
+  zh: { updated: '更新于' },
 } as const;
 
 /**
@@ -35,32 +35,33 @@ const TUTORIAL_PROSE_CLASS = cn(
  * instead of waiting for hydration; eyebrow, title and dek step in 60 ms apart. */
 const heroStep = (step: number) => ({ '--motion-delay': `${step * 60}ms` }) as CSSProperties;
 
-export interface PowerXTutorialArticleProps {
+export interface TutorialArticleProps {
   locale: Locale;
-  meta: PowerXTutorialMeta;
+  meta: TutorialMeta;
   content: ReactNode;
+  guide: TutorialGuide;
 }
 
-export function PowerXTutorialArticle({ locale, meta, content }: PowerXTutorialArticleProps) {
+export function TutorialArticle({ locale, meta, content, guide }: TutorialArticleProps) {
   const t = STRINGS[locale];
 
   return (
-    <article data-testid="powerx-tutorial-article">
+    <article data-testid={`${guide.testId}-article`}>
       <HashScroll />
       <header className="pt-4 sm:pt-8">
-        <PowerXTutorialLink
-          href={localePath(getDashboardRoute('powerx').path, locale)}
-          analyticsEvent="powerx_tutorial_returned"
-          analyticsTarget="powerx"
+        <TutorialLink
+          href={localePath(getDashboardRoute(guide.dashboard).path, locale)}
+          analyticsEvent={guide.returnedEvent}
+          analyticsTarget={guide.dashboard}
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          {t.back}
-        </PowerXTutorialLink>
+          {`← ${guide.about}`}
+        </TutorialLink>
         <p
           className="motion-enter mt-10 text-xs font-medium text-muted-foreground"
           style={heroStep(0)}
         >
-          {t.eyebrow}
+          {guide.eyebrow[locale]}
         </p>
         <h1
           className={cn(
@@ -85,7 +86,7 @@ export function PowerXTutorialArticle({ locale, meta, content }: PowerXTutorialA
         </p>
       </header>
 
-      <div className={cn(TUTORIAL_PROSE_CLASS, 'mt-12')} data-testid="powerx-tutorial-body">
+      <div className={cn(TUTORIAL_PROSE_CLASS, 'mt-12')} data-testid={`${guide.testId}-body`}>
         {content}
       </div>
     </article>

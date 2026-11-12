@@ -75,6 +75,7 @@ import {
   type Model,
   MODEL_OPTIONS,
   isModelVisible,
+  isRegisteredModel,
   modelRequiresObservations,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -256,11 +257,14 @@ export default function ChartControls({
   const selectableModels = useMemo(
     () =>
       tcoSource === 'inference' && !powerXSurface
-        ? MODEL_OPTIONS.filter(
-            (model) =>
-              isModelVisible(model, featureGateUnlocked) &&
-              (availableModels.includes(model) || modelRequiresObservations(model)),
-          )
+        ? [
+            ...MODEL_OPTIONS.filter(
+              (model) =>
+                isModelVisible(model, featureGateUnlocked) &&
+                (availableModels.includes(model) || modelRequiresObservations(model)),
+            ),
+            ...availableModels.filter((model) => !isRegisteredModel(model)),
+          ]
         : availableModels,
     [availableModels, powerXSurface, tcoSource, featureGateUnlocked],
   );

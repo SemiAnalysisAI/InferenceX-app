@@ -2,12 +2,11 @@
 
 import { ArrowRight, GraduationCap } from 'lucide-react';
 
+import { TutorialLink } from '@/components/tutorial/tutorial-link';
 import { NewBadge } from '@/components/ui/new-badge';
 import type { Locale } from '@/lib/i18n/i18n';
 import { powerxTutorialPath } from '@/lib/powerx/tutorial-path';
 import { cn } from '@/lib/shared/utils';
-
-import { PowerXTutorialLink } from './powerx-tutorial-link';
 
 const STRINGS: Record<Locale, { badge: string; eyebrow: string; title: string }> = {
   en: { badge: 'New', eyebrow: 'Interactive tutorial', title: 'How we measure power' },
@@ -19,7 +18,7 @@ export function PowerXTutorialCta({ locale, className }: { locale: Locale; class
   const t = STRINGS[locale];
 
   return (
-    <PowerXTutorialLink
+    <TutorialLink
       href={powerxTutorialPath(locale)}
       analyticsEvent="powerx_tutorial_section_opened"
       analyticsTarget="powerx-header"
@@ -42,6 +41,6 @@ export function PowerXTutorialCta({ locale, className }: { locale: Locale; class
         aria-hidden
         className="ml-auto hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block"
       />
-    </PowerXTutorialLink>
+    </TutorialLink>
   );
 }

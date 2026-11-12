@@ -63,6 +63,7 @@ it.each([true, false])(
             colorFor={() => 'black'}
             against="reference"
             onAgainstChange={() => {}}
+            onSubjectChange={() => {}}
             onShow={() => {}}
             reveal={0}
           />
@@ -137,6 +138,7 @@ it('shows a newly read clip while another selected source is still pending', asy
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
         onShow={() => {}}
         reveal={0}
       />,
@@ -155,7 +157,7 @@ it('shows a newly read clip while another selected source is still pending', asy
   expect(container.textContent).not.toContain('Loading retained clips');
 });
 
-it('shows the loading state on both sides while the subject is read', () => {
+it('holds the prompt row and stage with a skeleton while the subject is read', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   vi.stubGlobal(
@@ -177,15 +179,15 @@ it('shows the loading state on both sides while the subject is read', () => {
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
         onShow={() => {}}
         reveal={0}
       />,
     );
   });
-  for (const side of ['a', 'b'])
-    expect(container.querySelector(`[data-side="${side}"]`)?.textContent).toContain(
-      'Loading retained clips',
-    );
+  expect(container.querySelector('[data-testid="video-results-clips-skeleton"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="video-results-stage"]')).toBeNull();
+  expect(container.querySelector('[role="status"]')?.textContent).toBe('Loading retained clips…');
 });
 
 it('waits for a newly wanted side before a reveal scrolls, even after an earlier read failed', async () => {
@@ -221,6 +223,7 @@ it('waits for a newly wanted side before a reveal scrolls, even after an earlier
       colorFor={() => 'black'}
       against="reference"
       onAgainstChange={() => {}}
+      onSubjectChange={() => {}}
       onShow={() => {}}
       reveal={reveal}
     />

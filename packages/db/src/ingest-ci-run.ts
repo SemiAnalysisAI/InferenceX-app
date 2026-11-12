@@ -808,7 +808,7 @@ async function main(): Promise<void> {
                     0,
                   );
                   console.log(
-                    `    server_logs ${configKey}: ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
+                    `    server_logs ${configKey}: ${logFiles.length} log/launch file(s) (${formatBytes(totalBytes)})`,
                   );
                   await withTransientDbRetry(`server_logs for ${configKey}`, () =>
                     insertServerLogFilePaths(sql, insertedIds, logFiles, processRedactionKey),

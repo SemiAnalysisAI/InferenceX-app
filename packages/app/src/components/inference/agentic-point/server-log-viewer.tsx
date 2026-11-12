@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
+import { isLaunchFileName } from '@semianalysisai/inferencex-db/etl/launch-files';
 import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
 import { useServerLogSearch } from '@/hooks/api/use-server-log-search';
 import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log';
@@ -192,7 +193,8 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
   const locale = useLocale();
   const t = STRINGS[locale];
   const filesQuery = useServerLogFiles(id, enabled);
-  const files = filesQuery.data ?? [];
+  // Launch config files are stored with the logs but belong to the Reproduce view, not here.
+  const files = (filesQuery.data ?? []).filter((fileName) => !isLaunchFileName(fileName));
   const [selection, setSelection] = useState<LogSelection | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');

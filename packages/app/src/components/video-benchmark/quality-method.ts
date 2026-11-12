@@ -4,6 +4,43 @@ import type { MetricOptions, VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
 import { resultsClipGroups, resultsClipReference } from './results-clips';
 
+/** One lossless clip's PSNR against the Diffusers reference. */
+export interface ReferencePsnrScore {
+  /** The short case name, e.g. `ping-pong`; the prompt identifies the clip when it is absent. */
+  caseId: string | null;
+  prompt: string;
+  psnrDb: number;
+}
+
+/** The scored lossless clips of one lead's hardware. */
+export interface ReferencePsnrScores {
+  hardwareKey: string;
+  scores: ReferencePsnrScore[];
+}
+
+/**
+ * Each lead's lossless clips scored against the Diffusers reference, in lead order. A lossy
+ * lead, the matched-noise rerun, and an identical, incompatible or unscored pair carry no finite
+ * score of a lossless CI clip, so none counts; a lead without one is left out.
+ */
+export function referencePsnrScores(leads: readonly StageCandidate[]): ReferencePsnrScores[] {
+  const scored: ReferencePsnrScores[] = [];
+  for (const { point, side } of leads) {
+    if (!side || isLossy(point)) continue;
+    const scores: ReferencePsnrScore[] = [];
+    for (const group of resultsClipGroups([side])) {
+      if (group.scope) continue;
+      const clip = group.clips.get(side.hardwareKey);
+      // An identical or incompatible pair has no PSNR.
+      const psnrDb = clip?.quality?.psnrDb;
+      if (clip && typeof psnrDb === 'number' && Number.isFinite(psnrDb))
+        scores.push({ caseId: clip.record.caseId, prompt: group.prompt, psnrDb });
+    }
+    if (scores.length > 0) scored.push({ hardwareKey: side.hardwareKey, scores });
+  }
+  return scored;
+}
+
 /** Reference PSNR spread of the scored lossless clips the stage loaded. */
 export interface ReferencePsnrRange {
   min: number;
@@ -13,26 +50,17 @@ export interface ReferencePsnrRange {
   hardware: string[];
 }
 
-/**
- * The PSNR range of lossless clips against the Diffusers reference, over the visible leads'
- * loaded clips. A lossy lead, the matched-noise rerun, and an identical, incompatible or unscored
- * pair carry no finite score of a lossless CI clip, so none counts. Null until one clip does.
- */
+/** The PSNR range of `referencePsnrScores`; null until one clip has a score. */
 export function referencePsnrRange(leads: readonly StageCandidate[]): ReferencePsnrRange | null {
-  const scores: number[] = [];
-  const hardware: string[] = [];
-  for (const { point, side } of leads) {
-    if (!side || isLossy(point)) continue;
-    const before = scores.length;
-    for (const group of resultsClipGroups([side])) {
-      // An identical or incompatible pair has no PSNR.
-      const psnr = group.scope ? null : group.clips.get(side.hardwareKey)?.quality?.psnrDb;
-      if (typeof psnr === 'number' && Number.isFinite(psnr)) scores.push(psnr);
-    }
-    if (scores.length > before) hardware.push(side.hardwareKey);
-  }
+  const scored = referencePsnrScores(leads);
+  const scores = scored.flatMap((lead) => lead.scores.map((score) => score.psnrDb));
   if (scores.length === 0) return null;
-  return { min: Math.min(...scores), max: Math.max(...scores), clips: scores.length, hardware };
+  return {
+    min: Math.min(...scores),
+    max: Math.max(...scores),
+    clips: scores.length,
+    hardware: scored.map((lead) => lead.hardwareKey),
+  };
 }
 
 /**

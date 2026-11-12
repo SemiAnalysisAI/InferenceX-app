@@ -127,7 +127,7 @@ describe('Landing page performance', () => {
       expect(
         [...landingLogos].filter((name) => {
           const pathname = new URL(name).pathname;
-          return !pathname.endsWith('-color.svg') && pathname !== '/logos/muse-mascot.webp';
+          return !pathname.endsWith('-color.svg');
         }),
       ).to.deep.eq([]);
       expect(

@@ -7,9 +7,13 @@ import {
 
 export { GPU_KEYS };
 
-export function hwToGpuKey(hw: string): string | null {
+export function hwBaseKey(hw: string): string {
   const raw = hw.toLowerCase().split(':').pop()!.split('-')[0];
-  const base = GPU_RUNNER_ALIASES[raw] ?? raw;
+  return GPU_RUNNER_ALIASES[raw] ?? raw;
+}
+
+export function hwToGpuKey(hw: string): string | null {
+  const base = hwBaseKey(hw);
   return GPU_KEYS.has(base) ? base : null;
 }
 

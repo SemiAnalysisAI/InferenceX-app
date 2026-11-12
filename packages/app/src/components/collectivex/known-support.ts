@@ -107,13 +107,9 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'NCCL EP low-latency EP16 is not enabled on this pool; v0.2 enables it on B200, H100, H200, GB200 and GB300.',
     zh: '该集群尚未启用 NCCL EP 低延迟 EP16；v0.2 已在 B200、H100、H200、GB200 和 GB300 上启用此配置。',
   },
-  'b300-ll-single-node-pin': {
-    en: 'Works via a pinned single-node HCA list: the low-latency buffer self-enables IBGDA even single-node, and only the storage-IB rails accept AH/DCT creation (InferenceX#2525); steady-state traffic stays on NVLink.',
-    zh: '通过固定的单节点 HCA 列表可用：低延迟缓冲即使单节点也会自启用 IBGDA，而只有存储 IB 通道接受 AH/DCT 创建（InferenceX#2525）；稳态流量仍走 NVLink。',
-  },
-  'b300-ll-create-ah': {
-    en: 'Cross-node IBGDA fails during NVSHMEM setup — re-confirmed on a fresh node pair 2026-08-28: ibv_reg_dmabuf_mr returns a null MR before the downstream ibv_create_ah failure, with nvidia_peermem loaded; the live suspect is the stale libmlx5 in the container image (an image bump, not a host fix).',
-    zh: '跨节点 IBGDA 在 NVSHMEM 建立阶段失败——2026-08-28 在新节点对上复验：ibv_reg_dmabuf_mr 返回空 MR，随后才是 ibv_create_ah 失败，且 nvidia_peermem 已加载；当前疑点是容器镜像中过旧的 libmlx5（需镜像升级而非主机修复）。',
+  'b300-efa-nvshmem': {
+    en: "DeepEP V2's low-latency path is not enabled on this pool: its NVSHMEM initialization aborts on EFA.",
+    zh: 'DeepEP V2 的低延迟路径在该集群上未启用：其 NVSHMEM 初始化在 EFA 上会中止。',
   },
   'flashinfer-one-nvlink-domain': {
     en: "FlashInfer's one-sided workspace needs every rank inside one NVLink domain, so on single-node NVLink pools it runs EP8 only.",
@@ -235,7 +231,7 @@ const LOW_LATENCY: KnownMatrix = {
     'flashinfer-ep': off('no-ll-kernels'),
   },
   b300: {
-    'deepep-v2': cell(worksWith('b300-ll-single-node-pin'), broken('b300-ll-create-ah')),
+    'deepep-v2': cell(broken('b300-efa-nvshmem'), broken('b300-efa-nvshmem')),
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
     'nccl-ep': cell(worksWith('nccl-v02-ll'), na('nccl-ll-ep16-not-enabled')),

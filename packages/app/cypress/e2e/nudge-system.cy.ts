@@ -191,7 +191,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       ['action', 'qwen-color.svg'],
       ['secondary-action', 'kimi-color.svg'],
       ['additional-action-0', 'zai-color.svg'],
-      ['additional-action-1', 'muse-mascot.webp'],
+      ['additional-action-1', 'meta-color.svg'],
     ]) {
       cy.get(`[data-testid="launch-modal-${action}"] img`)
         .should('have.attr', 'src', `/logos/${logo}`)

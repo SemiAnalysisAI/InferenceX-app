@@ -1639,16 +1639,15 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
     expect(hardwareConfig).toHaveProperty('mi300x_vllm');
   });
 
-  it('falls back to unknown config for completely unrecognized hardware', () => {
+  it('labels completely unrecognized hardware by its raw name', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
     const rows = [makeRow({ hardware: 'zzz999', framework: 'mystery' })];
     const { hardwareConfig } = transformBenchmarkRows(rows);
     const hwKeys = Object.keys(hardwareConfig);
-    expect(hwKeys.length).toBe(1);
-    const config = hardwareConfig[hwKeys[0]];
-    expect(config.label).toBe('Unknown');
+    expect(hwKeys).toHaveLength(1);
+    expect(hardwareConfig[hwKeys[0]].label).toBe('ZZZ999');
 
     warnSpy.mockRestore();
     infoSpy.mockRestore();

@@ -25,6 +25,7 @@ concurrency:
 jobs:
   apply:
     name: Apply run overrides
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
