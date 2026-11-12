@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from './dashboard-routes';
 
-import { isValidTab, TAB_META } from './tab-meta';
+import { isValidTab, TAB_INTRO, TAB_META } from './tab-meta';
 import { isZhTab, TAB_INTRO_ZH, TAB_LABELS_ZH, TAB_META_ZH, tabMetadataZh } from './tab-meta-zh';
 
 const HAN_REGEX = /\p{Script=Han}/u;
@@ -64,5 +64,26 @@ describe('PowerX copy', () => {
       expect(text).toContain('每 Token 能耗');
       expect(text).not.toContain('输出 Token');
     }
+  });
+});
+
+const sentenceCount = (text: string, stop: RegExp) => text.split(stop).filter(Boolean).length;
+
+describe('CollectiveX copy', () => {
+  it('says in Chinese what the English intro says, with no ranking or recommendation promise', () => {
+    // The suite does not rank or recommend, and the English intro promises neither.
+    expect(TAB_INTRO.collectivex).not.toMatch(/rank|recommend/iu);
+    expect(TAB_INTRO_ZH.collectivex).not.toMatch(/排名|推荐/u);
+    // Both name the same libraries and the same three latencies.
+    for (const library of ['DeepEP', 'MoRI', 'UCCL', 'NCCL/RCCL']) {
+      expect(TAB_INTRO.collectivex).toContain(library);
+      expect(TAB_INTRO_ZH.collectivex).toContain(library);
+    }
+    expect(TAB_INTRO.collectivex).toContain('dispatch, combine and round-trip latency');
+    expect(TAB_INTRO_ZH.collectivex).toContain('分发（dispatch）、合并（combine）与完整往返延迟');
+    // The Chinese adds no sentence the English lacks.
+    expect(sentenceCount(TAB_INTRO_ZH.collectivex, /。/u)).toBe(
+      sentenceCount(TAB_INTRO.collectivex, /\.(?:\s|$)/u),
+    );
   });
 });

@@ -76,6 +76,8 @@ The public operations require `version=1`:
 | `/collectivex/runs/{runId}`                                                                            | One run dataset; a re-ingest of the same commit can replace its contents.                            |
 | [`/collectivex/changelog`](https://inferencex.semianalysis.com/api/v1/collectivex/changelog?version=1) | The perf-changelog.yaml PR entries linked to stored runs, with each changed case's before/after p50. |
 
+The changelog lists an entry only for a run that changed at least one of the cases it selects.
+
 All paths above are under `/api/v1`. Consult the [public API reference](https://inferencex.semianalysis.com/api)
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the
 current contract. A missing/unsupported version is HTTP 400. HTTP 404, a 5xx,
@@ -105,6 +107,10 @@ aggregation, best-of selection, or hardware ranking:
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | EP          | Full series configuration, including `series_id`, backend, phase, kernel mode, precision (dtype), hardware/vendor, and every `system` topology field; operation; `tokens_per_rank`; `global_tokens`; component `payload_bytes`.                                                      |
 | KV-transfer | Case configuration including `case_id`, backend, hardware/vendor, fabric, workload, precision, and topology; row `kind`, `isl`, `page_tokens`, `batch`, `op`, `descs`, and `req_bytes`. Cosmetic labels and outcome/reason text are retained as evidence but excluded from matching. |
+
+The kv-transfer suite was archived on 2026-11-10. Runs uploaded since then request no KV
+case and return an empty `kv` array; the KV-transfer rules in this cookbook apply only to
+earlier stored runs that still carry KV cases.
 
 Topology includes EP/rank count (`ep_size`), nodes, GPUs per node, scale-up domain,
 scale-up and scale-out transports, and topology class. Keep a declared null
@@ -141,7 +147,7 @@ the complete datasets' `coverage` and optional `kv` arrays for their outcome,
 disposition, reason, detail, and per-point terminal status. Retain pending,
 unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
 coverage statement. A successful workflow does not imply complete measurement
-coverage; absence of the optional `kv` field does not imply a failed KV suite.
+coverage; an empty or absent `kv` array does not imply a failed KV suite.
 Pending data and a cancelled run do not establish whether a case started or why
 measurements are missing. Keep those returned states separate from explanations.
 

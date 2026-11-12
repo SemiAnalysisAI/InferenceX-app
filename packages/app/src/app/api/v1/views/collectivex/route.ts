@@ -12,7 +12,7 @@ import {
   seriesMatchesSelection,
 } from '@/components/collectivex/data';
 import { swapChartPoints, swapRangeBands, swapRooflines } from '@/components/collectivex/swap-data';
-import { cachedJson } from '@/lib/cache/api-cache';
+import { cachedJson, collectiveXCacheTag } from '@/lib/cache/api-cache';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
   assertRunIdList,
@@ -179,7 +179,7 @@ export function GET(request: NextRequest) {
       metric: swapMetric,
       percentile: swapPercentile,
     }).filter((p) => active('swapSeries', p.seriesId));
-    return cachedJson(request, {
+    const payload = {
       apiVersion: 'v1',
       view: 'collectivex',
       knownSupport: COLLECTIVEX_KNOWN_SUPPORT,
@@ -235,6 +235,8 @@ export function GET(request: NextRequest) {
         modes: availableModes,
         precisions: availablePrecisions,
       },
-    });
+    };
+    // The CollectiveX tag, so an upload's purge (`/api/v1/invalidate?scope=collectivex`) clears it.
+    return cachedJson(request, payload, { tag: collectiveXCacheTag() });
   });
 }

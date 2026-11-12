@@ -251,7 +251,11 @@ export async function upsertCollectiveXChangelogLinks(
   }
 }
 
-/** Every linked changelog entry of a version's runs, newest entry first. */
+/**
+ * The linked changelog entries of a version's runs that changed at least one case, newest entry
+ * first. An entry linked to a run in which none of its selected cases changed is stored (a later
+ * `--link-run` can rewrite it) but has nothing to show, so it is not served.
+ */
 export async function listCollectiveXChangelog(
   sql: DbClient,
   version: number,
@@ -260,7 +264,7 @@ export async function listCollectiveXChangelog(
     SELECT e.run_id::text, e.entry_index, e.pr_number, e.pr_link,
       to_char(e.date, 'YYYY-MM-DD') AS date, e.pools, e.selectors, e.description, e.changes
     FROM cx_changelog_entries e JOIN cx_runs r ON r.run_id = e.run_id
-    WHERE r.version = ${version}
+    WHERE r.version = ${version} AND e.changes <> '[]'::jsonb
     ORDER BY e.date DESC, e.entry_index DESC, e.run_id DESC
   `;
   return rows as unknown as ChangelogLinkRow[];

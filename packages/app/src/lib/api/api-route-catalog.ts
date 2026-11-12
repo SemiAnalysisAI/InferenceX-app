@@ -75,7 +75,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: '590dcd902592e1b8daf605f35bd907c14767c1180fadf735e67dd815842e6667',
+    sourceSha256: '20eb387588dd0abb151c534dbafdf7b532cd93e1771b2cfb2a93ccec680bd1fe',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
@@ -2139,7 +2139,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: 'e4771fecf43cc7902000c5d11053e2a89e97ec4f56775e6fc974312c18a365b7',
+    sourceSha256: '0d53ab244496628373742f1575e415d58974905dc0254a33afa284ba59da4e26',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',

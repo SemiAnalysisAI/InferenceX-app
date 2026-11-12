@@ -1991,8 +1991,8 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Latest CollectiveX run, coverage, series, and optional KV cases.',
-        '最新的 CollectiveX 运行记录、覆盖情况、序列，以及可能存在的 KV 测试用例。',
+        'Latest CollectiveX run, coverage, series and swap_blocks results. The kv-transfer suite was archived on 2026-11-10; kv is empty unless the stored run still carries KV cases.',
+        '最新的 CollectiveX 运行记录、覆盖情况、序列和 swap_blocks 结果。kv-transfer 套件已于 2026-11-10 归档；除非已存储的运行仍包含 KV 用例，否则 kv 为空。',
         collectiveXDatasetSchema,
         {
           version: 1,
@@ -2011,8 +2011,8 @@ export const apiOperations: readonly ApiOperation[] = [
             terminal_points: 48,
             measured_points: 40,
             covered_skus: ['h200_sxm'],
-            kv_requested_cases: 4,
-            kv_measured_cases: 4,
+            kv_requested_cases: 0,
+            kv_measured_cases: 0,
           },
           coverage: [],
           series: [],
@@ -2089,7 +2089,7 @@ export const apiOperations: readonly ApiOperation[] = [
               requested_points: 48,
               terminal_points: 48,
               terminal_counts: { measured: 40, unsupported: 8, failed: 0 },
-              kv_cases: { requested: 4, measured: 4 },
+              kv_cases: { requested: 0, measured: 0 },
             },
           ],
           discovery_complete: true,
@@ -2118,8 +2118,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/changelog',
     summary: text('List CollectiveX changelog entries', '列出 CollectiveX 变更记录'),
     description: text(
-      'Returns the InferenceX collectivex/perf-changelog.yaml entries linked to stored runs, newest first: one row per run and entry, with the pair-period p50 before and after for every selected case that run changed.',
-      '按从新到旧返回已关联到已存储运行的 InferenceX collectivex/perf-changelog.yaml 记录：每个运行与记录一行，并附上该运行改变的每个被选中用例在之前和之后的 pair-period p50。',
+      'Returns the InferenceX collectivex/perf-changelog.yaml entries linked to stored runs, newest first: one row per run and entry, with the pair-period p50 before and after for every selected case that run changed. An entry is omitted for a run that changed none of its selected cases.',
+      '按从新到旧返回已关联到已存储运行的 InferenceX collectivex/perf-changelog.yaml 记录：每个运行与记录一行，并附上该运行改变的每个被选中用例在之前和之后的 pair-period p50。若某次运行未改变某条记录选中的任何用例，则不返回该行。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2244,8 +2244,8 @@ export const apiOperations: readonly ApiOperation[] = [
             terminal_points: 48,
             measured_points: 40,
             covered_skus: ['h200_sxm'],
-            kv_requested_cases: 4,
-            kv_measured_cases: 4,
+            kv_requested_cases: 0,
+            kv_measured_cases: 0,
           },
           coverage: [],
           series: [],
@@ -3471,8 +3471,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. /api/v1/benchmarks is the exception: the shared cache compresses it, so its ETag and Vary headers come from that cache. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。/api/v1/benchmarks 例外：由共享缓存负责压缩，因此其 ETag 和 Vary 头由该缓存决定。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. /api/v1/benchmarks is the exception: the shared cache compresses it, so its ETag and Vary headers come from that cache. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses, including /api/v1/views/collectivex, stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。/api/v1/benchmarks 例外：由共享缓存负责压缩，因此其 ETag 和 Vary 头由该缓存决定。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应（包括 /api/v1/views/collectivex）会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
       ),
     },
     {
