@@ -64,6 +64,22 @@ describe('COLLECTIVEX_KNOWN_SUPPORT', () => {
     expect(cell.ep8.status).toBe('works');
     expect(cell.ep16).toEqual({ status: 'broken', note: 'mi355x-ainic-a77' });
   });
+
+  it('shows no working DeepEP V2 low-latency degree on B300, which registers none', () => {
+    // InferenceX collectivex/configs/platform_config.json: b300 `ll_backends` is {"nccl-ep": [8]}.
+    const lowLatency = COLLECTIVEX_KNOWN_SUPPORT['low-latency'].b300;
+    expect(lowLatency['deepep-v2'].ep8).toEqual({ status: 'broken', note: 'b300-efa-nvshmem' });
+    expect(lowLatency['deepep-v2'].ep16).toEqual({ status: 'broken', note: 'b300-efa-nvshmem' });
+    expect(COLLECTIVEX_KNOWN_FOOTNOTES['b300-efa-nvshmem'].en).toContain('EFA');
+    // The pool's one registered low-latency library and its throughput DeepEP V2 are untouched.
+    expect(lowLatency['nccl-ep'].ep8.status).toBe('works');
+    expect(lowLatency['nccl-ep'].ep16.status).toBe('na');
+    expect(COLLECTIVEX_KNOWN_SUPPORT.normal.b300['deepep-v2'].ep8.status).toBe('works');
+    expect(COLLECTIVEX_KNOWN_SUPPORT.normal.b300['deepep-v2'].ep16.status).toBe('works');
+    // The notes that described the retired B300 pool's rails are no longer served.
+    expect(Object.keys(COLLECTIVEX_KNOWN_FOOTNOTES)).not.toContain('b300-ll-single-node-pin');
+    expect(Object.keys(COLLECTIVEX_KNOWN_FOOTNOTES)).not.toContain('b300-ll-create-ah');
+  });
 });
 
 const series = (

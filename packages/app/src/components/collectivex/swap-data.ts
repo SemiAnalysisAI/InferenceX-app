@@ -72,10 +72,16 @@ const SWAP_GPU_NAMES: Record<string, string> = {
   mi355x: 'MI355X',
 };
 
+/**
+ * Pools whose host link is PCIe 4.0 x16, not 5.0: h100-dgxc runs on AWS p5.48xlarge, whose AMD
+ * Milan hosts are PCIe 4.0 (32 GB/s one way).
+ */
+const SWAP_PCIE4_POOLS = new Set(['h100-dgxc']);
+
 export interface SwapRoofline {
   id: string;
   gbps: number;
-  path: 'PCIe 5.0 x16' | 'NVLink-C2C' | 'HBM / 2';
+  path: 'PCIe 4.0 x16' | 'PCIe 5.0 x16' | 'NVLink-C2C' | 'HBM / 2';
   devices: string[];
 }
 
@@ -89,13 +95,21 @@ export function swapRooflines(
     const spec = GPU_SPECS.find((gpu) => gpu.name === name);
     if (!spec) continue;
     const path =
-      direction === 'd2d' ? 'HBM / 2' : sku.startsWith('gb') ? 'NVLink-C2C' : 'PCIe 5.0 x16';
+      direction === 'd2d'
+        ? 'HBM / 2'
+        : sku.startsWith('gb')
+          ? 'NVLink-C2C'
+          : SWAP_PCIE4_POOLS.has(sku)
+            ? 'PCIe 4.0 x16'
+            : 'PCIe 5.0 x16';
     const gbps =
       direction === 'd2d'
         ? (Number.parseFloat(spec.memoryBandwidth) * 1000) / 2
         : path === 'NVLink-C2C'
           ? 225
-          : 64;
+          : path === 'PCIe 4.0 x16'
+            ? 32
+            : 64;
     const id = `${path.replaceAll(/[^a-zA-Z0-9_-]/g, '-')}-${gbps}`;
     const roof = roofs.get(id) ?? { id, gbps, path, devices: [] };
     roof.devices.push(name);

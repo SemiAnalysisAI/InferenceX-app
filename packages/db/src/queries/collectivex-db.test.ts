@@ -5,6 +5,7 @@ import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { type ChangelogEntry, linkRows } from '../collectivex/changelog';
 import { buildUploadedRun, validateResults } from '../collectivex/results-upload';
 import { makeRawMatrix, makeRawShard } from '../collectivex/test-fixture';
 import { planUpload } from '../ingest-collectivex';
@@ -15,7 +16,9 @@ import {
   getCollectiveXRun,
   getLatestCollectiveXRun,
   getMaxCollectiveXRunId,
+  listCollectiveXChangelog,
   listCollectiveXRuns,
+  upsertCollectiveXChangelogLinks,
   upsertCollectiveXRun,
 } from './collectivex';
 
@@ -249,6 +252,74 @@ describe('CollectiveX runs from uploaded results in PostgreSQL', () => {
     expect(third.plan.baseRunId).toBe(first.run.run_id);
     const merged = await getLatestCollectiveXRun(sql, 1);
     expect(merged?.docs).toHaveLength(2);
+  });
+});
+
+describe('CollectiveX changelog links in PostgreSQL', () => {
+  const entry: ChangelogEntry = {
+    index: 3,
+    date: '2026-10-29',
+    prNumber: 4581,
+    prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4581',
+    pools: ['mi300x', 'mi325x'],
+    selectors: {},
+    description: 'Run the MI300X and MI325X pools on the vLLM ROCm image.',
+  };
+
+  /** The links an upload of `docs` would store, computed against what is stored now. */
+  async function linksOf(docs: Json[], now: Date) {
+    const planned = await planUpload(sql, resultsDir(docs), now);
+    return linkRows(
+      [entry],
+      planned.run.matrix,
+      { runId: planned.run.run_id, docs: planned.docs },
+      planned.latest && { runId: planned.latest.run_id, docs: planned.latest.docs },
+    );
+  }
+
+  it('reports only the re-measured case when a pool folder is uploaded again', async () => {
+    const first = await upload([mi300x, mi325x], FIRST_AT);
+    // jsonb returns the stored documents with their keys in another order than the files.
+    const stored = (await getLatestCollectiveXRun(sql, 1))!.docs[0] as Json;
+    expect(Object.keys(stored)).not.toEqual(Object.keys(mi300x));
+
+    // The same two files, untouched: nothing changed.
+    const [unchanged] = await linksOf([mi300x, mi325x], SECOND_AT);
+    expect(unchanged.changes).toEqual([]);
+
+    // One of the two re-measured: only that case is a change, with both values.
+    const rerun = structuredClone(mi325x);
+    rerun.measurement.rows[0].components.pair_period.percentiles_us.p50 = 640.5;
+    const [link] = await linksOf([mi300x, rerun], SECOND_AT);
+    expect(link.changes.map((change) => [change.sku, change.case_id])).toEqual([
+      ['mi325x', mi325x.identity.case_id],
+    ]);
+    expect(link.changes[0].before).toMatchObject({ run_id: first.run.run_id });
+    expect(link.changes[0].before?.pair_period_p50_us[0]).toEqual([1, 871]);
+    expect(link.changes[0].after.pair_period_p50_us[0]).toEqual([1, 640.5]);
+  });
+
+  it('serves only the entries whose run changed a case', async () => {
+    const first = await upload([mi300x, mi325x], FIRST_AT);
+    const rerun = structuredClone(mi325x);
+    rerun.measurement.rows[0].components.pair_period.percentiles_us.p50 = 640.5;
+    const [changed] = await linksOf([rerun], SECOND_AT);
+    const second = await upload([rerun], SECOND_AT);
+    expect(changed.changes).toHaveLength(1);
+    // The first run's link to the same entry changed nothing: stored, but not served.
+    const unchanged = { ...changed, run_id: first.run.run_id, changes: [] };
+    await upsertCollectiveXChangelogLinks(sql, [unchanged, changed]);
+    const [{ count }] = await sql`SELECT count(*)::int AS count FROM cx_changelog_entries`;
+    expect(count).toBe(2);
+
+    const served = await listCollectiveXChangelog(sql, 1);
+    expect(served.map((row) => row.run_id)).toEqual([second.run.run_id]);
+    expect(served[0]).toMatchObject({ pr_number: 4581, date: '2026-10-29', pools: entry.pools });
+    expect(served[0].changes).toEqual(changed.changes);
+
+    // Linking the run again with no changed case rewrites the stored row, which then drops out.
+    await upsertCollectiveXChangelogLinks(sql, [{ ...changed, changes: [] }]);
+    expect(await listCollectiveXChangelog(sql, 1)).toEqual([]);
   });
 });
 

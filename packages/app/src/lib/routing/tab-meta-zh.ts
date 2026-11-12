@@ -142,7 +142,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   'agentic-workload-explorer':
     '本页面基于 ProxyTrace 采集的匿名 coding agent trace 冻结快照，展示真实智能体负载的会话结构、输入/输出 token、前缀缓存命中、首 token 延迟（TTFT）与工具调用分布。快照数据不再更新，所有时间窗口均以快照截止时间为准。',
   collectivex:
-    '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。跨芯片速率均按逻辑载荷计算；只有发布器确认完整且稳定的官方队列才会生成排名与推荐。',
+    '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。',
   submissions:
     '本页面列出提交到 InferenceX 的全部基准测试配置：按芯片厂商查看提交历史、活动趋势与数据点数量。',
   'ai-chart': '用自然语言描述想看的对比，即可获得基于 InferenceX 基准测试数据生成的图表。',
