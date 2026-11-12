@@ -13,7 +13,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const MODEL_LOGOS: Record<string, string> = {
-  'muse-spark-open': '/logos/muse-mascot.webp',
+  'muse-spark-open': '/logos/meta-color.svg',
   'kimi-k31-pro': '/logos/kimi-color.svg',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',

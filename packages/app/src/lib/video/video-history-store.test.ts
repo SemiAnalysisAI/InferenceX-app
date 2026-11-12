@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 4,
-      // A100 is now recognized by the shared hardware registry.
-      sources: '4eb19848170182e1b9ed9a69f5932a9fc5066e4ac4f84a63649b1fc4f74f0153',
+      // Muse's catalog logo changed; recorded video entries are unchanged.
+      sources: 'db9aff5ef4468c7a1603cba0a93440bfcbfef2addaf4c5972aa9dcb771b30a8b',
     });
   });
 });

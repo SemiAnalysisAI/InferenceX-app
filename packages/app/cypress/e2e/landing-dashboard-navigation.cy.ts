@@ -43,13 +43,13 @@ describe('Muse Spark Open results', () => {
     });
   });
   for (const prefix of ['', '/zh']) {
-    it(`opens the canonical Muse dashboard from ${prefix}/compare with the mascot`, () => {
+    it(`opens the canonical Muse dashboard from ${prefix}/compare with the Meta logo`, () => {
       cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
         .should('contain.text', prefix ? '查看结果' : 'View results')
         .and('not.contain.text', prefix ? '预览' : 'Preview')
         .find('img')
-        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+        .should('have.attr', 'src', '/logos/meta-color.svg');
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should(
         'have.attr',
         'href',
@@ -59,6 +59,11 @@ describe('Muse Spark Open results', () => {
       cy.location('pathname').should('eq', `${prefix}/infx/inference/muse-spark-open`);
       cy.location('search').should('eq', '');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark 1.3/Open 816B');
+      cy.get('[data-testid="model-selector"] img').should(
+        'have.attr',
+        'src',
+        '/logos/meta-color.svg',
+      );
       cy.title().should('contain', 'Muse Spark 1.3/Open');
       cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-slot="unofficial-banner"]').should('not.exist');
@@ -72,7 +77,7 @@ describe('Muse Spark Open results', () => {
       cy.get('[data-testid="model-selector"]')
         .should('contain.text', 'Muse Spark 1.3/Open 816B')
         .find('img')
-        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+        .should('have.attr', 'src', '/logos/meta-color.svg');
       cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
         'have.length.greaterThan',
         0,
