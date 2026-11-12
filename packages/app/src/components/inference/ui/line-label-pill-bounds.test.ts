@@ -3,7 +3,9 @@ import * as d3 from 'd3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  fitPillSegments,
   pillShiftIntoBounds,
+  pillWidthBudget,
   rectsStrictlyOverlap,
   renderLineLabels,
   updateRenderedLineLabels,
@@ -19,7 +21,7 @@ const CLIP_ID = 'clip-test-chart';
 const CHAR_WIDTH = 6;
 const TEXT_HEIGHT = 12;
 
-function renderChart(clip = true) {
+function renderChart(clip = true, plot = PLOT) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   const defs = document.createElementNS(SVG_NS, 'defs');
   svg.append(defs);
@@ -27,8 +29,8 @@ function renderChart(clip = true) {
     const clipPath = document.createElementNS(SVG_NS, 'clipPath');
     clipPath.setAttribute('id', CLIP_ID);
     const rect = document.createElementNS(SVG_NS, 'rect');
-    rect.setAttribute('width', String(PLOT.width));
-    rect.setAttribute('height', String(PLOT.height));
+    rect.setAttribute('width', String(plot.width));
+    rect.setAttribute('height', String(plot.height));
     clipPath.append(rect);
     defs.append(clipPath);
   }
@@ -170,6 +172,44 @@ describe('clamped pills do not stack on their neighbours', () => {
     }
   });
 
+  it('hides lower-priority pills that still collide after every nudge', () => {
+    const { zoomGroup } = renderChart();
+    const keys = Array.from({ length: 80 }, (_, index) => `s${index}`);
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    const nodes = keys.map((key) =>
+      zoomGroup.select<SVGGElement>(`.line-label[data-line-key="${key}"]`).node()!,
+    );
+    const shown = keys.filter((_, index) => nodes[index].style.opacity !== '0');
+    expect(shown.length).toBeLessThan(keys.length);
+    expect(nodes[0].style.opacity).not.toBe('0');
+    expect(nodes.at(-1)!.dataset.visible).toBe('0');
+    const boxes = shown.map((key) => pillBox(zoomGroup, key));
+    for (const [index, box] of boxes.entries()) {
+      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
+    }
+  });
+
+  it('keeps only the top few pills on a narrow plot and all of them on a wider one', () => {
+    const labels = ['a', 'b', 'c', 'd', 'e'].map((key, index) =>
+      placement(key, 20, 20 + index * 70, 'B200'),
+    );
+    const visibleKeys = (plot: { width: number; height: number }) => {
+      const { zoomGroup } = renderChart(true, plot);
+      renderLineLabels(zoomGroup, labels, { seriesAttribute: 'data-hw-key' });
+      return zoomGroup
+        .selectAll<SVGGElement, unknown>('.line-label')
+        .nodes()
+        .filter((node) => node.style.opacity !== '0')
+        .map((node) => node.dataset.lineKey);
+    };
+    expect(visibleKeys({ width: 280, height: 400 })).toEqual(['a', 'b', 'c']);
+    expect(visibleKeys({ width: 400, height: 400 })).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
   it('renders larger text and measures its pill before clamping on render and zoom', () => {
     Object.defineProperty(SVGElement.prototype, 'getBBox', {
       configurable: true,
@@ -281,6 +321,34 @@ describe('clamped pills do not stack on their neighbours', () => {
     expect(next.tx).toBe(218);
     expect(next.ty).toBe(16);
   });
+
+  it('draws a series-coloured leader only for a pill moved away from its anchor', () => {
+    const { zoomGroup } = renderChart();
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'B300 (vLLM)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+
+    const leader = (key: string) =>
+      zoomGroup.select<SVGLineElement>(`.line-label[data-line-key="${key}"] .ll-leader`);
+    for (const key of keys.slice(0, 4)) expect(leader(key).attr('display')).toBe('none');
+    const moved = leader('e');
+    expect(moved.attr('display')).toBeNull();
+    expect(moved.attr('stroke')).toBe('#0f0');
+    const box = pillBox(zoomGroup, 'e');
+    expect(box.tx + Number(moved.attr('x1'))).toBe(200);
+    expect(box.ty + Number(moved.attr('y1'))).toBe(150);
+    const endX = box.tx + Number(moved.attr('x2'));
+    const endY = box.ty + Number(moved.attr('y2'));
+    expect(endX).toBeGreaterThanOrEqual(box.left);
+    expect(endX).toBeLessThanOrEqual(box.right);
+    expect([box.top, box.bottom]).toContain(endY);
+
+    updateRenderedLineLabels(zoomGroup, [placement('e', 200, 150, 'B300 (vLLM)')]);
+    expect(leader('e').attr('display')).toBe('none');
+  });
 });
 
 describe('line-label pills stay inside the plot bounding box', () => {
@@ -363,5 +431,182 @@ describe('line-label pills stay inside the plot bounding box', () => {
     });
 
     expect(pillBox(zoomGroup, 'b300').right).toBe(200);
+  });
+});
+
+const stripes = (top: number, bottom: number) =>
+  Array.from({ length: Math.floor((bottom - top) / 10) + 1 }, (_, index) => ({
+    key: `stripe-${index}`,
+    points: [
+      { x: 0, y: top + index * 10 },
+      { x: 400, y: top + index * 10 },
+    ],
+  }));
+
+const split = (y: number) => [
+  {
+    key: `left-${y}`,
+    points: [
+      { x: 0, y },
+      { x: 195, y },
+    ],
+  },
+  {
+    key: `right-${y}`,
+    points: [
+      { x: 205, y },
+      { x: 400, y },
+    ],
+  },
+];
+
+describe('pills keep clear of other series', () => {
+  const crossing = {
+    key: 'other',
+    points: [
+      { x: 0, y: 136 },
+      { x: 400, y: 136 },
+    ],
+  };
+
+  it('moves off a line that its default slot would cover', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [crossing],
+    });
+
+    const box = pillBox(zoomGroup, 'b300');
+    expect(box.ty).toBe(164);
+    expect(box.top).toBeGreaterThan(136);
+  });
+
+  it('ignores its own series line', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [{ ...crossing, key: 'b300' }],
+    });
+
+    expect(pillBox(zoomGroup, 'b300').ty).toBe(136);
+  });
+
+  it('re-places on zoom with the projected lines', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+    });
+    updateRenderedLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      occluders: [crossing],
+    });
+
+    expect(pillBox(zoomGroup, 'b300').ty).toBe(164);
+  });
+
+  it('moves nearby with a faint leader that passes between other series', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [...split(136), ...split(164)],
+    });
+
+    const box = pillBox(zoomGroup, 'b300');
+    expect(box.bottom).toBeLessThan(136);
+    const leader = zoomGroup.select<SVGLineElement>('.line-label .ll-leader');
+    expect(leader.attr('display')).toBeNull();
+    expect(leader.attr('stroke-width')).toBe('1');
+    expect(leader.attr('stroke-opacity')).toBe('0.5');
+    const length = Math.hypot(
+      Number(leader.attr('x2')) - Number(leader.attr('x1')),
+      Number(leader.attr('y2')) - Number(leader.attr('y1')),
+    );
+    expect(length).toBeLessThanOrEqual(40);
+  });
+
+  it('hides a pill instead of moving it beyond the leader cap', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(60, 240),
+    });
+
+    const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
+    expect(node.style.opacity).toBe('0');
+    expect(node.dataset.visible).toBe('0');
+  });
+
+  it('hides a pill whose only nearby slots need a leader across another series', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(140, 160),
+    });
+
+    expect(zoomGroup.select<SVGGElement>('.line-label').node()!.style.opacity).toBe('0');
+  });
+
+  it('moves to another point on its own line when the anchor has no clear slot', () => {
+    const { zoomGroup } = renderChart();
+    const own = {
+      key: 'b300',
+      points: [
+        { x: 200, y: 150 },
+        { x: 200, y: 50 },
+      ],
+    };
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [own, ...stripes(100, 200)],
+    });
+
+    const box = pillBox(zoomGroup, 'b300');
+    expect(zoomGroup.select<SVGGElement>('.line-label').node()!.style.opacity).not.toBe('0');
+    expect(box.bottom).toBeLessThan(100);
+    expect(box.tx).toBe(208);
+    expect(box.ty).toBe(36);
+  });
+
+  it('hides a pill when every slot covers another series', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+    });
+
+    const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
+    expect(node.style.opacity).toBe('0');
+    expect(node.dataset.visible).toBe('0');
+  });
+});
+
+const measure = (text: string) => text.length * CHAR_WIDTH;
+
+describe('phone pill width budget', () => {
+  const segments = [
+    { className: 'll-gpu', text: 'GB300 NVL72', weight: '700' },
+    { className: 'll-engine', text: ' (Dynamo vLLM)', weight: '400' },
+  ];
+
+  it('gives narrow plots a share of their width and wide plots no cap', () => {
+    expect(pillWidthBudget(240)).toBeCloseTo(108);
+    expect(pillWidthBudget(800)).toBe(Infinity);
+  });
+
+  it('keeps the chip name and ellipsizes the framework inside its bracket', () => {
+    expect(fitPillSegments(segments, 120, measure).map((segment) => segment.text)).toEqual([
+      'GB300 NVL72',
+      ' (Dynam…)',
+    ]);
+  });
+
+  it('drops the framework when not even one letter fits', () => {
+    expect(fitPillSegments(segments, 70, measure).map((segment) => segment.text)).toEqual([
+      'GB300 NVL72',
+    ]);
+  });
+
+  it('leaves labels that fit untouched', () => {
+    expect(fitPillSegments(segments, Infinity, measure)).toEqual(segments);
+    expect(fitPillSegments(segments, 200, measure)).toEqual(segments);
   });
 });

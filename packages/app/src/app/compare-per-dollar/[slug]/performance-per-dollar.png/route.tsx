@@ -83,7 +83,7 @@ export async function GET(
       footer:
         lang === 'zh'
           ? 'Hyperscaler 自有设备 TCO｜数据由基准测试结果插值得出'
-          : 'Owning at Large Hyperscaler Volume TCO | interpolated from benchmark results',
+          : 'Owning at large hyperscaler volume TCO | interpolated from benchmark results',
       lang,
     });
   } catch (error) {

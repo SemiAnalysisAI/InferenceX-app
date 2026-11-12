@@ -14,7 +14,7 @@ async function overWire(rows: readonly EvalRow[]): Promise<EvalRow[]> {
   return expandEvalRows(await Response.json(compactEvalRows(rows)).json());
 }
 
-const base: EvalRow = rawRows[0]!;
+const base: EvalRow = { ...rawRows[0]!, spec_algorithm: null, spec_draft_model: null };
 
 describe('compactEvalRows', () => {
   it('restores every column, keeping only the metrics the dashboard reads', async () => {
@@ -23,6 +23,8 @@ describe('compactEvalRows', () => {
         ...base,
         id: 1,
         metrics: { n_eff: 10, em_strict: 0.5, em_strict_se: 0.1, em_flexible: 0.6, dp: 2 },
+        spec_algorithm: 'dflash',
+        spec_draft_model: 'RadixArk/Kimi-K3.1-Dflash2-Preview',
         timestamp: '2026-01-01T00:00:00Z',
         run_url: 'https://example.test/runs/1',
       },

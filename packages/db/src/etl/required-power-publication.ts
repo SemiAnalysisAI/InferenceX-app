@@ -64,13 +64,14 @@ function mappedIdentity(row: BenchmarkParams): string {
   return JSON.stringify([row.recipeFingerprint, row.conc, row.benchmarkType, row.isl, row.osl]);
 }
 
+const retainedIdentity = (row: BenchmarkParams) =>
+  JSON.stringify([configCacheKey(row.config), row.offloadMode, mappedIdentity(row)]);
+
 export function assertRequiredPowerPointsRetained(
   required: readonly BenchmarkParams[],
   retained: readonly BenchmarkParams[],
   stage: 'before_write' | 'after_insert',
 ): void {
-  const retainedIdentity = (row: BenchmarkParams) =>
-    JSON.stringify([configCacheKey(row.config), row.offloadMode, mappedIdentity(row)]);
   const present = new Map(retained.map((row) => [retainedIdentity(row), row]));
   for (const row of required) {
     const key = retainedIdentity(row);

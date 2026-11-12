@@ -28,16 +28,22 @@ const STRINGS = {
   },
 } as const;
 
+type ConfirmationCopy = { [K in keyof (typeof STRINGS)['en']]: string };
+
 export function EngineComparisonConfirmation({
   open,
   onCancel,
   onConfirm,
+  copy,
 }: {
   open: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  /** The current locale's wording when the engines are not vLLM and SGLang. */
+  copy?: ConfirmationCopy;
 }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = copy ?? STRINGS[locale];
   return (
     <Dialog
       open={open}

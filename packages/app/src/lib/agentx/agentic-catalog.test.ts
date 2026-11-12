@@ -29,7 +29,7 @@ describe('groupAgenticCatalog', () => {
     expect(groups).toHaveLength(1);
     const [group] = groups;
     expect(group.key).toBe('dsv4');
-    expect(group.label).toBe('DeepSeekv4 Pro 0813 1.6T');
+    expect(group.label).toBe('DeepSeek V4 Pro 0813 1.6T');
     expect(group.totalPoints).toBe(15);
     expect(group.cards.map((card) => card.label)).toEqual(['B200 · vLLM', 'H200 · SGLang']);
     expect(group.cards[0]).toMatchObject({

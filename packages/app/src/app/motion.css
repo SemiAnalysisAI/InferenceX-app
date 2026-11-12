@@ -1,23 +1,5 @@
 :root {
   --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
-  --motion-reveal-duration: 550ms;
-  --motion-reveal-distance: 12px;
-}
-
-@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
-  [data-reveal] {
-    opacity: 0;
-    transform: translateY(var(--motion-reveal-distance));
-    transition:
-      opacity var(--motion-reveal-duration) var(--motion-ease-enter),
-      transform var(--motion-reveal-duration) var(--motion-ease-enter);
-    transition-delay: var(--motion-reveal-delay, 0ms);
-  }
-
-  [data-reveal][data-inview='true'] {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -105,20 +87,20 @@
   opacity: 0.6;
 }
 
+/* A 1px bar stretched with scaleX, so the move animates transform only. */
 .tab-indicator {
   position: absolute;
   bottom: 0;
   left: 0;
+  width: 1px;
   height: 2px;
-  border-radius: 9999px;
-  will-change: transform, width;
+  transform-origin: left center;
+  will-change: transform;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .tab-indicator {
-    transition:
-      transform var(--motion-dur-base) var(--motion-ease-standard),
-      width var(--motion-dur-base) var(--motion-ease-standard);
+    transition: transform var(--motion-dur-base) var(--motion-ease-standard);
   }
 }
 
@@ -156,5 +138,16 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* An image that fades in once it loads: `data-loaded` starts false and its load event flips it. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-media {
+    transition: opacity var(--motion-dur-base) var(--motion-ease-enter);
+  }
+
+  .motion-media[data-loaded='false'] {
+    opacity: 0;
   }
 }

@@ -3,14 +3,14 @@ import Image from 'next/image';
 import { renderCaption } from '@/components/blog/mdx-components';
 import type { GlossaryFigure as GlossaryFigureData } from '@/lib/content/glossary';
 
-// Rendered width of the term page's main column (max-w-5xl card minus the 16rem aside and padding).
-const COLUMN_WIDTH = 688;
+// Rendered width of the term page's main column, which is the 45rem reading measure.
+const COLUMN_WIDTH = 720;
 
 export function GlossaryFigure({ figure }: { figure: GlossaryFigureData }) {
   // Growing each image by its aspect ratio gives every image in the row the same height.
   const totalAspect = figure.images.reduce((sum, image) => sum + image.width / image.height, 0);
   return (
-    <figure className="mt-8 flex max-w-3xl flex-col gap-3">
+    <figure className="mt-8 flex max-w-measure flex-col gap-3">
       <div className="flex flex-col gap-3 sm:flex-row">
         {figure.images.map((image) => {
           const aspect = image.width / image.height;

@@ -26,10 +26,13 @@ import {
   type CompareTableData,
   compareTableDataFromPoints,
   emptyCompareTableData,
+  fmtCost,
+  fmtTput,
 } from '@/lib/compare/compare-table-view';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { clampMetaDescription, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export { getCachedBenchmarks };
 
@@ -45,7 +48,7 @@ export const AGENTIC_SCENARIO_INTRO: AgenticScenarioIntro = {
   paragraph:
     'AgentX replays real coding-agent sessions rather than fixed-length prompts, so context grows turn over turn and most of each request is served from cache instead of being recomputed. That turns the comparison into a systems question: KV transfer between nodes, prefix-aware routing, and cache capacity all move the curve alongside raw chip throughput. Fixed-sequence workloads stay the clean baseline for kernel and silicon performance, so the two scenarios answer different questions about the same hardware.',
   linkLabel: 'Learn more about AgentX',
-  href: '/agentx',
+  href: AGENTX_ROUTE.path,
 };
 
 export interface PairSummary {
@@ -308,13 +311,28 @@ export function jsonLdEntryFor(key: string, summary: PairSummary, position: numb
 
 export type CompareJsonLdVariant = 'full' | 'per-dollar';
 
-export function fmtCost(v: number): string {
-  if (v >= 10) return `$${v.toFixed(1)}`;
-  return `$${v.toFixed(2)}`;
+/** Ratios of 3 or more read as "N×"; a percentage like "20939%" is unreadable. */
+export const LARGE_RATIO = 3;
+
+export function fmtRatioTimes(ratio: number): string {
+  return ratio >= 10 ? `${Math.round(ratio)}×` : `${ratio.toFixed(1)}×`;
 }
 
 export function fmtPctDelta(ratio: number): string {
   return `${Math.round((ratio - 1) * 100)}%`;
+}
+
+/** "42% more tok/s/chip" below {@link LARGE_RATIO}, "4.7× the tok/s/chip" from there up. */
+export function fmtMore(ratio: number, noun: string): string {
+  return ratio >= LARGE_RATIO
+    ? `${fmtRatioTimes(ratio)} the ${noun}`
+    : `${fmtPctDelta(ratio)} more ${noun}`;
+}
+
+export function fmtPctLower(costRatio: number): string {
+  const pct = (1 - 1 / costRatio) * 100;
+  // Integer rounding would print "100% cheaper" for a side that still costs something.
+  return pct >= 99.5 ? `${Math.floor(pct * 10) / 10}%` : `${Math.round(pct)}%`;
 }
 
 function hashStr(s: string): number {
@@ -380,17 +398,17 @@ export const BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
 
 const PER_DOLLAR_BOTH_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} costs ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} costs ${fmtCost(i.bCost)}. ${i.cheaper} is ${fmtPctDelta(i.ratio)} more cost-efficient at this operating point.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} costs ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} costs ${fmtCost(i.bCost)}. ${i.cheaper} delivers ${fmtMore(i.ratio, 'tokens per dollar')} at this operating point.`,
   (i) =>
-    `${i.cheaper} edges ${i.pricier} at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.cheaperCost)} per million tokens versus ${fmtCost(i.pricierCost)}, a ${fmtPctDelta(i.ratio)} cost-per-token gap.`,
+    `${i.cheaper} edges ${i.pricier} at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.cheaperCost)} per million tokens versus ${fmtCost(i.pricierCost)}, a ${fmtPctLower(i.ratio)} lower cost per token.`,
   (i) =>
-    `Push ${i.modelLabel} to ${i.target} tok/s/user and ${i.aLabel} lands at ${fmtCost(i.aCost)} per million tokens against ${i.bLabel}'s ${fmtCost(i.bCost)} — ${i.cheaper} pulls ahead by ${fmtPctDelta(i.ratio)}.`,
+    `Push ${i.modelLabel} to ${i.target} tok/s/user and ${i.aLabel} lands at ${fmtCost(i.aCost)} per million tokens against ${i.bLabel}'s ${fmtCost(i.bCost)} — ${i.cheaper} costs ${fmtPctLower(i.ratio)} less.`,
   (i) =>
-    `${i.aLabel}: ${fmtCost(i.aCost)} per million tokens. ${i.bLabel}: ${fmtCost(i.bCost)}. Both at ${i.target} tok/s/user on ${i.modelLabel}, with ${i.cheaper} ${fmtPctDelta(i.ratio)} cheaper.`,
+    `${i.aLabel}: ${fmtCost(i.aCost)} per million tokens. ${i.bLabel}: ${fmtCost(i.bCost)}. Both at ${i.target} tok/s/user on ${i.modelLabel}, with ${i.cheaper} ${fmtPctLower(i.ratio)} cheaper.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band — at ${i.target} tok/s/user — ${i.aLabel} runs ${fmtCost(i.aCost)} per million tokens on ${i.modelLabel} while ${i.bLabel} runs ${fmtCost(i.bCost)}. ${i.cheaper} is the cheaper choice by ${fmtPctDelta(i.ratio)}.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band — at ${i.target} tok/s/user — ${i.aLabel} runs ${fmtCost(i.aCost)} per million tokens on ${i.modelLabel} while ${i.bLabel} runs ${fmtCost(i.bCost)}. ${i.cheaper} is the cheaper choice by ${fmtPctLower(i.ratio)}.`,
   (i) =>
-    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtPctDelta(i.ratio)} more total tokens per dollar.`,
+    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtMore(i.ratio, 'total tokens per dollar')}.`,
 ];
 
 const PER_DOLLAR_TIED_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
@@ -436,12 +454,12 @@ function fullSummary(i: FullBoth): string {
     ? 'cost per token is essentially tied'
     : i.costRatio === null
       ? null
-      : `${i.cheaper} is ${fmtPctDelta(i.costRatio)} cheaper per token`;
+      : `${i.cheaper} is ${fmtPctLower(i.costRatio)} cheaper per token`;
   const tputPart = i.tputTied
     ? 'throughput per chip is essentially tied'
     : i.tputRatio === null
       ? null
-      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/chip`;
+      : `${i.faster} delivers ${fmtMore(i.tputRatio, 'tok/s/chip')}`;
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
@@ -450,17 +468,17 @@ function fullSummary(i: FullBoth): string {
 
 const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
+    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${fmtTput(i.bValue)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
   (i) =>
-    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
+    `${i.aLabel} posts ${fmtTput(i.aValue)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${fmtTput(i.bValue)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/chip, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Costs per million tokens land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
   (i) =>
-    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
+    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${fmtTput(i.aValue)} / ${fmtTput(i.bValue)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
   (i) =>
-    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${i.aValue.toFixed(0)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${i.bValue.toFixed(0)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
+    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${fmtTput(i.aValue)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${fmtTput(i.bValue)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
 ];
 
 const FULL_SINGLE_TEMPLATES: ((args: {
@@ -472,11 +490,11 @@ const FULL_SINGLE_TEMPLATES: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${fmtTput(i.presentValue)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
   (i) =>
-    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
+    `${i.presentLabel} hits ${fmtTput(i.presentValue)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
   (i) =>
-    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
+    `${i.presentLabel}: ${fmtTput(i.presentValue)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
 ];
 
 export function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {

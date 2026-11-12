@@ -4,6 +4,7 @@ import { hsl, rgb } from 'd3';
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
+  whiteTextFill,
   generateHighContrastGpuDateColors,
   generateGpuDateColors,
   generateVendorColors,
@@ -59,6 +60,19 @@ describe('generateVendorColors', () => {
     expect(hueOf(colors['mystery_series'])).toBeGreaterThanOrEqual(unknown.start);
     expect(hueOf(colors['mystery_series'])).toBeLessThanOrEqual(unknown.end);
   });
+
+  it('places each B and GB chip of a generation next to each other on the ramp', () => {
+    const keys = ['gb300_dynamo-vllm', 'gb200_vllm', 'b300_sglang', 'b200_vllm', 'h200_vllm'];
+    const colors = generateVendorColors(keys, 'dark');
+    const order = [...keys].sort((a, b) => lightnessOf(colors[b]) - lightnessOf(colors[a]));
+    expect(order).toEqual([
+      'gb300_dynamo-vllm',
+      'b300_sglang',
+      'gb200_vllm',
+      'b200_vllm',
+      'h200_vllm',
+    ]);
+  });
 });
 
 function lightnessOf(color: string): number {
@@ -66,6 +80,25 @@ function lightnessOf(color: string): number {
   expect(match, `expected oklch color, got ${color}`).not.toBeNull();
   return Number(match!.groups!.l);
 }
+
+describe('whiteTextFill', () => {
+  it('darkens yellow-green pills until white text reaches 4.5:1', () => {
+    expect(whiteTextFill('oklch(0.880 0.15 124.2)')).toBe('oklch(0.553 0.137 124.2)');
+  });
+
+  it('keeps fills that already pass', () => {
+    expect(whiteTextFill('oklch(0.450 0.15 150.0)')).toBe('oklch(0.450 0.15 150.0)');
+    expect(whiteTextFill('#1f4e79')).toBe('#1f4e79');
+  });
+
+  it('darkens light hex fills', () => {
+    expect(lightnessOf(whiteTextFill('#4285F4'))).toBeCloseTo(0.568, 2);
+  });
+
+  it('leaves unparseable fills alone', () => {
+    expect(whiteTextFill('var(--primary)')).toBe('var(--primary)');
+  });
+});
 
 describe('generateHighContrastGpuDateColors', () => {
   const bases = { h200_sglang: '#1f77b4', mi355x_vllm: '#d62728' };

@@ -103,3 +103,115 @@ export function swapRooflines(
   }
   return [...roofs.values()].sort((a, b) => a.gbps - b.gbps);
 }
+
+/**
+ * Linear y-axis for the bandwidth chart. A roofline far above the measured data (NVLink-C2C at
+ * 225 GB/s next to ~80 GB/s of data) would squash every series into the bottom third, so the
+ * axis breaks just above the data and stacks those rooflines in a short band above the break.
+ * Plot coordinates equal GB/s below the break; `toPlot`/`fromPlot` convert the compressed band.
+ */
+export interface SwapYAxis {
+  domainMax: number;
+  /** Plot-space y where the axis breaks, or null when every roofline fits on a true scale. */
+  breakAt: number | null;
+  toPlot: (gbps: number) => number;
+  /** GB/s for a plot-space tick, or null for a position inside the break band. */
+  fromPlot: (plot: number) => number | null;
+}
+
+export function swapYAxis(dataMax: number, rooflineGbps: number[]): SwapYAxis {
+  const top = dataMax > 0 ? dataMax : 1;
+  // Rooflines up to 1.7x the data stay on the true scale; the break sits above all of them.
+  const far = [...new Set(rooflineGbps.filter((gbps) => gbps > top * 1.7))].sort((a, b) => a - b);
+  const breakAt = Math.max(top, ...rooflineGbps.filter((gbps) => gbps <= top * 1.7)) * 1.15;
+  if (far.length === 0) {
+    return {
+      domainMax: Math.max(top, ...rooflineGbps) * 1.1,
+      breakAt: null,
+      toPlot: (gbps) => gbps,
+      fromPlot: (plot) => plot,
+    };
+  }
+  const step = breakAt * 0.14;
+  const plotOf = new Map(far.map((gbps, i) => [gbps, breakAt + step * (i + 1)]));
+  return {
+    domainMax: breakAt + step * (far.length + 0.6),
+    breakAt,
+    toPlot: (gbps) => plotOf.get(gbps) ?? gbps,
+    fromPlot: (plot) => {
+      if (plot <= breakAt) return plot;
+      for (const [gbps, at] of plotOf) if (Math.abs(at - plot) < 1e-9 * breakAt) return gbps;
+      return null;
+    },
+  };
+}
+
+/** One block count's value inside a SKU range at one block size. */
+export interface SwapRangeMember {
+  seriesId: string;
+  numBlocks: number;
+  y: number;
+}
+
+/** A SKU's lowest, median and highest value across block counts at one block size. */
+export interface SwapRangePoint {
+  x: number;
+  lo: number;
+  mid: number;
+  hi: number;
+  /** Best first: highest bandwidth or lowest latency. */
+  members: SwapRangeMember[];
+}
+
+/** Every block count of one SKU in one run, combined into one band. */
+export interface SwapRangeBand {
+  id: string;
+  runId: string;
+  sku: string;
+  device: string;
+  points: SwapRangePoint[];
+}
+
+/**
+ * Combine swap series into one band per (run, SKU): at each block size, the band spans the lowest
+ * to the highest value across block counts and its line is their median (mean of the two middle
+ * values for an even count), matching the EP "Range by SKU" view.
+ */
+export function swapRangeBands(
+  points: readonly SwapChartPoint[],
+  metric: 'latency' | 'bandwidth',
+): SwapRangeBand[] {
+  const bands = new Map<
+    string,
+    { band: Omit<SwapRangeBand, 'points'>; byX: Map<number, SwapRangeMember[]> }
+  >();
+  for (const p of points) {
+    const id = `${p.runId}__${p.sku}`;
+    let entry = bands.get(id);
+    if (!entry) {
+      entry = { band: { id, runId: p.runId, sku: p.sku, device: p.device }, byX: new Map() };
+      bands.set(id, entry);
+    }
+    const members = entry.byX.get(p.x) ?? [];
+    members.push({ seriesId: p.seriesId, numBlocks: p.row.num_blocks, y: p.y });
+    entry.byX.set(p.x, members);
+  }
+  return [...bands.values()]
+    .map(({ band, byX }) => ({
+      ...band,
+      points: [...byX]
+        .map(([x, members]) => {
+          const ys = members.map((m) => m.y).toSorted((a, b) => a - b);
+          const middle = Math.floor(ys.length / 2);
+          return {
+            x,
+            lo: ys[0],
+            mid: ys.length % 2 === 1 ? ys[middle] : (ys[middle - 1] + ys[middle]) / 2,
+            hi: ys.at(-1)!,
+            members: members.toSorted((a, b) => (metric === 'bandwidth' ? b.y - a.y : a.y - b.y)),
+          };
+        })
+        .toSorted((a, b) => a.x - b.x),
+    }))
+    .toSorted((a, b) => a.device.localeCompare(b.device) || a.runId.localeCompare(b.runId));
+}

@@ -76,6 +76,12 @@ describe('point-label plot bounding box primitives', () => {
   });
 });
 
+const converging = (key: string, startY: number): LineLabelSeries<Point> =>
+  series(
+    key,
+    [0, 25, 50, 75, 100].map((x) => ({ x, y: startY + ((50 - startY) * x) / 100 })),
+  );
+
 describe('line-label placement', () => {
   it('reserves enough vertical space for the larger line-label pills', () => {
     const labels = placeLineLabels(
@@ -148,11 +154,6 @@ describe('line-label placement', () => {
   });
 
   it('staggers anchor slots so converging curves spread along the line instead of stacking at the endpoint', () => {
-    const converging = (key: string, startY: number): LineLabelSeries<Point> =>
-      series(
-        key,
-        [0, 25, 50, 75, 100].map((x) => ({ x, y: startY + ((50 - startY) * x) / 100 })),
-      );
     const labels = placeLineLabels(
       [converging('a', 0), converging('b', 100), converging('c', 200), converging('d', 300)],
       identity,

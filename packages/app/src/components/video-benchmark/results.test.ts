@@ -39,6 +39,14 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
 
 const ids = (cells: ResultCell[]) => cells.map((c) => c.point.id).sort();
 
+const run = (id: string, runId: string, observedAt: string, hardwareKey = 'h200') => ({
+  ...eligible,
+  id,
+  runId,
+  observedAt,
+  hardwareKey,
+});
+
 describe('VideoGenX results contract', () => {
   it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
     const result = resultProjection(points, state());
@@ -266,13 +274,6 @@ describe('VideoGenX results contract', () => {
   });
 
   it('shows each deployment as of the selected run date and run', () => {
-    const run = (id: string, runId: string, observedAt: string, hardwareKey = 'h200') => ({
-      ...eligible,
-      id,
-      runId,
-      observedAt,
-      hardwareKey,
-    });
     // Newest publication first, as the history pages deliver them.
     const rerun = run('h200:new', '300', '2026-11-03T05:00:00Z');
     const republished = run('h200:stale', '300', '2026-11-03T05:00:00Z');
@@ -319,7 +320,7 @@ describe('VideoGenX results contract', () => {
       duration: 8,
       mode: 't2v',
       steps: 50,
-      gpuCount: 4,
+      gpuCount: null,
       engine: 'sglang',
       date: '2026-10-18',
       run: '456',
@@ -333,15 +334,15 @@ describe('VideoGenX results contract', () => {
       apiPrices: { t2v: 0, i2v: 0.1, r2v: null },
       utilization: 0.5,
       unofficialRun: '123',
-      xMetric: 'p90',
+      xMetric: 'gpus',
       yMetric: 'kjPerClip',
-      costBasis: 'allocated',
+      costBasis: 'participating',
       optimal: false,
       point: '123:selected-source:c1',
     };
     expect(
       parseResultsState(
-        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_configs=b200%3A4g%3Atp2%3Au2&r_from=2026-09-01&r_to=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_configs=b200%3A4g%3Atp2%3Au2&r_from=2026-09-01&r_to=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=gpus&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
       ),
     ).toEqual(selection);
     expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
@@ -352,6 +353,9 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_t2v')).toBe('0');
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
+    for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
+    // Retired engine comparison: an old link still plots the best engine per GPU.
+    expect(parseResultsState('r_compare=1&r_lossy=1')).toEqual({ ...state(), lossy: true });
     expect(
       parseResultsState(
         'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',
@@ -392,6 +396,30 @@ describe('VideoGenX results contract', () => {
       participating: null,
       allocated: null,
     });
+    // An engine only another workload measured is no choice for this cohort.
+    const sol = { ...c, id: 'fourth:c1', results: evidence({ engine: 'sol-engine' }) };
+    expect(resultProjection([a, b, c, sol], state()).options.engines).toEqual([
+      'sglang',
+      'vllm-omni',
+    ]);
+  });
+  const b200Entry = (id: string, engine: string) => ({
+    ...eligible,
+    id,
+    hardwareKey: 'b200',
+    results: evidence({ engine }),
+  });
+
+  it('offers each engine as its own chip config and ignores a key from before engines', () => {
+    const input = [b200Entry('vllm:c1', 'vllm-omni'), b200Entry('sglang:c1', 'sglang')];
+    const offered = resultProjection(input, state()).chipConfigs;
+    expect(offered.map(({ point }) => point.id)).toEqual(['sglang:c1', 'vllm:c1']);
+    // A share link from before engines named the same B200 4-GPU TP2 × Ulysses 2 deployment.
+    const stale = resultProjection(input, { ...state(), configs: ['b200:4g:tp2:u2'] });
+    expect(stale.state.configs).toEqual([]);
+    expect(stale.history).toEqual([]);
+    const chosen = resultProjection(input, { ...state(), configs: [offered[1].key] });
+    expect(ids(chosen.history)).toEqual(['vllm:c1']);
   });
   it.each([
     ['recorded results without an engine', evidence({ engine: null })],

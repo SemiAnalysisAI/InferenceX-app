@@ -2,7 +2,6 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 export const BLOG_COPY = {
   en: {
-    indexEyebrow: 'InferenceX Research',
     indexTitle: 'Articles',
     indexIntro:
       'Benchmark write-ups on agentic inference, AgentX results, and chip and serving-stack economics.',
@@ -18,8 +17,8 @@ export const BLOG_COPY = {
     count: (n: number) => (n === 1 ? '1 article' : `${n} articles`),
     taggedHeading: (tag: string) => `Tagged “${tag}”`,
     clearFilter: 'Show all articles',
-    emptyTag: (tag: string) => `No articles tagged “${tag}”.`,
-    emptyAll: 'Coming soon.',
+    emptyTag: (tag: string) => `No articles tagged “${tag}”`,
+    emptyAll: 'No articles yet',
     readingTime: (minutes: number) => `${minutes} min read`,
     updated: (date: string) => `Updated ${date}`,
     backToIndex: 'Back to articles',
@@ -40,7 +39,6 @@ export const BLOG_COPY = {
       'All articles and posts are © SemiAnalysis. All rights reserved. The AGPL-3.0 license covering the application source code does not apply to article content.',
   },
   zh: {
-    indexEyebrow: 'InferenceX 研究',
     indexTitle: '文章',
     indexIntro: '关于智能体推理、AgentX 结果、芯片与推理框架经济性的基准测试文章。',
     glossaryLead: '不熟悉相关概念？',
@@ -55,8 +53,8 @@ export const BLOG_COPY = {
     count: (n: number) => `${n} 篇文章`,
     taggedHeading: (tag: string) => `标签：${tag}`,
     clearFilter: '显示全部文章',
-    emptyTag: (tag: string) => `没有标签为“${tag}”的文章。`,
-    emptyAll: '即将上线。',
+    emptyTag: (tag: string) => `没有标签为“${tag}”的文章`,
+    emptyAll: '暂无文章',
     readingTime: (minutes: number) => `预计阅读 ${minutes} 分钟`,
     updated: (date: string) => `更新于 ${date}`,
     backToIndex: '返回文章列表',

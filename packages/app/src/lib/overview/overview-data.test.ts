@@ -17,7 +17,7 @@ import {
   applyOverviewRowScope,
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
-  buildOverviewModelSummary,
+  buildOverviewModelSummary as buildSummary,
   OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_ROW_SCOPE,
   overviewRowHasAnyCost,
@@ -39,6 +39,11 @@ import {
 } from './overview-data';
 
 let nextId = 1;
+
+// These fixtures exercise frontier math at 50, independently of the page's default SLO.
+const buildOverviewModelSummary = (
+  ...[model, rows, tier = 50, ...rest]: Parameters<typeof buildSummary>
+) => buildSummary(model, rows, tier, ...rest);
 
 const JULY_2026_HYPERSCALER_TCO = {
   b200: 1.73,
@@ -156,14 +161,14 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it.each([
-    [undefined, 'hardware'],
+    [undefined, '30d'],
     ['hardware', 'hardware'],
     ['7d', '7d'],
     ['30d', '30d'],
     ['60d', '60d'],
     ['90d', '90d'],
     [['30d'], '30d'],
-    ['unknown', 'hardware'],
+    ['unknown', '30d'],
   ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
     expect(resolveOverviewComparisonMode(raw)).toBe(expected);
   });
@@ -1214,17 +1219,33 @@ describe('overview platform selection', () => {
   });
 });
 
+const overviewPage = (tier?: 30 | 50 | 75 | 100) =>
+  assembleOverviewPageData(
+    {
+      [Model.Qwen3_5]: [
+        ...frontier([10800, 9000, 7200, 3600], {
+          hardware: 'mi355x',
+          precision: Precision.FP4,
+        }),
+        ...frontier([9900, 8100, 7650, 6300], { hardware: 'mi355x', precision: Precision.FP8 }),
+        ...frontier([10800, 9000, 7200, 5400], { hardware: 'b200', precision: Precision.FP8 }),
+      ],
+    },
+    tier,
+  ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
+
 describe('tier-parameterized overview', () => {
-  it('resolves the tier query value and falls back to 50', () => {
+  it('resolves the tier query value and falls back to 100', () => {
     expect(resolveOverviewTier('100')).toBe(100);
+    expect(resolveOverviewTier('50')).toBe(50);
     expect(resolveOverviewTier(['75', '30'])).toBe(75);
-    expect(resolveOverviewTier('40')).toBe(50);
-    expect(resolveOverviewTier('')).toBe(50);
-    expect(resolveOverviewTier(undefined)).toBe(50);
+    expect(resolveOverviewTier('40')).toBe(100);
+    expect(resolveOverviewTier('')).toBe(100);
+    expect(resolveOverviewTier(undefined)).toBe(100);
   });
 
-  it('stamps the displayed tier on the page and defaults to 50, down to empty models', () => {
-    expect(assembleOverviewPageData({}).tier).toBe(50);
+  it('stamps the displayed tier on the page and defaults to 100, down to empty models', () => {
+    expect(assembleOverviewPageData({}).tier).toBe(100);
     const page = assembleOverviewPageData({}, 75);
     expect(page.tier).toBe(75);
     expect(page.models[0]?.platforms[0]?.read.tier).toBe(75);
@@ -1282,28 +1303,13 @@ describe('tier-parameterized overview', () => {
   });
 
   it('re-selects each platform independently at the displayed tier', () => {
-    const page = (tier?: 30 | 50 | 75 | 100) =>
-      assembleOverviewPageData(
-        {
-          [Model.Qwen3_5]: [
-            ...frontier([10800, 9000, 7200, 3600], {
-              hardware: 'mi355x',
-              precision: Precision.FP4,
-            }),
-            ...frontier([9900, 8100, 7650, 6300], { hardware: 'mi355x', precision: Precision.FP8 }),
-            ...frontier([10800, 9000, 7200, 5400], { hardware: 'b200', precision: Precision.FP8 }),
-          ],
-        },
-        tier,
-      ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
-
-    const at50 = headlinePairOf(page(), 'mi355x-vs-b200');
+    const at50 = headlinePairOf(overviewPage(50), 'mi355x-vs-b200');
     expect(at50?.candidate.precision).toBe(Precision.FP4);
     expect(at50?.candidate.read.value).toBe(9000);
     expect(at50?.baseline.precision).toBe(Precision.FP8);
     expect(at50?.baseline.read.value).toBe(9000);
 
-    const at100 = headlinePairOf(page(100), 'mi355x-vs-b200');
+    const at100 = headlinePairOf(overviewPage(100), 'mi355x-vs-b200');
     expect(at100?.candidate.precision).toBe(Precision.FP4);
     expect(at100?.candidate.read.value).toBe(3600);
     expect(at100?.baseline.precision).toBe(Precision.FP8);
@@ -1315,6 +1321,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
   it('serves every matrix cell state through the real builder', () => {
     const page = assembleOverviewPageData(
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
+      50,
     );
 
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([

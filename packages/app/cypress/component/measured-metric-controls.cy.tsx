@@ -17,7 +17,7 @@ describe('Power boundary labels', () => {
   it('keeps boundary selection clear (en)', () => {
     cy.viewport(1280, 720);
     cy.mount(
-      <PathnameContext.Provider value="/inference">
+      <PathnameContext.Provider value="/infx/inference">
         <Controls />
       </PathnameContext.Provider>,
     );

@@ -1,6 +1,7 @@
 import { GET as releases } from '@/app/api/v1/framework-releases/route';
 import { GET as images } from '@/app/api/v1/latest-images/route';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { mergeDistinctRows } from '@semianalysisai/inferencex-db/lib/distinct-by';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { getImageAgeObservations } from '@semianalysisai/inferencex-db/queries/latest-images';
 import {
   imageAgeHistory,
@@ -35,7 +36,8 @@ import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
 const readHistory = cachedQuery(
-  (asOf: string) => getImageAgeObservations(getDb(), asOf),
+  async (asOf: string) =>
+    mergeDistinctRows(await readEachDb((sql) => getImageAgeObservations(sql, asOf))),
   'image-age-observations-v1',
   { blobOnly: true },
 );

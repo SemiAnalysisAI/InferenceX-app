@@ -56,7 +56,7 @@ const frontier = globalParetoFrontier(eligible, true, false);
 function mountPanel() {
   cy.viewport(1280, 1000);
   mountWithProviders(
-    <PathnameContext.Provider value="/inference">
+    <PathnameContext.Provider value="/infx/inference">
       <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
         <FrontierPointsPanel
           chartId="frontier-test"

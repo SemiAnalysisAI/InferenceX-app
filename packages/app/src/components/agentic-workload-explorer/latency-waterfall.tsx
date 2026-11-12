@@ -1,25 +1,42 @@
 'use client';
 
-import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { formatDuration } from '@/lib/agentic-workload-explorer/format';
 import { type StatRow } from '@/lib/agentic-workload-explorer/stat-rows';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { chartFont, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  TOKEN_SERIES_COLORS,
+  NEUTRAL_SERIES_COLOR,
+} from '@/components/agentic-workload-explorer/series-colors';
+import {
+  ShowMoreRows,
+  useRowLimit,
+} from '@/components/agentic-workload-explorer/conversation-view';
+import { fitLabel, rowChartColumns } from '@/components/agentic-workload-explorer/row-chart-layout';
 
 const COLORS = {
-  prefill: '#0ea5e9',
-  decode: '#8b5cf6',
-  undecomposed: '#6b7280',
+  prefill: TOKEN_SERIES_COLORS.input,
+  decode: TOKEN_SERIES_COLORS.output,
+  undecomposed: NEUTRAL_SERIES_COLOR,
 } as const;
 
 const STRINGS = {
   en: {
-    latencyDecomposition: 'Latency Decomposition',
+    latencyDecomposition: 'Latency decomposition',
     prefill: 'Prefill (TTFT)',
     decode: 'Decode',
     undecomposed: 'Undecomposed',
-    expandAll: 'Expand All',
-    collapseAll: 'Collapse All',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
     noData: 'No request data available',
     e2e: 'E2E',
     outputTokens: 'output tokens',
@@ -35,7 +52,7 @@ const STRINGS = {
     collapseAll: '全部收起',
     noData: '暂无请求数据',
     e2e: '端到端',
-    outputTokens: 'output tokens',
+    outputTokens: '输出 token',
     turnLabel: (n: number) => `轮次 ${n}`,
     reqLabel: (n: number) => `请求 ${n}`,
   },
@@ -53,9 +70,6 @@ function legendItems(t: LocaleStrings) {
 
 const ROW_HEIGHT = 28;
 const ROW_GAP = 2;
-const LABEL_WIDTH = 180;
-const DURATION_WIDTH = 70;
-const BAR_LEFT = LABEL_WIDTH + 8;
 
 interface TooltipData {
   x: number;
@@ -80,21 +94,10 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
     return all;
   });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(800);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const [rowLimit, , showMoreRows] = useRowLimit();
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: 0 });
+  const containerWidth = dimensions.width;
+  useFontsVersion();
 
   const toggleGroup = useCallback((turn: number) => {
     setExpandedGroups((prev) => {
@@ -193,19 +196,20 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
     [visibleRows],
   );
 
-  const barWidth = containerWidth - BAR_LEFT - DURATION_WIDTH - 16;
-  const svgHeight = visibleRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
+  const columns = rowChartColumns(containerWidth);
+  const barLeft = columns.label + 8;
+  const labelFont = chartFont(CHART_TYPE.axisLabel);
+  const barWidth = containerWidth - barLeft - columns.value - 8;
+  const shownRows = visibleRows.length > rowLimit ? visibleRows.slice(0, rowLimit) : visibleRows;
+  const svgHeight = shownRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
 
   const handleMouseMove = useCallback((e: React.MouseEvent, row: (typeof visibleRows)[number]) => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const rect = svgEl.getBoundingClientRect();
     const canDecompose = row.ttftMs !== null && row.ttftMs > 0 && row.durationMs > 0;
     const prefillMs = canDecompose ? row.ttftMs! : 0;
     const decodeMs = canDecompose ? row.durationMs - row.ttftMs! : 0;
     setTooltip({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       prefillMs,
       decodeMs,
       totalMs: row.durationMs,
@@ -222,226 +226,204 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
   }, []);
 
   if (rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground font-mono text-xs">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="h-32">{t.noData}</EmptyState>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.latencyDecomposition}
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-
-        <div className="flex items-center gap-4">
+    <Card className="relative">
+      <CardHeader className="gap-2 pb-3">
+        <CardTitle>{t.latencyDecomposition}</CardTitle>
+        <div className="flex flex-wrap items-center gap-4">
           {legendItems(t).map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-              <span className="text-3xs font-mono text-muted-foreground">{item.label}</span>
+              <span className="text-xs text-muted-foreground">{item.label}</span>
             </div>
           ))}
           {subagentGroupTurns.length > 0 && (
-            <div className="flex items-center gap-1 ml-auto">
-              <button
-                type="button"
-                onClick={expandAll}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
-              >
+            <div className="ml-auto flex items-center gap-2">
+              <Button type="button" variant="outline" size="xs" onClick={expandAll}>
                 {t.expandAll}
-              </button>
-              <button
-                type="button"
-                onClick={collapseAll}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
-              >
+              </Button>
+              <Button type="button" variant="outline" size="xs" onClick={collapseAll}>
                 {t.collapseAll}
-              </button>
+              </Button>
             </div>
           )}
         </div>
-      </div>
+      </CardHeader>
 
-      <div
-        ref={containerRef}
-        className="bg-surface border border-border rounded-md p-4 overflow-x-auto relative"
-      >
-        <svg ref={svgRef} width={containerWidth - 32} height={svgHeight} className="block">
-          {visibleRows.map((row, idx) => {
-            const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
-            const scale = barWidth > 0 ? barWidth / maxDuration : 0;
+      <CardContent className="overflow-x-auto">
+        <div ref={setContainerRef} className="min-w-0">
+          <svg
+            role="img"
+            aria-label={t.latencyDecomposition}
+            width={Math.max(0, containerWidth)}
+            height={svgHeight}
+            className="block"
+          >
+            {shownRows.map((row, idx) => {
+              const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
+              const scale = barWidth > 0 ? barWidth / maxDuration : 0;
 
-            const canDecompose = row.ttftMs !== null && row.ttftMs > 0 && row.durationMs > 0;
-            const prefillMs = canDecompose ? row.ttftMs! : 0;
-            const decodeMs = canDecompose ? Math.max(0, row.durationMs - row.ttftMs!) : 0;
+              const canDecompose = row.ttftMs !== null && row.ttftMs > 0 && row.durationMs > 0;
+              const prefillMs = canDecompose ? row.ttftMs! : 0;
+              const decodeMs = canDecompose ? Math.max(0, row.durationMs - row.ttftMs!) : 0;
 
-            const prefillW = prefillMs * scale;
-            const decodeW = decodeMs * scale;
-            const undecomposedW = canDecompose ? 0 : row.durationMs * scale;
+              const prefillW = prefillMs * scale;
+              const decodeW = decodeMs * scale;
+              const undecomposedW = canDecompose ? 0 : row.durationMs * scale;
 
-            const barX = BAR_LEFT;
-            const segments = canDecompose
-              ? [
-                  { x: barX, w: prefillW, color: COLORS.prefill },
-                  { x: barX + prefillW, w: decodeW, color: COLORS.decode },
-                ]
-              : [{ x: barX, w: undecomposedW, color: COLORS.undecomposed }];
+              const barX = barLeft;
+              const segments = canDecompose
+                ? [
+                    { x: barX, w: prefillW, color: COLORS.prefill },
+                    { x: barX + prefillW, w: decodeW, color: COLORS.decode },
+                  ]
+                : [{ x: barX, w: undecomposedW, color: COLORS.undecomposed }];
 
-            const isClickable = row.isGroup;
-            const labelX = row.indent === 1 ? 20 : 0;
+              const isClickable = row.isGroup;
+              const labelX = row.indent === 1 ? 20 : 0;
 
-            return (
-              <g
-                key={row.key}
-                className={isClickable ? 'cursor-pointer' : ''}
-                onClick={isClickable ? () => toggleGroup(row.turn) : undefined}
-                onMouseMove={(e) => handleMouseMove(e, row)}
-                onMouseLeave={handleMouseLeave}
-              >
-                {row.indent === 1 && (
-                  <line
-                    x1={8}
-                    y1={y}
-                    x2={8}
-                    y2={y + ROW_HEIGHT}
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    strokeOpacity={0.5}
-                  />
-                )}
-
-                <text
-                  x={labelX + 4}
-                  y={y + ROW_HEIGHT / 2}
-                  dominantBaseline="central"
-                  className="fill-current text-muted-foreground"
-                  style={{
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
+              return (
+                <g
+                  key={row.key}
+                  className={isClickable ? 'cursor-pointer' : ''}
+                  onClick={isClickable ? () => toggleGroup(row.turn) : undefined}
+                  onMouseMove={(e) => handleMouseMove(e, row)}
+                  onMouseLeave={handleMouseLeave}
                 >
-                  {isClickable ? (row.isExpanded ? '\u25BC ' : '\u25B6 ') : ''}
-                  {row.label}
-                </text>
-
-                <rect
-                  x={barX}
-                  y={y + 2}
-                  width={Math.max(0, barWidth)}
-                  height={ROW_HEIGHT - 4}
-                  rx={3}
-                  className="fill-current"
-                  style={{ color: 'var(--color-border)', opacity: 0.3 }}
-                />
-
-                {!row.isGroup &&
-                  segments.map((seg, si) =>
-                    seg.w > 0 ? (
-                      <rect
-                        key={si}
-                        x={seg.x}
-                        y={y + 2}
-                        width={seg.w}
-                        height={ROW_HEIGHT - 4}
-                        rx={
-                          si === 0
-                            ? 3
-                            : si === segments.length - 1 ||
-                                segments.slice(si + 1).every((s) => s.w === 0)
-                              ? 3
-                              : 0
-                        }
-                        fill={seg.color}
-                        opacity={0.85}
-                      />
-                    ) : null,
+                  {row.indent === 1 && (
+                    <line
+                      x1={8}
+                      y1={y}
+                      x2={8}
+                      y2={y + ROW_HEIGHT}
+                      stroke={TOKEN_SERIES_COLORS.output}
+                      strokeWidth={2}
+                      strokeOpacity={0.5}
+                    />
                   )}
 
-                <text
-                  x={barX + barWidth + 8}
-                  y={y + ROW_HEIGHT / 2}
-                  dominantBaseline="central"
-                  className="fill-current text-subtle"
-                  style={{
-                    fontSize: '10px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {row.isGroup
-                    ? ''
-                    : row.durationMs > 0
-                      ? formatDuration(row.durationMs)
-                      : '\u2014'}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                  <text
+                    x={labelX + 4}
+                    y={y + ROW_HEIGHT / 2}
+                    dominantBaseline="central"
+                    className="fill-current text-muted-foreground"
+                    style={{
+                      fontSize: px(CHART_TYPE.axisLabel),
+                      fontFamily: CHART_FONT_SANS,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {fitLabel(
+                      `${isClickable ? (row.isExpanded ? '\u25BC ' : '\u25B6 ') : ''}${row.label}`,
+                      labelFont,
+                      columns.label - labelX - 4,
+                    )}
+                  </text>
+
+                  <rect
+                    x={barX}
+                    y={y + 2}
+                    width={Math.max(0, barWidth)}
+                    height={ROW_HEIGHT - 4}
+                    rx={3}
+                    className="fill-current"
+                    style={{ color: 'var(--color-border)', opacity: 0.3 }}
+                  />
+
+                  {!row.isGroup &&
+                    segments.map((seg, si) =>
+                      seg.w > 0 ? (
+                        <rect
+                          key={si}
+                          x={seg.x}
+                          y={y + 2}
+                          width={seg.w}
+                          height={ROW_HEIGHT - 4}
+                          rx={
+                            si === 0
+                              ? 3
+                              : si === segments.length - 1 ||
+                                  segments.slice(si + 1).every((s) => s.w === 0)
+                                ? 3
+                                : 0
+                          }
+                          fill={seg.color}
+                          opacity={0.85}
+                        />
+                      ) : null,
+                    )}
+
+                  <text
+                    x={barX + barWidth + 8}
+                    y={y + ROW_HEIGHT / 2}
+                    dominantBaseline="central"
+                    className="fill-current text-muted-foreground"
+                    style={{
+                      fontSize: px(CHART_TYPE.axisLabel),
+                      fontFamily: CHART_FONT_SANS,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {row.isGroup
+                      ? ''
+                      : row.durationMs > 0
+                        ? formatDuration(row.durationMs)
+                        : '\u2014'}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <ShowMoreRows
+          shown={shownRows.length}
+          total={visibleRows.length}
+          view="prefill-vs-decode"
+          onShowMore={showMoreRows}
+        />
 
         {tooltip && (
-          <div
-            className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-3 py-2 space-y-1"
-            style={{
-              left: Math.min(tooltip.x + 12, containerWidth - 220),
-              top: tooltip.y - 8,
-              transform: 'translateY(-100%)',
-            }}
-          >
-            <div className="text-2xs font-mono font-medium text-foreground">{tooltip.label}</div>
-            <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
-              {tooltip.canDecompose ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.prefill }}
-                    />
-                    <span>
-                      {t.prefill}: {formatDuration(tooltip.prefillMs)} (
-                      {((tooltip.prefillMs / tooltip.totalMs) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.decode }}
-                    />
-                    <span>
-                      {t.decode}: {formatDuration(tooltip.decodeMs)} (
-                      {((tooltip.decodeMs / tooltip.totalMs) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-sm inline-block"
-                    style={{ backgroundColor: COLORS.undecomposed }}
-                  />
-                  <span>
-                    {t.undecomposed}: {formatDuration(tooltip.totalMs)}
-                  </span>
-                </div>
-              )}
-              <div className="pt-1 border-t border-border">
-                {t.e2e}: {formatDuration(tooltip.totalMs)}
-                {tooltip.tpotMs !== null && <> &middot; TPOT: {tooltip.tpotMs.toFixed(1)}ms/tok</>}
-                {tooltip.outputTokens > 0 && (
-                  <>
-                    {' '}
-                    &middot; {tooltip.outputTokens} {t.outputTokens}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above">
+            <ChartHoverCardBody
+              title={tooltip.label}
+              metrics={
+                tooltip.canDecompose
+                  ? [
+                      {
+                        value: formatDuration(tooltip.prefillMs),
+                        label: `${t.prefill} · ${((tooltip.prefillMs / tooltip.totalMs) * 100).toFixed(0)}%`,
+                        color: COLORS.prefill,
+                      },
+                      {
+                        value: formatDuration(tooltip.decodeMs),
+                        label: `${t.decode} · ${((tooltip.decodeMs / tooltip.totalMs) * 100).toFixed(0)}%`,
+                        color: COLORS.decode,
+                      },
+                    ]
+                  : [
+                      {
+                        value: formatDuration(tooltip.totalMs),
+                        label: t.undecomposed,
+                        color: COLORS.undecomposed,
+                      },
+                    ]
+              }
+              summary={[
+                `${t.e2e} ${formatDuration(tooltip.totalMs)}`,
+                tooltip.tpotMs === null ? null : `TPOT ${tooltip.tpotMs.toFixed(1)} ms/tok`,
+                tooltip.outputTokens > 0
+                  ? `${tooltip.outputTokens.toLocaleString()} ${t.outputTokens}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            />
+          </FloatingTooltip>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

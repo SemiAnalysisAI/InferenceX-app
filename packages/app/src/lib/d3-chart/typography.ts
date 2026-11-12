@@ -7,6 +7,8 @@ export const CHART_TYPE = {
   lineLabel: 13,
   micro: 9,
   watermark: 20,
+  /** Faint snapshot date behind an animated plot. */
+  dateStamp: 56,
 } as const;
 
 export function px(size: number): string {

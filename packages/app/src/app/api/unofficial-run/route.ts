@@ -122,6 +122,7 @@ export function normalizeArtifactRows(
       tracker,
       undefined,
       artifactRunId(runUrl),
+      { allowUnregistered: true },
     );
     if (!params) continue;
     const { config } = params;
@@ -188,6 +189,68 @@ function evalConfigKey(config: EvalParams['config']): string {
   ].join('|');
 }
 
+type ConfigColumns = Pick<
+  EvalRow,
+  | 'hardware'
+  | 'framework'
+  | 'model'
+  | 'precision'
+  | 'spec_method'
+  | 'disagg'
+  | 'prefill_tp'
+  | 'prefill_ep'
+  | 'prefill_dp_attention'
+  | 'prefill_num_workers'
+  | 'decode_tp'
+  | 'decode_ep'
+  | 'decode_dp_attention'
+  | 'decode_num_workers'
+  | 'num_prefill_gpu'
+  | 'num_decode_gpu'
+>;
+
+const configColumnsKey = (row: ConfigColumns): string =>
+  [
+    row.hardware,
+    row.framework,
+    row.model,
+    row.precision,
+    row.spec_method,
+    row.disagg,
+    row.prefill_tp,
+    row.prefill_ep,
+    row.prefill_dp_attention,
+    row.prefill_num_workers,
+    row.decode_tp,
+    row.decode_ep,
+    row.decode_dp_attention,
+    row.decode_num_workers,
+    row.num_prefill_gpu,
+    row.num_decode_gpu,
+  ].join('|');
+
+export function withRunSpeculation(
+  evaluations: EvalRow[],
+  benchmarks: BenchmarkRow[],
+  runUrl: string | null,
+): EvalRow[] {
+  const byConfig = new Map<string, Pick<EvalRow, 'spec_algorithm' | 'spec_draft_model'>>();
+  for (const row of benchmarks) {
+    const { spec_algorithm, spec_draft_model } = row.metrics as Record<string, unknown>;
+    if (row.run_url !== runUrl || typeof spec_algorithm !== 'string') continue;
+    const key = configColumnsKey(row);
+    if (byConfig.has(key)) continue;
+    byConfig.set(key, {
+      spec_algorithm,
+      spec_draft_model: typeof spec_draft_model === 'string' ? spec_draft_model : null,
+    });
+  }
+  if (byConfig.size === 0) return evaluations;
+  return evaluations.map((row) =>
+    row.spec_method === 'none' ? row : { ...row, ...byConfig.get(configColumnsKey(row)) },
+  );
+}
+
 /**
  * Normalize aggregate eval rows into the EvalRow shape the frontend expects.
  *
@@ -231,6 +294,8 @@ export function normalizeEvalArtifactRows(
       model: params.config.model,
       precision: params.config.precision,
       spec_method: params.config.specMethod,
+      spec_algorithm: null,
+      spec_draft_model: null,
       disagg: params.config.disagg,
       is_multinode: params.config.isMultinode,
       prefill_tp: params.config.prefillTp,
@@ -446,7 +511,7 @@ async function processSingleRun(
     );
     if (errorResponse) return { errorResponse };
     const normalized = normalizeEvalArtifactRows(rows, date, timestamp, runUrl, evalConfigIdOffset);
-    evaluations = normalized.rows;
+    evaluations = withRunSpeculation(normalized.rows, benchmarks, runUrl || null);
     nextEvalConfigIdOffset = normalized.maxConfigId;
   }
 

@@ -995,28 +995,28 @@ function chipBasisPoint(
   return transformBenchmarkRows([row], 'median', undefined, tokenBasis, chipBasis).chartData[0][0];
 }
 
-describe('transformBenchmarkRows — chip basis', () => {
-  const disagg = (benchmark_type = 'single_turn') =>
-    makeRow({
-      hardware: 'gb300',
-      framework: 'dynamo-sglang',
-      disagg: true,
-      is_multinode: true,
-      prefill_num_workers: 1,
-      decode_num_workers: 1,
-      num_prefill_gpu: 4,
-      num_decode_gpu: 12,
-      benchmark_type,
-      metrics: {
-        tput_per_gpu: 1000,
-        input_tput_per_gpu: 3600,
-        output_tput_per_gpu: 133,
-        median_intvty: 20,
-        median_e2el: 2,
-        theoretical_cache_hit_rate: 0.5,
-      },
-    });
+const disagg = (benchmark_type = 'single_turn') =>
+  makeRow({
+    hardware: 'gb300',
+    framework: 'dynamo-sglang',
+    disagg: true,
+    is_multinode: true,
+    prefill_num_workers: 1,
+    decode_num_workers: 1,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 12,
+    benchmark_type,
+    metrics: {
+      tput_per_gpu: 1000,
+      input_tput_per_gpu: 3600,
+      output_tput_per_gpu: 133,
+      median_intvty: 20,
+      median_e2el: 2,
+      theoretical_cache_hit_rate: 0.5,
+    },
+  });
 
+describe('transformBenchmarkRows — chip basis', () => {
   it('defaults to the stored per-pool rates', () => {
     const p = chipBasisPoint(disagg());
     expect(p.outputTputPerGpu?.y).toBe(133);
@@ -1056,22 +1056,22 @@ describe('transformBenchmarkRows — chip basis', () => {
   });
 });
 
-describe('applyUncachedTokenBasis', () => {
-  const agenticEntry = (metrics: Record<string, number>) => {
-    const entry = rowToAggDataEntry(
-      makeRow({
-        benchmark_type: 'agentic_traces',
-        metrics: {
-          tput_per_gpu: 900,
-          output_tput_per_gpu: 600,
-          input_tput_per_gpu: 300,
-          ...metrics,
-        },
-      }),
-    );
-    return entry;
-  };
+const agenticEntry = (metrics: Record<string, number>) => {
+  const entry = rowToAggDataEntry(
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      metrics: {
+        tput_per_gpu: 900,
+        output_tput_per_gpu: 600,
+        input_tput_per_gpu: 300,
+        ...metrics,
+      },
+    }),
+  );
+  return entry;
+};
 
+describe('applyUncachedTokenBasis', () => {
   it('drops the theoretical prefix share from total and input throughput', () => {
     const entry = agenticEntry({ theoretical_cache_hit_rate: 0.8 });
     expect(applyUncachedTokenBasis(entry)).toBe(true);
@@ -1116,20 +1116,24 @@ describe('applyUncachedTokenBasis', () => {
   });
 });
 
+const agenticRowWithId = (id: number, metrics: Record<string, number>) =>
+  makeRow({
+    id,
+    benchmark_type: 'agentic_traces',
+    metrics: {
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 600,
+      input_tput_per_gpu: 300,
+      ...metrics,
+    },
+  });
+
 describe('transformBenchmarkRows', () => {
   it('rescales every token metric on the uncached basis and drops points it cannot rescale', () => {
-    const agentic = (id: number, metrics: Record<string, number>) =>
-      makeRow({
-        id,
-        benchmark_type: 'agentic_traces',
-        metrics: {
-          tput_per_gpu: 900,
-          output_tput_per_gpu: 600,
-          input_tput_per_gpu: 300,
-          ...metrics,
-        },
-      });
-    const rows = [agentic(1, { theoretical_cache_hit_rate: 0.8 }), agentic(2, {})];
+    const rows = [
+      agenticRowWithId(1, { theoretical_cache_hit_rate: 0.8 }),
+      agenticRowWithId(2, {}),
+    ];
     const total = transformBenchmarkRows(rows).chartData[0];
     const uncached = transformBenchmarkRows(rows, 'median', undefined, 'uncached').chartData[0];
     expect(total).toHaveLength(2);
@@ -1250,6 +1254,10 @@ describe('transformBenchmarkRows', () => {
     expect(entry.suffix).toBe('(SGLang, MTP)');
   });
 });
+
+const meanTpotIntvty = (mean_tpot?: number) =>
+  rowToAggDataEntry(makeRow({ metrics: mean_tpot === undefined ? {} : { mean_tpot } }))
+    .mean_tpot_intvty;
 
 describe('rowToAggDataEntry — extended edge cases', () => {
   it('maps precision field from row', () => {
@@ -1440,9 +1448,6 @@ describe('rowToAggDataEntry — extended edge cases', () => {
   });
 
   it('derives mean TPOT interactivity only from a positive finite mean TPOT', () => {
-    const meanTpotIntvty = (mean_tpot?: number) =>
-      rowToAggDataEntry(makeRow({ metrics: mean_tpot === undefined ? {} : { mean_tpot } }))
-        .mean_tpot_intvty;
     expect(meanTpotIntvty(0.02)).toBe(50);
     expect(meanTpotIntvty(0)).toBeUndefined();
     expect(meanTpotIntvty(-0.02)).toBeUndefined();
@@ -1634,16 +1639,15 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
     expect(hardwareConfig).toHaveProperty('mi300x_vllm');
   });
 
-  it('falls back to unknown config for completely unrecognized hardware', () => {
+  it('labels completely unrecognized hardware by its raw name', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
     const rows = [makeRow({ hardware: 'zzz999', framework: 'mystery' })];
     const { hardwareConfig } = transformBenchmarkRows(rows);
     const hwKeys = Object.keys(hardwareConfig);
-    expect(hwKeys.length).toBe(1);
-    const config = hardwareConfig[hwKeys[0]];
-    expect(config.label).toBe('Unknown');
+    expect(hwKeys).toHaveLength(1);
+    expect(hardwareConfig[hwKeys[0]].label).toBe('ZZZ999');
 
     warnSpy.mockRestore();
     infoSpy.mockRestore();
@@ -1822,24 +1826,25 @@ describe('transformBenchmarkRows — dp_attention narrowing', () => {
   });
 });
 
-describe('mergeRunScopedRows', () => {
-  const vllmRun = (over: Partial<BenchmarkRow> = {}) =>
-    makeRow({
-      model: 'dsv4',
-      hardware: 'b300',
-      framework: 'vllm',
-      precision: 'fp4',
-      ...over,
-    });
-  const sglangBase = (over: Partial<BenchmarkRow> = {}) =>
-    makeRow({
-      model: 'dsv4',
-      hardware: 'b300',
-      framework: 'sglang',
-      precision: 'fp4',
-      ...over,
-    });
+const vllmRun = (over: Partial<BenchmarkRow> = {}) =>
+  makeRow({
+    model: 'dsv4',
+    hardware: 'b300',
+    framework: 'vllm',
+    precision: 'fp4',
+    ...over,
+  });
 
+const sglangBase = (over: Partial<BenchmarkRow> = {}) =>
+  makeRow({
+    model: 'dsv4',
+    hardware: 'b300',
+    framework: 'sglang',
+    precision: 'fp4',
+    ...over,
+  });
+
+describe('mergeRunScopedRows', () => {
   it('pins configs the run covers to the run rows, replacing base rows', () => {
     const runRows = [vllmRun({ id: 10, conc: 32 }), vllmRun({ id: 11, conc: 64 })];
     const baseRows = [vllmRun({ id: 90, conc: 32 }), vllmRun({ id: 91, conc: 128 })];
@@ -1918,19 +1923,19 @@ describe('mergeRunScopedRows', () => {
   });
 });
 
-describe('rowToAggDataEntry — agentic interactivity invariant', () => {
-  const agentic = (metrics: Record<string, number>) =>
-    rowToAggDataEntry(
-      makeRow({
-        benchmark_type: 'agentic_traces',
-        isl: null,
-        osl: null,
-        metrics,
-      }),
-    );
+const agenticMetricsRow = (metrics: Record<string, number>) =>
+  rowToAggDataEntry(
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      metrics,
+    }),
+  );
 
+describe('rowToAggDataEntry — agentic interactivity invariant', () => {
   it('overrides an artifact-supplied (fast-tail) *_intvty with 1/*_itl', () => {
-    const entry = agentic({
+    const entry = agenticMetricsRow({
       p90_itl: 0.0893,
       p90_intvty: 23.91,
       p75_itl: 0.0692,
@@ -1942,7 +1947,7 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
   });
 
   it('derives intvty from itl when the artifact omits intvty entirely', () => {
-    const entry = agentic({ p90_itl: 0.1, p95_itl: 0.2 });
+    const entry = agenticMetricsRow({ p90_itl: 0.1, p95_itl: 0.2 });
     expect(entry.p90_intvty).toBeCloseTo(10, 6);
     expect(entry.p95_intvty).toBeCloseTo(5, 6);
   });
@@ -1953,13 +1958,13 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
   });
 
   it('DROPS a stale artifact *_intvty when the matching *_itl is absent (overlay mirror of the ETL fix)', () => {
-    const entry = agentic({ p90_intvty: 42, p95_itl: 0.2 });
+    const entry = agenticMetricsRow({ p90_intvty: 42, p95_itl: 0.2 });
     expect(entry.p90_intvty).toBe(0);
     expect(entry.p95_intvty).toBeCloseTo(5, 6);
   });
 
   it('DROPS a stale artifact *_intvty when the matching *_itl is zero/invalid', () => {
-    const entry = agentic({ p90_itl: 0, p90_intvty: 42 });
+    const entry = agenticMetricsRow({ p90_itl: 0, p90_intvty: 42 });
     expect(entry.p90_intvty).toBe(0);
   });
 });
@@ -1981,19 +1986,19 @@ describe('rowToAggDataEntry — id coercion', () => {
   });
 });
 
-describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () => {
-  const agenticRow = (over: Partial<BenchmarkRow> = {}) =>
-    makeRow({
-      model: 'dsr1',
-      hardware: 'b300',
-      framework: 'vllm',
-      precision: 'fp4',
-      benchmark_type: 'agentic_traces',
-      isl: null,
-      osl: null,
-      ...over,
-    });
+const agenticRow = (over: Partial<BenchmarkRow> = {}) =>
+  makeRow({
+    model: 'dsr1',
+    hardware: 'b300',
+    framework: 'vllm',
+    precision: 'fp4',
+    benchmark_type: 'agentic_traces',
+    isl: null,
+    osl: null,
+    ...over,
+  });
 
+describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () => {
   it('a full run snapshot replaces old points across offload variants', () => {
     const runRows = [agenticRow({ id: 10, offload_mode: 'on' })];
     const baseRows = [

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import * as d3 from 'd3';
 import {
   type ContextTrajectories,
   type TrajectoryPoint,
@@ -10,15 +11,22 @@ import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { BrushBar, useBrush } from '@/components/agentic-workload-explorer/brush-bar';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { CURSOR_LINE_PROPS } from '@/lib/d3-chart/cursor';
+import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
+import { elapsedTicks } from '@/components/agentic-workload-explorer/tokens-over-time-chart';
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Trace of Context Growth Over Time',
+    sectionTitle: 'Trace of context growth over time',
     noData: 'No request data available',
     totalRequests: (total: number, subagent: number, invocations: number, main: number) =>
       `${total} total requests split up into ${subagent} sub-agent${invocations > 0 ? ` (${invocations} invocation${invocations === 1 ? '' : 's'})` : ''} and ${main} main-agent requests`,
-    mainAgent: 'Main Agent',
-    resetZoom: 'Reset Zoom',
+    mainAgent: 'Main agent',
+    resetZoom: 'Reset zoom',
     inputTokens: 'input tokens',
     subagentFallback: 'sub-agent',
   },
@@ -29,18 +37,12 @@ const STRINGS = {
       `共 ${total} 个请求，其中 ${subagent} 个子智能体请求${invocations > 0 ? `（${invocations} 次调用）` : ''}、${main} 个主智能体请求`,
     mainAgent: '主智能体',
     resetZoom: '重置缩放',
-    inputTokens: 'input tokens',
+    inputTokens: '输入 Token',
     subagentFallback: '子智能体',
   },
 } as const;
 
-function subagentColor(index: number, total: number): string {
-  const hue = (index * 360) / Math.max(total, 1);
-  const lightness = index % 2 === 0 ? 48 : 58;
-  return `hsl(${hue.toFixed(1)} 72% ${lightness}%)`;
-}
-
-const MARGIN = { top: 8, right: 16, bottom: 28, left: 56 } as const;
+const MARGIN = { top: 8, right: 56, bottom: 28, left: 56 } as const;
 const HEIGHT = 320;
 const POINT_HIT_RADIUS = 12;
 
@@ -76,7 +78,7 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
   const brush = useBrush({ fullStart: 0, fullEnd: xFull });
   const xSpan = Math.max(1, brush.end - brush.start);
 
-  const yDomain = useMemo(() => {
+  const yScale = useMemo(() => {
     let m = 0;
     const visit = (p: TrajectoryPoint) => {
       if (p.elapsedMs < brush.start || p.elapsedMs > brush.end) return;
@@ -84,15 +86,19 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
     };
     trajectories.main.forEach(visit);
     for (const traj of trajectories.subagents) traj.points.forEach(visit);
-    return m || 1;
-  }, [trajectories.main, trajectories.subagents, brush.start, brush.end]);
+    return d3
+      .scaleLinear()
+      .domain([0, m || 1])
+      .range([innerH, 0])
+      .nice(4);
+  }, [trajectories.main, trajectories.subagents, brush.start, brush.end, innerH]);
 
   const xOf = (ms: number) => ((ms - brush.start) / xSpan) * innerW;
-  const yOf = (tokens: number) => innerH - (tokens / yDomain) * innerH;
+  const yOf = (tokens: number) => yScale(tokens);
 
   const mainPath = useMemo(
     () => buildLinePath(trajectories.main, xOf, yOf),
-    [trajectories.main, innerW, innerH, brush.start, brush.end, yDomain],
+    [trajectories.main, innerW, innerH, brush.start, brush.end, yScale],
   );
 
   const subPaths = useMemo(
@@ -102,9 +108,9 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
         fill: buildFillPath(traj.points, xOf, yOf, innerH),
         label: traj.label ?? t.subagentFallback,
         key: traj.key,
-        color: subagentColor(i, trajectories.subagents.length),
+        color: CHART_COLORS[i % CHART_COLORS.length],
       })),
-    [trajectories.subagents, innerW, innerH, brush.start, brush.end, yDomain, t],
+    [trajectories.subagents, innerW, innerH, brush.start, brush.end, yScale, t],
   );
 
   const subColorByKey = useMemo(() => {
@@ -113,18 +119,9 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
     return m;
   }, [subPaths]);
 
-  const xTicks = useMemo(() => {
-    const n = 6;
-    return Array.from(
-      { length: n + 1 },
-      (_, i) => brush.start + ((brush.end - brush.start) * i) / n,
-    );
-  }, [brush.start, brush.end]);
+  const xTicks = useMemo(() => elapsedTicks(brush.start, brush.end), [brush.start, brush.end]);
 
-  const yTicks = useMemo(() => {
-    const n = 4;
-    return Array.from({ length: n + 1 }, (_, i) => (yDomain * i) / n);
-  }, [yDomain]);
+  const yTicks = useMemo(() => yScale.ticks(4), [yScale]);
 
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     if (trajectories.main.length === 0 && trajectories.subagents.length === 0) return;
@@ -137,7 +134,7 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
     }
 
     let bestPoint: TrajectoryPoint | null = null;
-    let bestLabel = 'main agent';
+    let bestLabel: string = t.mainAgent;
     let bestColor = 'currentColor';
     let bestDx = Infinity;
 
@@ -154,7 +151,7 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
       }
     };
 
-    considerSeries(trajectories.main, 'main agent', 'currentColor');
+    considerSeries(trajectories.main, t.mainAgent, 'currentColor');
     for (const traj of trajectories.subagents) {
       const color = subColorByKey.get(traj.key) ?? 'currentColor';
       considerSeries(traj.points, traj.label ?? t.subagentFallback, color);
@@ -174,61 +171,57 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
   }
 
   if (trajectories.counts.total === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-12 text-center font-mono text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="py-12">{t.noData}</EmptyState>;
   }
 
   const { main, subagent, invocations, total } = trajectories.counts;
 
   return (
     <div className="space-y-4">
-      <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border/20 bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-3xs font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.sectionTitle}
-          </span>
-          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-medium text-muted-foreground">{t.sectionTitle}</span>
+          <div className="h-px flex-1 bg-border/30" />
         </div>
         <div className="space-y-1.5">
-          <span className="font-mono text-3xs text-muted-foreground">
+          <span className="text-3xs tabular-nums text-muted-foreground">
             {t.totalRequests(total, subagent, invocations, main)}
           </span>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <div className="flex items-center gap-1.5">
               <div className="h-2.5 w-2.5 rounded-sm bg-foreground/70" />
-              <span className="font-mono text-3xs text-muted-foreground">{t.mainAgent}</span>
+              <span className="text-3xs text-muted-foreground">{t.mainAgent}</span>
             </div>
             {subPaths.map((p) => (
               <div key={`legend-${p.key}`} className="flex items-center gap-1.5" title={p.label}>
                 <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: p.color }} />
-                <span className="font-mono text-3xs text-muted-foreground">{p.label}</span>
+                <span className="text-3xs text-muted-foreground">{p.label}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div ref={containerRef} className="relative rounded-md border border-border bg-surface p-4">
+      <div ref={containerRef} className="relative rounded-xl border border-border/30 bg-card p-4">
         <div className="mb-1 flex items-center justify-end">
           {brush.isActive && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="2xs"
               onClick={() => {
                 brush.reset();
                 track('agentic_workload_trajectories_zoom_reset');
               }}
-              className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               {t.resetZoom}
-            </button>
+            </Button>
           )}
         </div>
         <svg
+          role="img"
+          aria-label={t.sectionTitle}
           width={width - 32}
-          viewBox={`0 0 ${width - 32} ${HEIGHT}`}
           height={HEIGHT}
           className="block"
           onMouseMove={handleMouseMove}
@@ -244,22 +237,15 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
               const y = yOf(tick);
               return (
                 <g key={`y-${i}`}>
-                  <line
-                    x1={0}
-                    x2={innerW}
-                    y1={y}
-                    y2={y}
-                    stroke="currentColor"
-                    strokeOpacity={0.08}
-                  />
+                  <line x1={0} x2={innerW} y1={y} y2={y} stroke="var(--border)" strokeWidth={1} />
                   <text
                     x={-8}
                     y={y}
                     textAnchor="end"
                     dominantBaseline="middle"
-                    className="fill-muted-foreground font-mono text-3xs"
+                    className="fill-muted-foreground text-3xs tabular-nums"
                   >
-                    {formatNumber(Math.round(tick))}
+                    {formatNumber(tick)}
                   </text>
                 </g>
               );
@@ -289,13 +275,23 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
                 strokeWidth={1.75}
               />
               {tooltip && (
-                <circle
-                  cx={xOf(tooltip.point.elapsedMs)}
-                  cy={yOf(tooltip.point.total)}
-                  r={4}
-                  fill={tooltip.agentColor}
-                  fillOpacity={0.95}
-                />
+                <>
+                  <line
+                    x1={xOf(tooltip.point.elapsedMs)}
+                    x2={xOf(tooltip.point.elapsedMs)}
+                    y1={0}
+                    y2={innerH}
+                    {...CURSOR_LINE_PROPS}
+                    pointerEvents="none"
+                  />
+                  <circle
+                    cx={xOf(tooltip.point.elapsedMs)}
+                    cy={yOf(tooltip.point.total)}
+                    r={4}
+                    fill={tooltip.agentColor}
+                    fillOpacity={0.95}
+                  />
+                </>
               )}
             </g>
 
@@ -324,7 +320,7 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
                     x={x}
                     y={innerH + 16}
                     textAnchor="middle"
-                    className="fill-muted-foreground font-mono text-3xs"
+                    className="fill-muted-foreground text-3xs tabular-nums"
                   >
                     {formatElapsedMMSS(tick)}
                   </text>
@@ -334,7 +330,7 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
           </g>
         </svg>
 
-        <div className="mt-2">
+        <div className="mt-3">
           <BrushBar
             width={width - 32}
             fullStart={0}
@@ -396,21 +392,13 @@ type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 function ChartTooltip({ data, t }: { data: TooltipState; t: Strings }) {
   const { point, agentLabel, agentColor } = data;
   return (
-    <div
-      className="pointer-events-none fixed z-50 rounded-md border border-border bg-surface p-2.5 shadow-lg"
-      style={{ left: data.x + 12, top: data.y - 10 }}
-    >
-      <div className="space-y-1 font-mono text-2xs">
-        <div className="flex items-center gap-1.5 font-bold text-foreground">
-          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: agentColor }} />
-          <span>{agentLabel}</span>
-        </div>
-        <div className="text-muted-foreground">@ {formatElapsedMMSS(point.elapsedMs)}</div>
-        <div className="flex items-center gap-2 border-t border-border pt-1 text-foreground">
-          <span className="text-muted-foreground">{t.inputTokens}</span>
-          <span className="ml-auto font-bold tabular-nums">{formatNumber(point.total)}</span>
-        </div>
-      </div>
-    </div>
+    <FloatingTooltip x={data.x} y={data.y}>
+      <ChartHoverCardBody
+        title={agentLabel}
+        subtitle={`@ ${formatElapsedMMSS(point.elapsedMs)}`}
+        color={agentColor}
+        metrics={[{ value: formatNumber(point.total), label: t.inputTokens }]}
+      />
+    </FloatingTooltip>
   );
 }

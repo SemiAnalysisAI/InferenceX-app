@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export interface ToolOsProviderBreakdown {
   client: string;
@@ -32,27 +33,30 @@ const CLIENT_LABELS: Record<string, string> = {
 
 const STRINGS = {
   en: {
-    title: 'Explicit Tool-Result Error Rate by OS',
-    comparableResults: (n: string) => `(${n} comparable results)`,
+    title: 'Explicit tool-result error rate by OS',
+    comparableResults: (n: string) => `${n} comparable results`,
     description:
       'Error rate uses matched Anthropic results because that protocol carries an explicit error signal. OpenAI and Codex remain in all-call volume and traffic mix, but are not silently counted as successes. OS describes the request sender, not necessarily the tool execution host. Coverage is matched/comparable calls; Signal Share is comparable/all matched results.',
     caption:
       'Explicit Anthropic tool-result error counts and percentages grouped by request sender operating system, with all-provider traffic composition.',
     emptyState: 'No OS result data',
     colOs: 'OS',
-    colAllCalls: 'All Calls',
+    colAllCalls: 'All calls',
     colComparable: 'Comparable',
     colMatched: 'Matched',
     colCoverage: 'Coverage',
-    colSignalShare: 'Signal Share',
+    colSignalShare: 'Signal share',
     colErrors: 'Errors',
-    colErrorRate: 'Error Rate',
-    colTrafficMix: 'Traffic Mix',
+    colErrorRate: 'Error rate',
+    colTrafficMix: 'Traffic mix',
     signalShareTitle: 'Share of all matched provider results included in the explicit error rate',
+    unknownOs: 'Unknown',
+    providerTitle: (calls: string, matched: string, explicit: boolean) =>
+      `${calls} calls · ${matched} matched · ${explicit ? 'explicit errors supported' : 'no explicit error signal'}`,
   },
   zh: {
     title: '按操作系统分组的工具结果错误率',
-    comparableResults: (n: string) => `(${n} 个可比较结果)`,
+    comparableResults: (n: string) => `${n} 个可比较结果`,
     description:
       '错误率使用 Anthropic 匹配结果计算，因为该协议携带显式错误信号。OpenAI 和 Codex 仅参与总调用量和流量占比统计，不被默认计为成功。OS 指请求发送端，不一定是工具执行主机。覆盖率为 matched/comparable 调用比；信号占比为 comparable/全部 matched 结果比。',
     caption:
@@ -68,6 +72,9 @@ const STRINGS = {
     colErrorRate: '错误率',
     colTrafficMix: '流量构成',
     signalShareTitle: '纳入显式错误率计算的匹配 provider 结果占比',
+    unknownOs: '未知',
+    providerTitle: (calls: string, matched: string, explicit: boolean) =>
+      `${calls} 次调用 · ${matched} 个已匹配 · ${explicit ? '支持显式错误信号' : '无显式错误信号'}`,
   },
 };
 
@@ -88,13 +95,18 @@ function ratio(numerator: number, denominator: number): number | null {
 }
 
 function ProviderMix({ row }: { row: ToolOsErrorRate }) {
+  const t = STRINGS[useLocale()];
   return (
     <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 text-3xs">
       {row.providers.map((provider) => (
         <span
           key={provider.client}
-          className={provider.supportsExplicitErrors ? 'text-foreground' : 'text-subtle'}
-          title={`${provider.totalCalls.toLocaleString()} calls · ${provider.matchedResults.toLocaleString()} matched${provider.supportsExplicitErrors ? ' · explicit errors supported' : ' · no explicit error signal'}`}
+          className={provider.supportsExplicitErrors ? 'text-foreground' : 'text-muted-foreground'}
+          title={t.providerTitle(
+            provider.totalCalls.toLocaleString(),
+            provider.matchedResults.toLocaleString(),
+            provider.supportsExplicitErrors,
+          )}
         >
           {CLIENT_LABELS[provider.client] ?? provider.client}{' '}
           {formatPct(ratio(provider.totalCalls, row.allCalls))}
@@ -112,22 +124,21 @@ export function ToolOsErrorRates({ rows }: { rows: ToolOsErrorRate[] }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle>
-          {t.title}{' '}
-          <span className="font-normal text-muted-foreground">
-            {t.comparableResults(matchedResults.toLocaleString())}
-          </span>
-        </CardTitle>
-        <p className="mt-0.5 text-3xs font-mono text-subtle">{t.description}</p>
+        <CardTitle>{t.title}</CardTitle>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {t.comparableResults(matchedResults.toLocaleString())} · {t.description}
+        </p>
       </CardHeader>
       <CardContent>
         {sortedRows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">{t.emptyState}</p>
+          <EmptyState bare className="py-8">
+            {t.emptyState}
+          </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-2xs font-mono">
+            <table className="w-full min-w-[850px] text-xs tabular-nums">
               <caption className="sr-only">{t.caption}</caption>
-              <thead className="border-b border-border text-muted-foreground">
+              <thead className="border-b border-border/20 text-muted-foreground">
                 <tr>
                   <th scope="col" className="py-1.5 text-left font-medium">
                     {t.colOs}
@@ -158,11 +169,11 @@ export function ToolOsErrorRates({ rows }: { rows: ToolOsErrorRate[] }) {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/20">
                 {sortedRows.map((row) => (
                   <tr key={row.os} className="transition-colors hover:bg-surface-hover/70">
                     <th scope="row" className="py-1.5 text-left font-medium">
-                      {row.os}
+                      {row.os === 'Unknown' ? t.unknownOs : row.os}
                     </th>
                     <td className="py-1.5 text-right tabular-nums">
                       {Number(row.allCalls).toLocaleString()}
@@ -182,7 +193,7 @@ export function ToolOsErrorRates({ rows }: { rows: ToolOsErrorRate[] }) {
                     >
                       {formatPct(ratio(row.matchedResults, row.allMatchedResults))}
                     </td>
-                    <td className="py-1.5 text-right tabular-nums text-rose-500">
+                    <td className="py-1.5 text-right tabular-nums text-destructive">
                       {Number(row.errors).toLocaleString()}
                     </td>
                     <td className="py-1.5 text-right font-medium tabular-nums">

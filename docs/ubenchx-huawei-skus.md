@@ -1,6 +1,6 @@
 # Huawei SKU configurations on TPC Skyline
 
-`/ubenchx/tpc-skyline` and its `/zh` sibling retain NVIDIA measured TPC/GPC groupings and add a separate Huawei 950PR table. The URL and `test=tpc-skyline` remain compatible. No inference catalog hardware entries or performance ceilings are introduced.
+`/ubx/tpc-skyline` and its `/zh` sibling retain NVIDIA measured TPC/GPC groupings and add a separate Huawei 950PR table. The URL and `test=tpc-skyline` remain compatible. No inference catalog hardware entries or performance ceilings are introduced.
 
 ## Evidence
 

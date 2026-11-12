@@ -23,6 +23,7 @@ import {
 } from '@/components/gpu-power/types';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import {
@@ -43,7 +44,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 const STRINGS = {
   en: {
     loading: 'Loading PowerX telemetry…',
-    error: 'Failed to load PowerX telemetry.',
+    error: 'Failed to load PowerX telemetry',
     missing:
       'No PowerX telemetry is stored for benchmark point #{id}. Telemetry may not have been collected or ingested.',
     series: 'Telemetry series',
@@ -58,7 +59,6 @@ const STRINGS = {
     perGpuStats: 'Per-chip statistics',
     chip: 'Chip',
     secondsUnit: 's',
-    resetFilter: 'Show all chips',
     allInLine: 'All-in provisioned line',
     allInHelp:
       'Dashed reference at the all-in provisioned utility power per chip from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
@@ -66,14 +66,14 @@ const STRINGS = {
     overlayNone: 'None',
     overlayLoading: 'Loading server metrics…',
     overlayError: 'Server metrics failed to load; overlays are unavailable.',
-    overlayUnavailable: 'This point has no server-metric series to overlay.',
+    overlayUnavailable: 'This point has no server-metric series to overlay',
     overlayAligned: 'The overlay is aligned to the telemetry by wall-clock timestamps.',
     overlayRelative:
       'The trace has no wall-clock timestamps, so the overlay and the telemetry are both aligned at their own t=0.',
   },
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
-    error: 'PowerX 遥测数据加载失败。',
+    error: 'PowerX 遥测数据加载失败',
     missing: '基准测试数据点 #{id} 没有存储的 PowerX 遥测数据。遥测数据可能尚未采集或入库。',
     series: '遥测序列',
     metric: '指标',
@@ -87,7 +87,6 @@ const STRINGS = {
     perGpuStats: '单芯片统计信息',
     chip: '芯片',
     secondsUnit: '秒',
-    resetFilter: '显示全部芯片',
     allInLine: '整体预配功耗参考线',
     allInHelp:
       '以虚线标出硬件注册表中每芯片的整体预配功耗，即市电侧的 all-in 功率（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
@@ -95,7 +94,7 @@ const STRINGS = {
     overlayNone: '无',
     overlayLoading: '正在加载服务端指标……',
     overlayError: '服务端指标加载失败，无法叠加显示。',
-    overlayUnavailable: '该数据点没有可叠加的服务端指标序列。',
+    overlayUnavailable: '该数据点没有可叠加的服务端指标序列',
     overlayAligned: '叠加曲线已按绝对时间戳与遥测数据对齐。',
     overlayRelative: 'trace 缺少绝对时间戳，因此叠加曲线与遥测数据均从各自的 t=0 开始对齐。',
   },
@@ -217,14 +216,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   if (!enabled) return null;
 
   if (query.isLoading) {
-    return (
-      <div
-        className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground"
-        data-testid="power-telemetry-loading"
-      >
-        {t.loading}
-      </div>
-    );
+    return <EmptyState data-testid="power-telemetry-loading">{t.loading}</EmptyState>;
   }
   if (query.isError && !query.data) {
     return (
@@ -238,12 +230,9 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   }
   if (!selectedSeries) {
     return (
-      <div
-        className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground"
-        data-testid="power-telemetry-missing"
-      >
+      <EmptyState data-testid="power-telemetry-missing">
         {t.missing.replace('{id}', String(id))}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -305,7 +294,11 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                   setSeriesSelection({ id, seriesId: Number(value) });
                 }}
               >
-                <SelectTrigger id="power-telemetry-series-select" className="w-full truncate">
+                <SelectTrigger
+                  id="power-telemetry-series-select"
+                  size="sm"
+                  className="w-full truncate"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -330,6 +323,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               <SelectTrigger
                 id="power-telemetry-metric-select"
                 data-testid="power-telemetry-metric-select"
+                size="sm"
                 className="w-full sm:w-56"
               >
                 <SelectValue />
@@ -366,6 +360,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 <SelectTrigger
                   id="power-telemetry-overlay"
                   data-testid="power-telemetry-overlay-select"
+                  size="sm"
                   className="w-full sm:w-64"
                 >
                   <SelectValue />
@@ -411,6 +406,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 hw: String(gpuIndex),
                 label: `${t.chip} ${gpuIndex}`,
                 color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+                lineDasharray: 'none',
                 isActive: visibleGpus.has(gpuIndex),
                 onClick: () => toggleGpu(gpuIndex),
               }))}
@@ -439,20 +435,14 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                     ]
                   : undefined
               }
-              actions={
-                hiddenGpus.size === 0
-                  ? []
-                  : [
-                      {
-                        id: 'power-telemetry-show-all-chips',
-                        label: t.resetFilter,
-                        onClick: () => {
-                          track('inference_agentic_power_gpu_reset_filter', { id });
-                          setHiddenSelection(null);
-                        },
-                      },
-                    ]
-              }
+              reset={{
+                id: 'power-telemetry-show-all-chips',
+                disabled: hiddenGpus.size === 0,
+                onClick: () => {
+                  track('inference_agentic_power_gpu_reset_filter', { id });
+                  setHiddenSelection(null);
+                },
+              }}
             />
           }
           caption={

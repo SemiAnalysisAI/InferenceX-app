@@ -1,15 +1,25 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatNumber, formatDuration } from '@/lib/agentic-workload-explorer/format';
-import type {
-  ConversationNode,
-  MessageNode,
-  SubagentGroupNode,
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  formatDollars,
+  formatNumber,
+  formatDuration,
+} from '@/lib/agentic-workload-explorer/format';
+import {
+  ShowMoreRows,
+  useRowLimit,
+  type ConversationNode,
+  type MessageNode,
+  type SubagentGroupNode,
 } from '@/components/agentic-workload-explorer/conversation-view';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const NODE_HEIGHT = 36;
 const NODE_GAP = 4;
@@ -22,13 +32,12 @@ const CONNECTOR_WIDTH = 32;
 
 const STRINGS = {
   en: {
-    flowGraph: 'Flow Graph',
-    legend: 'Legend',
+    flowGraph: 'Flow graph',
     noData: 'No conversation data to display',
     nodes: (n: number) => `${n} nodes`,
     subAgents: (n: number) => `${n} sub-agent${n === 1 ? '' : 's'}`,
-    expandAll: 'Expand All',
-    collapseAll: 'Collapse All',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
     nodeLabels: {
       user: 'User',
       assistant: 'Response',
@@ -39,14 +48,14 @@ const STRINGS = {
     },
     response: (tok: number) => `Response · ${formatNumber(tok)} tok`,
     responseNoTok: 'Response',
-    toolCall: 'Tool Call',
+    toolCall: 'Tool call',
     thinkingLabel: (chars: number) => `Thinking · ${formatNumber(chars)} chars`,
     resultLabel: 'Result',
     resultError: 'Result (error)',
+    errorBadge: 'error',
   },
   zh: {
     flowGraph: '流程图',
-    legend: '图例',
     noData: '暂无会话数据',
     nodes: (n: number) => `${n} 个节点`,
     subAgents: (n: number) => `${n} 个子智能体`,
@@ -66,6 +75,7 @@ const STRINGS = {
     thinkingLabel: (chars: number) => `思考 · ${formatNumber(chars)} 字符`,
     resultLabel: '结果',
     resultError: '结果（错误）',
+    errorBadge: '错误',
   },
 } as const;
 
@@ -75,36 +85,37 @@ interface NodeStyleDef {
   text: string;
 }
 
+// Node kinds read from their label. User turns and subagent groups sit one surface step up.
 const nodeStyleDefs: Record<string, NodeStyleDef> = {
   user: {
-    bg: 'bg-blue-500/8',
-    border: 'border-blue-500/30',
-    text: 'text-blue-400',
+    bg: 'bg-muted/20',
+    border: 'border-border/30',
+    text: 'text-foreground',
   },
   assistant: {
-    bg: 'bg-surface',
-    border: 'border-border',
+    bg: 'bg-card',
+    border: 'border-border/30',
     text: 'text-foreground',
   },
   tool_use: {
-    bg: 'bg-indigo-500/8',
-    border: 'border-indigo-500/30',
-    text: 'text-indigo-400',
+    bg: 'bg-card',
+    border: 'border-border/30',
+    text: 'text-muted-foreground',
   },
   tool_result: {
-    bg: 'bg-emerald-500/8',
-    border: 'border-emerald-500/30',
-    text: 'text-emerald-400',
+    bg: 'bg-card',
+    border: 'border-border/30',
+    text: 'text-muted-foreground',
   },
   thinking: {
-    bg: 'bg-amber-500/8',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400',
+    bg: 'bg-card',
+    border: 'border-dashed border-border/30',
+    text: 'text-muted-foreground',
   },
   subagent_group: {
-    bg: 'bg-purple-500/8',
-    border: 'border-purple-500/30',
-    text: 'text-purple-400',
+    bg: 'bg-muted/20',
+    border: 'border-border/30',
+    text: 'text-foreground',
   },
 };
 
@@ -140,8 +151,7 @@ export function tokenSummary(
 }
 
 export function formatCost(cost: number): string {
-  if (cost < 0.01) return '<$0.01';
-  return `$${cost.toFixed(3)}`;
+  return formatDollars(cost);
 }
 
 export function messageNodeSummary(node: MessageNode, t?: Strings): string {
@@ -197,52 +207,75 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
 
   const [expandAllCounter, setExpandAllCounter] = useState(0);
   const [collapseAllCounter, setCollapseAllCounter] = useState(0);
+  const [rowLimit, , showMoreRows] = useRowLimit(nodes.length === 0);
+  const shownNodes = nodes.length > rowLimit ? nodes.slice(0, rowLimit) : nodes;
 
   if (nodes.length === 0) {
-    return <p className="text-sm text-muted-foreground py-8 text-center font-mono">{t.noData}</p>;
+    return (
+      <EmptyState bare className="py-8">
+        {t.noData}
+      </EmptyState>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.flowGraph}
-        </span>
-        <div className="h-px flex-1 bg-border" />
-        <div className="flex items-center gap-3 text-2xs font-mono text-subtle">
-          <span>{t.nodes(nodes.length)}</span>
-          {subagentGroupCount > 0 && <span>{t.subAgents(subagentGroupCount)}</span>}
+    <Card>
+      <CardHeader className="gap-2 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+          <div className="min-w-0 grow basis-48">
+            <CardTitle>{t.flowGraph}</CardTitle>
+            <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+              {[
+                t.nodes(nodes.length),
+                subagentGroupCount > 0 ? t.subAgents(subagentGroupCount) : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+          </div>
           {subagentGroupCount > 0 && (
-            <div className="flex items-center gap-1 ml-1">
-              <button
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   setExpandAllCounter((c) => c + 1);
                   track('agentic_workload_dag_expand_all');
                 }}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
               >
                 {t.expandAll}
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   setCollapseAllCounter((c) => c + 1);
                   track('agentic_workload_dag_collapse_all');
                 }}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
               >
                 {t.collapseAll}
-              </button>
+              </Button>
             </div>
           )}
         </div>
-      </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {Object.entries(nodeStyleDefs).map(([key, style]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <div className={`w-3 h-3 rounded-sm border ${style.bg} ${style.border}`} />
+              <span className="text-xs text-muted-foreground">{getNodeStyle(key, t).label}</span>
+            </div>
+          ))}
+        </div>
+      </CardHeader>
 
-      <div className="relative rounded-md border border-border bg-surface p-4 overflow-x-auto">
+      <CardContent className="overflow-x-auto">
         <div
           className="relative"
           style={{ minWidth: TRUNK_X + TRUNK_WIDTH + CONNECTOR_WIDTH + BRANCH_WIDTH + 40 }}
         >
-          {nodes.map((node, idx) => {
+          {shownNodes.map((node, idx) => {
             if (node.kind === 'subagent_group') {
               return (
                 <SubagentGroupRow
@@ -250,7 +283,7 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
                   node={node}
                   index={idx}
                   isFirst={idx === 0}
-                  isLast={idx === nodes.length - 1}
+                  isLast={idx === shownNodes.length - 1}
                   expandAllCounter={expandAllCounter}
                   collapseAllCounter={collapseAllCounter}
                   t={t}
@@ -264,26 +297,20 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
                 node={node}
                 index={idx}
                 isFirst={idx === 0}
-                isLast={idx === nodes.length - 1}
+                isLast={idx === shownNodes.length - 1}
                 t={t}
               />
             );
           })}
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.legend}
-        </span>
-        {Object.entries(nodeStyleDefs).map(([key, style]) => (
-          <div key={key} className="flex items-center gap-1.5">
-            <div className={`w-3 h-3 rounded-sm border ${style.bg} ${style.border}`} />
-            <span className="text-3xs font-mono text-subtle">{getNodeStyle(key, t).label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+        <ShowMoreRows
+          shown={shownNodes.length}
+          total={nodes.length}
+          view="flow"
+          onShowMore={showMoreRows}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -308,13 +335,13 @@ function MessageNodeRow({
         className="absolute flex flex-col items-center"
         style={{ left: TRUNK_X - 8, width: 16, top: 0, bottom: 0 }}
       >
-        {!isFirst && <div className="w-px flex-1 bg-border" />}
+        {!isFirst && <div className="w-px flex-1 bg-border/30" />}
         <div className="w-2 h-2 rounded-full bg-border shrink-0" />
-        {!isLast && <div className="w-px flex-1 bg-border" />}
+        {!isLast && <div className="w-px flex-1 bg-border/30" />}
       </div>
 
       <div
-        className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 font-mono`}
+        className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 tabular-nums`}
         style={{
           marginLeft: TRUNK_X + 16,
           height: NODE_HEIGHT,
@@ -323,15 +350,15 @@ function MessageNodeRow({
           marginBottom: NODE_GAP / 2,
         }}
       >
-        <span className={`text-3xs font-bold shrink-0 ${style.text}`}>{style.label}</span>
-        <span className="text-2xs text-muted-foreground truncate">
+        <span className={`text-xs font-medium shrink-0 ${style.text}`}>{style.label}</span>
+        <span className="text-xs text-muted-foreground truncate">
           {messageNodeSummary(node, t)}
         </span>
         {(node.inputTokens ||
           node.cacheReadInputTokens ||
           node.cacheWriteTokens ||
           node.outputTokens) && (
-          <span className="text-3xs text-subtle shrink-0">
+          <span className="text-xs text-muted-foreground shrink-0">
             {tokenSummary(
               node.inputTokens,
               node.cacheReadInputTokens,
@@ -341,17 +368,19 @@ function MessageNodeRow({
           </span>
         )}
         {node.durationMs !== null && (
-          <span className="text-3xs text-subtle shrink-0">{formatDuration(node.durationMs)}</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {formatDuration(node.durationMs)}
+          </span>
         )}
         {node.costUsd !== null && node.costUsd > 0 && (
-          <span className="text-3xs text-emerald-400 shrink-0">{formatCost(node.costUsd)}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{formatCost(node.costUsd)}</span>
         )}
         {node.isError && (
           <Badge
             variant="outline"
-            className="text-3xs py-0 h-4 border-red-500/30 text-red-400 shrink-0"
+            className="text-xs py-0 h-4 border-destructive/30 text-destructive shrink-0"
           >
-            error
+            {t.errorBadge}
           </Badge>
         )}
       </div>
@@ -398,13 +427,13 @@ function SubagentGroupRow({
           className="absolute flex flex-col items-center"
           style={{ left: TRUNK_X - 8, width: 16, top: 0, bottom: 0 }}
         >
-          {!isFirst && <div className="w-px flex-1 bg-border" />}
-          <div className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-          {!isLast && <div className="w-px flex-1 bg-border" />}
+          {!isFirst && <div className="w-px flex-1 bg-border/30" />}
+          <div className="w-2 h-2 rounded-full bg-foreground/60 shrink-0" />
+          {!isLast && <div className="w-px flex-1 bg-border/30" />}
         </div>
 
         <svg
-          className="absolute"
+          className="absolute text-muted-foreground"
           style={{
             left: TRUNK_X + 8,
             top: (NODE_HEIGHT + NODE_GAP) / 2 - 1,
@@ -417,14 +446,14 @@ function SubagentGroupRow({
             y1={1}
             x2={CONNECTOR_WIDTH}
             y2={1}
-            stroke="#8b5cf6"
+            stroke="currentColor"
             strokeWidth={1.5}
             strokeDasharray="4 2"
           />
         </svg>
 
         <div
-          className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 font-mono cursor-pointer hover:brightness-125 transition-all`}
+          className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 tabular-nums cursor-pointer hover:bg-muted/60 transition-colors`}
           style={{
             marginLeft: TRUNK_X + 16 + CONNECTOR_WIDTH,
             height: NODE_HEIGHT,
@@ -437,15 +466,18 @@ function SubagentGroupRow({
             track('agentic_workload_dag_group_toggled', { enabled: !expanded });
           }}
         >
-          <span className="text-3xs text-subtle shrink-0">{expanded ? '\u25BC' : '\u25B6'}</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
-          <span className={`text-3xs font-bold shrink-0 ${style.text}`}>{style.label}</span>
-          <span className="text-2xs text-muted-foreground truncate">{subagentSummary(node)}</span>
+          {expanded ? (
+            <ChevronDown className="size-3 text-muted-foreground shrink-0" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="size-3 text-muted-foreground shrink-0" aria-hidden="true" />
+          )}
+          <span className={`text-xs font-medium shrink-0 ${style.text}`}>{style.label}</span>
+          <span className="text-xs text-muted-foreground truncate">{subagentSummary(node)}</span>
           {(node.totalInputTokens ||
             node.totalCacheRead ||
             node.totalCacheCreation ||
             node.totalOutputTokens) && (
-            <span className="text-3xs text-subtle shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {tokenSummary(
                 node.totalInputTokens,
                 node.totalCacheRead,
@@ -455,7 +487,7 @@ function SubagentGroupRow({
             </span>
           )}
           {node.totalDurationMs > 0 && (
-            <span className="text-3xs text-subtle shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {formatDuration(node.totalDurationMs)}
             </span>
           )}
@@ -465,7 +497,7 @@ function SubagentGroupRow({
       {expanded && node.children.length > 0 && (
         <div className="relative">
           <div
-            className="absolute w-px bg-border"
+            className="absolute w-px bg-border/30"
             style={{
               left: TRUNK_X - 8 + 7,
               top: 0,
@@ -473,13 +505,11 @@ function SubagentGroupRow({
             }}
           />
           <div
-            className="absolute w-px"
+            className="absolute w-px bg-border/30"
             style={{
               left: TRUNK_X + 16 + CONNECTOR_WIDTH + CHILD_INDENT - 12,
               top: 0,
               height: totalChildHeight,
-              background: '#8b5cf6',
-              opacity: 0.3,
             }}
           />
 
@@ -499,11 +529,11 @@ function SubagentGroupRow({
                     top: (NODE_HEIGHT + NODE_GAP) / 2 - 3,
                   }}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-400/50" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-border" />
                 </div>
 
                 <div
-                  className={`flex items-center gap-2 rounded-md border ${childStyle.bg} ${childStyle.border} px-3 font-mono`}
+                  className={`flex items-center gap-2 rounded-md border ${childStyle.bg} ${childStyle.border} px-3 tabular-nums`}
                   style={{
                     marginLeft: TRUNK_X + 16 + CONNECTOR_WIDTH + CHILD_INDENT,
                     height: NODE_HEIGHT,
@@ -512,17 +542,17 @@ function SubagentGroupRow({
                     marginBottom: NODE_GAP / 2,
                   }}
                 >
-                  <span className={`text-3xs font-bold shrink-0 ${childStyle.text}`}>
+                  <span className={`text-xs font-medium shrink-0 ${childStyle.text}`}>
                     {childStyle.label}
                   </span>
-                  <span className="text-2xs text-muted-foreground truncate">
+                  <span className="text-xs text-muted-foreground truncate">
                     {messageNodeSummary(child, t)}
                   </span>
                   {(child.inputTokens ||
                     child.cacheReadInputTokens ||
                     child.cacheWriteTokens ||
                     child.outputTokens) && (
-                    <span className="text-3xs text-subtle shrink-0">
+                    <span className="text-xs text-muted-foreground shrink-0">
                       {tokenSummary(
                         child.inputTokens,
                         child.cacheReadInputTokens,
@@ -534,7 +564,7 @@ function SubagentGroupRow({
                   {child.isError && (
                     <Badge
                       variant="outline"
-                      className="text-3xs py-0 h-4 border-red-500/30 text-red-400 shrink-0"
+                      className="text-xs py-0 h-4 border-destructive/30 text-destructive shrink-0"
                     >
                       error
                     </Badge>
@@ -546,7 +576,7 @@ function SubagentGroupRow({
 
           <div className="relative" style={{ height: NODE_GAP }}>
             <svg
-              className="absolute"
+              className="absolute text-muted-foreground"
               style={{
                 left: TRUNK_X + 8,
                 top: -NODE_GAP,
@@ -559,7 +589,7 @@ function SubagentGroupRow({
                 y1={NODE_GAP + 2}
                 x2={CONNECTOR_WIDTH}
                 y2={NODE_GAP + 2}
-                stroke="#8b5cf6"
+                stroke="currentColor"
                 strokeWidth={1.5}
                 strokeDasharray="4 2"
                 opacity={0.4}

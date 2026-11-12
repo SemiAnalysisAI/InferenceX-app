@@ -1,3 +1,4 @@
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 
 import {
@@ -5,7 +6,6 @@ import {
   prLabel,
   prUrl,
   type OptimizationFramework,
-  type OptimizationHighlight,
   type OptimizationSection,
   type OptimizationsOverview,
 } from '@/lib/agentx/agentx-optimizations';
@@ -15,7 +15,13 @@ import {
 } from '@/lib/agentx/agentx-optimizations-zh';
 import type { Locale } from '@/lib/i18n/i18n';
 
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
+import { FactGrid } from './fact-grid';
+import { ARTICLE_H2_CLASS, READING_LINK_CLASS } from '@/components/ui/reading-layout';
+import { cn } from '@/lib/shared/utils';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
@@ -30,21 +36,6 @@ function RichText({ text }: { text: string }) {
     ) : (
       part
     ),
-  );
-}
-
-function Highlights({ items }: { items: readonly OptimizationHighlight[] }) {
-  return (
-    <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70 lg:grid-cols-4">
-      {items.map((item) => (
-        <div key={item.label} className="flex flex-col bg-card px-4 py-5">
-          <dt className="order-2 mt-1 text-sm leading-5 text-muted-foreground">{item.label}</dt>
-          <dd className="order-1 font-mono text-xl font-semibold tabular-nums text-foreground">
-            {item.value}
-          </dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
@@ -67,7 +58,7 @@ function SectionFigure({
       className="group my-7 block rounded-xl focus-visible:outline-none"
     >
       <figure
-        className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"
+        className="overflow-hidden rounded-xl border border-border/30 bg-card transition-colors group-hover:border-border"
         data-testid={`agentx-optimizations-figure-${figure.key}`}
       >
         <Image
@@ -75,15 +66,16 @@ function SectionFigure({
           alt={figure.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 1152px"
+          sizes="(max-width: 768px) 100vw, 720px"
           quality={100}
           className="h-auto w-full bg-white"
         />
-        <figcaption className="border-t border-border/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
+        <figcaption className="border-t border-border/20 px-4 py-3 text-sm leading-6 text-muted-foreground">
           <span className="block">{figure.caption}</span>
           {!figure.hideFullResolutionCta && (
-            <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-primary group-hover:decoration-primary">
-              {ui.figureCta} ↗
+            <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-brand group-hover:decoration-brand">
+              {ui.figureCta}
+              <ExternalLinkIcon aria-hidden="true" />
             </span>
           )}
         </figcaption>
@@ -107,13 +99,10 @@ function SectionBlock({
       className={className}
       data-testid={`agentx-optimizations-section-${section.id}`}
     >
-      <h2
-        id={section.id}
-        className="mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight text-foreground"
-      >
+      <h2 id={section.id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
         {section.heading}
       </h2>
-      <div className="space-y-4 text-base leading-7 text-muted-foreground">
+      <div className="space-y-4 text-base leading-reading text-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>
             <RichText text={paragraph} />
@@ -123,9 +112,7 @@ function SectionBlock({
       {section.figure && <SectionFigure figure={section.figure} ui={ui} />}
       {section.prs && section.prs.length > 0 && (
         <div className="mt-5">
-          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-            {ui.prsLabel}
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">{ui.prsLabel}</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {section.prs.map((pr) => (
               <li key={prUrl(pr)}>
@@ -137,9 +124,10 @@ function SectionBlock({
                   rel="noopener noreferrer"
                   prefetch={false}
                   data-testid="agentx-optimizations-pr"
-                  className="inline-flex items-center rounded-md border border-border bg-card px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                  className="inline-flex min-h-8 items-center gap-1 rounded-md border border-border/30 bg-card px-2.5 font-mono text-xs leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  {prLabel(pr)} ↗
+                  {prLabel(pr)}
+                  <ExternalLinkIcon aria-hidden="true" className="ml-0" />
                 </AgentXOptimizationsLink>
               </li>
             ))}
@@ -148,9 +136,7 @@ function SectionBlock({
       )}
       {section.links && section.links.length > 0 && (
         <div className="mt-5">
-          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-            {ui.referencesLabel}
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">{ui.referencesLabel}</p>
           <ul className="mt-2 grid gap-x-8 gap-y-2 sm:grid-cols-2">
             {section.links.map((link) => (
               <li key={link.href}>
@@ -161,9 +147,10 @@ function SectionBlock({
                   target="_blank"
                   rel="noopener noreferrer"
                   prefetch={false}
-                  className="text-sm leading-6 text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
+                  className={cn(READING_LINK_CLASS, 'text-sm leading-6')}
                 >
-                  {link.label} ↗
+                  {link.label}
+                  <ExternalLinkIcon aria-hidden="true" />
                 </AgentXOptimizationsLink>
               </li>
             ))}
@@ -185,20 +172,21 @@ function FrameworkCard({
 }) {
   return (
     <AgentXOptimizationsLink
-      href={`${localePrefix(locale)}/agentx/optimizations/${framework.slug}`}
+      href={`${localePrefix(locale)}${AGENTX_ROUTE.path}/optimizations/${framework.slug}`}
       analyticsEvent="agentx_optimizations_framework_opened"
       analyticsTarget={framework.slug}
       data-testid="agentx-optimizations-card"
       data-framework={framework.slug}
-      className="group flex flex-col rounded-xl border border-border/70 bg-card p-5 transition-colors hover:border-primary/50"
+      className="group flex flex-col rounded-xl border border-border/30 bg-card p-5 transition-colors hover:bg-muted/40"
     >
-      <p className="font-mono text-2xs font-medium tracking-eyebrow text-brand uppercase">
+      <p className="text-xs font-medium text-muted-foreground">
         {overview.layerLabels[framework.layer]}
       </p>
       <h3 className="mt-2 text-lg font-semibold text-foreground">{framework.name}</h3>
       <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">{framework.summary}</p>
-      <span className="mt-4 inline-flex items-center text-sm font-semibold text-primary">
-        {overview.ui.readMore} →
+      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand">
+        {overview.ui.readMore}
+        <ArrowRight aria-hidden="true" className="size-4" />
       </span>
     </AgentXOptimizationsLink>
   );
@@ -211,42 +199,36 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
 
   return (
     <article data-testid="agentx-optimizations-index">
-      <header className="border-b border-border/70 pb-8">
+      <header className="border-b border-border/20 pb-8">
         <AgentXOptimizationsLink
-          href={`${localePrefix(locale)}/agentx`}
+          href={`${localePrefix(locale)}${AGENTX_ROUTE.path}`}
           analyticsEvent="agentx_optimizations_returned"
           analyticsTarget="overview"
-          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
+          <ArrowLeft aria-hidden="true" className="size-4" />
           {overview.ui.backToAgentX}
         </AgentXOptimizationsLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
-          {overview.eyebrow}
-        </p>
+        <p className="mt-8 text-xs font-medium text-muted-foreground">{overview.eyebrow}</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {overview.title}
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{overview.lead}</p>
-        <Highlights items={overview.highlights} />
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{overview.lead}</p>
+        <FactGrid items={overview.highlights} />
       </header>
 
       <div className="py-10">
-        <div className="space-y-4 text-base leading-7 text-muted-foreground">
+        <div className="space-y-4 text-base leading-reading text-foreground">
           {overview.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
         </div>
 
         <section aria-labelledby="projects" className="mt-14">
-          <h2
-            id="projects"
-            className="mb-3 scroll-mt-24 text-2xl font-semibold tracking-tight text-foreground"
-          >
+          <h2 id="projects" className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
             {overview.frameworksTitle}
           </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            {overview.frameworksIntro}
-          </p>
+          <p className="text-base leading-reading text-foreground">{overview.frameworksIntro}</p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {frameworks.map((framework) => (
               <FrameworkCard
@@ -265,7 +247,7 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
             key={section.id}
             section={section}
             ui={overview.ui}
-            className="mt-14 border-t border-border/70 pt-10"
+            className="mt-14 border-t border-border/20 pt-10"
           />
         ))}
       </div>
@@ -282,30 +264,29 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
 
   return (
     <article data-testid="agentx-optimizations-article" data-framework={framework.slug}>
-      <header className="border-b border-border/70 pb-8">
+      <header className="border-b border-border/20 pb-8">
         <AgentXOptimizationsLink
-          href={`${localePrefix(locale)}/agentx/optimizations`}
+          href={`${localePrefix(locale)}${AGENTX_ROUTE.path}/optimizations`}
           analyticsEvent="agentx_optimizations_returned"
           analyticsTarget="index"
-          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
+          <ArrowLeft aria-hidden="true" className="size-4" />
           {overview.ui.backToOverview}
         </AgentXOptimizationsLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
+        <p className="mt-8 text-xs font-medium text-muted-foreground">
           {overview.eyebrow} · {overview.layerLabels[framework.layer]}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {framework.name}
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{framework.lead}</p>
-        <Highlights items={framework.highlights} />
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{framework.lead}</p>
+        <FactGrid items={framework.highlights} />
       </header>
 
       <div className="py-10">
         <nav aria-label={overview.ui.onThisPage} className="mb-10">
-          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-            {overview.ui.onThisPage}
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">{overview.ui.onThisPage}</p>
           <ul className="mt-2 grid gap-x-8 gap-y-1 sm:grid-cols-2">
             {framework.sections.map((section) => (
               <li key={section.id}>
@@ -329,8 +310,8 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
           />
         ))}
 
-        <section aria-labelledby="other-projects" className="mt-14 border-t border-border/70 pt-10">
-          <h2 id="other-projects" className="text-base font-semibold text-foreground">
+        <section aria-labelledby="other-projects" className="mt-14 border-t border-border/20 pt-10">
+          <h2 id="other-projects" className={ARTICLE_H2_CLASS}>
             {overview.ui.allProjects}
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

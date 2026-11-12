@@ -10,10 +10,9 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { RadarDot } from '@/lib/d3-chart/layers/radar';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import ChartLegend from '@/components/ui/chart-legend';
-
-const NVIDIA_COLOR = '#76b900';
-const AMD_COLOR = '#ed1c24';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const RADAR_METRICS = GPU_CHART_METRICS.filter(
   (m) => m.key !== 'scaleUpWorldSize' && m.key !== 'scaleOutBandwidth',
@@ -64,13 +63,11 @@ interface GpuSpecsRadarChartProps {
 
 const RADAR_STRINGS = {
   en: {
-    resetFilter: 'Reset filter',
-    empty: 'Select at least one chip to display the radar chart.',
+    empty: 'Select at least one chip to display the radar chart',
     note: 'Values are normalized to percentages of the maximum across all chips for each metric. chips without FP4 support show 0% on the FP4 axis.',
   },
   zh: {
-    resetFilter: '重置筛选',
-    empty: '请至少选择一款芯片以显示雷达图。',
+    empty: '请至少选择一款芯片以显示雷达图',
     note: '每项指标均按所有芯片中的最大值归一化为百分比；不支持 FP4 的芯片在 FP4 轴上显示为 0%。',
   },
 } as const;
@@ -124,6 +121,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
         name: spec.name,
         label: spec.name,
         color: getGpuColor(spec, idx),
+        lineDasharray: 'none',
         isActive: selectedGpus.has(spec.name),
         onClick: () => toggleGpu(spec.name),
       })),
@@ -157,19 +155,20 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
         const { item, axisIndex } = dot;
         const metric = metrics[axisIndex];
         const rawValue = metric.getValue(item.gpu);
-        const vendorColor = item.gpu.vendor === 'nvidia' ? NVIDIA_COLOR : AMD_COLOR;
-        const vendorLabel = item.gpu.vendor === 'nvidia' ? 'NVIDIA' : 'AMD';
-        return `
-          <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              <div style="width: 10px; height: 10px; border-radius: 2px; background: ${dot.color};"></div>
-              <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${item.gpu.name}</span>
-              <span style="font-size: 10px; color: ${vendorColor}; font-weight: 500;">${vendorLabel}</span>
-            </div>
-            <div style="color: var(--muted-foreground); font-size: 11px;">
-              <strong>${locale === 'zh' ? metric.labelZh : metric.label}${locale === 'zh' ? '：' : ':'}</strong> ${rawValue === null ? '—' : rawValue.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')} ${locale === 'zh' ? metric.unitZh : metric.unit}
-            </div>
-          </div>`;
+        const zh = locale === 'zh';
+        return chartHoverCard({
+          title: item.gpu.name,
+          subtitle: item.gpu.vendor === 'nvidia' ? 'NVIDIA' : 'AMD',
+          color: dot.color,
+          metrics: [
+            {
+              value: rawValue === null ? '—' : rawValue.toLocaleString(zh ? 'zh-CN' : 'en-US'),
+              label: zh
+                ? `${metric.labelZh}（${metric.unitZh}）`
+                : `${metric.label} (${metric.unit})`,
+            },
+          ],
+        });
       },
       onHoverStart: (sel: d3.Selection<any, RadarDot<NormalizedGpu>, any, any>) => {
         sel.attr('r', 5.5);
@@ -187,7 +186,9 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
   if (selectedGpus.size === 0) {
     return (
       <div data-testid="gpu-specs-radar-chart">
-        <div className="flex items-center justify-center h-60 text-muted-foreground">{t.empty}</div>
+        <EmptyState bare className="h-60">
+          {t.empty}
+        </EmptyState>
       </div>
     );
   }
@@ -214,22 +215,14 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
               setIsLegendExpanded(expanded);
               track('gpu_specs_radar_legend_expanded', { enabled: expanded });
             }}
-            grouped={false}
-            actions={
-              selectedGpus.size < GPU_SPECS.length
-                ? [
-                    {
-                      id: 'radar-reset-filter',
-                      label: t.resetFilter,
-                      onClick: () => {
-                        selectAll();
-                        track('gpu_specs_radar_reset_filter');
-                      },
-                    },
-                  ]
-                : []
-            }
-            disableActiveSort={true}
+            reset={{
+              id: 'radar-reset-filter',
+              disabled: selectedGpus.size >= GPU_SPECS.length,
+              onClick: () => {
+                selectAll();
+                track('gpu_specs_radar_reset_filter');
+              },
+            }}
           />
         }
       />

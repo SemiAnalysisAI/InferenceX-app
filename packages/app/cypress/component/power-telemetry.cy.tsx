@@ -63,7 +63,7 @@ function QueryStatus() {
   return <output data-testid="query-status">{status}</output>;
 }
 
-function mountPoint(path = '/inference/agentic/206887') {
+function mountPoint(path = '/infx/inference/agentic/206887') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   cy.mount(
     <PathnameContext.Provider value={path}>
@@ -116,7 +116,7 @@ describe('PowerX telemetry interactions', () => {
       ],
     };
     cy.intercept('GET', endpoint, { body: native });
-    mountPoint(`/inference/agentic/${ID}`);
+    mountPoint(`/infx/inference/agentic/${ID}`);
     cy.get('[data-testid="power-telemetry-metric-select"]').click();
     cy.get('[role="option"]').contains('Temperature').click();
     cy.get(chart).find('svg').should('contain.text', 'Temperature (°C)');
@@ -197,7 +197,7 @@ describe('PowerX telemetry interactions', () => {
 
   it('keeps point tooltips on the samples while the all-in line is drawn', () => {
     cy.mount(
-      <PathnameContext.Provider value="/inference/agentic/206887">
+      <PathnameContext.Provider value="/infx/inference/agentic/206887">
         <GpuMetricsChart
           data={series(1, 'host-a', 500).data}
           visibleGpus={new Set([0, 1])}
@@ -210,7 +210,8 @@ describe('PowerX telemetry interactions', () => {
     );
     cy.get('[data-testid="gpu-power-all-in-line"]').should('contain.text', '1710W');
     cy.get('circle.point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]').should('contain.text', 'Chip 0');
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Chip 0');
+    cy.get('[data-testid="chart-pin-ring"]').should('exist');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {
@@ -242,7 +243,7 @@ describe('PowerX telemetry interactions', () => {
   it('keeps chip filters scoped to a host and renders en at 1280px', () => {
     cy.viewport(1280, 900);
     cy.intercept('GET', endpoint, { body: payload });
-    mountPoint(`/inference/agentic/${ID}`);
+    mountPoint(`/infx/inference/agentic/${ID}`);
     cy.get(chart).find('svg .point').should('have.length', 6);
     cy.get('[data-testid="power-telemetry-sample-count"]').should('have.text', '6');
     cy.get('table tbody tr').first().find('td').eq(4).should('have.text', '510.0');

@@ -7,6 +7,8 @@ Instructions for Claude agents implementing new entity additions.
 > If data for a new model or GPU is ingested before the normalizer mappings exist, those rows are **silently skipped** — `resolveModelKey()` / `hwToGpuKey()` returns `null`, the skip tracker logs them, but nothing is written to the DB. The data isn't lost (source artifacts remain in GCS), but recovering requires a full re-ingest after adding the mappings.
 >
 > **Always warn the user:** the `packages/db` and `packages/constants` changes (normalizers, HW_REGISTRY, DB_MODEL_TO_DISPLAY) must be merged and deployed before the first benchmark run containing the new entity. Frontend changes can follow later otherwise the new entity will be missing from dropdowns and charts.
+>
+> Unofficial-run overlays (`?unofficialrun=`) are the one exception. `/api/unofficial-run` calls `mapBenchmarkRow` with `allowUnregistered: true`, so a run with an unregistered model or GPU still plots. The model keeps its raw prefix (`infmax_model_prefix`, falling back to the HF model id) as both DB key and display name, and the GPU keeps its runner base (`cluster:zx9-lab` becomes `zx9`). The inference model selector lists such a model under "Unregistered models", the chart heading marks it "(unregistered model)", and a line under the heading names unregistered hardware. The official ETL never passes the option, so ingest still skips these rows. Overlays are a preview, not a substitute for the registry entries.
 
 ---
 

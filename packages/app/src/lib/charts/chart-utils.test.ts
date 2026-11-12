@@ -224,6 +224,15 @@ function isNotGreenish(rgb: [number, number, number]): boolean {
   return !(g > r * 1.2 && g > b * 1.2);
 }
 
+function assertMinDist(colors: Record<string, string>, min: number) {
+  const rgbs = Object.values(colors).map(parseRgb);
+  for (let i = 0; i < rgbs.length; i++) {
+    for (let j = i + 1; j < rgbs.length; j++) {
+      expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(min);
+    }
+  }
+}
+
 describe('generateHighContrastColors', () => {
   it.each(['light', 'dark'])(
     'gives TPUv7 the Google blue high-contrast color alongside Blackwell (%s)',
@@ -233,15 +242,6 @@ describe('generateHighContrastColors', () => {
       expect(new Set(Object.values(colors)).size).toBe(3);
     },
   );
-
-  function assertMinDist(colors: Record<string, string>, min: number) {
-    const rgbs = Object.values(colors).map(parseRgb);
-    for (let i = 0; i < rgbs.length; i++) {
-      for (let j = i + 1; j < rgbs.length; j++) {
-        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(min);
-      }
-    }
-  }
 
   it('returns an empty object for an empty keys array', () => {
     expect(generateHighContrastColors([], 'dark')).toEqual({});
@@ -1695,7 +1695,7 @@ describe('metricChartTitle', () => {
       'Total Tokens per $1 TCO',
     );
     expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+      'Total Tokens per $1 TCO (Owning at large hyperscaler volume)',
     );
     expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
       '每 1 美元 TCO 对应的总 token 数',

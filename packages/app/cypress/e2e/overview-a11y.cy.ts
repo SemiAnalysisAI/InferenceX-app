@@ -3,9 +3,19 @@ import type { Result } from 'axe-core';
 const OVERVIEW_SURFACE = '[data-testid="overview-page"]';
 
 const OVERVIEW_ROUTES = [
-  { name: 'English hardware comparison', path: '/overview', comparison: 'hardware' },
-  { name: 'Chinese hardware comparison', path: '/zh/overview', comparison: 'hardware' },
-  { name: 'historical comparison', path: '/overview?compare=30d', comparison: '30d' },
+  {
+    name: 'English hardware comparison',
+    path: '/overview?tier=50&compare=hardware',
+    comparison: 'hardware',
+    tier: '50',
+  },
+  {
+    name: 'Chinese hardware comparison',
+    path: '/zh/overview?tier=50&compare=hardware',
+    comparison: 'hardware',
+    tier: '50',
+  },
+  { name: 'historical comparison', path: '/overview', comparison: '30d', tier: '100' },
 ] as const;
 
 const OVERVIEW_THEMES = ['light', 'dark'] as const;
@@ -28,7 +38,7 @@ function reportViolations(violations: Result[]): void {
 }
 
 describe('Overview accessibility', () => {
-  for (const { name, path, comparison } of OVERVIEW_ROUTES) {
+  for (const { name, path, comparison, tier } of OVERVIEW_ROUTES) {
     for (const theme of OVERVIEW_THEMES) {
       it(`has no WCAG 2.0/2.1 A or AA violations in the ${name} view using the ${theme} theme`, () => {
         cy.visit(path, {
@@ -43,20 +53,19 @@ describe('Overview accessibility', () => {
         cy.get(
           `[data-testid="overview-comparison-switcher"] [data-overview-comparison="${comparison}"]`,
         ).should('have.attr', 'aria-current', 'true');
+        cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', tier);
         cy.get(`${OVERVIEW_SURFACE} [aria-busy]`)
           .should('have.attr', 'aria-busy', 'false')
           .and('have.css', 'opacity', '1');
 
         cy.get('[data-testid="overview-tier-slider"]').should(([slider]) => {
           const style = getComputedStyle(slider);
-          const primary = style.getPropertyValue('--primary').trim();
-          const channels = primary
-            .replace('#', '')
-            .match(/../g)!
-            .map((hex) => parseInt(hex, 16));
-          const accent = `rgb(${channels.join(', ')})`;
-          expect(style.accentColor, 'same accent token as the TCO range').to.equal(accent);
-          expect(style.backgroundImage, 'filled track uses the accent').to.contain(accent);
+          expect(slider, 'same range style as the TCO slider').to.have.class('range-slider');
+          expect(
+            style.getPropertyValue('--range-fill').trim(),
+            'fill uses the theme accent',
+          ).to.equal(style.getPropertyValue('--brand').trim());
+          expect(style.getPropertyValue('--range-progress').trim()).to.match(/%$/);
         });
 
         cy.injectAxe();

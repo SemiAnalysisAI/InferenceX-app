@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
+import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import { GET, POST } from './route';
 import { publishedVideoHistory, recordVideoHistory } from '@/lib/video/video-history-store';
+import { publishVideoQuality } from '@/lib/video/video-quality';
 import {
   approveVideoPublication,
   readStoredArtifact,
-  renditionPreviews,
+  derivedMedia,
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
@@ -14,13 +16,24 @@ import {
 
 vi.mock('next/cache', () => fakeNextCache);
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-vi.mock('@/lib/video/video-storage', () => ({
-  approveVideoPublication: vi.fn(),
-  videoStorageEnabled: vi.fn(() => false),
-  storedArtifacts: vi.fn(() => Promise.resolve([])),
-  readStoredArtifact: vi.fn(),
-  renditionPreviews: vi.fn(() => Promise.resolve(new Map())),
-  storeVideoArtifact: vi.fn(),
+vi.mock('@/lib/video/video-storage', () => {
+  const readIndex = vi.fn();
+  return {
+    approveVideoPublication: vi.fn(),
+    videoStorageEnabled: vi.fn(() => false),
+    storedArtifacts: vi.fn(() => Promise.resolve([])),
+    readStoredArtifact: readIndex,
+    readPublishedArtifact: vi.fn(async (...args: unknown[]) => ({
+      saved: await readIndex(...args),
+      complete: true,
+    })),
+    derivedMedia: vi.fn(() => Promise.resolve(new Map())),
+    storeVideoArtifact: vi.fn(),
+  };
+});
+vi.mock('@/lib/video/video-quality', () => ({
+  publishVideoQuality: vi.fn(() => Promise.resolve(null)),
+  liveTrustedQuality: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock('@/lib/video/video-history-store', () => ({
   publishedVideoHistory: vi.fn(() =>
@@ -53,7 +66,7 @@ afterEach(() => {
   vi.mocked(readStoredArtifact).mockReset();
   vi.mocked(storeVideoArtifact).mockClear();
   vi.mocked(approveVideoPublication).mockReset();
-  vi.mocked(renditionPreviews).mockReset().mockResolvedValue(new Map());
+  vi.mocked(derivedMedia).mockReset().mockResolvedValue(new Map());
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -87,6 +100,18 @@ describe('H3 CI artifact access', () => {
     expect(failed.status).toBe(502);
     expect(retried.status).toBe(200);
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('marks a History page whose index or approval reads failed as incomplete', async () => {
+    const page: VideoHistoryPage = { schemaVersion: 1, entries: [], nextPage: null };
+    vi.mocked(publishedVideoHistory)
+      .mockResolvedValueOnce({ page, complete: false })
+      .mockResolvedValueOnce({ page, complete: true });
+    const degraded = await GET(request('?format=history&page=1&pages=5'));
+    const complete = await GET(request('?format=history&page=1&pages=5'));
+    expect(degraded.status).toBe(200);
+    expect(degraded.headers.get('x-videogenx-incomplete')).toBe('1');
+    expect(complete.headers.get('x-videogenx-incomplete')).toBeNull();
   });
 
   it('never serves synthetic History approval in production when fixture mode is set', async () => {
@@ -254,11 +279,12 @@ describe('H3 CI artifact access', () => {
     expect(await repeated.json()).toEqual(saved);
     expect(readStoredArtifact).toHaveBeenCalledTimes(1);
   });
-  it('adds a web rendition only to clips whose sealed SHA256 has a receipt', async () => {
+  it('adds a web rendition and poster only to clips whose sealed SHA256 has a receipt', async () => {
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     const artifact = { id: 20, name: 'h3-results-10-1', expired: false, size_in_bytes: 4 };
     const [a, b] = ['a'.repeat(64), 'b'.repeat(64)];
     const preview = `https://store.test/h3-video-media/v1/objects/${'e'.repeat(64)}/web-h264-crf23.mp4`;
+    const poster = `https://store.test/h3-video-media/v1/objects/${'f'.repeat(64)}/poster-f0-w672-q4.jpg`;
     const saved = {
       storageVersion: 1 as const,
       runId: '10',
@@ -281,17 +307,20 @@ describe('H3 CI artifact access', () => {
     };
     vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved);
-    vi.mocked(renditionPreviews).mockResolvedValue(new Map([[a, preview]]));
+    vi.mocked(derivedMedia).mockResolvedValue(
+      new Map([[a, { previewUrl: preview, posterUrl: poster }]]),
+    );
     fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
     const published = await GET(request('?run=10&artifact=20&format=published'));
     const result = await published.json();
     expect(result.sources[0].assets).toEqual([
-      [clip(1), { ...original(a), previewUrl: preview }],
+      [clip(1), { ...original(a), previewUrl: preview, posterUrl: poster }],
+      // No receipt: neither field appears.
       [clip(2), original(b)],
     ]);
 
     resetFakeNextCache();
-    vi.mocked(renditionPreviews).mockRejectedValue(new Error('Blob list unavailable'));
+    vi.mocked(derivedMedia).mockRejectedValue(new Error('Blob list unavailable'));
     const fallback = await GET(request('?run=10&artifact=20&format=published'));
     expect(fallback.status).toBe(200);
     expect(await fallback.json()).toEqual(saved);
@@ -503,13 +532,14 @@ describe('explicit H3 publication', () => {
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
     vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    vi.mocked(publishVideoQuality).mockResolvedValueOnce({ pairs: [{}, {}] } as never);
     await GET(request('?format=history'));
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
     const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
     expect(result.status).toBe(200);
-    expect(await result.json()).toEqual(receipt);
+    expect(await result.json()).toEqual({ ...receipt, quality: 2 });
     expect(readStoredArtifact).toHaveBeenCalledWith('10', artifact);
     expect(approveVideoPublication).toHaveBeenCalledWith(
       '10',
@@ -526,6 +556,21 @@ describe('explicit H3 publication', () => {
     expect(vi.mocked(recordVideoHistory).mock.invocationCallOrder[0]).toBeGreaterThan(
       vi.mocked(approveVideoPublication).mock.invocationCallOrder[0],
     );
+  });
+
+  it('publishes a run whose quality is missing or cannot be attached', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    vi.mocked(publishVideoQuality).mockRejectedValueOnce(new Error('quality listing failed'));
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response(artifact));
+    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ ...receipt, quality: 'failed' });
+    expect(recordVideoHistory).toHaveBeenCalledExactlyOnceWith(saved);
   });
 
   it('reports a publication whose History entry was not recorded as failed and still drops cached History', async () => {

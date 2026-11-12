@@ -4,22 +4,21 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  formatNumber,
-  truncateHash,
-  truncateSessionId,
-} from '@/lib/agentic-workload-explorer/format';
+import { Button } from '@/components/ui/button';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { formatCost } from '@/components/agentic-workload-explorer/session-dag';
 import { parseUserAgent } from '@/lib/agentic-workload-explorer/user-agent';
 import { useInfiniteList } from '@/hooks/agentic-workload-explorer/use-infinite-scroll';
-import { Loader2, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Loader2, Search, X } from 'lucide-react';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import {
-  HARNESS_LABELS,
   HARNESSES,
   harnessFromUserAgent,
   isHarness,
   type Harness,
 } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { harnessLabel } from '@/lib/agentic-workload-explorer/harness-label';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 import type {
   Session,
@@ -27,44 +26,48 @@ import type {
   SessionStats,
 } from '@/lib/agentic-workload-explorer/api-types';
 import { createTaskLimiter } from '@/lib/agentic-workload-explorer/task-limiter';
-import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
+import { formatSnapshotClock, formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const STRINGS = {
   en: {
     sessions: 'Sessions',
     total: 'total',
-    searchPlaceholder: 'Search sessions...',
-    minReqs: { '20': '> 20 Reqs', '100': '> 100 Reqs', '0': 'All' } as Record<string, string>,
-    allVersions: 'All Versions',
-    allHarnesses: 'All Harnesses',
+    searchPlaceholder: 'Search sessions',
+    minReqs: { '20': '> 20 reqs', '100': '> 100 reqs', '0': 'All' } as Record<string, string>,
+    allVersions: 'All versions',
+    allHarnesses: 'All harnesses',
     noMatch: 'No sessions match these filters',
     colSession: 'Session',
     colUser: 'User',
     colReqs: 'Reqs',
     colCost: 'Cost',
-    colApiHit: 'API Hit',
-    colHashUpper: 'Hash Upper Bound',
-    colStarted: 'Started',
-    colActive: 'Active',
+    colApiHit: 'API hit',
+    colHashUpper: 'Hash upper bound',
+    colStarted: 'Started (UTC)',
+    colActive: 'Active (UTC)',
     apiHitTitle:
-      'API Cache Hit Rate — cache_read / (cache_read + cache_write + input) across every request in the session.',
+      'API cache hit rate — cache_read / (cache_read + cache_write + input) across every request in the session.',
     hashUpperTitle:
-      'Theoretical Upper Bound Cache Hit Rate — Assuming Infinite Cache TTL & Infinitely Large Cache. Walks a chain-hash trie over every request to find the longest prefix match against any prior chain in the session.',
+      'Theoretical upper-bound cache hit rate — assuming infinite cache TTL and an infinitely large cache. Walks a chain-hash trie over every request to find the longest prefix match against any prior chain in the session.',
     computeHashTitle: 'Compute the exact theoretical hash-cache upper bound for this session.',
-    hashLoad: 'Load',
+    hashLoad: 'Compute',
     hashRetry: 'Retry',
     hashNoData: 'No hash data — session has no recorded prompt blocks.',
     colVersion: 'Version',
     resetSort: 'Reset sort',
+    minReqsFilterLabel: 'Minimum requests',
+    versionFilterLabel: 'Trace version',
+    harnessFilterLabel: 'Harness',
     openSession: (id: string) => `Open session ${id}`,
   },
   zh: {
     sessions: '会话列表',
     total: '总计',
-    searchPlaceholder: '搜索会话…',
+    searchPlaceholder: '搜索会话',
     minReqs: { '20': '> 20 请求', '100': '> 100 请求', '0': '全部' } as Record<string, string>,
     allVersions: '所有版本',
     allHarnesses: '全部 harness',
@@ -75,18 +78,21 @@ const STRINGS = {
     colCost: '成本',
     colApiHit: 'API 命中',
     colHashUpper: 'Hash 上界',
-    colStarted: '开始',
-    colActive: '活跃',
+    colStarted: '开始 (UTC)',
+    colActive: '活跃 (UTC)',
     apiHitTitle:
       'API 缓存命中率 — 会话内所有请求的 cache_read / (cache_read + cache_write + input)',
     hashUpperTitle:
       '理论缓存命中上界 — 假设无限 Cache TTL 与无限大缓存。对每个请求遍历 chain-hash trie，查找与此前任意链的最长前缀匹配。',
     computeHashTitle: '计算此会话的精确理论 hash-cache 命中上界',
-    hashLoad: '加载',
+    hashLoad: '计算',
     hashRetry: '重试',
     hashNoData: '无 hash 数据 — 此会话没有记录 prompt 块',
     colVersion: '版本',
     resetSort: '重置排序',
+    minReqsFilterLabel: '最少请求数',
+    versionFilterLabel: 'Trace 版本',
+    harnessFilterLabel: 'Harness',
     openSession: (id: string) => `打开会话 ${id}`,
   },
 } as const;
@@ -136,7 +142,12 @@ function SortButton({
       } ${active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
     >
       {children}
-      {active && <span className="text-3xs opacity-60">{sortDir === 'desc' ? '▼' : '▲'}</span>}
+      {active &&
+        (sortDir === 'desc' ? (
+          <ArrowDown className="size-3 opacity-60" aria-hidden="true" />
+        ) : (
+          <ArrowUp className="size-3 opacity-60" aria-hidden="true" />
+        ))}
     </button>
   );
 }
@@ -147,28 +158,17 @@ type VersionFilter = 'all' | string;
 const PAGE_SIZE = 50;
 
 const MIN_REQS_FILTERS: { value: MinReqsFilter; label: string }[] = [
-  { value: '20', label: '> 20 Reqs' },
-  { value: '100', label: '> 100 Reqs' },
+  { value: '20', label: '> 20 reqs' },
+  { value: '100', label: '> 100 reqs' },
   { value: '0', label: 'All' },
 ];
 
-const HARNESS_FILTERS: { value: HarnessFilter; label: string }[] = [
-  { value: 'all', label: 'All Harnesses' },
-  ...HARNESSES.map((h) => ({ value: h, label: HARNESS_LABELS[h] })),
-];
-
-const HARNESS_BADGE_CLASSES: Record<Harness, string> = {
-  'claude-code': 'border-orange-500/30 bg-orange-500/8 text-orange-500',
-  codex: 'border-violet-500/30 bg-violet-500/8 text-violet-500',
-  pi: 'border-emerald-500/30 bg-emerald-500/8 text-emerald-500',
-  omp: 'border-sky-500/30 bg-sky-500/8 text-sky-500',
-  other: 'border-border bg-surface-hover text-muted-foreground',
-};
+const HARNESS_FILTERS: readonly HarnessFilter[] = ['all', ...HARNESSES];
 
 const VERSIONED_HARNESSES: readonly HarnessFilter[] = ['claude-code', 'codex', 'omp'];
 
 const VERSION_FILTERS: { value: VersionFilter; label: string }[] = [
-  { value: 'all', label: 'All Versions' },
+  { value: 'all', label: 'All versions' },
   { value: String(CURRENT_TRACE_VERSION), label: `v${CURRENT_TRACE_VERSION}` },
 ];
 
@@ -206,7 +206,9 @@ export default function SessionsPage() {
 }
 
 function SessionsPageContent() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const isMobile = useIsMobileViewport();
   const explorerHref = useExplorerHref();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -327,15 +329,13 @@ function SessionsPageContent() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.sessions}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.sessions}</span>
+        <span className="flex-1 h-px bg-border/30" />
         {statsRefreshing && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
         {loading || !stats ? (
           <Skeleton className="h-3 w-10" />
         ) : (
-          <span className="text-3xs font-mono text-subtle tabular-nums">
+          <span className="text-3xs text-muted-foreground tabular-nums">
             {formatNumber(stats.total)} {t.total}
           </span>
         )}
@@ -363,7 +363,7 @@ function SessionsPageContent() {
               }
             }}
             placeholder={t.searchPlaceholder}
-            className="h-7 pl-8 pr-7 w-56 rounded-md border border-border bg-background text-2xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+            className="h-11 md:h-8 pl-8 pr-7 w-56 rounded-md border border-input bg-background text-2xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
           />
           {searchQuery && (
             <button
@@ -379,62 +379,46 @@ function SessionsPageContent() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          {MIN_REQS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setFilter('minReqs', f.value)}
-              className={`px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md transition-colors ${
-                minReqsFilter === f.value
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
-              }`}
-            >
-              {t.minReqs[f.value] ?? f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          {VERSION_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setFilter('version', f.value)}
-              className={`px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md transition-colors ${
-                versionFilter === f.value
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
-              }`}
-            >
-              {f.value === 'all' ? t.allVersions : f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          {HARNESS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setFilter('harness', f.value)}
-              className={`px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md transition-colors ${
-                harnessFilter === f.value
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
-              }`}
-            >
-              {f.value === 'all' ? t.allHarnesses : f.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedToggle
+          role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
+          ariaLabel={t.minReqsFilterLabel}
+          value={minReqsFilter}
+          onValueChange={(value) => setFilter('minReqs', value)}
+          options={MIN_REQS_FILTERS.map((f) => ({
+            value: f.value,
+            label: t.minReqs[f.value] ?? f.label,
+          }))}
+        />
+        <SegmentedToggle
+          role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
+          ariaLabel={t.versionFilterLabel}
+          value={versionFilter}
+          onValueChange={(value) => setFilter('version', value)}
+          options={VERSION_FILTERS.map((f) => ({
+            value: f.value,
+            label: f.value === 'all' ? t.allVersions : f.label,
+          }))}
+        />
+        <SegmentedToggle
+          role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
+          ariaLabel={t.harnessFilterLabel}
+          value={harnessFilter}
+          onValueChange={(value) => setFilter('harness', value)}
+          options={HARNESS_FILTERS.map((value) => ({
+            value,
+            label: value === 'all' ? t.allHarnesses : harnessLabel(value, locale),
+          }))}
+        />
         {sortChanged && (
-          <button
-            type="button"
-            onClick={resetSort}
-            className="ml-auto px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
-          >
+          <Button type="button" variant="outline" size="xs" onClick={resetSort} className="ml-auto">
             {t.resetSort}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -445,12 +429,10 @@ function SessionsPageContent() {
           ))}
         </div>
       ) : sessions.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-sm text-muted-foreground">{t.noMatch}</p>
-        </div>
+        <EmptyState className="py-16">{t.noMatch}</EmptyState>
       ) : (
-        <div className="rounded-lg border border-border overflow-x-auto">
-          <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-surface text-3xs font-mono uppercase tracking-wider text-muted-foreground border-b border-border grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px]">
+        <div className="rounded-lg border border-border/30 sm:overflow-x-auto">
+          <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-card text-xs text-muted-foreground border-b border-border/20 grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px] font-medium max-sm:hidden">
             <SortButton col="session" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
               {t.colSession}
             </SortButton>
@@ -508,7 +490,7 @@ function SessionsPageContent() {
             </SortButton>
           </div>
 
-          <div className="min-w-[1160px] divide-y divide-border">
+          <div className="divide-y divide-border/20 sm:min-w-[1160px]">
             {sessions.map((session) => (
               <SessionRow key={session.id} session={session} />
             ))}
@@ -526,7 +508,8 @@ function SessionsPageContent() {
 }
 
 function SessionRow({ session }: { session: Session }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const explorerHref = useExplorerHref();
   const [hashState, setHashState] = useState<HashStatsState>({ status: 'pending' });
 
@@ -549,7 +532,7 @@ function SessionRow({ session }: { session: Session }) {
   const { cliVersion, os } = sessionUaInfo(session);
 
   return (
-    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px]">
+    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center max-sm:grid-cols-1 max-sm:gap-1 sm:grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px]">
       <Link
         href={explorerHref(`/sessions/${session.id}`)}
         aria-label={t.openSession(session.id)}
@@ -557,31 +540,37 @@ function SessionRow({ session }: { session: Session }) {
       />
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="font-mono text-sm font-medium truncate block">
-            {truncateSessionId(session.id)}
+          <span className="min-w-0 truncate font-mono text-xs font-medium" title={session.id}>
+            {session.id}
           </span>
           {(() => {
             const harness = harnessFromUserAgent(session.metadata?.userAgent);
             return (
-              <span
-                className={`shrink-0 px-1.5 py-0.5 rounded-sm text-3xs font-mono uppercase tracking-eyebrow border ${HARNESS_BADGE_CLASSES[harness]}`}
-              >
-                {HARNESS_LABELS[harness]}
+              <span className="shrink-0 rounded-md border border-border/30 px-1.5 py-0.5 text-xs text-muted-foreground">
+                {harnessLabel(harness, locale)}
               </span>
             );
           })()}
         </div>
-        <div className="flex items-center gap-2 text-3xs font-mono text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
+          <span className="sm:hidden">
+            {formatNumber(session.requestCount)} {t.colReqs}
+          </span>
+          {Number(session.totalCost) > 0 && (
+            <span className="text-foreground sm:hidden">
+              {formatCost(Number(session.totalCost))}
+            </span>
+          )}
           {os && (
             <>
-              <span className="text-border">·</span>
+              <span className="text-border sm:hidden">·</span>
               <span>{os}</span>
             </>
           )}
           {session.totalOutput > 0 && (
             <>
-              <span className="text-border">·</span>
-              <span className="text-subtle">
+              <span className={os ? 'text-border' : 'text-border sm:hidden'}>·</span>
+              <span className="text-muted-foreground">
                 {(session.totalCacheRead / session.totalOutput).toFixed(1)}:
                 {(session.totalCacheWrite / session.totalOutput).toFixed(1)}:1
               </span>
@@ -590,66 +579,77 @@ function SessionRow({ session }: { session: Session }) {
         </div>
       </div>
 
-      <span className="font-mono text-2xs truncate" title={cliVersion ?? undefined}>
+      <span className="truncate text-xs tabular-nums max-sm:hidden" title={cliVersion ?? undefined}>
         {cliVersion ? (
           <span className="text-muted-foreground">v{cliVersion}</span>
         ) : (
-          <span className="text-subtle">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </span>
 
-      <span className="font-mono text-2xs truncate">
-        <span className="text-muted-foreground">{truncateHash(session.clientApiKeyHash)}</span>
+      <span
+        className="truncate font-mono text-xs text-muted-foreground max-sm:hidden"
+        title={session.clientApiKeyHash}
+      >
+        {session.clientApiKeyHash}
       </span>
 
-      <span className="text-right font-mono text-sm tabular-nums">{session.requestCount}</span>
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
+        {session.requestCount.toLocaleString(locale)}
+      </span>
 
-      <span className="text-right font-mono text-2xs tabular-nums">
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
         {Number(session.totalCost) > 0 ? (
           <span className="text-foreground">{formatCost(Number(session.totalCost))}</span>
         ) : (
-          <span className="text-subtle">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </span>
 
-      <span className="text-right font-mono text-2xs tabular-nums">
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
         {apiHit === null ? (
-          <span className="text-subtle">—</span>
+          <span className="text-muted-foreground">—</span>
         ) : (
           <span className="text-foreground">{apiHit.toFixed(1)}%</span>
         )}
       </span>
 
-      <button
-        type="button"
-        className="relative z-20 text-right font-mono text-2xs tabular-nums hover:text-foreground"
-        title={t.computeHashTitle}
-        onClick={loadHashStats}
-      >
-        <HashHitRateCell state={hashState} />
-      </button>
-
-      <span className="text-right text-3xs font-mono text-muted-foreground">
-        {formatSnapshotTime(session.startedAt)}
+      <span className="relative z-20 justify-self-end text-right text-xs tabular-nums max-sm:hidden">
+        <HashHitRateCell state={hashState} onCompute={loadHashStats} />
       </span>
 
-      <span className="text-right text-3xs font-mono text-muted-foreground">
-        {formatSnapshotTime(session.lastActiveAt)}
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+        {formatSnapshotDate(session.startedAt, locale)} {formatSnapshotClock(session.startedAt)}
+      </span>
+
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+        {formatSnapshotDate(session.lastActiveAt, locale)}{' '}
+        {formatSnapshotClock(session.lastActiveAt)}
       </span>
     </div>
   );
 }
 
-function HashHitRateCell({ state }: { state: HashStatsState }) {
+function HashHitRateCell({ state, onCompute }: { state: HashStatsState; onCompute: () => void }) {
   const t = STRINGS[useLocale()];
-  if (state.status === 'pending') return <span className="text-subtle">{t.hashLoad}</span>;
-  if (state.status === 'loading') return <span className="text-subtle">···</span>;
-  if (state.status === 'error') {
-    return <span className="text-subtle">{t.hashRetry}</span>;
+  if (state.status === 'pending' || state.status === 'error') {
+    return (
+      <Button
+        type="button"
+        variant="link"
+        size="2xs"
+        className="px-0"
+        title={t.computeHashTitle}
+        onClick={onCompute}
+      >
+        {state.status === 'pending' ? t.hashLoad : t.hashRetry}
+      </Button>
+    );
   }
+  if (state.status === 'loading') return <span className="text-muted-foreground">···</span>;
   if (state.data.hashTotal === 0) {
     return (
-      <span className="text-subtle" title={t.hashNoData}>
+      <span className="text-muted-foreground" title={t.hashNoData}>
         —
       </span>
     );

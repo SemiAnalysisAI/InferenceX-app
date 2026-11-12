@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getRequestChartData,
@@ -32,12 +32,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
   }
   try {
-    const sha256s = await getCurrentRequestTimelineSha256s(getDb(), [id]);
+    const sha256s = await getCurrentRequestTimelineSha256s(await getPayloadDb(id), [id]);
     const sha256 = sha256s.get(id);
     const key = sha256 ? contentBlobKey(CACHE_KEY_PREFIX, sha256) : null;
     const redirect = key ? await contentBlobRedirect(request, key) : null;
     if (redirect) return redirect;
-    const data = await getRequestChartData(getDb(), id);
+    const data = await getRequestChartData(await getPayloadDb(id), id);
     if (!data) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     return cachedJsonStoringContentBlob(request, data, key);
   } catch (error) {

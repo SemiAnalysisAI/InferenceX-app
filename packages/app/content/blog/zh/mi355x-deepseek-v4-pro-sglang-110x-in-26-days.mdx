@@ -20,7 +20,7 @@ DeepSeek-V4-Pro 于 [2026-04-24](https://api-docs.deepseek.com/news/news260424) 
 
 **31 个性能优化 PR** 在 AMD 分支上紧密接力完成了这些核心工作：FP4 权重启用（[#24031](https://github.com/sgl-project/sglang/pull/24031)）、用于 DeepSeek Sparse Attention 的 TileLang 注意力索引器（[#24033](https://github.com/sgl-project/sglang/pull/24033)、[#24050](https://github.com/sgl-project/sglang/pull/24050)）、Triton 稀疏 MLA kernel 及后续融合调度优化（[#24930](https://github.com/sgl-project/sglang/pull/24930)、[#25878](https://github.com/sgl-project/sglang/pull/25878)、[#25977](https://github.com/sgl-project/sglang/pull/25977)）、融合的多头压缩 / RoPE / Hadamard（[#24355](https://github.com/sgl-project/sglang/pull/24355)、[#24727](https://github.com/sgl-project/sglang/pull/24727)、[#26014](https://github.com/sgl-project/sglang/pull/26014)）、FlyDSL MoE（[#24971](https://github.com/sgl-project/sglang/pull/24971)）、融合 hash topk（[#24728](https://github.com/sgl-project/sglang/pull/24728)）、AITER MHC 前处理/后处理，以及约六个压缩器逐元素 kernel 融合。速度就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
   点击查看完整的 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -156,7 +156,7 @@ DeepSeek 在预览发布时公布了 V4-Pro-Max 与 Claude Opus 4.6、GPT-5.4-xH
   caption="MI355X SGLang DeepSeek-V4-Pro（1.6T / 49B 激活参数）在 ISL 8192 / OSL 1024 下的表现。来自 amd/deepseek_v4 SGLang 分支的 5 个日期，跨度 26 天。标注表示 8-GPU TP=8 配置；后期日期在高并发段使用了 DP attention。"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1)，已预过滤为 MI355X SGLang DSv4-Pro 在 5 个测量日期的数据。
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1)，已预过滤为 MI355X SGLang DSv4-Pro 在 5 个测量日期的数据。
 
 ## MI355X DeepSeek-V4-Pro 的后续计划
 
@@ -165,8 +165,8 @@ DeepSeek 在预览发布时公布了 V4-Pro-Max 与 Claude Opus 4.6、GPT-5.4-xH
 <Figure
   srcLight="/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/specs-radar-light.png"
   srcDark="/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/specs-radar-dark.png"
-  alt="GPU 规格雷达图对比 MI355X（红色）与 B200 SXM（绿色），来自 /gpu-specs。MI355X 多边形在 Memory 轴达到 100%（288 GB，与 GB300 NVL72 持平），在 FP8 + BF16 TFLOP/s 轴亦然（5,033 / 2,516——单 GPU 天花板）。B200 多边形仅在 Scale Up BW 轴领先（NVLink 5 的 900 GB/s vs MI355X 的 Infinity Fabric 576 GB/s）。FP4 轴上两者均压缩于 GB300 NVL72 的 15,000 TFLOP/s 天花板之下。扩展域轴以 GB200/GB300 NVL72 的 72 GPU 为上限，因此两个 8-GPU SKU 均读数约 11%。"
-  caption="MI355X（红色）与 B200 SXM（绿色）在 /gpu-specs 上的对比。各轴按面板中所有厂商 SKU 的最大值归一化。MI355X 在每 GPU FP8 / BF16 / Memory 上达到天花板值；B200 仅在扩展带宽上领先。"
+  alt="GPU 规格雷达图对比 MI355X（红色）与 B200 SXM（绿色），来自 /infx/gpu-specs。MI355X 多边形在 Memory 轴达到 100%（288 GB，与 GB300 NVL72 持平），在 FP8 + BF16 TFLOP/s 轴亦然（5,033 / 2,516——单 GPU 天花板）。B200 多边形仅在 Scale Up BW 轴领先（NVLink 5 的 900 GB/s vs MI355X 的 Infinity Fabric 576 GB/s）。FP4 轴上两者均压缩于 GB300 NVL72 的 15,000 TFLOP/s 天花板之下。扩展域轴以 GB200/GB300 NVL72 的 72 GPU 为上限，因此两个 8-GPU SKU 均读数约 11%。"
+  caption="MI355X（红色）与 B200 SXM（绿色）在 /infx/gpu-specs 上的对比。各轴按面板中所有厂商 SKU 的最大值归一化。MI355X 在每 GPU FP8 / BF16 / Memory 上达到天花板值；B200 仅在扩展带宽上领先。"
 />
 
 | 规格                    | MI355X                     | B200 SXM            | MI355X / B200 |
@@ -203,7 +203,7 @@ DeepSeek 在预览发布时公布了 V4-Pro-Max 与 Claude Opus 4.6、GPT-5.4-xH
 
 31 个性能优化 PR 是以下贡献者的工作成果：[Thomas Wang](https://github.com/thomawan)（TileLang 注意力索引器、FlyDSL MoE、压缩器逐元素融合、带 CUDA graph 的 attn early-exit、rmsnorm-quant 融合）、[Xinyi Song](https://github.com/xinyiisme)（融合 compress-decode、融合 RoPE Hadamard、融合 hash topk、压缩器优化）、[HaiShaw](https://github.com/HaiShaw)（集成协调 + 环境配置）、[amd-danli103](https://github.com/amd-danli103)（Triton 稀疏 MLA + 融合调度）、[jacky.cheng](https://github.com/jackylee99)（input_layernorm + FP8 per-group 量化融合、softmax pool、AITER greedy_sample）、[kk](https://github.com/kkHuang-amd)（FP4 启用、MHC 性能、fuse_wqkv）、[Raiden Makoto](https://github.com/raidenmakoto)（Triton 融合 store cache）、[Xinyu Jiang](https://github.com/xinyujiang)（radix 优化），以及更广泛的 AMD AI 团队。从上游到基准测试的迭代速度就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
   点击查看完整的 InferenceX 仪表板 →
 </DashboardCTA>
 

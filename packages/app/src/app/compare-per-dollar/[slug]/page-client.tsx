@@ -28,7 +28,7 @@ const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
 const PER_DOLLAR_LABEL_OVERRIDES = {
   en: {
-    'Cost ($/M tok)': 'Dollar per Million Tokens',
+    'Cost ($/M tok)': 'Dollars per million tokens',
   },
   zh: {
     'Cost ($/M tok)': '每百万 token 成本（美元）',
@@ -39,10 +39,10 @@ const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 const STRINGS = {
   en: {
-    eyebrowSuffix: 'Performance per Dollar',
-    h1Suffix: 'Performance per Dollar',
+    eyebrowSuffix: 'Performance per dollar',
+    h1Suffix: 'performance per dollar',
     mainChartLinkText: 'the main inference chart',
-    fullComparisonLinkText: 'View full latency + throughput comparison →',
+    fullComparisonLinkText: 'View full latency and throughput comparison →',
     caveatSeqFallback: 'sequence',
     caveatPrecFallback: 'precision',
     pricingLabel: 'Chip pricing (owning hyperscaler):',
@@ -147,14 +147,14 @@ export default function ComparePerDollarPageClient({
       <div className="flex flex-col gap-4">
         <Card className="flex w-full min-w-0 flex-col gap-3">
           <header>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {modelLabel} · {t.eyebrowSuffix}
-            </div>
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-balance lg:text-3xl">
               {label} {t.h1Suffix}
             </h1>
             {isZh ? (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
                 {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的每百万 token
                 成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token 数归一化，用于比较不同
@@ -166,7 +166,7 @@ export default function ComparePerDollarPageClient({
                 相同。
               </p>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                 <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
                 Large-hyperscaler-volume ownership TCO normalized by total tokens — performance per
@@ -181,7 +181,7 @@ export default function ComparePerDollarPageClient({
             )}
             {agenticIntro && (
               <p
-                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                className="mt-3 max-w-3xl text-sm text-foreground"
                 data-testid="compare-agentic-intro"
               >
                 {agenticIntro.paragraph}{' '}
@@ -195,14 +195,17 @@ export default function ComparePerDollarPageClient({
               </p>
             )}
             {narrative.length > 0 && (
-              <div className="mt-3 flex flex-col gap-2" data-testid="compare-per-dollar-narrative">
+              <div
+                className="mt-3 flex max-w-3xl flex-col gap-2"
+                data-testid="compare-per-dollar-narrative"
+              >
                 {narrative.map((para, i) => (
-                  <p key={i} className="text-sm text-foreground/80">
+                  <p key={i} className="text-sm text-foreground">
                     {para}
                     {i === narrative.length - 1 && (
                       <>
                         {' '}
-                        <span className="text-muted-foreground italic">
+                        <span className="text-muted-foreground">
                           {isZh
                             ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
                             : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
@@ -238,7 +241,7 @@ export default function ComparePerDollarPageClient({
             <p className="mt-2 text-sm">
               <Link
                 href={isZh ? `/zh/compare/${slug}` : `/compare/${slug}`}
-                className="underline hover:text-primary text-muted-foreground"
+                className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_per_dollar_cross_link_to_full', { slug })}
               >
                 {t.fullComparisonLinkText}
@@ -261,29 +264,6 @@ export default function ComparePerDollarPageClient({
               </p>
             )}
           </header>
-          <figure
-            className="mt-2 flex flex-col gap-2"
-            data-testid="compare-per-dollar-indexed-image"
-          >
-            <img
-              src={heroImageSrc}
-              alt={
-                isZh
-                  ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
-                  : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
-              }
-              width={1200}
-              height={675}
-              loading="eager"
-              fetchPriority="high"
-              className="w-full rounded-lg border border-border/50"
-            />
-            <figcaption className="text-xs text-muted-foreground">
-              {isZh
-                ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
-                : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
-            </figcaption>
-          </figure>
           <CompareTableSection
             a={a}
             b={b}
@@ -298,6 +278,38 @@ export default function ComparePerDollarPageClient({
             emptyStateText={t.emptyState}
             isZh={isZh}
           />
+          <figure
+            className="mt-2 flex max-w-sm flex-col gap-2"
+            data-testid="compare-per-dollar-indexed-image"
+          >
+            <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              <img
+                src={heroImageSrc}
+                alt={
+                  isZh
+                    ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
+                    : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
+                }
+                width={1200}
+                height={675}
+                loading="lazy"
+                className="w-full rounded-lg"
+              />
+            </a>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
+                : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
+            </figcaption>
+            <a
+              href={heroImageSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-foreground underline underline-offset-2"
+            >
+              {isZh ? '查看大图 ↗' : 'Open full-size image ↗'}
+            </a>
+          </figure>
         </Card>
         <LazyCompareInferenceChart
           activeTab="compare"

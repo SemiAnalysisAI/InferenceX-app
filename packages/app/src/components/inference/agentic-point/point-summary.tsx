@@ -19,9 +19,9 @@ export const POINT_SUMMARY_STRINGS = {
     disagg: 'disagg',
     multiNodeAggregate: 'multi-node aggregate',
     githubRun: 'GitHub Actions run →',
-    offloadType: 'Offload Type',
-    offloadBackend: 'KV Offload Engine',
-    transferEngine: 'KV Transfer Engine',
+    offloadType: 'Offload type',
+    offloadBackend: 'KV offload engine',
+    transferEngine: 'KV transfer engine',
     router: 'Router',
     concurrency: 'Concurrency',
     gpuCacheHit: 'Chip cache hit',
@@ -56,7 +56,7 @@ const fmtPct = (v: number | null | undefined): string =>
 function MetaLine({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <span className="text-sm font-medium text-foreground">{value}</span>
     </div>
   );

@@ -1,6 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { useMemo, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
@@ -18,6 +21,14 @@ import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
+
+const ReproduceDrawer = dynamic(
+  () =>
+    import('@/components/inference/reproduce/ReproduceDrawer').then(
+      (module) => module.ReproduceDrawer,
+    ),
+  { ssr: false },
+);
 
 interface InferenceTableProps {
   data: InferenceData[];
@@ -45,7 +56,7 @@ export function inferenceTableHeaderLabels(
     chip: locale === 'zh' ? '芯片' : 'Chip',
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
-    physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
+    physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical chips',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     series: locale === 'zh' ? '系列' : 'Series',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
@@ -53,6 +64,7 @@ export function inferenceTableHeaderLabels(
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
     measuredGpuPower: locale === 'zh' ? 'GPU 实测功耗 (W/芯片)' : 'Measured GPU Power (W/chip)',
     estimateStatus: locale === 'zh' ? '整体估算状态' : 'All-in Estimate Status',
+    reproduce: locale === 'zh' ? '复现' : 'Reproduce',
   };
 }
 
@@ -76,6 +88,7 @@ export default function InferenceTable({
     [data, chartDefinition, selectedYAxisMetric],
   );
   const powerCompare = useMemo(() => inferPowerCompare(data), [data]);
+  const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
 
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
     () => [
@@ -163,7 +176,7 @@ export default function InferenceTable({
                 allInMeasuredStatusLabel(row, selectedYAxisMetric.slice(2), locale),
               sortValue: (row: InferenceData) =>
                 allInMeasuredStatusLabel(row, selectedYAxisMetric.slice(2), locale),
-              className: 'w-32 min-w-32 sm:w-auto sm:min-w-48',
+              className: 'w-28 min-w-28 sm:w-auto sm:min-w-48',
               importance: 'key' as const,
             },
           ]
@@ -184,6 +197,23 @@ export default function InferenceTable({
         className: 'tabular-nums',
         importance: 'key',
       },
+      {
+        header: headers.reproduce,
+        align: 'right',
+        cell: (row) => (
+          <Button
+            type="button"
+            variant="outline"
+            size="2xs"
+            data-testid="inference-table-reproduce"
+            onClick={() => setReproducePoint(row)}
+          >
+            {headers.reproduce}
+          </Button>
+        ),
+        className: 'whitespace-nowrap',
+        importance: 'key',
+      },
     ],
     [
       yPath,
@@ -197,11 +227,20 @@ export default function InferenceTable({
   );
 
   return (
-    <DataTable
-      data={sorted}
-      columns={columns}
-      testId="inference-results-table"
-      analyticsPrefix="inference_table"
-    />
+    <>
+      <DataTable
+        data={sorted}
+        columns={columns}
+        testId="inference-results-table"
+        analyticsPrefix="inference_table"
+      />
+      {reproducePoint === null ? null : (
+        <ReproduceDrawer
+          point={reproducePoint}
+          source="table"
+          onClose={() => setReproducePoint(null)}
+        />
+      )}
+    </>
   );
 }

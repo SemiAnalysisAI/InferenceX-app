@@ -58,6 +58,22 @@ describe('renderAxes', () => {
       expect(tickCount).toBeLessThanOrEqual(8);
     });
 
+    it('thins x ticks and grid lines to about one per 80px on a narrow plot', () => {
+      const layout = makeLayout({ containerWidth: 340 });
+      const xScale = d3.scaleLinear().domain([0, 700]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderAxes(layout, xScale, yScale, { xTickCount: 10 });
+      renderGrid(layout, xScale, yScale);
+
+      const labels = layout.xAxisGroup
+        .selectAll<SVGTextElement, unknown>('.tick text')
+        .nodes()
+        .map((node) => node.textContent);
+      expect(labels).toEqual(['0', '200', '400', '600']);
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBe(4);
+    });
+
     it('renders only explicit x tick values within the visible domain', () => {
       const layout = makeLayout();
       const xScale = d3.scaleLinear().domain([2, 10]).range([0, layout.width]);
@@ -73,6 +89,32 @@ describe('renderAxes', () => {
         labels.push(d3.select(this).text());
       });
       expect(labels).toEqual(['2', '4']);
+    });
+
+    it('hides the label next to a clamped last x tick when they collide', () => {
+      Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
+        value: () => 60,
+        configurable: true,
+      });
+      try {
+        const layout = makeLayout();
+        const xScale = d3.scaleLinear().domain([0, layout.width]).range([0, layout.width]);
+        const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+        renderAxes(layout, xScale, yScale, {
+          xTickValues: [0, layout.width - 40, layout.width],
+          xTickFormat: String,
+        });
+
+        const ticks = layout.xAxisGroup.selectAll<SVGGElement, unknown>('.tick').nodes();
+        const text = (index: number) => ticks[index].querySelector('text')!;
+        expect(text(2).getAttribute('dx')).toBe('-30');
+        expect(text(1).getAttribute('visibility')).toBe('hidden');
+        expect(ticks[1].querySelector('line')).not.toBeNull();
+        expect(text(0).getAttribute('visibility')).toBeNull();
+      } finally {
+        Reflect.deleteProperty(SVGElement.prototype, 'getComputedTextLength');
+      }
     });
 
     it('respects yTickCount', () => {
@@ -812,6 +854,17 @@ describe('writeAttrs and writeText', () => {
 
 const prefixedLabel = (d: d3.AxisDomain) => `#${String(d)}`;
 
+const split = (group: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+  group.selectAll('.tick').attr('data-mark', (_, index) => String(index));
+  group.selectAll<SVGTextElement, unknown>('.tick text').each(function () {
+    const label = this.textContent ?? '';
+    this.textContent = '';
+    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    tspan.textContent = label;
+    this.append(tspan);
+  });
+};
+
 describe('renderAxes parity with d3-axis', () => {
   it('renders the same DOM as d3 axis generators across domain, format and tick changes', () => {
     const ours = makeLayout();
@@ -856,16 +909,6 @@ describe('renderAxes parity with d3-axis', () => {
   it('matches d3 for band and time scales and after labels are customized', () => {
     const ours = makeLayout();
     const theirs = makeLayout();
-    const split = (group: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-      group.selectAll('.tick').attr('data-mark', (_, index) => String(index));
-      group.selectAll<SVGTextElement, unknown>('.tick text').each(function () {
-        const label = this.textContent ?? '';
-        this.textContent = '';
-        const tspan = document.createElementNS(SVG_NS, 'tspan');
-        tspan.textContent = label;
-        this.append(tspan);
-      });
-    };
     const domains = [
       ['b200 fp4', 'h100 fp8', 'mi355x fp4'],
       ['h100 fp8', 'gb200 fp4', 'b200 fp4', 'mi300x fp8'],

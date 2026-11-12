@@ -1,3 +1,6 @@
+import { Card, CardTitle } from '@/components/ui/card';
+import { Stat } from '@/components/ui/stat';
+import { EmptyState } from '@/components/ui/empty-state';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { ErrorReach, ErrorReachCohort } from '@/lib/agentic-workload-explorer/api-types';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -14,10 +17,10 @@ const STRINGS = {
     reachTitle: 'Reach separates broad incidents from repeated failures in a few sessions',
     reachDescription: (days: number) =>
       `Rolling ${days} days. Affected sessions have at least one failed HTTP request; repeat-error sessions have two or more. Errors include HTTP 4xx/5xx and recorded proxy failures.`,
-    requestErrorRate: 'Request Error Rate',
-    sessionsAffected: 'Sessions Affected',
-    repeatSessionShare: 'Repeat-Session Share',
-    topTenConcentration: 'Top 10 Concentration',
+    requestErrorRate: 'Request error rate',
+    sessionsAffected: 'Sessions affected',
+    repeatSessionShare: 'Repeat-session share',
+    topTenConcentration: 'Top 10 concentration',
     requestsDetail: (errors: string, total: string) => `${errors} / ${total} requests`,
     sessionsDetail: (affected: string, total: string) => `${affected} / ${total} sessions`,
     repeatDetail: (count: string) => `${count} sessions with 2+ errors`,
@@ -26,12 +29,12 @@ const STRINGS = {
     colProvider: 'Provider',
     colRequests: 'Requests',
     colErrors: 'Errors',
-    colReqRate: 'Req. Rate',
-    colSessionsHit: 'Sessions Hit',
+    colReqRate: 'Req. rate',
+    colSessionsHit: 'Sessions hit',
     colReach: 'Reach',
-    colErrorsPerHit: 'Errors / Hit',
-    colRepeatShare: 'Repeat Share',
-    colTopTenShare: 'Top 10 Share',
+    colErrorsPerHit: 'Errors / hit',
+    colRepeatShare: 'Repeat share',
+    colTopTenShare: 'Top 10 share',
     errorsPerHitTitle: 'Average / p90 request errors per affected session',
     repeatShareTitle: 'Share of errors from sessions with two or more errors',
   },
@@ -67,18 +70,6 @@ function formatPct(value: number | null, digits = 1): string {
   return value === null ? '—' : `${(value * 100).toFixed(digits)}%`;
 }
 
-function ReachMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-md border border-border bg-background/40 p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-0.5 text-lg font-mono font-bold">{value}</div>
-      <div className="mt-0.5 text-3xs font-mono text-muted-foreground">{detail}</div>
-    </div>
-  );
-}
-
 function ProviderRow({ row }: { row: ErrorReachCohort }) {
   return (
     <tr className="transition-colors hover:bg-surface-hover/70">
@@ -86,7 +77,7 @@ function ProviderRow({ row }: { row: ErrorReachCohort }) {
         {PROVIDER_LABELS[row.client] ?? row.client}
       </th>
       <td className="py-1.5 text-right tabular-nums">{formatNumber(row.requestCount)}</td>
-      <td className="py-1.5 text-right tabular-nums text-rose-500">
+      <td className="py-1.5 text-right tabular-nums text-red-700 dark:text-red-400">
         {formatNumber(row.errorCount)}
       </td>
       <td className="py-1.5 text-right tabular-nums">{formatPct(row.requestErrorRate, 2)}</td>
@@ -98,7 +89,7 @@ function ProviderRow({ row }: { row: ErrorReachCohort }) {
         {row.avgErrorsPerAffectedSession === null
           ? '—'
           : row.avgErrorsPerAffectedSession.toFixed(1)}
-        <span className="text-subtle">
+        <span className="text-muted-foreground">
           {' '}
           /{' '}
           {row.p90ErrorsPerAffectedSession === null
@@ -116,24 +107,20 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
   const t = STRINGS[locale];
   const overall = data.overall;
   if (!overall) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-6 text-center text-2xs font-mono text-muted-foreground">
-        {t.noRequests(data.windowDays)}
-      </div>
-    );
+    return <EmptyState>{t.noRequests(data.windowDays)}</EmptyState>;
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3 space-y-3">
+    <Card className="gap-4">
       <div>
-        <div className="text-3xs font-mono font-bold text-foreground">{t.reachTitle}</div>
-        <p className="mt-0.5 text-3xs font-mono text-subtle">
+        <CardTitle>{t.reachTitle}</CardTitle>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {t.reachDescription(data.windowDays)}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <ReachMetric
+      <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat
           label={t.requestErrorRate}
           value={formatPct(overall.requestErrorRate, 2)}
           detail={t.requestsDetail(
@@ -141,7 +128,7 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
             formatNumber(overall.requestCount),
           )}
         />
-        <ReachMetric
+        <Stat
           label={t.sessionsAffected}
           value={formatPct(overall.affectedSessionRate)}
           detail={t.sessionsDetail(
@@ -149,12 +136,12 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
             formatNumber(overall.sessionCount),
           )}
         />
-        <ReachMetric
+        <Stat
           label={t.repeatSessionShare}
           value={formatPct(overall.repeatErrorShare)}
           detail={t.repeatDetail(formatNumber(overall.repeatErrorSessionCount))}
         />
-        <ReachMetric
+        <Stat
           label={t.topTenConcentration}
           value={formatPct(overall.topTenErrorShare)}
           detail={t.topDetail(
@@ -162,12 +149,12 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
             formatNumber(overall.maxErrorsInSession),
           )}
         />
-      </div>
+      </dl>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-2xs font-mono">
+        <table className="w-full min-w-[860px] text-xs tabular-nums">
           <caption className="sr-only">{t.caption}</caption>
-          <thead className="border-b border-border text-muted-foreground">
+          <thead className="border-b border-border/20 text-muted-foreground">
             <tr>
               <th scope="col" className="py-1.5 text-left font-medium">
                 {t.colProvider}
@@ -198,13 +185,13 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-border/20">
             {data.byClient.map((row) => (
               <ProviderRow key={row.client} row={row} />
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }

@@ -11,6 +11,12 @@ vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 import { D3ChartWrapper } from './d3-chart-wrapper';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }

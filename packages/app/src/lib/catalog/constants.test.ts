@@ -164,14 +164,17 @@ describe('getHardwareConfig', () => {
     });
   });
 
-  it('returns unknown config when base GPU is not recognised', () => {
-    const config = getHardwareConfig('completelynew');
-    expect(config.label).toBe('Unknown');
-  });
-
-  it('returns unknown config when neither key nor base is recognised', () => {
-    const config = getHardwareConfig('completelynew_variant');
-    expect(config.label).toBe('Unknown');
+  it('labels an unregistered base GPU by its raw name and keeps its parts', () => {
+    expect(getHardwareConfig('completelynew')).toMatchObject({
+      name: 'completelynew',
+      label: 'COMPLETELYNEW',
+      suffix: '',
+    });
+    expect(getHardwareConfig('completelynew_sglang_mtp')).toMatchObject({
+      name: 'completelynew-sglang-mtp',
+      label: 'COMPLETELYNEW',
+      suffix: '(SGLang, MTP)',
+    });
   });
 
   it('always returns an object with required fields (name, label)', () => {
@@ -182,10 +185,10 @@ describe('getHardwareConfig', () => {
     }
   });
 
-  it('logs a console.warn for unknown keys', () => {
+  it('logs a console.warn for the unknown sentinel key', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    getHardwareConfig('not-a-real-gpu');
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not-a-real-gpu'));
+    expect(getHardwareConfig('unknown').label).toBe('Unknown');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown'));
     warnSpy.mockRestore();
   });
 

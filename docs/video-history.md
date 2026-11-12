@@ -1,6 +1,6 @@
 # Video performance history
 
-`/video` and `/zh/video` lead with the cross-hardware dashboard (see [VideoGenX dashboard](./videogenx-dashboard.md)); the **Performance history** list described here sits in a collapsible section below it, which opens automatically when the URL carries a `history-*` filter (`history-hardware`, `history-concurrency`, `history-query`). Each entry links to its original GitHub Actions run. The earlier per-run viewer, trade-off chart and CI-run browser were removed with the dashboard rebuild; clips are compared in the dashboard's Compare panel.
+`/vgx` and `/zh/vgx` lead with the cross-hardware dashboard (see [VideoGenX dashboard](./videogenx-dashboard.md)); the **Performance history** list described here sits in a collapsible section below it, which opens automatically when the URL carries a `history-*` filter (`history-hardware`, `history-concurrency`, `history-query`). Each entry links to its original GitHub Actions run. The earlier per-run viewer, trade-off chart and CI-run browser were removed with the dashboard rebuild; clips are compared in the dashboard's Compare panel.
 
 ## Read path
 
@@ -42,7 +42,11 @@ differ, so a page read does not warm the view API and vice versa; each entry is
 still shared across requests and instances, and the tag purge expires both.
 These reads do not call GitHub. A page whose index or approval receipt could not be read, a
 page read while storage is off, and absent media are returned but not retained,
-so the next read tries storage again. A page past the end is empty for any page number,
+so the next read tries storage again. Such a History page carries
+`X-VideoGenX-Incomplete: 1`: the page shell seeds nothing from it and leaves History to
+the browser, and the browser keeps the entries it received but shows the failed-read
+notice with its retry, because the missing entries would otherwise read as an empty chart
+without a retry. A page past the end is empty for any page number,
 so only page 1 is retained when empty. Unapproved entries are retained, because
 an approval only appears through publication. A publication or backfill expires
 the tag at once, also when it fails after a write, and
@@ -54,7 +58,7 @@ verified, read-only snapshot and bypasses this cache.
 超过 5 分钟的条目会再返回一次，同时由 Next 在后台刷新；这只用于兜底与发布失效同时进行的读取。页面渲染与 HTTP 路由对同一页各自持有一份缓存条目：Next 以编译后的回调文本作为
 `unstable_cache` 的键，而两个 bundle 并不相同，因此页面读取不会预热视图 API，反之亦然；
 每份条目仍跨请求、跨实例共享，标签失效会同时清除两者。这些读取不调用 GitHub。
-索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；
+索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；这样的 History 页带有 `X-VideoGenX-Incomplete: 1`：页面骨架不用它预填数据，改由浏览器读取 History；浏览器保留已收到的条目，但显示读取失败提示和重试按钮，否则缺失的条目只会表现为一张没有重试入口的空图表；
 超出末页的页对任何页码都为空，因此只有第 1 页在为空时也会保留；未批准条目会保留，因为批准只会通过发布产生。发布或历史补建会立即让该标签失效，即使在写入后失败也是如此；
 `POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页与页数分别缓存，
 仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
@@ -62,7 +66,51 @@ verified, read-only snapshot and bypasses this cache.
 
 The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` takes a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
-Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout, and finally records the artifact in a new History snapshot. A repeat with the same identity reuses the receipt; a mismatched receipt does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
+Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout, and finally records the artifact in a new History snapshot. A repeat with the same identity, or a manual republish without a merge run ID, reuses the receipt; a receipt with a different merge run ID does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
+
+### Per-clip reference quality
+
+After approval and History, the authorized POST attaches per-clip PSNR from InferenceX's
+Video Quality workflow. That workflow runs after every Run Sweep and uploads
+`h3-quality-<run>-<attempt>` (`quality.json`, the reference descriptor and `SHA256SUMS`)
+to its own run. The POST looks up that name with GitHub's repository-wide artifact filter,
+starting at the result artifact's attempt and continuing to the run's latest attempt, because a
+later attempt's artifact also scores earlier bundles that were not rerun. It trusts the newest
+unexpired copy whose workflow run is `.github/workflows/video-quality.yml`, started by
+`workflow_run` or `workflow_dispatch` on `main` at a commit that is on `main`, with
+SemiAnalysisAI/InferenceX as both repository and head repository, so a fork pull request or
+another branch cannot qualify. The scorer
+revision inside `quality.json` is provenance, not trust. `SHA256SUMS` must seal `quality.json`
+and the descriptor, and `references.descriptor_sha256` must match the descriptor. Each pair must
+bind to the stored artifact by run, artifact, source, manifest SHA, cell, slot, case, prompt,
+seed, media path and media SHA. Its reference must be the descriptor case with the same prompt,
+seed and settings, at `<case_id>.mp4` with the listed SHA256. One failed check rejects the
+whole attachment.
+
+Reference MP4s come from the descriptor's release, which must be in SemiAnalysisAI/InferenceX.
+Each is checked against the listed SHA256 and size and stored once at
+`objects/<sha256>/<case_id>.mp4`, the same content-addressed path as candidate clips, so
+playback and the Difference canvas read Blob media with cross-origin pixel access. The
+attachment then goes once to `quality/<run>/<artifact name>_<artifact id>.json`, apart from the
+immutable index. It holds the pairs and the unscored clips with their reason. Published media reads merge it into the artifact. A share that only
+marks the artifact unreadable is not stored, so a later successful score can still attach. A
+missing, untrusted or failing quality artifact leaves the publication as it is, and the POST still
+succeeds; its response reports `quality` as the attached pair count, null when none is available
+yet, or `failed`.
+
+Quality usually finishes after the publication dispatch. A later manual h3-media dispatch with
+the same `run_id` attaches it. That dispatch names no merge run, so the POST reuses the recorded
+approval; indexes and History are reused too, and a stored attachment is returned without reading
+GitHub. The renditions job that follows also encodes stored reference
+clips by sealed SHA256, so the reference plays a light encode in Clip view and the original in
+Difference.
+
+An unstored `?unofficialrun=` artifact is read with `format=live&run=<run>&artifact=<id>`: its
+documents plus the same verified pairs and unscored clips, without media URLs. Its clips show
+PSNR or the unscored reason over an empty media tile. Each artifact's live quality lookup, found or
+not, is reused for 5 minutes.
+
+中文：授权 POST 在批准和写入 History 之后，从 InferenceX 的 Video Quality 工作流附加逐条视频 PSNR。该工作流在每次 Run Sweep 完成后运行，把 `h3-quality-<run>-<attempt>`（`quality.json`、参考描述文件和 `SHA256SUMS`）上传到自己的运行中。POST 用 GitHub 仓库级产物名称筛选查找该产物，从结果产物所属的 attempt 开始，一直查到运行的最新 attempt，因为后续 attempt 的质量产物也会为未重跑的早期结果包评分。它只信任最新且未过期、由 `.github/workflows/video-quality.yml` 以 `workflow_run` 或 `workflow_dispatch` 方式在 `main` 分支上、且基于 `main` 已有提交运行后上传的副本（仓库和 head 仓库都必须是 SemiAnalysisAI/InferenceX，因此 fork PR 或其他分支不会被采信）。`quality.json` 中的评分器 revision 只作溯源，不作为信任依据。`SHA256SUMS` 必须封存 `quality.json` 与描述文件，`references.descriptor_sha256` 必须与描述文件一致。每个配对须按运行、产物、来源、manifest SHA、测量单元、slot、用例、prompt、seed、媒体路径和媒体 SHA 绑定到已存产物；参考视频必须是描述文件中 prompt、seed 和配置都一致的用例，路径为 `<case_id>.mp4`，SHA256 与描述文件一致。任一检查失败即拒绝整个附件。参考 MP4 从描述文件指定的 release 下载（只接受 SemiAnalysisAI/InferenceX），核对 SHA256 和大小后存入 `objects/<sha256>/<case_id>.mp4`，与候选视频使用相同的内容寻址路径，因此播放和“差异”画布都读取允许跨域像素访问的 Blob 媒体。随后把附件一次性写入 `quality/<run>/<产物名>_<产物 ID>.json`，与不可变索引分开存放；附件包含配对，以及未评分视频及其原因。读取已发布媒体时会把它合并到产物中。只标记该产物无法读取的结果不会存储，因此之后评分成功时仍可附加。质量产物缺失、不可信或校验失败时发布结果不变，POST 照常成功，响应中的 `quality` 为已附加的配对数量；暂无结果时为 null，附加失败时为 `failed`。质量评分通常晚于发布触发完成；之后以相同 `run_id` 手动触发 h3-media 即可附加。手动触发不带 merge 运行 ID，POST 会沿用已记录的批准回执；索引和 History 同样直接复用，已存附件直接返回，不再读取 GitHub。随后的转码 job 也按封存 SHA256 为已存参考视频生成网页转码版本，参考视频在“视频”视图播放转码版本，在“差异”视图使用原始视频。未存储的 `?unofficialrun=` 产物通过 `format=live&run=<run>&artifact=<id>` 读取，返回其文档以及同样校验过的配对和未评分视频，不含媒体 URL；这些视频显示 PSNR 或未评分原因，媒体位置留空。每个产物的 live 质量查找结果无论有无都复用 5 分钟。
 
 ### Web playback renditions
 
@@ -87,14 +135,30 @@ unfinished clips. The output hash in the receipt path lets readers resolve every
 rendition from one listing. `--dry-run` lists the work and `--out-dir <dir>` encodes
 locally; neither writes to Blob. `--limit <n>` bounds a run.
 
-Published media reads add `previewUrl` to each asset whose sealed SHA256 has a receipt,
-from one listing shared across instances. Renditions are encoded after the publication
-purge, so the listing refreshes in the background after 60 seconds instead of waiting for
-the next publication. `url` stays the sealed
-original. A failed listing serves the originals only. Indexes, approvals and History
-are unchanged.
+The same job also writes a poster for each sealed MP4: the `poster-f0-w672-q4` profile
+decodes the first frame, with no seek, so the still matches the frame playback starts on.
+It scales the frame to at most 672 px wide at the source aspect (672x384 for the
+1344x768 clips) and writes one JPEG at `-q:v 4` with metadata stripped. The script rejects
+a poster unless the original matched its recorded SHA256 and ffprobe reports one `mjpeg`
+frame no wider than 672 px whose aspect is within 1% of the original. It uploads the JPEG
+to `objects/<output sha256>/poster-f0-w672-q4.jpg`, then writes the receipt
+`renditions/<source sha256>/poster-f0-w672-q4/<output sha256>.json` with its bytes, size,
+the ffmpeg version and the arguments. The plan is per original and profile: each original
+is downloaded and verified once, the poster encodes first, then the rendition, and a
+profile with a receipt is skipped. A backfill after renditions exist therefore encodes
+posters only. Changed poster arguments need a new profile id. Diagnostic media are not
+planned and get no poster.
 
-中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。读取已发布媒体时，某个媒体的封存 SHA256 有对应回执时，返回结果会附加 `previewUrl`；回执列表跨实例共享缓存。转码在发布清除缓存之后才完成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
+Published media reads add `previewUrl` and `posterUrl` to each asset and stored reference
+whose sealed SHA256 has the matching receipt, from one listing shared across instances. A
+missing receipt leaves the field absent. Renditions and posters are encoded after the
+publication purge, so the listing refreshes in the background after 60 seconds instead of
+waiting for the next publication. Its cache key is versioned with the value shape. `url`
+stays the sealed original, and metrics, PSNR, Difference and the media link never read a
+poster. A failed listing serves the originals only. Indexes, approvals and History are
+unchanged.
+
+中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。同一 job 还为每个封存 MP4 生成封面：`poster-f0-w672-q4` 配置不做 seek，直接解码第一帧，使封面与开始播放时的画面一致；按原始宽高比缩放到最宽 672 px（1344x768 的视频为 672x384），以 `-q:v 4` 输出单张 JPEG 并去除元数据。只有原始视频与记录的 SHA256 一致，且 ffprobe 显示输出为单帧 `mjpeg`、宽度不超过 672 px、宽高比与原始视频相差不超过 1% 时，封面才会被接受。脚本先把 JPEG 上传到 `objects/<output sha256>/poster-f0-w672-q4.jpg`，再写入回执 `renditions/<source sha256>/poster-f0-w672-q4/<output sha256>.json`，记录字节数、尺寸、ffmpeg 版本和参数。处理计划按原始视频和配置分别计算：每个原始视频只下载并校验一次，先生成封面再转码，已有回执的配置直接跳过，因此转码版本已存在时补转只生成封面。封面参数变化时须使用新的配置 ID。诊断视频不在计划内，没有封面。读取已发布媒体和已存参考视频时，封存 SHA256 有对应回执的媒体会附加 `previewUrl` 和 `posterUrl`；没有回执时对应字段不出现。回执列表跨实例共享缓存。转码和封面都在发布清除缓存之后才生成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；其缓存键随值结构升级版本。`url` 仍是封存的原始视频，指标、PSNR、“差异”视图和视频文件链接都不读取封面；列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
 
 ## Evidence boundaries
 
@@ -137,26 +201,24 @@ from that run compare only when their canonical workloads match.
 ### Original CI ZIP reader check
 
 The replay manifest may also contain
-`quality: { path: "/absolute/quality.json", sha256: "<digest>" }`. This independent
-v1 attachment names the scorer revision/hash and original reference receipts, then
-binds each comparison to the candidate run/artifact/source/manifest/cell/slot/case/
-prompt/seed/media SHA. Each reference descriptor contains `receipt_path`,
-`receipt_sha256` and the adjacent SHA256SUMS file's `checksums_sha256`. The reader
-verifies receipt and referenced MP4 bytes before exposing scores or reference URLs.
-Private paths and free-text decoder errors never enter the JSON response; public
-checks contain allowlisted names/status and only numeric or boolean observations.
-Raw diagnostics remain in the sealed local attachment.
+`quality: { path: "/absolute/h3-quality-dir", references: "/absolute/reference-dir" }`:
+a downloaded `h3-quality-<run>-<attempt>` artifact and the reference release MP4s. The
+reader uses the same seal and pair checks as publication (see Per-clip reference quality)
+and verifies each referenced MP4 against the descriptor's SHA256 and size before exposing
+scores or reference URLs. Private paths and free-text decoder errors never enter the JSON
+response; public checks contain allowlisted names/status and only numeric or boolean
+observations. Raw diagnostics remain in the sealed local attachment.
 
 Original ZIPs stay unchanged. Duplicate pairs, substituted identities, unsafe paths
 or invalid seals fail the attachment closed. Reference MP4s use the existing replay
-byte-range path with a receipt-scoped source identity and exact candidate
+byte-range path with a source identity scoped to the reference SHA256 and exact candidate
 run/artifact membership; unbound cases are unavailable. This route remains
 development-only. PSNR comes from complete decoded RGB24 comparison, not the browser
 difference canvas. Exact equality and incompatible media have distinct statuses
 with null PSNR. Original plan hashes, unjudged quality and releaseQualified=false
 remain visible.
 
-中文：回放配置可额外提供 `quality: { path, sha256 }`，读取独立封存的 v1 配对附件。读取前校验原始参考回执、相邻 SHA256SUMS 及所引用 MP4 字节，并精确绑定候选运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed 和媒体 SHA。本机路径和解码器自由文本错误不进入 API；公开检查仅保留允许的名称、状态及数值或布尔观察值，完整诊断留在本地封存附件。重复配对、身份替换、不安全路径或封印失效均拒绝读取。参考视频按参考回执和候选 run/artifact 隔离，只提供该产物实际绑定的用例，不授予发布批准，也不修改原始 ZIP。
+中文：回放配置可额外提供 `quality: { path, references }`，分别指向已下载的 `h3-quality-<run>-<attempt>` 产物目录和参考 release 的 MP4 目录。读取器使用与发布相同的封印与配对校验，并按描述文件核对所引用 MP4 的 SHA256 和大小，精确绑定候选运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed 和媒体 SHA。本机路径和解码器自由文本错误不进入 API；公开检查仅保留允许的名称、状态及数值或布尔观察值，完整诊断留在本地封存附件。重复配对、身份替换、不安全路径或封印失效均拒绝读取。参考视频按参考 SHA256 和候选 run/artifact 隔离，只提供该产物实际绑定的用例，不授予发布批准，也不修改原始 ZIP。
 
 ### Matched-noise diagnostic replay
 
@@ -215,11 +277,11 @@ GitHub 产物元数据和预期 plan SHA256。读取器校验原始字节摘要�
 
 `publish-video-results` repository dispatch 明确传入 `source_run_id` 与 `merge_run_id`；手动 `workflow_dispatch` 必须指定来源 `run_id`，不再定时扫描全部运行。任务只列举指定运行的 GitHub 产物及其后续分页，对每个产物以现有失效密钥调用受 Bearer 保护的 `POST /api/video-runs`。已存索引仍会重试，以补写可能缺失的批准回执；某个产物失败后继续尝试后续产物，但任务最终报告失败。此授权只批准指定来源的发布，不代表 benchmark 通过质量验收。
 
-原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。授权 POST 先写已校验的不可变对象与索引，并确认索引可读，再写绑定产物身份、来源哈希和 checkout 的独立不可变批准回执，最后把该产物写入新的历史快照。所有公开 GET（包括 `format=media` 未命中）都不写入；缺少媒体时返回 204。旧索引、失败或低样本来源仍在历史中；只有回执验证通过的观测进入默认图表，原有样本门槛继续适用。
+原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。授权 POST 先写已校验的不可变对象与索引，并确认索引可读，再写绑定产物身份、来源哈希和 checkout 的独立不可变批准回执，最后把该产物写入新的历史快照。相同身份的重复请求，或未提供 merge 运行 ID 的手动重新发布，都会沿用已有回执；merge 运行 ID 不同的回执不授权该来源。所有公开 GET（包括 `format=media` 未命中）都不写入；缺少媒体时返回 204。旧索引、失败或低样本来源仍在历史中；只有回执验证通过的观测进入默认图表，原有样本门槛继续适用。
 
 历史快照是 `h3-video-media/v1/runs/history/v<projection>/<毫秒>-<后缀>.json` 下的一个不可变 JSON，按索引路径保存投影条目，以及构建时验证的批准回执上传时间（无回执时为 null）。读取只使用当前 `VIDEO_HISTORY_PROJECTION` 的最新快照。授权 POST 批准产物后写入新快照，保留仍然有效的记录并加入该产物，然后删除除被替换快照以外的旧快照。以同一 Bearer 密钥向 `POST /api/video-runs` 发送 `{"history":"backfill"}` 会为所有缺少有效记录的索引补建条目。Warm After Deploy 工作流在每次生产发布后调用它，所有记录有效时不写入。构建时读不到回执的索引不进快照，不会被记成未批准。投影版本写在路径中，测试固定生成条目的源码摘要，可能改变条目的修改须提升版本，下一次补建会重建快照。并发写入可能丢掉对方新增的记录，此后读取会直接投影该索引，直到下次发布或补建，输出不变。
 
-`/video` 与 `/zh/video` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
+`/vgx` 与 `/zh/vgx` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
 
 历史读取列举既有发布索引与批准回执的元数据，按索引发布时间排序，并读取一份历史快照。记录仍对应索引与回执上传时间的条目直接取自快照，其余条目才读取完整索引与回执。`pages=2` 至 `pages=5` 在一次响应中返回连续多页，条目与 `nextPage` 和逐页读取相同。读取不下载或发布媒体，也不写入。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。已分配 GPU 数须有保留的 Slurm `AllocTRES` 或通过验证的 AMD allocation binding；原生功率文档的 `expected_gpu_count` 仅描述遥测覆盖范围，不能证明预留数量。缺少分配证据时，该数量及按分配数量归一化的指标保持 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）、配置的 `tp_size` / `ulysses_degree` / `attention_backend`，以及端点的副本数（`execution.deployment.replica_count`，早于该记录的产物包为 null）；`workloadKey` 在信息完整时保留完整工作负载身份，prompts 与 seeds 不能由缩写显示标签替代。这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板以一次请求最多读取五页，并据此推导全部指标，浏览器不再解析产物包。
 

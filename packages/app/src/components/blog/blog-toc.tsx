@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -12,12 +13,10 @@ const STRINGS = {
   en: {
     defaultLabel: 'On this page',
     tableOfContents: 'Table of contents',
-    clickToExpand: '(click to expand)',
   },
   zh: {
     defaultLabel: '本页目录',
     tableOfContents: '本页目录',
-    clickToExpand: '（点击展开）',
   },
 } as const;
 
@@ -115,7 +114,7 @@ export function BlogToc({
   if (headings.length === 0) return null;
 
   const list = (
-    <ol className="flex flex-col border-l border-border/40">
+    <ol className="flex flex-col border-l border-border/30">
       {headings.map((h) => {
         const active = activeId === h.id;
         return (
@@ -146,17 +145,18 @@ export function BlogToc({
         <details
           aria-label={t.tableOfContents}
           className={cn(
-            'group rounded-xl border border-border/50 bg-card/60 px-4 py-3 backdrop-blur-[2px]',
+            'group rounded-xl border border-border/30 bg-card px-4 py-3',
             variant === 'both' && 'lg:hidden',
             className,
           )}
           data-testid="blog-toc-inline"
         >
-          <summary className="cursor-pointer text-sm font-medium">
-            {displayLabel}{' '}
-            <span className="font-normal text-muted-foreground group-open:hidden">
-              {t.clickToExpand}
-            </span>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            {displayLabel}
+            <ChevronDown
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
+            />
           </summary>
           <div className="mt-3">{list}</div>
         </details>
@@ -172,9 +172,7 @@ export function BlogToc({
           )}
           data-testid="blog-toc-sidebar"
         >
-          <Eyebrow as="p" tone="muted">
-            {displayLabel}
-          </Eyebrow>
+          <Eyebrow as="p">{displayLabel}</Eyebrow>
           <div
             ref={scrollBoxRef}
             className={cn(

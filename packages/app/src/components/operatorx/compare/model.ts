@@ -8,6 +8,7 @@ export interface ComparisonModel {
   hardware: string[];
   available: string[];
   toggle: (hardware: string) => void;
+  reset: () => void;
   colors: Record<string, string>;
   baseline: string | null;
   value: (hardware: string, caseIndex: number) => number | null;
@@ -20,7 +21,12 @@ export interface ComparisonModel {
 export function buildModel(
   view: ComparisonView,
   metric: Metric,
-  selection: { hardware: string[]; available: string[]; toggle: (hardware: string) => void },
+  selection: {
+    hardware: string[];
+    available: string[];
+    toggle: (hardware: string) => void;
+    reset: () => void;
+  },
   colors: Record<string, string>,
   baseline: string | null,
   drill: { inspect: (caseIndex: number) => void; preview: (caseIndex: number) => void },

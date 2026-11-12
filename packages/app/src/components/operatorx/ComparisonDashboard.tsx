@@ -8,7 +8,9 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
 import { Pending } from '@/components/ui/pending';
@@ -18,6 +20,7 @@ import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
@@ -34,6 +37,35 @@ import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
 const NO_BASELINE = 'none';
+
+const STRINGS = {
+  en: {
+    loading: 'Loading results…',
+    controlsGroup: 'Comparison config',
+    empty: 'No results yet',
+    workload: 'Workload',
+    devices: 'Devices',
+    metric: 'Metric',
+    baseline: 'Baseline',
+    none: 'None',
+    oneDevice: '1 GPU',
+    split: (label: string, cases: number) => `${label} (${cases})`,
+    loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
+  },
+  zh: {
+    loading: '正在加载结果…',
+    controlsGroup: '对比配置',
+    empty: '暂无结果',
+    workload: '工作负载',
+    devices: '设备',
+    metric: '指标',
+    baseline: '基线',
+    none: '无',
+    oneDevice: '单 GPU',
+    split: (label: string, cases: number) => `${label}（${cases}）`,
+    loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
+  },
+};
 
 // Literal class names so Tailwind generates them.
 const SPAN_CLASS = {
@@ -109,6 +141,7 @@ const VizCard = memo(
     span: Span;
     eager: boolean;
   }) => {
+    const locale = useLocale();
     const [mounted, setMounted] = useState(eager);
     const card = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -139,7 +172,7 @@ const VizCard = memo(
         className={`min-w-0 ${SPAN_CLASS[span]}`}
       >
         <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
-          {viz.title}
+          {viz.title[locale]}
         </Heading>
         {mounted ? (
           <viz.Component model={model} />
@@ -159,7 +192,7 @@ function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDe
   return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
 }
 
-const CONTROL_LABELS = ['Workload', 'Devices', 'Metric', 'Baseline'] as const;
+const CONTROL_LABELS = ['workload', 'devices', 'metric', 'baseline'] as const;
 
 /**
  * Loading state laid out like the loaded dashboard (controls card, then the card grid with
@@ -167,23 +200,28 @@ const CONTROL_LABELS = ['Workload', 'Devices', 'Metric', 'Baseline'] as const;
  * or the footer under a reader who has already scrolled.
  */
 function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   return (
     <div
       className="flex flex-col gap-4"
       data-testid="operatorx-loading"
       aria-busy="true"
-      aria-label="Loading results…"
+      aria-label={strings.loading}
     >
       <Card className="relative z-10 py-4 md:py-5">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-          {CONTROL_LABELS.map((label) => (
-            <div key={label} className="min-w-0 space-y-1.5">
-              <Label>{label}</Label>
+        <ControlPanel
+          legend={strings.controlsGroup}
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {CONTROL_LABELS.map((key) => (
+            <div key={key} className="min-w-0 space-y-1.5">
+              <Label>{strings[key]}</Label>
               <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
             </div>
           ))}
-        </div>
-        <div className="mt-4 border-t border-border/60 pt-3">
+        </ControlPanel>
+        <div className="mt-4 border-t border-border/30 pt-3">
           <Skeleton aria-hidden="true" className="h-[106px] lg:h-[62px]" />
         </div>
       </Card>
@@ -195,7 +233,7 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
             className={`min-w-0 ${SPAN_CLASS[span]}`}
           >
             <Heading as="h2" level="card" className="mb-4">
-              {viz.title}
+              {viz.title[locale]}
             </Heading>
             <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
           </Card>
@@ -206,6 +244,8 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
 }
 
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const {
@@ -241,6 +281,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
       const next = toggleHardwareSelection(hardware, hw);
       if (next !== hardware) setPicked(next);
     };
+    const reset = () => {
+      track('operatorx_legend_filter_reset', { op });
+      setPicked(null);
+    };
     const inspect = (index: number) => {
       track('operatorx_case_opened', { op, metric: metric.id });
       setInspected(index);
@@ -251,7 +295,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         op,
         caseRefs(view, hardware, i).map((r) => r.ref),
       );
-    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
+    return buildModel(view, metric, { hardware, available, toggle, reset }, colors, baseline, {
       inspect,
       preview,
     });
@@ -270,18 +314,16 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;
-  if (view.workloads.length === 0)
-    return (
-      <Card className="py-6 text-center">
-        <p className="text-sm text-muted-foreground">No results yet</p>
-      </Card>
-    );
+  if (view.workloads.length === 0) return <EmptyState>{strings.empty}</EmptyState>;
 
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ControlGroup label="Workload" htmlFor="operatorx-workload">
+        <ControlPanel
+          legend={strings.controlsGroup}
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <ControlGroup label={strings.workload} htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
               value={pending?.id ?? view.workload ?? ''}
@@ -300,7 +342,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="Devices" htmlFor="operatorx-parallel">
+          <ControlGroup label={strings.devices} htmlFor="operatorx-parallel">
             <SearchableSelect
               triggerId="operatorx-parallel"
               value={view.parallel || ONE_DEVICE}
@@ -314,13 +356,13 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                   label: '',
                   options: view.parallelOptions.map((o) => ({
                     value: o.key || ONE_DEVICE,
-                    label: `${o.label} (${o.cases})`,
+                    label: strings.split(o.key ? o.label : strings.oneDevice, o.cases),
                   })),
                 },
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="Metric" htmlFor="operatorx-metric">
+          <ControlGroup label={strings.metric} htmlFor="operatorx-metric">
             <SearchableSelect
               triggerId="operatorx-metric"
               value={metric.id}
@@ -332,13 +374,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               groups={[
                 {
                   label: '',
-                  options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
+                  options: METRICS.map((m) => ({
+                    value: m.id,
+                    label:
+                      locale === 'zh' ? `${m.label.zh}（${m.unit}）` : `${m.label.en} (${m.unit})`,
+                  })),
                 },
               ]}
             />
           </ControlGroup>
 
-          <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
+          <ControlGroup label={strings.baseline} htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
               value={baseline ?? NO_BASELINE}
@@ -351,19 +397,19 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                 {
                   label: '',
                   options: [
-                    { value: NO_BASELINE, label: 'None' },
+                    { value: NO_BASELINE, label: strings.none },
                     ...hardware.map((h) => ({ value: h, label: hardwareLabel(h) })),
                   ],
                 },
               ]}
             />
           </ControlGroup>
-        </div>
-        <div className="mt-4 border-t border-border/60 pt-3">
+        </ControlPanel>
+        <div className="mt-4 border-t border-border/30 pt-3">
           <CoverageStrip model={model} />
         </div>
       </Card>
-      <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
+      <Pending active={switching} label={strings.loadingWorkload(pending?.label)}>
         <div className="grid gap-4 lg:grid-cols-12">
           {layout(visibleVisualizations(op, baseline)).map(({ viz, span }, index) => (
             <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />

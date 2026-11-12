@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, memo } from 'react';
+import { act, memo, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -183,23 +183,24 @@ describe('GlobalFilterProvider stale g_rundate snapshot', () => {
   });
 });
 
+const mount = (Probe: ComponentType, initialChipBasis?: 'pool' | 'total') => {
+  container = document.createElement('div');
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <GlobalFilterProvider initialModel={Model.Kimi_K3} initialChipBasis={initialChipBasis}>
+        <Probe />
+      </GlobalFilterProvider>,
+    ),
+  );
+};
+
 describe('GlobalFilterProvider chip basis', () => {
   let observedChipBasis: string | undefined;
   const ChipBasisProbe = memo(() => {
     observedChipBasis = useGlobalFilterSelection().chipBasis;
     return null;
   });
-  const mount = (initialChipBasis?: 'pool' | 'total') => {
-    container = document.createElement('div');
-    root = createRoot(container);
-    act(() =>
-      root?.render(
-        <GlobalFilterProvider initialModel={Model.Kimi_K3} initialChipBasis={initialChipBasis}>
-          <ChipBasisProbe />
-        </GlobalFilterProvider>,
-      ),
-    );
-  };
 
   beforeEach(() => {
     mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_chips');
@@ -213,12 +214,12 @@ describe('GlobalFilterProvider chip basis', () => {
     mocks.getUrlParam.mockImplementation((key: string) =>
       key === 'g_chips' ? 'total' : undefined,
     );
-    mount();
+    mount(ChipBasisProbe);
     expect(observedChipBasis).toBe('total');
   });
 
   it('keeps an embed’s server-resolved basis over the URL', () => {
-    mount('total');
+    mount(ChipBasisProbe, 'total');
     expect(observedChipBasis).toBe('total');
   });
 });

@@ -16,7 +16,7 @@ const canonical = (value) =>
       typeof item === 'number' &&
       (!Number.isFinite(item) || (Number.isInteger(item) && !Number.isSafeInteger(item)))
     ) {
-      throw new Error('Comparison identity contains an unrepresentable number');
+      throw new TypeError('Comparison identity contains an unrepresentable number');
     }
     return object(item)
       ? Object.fromEntries(

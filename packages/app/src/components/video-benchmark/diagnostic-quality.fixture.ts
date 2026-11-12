@@ -20,7 +20,7 @@ export function diagnosticQualityFixture(
     manifest,
     `NVIDIA ${hardware.toUpperCase()}`,
   );
-  const plan = original.receipt.plan;
+  const { plan } = original;
   const noise = {
     video: {
       raw_sha256: '1'.repeat(64),
@@ -71,7 +71,16 @@ export function diagnosticQualityFixture(
       video_file_sha256: noise.video.file_sha256,
       audio_file_sha256: noise.audio.file_sha256,
     })),
-    schedule: original.receipt.schedule,
+    schedule: Object.fromEntries(
+      ['video', 'audio'].map((modality) => [
+        modality,
+        {
+          updates: 50,
+          sigmas: Array.from({ length: 51 }, (_, i) => 1 - i / 50),
+          float32_le_sha256: '2'.repeat(64),
+        },
+      ]),
+    ),
     media: { path: 'drum-taps/candidate.mp4', sha256: '0'.repeat(64) },
     evidence: [{ path: 'native.json', sha256: 'a'.repeat(64) }],
   };

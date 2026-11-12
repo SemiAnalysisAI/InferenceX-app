@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
+import {
+  deploymentKey,
+  isQueueing,
+  layoutLabel,
+  leadCell,
+  losslessTwin,
+  sharedLayoutCells,
+} from './deployment';
 import type { VideoPoint } from './metrics';
+import { resultsClipPoints } from './results-clips';
+import type { ResultsEvidence } from './results-evidence';
 
 const base: VideoPoint = {
   id: 'a',
@@ -35,19 +44,21 @@ const base: VideoPoint = {
   observedAt: null,
 };
 const options = { tier: 'h' } as const;
+const results = (optimizations: string[]) =>
+  ({ engine: 'sol-engine', optimizations }) as unknown as ResultsEvidence;
 
 describe('deployment', () => {
   it('keys a deployment by boards and model split, not by concurrency', () => {
     const c4: VideoPoint = { ...base, concurrency: 4 };
-    expect(deploymentKey(base)).toBe('4g:tp2:u2');
-    expect(deploymentKey(c4)).toBe('4g:tp2:u2');
+    expect(deploymentKey(base)).toBe('na:4g:tp2:u2');
+    expect(deploymentKey(c4)).toBe('na:4g:tp2:u2');
     expect(
       deploymentKey({
         ...base,
         server: { tp: 1, ulysses: 4, attention: null },
       }),
-    ).toBe('4g:tp1:u4');
-    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('nag:tpna:una');
+    ).toBe('na:4g:tp1:u4');
+    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('na:nag:tpna:una');
   });
   it('treats concurrency above the replica count as queueing, with one replica when unknown', () => {
     expect(isQueueing(base)).toBe(false);
@@ -93,7 +104,7 @@ describe('deployment', () => {
     ).toEqual(['a', 'b4']);
     expect(sharedLayoutCells([])).toEqual([]);
   });
-  it('leads with the most efficient non-queued deployment of the hardware', () => {
+  it('leads with the most efficient non-queued, lossless deployment of the hardware', () => {
     const eightBoards = {
       ...base,
       id: 'b',
@@ -116,6 +127,22 @@ describe('deployment', () => {
     expect(leadCell([base, tie], 'h200', options)?.id).toBe('d');
     const noRate = { ...base, id: 'e', wallSeconds: null };
     expect(leadCell([noRate], 'h200', options)?.id).toBe('e');
+    const cached = {
+      ...base,
+      id: 'f',
+      wallSeconds: 1000,
+      results: { engine: 'sol-engine', optimizations: ['first-block-cache'] } as ResultsEvidence,
+    };
+    expect(leadCell([base, cached], 'h200', options)?.id).toBe('a');
+    // A named run owns its hardware's clip even when its only deployment is lossy.
+    const clips = resultsClipPoints(
+      [
+        { point: base, overlay: false },
+        { point: cached, overlay: true },
+      ],
+      options,
+    );
+    expect(clips.map((p) => p.id)).toEqual(['f']);
   });
   it('requires a known shared workload and layout at C1 for evidence comparisons', () => {
     const matching = { ...base, id: 'b', hardwareKey: 'b200' };
@@ -141,5 +168,22 @@ describe('deployment', () => {
     expect(sharedLayoutCells([{ ...base, workloadKey: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, server: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, concurrency: 2, replicas: 2 }])).toEqual([]);
+  });
+  it('pairs a lossy cell only with its own run’s lossless cell on the same workload, engine and layout', () => {
+    const lossy = { ...base, id: 'lossy', results: results(['cuda-graph', 'first-block-cache']) };
+    const twin = { ...base, id: 'twin', results: results(['cuda-graph']) };
+    const strangers: VideoPoint[] = [
+      { ...twin, id: 'other-run', runId: '2' },
+      { ...twin, id: 'other-workload', workloadKey: 'other' },
+      { ...twin, id: 'other-split', server: { tp: 4, ulysses: 1, attention: null } },
+      { ...twin, id: 'other-count', participating: 8 },
+      { ...twin, id: 'other-engine', results: { ...twin.results!, engine: 'sglang' } },
+      { ...twin, id: 'also-lossy', results: results(['teacache']) },
+    ];
+    expect(losslessTwin(lossy, strangers)).toBeNull();
+    const elsewhere = { ...twin, id: 'c2', concurrency: 2 };
+    expect(losslessTwin(lossy, [...strangers, elsewhere, twin])?.id).toBe('twin');
+    expect(losslessTwin(lossy, [elsewhere])?.id).toBe('c2');
+    expect(losslessTwin(twin, [twin])).toBeNull();
   });
 });

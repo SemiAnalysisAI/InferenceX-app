@@ -1,7 +1,9 @@
 import { at, number, rows, text, type Json } from './bundle';
-import { costPerGpuHour, hardwareSort, type CostTier } from './hardware';
+import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
-import { chipConfigKey } from './deployment';
+import { chipConfigKey, compareDeployments } from './deployment';
+import { engineSort } from './engines';
+import { optimizationsOf } from './optimizations';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
@@ -33,7 +35,10 @@ export interface ResultsState {
   mode: string | null;
   steps: number | null;
   gpuCount: number | null;
+  /** Limits cells to one engine; null keeps every engine. */
   engine: string | null;
+  /** Also plot lossy-optimization series; they never compete for a hardware's default line. */
+  lossy: boolean;
   /** As-of execution date: each deployment's latest run measured on or before it. */
   date: string | null;
   /** Run on the selected date to view as of; null is that date's last run. */
@@ -65,6 +70,7 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   steps: null,
   gpuCount: null,
   engine: null,
+  lossy: false,
   date: null,
   run: null,
   configs: [],
@@ -94,6 +100,9 @@ export const RESULTS_QUERY_PARAMS = [
   'r_steps',
   'r_gpus',
   'r_engine',
+  // Retired engine comparison: accepted so old links and API calls still work, then ignored.
+  'r_compare',
+  'r_lossy',
   'r_date',
   'r_run',
   'r_configs',
@@ -133,8 +142,10 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     duration: numeric('r_duration', null),
     mode: s.get('r_mode') || null,
     steps: numeric('r_steps', null),
-    gpuCount: numeric('r_gpus', null),
+    // Retired overview controls cannot be restored by an old shared link.
+    gpuCount: null,
     engine: s.get('r_engine') || null,
+    lossy: s.get('r_lossy') === '1',
     date: s.get('r_date') || null,
     run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
     configs: [...new Set((s.get('r_configs') ?? '').split(',').filter(Boolean))].slice(
@@ -156,7 +167,7 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     unofficialRun: /^[1-9]\d*$/u.test(overlay ?? '') ? overlay : null,
     xMetric: isResultsXMetric(x) ? x : DEFAULT_RESULTS_STATE.xMetric,
     yMetric: isResultsYMetric(y) ? y : DEFAULT_RESULTS_STATE.yMetric,
-    costBasis: s.get('r_basis') === 'allocated' ? 'allocated' : 'participating',
+    costBasis: 'participating',
     optimal: s.get('r_optimal') !== '0',
     point: s.get('r_point') || null,
   };
@@ -171,8 +182,8 @@ export function resultsSearch(state: ResultsState): string {
     r_duration: state.duration,
     r_mode: state.mode,
     r_steps: state.steps,
-    r_gpus: state.gpuCount,
     r_engine: state.engine,
+    r_lossy: state.lossy ? 1 : null,
     r_date: state.date,
     r_run: state.run,
     r_configs: state.configs.join(',') || null,
@@ -188,7 +199,6 @@ export function resultsSearch(state: ResultsState): string {
     r_utilization: state.utilization,
     r_x: state.xMetric,
     r_y: state.yMetric,
-    r_basis: state.costBasis,
     r_optimal: state.optimal ? 1 : 0,
     r_point: state.point,
     unofficialruns: state.unofficialRun,
@@ -230,6 +240,7 @@ export function resultMetadata(point: VideoPoint) {
     measurementBoundary: text(at(identity, 'semantics', 'boundary')) || null,
     mode: point.results?.mode ?? (text(at(generation, 'mode')) || text(at(plan, 'mode')) || null),
     engine: point.results?.engine ?? null,
+    optimizations: optimizationsOf(point),
     date: point.observedAt?.slice(0, 10) ?? null,
   };
 }
@@ -357,14 +368,9 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
 const values = <T extends string | number>(items: (T | null)[]) => [
   ...new Set(items.filter((x): x is T => x !== null)),
 ];
-const latest = (input: VideoPoint[]) => {
-  const groups = new Map<string, VideoPoint[]>();
-  for (const point of input) {
-    const key = JSON.stringify([point.workloadKey, point.results?.engine ?? null]);
-    groups.set(key, [...(groups.get(key) ?? []), point]);
-  }
-  return [...groups.values()].flatMap(latestVideoCells);
-};
+/** Newest cell per workload, hardware, deployment and concurrency; engines never replace each other. */
+const latest = (input: VideoPoint[]) =>
+  [...Map.groupBy(input, (point) => point.workloadKey).values()].flatMap(latestVideoCells);
 
 /** One published official run of the selected workload, in measurement order. */
 export interface ResultsRun {
@@ -456,17 +462,14 @@ export function resultProjection(
   const runs = workloadRuns(official);
   const chipConfigs = [...new Map(official.map((p) => [chipConfigKey(p), p]))]
     .map(([key, point]) => ({ key, point }))
-    .toSorted(
-      (a, b) =>
-        hardwareSort(a.point.hardwareKey ?? '') - hardwareSort(b.point.hardwareKey ?? '') ||
-        (a.point.participating ?? 0) - (b.point.participating ?? 0) ||
-        a.key.localeCompare(b.key),
-    );
+    .toSorted((a, b) => compareDeployments(a.point, b.point) || a.key.localeCompare(b.key));
+  // A key this workload does not offer (an old share link) compares nothing, so the run shows.
+  const configs = state.configs.filter((key) => chipConfigs.some((config) => config.key === key));
   const comparedRuns = Map.groupBy(
     official.filter((p) => {
       const date = p.observedAt?.slice(0, 10) ?? '';
       return (
-        state.configs.includes(chipConfigKey(p)) &&
+        configs.includes(chipConfigKey(p)) &&
         (state.compareFrom === null || date >= state.compareFrom) &&
         (state.compareTo === null || date <= state.compareTo)
       );
@@ -477,7 +480,7 @@ export function resultProjection(
     ...[...comparedRuns.values()].flatMap(latest),
     ...latest(
       namedMatches.filter(
-        (p) => p.workloadKey === workloadKey && state.configs.includes(chipConfigKey(p)),
+        (p) => p.workloadKey === workloadKey && configs.includes(chipConfigKey(p)),
       ),
     ),
   ].map((p) => resultCell(p, state));
@@ -532,6 +535,7 @@ export function resultProjection(
     state: {
       ...state,
       workload: workloadKey === null ? state.workload : workloads.get(workloadKey)!.key,
+      configs,
     },
     cells,
     overlayCells,
@@ -551,7 +555,11 @@ export function resultProjection(
       modes: values(metadata.map((m) => m.mode)),
       steps: values(metadata.map((m) => m.steps)),
       gpuCounts: values(available.map((p) => p.participating)),
-      engines: values(metadata.map((m) => m.engine)),
+      // The selected workload's engines, before the engine filter: another workload's
+      // engine would offer a choice this cohort cannot show.
+      engines: values(
+        available.filter((p) => p.workloadKey === workloadKey).map((p) => resultMetadata(p).engine),
+      ).toSorted((a, b) => engineSort(a) - engineSort(b)),
       dates: values(runs.map((r) => r.date)),
       workloads: [...workloads.values()]
         .filter((w) => !state.model || w.model === state.model)

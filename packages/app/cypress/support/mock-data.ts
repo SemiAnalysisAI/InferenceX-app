@@ -13,10 +13,6 @@ import type {
   EvaluationChartData,
 } from '@/components/evaluation/types';
 import type {
-  ModelSuccessRateData,
-  ReliabilityChartContextType,
-} from '@/components/reliability/types';
-import type {
   GlobalFilterActionsContextType,
   GlobalFilterAvailabilityContextType,
   GlobalFilterRunContextType,
@@ -305,6 +301,8 @@ export function createMockEvaluationChartData(
     configId: 1,
     hwKey: 'b200_trt' as any,
     hardware: 'b200',
+    hwLabel: 'B200',
+    engineLabel: 'TRTLLM',
     configLabel: 'B200 (TRTLLM)',
     score: 87.5,
     scoreError: 1.2,
@@ -376,56 +374,6 @@ export function createMockEvaluationContext(
     selectedPrecisions: ['fp4'],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_eval'),
     availablePrecisions: ['fp4', 'fp8', 'bf16'],
-    ...overrides,
-  };
-}
-
-function createMockReliabilityData(
-  overrides?: Partial<ModelSuccessRateData & { modelLabel: string }>,
-): ModelSuccessRateData & { modelLabel: string } {
-  return {
-    model: Model.DeepSeek_R1,
-    modelLabel: 'DeepSeek R1 0528',
-    successRate: 96.5,
-    total: 200,
-    n_success: 193,
-    ...overrides,
-  };
-}
-
-export function createMockReliabilityContext(
-  overrides?: Partial<ReliabilityChartContextType>,
-): ReliabilityChartContextType {
-  const mockData = createMockReliabilityData();
-  return {
-    loading: false,
-    error: null,
-    refetch: namedStub('refetchReliability').resolves(),
-    dateRangeSuccessRateData: {
-      'last-7-days': {
-        [Model.DeepSeek_R1]: {
-          rate: 96.5,
-          total: 200,
-          n_success: 193,
-        },
-      },
-    },
-    filteredReliabilityData: [mockData],
-    chartData: [mockData],
-    availableModels: [Model.DeepSeek_R1],
-    dateRange: 'last-7-days',
-    setDateRange: namedStub('setDateRange'),
-    showPercentagesOnBars: true,
-    setShowPercentagesOnBars: namedStub('setShowPercentagesOnBars'),
-    highContrast: false,
-    setHighContrast: namedStub('setHighContrast_reliability'),
-    enabledModels: new Set([Model.DeepSeek_R1]),
-    toggleModel: namedStub('toggleModel'),
-    removeModel: namedStub('removeModel'),
-    isLegendExpanded: true,
-    setIsLegendExpanded: namedStub('setIsLegendExpanded_reliability'),
-    modelsWithData: new Set([Model.DeepSeek_R1]),
-    selectAllModels: namedStub('selectAllModels'),
     ...overrides,
   };
 }

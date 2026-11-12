@@ -405,6 +405,10 @@
       ]
     },
     {
+      "spec": "cypress/component/chart-point-details.cy.tsx",
+      "duration": 900
+    },
+    {
       "spec": "cypress/component/chart-selectors.cy.tsx",
       "duration": 11928,
       "tests": [
@@ -502,7 +506,7 @@
           "title": [
             "Chart Selectors",
             "ScenarioSelector",
-            "explains the agentic workload in a tooltip that links to /agentx"
+            "explains the agentic workload in a tooltip that links to /infx/agentx"
           ],
           "duration": 328,
           "attempts": 1
@@ -2748,28 +2752,6 @@
       ]
     },
     {
-      "spec": "cypress/component/reliability-bar-chart.cy.tsx",
-      "duration": 224,
-      "tests": [
-        {
-          "title": ["ReliabilityBarChartD3", "tracks retry and requests reliability data again"],
-          "duration": 218,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/reliability-chart-controls.cy.tsx",
-      "duration": 271,
-      "tests": [
-        {
-          "title": ["Reliability ChartControls", "calls setDateRange when an option is selected"],
-          "duration": 268,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/scale-up-topology.cy.tsx",
       "duration": 1580,
       "tests": [
@@ -3253,7 +3235,7 @@
         {
           "title": [
             "TabNav retained inference model",
-            "preserves the selected model and unofficial run from /zh/evaluation at 375px"
+            "preserves the selected model and unofficial run from /zh/infx/evaluation at 375px"
           ],
           "duration": 109,
           "attempts": 1
@@ -3317,7 +3299,7 @@
         {
           "title": [
             "TabNav — unofficialrun URL preservation (issue #319)",
-            "carries route-owned runs from /zh/profit-estimator to desktop and mobile tabs"
+            "carries route-owned runs from /zh/infx/profit-estimator to desktop and mobile tabs"
           ],
           "duration": 54,
           "attempts": 1
@@ -3607,6 +3589,28 @@
             "states each published source’s GPU power verdict in the history list"
           ],
           "duration": 90,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/component/video-quality-guide.cy.tsx",
+      "duration": 1788,
+      "tests": [
+        {
+          "title": [
+            "VideoGenX quality guide widgets",
+            "never move the page while hovering clips or switching scores at 390px"
+          ],
+          "duration": 897,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VideoGenX quality guide widgets",
+            "never move the page while hovering clips or switching scores at 1280px"
+          ],
+          "duration": 891,
           "attempts": 1
         }
       ]

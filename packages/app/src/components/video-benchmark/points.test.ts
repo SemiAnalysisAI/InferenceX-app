@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
 import { dashboardCells, latestVideoCells, namedRunPoints, videoPoints } from './points';
+import type { ResultsEvidence } from './results-evidence';
 
 const observation: VideoHistoryObservation = {
   id: 'sha:c1',
@@ -219,6 +220,39 @@ describe('videoPoints', () => {
       ['sha:c2', 150.6],
     ]);
   });
+  it('lets a newer recorded layout supersede a cell published before layouts were recorded', () => {
+    const entry = (runId: string, id: string, server: VideoHistoryObservation['server']) => ({
+      ...page.entries[0],
+      id: `${runId}.1`,
+      runId,
+      sources: [{ ...source, id: runId, observations: [{ ...observation, id, server }] }],
+    });
+    const points = videoPoints([
+      {
+        ...page,
+        entries: [entry('5', 'recorded:c1', observation.server), entry('4', 'legacy:c1', null)],
+      },
+    ]);
+    expect(latestVideoCells(points).map((p) => p.id)).toEqual(['recorded:c1']);
+  });
+});
+
+const pageOf = (
+  runId: string,
+  hardware: string,
+  observations: VideoHistoryObservation[],
+): VideoHistoryPage => ({
+  schemaVersion: 1,
+  nextPage: null,
+  entries: [
+    {
+      ...page.entries[0],
+      id: `${runId}.1`,
+      runId,
+      artifact: { ...artifact, id: Number(runId) },
+      sources: [{ ...source, id: runId, hardware, observations }],
+    },
+  ],
 });
 
 describe('dashboardCells', () => {
@@ -230,23 +264,6 @@ describe('dashboardCells', () => {
     ...observation,
     workload: FORMAL,
     ...over,
-  });
-  const pageOf = (
-    runId: string,
-    hardware: string,
-    observations: VideoHistoryObservation[],
-  ): VideoHistoryPage => ({
-    schemaVersion: 1,
-    nextPage: null,
-    entries: [
-      {
-        ...page.entries[0],
-        id: `${runId}.1`,
-        runId,
-        artifact: { ...artifact, id: Number(runId) },
-        sources: [{ ...source, id: runId, hardware, observations }],
-      },
-    ],
   });
 
   it('drops cells under the sample floor even when they are the most efficient', () => {
@@ -317,6 +334,40 @@ describe('dashboardCells', () => {
     const result = dashboardCells(videoPoints([newer, older]));
     expect(result.cells.map((p) => p.id)).toEqual(['new:c1']);
     expect(result.otherWorkloads).toBe(1);
+  });
+
+  const served = (
+    id: string,
+    hardware: string,
+    engine: string,
+    server: typeof observation.server,
+    optimizations: string[] = [],
+  ) => cell({ id, hardware, server, results: { engine, optimizations } as ResultsEvidence });
+
+  it('never lets one engine replace another engine at the same hardware, GPUs and concurrency', () => {
+    const split = { tp: 1, ulysses: 4, attention: null };
+    const result = dashboardCells(
+      videoPoints([
+        // Nor is a stock cell an older layout of the same engine with caching.
+        pageOf('6', 'H100', [
+          served('h100-cached:c1', 'H100', 'sglang', split, ['first-block-cache']),
+        ]),
+        pageOf('5', 'H100', [served('h100-stock:c1', 'H100', 'sglang', null)]),
+        pageOf('4', 'B200', [served('b200-vllm:c1', 'B200', 'vllm-omni', split)]),
+        pageOf('3', 'B200', [served('b200-sglang:c1', 'B200', 'sglang', split)]),
+        // An SGLang cell from before layouts were recorded is no older layout of vLLM-Omni.
+        pageOf('2', 'H200', [served('h200-vllm:c1', 'H200', 'vllm-omni', split)]),
+        pageOf('1', 'H200', [served('h200-sglang:c1', 'H200', 'sglang', null)]),
+      ]),
+    );
+    expect(result.cells.map((p) => p.id).toSorted()).toEqual([
+      'b200-sglang:c1',
+      'b200-vllm:c1',
+      'h100-cached:c1',
+      'h100-stock:c1',
+      'h200-sglang:c1',
+      'h200-vllm:c1',
+    ]);
   });
 
   it('keeps legacy cells together only inside their sealed source, never by label', () => {

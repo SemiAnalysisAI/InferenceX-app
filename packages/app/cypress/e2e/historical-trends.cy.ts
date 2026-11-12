@@ -3,6 +3,31 @@ import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
 
 import { availabilityBody } from '../support/e2e';
 
+/** Clicks the trend chart where its first point is drawn; the hover overlay above the dots takes the click. */
+const clickFirstTrendPoint = () =>
+  cy
+    .get('[data-testid="trend-chart-svg"] .dot-group circle')
+    .first()
+    .then(($dot) => {
+      const dot = $dot[0].getBoundingClientRect();
+      cy.get('[data-testid="trend-chart-svg"] .proximity-overlay').then(($overlay) => {
+        const plot = $overlay[0].getBoundingClientRect();
+        cy.wrap($overlay).click(dot.x + dot.width / 2 - plot.x, dot.y + dot.height / 2 - plot.y, {
+          force: true,
+        });
+      });
+    });
+
+/** Opens the waterfall series picker, reads every option's series id, and closes it again. */
+const waterfallSeriesIds = () => {
+  cy.get('[data-testid="waterfall-series"]').click();
+  return cy.get('[data-testid="waterfall-series-option"]').then(($options) => {
+    const ids = [...$options].map((option) => option.dataset.seriesId ?? '');
+    cy.focused().type('{esc}');
+    return cy.wrap(ids);
+  });
+};
+
 describe('Historical improvement waterfall', () => {
   beforeEach(() => {
     cy.fixture<BenchmarkRow[]>('api/benchmarks-history.json').then((rows) => {
@@ -10,7 +35,7 @@ describe('Historical improvement waterfall', () => {
         body: compactTrendHistory(rows),
       }).as('waterfallHistory');
     });
-    cy.visit('/historical?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/historical?g_model=DeepSeek-R1-0528');
     cy.wait('@waterfallHistory');
     cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
   });
@@ -22,10 +47,10 @@ describe('Historical improvement waterfall', () => {
     cy.get('#historical-trend-export').should('exist');
     cy.get('[data-testid="waterfall-step"][data-kind="baseline"]').should('have.length', 1);
     cy.get('[data-testid="waterfall-step"][data-kind="best"]').should('have.length', 1);
-    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
-      if ($options.length > 1) {
-        cy.get('[data-testid="waterfall-series"]').select($options.eq(1).val() as string);
-      }
+    cy.get('[data-testid="waterfall-series"]').click();
+    cy.get('[data-testid="waterfall-series-option"]').then(($options) => {
+      if ($options.length > 1) cy.wrap($options.eq(1)).click();
+      else cy.focused().type('{esc}');
     });
     cy.get('[data-testid="historical-view-line"]').click();
     cy.get('[data-testid="trend-chart-svg"]').should('be.visible');
@@ -34,7 +59,7 @@ describe('Historical improvement waterfall', () => {
 
   it('uses internal horizontal scrolling without widening a 375px page', () => {
     cy.viewport(375, 844);
-    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('select[data-testid="historical-view"]').select('waterfall');
     cy.get('[data-testid="waterfall-chart-svg"]').should('exist');
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
@@ -44,30 +69,25 @@ describe('Historical improvement waterfall', () => {
 
   it('preserves hardware filtering, high contrast and reset in waterfall mode', () => {
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
-    cy.get('[data-testid="waterfall-controls"]').should('have.attr', 'open');
+    cy.get('[data-testid="waterfall-controls"] button[aria-expanded]').should('not.be.visible');
     cy.get('#historical-log-scale').should('not.exist');
     cy.get('#historical-high-contrast').should('be.visible').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
 
-    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
-      const initialCount = $options.length;
+    waterfallSeriesIds().then((ids) => {
+      const initialCount = ids.length;
       expect(initialCount).to.be.greaterThan(1);
-      const hardware = String($options.eq(0).val()).split('__')[0];
+      const hardware = ids[0].split('__')[0];
       cy.get(`[data-testid="waterfall-controls"] label[for="checkbox-${hardware}"]`).click();
-      cy.get('[data-testid="waterfall-series"] option').should(
-        'have.length.lessThan',
-        initialCount,
-      );
+      waterfallSeriesIds().should('have.length.lessThan', initialCount);
       cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
-      cy.get('[data-testid="waterfall-series"] option').should('have.length', initialCount);
+      waterfallSeriesIds().should('have.length', initialCount);
     });
 
     cy.get('[data-testid="historical-view-line"]').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
     cy.get('#historical-log-scale').should('be.visible');
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'unchecked');
   });
@@ -76,7 +96,6 @@ describe('Historical improvement waterfall', () => {
     cy.get('[data-testid="historical-trend-figure"] [data-testid="legend-close-button"]').click();
     cy.get('#historical-high-contrast').should('not.exist');
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
     cy.get('#historical-high-contrast').should('be.visible').click();
     cy.get('[data-testid="waterfall-controls"] [data-testid="legend-open-button"]').should(
       'not.exist',
@@ -86,7 +105,6 @@ describe('Historical improvement waterfall', () => {
     );
     cy.get('[data-testid="waterfall-controls"] label[for^="checkbox-"]').first().click();
     cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click().click();
     cy.get('#historical-high-contrast')
       .should('be.visible')
       .and('have.attr', 'data-state', 'checked');
@@ -97,7 +115,6 @@ describe('Historical improvement waterfall', () => {
     );
     cy.get('#historical-high-contrast').should('not.exist');
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
     cy.get('#historical-high-contrast')
       .should('be.visible')
       .and('have.attr', 'data-state', 'checked');
@@ -105,7 +122,7 @@ describe('Historical improvement waterfall', () => {
 });
 
 const visitHistoricalWithSetup = () => {
-  cy.visit('/historical', {
+  cy.visit('/infx/historical', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -161,7 +178,7 @@ describe('Historical Trends AgentX P90 operating point', () => {
     });
     for (const prefix of ['', '/zh']) {
       cy.visit(
-        `${prefix}/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp8&i_metric=y_tpPerGpu&g_rundate=${date}`,
+        `${prefix}/infx/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp8&i_metric=y_tpPerGpu&g_rundate=${date}`,
       );
       cy.wait('@p90Benchmarks');
       cy.wait('@p90History');
@@ -169,8 +186,8 @@ describe('Historical Trends AgentX P90 operating point', () => {
         .should('have.attr', 'aria-label')
         .and('contain', 'P90');
       cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', 'P90');
-      cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
-      cy.get('[data-chart-tooltip]:visible').should('contain.text', '300');
+      clickFirstTrendPoint();
+      cy.get('[data-testid="point-details-panel"]').should('contain.text', '300');
     }
   });
 });
@@ -188,16 +205,18 @@ describe('Historical Trends — Content & Interactions', () => {
       }));
       cy.intercept('GET', '**/api/v1/benchmarks?*', withoutRoleEnergy).as('benchmarks');
       cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*').as('history');
-      cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
+      cy.visit(
+        '/infx/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken',
+      );
       cy.wait('@benchmarks');
       cy.wait('@history');
-      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
+      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured energy');
       cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Input token');
       cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'Prefill GPUs');
       cy.get('[data-testid="historical-target-slider"]').should('be.visible');
       cy.get('[data-testid="historical-trend-figure"]')
         .should('be.visible')
-        .and('contain.text', 'No historical data found for the tracked configurations.');
+        .and('contain.text', 'No historical data found for the tracked configurations');
       cy.contains(
         'No interactivity chart data available for the selected model and sequence.',
       ).should('not.exist');
@@ -217,7 +236,7 @@ describe('Historical Trends — Content & Interactions', () => {
       .should('be.visible')
       .and('have.text', 'FP4')
       .and('be.disabled');
-    cy.visit('/historical?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/historical?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     cy.get('[data-testid="precision-multiselect"][role="combobox"]')
       .should('be.visible')
@@ -243,14 +262,14 @@ describe('Historical Trends — Content & Interactions', () => {
       });
   });
 
-  it('offers the published tiers in the caption Cost Tier selector but no Custom User Values', () => {
+  it('offers the published tiers in the caption Cost Tier selector but no Custom user values', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]')
       .should('be.visible')
-      .and('contain.text', 'Owning at Large Hyperscaler Volume')
+      .and('contain.text', 'Owning at large hyperscaler volume')
       .click('right');
     cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
     cy.get('[data-testid="cost-tier-rental"]').should('exist');
@@ -258,14 +277,14 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('[data-testid="cost-tier-rental"]').click();
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]').should(
       'contain.text',
-      'Rent - 3 Year Commit',
+      'Rent – 3-year commit',
     );
   });
 });
 
 describe('Historical Trends — Chinese route', () => {
   beforeEach(() => {
-    cy.visit('/zh/historical', {
+    cy.visit('/zh/infx/historical', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -278,9 +297,9 @@ describe('Historical Trends — Chinese route', () => {
     cy.contains('目标交互性（tok/s/user）').should('be.visible');
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
-    cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '点击其他区域关闭')
+    clickFirstTrendPoint();
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', '目标交互性')
       .invoke('text')
       .should('match', /\d{4}年/u);
   });
@@ -299,14 +318,14 @@ describe('Historical Trends — Chinese route', () => {
     });
 
     cy.visit(
-      `/zh/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp4&g_rundate=${runDate}`,
+      `/zh/infx/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp4&g_rundate=${runDate}`,
     );
     cy.wait('@agenticAvailability');
     cy.wait('@agenticBenchmarks');
+    cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '智能体');
     cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
       .first()
-      .should('contain.text', '智能体')
-      .and('contain.text', '2025年3月1日')
+      .should('contain.text', '2025年3月1日')
       .and('not.contain.text', runDate);
   });
 
@@ -314,7 +333,7 @@ describe('Historical Trends — Chinese route', () => {
     cy.intercept('GET', '**/api/v1/benchmarks?*', []).as('emptyBenchmarks');
     cy.reload();
     cy.wait('@emptyBenchmarks');
-    cy.contains('所选模型和序列暂无交互性图表数据。').should('be.visible');
+    cy.contains('所选模型和序列暂无交互性图表数据').should('be.visible');
     cy.get('[data-testid="historical-trends-display"] .animate-pulse').should('not.exist');
     cy.get('[data-testid="historical-target-slider"]').should('not.exist');
     cy.get('[data-testid="historical-trend-figure"]').should('not.exist');
@@ -333,7 +352,7 @@ describe('Historical Trends — Chinese route', () => {
       cy.reload();
       cy.wait('@failedBenchmarks');
       cy.wait('@failedBenchmarks');
-      cy.contains('历史基准测试数据加载失败。').should('be.visible');
+      cy.contains('历史基准测试数据加载失败').should('be.visible');
       cy.contains('historical-database-internal-detail').should('not.exist');
       cy.contains('button', '重新加载页面')
         .then(() => {
@@ -364,8 +383,8 @@ describe('Historical Trends — Chinese route', () => {
       cy.wait('@secondaryHistory');
       cy.wait('@secondaryHistory');
       cy.get('[data-testid="historical-trend-error"]')
-        .should('contain.text', '历史趋势数据加载失败。')
-        .and('not.contain.text', '历史基准测试数据加载失败。')
+        .should('contain.text', '历史趋势数据加载失败')
+        .and('not.contain.text', '历史基准测试数据加载失败')
         .and('not.contain.text', 'secondary-history-internal-detail');
       cy.contains('button', '重试加载趋势数据').click();
       cy.wait('@secondaryHistory');
@@ -381,5 +400,131 @@ describe('Historical Trends — Chinese route', () => {
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
+  });
+});
+
+describe('Historical frontier views', () => {
+  beforeEach(() => {
+    // The trend line loads compact trend rows; the frontier views load the full history only
+    // once one of them is opened.
+    cy.fixture<BenchmarkRow[]>('api/benchmarks-history.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*', {
+        body: compactTrendHistory(rows),
+      }).as('trendHistory');
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*', { body: rows }).as('frontierHistory');
+    });
+    cy.visit('/infx/historical?g_model=DeepSeek-R1-0528');
+    cy.wait('@trendHistory');
+    cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
+  });
+
+  it('adds Frontier, Compare and Software gains beside the trend views', () => {
+    cy.get('[data-testid^="historical-view-"]').then(($buttons) => {
+      expect([...$buttons].map((button) => button.textContent)).to.deep.equal([
+        'Trend line',
+        'Improvement waterfall',
+        'Frontier',
+        'Compare',
+        'Software gains',
+      ]);
+    });
+    cy.get('[data-testid="historical-view-frontier"]').click();
+    cy.get('[data-testid="frontier-view"]').should('be.visible');
+    // The trend target keeps its place but is inert: frontier views span every interactivity.
+    cy.get('[data-testid="historical-target-slider"]').closest('[inert]').should('exist');
+    cy.get('[data-testid="frontier-grouping"]').should('not.exist');
+    cy.get('[data-testid="frontier-vendor-all"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-svg"] path.fr-area').should('have.length', 1);
+    // Choosing a vendor redraws the frontier from that company's chips alone.
+    cy.get('[data-testid="frontier-vendor-AMD"]').click();
+    cy.get('[data-testid="frontier-vendor-AMD"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-svg"] .line-label').should(($labels) => {
+      expect($labels.text()).to.contain('MI3');
+      expect($labels.text()).not.to.contain('B200');
+    });
+
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('[data-testid="trend-chart-svg"]').should('be.visible');
+    cy.get('[data-testid="historical-target-slider"]').closest('[inert]').should('not.exist');
+  });
+
+  it('compares vendors and chips with lead bars and per-series selection', () => {
+    cy.get('[data-testid="historical-view-compare"]').click();
+    cy.get('[data-testid="frontier-grouping-vendor"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-series-NVIDIA"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-series-AMD"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-lead-bars"] rect').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="frontier-area-timeline"] path').should('have.length.greaterThan', 0);
+
+    // One series on its own gets the shading under its curve.
+    cy.get('[data-testid="frontier-series-AMD"]').click();
+    cy.get('[data-testid="frontier-lead-bars"]').should('not.exist');
+    cy.contains('Pick at least two to compare.').should('be.visible');
+    cy.get('[data-testid="frontier-svg"] path.fr-area').should('have.length', 1);
+
+    cy.get('[data-testid="frontier-vendor"]').should('not.exist');
+    cy.get('[data-testid="frontier-grouping-gpu"]').click();
+    cy.get('[data-testid^="frontier-series-"][aria-pressed="true"]').should('have.length', 2);
+    cy.get('[data-testid="frontier-series-b200"]').should('exist');
+    cy.get('[data-testid="frontier-vendor-NVIDIA"]').click();
+    cy.get('[data-testid="frontier-series-mi355x"]').should('not.exist');
+    cy.get('[data-testid="frontier-series-b200"]').should('exist');
+  });
+
+  it('plots the rate of software gain by date and by chip age under Software gains', () => {
+    cy.get('[data-testid="historical-view-software"]').click();
+    cy.get('[data-testid="frontier-gain-rate"] svg path').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="frontier-gain-rate-table"]').within(() => {
+      cy.contains('th', 'Current rate').should('exist');
+      cy.get('tbody tr').should('have.length.greaterThan', 0);
+    });
+    cy.get('[data-testid="frontier-gain-rate-window-30"]').click();
+    cy.get('[data-testid="frontier-gain-rate-axis-age"]').click();
+    cy.get('[data-testid="frontier-gain-rate"]').should('contain.text', 'Days since first run');
+    cy.get('[data-testid="frontier-gain-rate-common"]').should('not.exist');
+  });
+
+  it('shows same-chip software gains without a vendor option', () => {
+    cy.get('[data-testid="historical-view-software"]').click();
+    cy.get('[data-testid="frontier-grouping"]').should('not.exist');
+    cy.get('[data-testid^="frontier-series-"]').first().should('not.contain.text', 'NVIDIA');
+    cy.get('[data-testid="frontier-software-gain"]')
+      .closest('section')
+      .should('contain.text', 'the ground of its first run');
+    cy.get('[data-testid="frontier-software-bars"] rect').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="frontier-software-table"]').within(() => {
+      cy.contains('th', 'Average').should('exist');
+      cy.get('tbody tr').should('have.length.greaterThan', 0);
+      cy.get('tbody tr').first().find('td').last().invoke('text').should('match', /x$|—/);
+    });
+  });
+
+  it('scrubs the chapter timeline and lists the points behind the curve', () => {
+    cy.get('[data-testid="historical-view-frontier"]').click();
+    cy.get('[data-testid="frontier-date-slider"]').then(($slider) => {
+      const last = Number($slider.attr('max'));
+      expect(last).to.be.greaterThan(1);
+      expect(Number($slider.val())).to.equal(last);
+    });
+    // Cypress cannot type into a range input; set it the way a drag would, through React.
+    cy.get<HTMLInputElement>('[data-testid="frontier-date-slider"]').then(([slider]) => {
+      const { prototype } = slider.ownerDocument.defaultView!.HTMLInputElement;
+      Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(slider, '0');
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    cy.get('[data-testid="frontier-date-slider"]').should('have.value', '0');
+    cy.get('[data-testid="frontier-play"]').should('contain.text', 'Play');
+
+    cy.get('[data-testid="frontier-data-toggle"]').click();
+    cy.get('[data-testid="frontier-data-table"] tbody tr').should('have.length.greaterThan', 0);
+  });
+
+  it('labels the frontier views in Chinese', () => {
+    cy.visit('/zh/infx/historical?g_model=DeepSeek-R1-0528');
+    cy.wait('@trendHistory');
+    cy.get('[data-testid="historical-view-frontier"]').should('have.text', '前沿').click();
+    cy.get('[data-testid="historical-view-compare"]').should('have.text', '对比');
+    cy.get('[data-testid="historical-view-software"]').should('have.text', '软件提升');
+    cy.get('[data-testid="frontier-vendor-all"]').should('have.text', '全部');
   });
 });

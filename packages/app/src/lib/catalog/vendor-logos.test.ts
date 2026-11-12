@@ -32,11 +32,10 @@ describe('vendor logo icons', () => {
     expect(getLineLabelVendorIcon('jalapeno')).toBe(VENDOR_LOGO_ICONS.OpenAI);
   });
 
-  it('uses the same export-safe Google mark for TPU labels and hardware badges', () => {
+  it('uses the export-safe public Google mark for TPU hardware badges', () => {
     for (const key of ['tpuv7', 'tpuv7_vllm', 'tpuv7_vllm_fp8']) {
       expect(getLineLabelVendorIcon(key)).toBe(VENDOR_LOGO_ICONS.Google);
       expect(getAxisVendorIcon(key)?.monochrome).toBe(true);
-      expect(getAxisVendorIcon(key)?.href).toBe(VENDOR_LOGO_ICONS.Google.href);
     }
     expect(getHwVendorLogo('Google')).toBe('google.svg');
     expect(isMonochromeLogo('google.svg')).toBe(true);
@@ -44,20 +43,19 @@ describe('vendor logo icons', () => {
     expect([...svg.matchAll(/fill="(?<fill>[^"]+)"/gu)].map((match) => match.groups?.fill)).toEqual(
       ['#000000', '#000000', '#000000', '#000000'],
     );
-    expect(VENDOR_LOGO_ICONS.Google.href).toBe(`data:image/svg+xml,${encodeURIComponent(svg)}`);
+    expect(getAxisVendorIcon('tpuv7')?.href).toBe(`data:image/svg+xml,${encodeURIComponent(svg)}`);
   });
 
   it('returns no icon for unknown hardware', () => {
     expect(getLineLabelVendorIcon('unknown-hw')).toBeUndefined();
   });
 
-  it('uses the black PNG eye mark for NVIDIA so it stays visible on green pills', () => {
-    expect(VENDOR_LOGO_ICONS.NVIDIA.href).toMatch(/^data:image\/png;base64,/);
-  });
-
-  it('inlines brand colors in the SVG data URIs', () => {
-    expect(decodeURIComponent(VENDOR_LOGO_ICONS.AMD.href)).toContain('#000000');
-    expect(decodeURIComponent(VENDOR_LOGO_ICONS.OpenAI.href)).toContain('#ffffff');
+  it('fills every line-label mark with the white label text color', () => {
+    for (const icon of Object.values(VENDOR_LOGO_ICONS)) {
+      const svg = decodeURIComponent(icon.href);
+      expect(svg).toContain('#ffffff');
+      expect(svg).not.toContain('#000000');
+    }
   });
 });
 

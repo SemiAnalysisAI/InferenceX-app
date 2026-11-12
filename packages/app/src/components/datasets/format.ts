@@ -1,8 +1,4 @@
-import type { Locale } from '@/lib/i18n/i18n';
-
-function localeTag(locale: Locale): 'en-US' | 'zh-CN' {
-  return locale === 'zh' ? 'zh-CN' : 'en-US';
-}
+import { localeTag, type Locale } from '@/lib/i18n/i18n';
 
 export function localeNumber(n: number, locale: Locale): string {
   return n.toLocaleString(localeTag(locale));

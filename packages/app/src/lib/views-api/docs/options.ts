@@ -48,7 +48,7 @@ const responseSchema = objectSchema(
         }),
       ),
       description:
-        'Models in selector order within each category. This presentation order does not change defaults.model.',
+        'Models in selector order within each category, with Kimi-K3.1-Pro first. The bare inference page opens Kimi-K3.1-Pro; this navigation default does not change defaults.model or remove the inference API requirement for an explicit model.',
     },
     sequences: arraySchema(
       objectSchema({
@@ -73,7 +73,11 @@ const responseSchema = objectSchema(
           ...numberSchema,
           description: 'Per-chip rated TDP in watts, shared with chip pages. B300 uses 1100 W.',
         },
-        costPerHour: objectSchema({ h: numberSchema, r: numberSchema }),
+        costPerHour: {
+          ...objectSchema({ h: numberSchema, r: numberSchema }),
+          description:
+            'USD per chip-hour: h is hyperscaler ownership, r is committed rental. A100 h=0.78 is a user-supplied assumption; its r=9.99 is an unverified placeholder, not a rental quote.',
+        },
       }),
     ),
     frameworks: arraySchema(

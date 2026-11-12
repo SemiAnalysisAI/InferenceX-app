@@ -21,7 +21,7 @@ tags:
 
 On DeepSeek R1 0528 FP4 1k/1k with Dynamo TRT-LLM + MTP and disaggregated prefill/decode on both SKUs, GB200 NVL72 delivers **up to 4.39x throughput per GPU vs B200 at iso-interactivity** — peaking at 125 tok/s/user (4,130 tok/s/GPU on GB200 NVL72 vs 941 tok/s/GPU on B200).
 
-NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) connects all 72 GPUs over NVLink 5 at **900 GB/s per GPU uni-directional** (1.8 TB/s jensen math bidi rx + tx). A [B200](https://inferencex.semianalysis.com/gpu-specs) server connects only 8 GPUs over NVLink; once decode EP needs more than 8 ranks, the all-to-all has to leave the NVLink island and cross **ConnectX-7 RoCEv2 Ethernet at 400 Gbit/s per GPU**. So per-GPU bandwidth available to any wider-than-8 EP collective drops from 900 GB/s to 50 GB/s, 18x. DeepSeek R1's 256 routed experts amortize beautifully when the all-to-all stays on NVLink end-to-end across 16 or 32 ranks.
+NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/infx/gpu-specs) connects all 72 GPUs over NVLink 5 at **900 GB/s per GPU uni-directional** (1.8 TB/s jensen math bidi rx + tx). A [B200](https://inferencex.semianalysis.com/infx/gpu-specs) server connects only 8 GPUs over NVLink; once decode EP needs more than 8 ranks, the all-to-all has to leave the NVLink island and cross **ConnectX-7 RoCEv2 Ethernet at 400 Gbit/s per GPU**. So per-GPU bandwidth available to any wider-than-8 EP collective drops from 900 GB/s to 50 GB/s, 18x. DeepSeek R1's 256 routed experts amortize beautifully when the all-to-all stays on NVLink end-to-end across 16 or 32 ranks.
 
 <Figure
   srcLight="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-light.png"
@@ -30,7 +30,7 @@ NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) connects all
   caption="GB200 NVL72 rack layout — 18 compute trays × 4 GPUs each = 72 GPUs in one NVLink-5 scale-up domain, stitched together by 9 NVSwitch5 trays. The whole rack runs the same fabric the GPUs inside an HGX B200 node use; B200 multinode disagg crosses InfiniBand or RoCEv2 Ethernet between racks at 18x lower per-GPU bandwidth."
 />
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -129,7 +129,7 @@ The 4.39x throughput peak (3.87x cost gap) at 125 tok/s/user is where wide EP ac
   caption="DeepSeek R1 0528 FP4 1k/1k Pareto frontier. GB200 NVL72 vs B200, both Dynamo TRT-LLM + MTP, both disaggregated prefill/decode. Measured on InferenceX 2026-05-22. Point labels denote decode TP."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp), pre-filtered to B200 and GB200 NVL72 Dynamo TRT MTP on DeepSeek R1 FP4 1k/1k for the 2026-05-22 run.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp), pre-filtered to B200 and GB200 NVL72 Dynamo TRT MTP on DeepSeek R1 FP4 1k/1k for the 2026-05-22 run.
 
 ## When Each SKU Wins
 
@@ -141,7 +141,7 @@ NVIDIA's [SGLang GB200 NVL72 results](https://lmsys.org/blog/2025-09-25-gb200-pa
 
 Thanks to NVIDIA's Dynamo and TensorRT-LLM teams — including Jatin Gangani, Kedar Potdar, Sridhar Ramaswamy, Ishan Dhanani, and Sahithi Chigurupati — for shipping the disagg recipes on both B200 multinode RoCEv2 and GB200 NVL72. Checkout our other blog post on [GB200 NVL72 vs B200 Kimi K2.5 post](https://inferencex.semianalysis.com/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200).
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

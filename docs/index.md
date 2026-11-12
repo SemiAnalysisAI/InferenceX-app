@@ -9,7 +9,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [API Skill Examples](./inferencex-api-examples.md) shows how to install the public API skill, query benchmarks, and export measured PowerX data.
 - [PowerX System Power](./powerx-system-power.md) covers the modeled chassis and rack power, its assumptions, and the offline comparison export.
 - [PowerX Permanent View](./powerx-permanent-view.md) covers the measured-energy power metrics, their share links, and the power timeline.
-- [PowerX Tutorial](./powerx-tutorial.md) covers the `.mdx` source behind `/powerx/tutorial`, its syntax, and its widgets.
+- [PowerX Tutorial](./powerx-tutorial.md) covers the `.mdx` source behind `/pwx/tutorial`, its syntax, and its widgets.
 - [API Skill Releases](./inferencex-skills-release.md) is the runbook for preparing, verifying, publishing, and recovering `inferencex-skills` releases.
 - [API Skill Discovery](./inferencex-skills-discovery.md) is the acceptance protocol for implicit skill discovery in fresh Codex and Claude Code projects.
 - [CLI Compatibility](./inferencex-cli-compatibility.md) covers the CLI contract, exit semantics, platform scope, and legacy migration.
@@ -18,6 +18,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [D3 Charts](./d3-charts.md) covers render phases, zoom and tooltip behavior, animation, and Pareto highlights.
 - [Video History](./video-history.md) covers the read-only published H3 catalog, source identity, metric boundaries, and retained-data replay.
 - [VideoGenX dashboard](./videogenx-dashboard.md) covers shared workload selection, deployment metrics, Compare, and missing-data rules.
+- [VideoGenX Quality Guide](./videogenx-quality-guide.md) covers `/vgx/quality`, its pinned reference PSNR read, the illustrative sweet-spot chart, and layout stability.
 - [Data Pipeline](./data-pipeline.md) covers DB schema and migration rules, ETL design, audited purges and backfills, and agentic and PowerX storage.
 - [Ingesting Runs](./ingesting-runs.md) is the runbook for manually ingesting a GitHub Actions benchmark run.
 - [Deployment Configuration](./deployment-configuration.md) lists the environment variables, GitHub variables, and GitHub secrets the app and workflows read, and which of them are required.

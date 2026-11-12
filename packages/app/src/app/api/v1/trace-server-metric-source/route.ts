@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { CHART_SERIES_VERSION } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
 import {
   getTraceServerMetricSource,
@@ -16,8 +16,8 @@ export const maxDuration = 300;
 export const CACHE_KEY_PREFIX = `trace-server-metric-source-v${CHART_SERIES_VERSION}`;
 
 const getCachedMetricSource = cachedQuery(
-  (id: number, source: string): Promise<MetricSourceSeries | null> =>
-    getTraceServerMetricSource(getDb(), id, source),
+  async (id: number, source: string): Promise<MetricSourceSeries | null> =>
+    getTraceServerMetricSource(await getPayloadDb(id), id, source),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

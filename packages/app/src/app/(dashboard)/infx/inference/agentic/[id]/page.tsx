@@ -1,0 +1,32 @@
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
+import { AgenticPointDetail } from '@/components/inference/agentic-point/agentic-point-detail';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: 'Agentic trace detail | InferenceX',
+    description: `Inspect request timelines, server metrics, aggregates, and logs for Agentic benchmark point #${id}.`,
+    alternates: enAlternates(`${getDashboardRoute('inference').path}/agentic/${id}`),
+    robots: { index: false },
+  };
+}
+
+export default async function AgenticPointDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const numericId = Number(id);
+  if (!isPersistedBenchmarkId(numericId)) notFound();
+  return <AgenticPointDetail id={numericId} />;
+}

@@ -21,6 +21,9 @@ vi.mock('@/lib/cache/api-cache', () => ({ cachedQuery: mocks.cachedQuery }));
 
 import { lookupDatasetPage } from './dataset-pages.server';
 
+// Vitest clears mock history before every test, so keep the calls made while the module loaded.
+const moduleLoadCachedQueryCalls = [...mocks.cachedQuery.mock.calls];
+
 describe('lookupDatasetPage', () => {
   beforeEach(() => {
     mocks.fixturesMode = false;
@@ -28,8 +31,7 @@ describe('lookupDatasetPage', () => {
   });
 
   it('reads the per-slug dataset cache shared with /api/v1/datasets/[slug]', () => {
-    expect(mocks.cachedQuery).toHaveBeenCalledTimes(1);
-    expect(mocks.cachedQuery).toHaveBeenCalledWith(expect.any(Function), 'dataset');
+    expect(moduleLoadCachedQueryCalls).toEqual([[expect.any(Function), 'dataset']]);
   });
 
   it('finds ingested datasets with a lookup for that slug alone', async () => {

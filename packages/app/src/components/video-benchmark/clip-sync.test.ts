@@ -23,6 +23,8 @@ const group = (clips: ClipSnapshot[], changes: Partial<ClipGroup> = {}): ClipGro
   clips,
   audible: null,
   duration: 5,
+  speed: 1,
+  loop: false,
   ...changes,
 });
 const ofType = (step: ClipGroupStep, type: ClipAction['type']) =>
@@ -224,6 +226,65 @@ describe('stepClipGroup', () => {
     expect(paused).toMatchObject({
       phase: 'paused',
       actions: [{ type: 'seek', key: 'b200', time: 2 }],
+    });
+  });
+
+  it('keeps the chosen speed through drift nudges, scrubs and resumes instead of snapping to 1×', () => {
+    const slow = { speed: 0.5 };
+    // A reloaded source comes back at the element default rate of 1.
+    const nudged = stepClipGroup(
+      group([clip('b200'), clip('h100', { currentTime: 1.15, playbackRate: 0.5 })], slow),
+      'tick',
+    );
+    expect(nudged.actions).toEqual([
+      { type: 'rate', key: 'b200', rate: 0.5 },
+      { type: 'rate', key: 'h100', rate: 0.45 },
+    ]);
+    const settled = stepClipGroup(
+      group(
+        [
+          clip('b200', { playbackRate: 0.5 }),
+          clip('h100', { currentTime: 1.005, playbackRate: 0.45 }),
+        ],
+        slow,
+      ),
+      'tick',
+    );
+    expect(settled.actions).toEqual([{ type: 'rate', key: 'h100', rate: 0.5 }]);
+    const scrubbed = stepClipGroup(
+      group([clip('b200', { playbackRate: 0.45 }), clip('h100', { playbackRate: 0.5 })], slow),
+      { type: 'seek', time: 2 },
+    );
+    expect(ofType(scrubbed, 'rate')).toEqual([{ type: 'rate', key: 'b200', rate: 0.5 }]);
+    const resumed = stepClipGroup(
+      group([clip('b200', { bufferedEnd: 2.2 }), clip('h100')], { ...slow, phase: 'buffering' }),
+      'tick',
+    );
+    expect(resumed).toMatchObject({
+      phase: 'playing',
+      actions: [
+        { type: 'rate', key: 'b200', rate: 0.5 },
+        { type: 'rate', key: 'h100', rate: 0.5 },
+        { type: 'play-all' },
+      ],
+    });
+  });
+
+  it('loops by rewinding every clip together, also when one side reaches the end first', () => {
+    const looped = stepClipGroup(
+      group([clip('b200', { currentTime: 4.9 }), clip('h100', { currentTime: 5, ended: true })], {
+        loop: true,
+      }),
+      'tick',
+    );
+    expect(looped).toMatchObject({
+      phase: 'loading',
+      actions: [
+        { type: 'pause-all' },
+        { type: 'seek', key: 'b200', time: 0 },
+        { type: 'seek', key: 'h100', time: 0 },
+      ],
+      time: 0,
     });
   });
 });

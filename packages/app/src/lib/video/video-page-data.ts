@@ -11,6 +11,7 @@ import {
 } from '@/components/video-benchmark/initial-data';
 import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { chartedCells, stageOpenings } from '@/components/video-benchmark/results-chart';
 import {
   publishedResultsSide,
   resultsClipPoints,
@@ -50,6 +51,10 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
       pages: String(VIDEO_HISTORY_MAX_PAGES),
     });
     if (!historyResponse.ok) throw new Error('Published history unavailable');
+    // The shared cache serves a degraded read without retaining it; a seed would retain it
+    // for this document and stop the browser's own read.
+    if (historyResponse.headers.get('x-videogenx-incomplete') === '1')
+      throw new Error('Published history incomplete');
     const data: VideoHistoryPage = await historyResponse.json();
     if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
       throw new Error('Unsupported published history projection');
@@ -60,9 +65,9 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
       state,
       namedRunPoints(pages, state.unofficialRun),
     );
-    const points = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
-      tier: state.costTier,
-    });
+    const leads = resultsClipPoints(chartedCells(projection, state), { tier: state.costTier });
+    // The stage opens on its own deployment, which the first render must not fetch again.
+    const points = [...new Set([...leads, ...stageOpenings(projection, state, leads)])];
     const artifacts = new Map<string, Promise<StoredArtifact | null>>();
     const sides = await Promise.allSettled(
       points.map(async (point) => {

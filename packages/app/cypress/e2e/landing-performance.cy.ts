@@ -61,9 +61,12 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.request('/')
       .its('body')
-      .should('contain', 'See full quotes')
+      .should('contain', 'All quotes and supporters')
       .and('contain', 'href="/quotes#quote-minimax"')
-      .and('contain', 'data-testid="launch-banner"');
+      .and('contain', 'data-testid="launch-banner"')
+      // Both A/B arms are server-rendered; the pre-paint style shows only the assigned one.
+      .and('contain', 'data-banner-variant="ubenchx"')
+      .and('contain', 'data-banner-variant="operatorx"');
 
     // The previous page can still be loading a chunk when this intercept starts, and the visit
     // below aborts it. Cypress fails the test when a response callback loses its browser
@@ -84,23 +87,17 @@ describe('Landing page performance', () => {
       },
     });
 
-    // Both A/B arms are server-rendered; the pre-paint style shows only the assigned one.
-    cy.get('[data-banner-variant="ubenchx"]').should('exist').and('not.be.visible');
+    // Hydration may already have dropped the unassigned arm by now, so only its visibility is
+    // checked here; the server-rendered markup is checked on the request above.
+    cy.get('[data-banner-variant="ubenchx"]:visible').should('not.exist');
     cy.get('[data-testid="launch-banner"]:visible')
       .should('have.length', 1)
-      .and('have.attr', 'href', '/operatorx');
-    cy.get('[data-testid="intro-section"]').should(
-      'contain.text',
-      'See full quotes & more supporters',
-    );
-    cy.get('[data-testid="compare-agentx-primary"]')
-      .should('be.visible')
-      .closest('[data-reveal]')
-      .should('not.exist');
+      .and('have.attr', 'href', '/opx');
+    cy.get('[data-testid="intro-section"]').should('contain.text', 'All quotes and supporters');
+    cy.get('[data-testid="compare-agentx-primary"]').should('be.visible');
     cy.get('[data-testid="supporters-more-row"]')
-      .should('have.class', 'justify-end')
       .find('a')
-      .should('have.text', 'See full quotes & more supporters →');
+      .should('have.text', 'All quotes and supporters');
     expectLowCls();
   });
 
@@ -115,23 +112,16 @@ describe('Landing page performance', () => {
 
     cy.get('html').should('have.attr', 'data-landing-banner-dismissed');
     cy.get('[data-testid="launch-banner"]').should('not.exist');
-    cy.get('[data-testid="intro-section"]').should(
-      'contain.text',
-      'See full quotes & more supporters',
-    );
+    cy.get('[data-testid="intro-section"]').should('contain.text', 'All quotes and supporters');
     expectLowCls();
   });
 
-  it('does not load the decorative circuit mask on mobile', () => {
+  it('loads only colored supporter logos on mobile', () => {
     cy.viewport(412, 823);
     cy.visit('/');
 
-    cy.get('.circuit-bg').should('have.css', 'display', 'none');
     cy.window().then((win) => {
       const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
-      expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
-        false,
-      );
       const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(landingLogos.size).to.be.lessThan(6);
       expect(
@@ -178,7 +168,6 @@ describe('Landing page performance', () => {
 
       expect([...fonts]).to.have.length(1);
       expect([...logos]).to.have.length(0);
-      expect(body.match(/<link\b[^>]*left-pattern-full\.svg[^>]*>/gu) ?? []).to.have.length(0);
     });
   });
 });

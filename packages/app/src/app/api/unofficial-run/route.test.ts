@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
+import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
+
 import {
   githubRateLimitRetryAfter,
   normalizeArtifactRows,
   normalizeEvalArtifactRows,
   unofficialRunCacheControl,
+  withRunSpeculation,
 } from './route';
 
 const mockGetEntries = vi.fn();
@@ -322,17 +325,17 @@ describe('normalizeArtifactRows', () => {
     expect(rows[0].disagg).toBe(true);
   });
 
-  it('skips rows with unmapped model', () => {
+  it('keeps a row with an unregistered model under its raw model identity', () => {
     const rows = normalizeArtifactRows(
       [rawRow({ infmax_model_prefix: undefined, model: 'unknown/model' })],
       '2026-03-01',
     );
-    expect(rows).toHaveLength(0);
+    expect(rows.map((row) => row.model)).toEqual(['unknown/model']);
   });
 
-  it('skips rows with unmapped hardware', () => {
-    const rows = normalizeArtifactRows([rawRow({ hw: 'unknown-gpu' })], '2026-03-01');
-    expect(rows).toHaveLength(0);
+  it('keeps a row with unregistered hardware under its raw runner base', () => {
+    const rows = normalizeArtifactRows([rawRow({ hw: 'cluster:unknowngpu-lab' })], '2026-03-01');
+    expect(rows.map((row) => row.hardware)).toEqual(['unknowngpu']);
   });
 
   it('skips rows missing ISL/OSL', () => {
@@ -340,7 +343,7 @@ describe('normalizeArtifactRows', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('processes multiple rows, skipping invalid ones', () => {
+  it('processes multiple rows, keeping registered keys canonical', () => {
     const rows = normalizeArtifactRows(
       [
         rawRow({ infmax_model_prefix: 'dsr1' }),
@@ -349,9 +352,7 @@ describe('normalizeArtifactRows', () => {
       ],
       '2026-03-01',
     );
-    expect(rows).toHaveLength(2);
-    expect(rows[0].model).toBe('dsr1');
-    expect(rows[1].model).toBe('gptoss120b');
+    expect(rows.map((row) => row.model)).toEqual(['dsr1', 'unknown/bad', 'gptoss120b']);
   });
 
   it('sets the provided date on all rows', () => {
@@ -394,6 +395,38 @@ describe('normalizeArtifactRows', () => {
 });
 
 describe('normalizeEvalArtifactRows', () => {
+  it('retains uppercase A100 cluster identities in unofficial evaluations', () => {
+    const { rows } = normalizeEvalArtifactRows(
+      [
+        rawEvalRow({
+          hw: 'CLUSTER:A100-CW',
+          model: 'deepseek-ai/DeepSeek-V4.1-Flash',
+          model_prefix: 'dsv41flash',
+          framework: 'vllm',
+          precision: 'fp4',
+          spec_decoding: 'mtp',
+          disagg: false,
+          conc: 28,
+          em_strict: 0.9727065959059894,
+          score: 0.9727065959059894,
+        }),
+      ],
+      '2026-11-11',
+      '2026-11-11T06:50:22Z',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42940055863',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      hardware: 'a100',
+      model: 'dsv41flash',
+      framework: 'vllm',
+      precision: 'fp4',
+      conc: 28,
+      task: 'gsm8k',
+      metrics: { em_strict: 0.9727065959059894 },
+    });
+  });
+
   it('converts aggregate eval rows to EvalRow shape with synthetic config ids', () => {
     const { rows, maxConfigId } = normalizeEvalArtifactRows(
       [rawEvalRow({ task: 'gsm8k', conc: 16 }), rawEvalRow({ task: 'mmlu', conc: 32 })],
@@ -448,6 +481,58 @@ describe('normalizeEvalArtifactRows', () => {
     );
 
     expect(rows).toEqual([]);
+  });
+});
+
+describe('withRunSpeculation', () => {
+  const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
+  const config = {
+    hardware: 'b300',
+    framework: 'sglang',
+    model: 'kimik3.1',
+    precision: 'fp4',
+    spec_method: 'draft_model',
+    disagg: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 0,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_dp_attention: false,
+    decode_num_workers: 0,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+  };
+  const evaluation = {
+    ...config,
+    id: -1,
+    config_id: 1,
+    spec_algorithm: null,
+    spec_draft_model: null,
+  } as unknown as EvalRow;
+  const benchmark = (url: string, overrides: Partial<typeof config> = {}) =>
+    ({
+      ...config,
+      ...overrides,
+      run_url: url,
+      metrics: { spec_algorithm: 'dflash', spec_draft_model: 'RadixArk/Kimi-K3.1-Dflash2-Preview' },
+    }) as unknown as BenchmarkRow;
+
+  it('copies the speculative algorithm and draft model from the same run and config', () => {
+    expect(withRunSpeculation([evaluation], [benchmark(runUrl)], runUrl)[0]).toMatchObject({
+      spec_algorithm: 'dflash',
+      spec_draft_model: 'RadixArk/Kimi-K3.1-Dflash2-Preview',
+    });
+  });
+
+  it('ignores other runs and other configs', () => {
+    const [row] = withRunSpeculation(
+      [evaluation],
+      [benchmark('https://example.test/runs/9'), benchmark(runUrl, { decode_tp: 4 })],
+      runUrl,
+    );
+    expect(row).toMatchObject({ spec_algorithm: null, spec_draft_model: null });
   });
 });
 

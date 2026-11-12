@@ -1,40 +1,60 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
+import { Suspense, useCallback, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatNumber, formatDuration } from '@/lib/agentic-workload-explorer/format';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import { bucketLabel, formatDuration, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/agentic-workload-explorer/ui/table';
+import {
+  formatAxisNumber,
+  formatHourLabel,
+  TrendsStackedChart,
+  type StackedDayPoint,
+} from '@/components/agentic-workload-explorer/trends-charts';
+import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
+    stats: 'Stats',
     failedToLoad: 'Failed to load endpoint data',
-    totalRequests: 'Total Requests',
-    errorRate: 'Error Rate',
+    totalRequests: 'Total requests',
+    errorRate: 'Error rate',
     routes: 'Routes',
-    errorsFinal24h: 'Errors (Final 24h)',
-    final7days: 'final 7 days',
+    errorsFinal24h: 'Errors (final 24h)',
+    final7days: 'Final 7 days',
     errors: (n: string) => `${n} errors`,
     uniqueEndpoints: 'unique endpoints',
-    final24hours: 'final 24 hours',
-    statusCodeDistribution: 'Status Code Distribution',
-    hourlyTraffic: 'Hourly Traffic',
-    final48hours: 'final 48 hours',
-    routeBreakdown: 'Route Breakdown',
-    latestErrors: 'Latest Errors',
+    final24hours: 'Final 24 hours',
+    statusCodeDistribution: 'Status code distribution',
+    shareOfRequests: (share: string) => `${share} of requests`,
+    hourlyTraffic: 'Hourly traffic',
+    hourlyTrafficDetail: 'Requests per hour by route · Final 48 hours',
+    yRequests: 'Requests',
+    routeBreakdown: 'Route breakdown',
+    latestErrors: 'Latest errors',
     thEndpoint: 'Endpoint',
     thTotal: 'Total',
     thSuccess: 'Success',
     thErrors: 'Errors',
     thSuccessPct: 'Success %',
-    thAvgLatency: 'Avg Latency',
-    thP95Latency: 'p95 Latency',
+    thAvgLatency: 'Avg latency',
+    thP95Latency: 'p95 latency',
     thTime: 'Time',
     thModel: 'Model',
     thStatus: 'Status',
@@ -42,9 +62,10 @@ const STRINGS = {
     thError: 'Error',
     noRequestData: 'No request data in the final 7 days',
     noErrors: 'No errors in the final 24 hours',
-    tooltipTotal: 'total',
   },
   zh: {
+    yRequests: '请求数',
+    stats: '统计',
     failedToLoad: '无法加载端点数据',
     totalRequests: '总请求数',
     errorRate: '错误率',
@@ -55,8 +76,9 @@ const STRINGS = {
     uniqueEndpoints: '独立端点',
     final24hours: '最后 24 小时',
     statusCodeDistribution: '状态码分布',
+    shareOfRequests: (share: string) => `占请求的 ${share}`,
     hourlyTraffic: '每小时流量',
-    final48hours: '最后 48 小时',
+    hourlyTrafficDetail: '按路由统计的每小时请求数 · 最后 48 小时',
     routeBreakdown: '路由明细',
     latestErrors: '最近错误',
     thEndpoint: 'Endpoint',
@@ -73,21 +95,8 @@ const STRINGS = {
     thError: '错误',
     noRequestData: '最后 7 天无请求数据',
     noErrors: '最后 24 小时无错误',
-    tooltipTotal: '合计',
   },
 } as const;
-
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-muted-foreground">{detail}</span>}
-    </div>
-  );
-}
 
 interface RouteStat {
   endpoint: string;
@@ -126,51 +135,10 @@ interface ProxyHealthData {
   recentErrors: RecentError[];
 }
 
-const CHART_W = 600;
-const CHART_H = 180;
-const MARGIN = { top: 8, right: 12, bottom: 32, left: 48 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
-const SVG_FONT_SIZE = '9px';
-
 const ENDPOINT_COLORS: Record<string, string> = {
-  '/v1/messages': '#10b981',
+  '/v1/messages': CHART_COLORS[2],
 };
-const FALLBACK_COLORS = ['#f59e0b', '#ec4899', '#6366f1', '#14b8a6'];
-
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
-
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
+const FALLBACK_COLORS = [CHART_COLORS[1], CHART_COLORS[6], CHART_COLORS[4], CHART_COLORS[5]];
 
 const STATUS_COLORS: Record<string, string> = {
   '2xx': '#10b981',
@@ -179,6 +147,16 @@ const STATUS_COLORS: Record<string, string> = {
   '5xx': '#ef4444',
   unknown: '#6b7280',
 };
+
+const TEXT_SUCCESS = 'text-emerald-700 dark:text-emerald-400';
+const TEXT_WARNING = 'text-amber-700 dark:text-amber-400';
+const TEXT_DESTRUCTIVE = 'text-red-700 dark:text-red-400';
+
+function shareLabel(count: number, total: number): string {
+  if (total <= 0 || count <= 0) return '0.0%';
+  const fixed = ((count / total) * 100).toFixed(1);
+  return fixed === '0.0' ? '<0.1%' : `${fixed}%`;
+}
 
 export default function ProxyHealthPage() {
   return (
@@ -189,7 +167,8 @@ export default function ProxyHealthPage() {
 }
 
 function ProxyHealthPageContent() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const { apiParam: traceVersionParam } = useTraceVersion();
 
   const { data, loading } = useDashboardData<ProxyHealthData>({
@@ -215,234 +194,200 @@ function ProxyHealthPageContent() {
   }
 
   if (!data) {
-    return (
-      <div className="text-sm font-mono text-muted-foreground text-center py-8">
-        {t.failedToLoad}
-      </div>
-    );
+    return <EmptyState>{t.failedToLoad}</EmptyState>;
   }
 
   const totalRequests = data.routeStats.reduce((s, r) => s + r.total, 0);
   const totalErrors = data.routeStats.reduce((s, r) => s + r.errorCount, 0);
   const errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
+  const statusTotal = data.statusDistribution.reduce((s, d) => s + d.count, 0);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard
-          label={t.totalRequests}
-          value={formatNumber(totalRequests)}
-          subtitle={t.final7days}
-        />
-        <StatCard
-          label={t.errorRate}
-          value={`${errorRate.toFixed(1)}%`}
-          subtitle={t.errors(formatNumber(totalErrors))}
-          color={
-            errorRate > 5 ? 'text-rose-500' : errorRate > 1 ? 'text-amber-500' : 'text-emerald-500'
-          }
-        />
-        <StatCard
-          label={t.routes}
-          value={String(data.routeStats.length)}
-          subtitle={t.uniqueEndpoints}
-        />
-        <StatCard
-          label={t.errorsFinal24h}
-          value={String(data.recentErrors.length)}
-          subtitle={t.final24hours}
-          color={data.recentErrors.length > 10 ? 'text-rose-500' : undefined}
-        />
+      <div>
+        <SectionHeader label={t.stats} />
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Stat
+            boxed
+            label={t.totalRequests}
+            value={formatNumber(totalRequests)}
+            detail={t.final7days}
+          />
+          <Stat
+            boxed
+            label={t.errorRate}
+            value={`${errorRate.toFixed(1)}%`}
+            detail={t.errors(formatNumber(totalErrors))}
+            valueClassName={
+              errorRate > 5 ? 'text-destructive' : errorRate > 1 ? 'text-warning' : 'text-success'
+            }
+          />
+          <Stat
+            boxed
+            label={t.routes}
+            value={String(data.routeStats.length)}
+            detail={t.uniqueEndpoints}
+          />
+          <Stat
+            boxed
+            label={t.errorsFinal24h}
+            value={String(data.recentErrors.length)}
+            detail={t.final24hours}
+            valueClassName={data.recentErrors.length > 10 ? 'text-destructive' : undefined}
+          />
+        </dl>
       </div>
 
       {data.statusDistribution.length > 0 && (
         <div>
           <SectionHeader label={t.statusCodeDistribution} detail={t.final7days} />
-          <div className="mt-3 flex items-end gap-1.5 h-16">
-            {data.statusDistribution.map((s) => {
-              const maxCount = Math.max(...data.statusDistribution.map((d) => d.count), 1);
-              const height = (s.count / maxCount) * 100;
-              return (
-                <div key={s.statusGroup} className="flex flex-col items-center gap-1 flex-1">
-                  <span className="text-3xs font-mono text-muted-foreground">
-                    {formatNumber(s.count)}
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {data.statusDistribution.map((s) => (
+              <Stat
+                key={s.statusGroup}
+                boxed
+                label={
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className="size-2 rounded-sm"
+                      style={{ backgroundColor: STATUS_COLORS[s.statusGroup] ?? '#6b7280' }}
+                    />
+                    {bucketLabel(s.statusGroup, locale)}
                   </span>
-                  <div
-                    className="w-full rounded-t"
-                    style={{
-                      height: `${Math.max(height, 4)}%`,
-                      backgroundColor: STATUS_COLORS[s.statusGroup] || '#6b7280',
-                      opacity: 0.8,
-                    }}
-                  />
-                  <span
-                    className="text-3xs font-mono font-bold"
-                    style={{ color: STATUS_COLORS[s.statusGroup] || '#6b7280' }}
-                  >
-                    {s.statusGroup}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                }
+                value={formatNumber(s.count)}
+                detail={t.shareOfRequests(shareLabel(s.count, statusTotal))}
+              />
+            ))}
+          </dl>
         </div>
       )}
 
       {data.hourlyByEndpoint.length > 0 && (
-        <div>
-          <SectionHeader label={t.hourlyTraffic} detail={t.final48hours} />
-          <Expandable title={t.hourlyTraffic} subtitle={t.final48hours} corner>
-            <div className="mt-3 rounded-md border border-border bg-surface p-3">
-              <HourlyTrafficChart hourly={data.hourlyByEndpoint} tooltipTotal={t.tooltipTotal} />
-            </div>
-          </Expandable>
-        </div>
+        <HourlyTrafficChart
+          hourly={data.hourlyByEndpoint}
+          title={t.hourlyTraffic}
+          subtext={t.hourlyTrafficDetail}
+          yLabel={t.yRequests}
+        />
       )}
 
       <div>
         <SectionHeader label={t.routeBreakdown} detail={t.final7days} />
-        <div className="mt-3 rounded-md border border-border bg-surface overflow-hidden">
-          <table className="w-full text-2xs font-mono">
-            <thead>
-              <tr className="border-b border-border bg-surface-hover">
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thEndpoint}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thTotal}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thSuccess}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thErrors}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thSuccessPct}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thAvgLatency}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thP95Latency}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded-xl border border-border/30 bg-card">
+          <Table className="text-xs tabular-nums">
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t.thEndpoint}</TableHead>
+                <TableHead className="text-right">{t.thTotal}</TableHead>
+                <TableHead className="text-right">{t.thSuccess}</TableHead>
+                <TableHead className="text-right">{t.thErrors}</TableHead>
+                <TableHead className="text-right">{t.thSuccessPct}</TableHead>
+                <TableHead className="text-right">{t.thAvgLatency}</TableHead>
+                <TableHead className="text-right">{t.thP95Latency}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {data.routeStats.map((route) => {
                 const successRate = route.total > 0 ? (route.successCount / route.total) * 100 : 0;
                 return (
-                  <tr
-                    key={route.endpoint}
-                    className="border-b border-border last:border-0 hover:bg-surface-hover"
-                  >
-                    <td className="px-3 py-2 text-foreground">{route.endpoint}</td>
-                    <td className="px-3 py-2 text-right">{formatNumber(route.total)}</td>
-                    <td className="px-3 py-2 text-right text-emerald-500">
+                  <TableRow key={route.endpoint}>
+                    <TableCell className="text-foreground">
+                      {bucketLabel(route.endpoint, locale)}
+                    </TableCell>
+                    <TableCell className="text-right">{formatNumber(route.total)}</TableCell>
+                    <TableCell className={`text-right ${TEXT_SUCCESS}`}>
                       {formatNumber(route.successCount)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-rose-500">
+                    </TableCell>
+                    <TableCell className={`text-right ${TEXT_DESTRUCTIVE}`}>
                       {route.errorCount > 0 ? formatNumber(route.errorCount) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <span
-                        className={
-                          successRate >= 99
-                            ? 'text-emerald-500'
-                            : successRate >= 95
-                              ? 'text-amber-500'
-                              : 'text-rose-500'
-                        }
-                      >
-                        {successRate.toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">
+                    </TableCell>
+                    <TableCell
+                      className={`text-right ${
+                        successRate >= 99
+                          ? TEXT_SUCCESS
+                          : successRate >= 95
+                            ? TEXT_WARNING
+                            : TEXT_DESTRUCTIVE
+                      }`}
+                    >
+                      {successRate.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
                       {route.avgDurationMs > 0 ? formatDuration(route.avgDurationMs) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
                       {route.p95DurationMs > 0 ? formatDuration(route.p95DurationMs) : '—'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
               {data.routeStats.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                     {t.noRequestData}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
 
       <div>
         <SectionHeader label={t.latestErrors} detail={t.final24hours} />
-        <div className="mt-3 rounded-md border border-border bg-surface overflow-hidden">
-          <table className="w-full text-2xs font-mono">
-            <thead>
-              <tr className="border-b border-border bg-surface-hover">
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thTime}
-                </th>
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thEndpoint}
-                </th>
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thModel}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thStatus}
-                </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thDuration}
-                </th>
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
-                  {t.thError}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded-xl border border-border/30 bg-card">
+          <Table className="text-xs tabular-nums">
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t.thTime}</TableHead>
+                <TableHead>{t.thEndpoint}</TableHead>
+                <TableHead>{t.thModel}</TableHead>
+                <TableHead className="text-right">{t.thStatus}</TableHead>
+                <TableHead className="text-right">{t.thDuration}</TableHead>
+                <TableHead>{t.thError}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {data.recentErrors.map((err) => (
-                <tr
-                  key={err.id}
-                  className="border-b border-border last:border-0 hover:bg-surface-hover"
-                >
-                  <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                    {formatSnapshotTime(err.timestamp)}
-                  </td>
-                  <td className="px-3 py-2 text-foreground">{err.endpoint}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{err.model ?? '—'}</td>
-                  <td className="px-3 py-2 text-right">
-                    <span
-                      className={
-                        err.responseStatusCode && err.responseStatusCode >= 500
-                          ? 'text-rose-500'
-                          : 'text-amber-500'
-                      }
-                    >
-                      {err.responseStatusCode ?? 'null'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">
+                <TableRow key={err.id}>
+                  <TableCell className="text-muted-foreground">
+                    {formatSnapshotTime(err.timestamp, locale)}
+                  </TableCell>
+                  <TableCell className="text-foreground">
+                    {bucketLabel(err.endpoint, locale)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{err.model ?? '—'}</TableCell>
+                  <TableCell
+                    className={`text-right font-mono ${
+                      err.responseStatusCode && err.responseStatusCode >= 500
+                        ? TEXT_DESTRUCTIVE
+                        : TEXT_WARNING
+                    }`}
+                  >
+                    {err.responseStatusCode ?? 'null'}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
                     {err.durationMs ? formatDuration(err.durationMs) : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-rose-400 truncate max-w-xs" title={err.error ?? ''}>
+                  </TableCell>
+                  <TableCell
+                    className={`max-w-xs truncate ${TEXT_DESTRUCTIVE}`}
+                    title={err.error ?? ''}
+                  >
                     {err.error ? err.error.slice(0, 80) : '—'}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {data.recentErrors.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-emerald-500">
+                <TableRow>
+                  <TableCell colSpan={6} className={`py-6 text-center ${TEXT_SUCCESS}`}>
                     {t.noErrors}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>
@@ -451,186 +396,58 @@ function ProxyHealthPageContent() {
 
 function HourlyTrafficChart({
   hourly,
-  tooltipTotal,
+  title,
+  subtext,
+  yLabel,
 }: {
   hourly: HourlyEndpoint[];
-  tooltipTotal: string;
+  title: string;
+  subtext: string;
+  yLabel: string;
 }) {
-  const { hours, endpointNames, seriesByEndpoint, maxCount } = useMemo(() => {
-    const hourSet = new Set<string>();
-    const epSet = new Set<string>();
+  const locale = useLocale();
+  const { days, endpoints, colors } = useMemo(() => {
+    const byHour = new Map<string, Record<string, number>>();
+    const endpointSet = new Set<string>();
     for (const h of hourly) {
-      hourSet.add(h.hour);
-      epSet.add(h.endpoint);
+      endpointSet.add(h.endpoint);
+      const values = byHour.get(h.hour) ?? {};
+      values[h.endpoint] = (values[h.endpoint] ?? 0) + h.count;
+      byHour.set(h.hour, values);
     }
-    const sortedHours = [...hourSet].toSorted();
-    const epNames = [...epSet].toSorted();
-
-    const lookup = new Map<string, number>();
-    for (const h of hourly) {
-      lookup.set(`${h.hour}|${h.endpoint}`, h.count);
-    }
-
-    const series: Record<string, number[]> = {};
-    for (const ep of epNames) {
-      series[ep] = sortedHours.map((hr) => lookup.get(`${hr}|${ep}`) || 0);
-    }
-
-    let max = 0;
-    for (let i = 0; i < sortedHours.length; i++) {
-      let sum = 0;
-      for (const ep of epNames) sum += series[ep][i];
-      if (sum > max) max = sum;
-    }
-
-    return { hours: sortedHours, endpointNames: epNames, seriesByEndpoint: series, maxCount: max };
-  }, [hourly]);
-
-  if (hours.length === 0) return null;
-
-  const yTicks = generateTicks(0, maxCount, 5);
-  const yMax = yTicks.at(-1) || maxCount || 1;
-
-  const barGap = 1;
-  const barWidth = Math.max(1, (PLOT_W - barGap * hours.length) / hours.length);
-
-  const sx = (i: number) => MARGIN.left + i * (barWidth + barGap);
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  const colorMap = new Map<string, string>();
-  let fallbackIdx = 0;
-  for (const ep of endpointNames) {
-    colorMap.set(
-      ep,
-      ENDPOINT_COLORS[ep] || FALLBACK_COLORS[fallbackIdx++ % FALLBACK_COLORS.length],
+    const sortedEndpoints = [...endpointSet].toSorted();
+    let fallback = 0;
+    const colorMap = new Map(
+      sortedEndpoints.map((ep) => [
+        ep,
+        ENDPOINT_COLORS[ep] ?? FALLBACK_COLORS[fallback++ % FALLBACK_COLORS.length],
+      ]),
     );
-  }
-
-  const labelInterval = Math.max(1, Math.floor(hours.length / 8));
+    return {
+      days: [...byHour.keys()]
+        .toSorted()
+        .map((hour): StackedDayPoint => ({ day: hour, values: byHour.get(hour)! })),
+      endpoints: sortedEndpoints,
+      colors: colorMap,
+    };
+  }, [hourly]);
+  const labelFor = useCallback((ep: string) => bucketLabel(ep, locale), [locale]);
+  const colorFor = useCallback((ep: string) => colors.get(ep) ?? CHART_COLORS[0], [colors]);
+  const formatHour = useCallback((hour: string) => formatHourLabel(hour, locale), [locale]);
 
   return (
-    <div>
-      <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" role="img">
-        {yTicks.map((t) => (
-          <g key={t}>
-            <line
-              x1={MARGIN.left}
-              y1={sy(t)}
-              x2={MARGIN.left + PLOT_W}
-              y2={sy(t)}
-              stroke="var(--color-border)"
-              strokeWidth={0.5}
-            />
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t)}
-              textAnchor="end"
-              dominantBaseline="middle"
-              fill="var(--color-muted-foreground)"
-              fontFamily={SVG_FONT}
-              fontSize={SVG_FONT_SIZE}
-            >
-              {formatNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        {hours.map((hr, i) => {
-          let cumY = 0;
-          const total = endpointNames.reduce((s, ep) => s + seriesByEndpoint[ep][i], 0);
-          return (
-            <g key={hr}>
-              {endpointNames.map((ep) => {
-                const count = seriesByEndpoint[ep][i];
-                if (count === 0) return null;
-                const barH = (count / yMax) * PLOT_H;
-                const y = sy(cumY + count);
-                cumY += count;
-                return (
-                  <rect
-                    key={ep}
-                    x={sx(i)}
-                    y={y}
-                    width={barWidth}
-                    height={Math.max(barH, 0.5)}
-                    fill={colorMap.get(ep)}
-                    opacity={0.8}
-                  >
-                    <title>
-                      {new Date(hr).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {'\n'}
-                      {ep}: {count} ({total} {tooltipTotal})
-                    </title>
-                  </rect>
-                );
-              })}
-            </g>
-          );
-        })}
-
-        {hours.map((hr, i) =>
-          i % labelInterval === 0 ? (
-            <text
-              key={hr}
-              x={sx(i) + barWidth / 2}
-              y={CHART_H - 4}
-              textAnchor="middle"
-              fill="var(--color-muted-foreground)"
-              fontFamily={SVG_FONT}
-              fontSize={SVG_FONT_SIZE}
-            >
-              {new Date(hr).toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-              })}
-            </text>
-          ) : null,
-        )}
-      </svg>
-
-      <div className="flex flex-wrap gap-3 mt-2 px-1">
-        {endpointNames.map((ep) => (
-          <div key={ep} className="flex items-center gap-1.5">
-            <div
-              className="w-2.5 h-2.5 rounded-sm"
-              style={{ backgroundColor: colorMap.get(ep), opacity: 0.8 }}
-            />
-            <span className="text-3xs font-mono text-muted-foreground">{ep}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  color,
-}: {
-  label: string;
-  value: string;
-  subtitle?: string;
-  color?: string;
-}) {
-  return (
-    <div className="rounded-md border border-border bg-surface px-3 py-2.5">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </div>
-      <div
-        className={`text-lg font-mono font-bold tracking-tight mt-0.5 ${color ?? 'text-foreground'}`}
-      >
-        {value}
-      </div>
-      {subtitle && <div className="text-3xs font-mono text-subtle mt-0.5">{subtitle}</div>}
-    </div>
+    <TrendsStackedChart
+      title={title}
+      subtext={subtext}
+      days={days}
+      seriesKeys={endpoints}
+      labelFor={labelFor}
+      colorFor={colorFor}
+      mode="count"
+      yFormatter={formatAxisNumber}
+      yLabel={yLabel}
+      xFormatter={formatHour}
+      filename="hourly-traffic"
+    />
   );
 }

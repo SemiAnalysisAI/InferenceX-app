@@ -1,7 +1,36 @@
 'use client';
 
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
+import { useMemo, useState, type FormEvent, type PointerEvent } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Stat } from '@/components/ui/stat';
+import { Heading } from '@/components/ui/heading';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import {
+  ChartActions,
+  ExpandableChart,
+} from '@/components/agentic-workload-explorer/expandable-chart';
+import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/agentic-workload-explorer/ui/table';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+import { CURSOR_LINE_PROPS } from '@/lib/d3-chart/cursor';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import {
@@ -32,7 +61,7 @@ const COHORT_LABELS = {
 const STRINGS = {
   en: {
     heading: 'Session reuse',
-    description: 'Observed conversation activity and returns after long gaps.',
+    description: 'Observed conversation activity and returns after long gaps',
     exportCsv: 'Export CSV',
     exportJson: 'Export JSON',
     windowDesc: (start: string, end: string, asOf: string, days: number) =>
@@ -48,14 +77,14 @@ const STRINGS = {
     cutoffsLabel: 'Cutoffs (days)',
     apply: 'Apply',
     coverageCohort: 'Coverage cohort',
-    cutoffsError: 'Enter comma-separated whole days from 1 to 28.',
+    cutoffsError: 'Enter comma-separated whole days from 1 to 28',
     noEligible:
       'No eligible sessions have enough follow-up in this trace-version scope. Try All versions or return after more history is recorded.',
     chartCoverageTitle: 'Conversation age versus call volume',
-    chartCoverageSubtitle: 'Session counts and call counts have different denominators.',
+    chartCoverageSubtitle: 'Session counts and call counts have different denominators',
     legendSessionSpan: 'Session span within window',
     legendCallsWithin: 'Calls within window',
-    noCohortSessions: 'No eligible sessions in this cohort.',
+    noCohortSessions: 'No eligible sessions in this cohort',
     chartCohortTitle: 'Call-age coverage by cohort',
     chartCohortSubtitle:
       'Proxy cohorts overlap; they are not one-shot, multi-shot or deep-research task labels.',
@@ -84,21 +113,19 @@ const STRINGS = {
     dataTableNote:
       "Session age is the time from first to last observed successful call. Call age is measured from that session's first observed call. A return gap is measured between consecutive observed calls, without a 30-minute idle cutoff. None of these quantities is a measure of bytes stored.",
     xAxisLabel: 'Days from first observed call',
-    svgCoverageTitle: (label: string) => `Session and call-age coverage: ${label}`,
+    svgCoverageTitle: (label: string) => `Session and call-age coverage, ${label}`,
     svgCohortTitle: 'Call-age coverage by session cohort',
     svgReturnTitle: 'Sessions returning after a long gap',
-    tooltipCoverage: (days: number, name: string, n: string, d: string, p: string) =>
-      `${days} days · ${name}: ${n} / ${d} (${p})`,
-    tooltipCohort: (label: string, days: number, n: string, d: string, p: string) =>
-      `${label} · ${days} days: ${n} / ${d} calls (${p})`,
-    tooltipReturn: (label: string, days: number, n: string, d: string) =>
-      `${label} · gap over ${days} days: ${n} / ${d} sessions`,
+    dayGroup: (days: number) => `${days} days from first call`,
+    returnGapTitle: (label: string, days: number) => `${label}, gap over ${days} days`,
+    ofSessions: (n: string, d: string) => `${n} / ${d} sessions`,
+    ofCalls: (n: string, d: string) => `${n} / ${d} calls`,
     barSessions: 'Sessions',
     barCalls: 'Calls',
   },
   zh: {
     heading: 'Session 复用',
-    description: '对话活动观测与长间隔后回访情况。',
+    description: '对话活动观测与长间隔后回访情况',
     exportCsv: '导出 CSV',
     exportJson: '导出 JSON',
     windowDesc: (start: string, end: string, asOf: string, days: number) =>
@@ -114,14 +141,14 @@ const STRINGS = {
     cutoffsLabel: '截止天数',
     apply: '应用',
     coverageCohort: '覆盖群组',
-    cutoffsError: '请输入 1 到 28 的逗号分隔整数天数。',
+    cutoffsError: '请输入 1 到 28 的逗号分隔整数天数',
     noEligible:
       '当前 trace version 范围内没有足够跟踪期的 session。请尝试选择“全部版本”，或等待更多历史数据积累后再查看。',
     chartCoverageTitle: '对话时长与调用量',
-    chartCoverageSubtitle: 'Session 计数与调用计数的分母不同。',
+    chartCoverageSubtitle: 'Session 计数与调用计数的分母不同',
     legendSessionSpan: 'Session 跨度（窗口内）',
     legendCallsWithin: '调用次数（窗口内）',
-    noCohortSessions: '该群组内无符合条件的 session。',
+    noCohortSessions: '该群组内无符合条件的 session',
     chartCohortTitle: '按群组的调用时长覆盖',
     chartCohortSubtitle: '代理群组存在重叠，并非一次性、多次或深度研究任务标签。',
     cohortNote:
@@ -140,36 +167,36 @@ const STRINGS = {
     dataTableSummary: '数据表与定义',
     thCohort: '群组',
     thDays: '天数',
-    thSessions: 'Sessions',
+    thSessions: 'Session 数',
     thCalls: '调用',
-    thSessionsWithin: '窗口内 sessions',
+    thSessionsWithin: '窗口内 session 数',
     thCallsWithin: '窗口内调用',
-    thSessionsReturning: '间隔后回访的 sessions',
+    thSessionsReturning: '间隔后回访的 session 数',
     dataTableNote:
       'Session 时长为首次到末次成功调用的间隔。调用时长以该 session 首次调用为起点。回访间隔为相邻调用之间的时间差，不设 30 分钟空闲截断。这些指标均非字节存储量的度量。',
     xAxisLabel: '距首次调用的天数',
-    svgCoverageTitle: (label: string) => `Session 及调用时长覆盖：${label}`,
+    svgCoverageTitle: (label: string) => `Session 及调用时长覆盖，${label}`,
     svgCohortTitle: '按 session 群组的调用时长覆盖',
     svgReturnTitle: '长间隔后回访的 session',
-    tooltipCoverage: (days: number, name: string, n: string, d: string, p: string) =>
-      `${days} 天 · ${name}: ${n} / ${d} (${p})`,
-    tooltipCohort: (label: string, days: number, n: string, d: string, p: string) =>
-      `${label} · ${days} 天: ${n} / ${d} 次调用 (${p})`,
-    tooltipReturn: (label: string, days: number, n: string, d: string) =>
-      `${label} · 间隔超过 ${days} 天: ${n} / ${d} sessions`,
-    barSessions: 'Sessions',
+    dayGroup: (days: number) => `距首次调用 ${days} 天`,
+    returnGapTitle: (label: string, days: number) => `${label}，间隔超过 ${days} 天`,
+    ofSessions: (n: string, d: string) => `${n} / ${d} 个 session`,
+    ofCalls: (n: string, d: string) => `${n} / ${d} 次调用`,
+    barSessions: 'Session',
     barCalls: '调用',
   },
 } as const;
-const COLORS = ['#0ea5e9', '#10b981', '#a855f7', '#f59e0b'];
-const BUTTON =
-  'rounded border border-border px-2 py-1 text-3xs font-mono text-muted-foreground hover:bg-surface-hover hover:text-foreground';
-const W = 900,
-  H = 285,
-  L = 48,
-  R = 16,
-  T = 16,
-  B = 45;
+
+const COLORS = [CHART_COLORS[0], CHART_COLORS[2], CHART_COLORS[4], CHART_COLORS[1]];
+const MIN_CHART_WIDTH = 320;
+const BAR_H = 280;
+const BAR_MARGIN = { left: 44, right: 12, top: 12, bottom: 44 };
+const RETURN_LEFT = 220;
+const RETURN_TOP = 30;
+const RETURN_CELL_H = 48;
+const RETURN_MIN_CELL_W = 48;
+const PERCENT_TICKS = [0, 25, 50, 75, 100];
+
 const pct = (n: number, d: number) => (d ? `${((100 * n) / d).toFixed(1)}%` : '—');
 const number = (n: number | null) =>
   n === null ? '—' : n.toLocaleString(undefined, { maximumFractionDigits: 1 });
@@ -184,78 +211,168 @@ function download(text: string, type: string, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function ChartFrame({
-  title,
-  children,
-  height = H,
-  width = W,
-}: {
-  title: string;
-  children: ReactNode;
-  height?: number;
-  width?: number;
-}) {
+type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
+
+interface HoverPoint {
+  index: number;
+  x: number;
+  y: number;
+}
+
+interface BarSeries {
+  key: string;
+  label: string;
+  color: string;
+  denominator: number;
+  values: number[];
+  of: (n: string, d: string) => string;
+}
+
+function Legend({ items }: { items: { key: string; label: string; color: string }[] }) {
   return (
-    <div className="overflow-x-auto">
-      <svg
-        role="img"
-        aria-label={title}
-        viewBox={`0 0 ${width} ${height}`}
-        style={{ minWidth: width > W ? width : 680 }}
-        className="w-full min-w-[680px] font-mono"
-      >
-        <title>{title}</title>
-        {children}
-      </svg>
+    <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 px-2 text-xs text-muted-foreground">
+      {items.map((item) => (
+        <span key={item.key} className="inline-flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="size-2 rounded-sm"
+            style={{ backgroundColor: item.color }}
+          />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
 
-function Axes({ days, xAxisLabel }: { days: number[]; xAxisLabel: string }) {
-  const pw = W - L - R,
-    ph = H - T - B;
+function GroupedBarChart({
+  ariaLabel,
+  days,
+  series,
+  t,
+}: {
+  ariaLabel: string;
+  days: number[];
+  series: BarSeries[];
+  t: Strings;
+}) {
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: BAR_H });
+  const [hover, setHover] = useState<HoverPoint | null>(null);
+  const width = Math.max(dimensions.width, MIN_CHART_WIDTH);
+  const plotW = width - BAR_MARGIN.left - BAR_MARGIN.right;
+  const plotH = BAR_H - BAR_MARGIN.top - BAR_MARGIN.bottom;
+  const step = plotW / days.length;
+  const barW = (step * 0.76) / series.length;
+  const yFor = (share: number) => BAR_MARGIN.top + plotH * (1 - share);
+  const groupX = (i: number) => BAR_MARGIN.left + i * step;
+  const updateHover = (index: number) => (e: PointerEvent<SVGRectElement>) =>
+    setHover({ index, x: e.clientX, y: e.clientY });
+
   return (
-    <>
-      {[0, 25, 50, 75, 100].map((v) => (
-        <g key={v}>
+    <div ref={setContainerRef} className="w-full min-w-0">
+      <svg
+        role="img"
+        aria-label={ariaLabel}
+        width={width}
+        height={BAR_H}
+        className="block"
+        onPointerLeave={() => setHover(null)}
+      >
+        {PERCENT_TICKS.map((v) => (
+          <g key={v}>
+            <line
+              x1={BAR_MARGIN.left}
+              x2={width - BAR_MARGIN.right}
+              y1={yFor(v / 100)}
+              y2={yFor(v / 100)}
+              stroke="var(--chart-grid)"
+              strokeWidth={1}
+              shapeRendering="crispEdges"
+            />
+            <text
+              x={BAR_MARGIN.left - 8}
+              y={yFor(v / 100)}
+              textAnchor="end"
+              dominantBaseline="central"
+              fontSize={CHART_TYPE.annotation}
+              className="fill-muted-foreground tabular-nums"
+            >
+              {v}%
+            </text>
+          </g>
+        ))}
+        {hover && (
           <line
-            x1={L}
-            x2={W - R}
-            y1={T + ph * (1 - v / 100)}
-            y2={T + ph * (1 - v / 100)}
-            className="stroke-border"
+            x1={groupX(hover.index) + step / 2}
+            x2={groupX(hover.index) + step / 2}
+            y1={BAR_MARGIN.top}
+            y2={BAR_MARGIN.top + plotH}
+            {...CURSOR_LINE_PROPS}
+            className="pointer-events-none"
           />
-          <text
-            x={L - 8}
-            y={T + ph * (1 - v / 100) + 3}
-            textAnchor="end"
-            className="fill-muted-foreground"
-            fontSize={9}
-          >
-            {v}%
-          </text>
-        </g>
-      ))}
-      {days.map((d, i) => (
+        )}
+        {days.map((d, i) => (
+          <g key={d}>
+            {series.map((s, j) => {
+              const share = s.denominator ? s.values[i] / s.denominator : 0;
+              return (
+                <rect
+                  key={s.key}
+                  x={groupX(i) + step * 0.12 + j * barW}
+                  y={yFor(share)}
+                  width={Math.max(1, barW - 2)}
+                  height={plotH * share}
+                  fill={s.color}
+                  opacity={hover === null || hover.index === i ? 0.9 : 0.45}
+                  className="pointer-events-none"
+                />
+              );
+            })}
+            <text
+              x={groupX(i) + step / 2}
+              y={BAR_MARGIN.top + plotH + 18}
+              textAnchor="middle"
+              fontSize={CHART_TYPE.annotation}
+              className="fill-muted-foreground tabular-nums"
+            >
+              {d}
+            </text>
+            <rect
+              x={groupX(i)}
+              y={BAR_MARGIN.top}
+              width={step}
+              height={plotH}
+              fill="transparent"
+              onPointerMove={updateHover(i)}
+              onPointerDown={updateHover(i)}
+            />
+          </g>
+        ))}
         <text
-          key={d}
-          x={L + (pw * (i + 0.5)) / days.length}
-          y={H - B + 18}
+          x={BAR_MARGIN.left + plotW / 2}
+          y={BAR_H - 6}
           textAnchor="middle"
+          fontSize={CHART_TYPE.axisLabel}
           className="fill-muted-foreground"
-          fontSize={10}
         >
-          {d}
+          {t.xAxisLabel}
         </text>
-      ))}
-      <text x={W / 2} y={H - 5} textAnchor="middle" className="fill-muted-foreground" fontSize={10}>
-        {xAxisLabel}
-      </text>
-    </>
+      </svg>
+      {hover && (
+        <FloatingTooltip x={hover.x} y={hover.y}>
+          <ChartHoverCardBody
+            title={t.dayGroup(days[hover.index])}
+            metrics={series.map((s) => ({
+              value: pct(s.values[hover.index], s.denominator),
+              label: `${s.label} · ${s.of(number(s.values[hover.index]), number(s.denominator))}`,
+              color: s.color,
+            }))}
+          />
+        </FloatingTooltip>
+      )}
+    </div>
   );
 }
-
-type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
 
 function CoverageChart({
   series,
@@ -266,35 +383,30 @@ function CoverageChart({
   t: Strings;
   labels: Record<ReuseCohort, string>;
 }) {
-  const pw = W - L - R,
-    ph = H - T - B,
-    step = pw / series.points.length;
   return (
-    <ChartFrame title={t.svgCoverageTitle(labels[series.key])}>
-      <Axes days={series.points.map((p) => p.days)} xAxisLabel={t.xAxisLabel} />
-      {series.points.flatMap((p, i) =>
-        [
-          { name: t.barSessions, n: p.sessionsWithin, d: series.sessions, color: COLORS[1] },
-          { name: t.barCalls, n: p.callsWithin, d: series.calls, color: COLORS[0] },
-        ].map((s, j) => {
-          const h = s.d ? (ph * s.n) / s.d : 0;
-          return (
-            <rect
-              key={`${p.days}-${s.name}`}
-              x={L + i * step + step * 0.12 + j * step * 0.38}
-              y={T + ph - h}
-              width={step * 0.34}
-              height={h}
-              fill={s.color}
-            >
-              <title>
-                {t.tooltipCoverage(p.days, s.name, number(s.n), number(s.d), pct(s.n, s.d))}
-              </title>
-            </rect>
-          );
-        }),
-      )}
-    </ChartFrame>
+    <GroupedBarChart
+      ariaLabel={t.svgCoverageTitle(labels[series.key])}
+      days={series.points.map((p) => p.days)}
+      t={t}
+      series={[
+        {
+          key: 'sessions',
+          label: t.barSessions,
+          color: COLORS[1],
+          denominator: series.sessions,
+          values: series.points.map((p) => p.sessionsWithin),
+          of: t.ofSessions,
+        },
+        {
+          key: 'calls',
+          label: t.barCalls,
+          color: COLORS[0],
+          denominator: series.calls,
+          values: series.points.map((p) => p.callsWithin),
+          of: t.ofCalls,
+        },
+      ]}
+    />
   );
 }
 
@@ -307,39 +419,20 @@ function CohortChart({
   t: Strings;
   labels: Record<ReuseCohort, string>;
 }) {
-  const pw = W - L - R,
-    ph = H - T - B,
-    days = cohorts[0].points.map((p) => p.days),
-    step = pw / days.length;
   return (
-    <ChartFrame title={t.svgCohortTitle}>
-      <Axes days={days} xAxisLabel={t.xAxisLabel} />
-      {cohorts.flatMap((c, j) =>
-        c.points.map((p, i) => {
-          const h = c.calls ? (ph * p.callsWithin) / c.calls : 0;
-          return (
-            <rect
-              key={`${c.key}-${p.days}`}
-              x={L + i * step + step * 0.08 + j * step * 0.21}
-              y={T + ph - h}
-              width={step * 0.18}
-              height={h}
-              fill={COLORS[j]}
-            >
-              <title>
-                {t.tooltipCohort(
-                  labels[c.key],
-                  p.days,
-                  number(p.callsWithin),
-                  number(c.calls),
-                  pct(p.callsWithin, c.calls),
-                )}
-              </title>
-            </rect>
-          );
-        }),
-      )}
-    </ChartFrame>
+    <GroupedBarChart
+      ariaLabel={t.svgCohortTitle}
+      days={cohorts[0].points.map((p) => p.days)}
+      t={t}
+      series={cohorts.map((c, j) => ({
+        key: c.key,
+        label: labels[c.key],
+        color: COLORS[j],
+        denominator: c.calls,
+        values: c.points.map((p) => p.callsWithin),
+        of: t.ofCalls,
+      }))}
+    />
   );
 }
 
@@ -352,88 +445,143 @@ function ReturnChart({
   t: Strings;
   labels: Record<ReuseCohort, string>;
 }) {
-  const width = Math.max(W, 230 + cohorts[0].points.length * 58);
-  const left = 220,
-    top = 35,
-    cellH = 48,
-    pw = width - left - 10,
-    days = cohorts[0].points.map((p) => p.days),
-    step = pw / days.length;
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: 0 });
+  const [hover, setHover] = useState<(HoverPoint & { row: number }) | null>(null);
+  const days = cohorts[0].points.map((p) => p.days);
+  const width = Math.max(
+    dimensions.width,
+    MIN_CHART_WIDTH,
+    RETURN_LEFT + days.length * RETURN_MIN_CELL_W + 10,
+  );
+  const step = (width - RETURN_LEFT - 10) / days.length;
+  const height = RETURN_TOP + RETURN_CELL_H * cohorts.length + 12;
   const max = Math.max(
     0.01,
     ...cohorts.flatMap((c) =>
       c.points.map((p) => (c.sessions ? p.sessionsReturningAfterGap / c.sessions : 0)),
     ),
   );
+  const hovered = hover ? cohorts[hover.row] : undefined;
+  const hoveredPoint = hover && hovered ? hovered.points[hover.index] : undefined;
+
   return (
-    <ChartFrame title={t.svgReturnTitle} height={top + cellH * cohorts.length + 12} width={width}>
-      {days.map((d, i) => (
-        <text
-          key={d}
-          x={left + step * (i + 0.5)}
-          y={20}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          fontSize={10}
-        >
-          {d}d
-        </text>
-      ))}
-      {cohorts.map((c, j) => (
-        <g key={c.key}>
+    <div ref={setContainerRef} className="w-full min-w-0 overflow-x-auto">
+      <svg
+        role="img"
+        aria-label={t.svgReturnTitle}
+        width={width}
+        height={height}
+        className="block"
+        onPointerLeave={() => setHover(null)}
+      >
+        {days.map((d, i) => (
           <text
-            x={left - 12}
-            y={top + cellH * j + 18}
-            textAnchor="end"
-            className="fill-foreground"
-            fontSize={10}
+            key={d}
+            x={RETURN_LEFT + step * (i + 0.5)}
+            y={18}
+            textAnchor="middle"
+            fontSize={CHART_TYPE.annotation}
+            className="fill-muted-foreground tabular-nums"
           >
-            {labels[c.key]}
+            {d}d
           </text>
-          <text
-            x={left - 12}
-            y={top + cellH * j + 33}
-            textAnchor="end"
-            className="fill-muted-foreground"
-            fontSize={9}
-          >
-            N={number(c.sessions)}
-          </text>
-          {c.points.map((p, i) => {
-            const ratio = c.sessions ? p.sessionsReturningAfterGap / c.sessions : 0;
-            return (
-              <g key={p.days}>
-                <rect
-                  x={left + i * step + 1}
-                  y={top + j * cellH + 1}
-                  width={step - 2}
-                  height={cellH - 2}
-                  fill={COLORS[2]}
-                  fillOpacity={0.08 + (0.5 * ratio) / max}
-                />
-                <text
-                  x={left + (i + 0.5) * step}
-                  y={top + j * cellH + 28}
-                  textAnchor="middle"
-                  className="fill-foreground"
-                  fontSize={11}
-                >
-                  {pct(p.sessionsReturningAfterGap, c.sessions)}
-                </text>
-                <title>
-                  {t.tooltipReturn(
-                    labels[c.key],
-                    p.days,
-                    number(p.sessionsReturningAfterGap),
-                    number(c.sessions),
-                  )}
-                </title>
-              </g>
-            );
-          })}
-        </g>
-      ))}
-    </ChartFrame>
+        ))}
+        {cohorts.map((c, j) => (
+          <g key={c.key}>
+            <text
+              x={RETURN_LEFT - 12}
+              y={RETURN_TOP + RETURN_CELL_H * j + 20}
+              textAnchor="end"
+              fontSize={CHART_TYPE.annotation}
+              className="fill-foreground"
+            >
+              {labels[c.key]}
+            </text>
+            <text
+              x={RETURN_LEFT - 12}
+              y={RETURN_TOP + RETURN_CELL_H * j + 35}
+              textAnchor="end"
+              fontSize={CHART_TYPE.axisLabelSub}
+              className="fill-muted-foreground tabular-nums"
+            >
+              N={number(c.sessions)}
+            </text>
+            {c.points.map((p, i) => {
+              const ratio = c.sessions ? p.sessionsReturningAfterGap / c.sessions : 0;
+              const update = (e: PointerEvent<SVGRectElement>) =>
+                setHover({ row: j, index: i, x: e.clientX, y: e.clientY });
+              return (
+                <g key={p.days}>
+                  <rect
+                    x={RETURN_LEFT + i * step + 1}
+                    y={RETURN_TOP + j * RETURN_CELL_H + 1}
+                    width={step - 2}
+                    height={RETURN_CELL_H - 2}
+                    rx={2}
+                    fill={COLORS[2]}
+                    fillOpacity={0.08 + (0.5 * ratio) / max}
+                    onPointerMove={update}
+                    onPointerDown={update}
+                  />
+                  <text
+                    x={RETURN_LEFT + (i + 0.5) * step}
+                    y={RETURN_TOP + j * RETURN_CELL_H + RETURN_CELL_H / 2}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={CHART_TYPE.annotation}
+                    className="pointer-events-none fill-foreground tabular-nums"
+                  >
+                    {pct(p.sessionsReturningAfterGap, c.sessions)}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
+        {hover && (
+          <rect
+            x={RETURN_LEFT + hover.index * step + 0.75}
+            y={RETURN_TOP + hover.row * RETURN_CELL_H + 0.75}
+            width={step - 1.5}
+            height={RETURN_CELL_H - 1.5}
+            rx={2}
+            fill="none"
+            stroke="var(--foreground)"
+            strokeWidth={1.5}
+            className="pointer-events-none"
+          />
+        )}
+      </svg>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span className="font-medium">{t.svgReturnTitle}</span>
+        <span className="tabular-nums">0%</span>
+        <span
+          aria-hidden="true"
+          className="h-2.5 w-32 rounded-sm"
+          style={{
+            background: `linear-gradient(to right, color-mix(in srgb, ${COLORS[2]} 8%, transparent), color-mix(in srgb, ${COLORS[2]} 58%, transparent))`,
+          }}
+        />
+        <span className="tabular-nums">{(100 * max).toFixed(1)}%</span>
+      </div>
+      {hover && hovered && hoveredPoint && (
+        <FloatingTooltip x={hover.x} y={hover.y}>
+          <ChartHoverCardBody
+            title={t.returnGapTitle(labels[hovered.key], hoveredPoint.days)}
+            metrics={[
+              {
+                value: pct(hoveredPoint.sessionsReturningAfterGap, hovered.sessions),
+                label: t.ofSessions(
+                  number(hoveredPoint.sessionsReturningAfterGap),
+                  number(hovered.sessions),
+                ),
+                color: COLORS[2],
+              },
+            ]}
+          />
+        </FloatingTooltip>
+      )}
+    </div>
   );
 }
 
@@ -459,169 +607,211 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
     setDays(parsed);
     setError('');
   }
+  const methodology = [
+    t.windowDesc(
+      date(data.window.cohortStart),
+      date(data.window.cohortEnd),
+      date(data.window.asOf),
+      data.window.followupDays,
+    ),
+    t.eligibleDesc(number(all.sessions), number(all.calls), data.traceVersion),
+    t.lookbackDesc(
+      Math.round(
+        (Date.parse(data.window.asOf) - Date.parse(data.window.observationStart)) / 86_400_000,
+      ),
+    ),
+    ...(data.traceVersion === null ? [] : [t.versionNote]),
+    t.coverageDesc(
+      number(data.coverage.beforeCohortSessions),
+      number(data.coverage.insufficientFollowupSessions),
+    ),
+  ];
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-sm font-mono font-bold">{t.heading}</h1>
-          <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
+          <Heading as="h2" level="card">
+            {t.heading}
+          </Heading>
+          <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            className={BUTTON}
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
             onClick={() => {
               track('agentic_workload_session_reuse_export', { format: 'csv' });
               download(sessionReuseCsv(selected), 'text/csv;charset=utf-8', 'session-reuse.csv');
             }}
           >
             {t.exportCsv}
-          </button>
-          <button
-            className={BUTTON}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
             onClick={() => {
               track('agentic_workload_session_reuse_export', { format: 'json' });
               download(JSON.stringify(selected, null, 2), 'application/json', 'session-reuse.json');
             }}
           >
             {t.exportJson}
-          </button>
+          </Button>
         </div>
       </div>
-      <div className="rounded-md border border-border bg-surface p-3 text-xs text-muted-foreground space-y-1">
-        <p>
-          {t.windowDesc(
-            date(data.window.cohortStart),
-            date(data.window.cohortEnd),
-            date(data.window.asOf),
-            data.window.followupDays,
-          )}
-        </p>
-        <p>{t.eligibleDesc(number(all.sessions), number(all.calls), data.traceVersion)}</p>
-        <p>
-          {t.lookbackDesc(
-            Math.round(
-              (Date.parse(data.window.asOf) - Date.parse(data.window.observationStart)) /
-                86_400_000,
-            ),
-          )}
-        </p>
-        {data.traceVersion !== null && <p>{t.versionNote}</p>}
-        <p>
-          {t.coverageDesc(
-            number(data.coverage.beforeCohortSessions),
-            number(data.coverage.insufficientFollowupSessions),
-          )}
-        </p>
-      </div>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        {methodology.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
       <form onSubmit={apply} className="flex flex-wrap items-center gap-2">
-        <label htmlFor="reuse-days" className="text-3xs font-mono text-muted-foreground">
+        <label htmlFor="reuse-days" className="text-sm text-muted-foreground">
           {t.cutoffsLabel}
         </label>
-        <input
+        <Input
           id="reuse-days"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           aria-describedby={error ? 'reuse-error' : undefined}
-          className="w-64 rounded border border-border bg-background px-2 py-1 text-xs font-mono"
+          aria-invalid={error ? true : undefined}
+          className="w-64 tabular-nums"
         />
-        <button className={BUTTON} type="submit">
+        <Button variant="outline" type="submit">
           {t.apply}
-        </button>
-        <label htmlFor="reuse-cohort" className="ml-2 text-3xs font-mono text-muted-foreground">
+        </Button>
+        <label htmlFor="reuse-cohort" className="ml-2 text-sm text-muted-foreground">
           {t.coverageCohort}
         </label>
-        <select
-          id="reuse-cohort"
+        <Select
           value={cohort}
-          onChange={(e) => {
-            const next = e.target.value as ReuseCohort;
+          onValueChange={(value) => {
+            const next = value as ReuseCohort;
             track('agentic_workload_session_reuse_cohort_changed', { cohort: next });
             setCohort(next);
           }}
-          className="rounded border border-border bg-background px-2 py-1 text-xs font-mono"
         >
-          {data.cohorts.map((c) => (
-            <option key={c.key} value={c.key}>
-              {labels[c.key]}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id="reuse-cohort">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {data.cohorts.map((c) => (
+              <SelectItem key={c.key} value={c.key}>
+                {labels[c.key]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {error && (
-          <p id="reuse-error" role="alert" className="text-xs text-rose-500">
+          <p id="reuse-error" role="alert" className="text-xs text-destructive">
             {error}
           </p>
         )}
       </form>
       {all.sessions === 0 ? (
-        <div className="rounded-md border border-border p-6 text-xs text-muted-foreground">
+        <div className="rounded-md border border-border/30 p-6 text-sm text-muted-foreground">
           {t.noEligible}
         </div>
       ) : (
         <>
-          <ExpandableChart title={t.chartCoverageTitle} subtitle={t.chartCoverageSubtitle}>
-            <div className="flex gap-4 mb-2 text-3xs font-mono">
-              <span style={{ color: COLORS[1] }}>{t.legendSessionSpan}</span>
-              <span style={{ color: COLORS[0] }}>{t.legendCallsWithin}</span>
-            </div>
+          <ExpandableChart
+            sharedZoom
+            title={t.chartCoverageTitle}
+            subtitle={t.chartCoverageSubtitle}
+            actions={
+              <ChartActions
+                fileName="session-reuse-coverage"
+                onExportPng={() =>
+                  track('agentic_workload_export_png', { chart: 'session-reuse-coverage' })
+                }
+              />
+            }
+          >
             {series.sessions ? (
-              <CoverageChart series={series} t={t} labels={labels} />
+              <>
+                <CoverageChart series={series} t={t} labels={labels} />
+                <Legend
+                  items={[
+                    { key: 'sessions', label: t.legendSessionSpan, color: COLORS[1] },
+                    { key: 'calls', label: t.legendCallsWithin, color: COLORS[0] },
+                  ]}
+                />
+              </>
             ) : (
-              <p className="py-8 text-xs text-muted-foreground">{t.noCohortSessions}</p>
+              <p className="py-8 text-sm text-muted-foreground">{t.noCohortSessions}</p>
             )}
           </ExpandableChart>
-          <ExpandableChart title={t.chartCohortTitle} subtitle={t.chartCohortSubtitle}>
-            <div className="flex flex-wrap gap-3 mb-2 text-3xs font-mono">
-              {selected.cohorts.map((c, i) => (
-                <span key={c.key} style={{ color: COLORS[i] }}>
-                  {labels[c.key]} · N={number(c.sessions)}
-                </span>
-              ))}
-            </div>
+          <ExpandableChart
+            sharedZoom
+            title={t.chartCohortTitle}
+            subtitle={t.chartCohortSubtitle}
+            actions={
+              <ChartActions
+                fileName="session-reuse-cohorts"
+                onExportPng={() =>
+                  track('agentic_workload_export_png', { chart: 'session-reuse-cohorts' })
+                }
+              />
+            }
+          >
             <CohortChart cohorts={selected.cohorts} t={t} labels={labels} />
-            <p className="text-3xs text-muted-foreground mt-2">{t.cohortNote}</p>
+            <Legend
+              items={selected.cohorts.map((c, i) => ({
+                key: c.key,
+                label: `${labels[c.key]} · N=${number(c.sessions)}`,
+                color: COLORS[i],
+              }))}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">{t.cohortNote}</p>
           </ExpandableChart>
-          <ExpandableChart title={t.chartReturnTitle} subtitle={t.chartReturnSubtitle}>
+          <ExpandableChart
+            sharedZoom
+            title={t.chartReturnTitle}
+            subtitle={t.chartReturnSubtitle}
+            actions={
+              <ChartActions
+                fileName="session-reuse-return"
+                onExportPng={() =>
+                  track('agentic_workload_export_png', { chart: 'session-reuse-return' })
+                }
+              />
+            }
+          >
             <ReturnChart cohorts={selected.cohorts} t={t} labels={labels} />
-            <p className="text-3xs text-muted-foreground mt-2">{t.returnNote}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t.returnNote}</p>
           </ExpandableChart>
         </>
       )}
-      <div className="flex items-center gap-2">
-        <h2 className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.activityHeader(data.window.activityDays)}
-        </h2>
-        <div className="h-px bg-border flex-1" />
+      <div>
+        <SectionHeader label={t.activityHeader(data.window.activityDays)} />
+        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {(
+            [
+              [t.calls, data.activity.calls],
+              [t.activeCredentials, data.activity.activeCredentials],
+              [t.callsPerActiveCredentialDay, data.activity.callsPerActiveCredentialDay],
+              [t.callsPerCredentialCalendarDay, data.activity.callsPerCredentialCalendarDay],
+            ] as const
+          ).map(([label, value]) => (
+            <Stat key={label} boxed label={label} value={number(value as number | null)} />
+          ))}
+        </dl>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t.activityDesc(
+            date(data.window.activityStart),
+            date(data.window.asOf),
+            number(data.activity.activeCredentialDays),
+            number(data.activity.medianActiveDayCalls),
+            number(data.activity.p90ActiveDayCalls),
+          )}
+        </p>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {(
-          [
-            [t.calls, data.activity.calls],
-            [t.activeCredentials, data.activity.activeCredentials],
-            [t.callsPerActiveCredentialDay, data.activity.callsPerActiveCredentialDay],
-            [t.callsPerCredentialCalendarDay, data.activity.callsPerCredentialCalendarDay],
-          ] as const
-        ).map(([label, value]) => (
-          <div key={label} className="rounded-md border border-border bg-surface p-3">
-            <div className="text-3xs font-mono text-muted-foreground">{label}</div>
-            <div className="text-lg font-mono font-bold mt-1">{number(value as number | null)}</div>
-          </div>
-        ))}
-      </div>
-      <p className="text-3xs text-muted-foreground">
-        {t.activityDesc(
-          date(data.window.activityStart),
-          date(data.window.asOf),
-          number(data.activity.activeCredentialDays),
-          number(data.activity.medianActiveDayCalls),
-          number(data.activity.p90ActiveDayCalls),
-        )}
-      </p>
-      <details className="rounded-md border border-border p-3">
-        <summary className="cursor-pointer text-xs font-mono">{t.dataTableSummary}</summary>
-        <div className="overflow-x-auto mt-3">
-          <table className="w-full text-3xs font-mono text-left">
-            <thead>
-              <tr>
+      <details className="rounded-xl border border-border/30 bg-card p-3">
+        <summary className="cursor-pointer text-sm font-medium">{t.dataTableSummary}</summary>
+        <div className="mt-3">
+          <Table className="text-xs tabular-nums">
+            <TableHeader>
+              <TableRow>
                 {[
                   t.thCohort,
                   t.thDays,
@@ -630,19 +820,19 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
                   t.thSessionsWithin,
                   t.thCallsWithin,
                   t.thSessionsReturning,
-                ].map((h) => (
-                  <th key={h} className="p-2 border-b border-border">
+                ].map((h, i) => (
+                  <TableHead key={h} className={i === 0 ? undefined : 'text-right'}>
                     {h}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {selected.cohorts.flatMap((c) =>
                 c.points.map((p) => (
-                  <tr key={`${c.key}-${p.days}`}>
+                  <TableRow key={`${c.key}-${p.days}`}>
+                    <TableCell>{labels[c.key]}</TableCell>
                     {[
-                      labels[c.key],
                       p.days,
                       c.sessions,
                       c.calls,
@@ -650,17 +840,17 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
                       p.callsWithin,
                       p.sessionsReturningAfterGap,
                     ].map((v, i) => (
-                      <td key={i} className="p-2 border-b border-border">
-                        {typeof v === 'number' ? number(v) : v}
-                      </td>
+                      <TableCell key={i} className="text-right">
+                        {number(v)}
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 )),
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
-        <p className="mt-3 text-3xs text-muted-foreground">{t.dataTableNote}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{t.dataTableNote}</p>
       </details>
     </div>
   );

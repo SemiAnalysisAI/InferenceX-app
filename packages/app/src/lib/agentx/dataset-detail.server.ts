@@ -1,14 +1,14 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readFirstFound } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { getDataset, type DatasetDetail } from '@semianalysisai/inferencex-db/queries/datasets';
 
 import { cachedQuery } from '@/lib/cache/api-cache';
 
 /**
- * One dataset by slug, shared by `/api/v1/datasets/[slug]` and the `/agentx/[slug]` pages so both
+ * One dataset by slug, shared by `/api/v1/datasets/[slug]` and the `/infx/agentx/[slug]` pages so both
  * read the same cache entry. Keyed per slug, so a newly ingested dataset resolves on its first
  * request instead of waiting for a purge of a cached whole-catalog list.
  */
 export const getCachedDataset = cachedQuery(
-  (slug: string): Promise<DatasetDetail | null> => getDataset(getDb(), slug),
+  (slug: string): Promise<DatasetDetail | null> => readFirstFound((sql) => getDataset(sql, slug)),
   'dataset',
 );

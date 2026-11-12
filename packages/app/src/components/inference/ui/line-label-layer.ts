@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
+import { whiteTextFill } from '@/lib/charts/dynamic-colors';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-point-registry';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
@@ -105,52 +106,333 @@ interface PillLayoutItem {
   label: LineLabelPlacement;
 }
 
+export interface PillOccluder {
+  key: string;
+  points: readonly CartesianPoint[];
+}
+
+const NARROW_PLOT_WIDTH = 360;
+const NARROW_PILL_LIMIT = 3;
+const NARROW_PILL_SHARE = 0.45;
+
+export function pillWidthBudget(plotWidth: number): number {
+  return plotWidth < NARROW_PLOT_WIDTH ? plotWidth * NARROW_PILL_SHARE : Infinity;
+}
+
+export function fitPillSegments<TSegment extends { text: string; weight: string }>(
+  segments: readonly TSegment[],
+  maxWidth: number,
+  measure: (text: string, weight: string) => number,
+): TSegment[] {
+  if (segments.length === 0 || !Number.isFinite(maxWidth)) return [...segments];
+  const fitted = [segments[0]];
+  let used = measure(segments[0].text, segments[0].weight);
+  for (const segment of segments.slice(1)) {
+    const width = measure(segment.text, segment.weight);
+    if (used + width <= maxWidth) {
+      fitted.push(segment);
+      used += width;
+      continue;
+    }
+    const wrapped = /^(?<lead>\s*\()(?<body>.*)\)$/u.exec(segment.text)?.groups;
+    const lead = wrapped?.lead ?? '';
+    const body = wrapped?.body ?? segment.text;
+    const close = wrapped ? ')' : '';
+    for (let length = body.length - 1; length > 0; length--) {
+      const prefix = body.slice(0, length).trimEnd();
+      if (!prefix.trim()) break;
+      const text = `${lead}${prefix}…${close}`;
+      if (used + measure(text, segment.weight) <= maxWidth) {
+        fitted.push({ ...segment, text });
+        break;
+      }
+    }
+    break;
+  }
+  return fitted;
+}
+
+function segmentHitsRect(a: CartesianPoint, b: CartesianPoint, rect: RectBounds): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const clip = (p: number, q: number) => {
+    if (p === 0) return q >= 0;
+    const t = q / p;
+    if (p < 0) {
+      if (t > t1) return false;
+      if (t > t0) t0 = t;
+    } else {
+      if (t < t0) return false;
+      if (t < t1) t1 = t;
+    }
+    return true;
+  };
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return (
+    clip(-dx, a.x - rect.left) &&
+    clip(dx, rect.right - a.x) &&
+    clip(-dy, a.y - rect.top) &&
+    clip(dy, rect.bottom - a.y)
+  );
+}
+
+interface BoundedOccluder extends PillOccluder {
+  bounds: RectBounds;
+}
+
+function boundOccluder(occluder: PillOccluder): BoundedOccluder {
+  const bounds = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+  for (const { x, y } of occluder.points) {
+    bounds.left = Math.min(bounds.left, x);
+    bounds.right = Math.max(bounds.right, x);
+    bounds.top = Math.min(bounds.top, y);
+    bounds.bottom = Math.max(bounds.bottom, y);
+  }
+  return { ...occluder, bounds };
+}
+
+function coversOtherPath(
+  box: RectBounds,
+  key: string,
+  occluders: readonly BoundedOccluder[],
+): boolean {
+  for (const { key: occluderKey, points, bounds } of occluders) {
+    if (occluderKey === key || !rectsOverlap(box, bounds)) continue;
+    if (points.length === 1) return true;
+    for (let i = 1; i < points.length; i++) {
+      if (segmentHitsRect(points[i - 1], points[i], box)) return true;
+    }
+  }
+  return false;
+}
+
+const LEADER_MIN_SHIFT = 12;
+const LEADER_MIN_GAP = 6;
+const LEADER_MAX_LENGTH = 40;
+const NARROW_LEADER_MAX_LENGTH = 32;
+const LEADER_OPACITY = 0.5;
+
+function turn(p: CartesianPoint, q: CartesianPoint, r: CartesianPoint): number {
+  return Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+}
+
+function segmentsCross(
+  a: CartesianPoint,
+  b: CartesianPoint,
+  c: CartesianPoint,
+  d: CartesianPoint,
+): boolean {
+  return turn(c, d, a) * turn(c, d, b) < 0 && turn(a, b, c) * turn(a, b, d) < 0;
+}
+
+function leaderCrossesOtherPath(
+  anchor: CartesianPoint,
+  end: CartesianPoint,
+  key: string,
+  occluders: readonly BoundedOccluder[],
+): boolean {
+  const reach = {
+    left: Math.min(anchor.x, end.x),
+    right: Math.max(anchor.x, end.x),
+    top: Math.min(anchor.y, end.y),
+    bottom: Math.max(anchor.y, end.y),
+  };
+  for (const { key: occluderKey, points, bounds } of occluders) {
+    if (occluderKey === key || !rectsOverlap(reach, bounds)) continue;
+    for (let i = 1; i < points.length; i++) {
+      if (segmentsCross(anchor, end, points[i - 1], points[i])) return true;
+    }
+  }
+  return false;
+}
+
+function syncLeader(
+  node: SVGGElement,
+  anchor: CartesianPoint,
+  color: string,
+  local: RectBounds,
+  tx: number,
+  ty: number,
+  show: boolean,
+): void {
+  const leader = node.querySelector<SVGLineElement>('.ll-leader');
+  if (!leader) return;
+  const ax = anchor.x - tx;
+  const ay = anchor.y - ty;
+  const ex = Math.min(Math.max(ax, local.left), local.right);
+  const ey = Math.min(Math.max(ay, local.top), local.bottom);
+  if (!show || Math.hypot(ax - ex, ay - ey) < LEADER_MIN_GAP) {
+    leader.setAttribute('display', 'none');
+    return;
+  }
+  leader.setAttribute('x1', String(ax));
+  leader.setAttribute('y1', String(ay));
+  leader.setAttribute('x2', String(ex));
+  leader.setAttribute('y2', String(ey));
+  leader.setAttribute('stroke', color);
+  leader.removeAttribute('display');
+}
+
+const ALTERNATE_ANCHORS = 4;
+
+function alternateAnchors(
+  key: string,
+  primary: CartesianPoint,
+  lines: readonly BoundedOccluder[],
+  bounds: RectBounds,
+): CartesianPoint[] {
+  const inside = lines
+    .filter((line) => line.key === key)
+    .flatMap((line) => line.points)
+    .filter(
+      (point) =>
+        point.x >= bounds.left &&
+        point.x <= bounds.right &&
+        point.y >= bounds.top &&
+        point.y <= bounds.bottom &&
+        (point.x !== primary.x || point.y !== primary.y),
+    );
+  const step = Math.max(1, inside.length / ALTERNATE_ANCHORS);
+  const picked: CartesianPoint[] = [];
+  for (let index = step / 2; index < inside.length; index += step) {
+    picked.push(inside[Math.floor(index)]);
+  }
+  return picked.sort(
+    (a, b) =>
+      Math.hypot(a.x - primary.x, a.y - primary.y) - Math.hypot(b.x - primary.x, b.y - primary.y),
+  );
+}
+
 function layoutPills(
   items: readonly PillLayoutItem[],
   offsetX: number,
   offsetY: number,
   bounds: RectBounds | null,
   obstacles: readonly RectBounds[],
+  occluders: readonly PillOccluder[],
 ): void {
   const placed: RectBounds[] = [...obstacles];
+  const narrow = bounds !== null && bounds.right - bounds.left < NARROW_PLOT_WIDTH;
+  const limit = narrow ? NARROW_PILL_LIMIT : Infinity;
+  const maxLeader = narrow ? NARROW_LEADER_MAX_LENGTH : LEADER_MAX_LENGTH;
+  const lines = occluders.filter((occluder) => occluder.points.length > 0).map(boundOccluder);
+  let shown = 0;
 
   for (const { node, label } of items) {
+    const primary = { x: label.x, y: label.y };
     const tx0 = label.x + offsetX;
     const ty0 = label.y + offsetY;
     const local = bounds ? pillLocalBox(node) : null;
     if (!bounds || !local || !label.visible) {
       node.setAttribute('transform', `translate(${tx0},${ty0})`);
+      if (local) syncLeader(node, primary, label.color, local, tx0, ty0, false);
       continue;
     }
 
-    const mirrorX = 2 * label.x - tx0 - local.left - local.right;
-    const mirrorY = 2 * label.y - ty0 - local.top - local.bottom;
-    const candidates: [number, number][] = [
-      [tx0, ty0],
-      [tx0, mirrorY],
-      [mirrorX, ty0],
-      [mirrorX, mirrorY],
-    ];
     const rowHeight = local.bottom - local.top + 4;
-    for (let row = 1; row <= 3; row++) {
-      for (const cx of [tx0, mirrorX]) {
-        candidates.push([cx, ty0 - row * rowHeight], [cx, ty0 + row * rowHeight]);
-      }
-    }
-
-    const clamped = candidates.map(([cx, cy]) => {
+    const clampAt = ([cx, cy]: [number, number]) => {
       const shift = pillShiftIntoBounds(pillBoxAt(local, cx, cy), bounds);
       const tx = cx + shift.x;
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
-    });
-    const chosen =
-      clamped.find(
-        (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
-      ) ?? clamped[0];
+    };
+    const placeNear = (anchor: CartesianPoint) => {
+      const ax = anchor.x + offsetX;
+      const ay = anchor.y + offsetY;
+      const mirrorX = 2 * anchor.x - ax - local.left - local.right;
+      const mirrorY = 2 * anchor.y - ay - local.top - local.bottom;
+      const candidates: [number, number][] = [
+        [ax, ay],
+        [ax, mirrorY],
+        [mirrorX, ay],
+        [mirrorX, mirrorY],
+      ];
+      for (let row = 1; row <= 3; row++) {
+        for (const cx of [ax, mirrorX]) {
+          candidates.push([cx, ay - row * rowHeight], [cx, ay + row * rowHeight]);
+        }
+      }
+      const farSlots = () => {
+        const columnStep = (local.right - local.left) / 2;
+        const colReach = Math.ceil((maxLeader + local.right - local.left) / columnStep);
+        const rowReach = Math.ceil((maxLeader + local.bottom - local.top) / rowHeight);
+        const colMin = Math.max(
+          -colReach,
+          Math.floor((bounds.left - ax - local.left) / columnStep),
+        );
+        const colMax = Math.min(
+          colReach,
+          Math.ceil((bounds.right - ax - local.right) / columnStep),
+        );
+        const rowMin = Math.max(-rowReach, Math.floor((bounds.top - ay - local.top) / rowHeight));
+        const rowMax = Math.min(
+          rowReach,
+          Math.ceil((bounds.bottom - ay - local.bottom) / rowHeight),
+        );
+        const far: { slot: [number, number]; distance: number }[] = [];
+        for (let col = colMin; col <= colMax; col++) {
+          for (let row = rowMin; row <= rowMax; row++) {
+            far.push({
+              slot: [ax + col * columnStep, ay + row * rowHeight],
+              distance: Math.hypot(col * columnStep, row * rowHeight),
+            });
+          }
+        }
+        return far.sort((a, b) => a.distance - b.distance).map(({ slot }) => slot);
+      };
+      const firstClean = (slots: readonly [number, number][]) => {
+        for (const slot of slots) {
+          const candidate = clampAt(slot);
+          const { box } = candidate;
+          const end = {
+            x: Math.min(Math.max(anchor.x, box.left), box.right),
+            y: Math.min(Math.max(anchor.y, box.top), box.bottom),
+          };
+          const length = Math.hypot(end.x - anchor.x, end.y - anchor.y);
+          if (length > maxLeader) continue;
+          if (placed.some((other) => rectsStrictlyOverlap(box, other))) continue;
+          if (coversOtherPath(box, label.key, lines)) continue;
+          const moved = Math.hypot(candidate.tx - ax, candidate.ty - ay) > LEADER_MIN_SHIFT;
+          if (
+            moved &&
+            length >= LEADER_MIN_GAP &&
+            leaderCrossesOtherPath(anchor, end, label.key, lines)
+          ) {
+            continue;
+          }
+          return { ...candidate, anchor, moved };
+        }
+        return undefined;
+      };
+      return firstClean(candidates) ?? firstClean(farSlots());
+    };
+
+    let chosen = shown < limit ? placeNear(primary) : undefined;
+    if (shown < limit && !chosen) {
+      for (const anchor of alternateAnchors(label.key, primary, lines, bounds)) {
+        chosen = placeNear(anchor);
+        if (chosen) break;
+      }
+    }
+    if (!chosen) {
+      const fallback = clampAt([tx0, ty0]);
+      node.setAttribute('transform', `translate(${fallback.tx},${fallback.ty})`);
+      node.style.opacity = '0';
+      node.dataset.visible = '0';
+      node.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
+      syncLeader(node, primary, label.color, local, fallback.tx, fallback.ty, false);
+      continue;
+    }
+    if (node.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
+      node.removeAttribute(PLACEMENT_HIDDEN_ATTR);
+      node.dataset.visible = '1';
+    }
 
     node.setAttribute('transform', `translate(${chosen.tx},${chosen.ty})`);
+    syncLeader(node, chosen.anchor, label.color, local, chosen.tx, chosen.ty, chosen.moved);
     placed.push(chosen.box);
+    shown++;
   }
 }
 
@@ -358,6 +640,7 @@ export function renderLineLabels(
       label: LineLabelPlacement,
     ) => void;
     bounds?: RectBounds | null;
+    occluders?: readonly PillOccluder[];
   },
 ): void {
   const opacity = options.opacity ?? 1;
@@ -373,6 +656,12 @@ export function renderLineLabels(
           .append('g')
           .attr('class', 'line-label')
           .style('pointer-events', 'none');
+        labelGroup
+          .append('line')
+          .attr('class', 'll-leader')
+          .attr('stroke-width', 1)
+          .attr('stroke-opacity', LEADER_OPACITY)
+          .attr('display', 'none');
         labelGroup.append('rect').attr('class', 'll-bg').attr('rx', 4).attr('ry', 4);
         labelGroup
           .append('text')
@@ -419,7 +708,7 @@ export function renderLineLabels(
       .attr('y', bbox.y - 3)
       .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
-      .attr('fill', label.color);
+      .attr('fill', whiteTextFill(label.color));
 
     labelGroup
       .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')
@@ -440,6 +729,7 @@ export function renderLineLabels(
     offsetY,
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
+    options.occluders ?? [],
   );
 }
 
@@ -451,6 +741,7 @@ export function updateRenderedLineLabels(
     offsetX?: number;
     offsetY?: number;
     bounds?: RectBounds | null;
+    occluders?: readonly PillOccluder[];
   } = {},
 ): void {
   const byKey = new Map(labels.map((label) => [label.key, label]));
@@ -477,6 +768,7 @@ export function updateRenderedLineLabels(
     offsetY,
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
+    options.occluders ?? [],
   );
 }
 

@@ -4,6 +4,7 @@ import {
   type CompareModelSlug,
 } from '@/lib/compare/compare-slug';
 import { isModelVisible, Model, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const MODEL_ROUTE_TABS = [
   'calculator',
@@ -12,13 +13,6 @@ export const MODEL_ROUTE_TABS = [
   'profit-estimator-per-gigawatt',
 ] as const;
 export type ModelRouteTab = (typeof MODEL_ROUTE_TABS)[number];
-
-const MODEL_ROUTE_TAB_PATHS: Record<ModelRouteTab, `/${string}`> = {
-  calculator: '/calculator',
-  historical: '/historical',
-  'profit-estimator': '/profit-estimator',
-  'profit-estimator-per-gigawatt': '/profit-estimator-per-gigawatt',
-};
 
 export const DEFAULT_ROUTE_MODEL: Model = Model.DeepSeek_V4_Pro;
 
@@ -39,6 +33,7 @@ const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [
   Model.MiniMax_M3,
   Model.DeepSeek_V4_Pro,
   Model.DeepSeek_V4_1_Flash,
+  Model.Muse_Spark_Open,
 ];
 const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
   'profit-estimator': PROFIT_ESTIMATOR_MODELS,
@@ -98,13 +93,14 @@ export function modelRouteSlug(model: Model): string | null {
 }
 
 export function modelRoutePath(tab: ModelRouteTab, slug: string): string {
-  return `${MODEL_ROUTE_TAB_PATHS[tab]}/${slug}`;
+  return `${getDashboardRoute(tab).path}/${slug}`;
 }
 
 export interface ParsedModelRoutePathname {
   tab: ModelRouteTab;
   zh: boolean;
   slug: string | null;
+  filters: string[];
 }
 
 export function parseModelRoutePathname(pathname: string): ParsedModelRoutePathname | null {
@@ -112,8 +108,8 @@ export function parseModelRoutePathname(pathname: string): ParsedModelRoutePathn
   const zh = barePath === '/zh' || barePath.startsWith('/zh/');
   const enPath = zh ? barePath.slice('/zh'.length) || '/' : barePath;
   for (const tab of MODEL_ROUTE_TABS) {
-    const tabPath = MODEL_ROUTE_TAB_PATHS[tab];
-    if (enPath === tabPath) return { tab, zh, slug: null };
+    const tabPath = getDashboardRoute(tab).path;
+    if (enPath === tabPath) return { tab, zh, slug: null, filters: [] };
     if (enPath.startsWith(`${tabPath}/`)) {
       const rest = enPath.slice(tabPath.length + 1);
       if (!rest) return null;
@@ -122,7 +118,7 @@ export function parseModelRoutePathname(pathname: string): ParsedModelRoutePathn
         if (tab !== 'profit-estimator' && tab !== 'profit-estimator-per-gigawatt') return null;
         if (filters.length % 2 !== 0 || filters.some((part) => !part)) return null;
       }
-      return { tab, zh, slug };
+      return { tab, zh, slug, filters };
     }
   }
   return null;
@@ -145,10 +141,7 @@ export function modelRoutePathnameRewrite(pathname: string, model: Model): strin
   if (!parsed.slug && model === defaultRouteModel(parsed.tab)) return null;
   const suffix =
     parsed.tab === 'profit-estimator' || parsed.tab === 'profit-estimator-per-gigawatt'
-      ? pathname
-          .split('/')
-          .slice(parsed.zh ? 4 : 3)
-          .join('/')
+      ? parsed.filters.join('/')
       : '';
   const enPath = `${modelRoutePath(parsed.tab, slug)}${suffix ? `/${suffix}` : ''}`;
   return parsed.zh ? `/zh${enPath}` : enPath;

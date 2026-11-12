@@ -2,32 +2,69 @@
 
 import { curveLinear } from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
+import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics/analytics';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { OpxChart, hardwareLegend } from '../charts/kit';
 import { formatCompact } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
-import { originRows } from '../compare/slices';
+import { originText } from '../compare/slices';
 import type { VizDefinition } from './types';
 import { RooflineBars } from './roofline-bars';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
+const ROOF_DASH = '6 4';
+const ROOF_SAMPLES = 64;
 
 const STRINGS = {
-  en: { sharedOnly: 'Shared cases only' },
-  zh: { sharedOnly: '仅共同用例' },
+  en: {
+    sharedOnly: 'Shared cases only',
+    empty: 'No case has FLOP and byte counts',
+    precision: 'Compute precision',
+    normalized: 'Normalized',
+    intensityAxis: 'Arithmetic intensity',
+    shareAxis: 'Share of peak compute (%)',
+    tflopsAxis: 'Achieved TFLOPS',
+    share: (pct: string, what: 'compute' | 'bandwidth') => ` · ${pct}% of peak ${what}`,
+    effective: (ai: string) => ` · ${ai} effective`,
+    stage: { compute: 'compute', memory: 'memory', link: 'link' },
+    bound: (stage: string) => `${stage}-bound`,
+    ofRoofline: (pct: string) => `${pct}% of roofline`,
+    listSeparator: ', ',
+    aside: (text: string) => ` (${text})`,
+  },
+  zh: {
+    sharedOnly: '仅共同用例',
+    empty: '没有同时带 FLOP 和字节数的用例',
+    precision: '计算精度',
+    normalized: '归一化',
+    intensityAxis: '算术强度',
+    shareAxis: '计算峰值占比（%）',
+    tflopsAxis: '实测 TFLOPS',
+    share: (pct: string, what: 'compute' | 'bandwidth') =>
+      ` · ${what === 'compute' ? '计算' : '带宽'}峰值的 ${pct}%`,
+    effective: (ai: string) => ` · 有效 ${ai}`,
+    stage: { compute: '计算', memory: '访存', link: '互联' },
+    bound: (stage: string) => `${stage}受限`,
+    ofRoofline: (pct: string) => `达到 roofline 的 ${pct}%`,
+    listSeparator: '，',
+    aside: (text: string) => `（${text}）`,
+  },
 };
+
+type Strings = (typeof STRINGS)['en' | 'zh'];
 
 interface Point {
   hw: string;
@@ -42,23 +79,15 @@ interface Point {
 
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
-const share = (v: number, of: number | null, what: string) =>
-  of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
 /** `37% of roofline (88 µs · compute 41%, memory 59%)`. */
-function boundRow(b: RooflineBound, us: number): string {
-  const parts = (
-    [
-      ['compute', b.compute],
-      ['memory', b.memory],
-      ['link', b.link],
-    ] as const
-  ).filter(([, t]) => t > 0);
+function boundText(b: RooflineBound, us: number, strings: Strings): string {
+  const parts = (['compute', 'memory', 'link'] as const).filter((stage) => b[stage] > 0);
   const split =
     parts.length > 1
-      ? ` · ${parts.map(([name, t]) => `${name} ${ratio((t / b.us) * 100)}%`).join(', ')}`
-      : ` · ${parts[0]?.[0] ?? 'compute'}-bound`;
-  return `<strong>${ratio((b.us / us) * 100)}% of roofline</strong> (${ratio(b.us)} µs${split})`;
+      ? ` · ${parts.map((stage) => `${strings.stage[stage]} ${ratio((b[stage] / b.us) * 100)}%`).join(strings.listSeparator)}`
+      : ` · ${strings.bound(strings.stage[parts[0] ?? 'compute'])}`;
+  return `${strings.ofRoofline(ratio((b.us / us) * 100))}${strings.aside(`${ratio(b.us)} µs${split}`)}`;
 }
 
 export function Roofline({
@@ -68,7 +97,10 @@ export function Roofline({
   model: ComparisonModel;
   summaryOnly?: boolean;
 }) {
-  const strings = STRINGS[useLocale()];
+  const locale = useLocale();
+  const strings = STRINGS[locale];
+  const share = (v: number, of: number | null, what: 'compute' | 'bandwidth') =>
+    of ? strings.share(ratio((v / of) * 100), what) : '';
   const { view } = model;
   const counts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
@@ -81,6 +113,8 @@ export function Roofline({
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
   const [sharedOnly, setSharedOnly] = useState(true);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const legendId = useId();
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   // Each stage hits its own roof, so a case sits at its effective intensity: where the
   // device's roofline reaches the case's bound, F / t_roof (plain FLOP/byte for one stage).
@@ -110,7 +144,7 @@ export function Roofline({
     () => rooflineSummary(view, { precision, hardware: model.hardware, sharedOnly, normalized }),
     [view, precision, model.hardware, normalized, sharedOnly],
   );
-  if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
+  if (!precision) return <EmptyChart>{strings.empty}</EmptyChart>;
   const composite = view.cases.some(
     (c) => (c.work?.parts.length ?? 0) > 1 || (c.work?.links.length ?? 0) > 0,
   );
@@ -123,11 +157,18 @@ export function Roofline({
         ]
       : [0.1, 10];
   const rooflines: Record<string, { x: number; y: number }[]> = {};
-  const roof = (peak: number, knee: number) => [
-    { x: a0, y: Math.min(peak, (peak / knee) * a0) },
-    ...(knee > a0 && knee < a1 ? [{ x: knee, y: peak }] : []),
-    { x: a1, y: Math.min(peak, (peak / knee) * a1) },
-  ];
+  // The y axis is sqrt over a log x axis, so the bandwidth slope bends on screen: sample it.
+  const roof = (peak: number, knee: number) => {
+    const end = Math.min(knee, a1);
+    const slope =
+      end > a0
+        ? Array.from({ length: ROOF_SAMPLES + 1 }, (_, i) => {
+            const x = a0 * (end / a0) ** (i / ROOF_SAMPLES);
+            return { x, y: (peak / knee) * x };
+          })
+        : [{ x: a0, y: peak }];
+    return knee < a1 ? [...slope, { x: a1, y: peak }] : slope;
+  };
   if (normalized) rooflines[SHARED] = roof(1, 1);
   else
     for (const hw of model.hardware) {
@@ -148,7 +189,7 @@ export function Roofline({
             track('operatorx_roofline_precision_selected', { precision: value });
             setPicked(value);
           }}
-          ariaLabel="Compute precision"
+          ariaLabel={strings.precision}
           options={precisions.map((p) => ({ value: p, label: p }))}
         />
         <div className="flex items-center gap-2">
@@ -164,7 +205,7 @@ export function Roofline({
             htmlFor={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
             className="text-sm font-normal text-muted-foreground"
           >
-            Normalized
+            {strings.normalized}
           </Label>
         </div>
         {summaryOnly && (
@@ -197,31 +238,27 @@ export function Roofline({
             height={400}
             margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
             xScale={{ type: 'log', domain: [a0, a1], nice: false }}
-            yScale={{
-              type: 'log',
-              domain: [Math.max(1e-3, Math.min(...ys) / 1.5), Math.max(...ys) * 1.3],
-              nice: false,
-            }}
+            yScale={{ type: 'sqrt', domain: [0, Math.max(...ys) * 1.1], nice: false }}
             xAxis={
               normalized
                 ? {
-                    label: 'Arithmetic Intensity',
+                    label: strings.intensityAxis,
                     tickFormat: (v) => ratio(Number(v)),
                   }
                 : {
-                    label: 'Arithmetic Intensity (FLOP/byte)',
+                    label: `${strings.intensityAxis}${strings.aside('FLOP/byte')}`,
                     tickFormat: (v) => formatCompact(Number(v)),
                   }
             }
             yAxis={
               normalized
                 ? {
-                    label: 'Share of peak compute (%)',
+                    label: strings.shareAxis,
                     tickCount: 6,
                     tickFormat: (v) => ratio(Number(v) * 100),
                   }
                 : {
-                    label: 'Achieved TFLOPS',
+                    label: strings.tflopsAxis,
                     tickCount: 6,
                     tickFormat: (v) => formatCompact(Number(v)),
                   }
@@ -237,7 +274,7 @@ export function Roofline({
                       ? 'var(--muted-foreground)'
                       : (model.colors[hw] ?? 'var(--muted-foreground)'),
                   strokeWidth: 2,
-                  strokeDasharray: '6 4',
+                  strokeDasharray: ROOF_DASH,
                   curve: curveLinear,
                 },
               },
@@ -265,22 +302,33 @@ export function Roofline({
                 const bw = peakBandwidthTBs(p.hw);
                 const c = view.cases[p.i];
                 const tbs = c.bytes! / (p.us * 1e6);
-                return tooltipHtml({
+                return chartHoverCard({
                   title: hardwareLabel(p.hw),
+                  subtitle: `${c.shape} · ${c.precision}`,
                   color: model.colors[p.hw],
-                  rows: [
-                    esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
-                    ...originRows(view, p.i),
-                    `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
-                    `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
-                    `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? ` · ${p.ai.toFixed(0)} effective` : ''}`,
-                    ...(p.bound ? [boundRow(p.bound, p.us)] : []),
+                  metrics: [
+                    {
+                      value: p.tflops.toFixed(1),
+                      label: `TFLOPS${share(p.tflops, peak, 'compute')}`,
+                    },
+                    { value: tbs.toFixed(2), label: `TB/s${share(tbs, bw, 'bandwidth')}` },
                   ],
-                  footer: 'Click for kernel timeline',
+                  summary: [
+                    originText(view, p.i, locale),
+                    `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? strings.effective(p.ai.toFixed(0)) : ''}`,
+                    ...(p.bound ? [boundText(p.bound, p.us, strings)] : []),
+                  ].join(' · '),
                 });
               },
             }}
-            legendElement={<HardwareLegend model={model} />}
+            legendElement={
+              <ChartLegend
+                variant="sidebar"
+                isLegendExpanded={legendExpanded}
+                onExpandedChange={setLegendExpanded}
+                {...hardwareLegend(model, legendId, normalized ? undefined : ROOF_DASH)}
+              />
+            }
           />
         </div>
       )}
@@ -290,7 +338,7 @@ export function Roofline({
 
 export const roofline: VizDefinition = {
   id: 'roofline',
-  title: 'Roofline',
+  title: { en: 'Roofline', zh: 'Roofline' },
   ops: ['gemm', 'moe', 'attention'],
   wide: true,
   Component: Roofline,

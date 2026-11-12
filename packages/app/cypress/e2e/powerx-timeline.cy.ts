@@ -147,7 +147,7 @@ function interceptOverlay() {
 
 function visitChart(extraParams: string) {
   interceptRows();
-  cy.visit(`/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
+  cy.visit(`/pwx?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
@@ -164,6 +164,21 @@ describe('PowerX measured power timeline', () => {
         return false;
       }
     });
+  });
+
+  it('moves old /powerx links to /pwx with the query intact', () => {
+    interceptRows();
+    cy.visit('/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      },
+    });
+    cy.location().should((location) => {
+      expect(location.pathname).to.eq('/pwx');
+      expect(location.search).to.eq('?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4');
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 
   it('restores the shared serving-window view and focus on an unofficial trace', () => {

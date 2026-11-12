@@ -1,14 +1,18 @@
 'use client';
 
+import { ChevronLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Distribution } from '@/components/inference/agentic-point/distribution';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
+import { ShareButton } from '@/components/ui/share-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { cn } from '@/lib/shared/utils';
 import { layoutLabel } from './deployment';
+import { runtimeLabel } from './optimizations';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
@@ -85,7 +89,7 @@ const STRINGS = {
     integrity: 'Integrity',
     sealed: 'SHA256SUMS',
     verified: 'Verified',
-    psnr: 'Per-clip PSNR → Comparison clips',
+    psnr: 'Per-clip PSNR → comparison clips',
     model: 'Model',
     run: 'Run ID',
     artifact: 'Artifact ID',
@@ -178,9 +182,9 @@ const withUnit = (value: number | null | undefined, unit: string, digits: number
 
 function Panel({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
-    <section className="flex min-w-0 flex-col gap-2 rounded-md border p-4">
+    <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-border/70 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Heading as="h3" level="label" className="font-semibold">
+        <Heading as="h3" level="label">
           {title}
         </Heading>
         {note && <span className="text-xs text-muted-foreground">{note}</span>}
@@ -225,7 +229,7 @@ export default function VideoDeploymentDetail({
   onPsnr,
 }: {
   cell: ResultCell;
-  /** Deployments of the same hardware and run channel across every GPU count. */
+  /** Deployments of the same hardware, runtime and run channel across every GPU count. */
   siblings: ResultCell[];
   gpuCounts: number[];
   workloadLabel: string;
@@ -240,6 +244,7 @@ export default function VideoDeploymentDetail({
   const s = STRINGS[locale];
   const { point, evidence } = cell;
   const hardware = hardwareLabel(point.hardwareKey ?? '');
+  const engine = runtimeLabel(cell.metadata.engine, cell.metadata.optimizations) ?? s.notRecorded;
   const powerEvidence =
     evidence?.powerValid === true
       ? s.validPower
@@ -254,30 +259,34 @@ export default function VideoDeploymentDetail({
 
   return (
     <div className="flex min-w-0 flex-col gap-4" data-testid="video-results-detail">
-      <div className="text-sm">
-        <button
-          type="button"
-          className="cursor-pointer underline-offset-2 hover:underline"
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 text-muted-foreground hover:text-foreground"
           data-testid="results-detail-back"
           onClick={onBack}
         >
-          ← {s.back}
-        </button>
+          <ChevronLeft aria-hidden="true" />
+          {s.back}
+        </Button>
       </div>
       <Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <div>
-            <Heading as="h1" level="card" className="flex flex-wrap items-center gap-2">
-              <span className={styles.dot} style={{ background: color }} />
-              {[hardware, cell.metadata.model, cell.metadata.engine ?? s.notRecorded].join(' · ')}
-            </Heading>
-            <p className="text-xs text-muted-foreground">
-              {[
-                cell.metadata.date ?? s.notRecorded,
-                ...(cell.overlay ? [`${s.unofficial} #${point.runId}`] : []),
-              ].join(' · ')}
-            </p>
-          </div>
+          <DashboardSectionHeader
+            headingAs="h1"
+            title={
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <span className={styles.dot} style={{ background: color }} />
+                {[hardware, cell.metadata.model, engine].join(' · ')}
+              </span>
+            }
+            description={[
+              cell.metadata.date ?? s.notRecorded,
+              ...(cell.overlay ? [`${s.unofficial} #${point.runId}`] : []),
+            ].join(' · ')}
+            actions={<ShareButton />}
+          />
           <div
             className="flex flex-wrap items-center gap-2 text-xs"
             role="group"
@@ -288,21 +297,20 @@ export default function VideoDeploymentDetail({
             {siblings.map((sibling) => {
               const selected = resultsPointKey(sibling) === resultsPointKey(cell);
               return (
-                <button
+                <Button
                   key={resultsPointKey(sibling)}
                   type="button"
+                  size="sm"
+                  variant="outline"
                   aria-pressed={selected}
-                  className={cn(
-                    'min-h-8 cursor-pointer rounded-full border px-3',
-                    selected ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted',
-                  )}
+                  className="text-xs"
                   onClick={() => {
                     if (!selected) onSelect(sibling);
                   }}
                 >
                   {layoutLabel(sibling.point, locale)} · c={sibling.point.concurrency} ·{' '}
                   {n(sibling.point.valid, 0)} {s.clips}
-                </button>
+                </Button>
               );
             })}
             {gpuCounts
@@ -311,7 +319,7 @@ export default function VideoDeploymentDetail({
               .map((count) => (
                 <span
                   key={count}
-                  className="inline-flex min-h-8 items-center rounded-full border border-dashed px-3 text-muted-foreground"
+                  className="inline-flex h-8 items-center rounded-md border border-dashed px-3 text-muted-foreground"
                 >
                   {s.notMeasuredGpus(count)}
                 </span>
@@ -321,7 +329,7 @@ export default function VideoDeploymentDetail({
             rows={[
               [s.gpus, s.gpuDetail(n(point.participating, 0), n(point.allocated, 0))],
               [s.concurrency, n(point.concurrency, 0)],
-              [s.engine, cell.metadata.engine ?? s.notRecorded],
+              [s.engine, engine],
               [s.runtime, code(point.runtime.slice(0, 12))],
               [s.workload, workloadLabel],
               [s.valid, `${n(point.valid, 0)} / ${n(point.scheduled, 0)}`],

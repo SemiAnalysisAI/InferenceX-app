@@ -257,55 +257,63 @@ const partRow = (category: string) =>
 const rowPoint = (row: HTMLElement) =>
   row.querySelector('[data-testid="power-chip-compare-point"]')?.textContent;
 
-describe('PowerAnalysisPanels per-chip compared point', () => {
-  const drilldownHits = () => [
-    ...container.querySelectorAll<SVGRectElement>(
-      '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
-    ),
-  ];
-  const drilldownTitle = () =>
-    container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent;
-  const marker = () =>
-    container.querySelector<SVGRectElement>('[data-testid="power-breakdown-compared"]');
-  const partsHeading = () =>
-    container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
-  const chipRows = () => [
-    ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
-  ];
-  const chipRow = (name: string) =>
-    chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
-  const sliderValue = () =>
-    container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
-  const moveSlider = (step: number) => {
-    const slider = container.querySelector<HTMLInputElement>(
-      '[data-testid="power-chip-compare-target"]',
-    )!;
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
-        slider,
-        String(step),
-      );
-      slider.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  };
-  const renderInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
-    render(
-      <PowerXSurfaceProvider>
-        <PowerAnalysisPanels
-          data={data}
-          overlayData={overlayData}
-          xField="mean_tpot_intvty"
-          xLabel="Interactivity (output tok/s/user)"
-          chartId="chart-4"
-          placement="before"
-        />
-      </PowerXSurfaceProvider>,
-    );
+const drilldownHits = () => [
+  ...container.querySelectorAll<SVGRectElement>(
+    '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
+  ),
+];
 
+const drilldownTitle = () =>
+  container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent;
+
+const marker = () =>
+  container.querySelector<SVGRectElement>('[data-testid="power-breakdown-compared"]');
+
+const partsHeading = () =>
+  container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
+
+const moveSlider = (step: number) => {
+  const slider = container.querySelector<HTMLInputElement>(
+    '[data-testid="power-chip-compare-target"]',
+  )!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      slider,
+      String(step),
+    );
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+};
+
+const chipRows = () => [
+  ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+];
+
+const sliderValue = () =>
+  container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
+
+const chipRow = (name: string) =>
+  chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
+
+const renderPanelInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
+  render(
+    <PowerXSurfaceProvider>
+      <PowerAnalysisPanels
+        data={data}
+        overlayData={overlayData}
+        xField="mean_tpot_intvty"
+        xLabel="Interactivity (output tok/s/user)"
+        chartId="chart-4"
+        placement="before"
+      />
+    </PowerXSurfaceProvider>,
+  );
+
+describe('PowerAnalysisPanels per-chip compared point', () => {
   beforeEach(() => track.mockClear());
 
   it('pins the clicked column for that chip only and keeps the drill-down on it', () => {
-    renderInline([...sglang, ...vllm]);
+    renderPanelInline([...sglang, ...vllm]);
     // The slider lands on vLLM c16 at 60 tok/s/user; the SGLang row reads its own nearest point.
     expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
     expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
@@ -342,7 +350,7 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
   });
 
   it('keeps the pin through opening another chip and collapsing, drops it when the slider moves', () => {
-    renderInline([...sglang, ...vllm]);
+    renderPanelInline([...sglang, ...vllm]);
     const order = chipRows().map(
       (row) => row.querySelector('span span span.truncate')?.textContent,
     );
@@ -376,7 +384,7 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
   });
 
   it('pins a point of an unofficial-run series by its own key', () => {
-    renderInline([...sglang, ...overlay], overlay);
+    renderPanelInline([...sglang, ...overlay], overlay);
     const overlayRow = chipRows().find((row) => row.textContent?.includes('single-hue'))!;
     const overlayName = overlayRow.querySelector('span span span.truncate')!.textContent!;
     expect(chipRows().map((row) => row.dataset.pinned)).toEqual([undefined, undefined]);
@@ -449,22 +457,32 @@ describe('PowerChipCompare legend highlight', () => {
     expect(segments('server')).toHaveLength(2);
     expect(segments('facility')).toHaveLength(2);
     // Each chip's segments repeat the plot in that chip's colour; a layer made of several
-    // parts lists them in its title.
+    // parts lists them in its hover card.
+    const hoverCard = (segment: HTMLElement) => {
+      mouse(segment, 'mouseover');
+      const text =
+        document.querySelector('[data-testid="power-chip-compare-hover-card"]')?.textContent ?? '';
+      mouse(segment, 'mouseout');
+      return text;
+    };
     const gpuSegment = segments('gpu')[0];
     expect(gpuSegment.style.backgroundColor).toContain('90%');
     expect(gpuSegment.style.backgroundColor).toContain('var(--b200_');
     expect(gpuSegment.style.backgroundImage).toBe('');
-    expect(gpuSegment.getAttribute('title')).toMatch(/^GPU: \d+ W$/u);
+    expect(hoverCard(gpuSegment)).toMatch(/GPU · Measured[\d,]+W\/GPU/u);
     const serverSegment = segments('server')[0];
     expect(serverSegment.style.backgroundImage).toContain('repeating-linear-gradient(135deg');
     expect(serverSegment.style.backgroundImage).toContain('var(--b200_');
-    const serverTitle = serverSegment.getAttribute('title') ?? '';
-    expect(serverTitle).toMatch(/^Server parts: \d+ W · /u);
-    expect(serverTitle).toContain('NICs');
-    expect(serverTitle).toContain('NVSwitch');
-    expect(serverTitle).not.toContain('PSU loss');
-    expect(segments('fansPsu')[0].getAttribute('title')).toContain('PSU loss');
-    expect(segments('network')[0].getAttribute('title')).toMatch(/^Network share: \d+ W$/u);
+    const serverCard = hoverCard(serverSegment);
+    expect(serverCard).toMatch(/Server parts · Modeled \(hatched\)[\d,]+W\/GPU/u);
+    expect(serverCard).toContain('NICs');
+    expect(serverCard).toContain('NVSwitch');
+    expect(serverCard).not.toContain('PSU loss');
+    expect(hoverCard(segments('fansPsu')[0])).toContain('PSU loss');
+    const networkCard = hoverCard(segments('network')[0]);
+    expect(networkCard).toContain('Network share');
+    expect(networkCard).not.toMatch(/\d W · /u);
+    expect(document.querySelector('[data-testid="power-chip-compare-hover-card"]')).toBeNull();
     mouse(item, 'mouseover');
     for (const segment of segments('server')) {
       expect(segment.dataset.emphasis).toBe('highlighted');
@@ -523,44 +541,44 @@ describe('nearestColumnIndex', () => {
   });
 });
 
+const readoutPoint = () =>
+  container.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent;
+
+const readoutSource = () =>
+  container.querySelector('[data-testid="power-breakdown-readout-source"]')?.textContent;
+
+const rule = () =>
+  container.querySelector<SVGLineElement>('[data-testid="power-breakdown-scrub-rule"]');
+
+const cursorLabel = () => container.querySelector('[data-testid="power-breakdown-cursor-label"]');
+
+const compareButton = () =>
+  container.querySelector<HTMLButtonElement>('[data-testid="power-breakdown-compare-at"]');
+
+const renderTouchInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
+  render(
+    <PowerXSurfaceProvider>
+      <PowerAnalysisPanels
+        data={data}
+        overlayData={overlayData}
+        xField="mean_tpot_intvty"
+        xLabel="Interactivity (output tok/s/user)"
+        chartId="chart-5"
+        placement="before"
+      />
+    </PowerXSurfaceProvider>,
+  );
+
+const touchHits = () => [
+  ...container.querySelectorAll<SVGRectElement>(
+    '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
+  ),
+];
+
+const panelReadout = () =>
+  container.querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
+
 describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
-  const renderInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
-    render(
-      <PowerXSurfaceProvider>
-        <PowerAnalysisPanels
-          data={data}
-          overlayData={overlayData}
-          xField="mean_tpot_intvty"
-          xLabel="Interactivity (output tok/s/user)"
-          chartId="chart-5"
-          placement="before"
-        />
-      </PowerXSurfaceProvider>,
-    );
-  const hits = () => [
-    ...container.querySelectorAll<SVGRectElement>(
-      '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
-    ),
-  ];
-  const readout = () =>
-    container.querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
-  const readoutPoint = () =>
-    container.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent;
-
-  const readoutSource = () =>
-    container.querySelector('[data-testid="power-breakdown-readout-source"]')?.textContent;
-  const rule = () =>
-    container.querySelector<SVGLineElement>('[data-testid="power-breakdown-scrub-rule"]');
-  const cursorLabel = () => container.querySelector('[data-testid="power-breakdown-cursor-label"]');
-  const compareButton = () =>
-    container.querySelector<HTMLButtonElement>('[data-testid="power-breakdown-compare-at"]');
-  const chipRows = () => [
-    ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
-  ];
-
-  const sliderValue = () =>
-    container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
-
   // The stub plot is 517 px wide on even spacing: columns centre at 78, 207, 336, 465.
   const AT = { c64: 60, c16: 210, c4: 330, c1: 470 };
 
@@ -570,12 +588,12 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
   });
 
   it('scrubs the nearest column into the readout, moves the slider from the button', () => {
-    renderInline([...sglang, ...vllm]);
-    const columns = hits();
+    renderTouchInline([...sglang, ...vllm]);
+    const columns = touchHits();
     expect(columns).toHaveLength(4);
     // A finger on the plot reads the column nearest its x, wherever the hit band is.
     pointer(columns[1], 'pointerdown', { clientX: AT.c64, clientY: 200 });
-    expect(readout()?.dataset.source).toBe('scrub');
+    expect(panelReadout()?.dataset.source).toBe('scrub');
     expect(readoutPoint()).toBe('c64 · 30 tok/s/user');
     expect(rule()?.dataset.index).toBe('0');
     expect(container.querySelector('circle.breakdown-scrub-dot')?.getAttribute('fill')).toBe(
@@ -593,7 +611,7 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     expect(sliderValue()).toBe('60 tok/s/user');
     expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
     pointer(columns[1], 'pointerup', { clientX: AT.c4, clientY: 180 });
-    expect(readout()?.dataset.source).toBe('scrub');
+    expect(panelReadout()?.dataset.source).toBe('scrub');
     expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
     // The explicit action: the slider moves to the scrubbed interactivity.
     expect(compareButton()?.textContent).toBe('Compare chips at 100 tok/s/user');
@@ -607,12 +625,27 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
       source: 'scrub',
     });
     expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
-    expect(readout()?.dataset.source).toBe('compared');
+    expect(panelReadout()?.dataset.source).toBe('compared');
     expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
     expect(rule()).toBeNull();
     expect(compareButton()?.disabled).toBe(true);
   });
 });
+
+const drilldown = () =>
+  container.querySelector<HTMLElement>('[data-testid="power-chip-compare-drilldown"]')!;
+
+const tickLabels = () =>
+  [...drilldown().querySelectorAll('[data-testid="x-tick"]')].map((tick) => tick.textContent);
+
+const tiles = () => [
+  ...drilldown().querySelectorAll<HTMLButtonElement>(
+    '[data-testid="power-breakdown-readout-part"]',
+  ),
+];
+
+const drilldownReadout = () =>
+  drilldown().querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
 
 describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
   // An agentic sweep that never leaves 2-5 tok/s/user: ten points whose whole-number
@@ -634,17 +667,6 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
         />
       </PowerXSurfaceProvider>,
     );
-  const drilldown = () =>
-    container.querySelector<HTMLElement>('[data-testid="power-chip-compare-drilldown"]')!;
-  const tickLabels = () =>
-    [...drilldown().querySelectorAll('[data-testid="x-tick"]')].map((tick) => tick.textContent);
-  const readout = () =>
-    drilldown().querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
-  const tiles = () => [
-    ...drilldown().querySelectorAll<HTMLButtonElement>(
-      '[data-testid="power-breakdown-readout-part"]',
-    ),
-  ];
 
   beforeEach(() => track.mockClear());
 
@@ -685,9 +707,10 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
     act(() =>
       (hits[0] as SVGRectElement).dispatchEvent(new MouseEvent('click', { bubbles: true })),
     );
-    expect(readout()?.dataset.source).toBe('pinned');
+    expect(drilldownReadout()?.dataset.source).toBe('pinned');
     expect(
-      readout()?.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent,
+      drilldownReadout()?.querySelector('[data-testid="power-breakdown-readout-point"]')
+        ?.textContent,
     ).toBe('c12 · 2.1 tok/s/user');
     // One tile per layer, each with its W/GPU and its share, and the shares add up.
     const shares = tiles().map((tile) =>
@@ -721,7 +744,7 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
     );
     expect(follow?.textContent).toBe('Follow slider');
     act(() => follow!.click());
-    expect(readout()?.dataset.source).toBe('compared');
+    expect(drilldownReadout()?.dataset.source).toBe('compared');
     expect(drilldown().querySelector('[data-testid="power-breakdown-readout-follow"]')).toBeNull();
   });
 });

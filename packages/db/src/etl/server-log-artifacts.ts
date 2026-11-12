@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import { isLaunchFileName } from './launch-files';
 import {
   capServerLogSlices,
   capServerLogText,
@@ -103,7 +104,7 @@ export function listServerLogFilePaths(root: string): ServerLogFilePath[] {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const pathname = path.join(directory, entry.name);
       if (entry.isDirectory()) visit(pathname);
-      else if (entry.isFile() && isLogFileName(entry.name)) {
+      else if (entry.isFile() && (isLogFileName(entry.name) || isLaunchFileName(entry.name))) {
         files.push({
           fileName: path.relative(root, pathname).split(path.sep).join('/'),
           path: pathname,
@@ -130,7 +131,7 @@ export function readServerLogFilePaths(files: readonly ServerLogFilePath[]): Ser
 export function primaryServerLogFile(files: readonly ServerLogFile[]): ServerLogFile | null {
   return (
     files.find((file) => path.posix.basename(file.fileName).toLowerCase() === 'server.log') ??
-    files[0] ??
+    files.find((file) => isLogFileName(file.fileName)) ??
     null
   );
 }

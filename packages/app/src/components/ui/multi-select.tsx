@@ -70,6 +70,8 @@ interface MultiSelectProps {
   placeholder?: string;
   size?: 'sm' | 'default';
   className?: string;
+  /** Classes for the dropdown panel, e.g. a width wider than the trigger. */
+  contentClassName?: string;
   disabled?: boolean;
   maxSelections?: number;
   minSelections?: number;
@@ -84,6 +86,8 @@ interface MultiSelectProps {
   clearSearchLabel?: string;
   selectedSuffix?: string;
   minimumPrefix?: string;
+  /** Display a retained selection without adding it to the available options. */
+  missingSelectedOption?: (value: string) => MultiSelectOption;
 }
 
 function MultiSelect({
@@ -99,6 +103,7 @@ function MultiSelect({
   placeholder,
   size = 'default',
   className,
+  contentClassName,
   disabled = false,
   maxSelections,
   minSelections,
@@ -113,6 +118,7 @@ function MultiSelect({
   clearSearchLabel,
   selectedSuffix,
   minimumPrefix,
+  missingSelectedOption,
 }: MultiSelectProps) {
   const t = STRINGS[useLocale()];
   const resolvedPlaceholder = placeholder ?? t.placeholder;
@@ -300,7 +306,9 @@ function MultiSelect({
   };
 
   const selectedOptions = value.map(
-    (val) => flatOptions.find((opt) => opt.value === val) ?? { value: val, label: val },
+    (val) =>
+      flatOptions.find((opt) => opt.value === val) ??
+      missingSelectedOption?.(val) ?? { value: val, label: val },
   );
   const selectedLabels = selectedOptions.map((opt) => opt.label);
 
@@ -372,7 +380,7 @@ function MultiSelect({
         <span className="absolute right-2 flex size-3.5 items-center justify-center">
           {isSelected && <CheckIcon className="size-4 text-primary" />}
         </span>
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 flex-1 items-center gap-2">
           {option.icon}
           {option.label}
           {option.badge}
@@ -433,7 +441,7 @@ function MultiSelect({
                 <span
                   key={value[index]}
                   data-slot="select-chip"
-                  className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
+                  className="bg-foreground/[0.08] text-foreground inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
                   {selectedOptions[index]?.icon}
                   <span className="min-w-0 truncate" title={label}>
@@ -450,7 +458,7 @@ function MultiSelect({
                       }
                     }}
                     className={cn(
-                      'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
+                      'hover:bg-foreground/10 rounded-sm cursor-pointer transition-colors',
                       (disabled || isMinReached) && 'hidden',
                     )}
                     aria-label={`${t.removePrefix}${label}`}
@@ -502,6 +510,7 @@ function MultiSelect({
           data-slot="select-content"
           className={cn(
             'bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 absolute z-[120] mt-1 flex max-h-72 w-full origin-top flex-col overflow-hidden rounded-md border shadow-md',
+            contentClassName,
           )}
         >
           <div className="min-h-0 p-1 space-y-1 overflow-y-auto custom-scrollbar">

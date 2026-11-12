@@ -1,6 +1,7 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
+import { getDashboardRoute } from './src/lib/routing/dashboard-routes';
 import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
 import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
@@ -19,14 +20,15 @@ const PUBLIC_ASSET_SOURCES = [
 ];
 
 const LOCALE_PREFIXES = ['', '/zh'] as const;
+const INFERENCE_PATH = getDashboardRoute('inference').path;
 
 const SEO_REDIRECTS = [
-  { source: '/datasets', destination: '/agentx' },
-  { source: '/zh/datasets', destination: '/zh/agentx' },
+  { source: '/datasets', destination: '/infx/agentx' },
+  { source: '/zh/datasets', destination: '/zh/infx/agentx' },
   ...LOCALE_PREFIXES.flatMap((prefix) => [
-    { source: `${prefix}/xvideo`, destination: `${prefix}/video` },
-    { source: `${prefix}/xxvideo`, destination: `${prefix}/video` },
-    { source: `${prefix}/ubenchx`, destination: `${prefix}/ubenchx/mem-bw` },
+    { source: `${prefix}/xvideo`, destination: `${prefix}/vgx` },
+    { source: `${prefix}/xxvideo`, destination: `${prefix}/vgx` },
+    { source: `${prefix}/ubx`, destination: `${prefix}/ubx/mem-bw` },
     { source: `${prefix}/run/glm-5-2-on-:chip`, destination: `${prefix}/run/glm-5-3-on-:chip` },
     {
       source: `${prefix}/rankings/fastest-gpu-for-glm-5-2`,
@@ -77,26 +79,30 @@ const nextConfig: NextConfig = {
       ...SEO_REDIRECTS,
       // The featured model can change; do not permanently cache this default.
       ...LOCALE_PREFIXES.map((prefix) => ({
-        source: `${prefix}/inference`,
-        destination: `${prefix}/inference/deepseek-v41-flash`,
+        source: `${prefix}${INFERENCE_PATH}`,
+        destination: `${prefix}${INFERENCE_PATH}/kimi-k31-pro`,
         permanent: false,
-        missing: [{ type: 'query' as const, key: 'g_model' }],
+        missing: [
+          { type: 'query' as const, key: 'g_model' },
+          { type: 'query' as const, key: 'i_metric', value: 'y_measured[A-Za-z]+' },
+          { type: 'query' as const, key: 'i_power', value: '(?:.*,)?(?:certified|legacy)(?:,.*)?' },
+        ],
       })),
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       ...HISTORICAL_MODEL_ALIAS_REDIRECTS,
       ...VIDEO_ALIAS_REDIRECTS,
       {
         source: '/datasets/:path*',
-        destination: '/agentx/:path*',
+        destination: '/infx/agentx/:path*',
         permanent: true,
       },
       {
         source: '/zh/datasets/:path*',
-        destination: '/zh/agentx/:path*',
+        destination: '/zh/infx/agentx/:path*',
         permanent: true,
       },
-      { source: '/gpu-metrics', destination: '/inference', permanent: true },
-      { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
+      { source: '/gpu-metrics', destination: INFERENCE_PATH, permanent: true },
+      { source: '/zh/gpu-metrics', destination: `/zh${INFERENCE_PATH}`, permanent: true },
     ]);
   },
   rewrites() {

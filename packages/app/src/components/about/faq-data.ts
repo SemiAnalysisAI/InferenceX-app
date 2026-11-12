@@ -93,7 +93,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     id: 'faq-raw-logs',
     question: 'Where can I see the raw benchmark logs?',
     answer:
-      'Click any data point on a chart to open its tooltip. The "GitHub Actions Run" link goes directly to the workflow run that produced it. From there you can inspect the full job logs, the exact framework and driver versions, command line arguments, and download the raw artifacts including request latencies, token counts, and chip power telemetry.',
+      'Click any data point on a chart to open its tooltip. The "GitHub Actions run" link goes directly to the workflow run that produced it. From there you can inspect the full job logs, the exact framework and driver versions, command line arguments, and download the raw artifacts including request latencies, token counts, and chip power telemetry.',
   },
   {
     id: 'faq-rerun-benchmark',

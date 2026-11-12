@@ -18,6 +18,18 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/options', () => {
+  it('exposes A100 with the hyperscaler ownership assumption', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    expect(body.hardware.find((hw: { key: string }) => hw.key === 'a100')).toMatchObject({
+      label: 'A100',
+      vendor: 'NVIDIA',
+      arch: 'Ampere',
+      tdpW: 400,
+      costPerHour: { h: 0.78, r: 9.99 },
+    });
+  });
+
   it('returns every option domain with the envelope', async () => {
     const res = await GET(request('/api/v1/views/options'));
     expect(res.status).toBe(200);
@@ -87,6 +99,17 @@ describe('GET /api/v1/views/options', () => {
     expect(agentic.isl).toBeNull();
   });
 
+  it('keeps Flash 8K/1K active independently of the non-Flash GLM retirement', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    const flash = body.models.find((model: { name: string }) => model.name === 'GLM-5.3-Flash');
+    const nonFlash = body.models.find((model: { name: string }) => model.name === 'GLM-5.2');
+    expect(flash.deprecatedSequences).not.toContain('8k/1k');
+    expect(flash.deprecatedSequences).not.toContain('agentic-traces');
+    expect(flash.deprecatedSequences).toContain('1k/1k');
+    expect(nonFlash.deprecatedSequences).toContain('8k/1k');
+  });
+
   it('returns default models in selector order without changing the selected default', async () => {
     const res = await GET(request('/api/v1/views/options'));
     const body = await res.json();
@@ -95,10 +118,10 @@ describe('GET /api/v1/views/options', () => {
         .filter((model: { category: string }) => model.category === 'default')
         .map((model: { name: string }) => model.name),
     ).toEqual([
+      'Kimi-K3.1-Pro',
       'DeepSeek-V4.1-Flash',
       'GLM-5.2',
       'GLM-5.3-Flash',
-      'Kimi-K3.1-Pro',
       'MiniMax-M3.1-Flash',
       'Muse-Spark-Open',
       'Qwen-3.5-397B-A17B',

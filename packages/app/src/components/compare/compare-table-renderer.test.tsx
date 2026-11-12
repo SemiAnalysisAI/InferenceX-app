@@ -21,6 +21,13 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   locale.current = 'en';
   container = document.createElement('div');
   document.body.append(container);
@@ -30,6 +37,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.unstubAllGlobals();
 });
 
 function renderTable(overrides: Partial<React.ComponentProps<typeof CompareTableRenderer>>) {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { easeCubicInOut } from 'd3';
+import { easeCubicInOut, select } from 'd3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
@@ -101,6 +101,24 @@ describe('CanvasPointLayer drawing', () => {
     expect(calls.map((call) => JSON.stringify(call)).join('\n')).toMatchInlineSnapshot(`
       "["setTransform",1,0,0,1,0,0]
       ["clearRect",0,0,200,160]
+      ["setTransform",2,0,0,2,264,-64]
+      ["set:globalAlpha",0.4]
+      ["set:strokeStyle","teal"]
+      ["set:lineWidth",1.5]
+      ["setLineDash",[3,2]]
+      ["beginPath"]
+      ["arc",0,0,7.5,0,6.283185307179586]
+      ["stroke"]
+      ["setLineDash",[]]
+      ["setTransform",2,0,0,2,100,224]
+      ["set:globalAlpha",0.4]
+      ["set:strokeStyle","orange"]
+      ["set:lineWidth",1.5]
+      ["setLineDash",[3,2]]
+      ["beginPath"]
+      ["arc",0,0,7.5,0,6.283185307179586]
+      ["stroke"]
+      ["setLineDash",[]]
       ["setTransform",2,0,0,2,-64,80]
       ["set:globalAlpha",0.8]
       ["set:fillStyle","teal"]
@@ -111,28 +129,12 @@ describe('CanvasPointLayer drawing', () => {
       ["set:fillStyle","#123456"]
       ["new Path2D"]
       ["fill",[["rect",-3.5,-3.5,7,7]]]
-      ["set:globalAlpha",0.4]
-      ["set:strokeStyle","teal"]
-      ["set:lineWidth",1.5]
-      ["setLineDash",[3,2]]
-      ["beginPath"]
-      ["arc",0,0,7.5,0,6.283185307179586]
-      ["stroke"]
-      ["setLineDash",[]]
       ["setTransform",2,0,0,2,100,224]
       ["set:globalAlpha",0.8]
       ["set:fillStyle","var(--missing)"]
       ["new Path2D"]
       ["new Path2D","M 0 -2.8867513459481287 L 5 1.4433756729740643 L -5 1.4433756729740643 Z"]
       ["fill",[["addPath","M 0 -2.8867513459481287 L 5 1.4433756729740643 L -5 1.4433756729740643 Z"]]]
-      ["set:globalAlpha",0.4]
-      ["set:strokeStyle","orange"]
-      ["set:lineWidth",1.5]
-      ["setLineDash",[3,2]]
-      ["beginPath"]
-      ["arc",0,0,7.5,0,6.283185307179586]
-      ["stroke"]
-      ["setLineDash",[]]
       ["setTransform",2,0,0,2,20,40]
       ["set:globalAlpha",0.16000000000000003]
       ["set:fillStyle","plum"]
@@ -147,14 +149,7 @@ describe('CanvasPointLayer drawing', () => {
       ["set:globalAlpha",1]
       ["setTransform",1,0,0,1,0,0]
       ["clearRect",0,0,200,160]
-      ["setTransform",2,0,0,2,-64,80]
-      ["set:globalAlpha",0.8]
-      ["set:fillStyle","teal"]
-      ["fill",[["arc",0,0,3.5,0,6.283185307179586]]]
       ["setTransform",2,0,0,2,264,-64]
-      ["set:globalAlpha",0.8]
-      ["set:fillStyle","#123456"]
-      ["fill",[["rect",-3.5,-3.5,7,7]]]
       ["set:globalAlpha",0.4]
       ["set:strokeStyle","teal"]
       ["set:lineWidth",1.5]
@@ -164,9 +159,6 @@ describe('CanvasPointLayer drawing', () => {
       ["stroke"]
       ["setLineDash",[]]
       ["setTransform",2,0,0,2,100,224]
-      ["set:globalAlpha",0.8]
-      ["set:fillStyle","var(--missing)"]
-      ["fill",[["addPath","M 0 -2.8867513459481287 L 5 1.4433756729740643 L -5 1.4433756729740643 Z"]]]
       ["set:globalAlpha",0.4]
       ["set:strokeStyle","orange"]
       ["set:lineWidth",1.5]
@@ -175,6 +167,18 @@ describe('CanvasPointLayer drawing', () => {
       ["arc",0,0,7.5,0,6.283185307179586]
       ["stroke"]
       ["setLineDash",[]]
+      ["setTransform",2,0,0,2,-64,80]
+      ["set:globalAlpha",0.8]
+      ["set:fillStyle","teal"]
+      ["fill",[["arc",0,0,3.5,0,6.283185307179586]]]
+      ["setTransform",2,0,0,2,264,-64]
+      ["set:globalAlpha",0.8]
+      ["set:fillStyle","#123456"]
+      ["fill",[["rect",-3.5,-3.5,7,7]]]
+      ["setTransform",2,0,0,2,100,224]
+      ["set:globalAlpha",0.8]
+      ["set:fillStyle","var(--missing)"]
+      ["fill",[["addPath","M 0 -2.8867513459481287 L 5 1.4433756729740643 L -5 1.4433756729740643 Z"]]]
       ["setTransform",2,0,0,2,20,40]
       ["set:globalAlpha",0.16000000000000003]
       ["set:fillStyle","plum"]
@@ -374,18 +378,6 @@ describe('CanvasPointLayer position animation', () => {
     expect(frames.pending()).toBe(false);
   });
 
-  it('requests an unaccelerated 2D context so WebKit keeps the canvas inside the plot transform', () => {
-    const frames = installFrames();
-    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-    const { layer } = mountLayer();
-    layer.join([point('a', 10, 10)], key, 100, 100);
-    layer.restyle(config);
-    layer.place(identity, identity);
-    layer.invalidate();
-    frames.run(0);
-    expect(getContext).toHaveBeenCalledWith('2d', { willReadFrequently: true });
-  });
-
   it('gives up animating when the canvas has no 2D context', () => {
     const frames = installFrames();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
@@ -403,20 +395,20 @@ describe('CanvasPointLayer position animation', () => {
   });
 });
 
-describe('CanvasPointLayer opacity transitions', () => {
-  function fadingLayer(durationMs: number) {
-    const frames = installFrames();
-    const calls = installRecordingContext();
-    const { layer } = mountLayer();
-    layer.join([point('a', 10, 10)], key, 100, 100);
-    layer.restyle(config);
-    layer.place(identity, identity);
-    frames.run(5);
-    layer.setOpacityTransition(durationMs);
-    calls.length = 0;
-    return { frames, calls, layer };
-  }
+function fadingLayer(durationMs: number) {
+  const frames = installFrames();
+  const calls = installRecordingContext();
+  const { layer } = mountLayer();
+  layer.join([point('a', 10, 10)], key, 100, 100);
+  layer.restyle(config);
+  layer.place(identity, identity);
+  frames.run(5);
+  layer.setOpacityTransition(durationMs);
+  calls.length = 0;
+  return { frames, calls, layer };
+}
 
+describe('CanvasPointLayer opacity transitions', () => {
   it('eases from the shown opacity, starting at the first frame even at time zero', () => {
     const { frames, calls, layer } = fadingLayer(100);
     layer.setOpacity(() => 0.5);
@@ -460,6 +452,49 @@ describe('CanvasPointLayer opacity transitions', () => {
     frames.run(10);
     frames.run(11);
     expect(drawnAlphas(calls)).toEqual([1, 0.5]);
+  });
+});
+
+describe('CanvasPointLayer paint order', () => {
+  it('paints gridlines, halos and curves under the points and keeps labels in the SVG above', () => {
+    const frames = installFrames();
+    const calls = installRecordingContext();
+    const { svg, zoomGroup, layer } = mountLayer();
+    select(svg)
+      .insert('g', ':first-child')
+      .attr('class', 'grid-h')
+      .append('line')
+      .attr('x2', 100)
+      .style('stroke', 'rgb(1, 1, 1)')
+      .style('stroke-width', '1px');
+    const curve = select(zoomGroup)
+      .insert('g', ':first-child')
+      .attr('class', 'rooflines-layer')
+      .append('path')
+      .attr('d', 'M0,0L100,100')
+      .style('stroke', 'rgb(2, 2, 2)')
+      .style('stroke-width', '2px')
+      .style('fill', 'none');
+    const label = select(zoomGroup).append('g').attr('class', 'line-label');
+    layer.join([point('a', 10, 10)], key, 100, 100);
+    layer.restyle({ ...config, getColor: () => 'rgb(4, 4, 4)', underlay: ['.rooflines-layer'] });
+    layer.setHalo(() => 'rgb(3, 3, 3)', { radius: 7, strokeWidth: 1, dash: [], opacity: 1 });
+    layer.place(identity, identity);
+    frames.run(0);
+    const paints = calls.filter(
+      (call) =>
+        (call[0] === 'set:strokeStyle' || call[0] === 'set:fillStyle') &&
+        call[1] !== 'rgba(0, 0, 0, 0)',
+    );
+    expect(paints.map((call) => call[1])).toEqual([
+      'rgb(1, 1, 1)',
+      'rgb(3, 3, 3)',
+      'rgb(2, 2, 2)',
+      'rgb(4, 4, 4)',
+    ]);
+    expect(svg.previousElementSibling?.localName).toBe('canvas');
+    expect(curve.style('visibility')).toBe('hidden');
+    expect(label.style('visibility')).not.toBe('hidden');
   });
 });
 

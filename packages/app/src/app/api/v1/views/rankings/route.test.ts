@@ -101,14 +101,15 @@ describe('GET /api/v1/views/rankings', () => {
       kind: 'cheapest-gpu',
       model: 'Qwen-3.5-397B-A17B',
       scenario: 'all',
-      tier: 50,
       engine: 'community',
       format: 'json',
     });
-    expect(body.tier).toBe(50);
-    expect(body.entries.map((entry: { scenario: string }) => entry.scenario)).toEqual([
-      'single_turn_8k1k',
-      'agentx',
+    expect(body).not.toHaveProperty('tier');
+    expect(
+      body.entries.map((entry: { scenario: string; tier: number }) => [entry.scenario, entry.tier]),
+    ).toEqual([
+      ['single_turn_8k1k', 50],
+      ['agentx', 125],
     ]);
     expect(body.entries[1].rows).toEqual([]);
 

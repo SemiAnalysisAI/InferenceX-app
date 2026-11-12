@@ -15,8 +15,8 @@ Before writing anything, ask the user for whichever of these they have:
 
 1. **A chart image** from the InferenceX dashboard (this is the visual that will ship in the post)
 2. **A CSV export** from the dashboard with the underlying rows (this is the authoritative numeric source)
-3. **An "instant link" / preset URL** to the chart on `inferencex.semianalysis.com/inference?...` (this becomes both the `DashboardCTA` href and the live-chart link)
-4. **A `/gpu-specs` radar image** for the SKUs in the comparison (the user clicks "Radar" on the dashboard's GPU specs page, toggles only the SKUs in the post, and screenshots). Used in the "On-Paper Specs" section as the second figure. If the post is a cross-vendor or cross-generation comparison, this is high-value and you should ask for it; if it's a same-SKU version-bump comparison (e.g. SGLang v0.5.5 → v0.5.6 on the same B200 pool), skip the radar.
+3. **An "instant link" / preset URL** to the chart on `inferencex.semianalysis.com/infx/inference?...` (this becomes both the `DashboardCTA` href and the live-chart link)
+4. **A `/infx/gpu-specs` radar image** for the SKUs in the comparison (the user clicks "Radar" on the dashboard's GPU specs page, toggles only the SKUs in the post, and screenshots). Used in the "On-Paper Specs" section as the second figure. If the post is a cross-vendor or cross-generation comparison, this is high-value and you should ask for it; if it's a same-SKU version-bump comparison (e.g. SGLang v0.5.5 → v0.5.6 on the same B200 pool), skip the radar.
 5. **The upstream PR** that caused the change (SGLang / vLLM / TRT-LLM)
 6. **The InferenceX recipe PR** that wired it into the benchmark loop
 7. **Tweet / X post text** if there's a marketing framing they want the lede to echo
@@ -113,7 +113,7 @@ Bold the peak ratio in the lede. Second paragraph: name the upstream PRs that ma
 </DashboardCTA>
 ```
 
-Use the preset URL the user provided so clicking lands on the exact comparison view, not the bare dashboard. Format: `https://inferencex.semianalysis.com/inference?g_model=...&i_prec=...&g_rundate=...&g_runid=...&i_active={hw1}_{fw1}%2C{hw2}_{fw2}&i_metric=y_costh&i_linelabel=1`.
+Use the preset URL the user provided so clicking lands on the exact comparison view, not the bare dashboard. Format: `https://inferencex.semianalysis.com/infx/inference?g_model=...&i_prec=...&g_rundate=...&g_runid=...&i_active={hw1}_{fw1}%2C{hw2}_{fw2}&i_metric=y_costh&i_linelabel=1`.
 
 ### `<Figure>` hero image immediately after the top DashboardCTA
 
@@ -160,7 +160,7 @@ Skip this section for same-SKU version-bump posts (e.g. SGLang v0.5.5 → v0.5.6
 
 Structure (~3 elements, in order):
 
-1. **One short intro paragraph** — name the two SKUs and their generation, then explain that the radar normalizes each axis to the cross-vendor maximum in [`/gpu-specs`](/gpu-specs), so the visible polygons compress against axes where a different SKU (typically GB200/GB300 NVL72 for scale-up-domain axes, GB300 NVL72 for FP4) sets the ceiling.
+1. **One short intro paragraph** — name the two SKUs and their generation, then explain that the radar normalizes each axis to the cross-vendor maximum in [`/infx/gpu-specs`](/infx/gpu-specs), so the visible polygons compress against axes where a different SKU (typically GB200/GB300 NVL72 for scale-up-domain axes, GB300 NVL72 for FP4) sets the ceiling.
 2. **`<Figure>` for the radar.** Save the user's radar screenshot to `packages/app/public/images/{slug}/specs-radar-light.png` (and `-dark.png` — copy the same file in if they only have one). The caption should call out (a) which SKU sets the ceiling on the most-visually-compressed axes and the absolute max value (e.g. "FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%"), (b) that the older-gen SKU reads 0% on the FP4 axis when it has no FP4 tensor cores.
 3. **Absolute specs table.** Pull values directly from `packages/app/src/lib/catalog/gpu-specs.ts` — never paraphrase from memory or a vendor datasheet, because the spec file is the source of truth the dashboard renders. Include both per-GPU and scale-up-domain rows so the reader can audit the implications paragraph.
 
@@ -248,7 +248,7 @@ Place the **same** `<Figure>` block from Step 4 here again, immediately followed
   caption="..."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?...), pre-filtered to {hardware/framework/model/precision}.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?...), pre-filtered to {hardware/framework/model/precision}.
 ```
 
 Same `srcLight`/`srcDark`/`alt`/`caption` as the top placement — copy-paste, do not vary.
@@ -344,7 +344,7 @@ After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose
 - For frameworks: SGLang, vLLM, TRT-LLM (or TensorRT-LLM in formal contexts), Dynamo TRT-LLM, Dynamo vLLM, Dynamo SGLang. AMD's disagg fork is `mori-sglang`.
 - Use em-dashes `—` not double-hyphens.
 - Link the upstream PRs and InferenceX recipe PRs every time. Reader wants the receipts.
-- **Cross-links go where the prose motivates them, not in the lede.** Link `/gpu-specs`, prior InferenceX posts, kernel-recipe docs, and SemiAnalysis models _next to the sentence that earns the click_ — when the post discusses NVLink fanout, the `/gpu-specs` link goes in that paragraph, not in the headline number sentence. The lede is for the headline ratio and the workload; navigation belongs in the body. Link each cross-target once at the first place it's contextually motivated, not at every mention of the SKU/model/topic.
+- **Cross-links go where the prose motivates them, not in the lede.** Link `/infx/gpu-specs`, prior InferenceX posts, kernel-recipe docs, and SemiAnalysis models _next to the sentence that earns the click_ — when the post discusses NVLink fanout, the `/infx/gpu-specs` link goes in that paragraph, not in the headline number sentence. The lede is for the headline ratio and the workload; navigation belongs in the body. Link each cross-target once at the first place it's contextually motivated, not at every mention of the SKU/model/topic.
 - **Write tight first, expand only on request.** Default to 1-3 short paragraphs per explanation; trust the reader to ask for more detail in review. Long preemptive expansions get trimmed back by the reviewer (and overwritten by the browser editor's auto-save while you wait).
 - **Don't restate the table contents in prose.** If the reader can see "4,130 vs 941 tok/s/GPU = 4.39x at 125 tok/s/user" in the iso-interactivity row, don't also write it in the closing paragraph after the table. Use the prose around tables to explain the WHY, not to summarize the WHAT. A closing paragraph that just restates the headline number gets removed in editorial review.
 - Don't apologize for non-coverage in the lede — save it for "What's Next".

@@ -1,5 +1,6 @@
 import type * as d3 from 'd3';
 
+import type { ChartHeight } from '@/hooks/useResponsiveChartDimensions';
 import type { ChartLayout, ChartMargin, ContinuousScale } from '../types';
 import type { AnyScale } from '../chart-update';
 import type { BuiltScale } from './scale-builders';
@@ -18,6 +19,8 @@ export type ScaleConfig =
   | { type: 'band'; domain: string[]; padding?: number }
   | { type: 'linear'; domain: [number, number]; nice?: boolean }
   | { type: 'log'; domain: [number, number]; nice?: boolean }
+  /** Square-root axis: compresses the low end less than log, spreading out the top. */
+  | { type: 'sqrt'; domain: [number, number]; nice?: boolean }
   | { type: 'time'; domain: [Date, Date]; nice?: boolean };
 
 interface LayerBase {
@@ -158,6 +161,9 @@ export interface TooltipConfig<T = any> {
   attachToLayer?: number;
   proximityHover?: boolean;
   getDataX?: (d: T) => number;
+  /** With proximityHover, lock onto a point only within the scatter hit radius instead of by x alone. */
+  getDataY?: (d: T) => number;
+  details?: (d: T, isOverlay: boolean, close: () => void) => React.ReactNode;
 }
 
 export interface RenderContext {
@@ -193,7 +199,7 @@ export interface D3ChartHandle {
 export interface D3ChartProps<T = any> {
   chartId: string;
   data: T[];
-  height?: number;
+  height?: ChartHeight;
   margin?: ChartMargin;
   watermark?: 'logo' | 'unofficial' | 'none';
   testId?: string;

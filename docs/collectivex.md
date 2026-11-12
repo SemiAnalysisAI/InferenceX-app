@@ -66,7 +66,7 @@ machine (`host`, `hosts`, `hostname`, `nodelist`, `slurm_nodelist`, `master_addr
 case-insensitive). Each document is then assembled alone, so every failure names its file.
 
 - **CLI**: `bun run admin:db:ingest:collectivex (--dir <results-dir> --pr <n>... |
---link-run <run_id> --pr <n>... | --delete-run <run_id>) [--yes] [--no-ssl]`. `--dir` reads and
+  --link-run <run_id> --pr <n>... | --delete-run <run_id>) [--yes] [--no-ssl]`. `--dir` reads and
   validates the directory, merges it over the latest stored run, links the run to the changelog
   entries of the named PRs (see [Changelog](#changelog)), prints the plan (run_id, source sha,
   how many uploaded, replaced, kept and dropped, each dropped case, and each entry with the cases
@@ -140,7 +140,7 @@ case instead, upload its corrected result: the new run replaces that case and ke
   only measured pools. A later upload of other pools is a new run with a later `run_id` that
   also keeps the earlier pools' results, so it becomes the latest run (a superset) while the
   earlier one stays listed in the API.
-- **One run on the page**: `/collectivex` shows only the newest stored run with at least one
+- **One run on the page**: `/colx` shows only the newest stored run with at least one
   measured case; there is no run table or multi-run overlay. The header's Suites control picks
   the one section shown: `EP` (the default) shows the EP chart controls and chart, `KV` the
   kv-transfer section, and `swap_blocks` the swap_blocks section. KV and swap_blocks are offered
@@ -156,6 +156,11 @@ case instead, upload its corrected result: the new run replaces that case and ke
 - **Vendor scope is explicit**: the shared reader accepts only `amd` and `nvidia` results
   (case-insensitive). Other vendor values are omitted from chart series, coverage, and SKU
   summaries; runs with no supported-vendor cases stay hidden.
+- **Headline is the pair period**: the reader maps each result's `components.pair_period` (the
+  chained steady-state period the methodology ranks on) into `series[].points[].components`
+  beside `dispatch`, `stage`, `combine` and `roundtrip`, with the round trip's payload bytes. The
+  EP chart and the views API default to `pair_period` at p50. A run whose results carry no pair
+  period shows the fresh-entry round trip instead.
 - **Withheld tails**: an EP result may publish p90/p95/p99 as `null` when too many of a
   series' samples were misaligned or host-stalled (p50 is always present). The reader keeps
   the derived rates `null` there, the alpha-beta fit skips them, and the tooltip shows them
@@ -206,7 +211,7 @@ methodology link then points at `swap-blocks.md`. The chart selects direction, l
 plots block bytes in B/KiB/MiB/GiB, and keeps bandwidth linear with a zero baseline.
 Latency is logarithmic. Bandwidth is copied payload divided by host-observed latency,
 including submission and CUDA synchronization, counting payload once even for d2d.
-Both `/collectivex` and `/zh/collectivex` expose the controls and tooltips.
+Both `/colx` and `/zh/colx` expose the controls and tooltips.
 
 Bandwidth charts draw dashed nominal hardware rooflines for visible GPUs. Host transfers use **64 GB/s one-way PCIe 5.0 x16** on the
 registered x86 pools (including HGX B300's CPU uplink). GB200/GB300 use **225 GB/s per GPU

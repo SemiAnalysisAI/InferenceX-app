@@ -41,6 +41,7 @@ import {
   Model,
   MODEL_OPTIONS,
   isModelVisible,
+  isRegisteredModel,
   modelRequiresFeatureGate,
   modelRequiresObservations,
   Precision,
@@ -252,7 +253,7 @@ export function GlobalFilterProvider({
   // and the render immediately after relocking. Every consumer sees this value.
   const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
     ? requestedModel
-    : Model.DeepSeek_V4_1_Flash;
+    : Model.Kimi_K3_1_Pro;
   useIsomorphicLayoutEffect(() => {
     if (!modelGatePending) setInferenceNavigationModel(selectedModel);
   }, [selectedModel, modelGatePending]);
@@ -397,13 +398,15 @@ export function GlobalFilterProvider({
 
   const availableModels = useMemo(() => {
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
-    return MODEL_OPTIONS.filter((m) => {
+    const registered = MODEL_OPTIONS.filter((m) => {
       if (!isModelVisible(m, featureGateUnlocked)) return false;
       if (unofficialModels.has(m)) return true;
       if (!availability) return !modelRequiresObservations(m);
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
       return keys.some((key) => availability.linesByModel.has(key));
     });
+    const unregistered = [...unofficialModels].filter((m) => !isRegisteredModel(m)).toSorted();
+    return [...registered, ...unregistered];
   }, [availability, unofficialAvailable, featureGateUnlocked]);
 
   const lastAutoSwitchKeyRef = useRef<string>('');

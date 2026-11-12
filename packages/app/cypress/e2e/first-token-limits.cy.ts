@@ -13,7 +13,7 @@ const SUMMARY = '[data-testid="first-token-chart"] svg .ft-summary-who';
 
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 };
 
 const firstRowCell = (header: string) =>
@@ -27,7 +27,7 @@ describe('First-Token Limits', () => {
   describe('official rows only', () => {
     before(() => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -66,30 +66,28 @@ describe('First-Token Limits', () => {
       let downloads = 0;
       let failure: unknown;
       cy.window().then((win) => {
-        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
-          function (this: HTMLAnchorElement) {
-            if (!this.download.endsWith('.png')) return;
-            try {
-              const root = win.document.querySelector('#first-token-limits-export')!;
-              const svg = root.querySelector('svg[data-testid="d3-chart-svg"]')!;
-              const plot = svg.querySelector('.grid .border-right')!;
-              const width = Number(plot.getAttribute('x1'));
-              const height = Number(plot.getAttribute('y2'));
-              expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('x'))).to.eq(width / 2);
-              expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('y'))).to.eq(
-                height + 82,
-              );
-              for (const summary of svg.querySelectorAll('.ft-summary-who')) {
-                expect(Number(summary.getAttribute('y'))).to.eq(height + 40);
-              }
-              const bounds = svg.getBoundingClientRect();
-              expect(bounds.bottom).to.be.at.most(root.getBoundingClientRect().bottom);
-              downloads++;
-            } catch (error) {
-              failure = error;
+        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+          this: HTMLAnchorElement,
+        ) {
+          if (!this.download.endsWith('.png')) return;
+          try {
+            const root = win.document.querySelector('#first-token-limits-export')!;
+            const svg = root.querySelector('svg[data-testid="d3-chart-svg"]')!;
+            const plot = svg.querySelector('.grid .border-right')!;
+            const width = Number(plot.getAttribute('x1'));
+            const height = Number(plot.getAttribute('y2'));
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('x'))).to.eq(width / 2);
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('y'))).to.eq(height + 82);
+            for (const summary of svg.querySelectorAll('.ft-summary-who')) {
+              expect(Number(summary.getAttribute('y'))).to.eq(height + 40);
             }
-          },
-        );
+            const bounds = svg.getBoundingClientRect();
+            expect(bounds.bottom).to.be.at.most(root.getBoundingClientRect().bottom);
+            downloads++;
+          } catch (error) {
+            failure = error;
+          }
+        });
       });
       (['16:9', '1:1'] as const).forEach((ratio, index) => {
         cy.get('[data-testid="first-token-figure"] [data-testid="export-button"]').click();
@@ -124,7 +122,7 @@ describe('First-Token Limits', () => {
   describe('empty states', () => {
     it('blames the cap ladder, not the floor, when rows qualify but none clears a cap', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -136,7 +134,7 @@ describe('First-Token Limits', () => {
 
     it('blames the floor when nothing reaches the requested interactivity', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -147,7 +145,7 @@ describe('First-Token Limits', () => {
   describe('share-link seeding', () => {
     it('reads the interactivity floor and cap ladder from the URL', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -162,7 +160,7 @@ describe('First-Token Limits', () => {
     before(() => {
       interceptCalculatorOverlayRun();
       cy.visit(
-        `/first-token?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`,
+        `/infx/first-token?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`,
         { onBeforeLoad: dismissNudges },
       );
       cy.wait('@unofficialRun');

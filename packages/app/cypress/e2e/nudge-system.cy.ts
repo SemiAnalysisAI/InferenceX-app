@@ -5,7 +5,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
     'inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed',
-    'inferencex-reproducibility-nudge-shown',
+    'inferencex-reproducibility-nudge-dismissed',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
     'inferencex-gradient-nudge-shown',
@@ -43,8 +43,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
-    cy.get('[data-new-badge]')
-      .should('have.length', 4)
+    cy.get('[data-new-badge]:visible')
+      .should('have.length', 3)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -143,7 +143,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
           [...modal.querySelectorAll('button[data-testid]')].map((button) =>
             button.textContent?.trim(),
           ),
-        ).to.deep.eq(['Qwen3.5', 'Kimi K3', 'GLM5.3', 'Muse Spark']);
+        ).to.deep.eq(['Qwen3.5', 'Kimi K3', 'GLM5.3', 'Muse Spark 1.3/Open']);
         expect(rows.size).to.eq(2);
         expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
         const close = modal.querySelector('button[aria-label]')!;
@@ -212,7 +212,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .should('be.visible')
       .and('have.attr', 'aria-modal', 'true')
       .and('contain.text', 'TPUv7 preliminary results across multiple models')
-      .and('contain.text', 'AgentX Preview Submissions')
+      .and('contain.text', 'AgentX preview submissions')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
         const root = $modal[0].ownerDocument.documentElement;
@@ -222,7 +222,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
     cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
     cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
-    cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    cy.location('pathname').should('eq', '/infx/inference/qwen-3-5');
     assertTpuResultsFilters();
   });
 
@@ -267,14 +267,14 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .and('contain.text', 'AgentX 预览版提交结果')
       .and('not.contain.text', '稍后再看');
     cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
-    cy.location('pathname').should('eq', '/zh/inference/qwen-3-5');
+    cy.location('pathname').should('eq', '/zh/infx/inference/qwen-3-5');
     assertTpuResultsFilters();
   });
 
   for (const prefix of ['', '/zh']) {
     for (const [index, label, slug, model] of [
       [0, 'GLM5.3', 'glm-5-3', 'GLM-5.2'],
-      [1, 'Muse Spark', 'muse-spark-open', 'Muse-Spark-Open'],
+      [1, 'Muse Spark 1.3/Open', 'muse-spark-open', 'Muse-Spark-Open'],
     ] as const) {
       it(`opens ${label} with its intended filters from ${prefix || '/'}`, () => {
         interceptTpuLaunchData(model);
@@ -282,7 +282,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
         cy.get(`[data-testid="launch-modal-additional-action-${index}"]`)
           .should('have.text', label)
           .click();
-        cy.location('pathname').should('eq', `${prefix}/inference/${slug}`);
+        cy.location('pathname').should('eq', `${prefix}/infx/inference/${slug}`);
         if (label === 'GLM5.3') {
           cy.location('search').should('eq', '?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8');
           cy.get('[data-testid="precision-multiselect"]')
@@ -313,7 +313,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
             .should('have.text', 'Kimi K3')
             .click();
         });
-      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k3`);
+      cy.location('pathname').should('eq', `${prefix}/infx/inference/kimi-k3`);
       cy.window().then((win) => {
         expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
       });
@@ -327,8 +327,8 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
-      .should('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
-      .and('contain.text', 'Cycle Level Core memory-access MicroBenchmarks (Beta)')
+      .should('contain.text', 'Huawei Ascend 950PR microbenchmarks')
+      .and('contain.text', 'Cycle-level core memory-access microbenchmarks (beta)')
       .and('have.css', 'white-space', 'normal')
       .should(($paragraphs) => {
         for (const text of $paragraphs) {
@@ -336,6 +336,11 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
           expect(text.scrollHeight).to.be.at.most(text.clientHeight);
         }
       });
+    cy.get('[data-new-badge="launch-banner"]')
+      .parent()
+      .should('have.css', 'white-space', 'nowrap')
+      .and('contain.text', 'microbenchmarks');
+    cy.get('[data-testid="launch-banner"] > svg').should('have.css', 'align-self', 'flex-start');
   });
 
   it('dismissing the banner persists across reloads', () => {
@@ -363,10 +368,10 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/ubenchx/core-memory-profiles');
+      .and('have.attr', 'href', '/ubx/core-memory-profiles');
     cy.get('[data-testid="launch-banner"]:visible').click();
 
-    cy.location('pathname').should('eq', '/ubenchx/core-memory-profiles');
+    cy.location('pathname').should('eq', '/ubx/core-memory-profiles');
     cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
 
     cy.get('[data-testid="nav-link-home"]').click();
@@ -382,23 +387,23 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 });
 
 describe('Dashboard nudges — reproducibility toast', () => {
-  it('reproducibility nudge is session-only — gone after reload', () => {
-    cy.visit('/inference', {
+  it('reproducibility nudge stays dismissed across reloads', () => {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
       },
     });
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="reproducibility-nudge"]').should('be.visible');
+    cy.get('[data-testid="reproducibility-nudge"] button[aria-label="Dismiss"]').click();
+    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
 
     cy.window().then((win) => {
-      expect(win.sessionStorage.getItem('inferencex-reproducibility-nudge-shown')).to.not.equal(
-        null,
-      );
+      expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
     });
     cy.reload();
-    // Both toasts share one slot and the reproducibility timer (1.5s) fires before the filter
-    // hint (2.5s), so the filter hint appearing proves the reproducibility nudge stayed hidden.
+    // The filter hint timer (2.5s) fires after the reproducibility timer (1.5s), so the inline
+    // filter hint appearing proves the reproducibility nudge stayed hidden.
     cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
   });
@@ -406,14 +411,14 @@ describe('Dashboard nudges — reproducibility toast', () => {
 
 function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
   clearAllNudgeStorage(win);
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
   win.sessionStorage.setItem('inferencex-star-nudge-shown', '1');
 }
 
-describe('Dashboard nudges — filter-hint toast', () => {
+describe('Dashboard nudges — inline filter hint', () => {
   it('does not show the filter-hint nudge outside the inference tab', () => {
     cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
-      cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
+      cy.visit('/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
       // The evaluation toast (1.5s) proves the hydrated engines have armed their timers.
       tickUntilVisible(clock, '[data-testid="eval-samples-nudge"]');
       cy.tick(2500);
@@ -422,27 +427,33 @@ describe('Dashboard nudges — filter-hint toast', () => {
   });
 
   it('arms the filter hint before a client transition into inference', () => {
-    cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
+    cy.visit('/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/infx/inference');
     cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
   });
 
   it('re-evaluates the localized filter hint after a Chinese tab transition', () => {
-    cy.visit('/zh/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
+    cy.visit('/zh/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.location('pathname').should('eq', '/zh/inference');
+    cy.location('pathname').should('eq', '/zh/infx/inference');
     cy.get('[data-testid="filter-hint-nudge"]')
       .should('be.visible')
       .and('contain.text', '图表太拥挤？');
   });
 
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
-    cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
+      onBeforeLoad: suppressCompetingDashboardToasts,
+    });
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
+    cy.get('[data-testid="filter-hint-nudge"]')
+      .should('be.visible')
+      .and('have.css', 'position', 'static')
+      .closest('[data-slot="chart-legend-wrapper"]')
+      .should('exist');
 
     cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
     cy.window()
@@ -456,9 +467,9 @@ describe('Dashboard nudges — filter-hint toast', () => {
   });
 });
 
-describe('Evaluation nudges — eval-samples toast', () => {
+describe('Evaluation nudges — inline eval-samples hint', () => {
   it('eval-samples open event refreshes the cooldown timestamp', () => {
-    cy.visit('/evaluation', {
+    cy.visit('/infx/evaluation', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
       },
@@ -483,7 +494,7 @@ describe('Evaluation nudges — eval-samples toast', () => {
 
 describe('Nudge scope isolation', () => {
   it('landing nudges do not appear on dashboard', () => {
-    cy.visit('/inference', {
+    cy.visit('/infx/inference', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="github-star-modal"]').should('not.exist');

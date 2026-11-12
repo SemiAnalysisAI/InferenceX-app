@@ -2,44 +2,56 @@
 
 import {
   createContext,
-  Fragment,
+  useCallback,
   useContext,
   useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { Maximize2 } from 'lucide-react';
+import { ChartButtons, ExpandChartButton } from '@/components/ui/chart-buttons';
+import { resolveChartInstructions, TOUCH_PRIMARY_QUERY } from '@/components/ui/d3-chart-wrapper';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { zoomEventFilter } from '@/hooks/useChartZoom';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 
 const STRINGS = {
-  en: {
-    expandChart: 'Expand chart',
-    close: 'Close',
-    zoomInstructions: 'scroll to zoom · drag to pan · double-click to reset',
-  },
-  zh: {
-    expandChart: '展开图表',
-    close: '关闭',
-    zoomInstructions: '滚轮缩放 · 拖动平移 · 双击重置',
-  },
+  en: { expandChart: 'Expand chart' },
+  zh: { expandChart: '展开图表' },
 } as const;
 
-export function ExpandButton({ onClick }: { onClick: () => void }) {
-  const t = STRINGS[useLocale()];
+function useChartId() {
+  return `awe-${useId().replaceAll(/[^a-zA-Z0-9_-]/gu, '')}`;
+}
+
+const ChartIdContext = createContext<string | null>(null);
+
+function ChartExportFrame({
+  chartId,
+  title,
+  children,
+}: {
+  chartId: string;
+  title: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-muted-foreground hover:text-foreground transition-colors"
-      aria-label={t.expandChart}
-    >
-      <Maximize2 className="size-4" />
-    </button>
+    <ChartIdContext.Provider value={chartId}>
+      <div id={chartId} className="min-w-0">
+        <div className="export-only mb-2 hidden text-sm font-medium text-foreground">{title}</div>
+        {children}
+        <div className="max-h-0 overflow-hidden" aria-hidden="true">
+          <div id={`${chartId}-export`} className="p-4" />
+        </div>
+      </div>
+    </ChartIdContext.Provider>
   );
 }
 
@@ -72,12 +84,18 @@ function setScale(svg: SVGSVGElement) {
 
 function ChartZoom({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const touchPrimary = useMediaQuery(TOUCH_PRIMARY_QUERY);
+  const [zoomable, setZoomable] = useState(false);
 
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
-    const rescale = () => root.querySelectorAll<SVGSVGElement>(CHART_SVG).forEach(setScale);
+    const rescale = () => {
+      const svgs = root.querySelectorAll<SVGSVGElement>(CHART_SVG);
+      svgs.forEach(setScale);
+      setZoomable(svgs.length > 0);
+    };
     const resize = new ResizeObserver(rescale);
     resize.observe(root);
     const mutations = new MutationObserver(rescale);
@@ -103,9 +121,10 @@ function ChartZoom({ children }: { children: ReactNode }) {
       const o = svg && original(svg);
       const b = svg && readBox(svg);
       const ctm = svg?.getScreenCTM();
-      if (!svg || !o || !b || !ctm) return;
+      if (!svg || !o || !b || !ctm || !zoomEventFilter(e)) return;
       e.preventDefault();
-      const w = Math.min(o.w, Math.max(o.w / MAX_ZOOM, b.w * Math.exp(e.deltaY * 0.0015)));
+      const delta = e.deltaY || e.deltaX;
+      const w = Math.min(o.w, Math.max(o.w / MAX_ZOOM, b.w * Math.exp(delta * 0.0015)));
       const f = w / b.w;
       const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
       apply(svg, { x: p.x - (p.x - b.x) * f, y: p.y - (p.y - b.y) * f, w, h: b.h * f }, o);
@@ -166,17 +185,22 @@ function ChartZoom({ children }: { children: ReactNode }) {
   return (
     <div ref={ref} className="chart-zoom w-full min-w-0">
       {children}
-      <p className="mt-2 text-right text-3xs font-mono text-subtle">{t.zoomInstructions}</p>
+      {zoomable && !touchPrimary && (
+        <p className="no-export mt-2 text-center text-xs text-balance text-muted-foreground">
+          {resolveChartInstructions(undefined, locale, true, false)}
+        </p>
+      )}
     </div>
   );
 }
 
-export function ChartDialog({
+function ChartDialog({
   open,
   onOpenChange,
   title,
   subtitle,
   children,
+  actions,
   sharedZoom = false,
 }: {
   open: boolean;
@@ -184,25 +208,28 @@ export function ChartDialog({
   title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode;
+  actions?: ReactNode;
   sharedZoom?: boolean;
 }) {
   const t = STRINGS[useLocale()];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[92vh] w-[min(96vw,1400px)] max-w-none gap-4 overflow-y-auto p-6"
+        className="z-[60] max-h-[92vh] w-[min(96vw,1400px)] max-w-none gap-4 overflow-y-auto p-6"
         overlayClassName="z-[60]"
       >
-        <div className="pr-8">
-          <DialogTitle className="text-lg font-semibold leading-none tracking-tight">
-            {title}
-          </DialogTitle>
-          {subtitle && (
-            <DialogDescription className="mt-1.5 text-xs text-muted-foreground">
-              {subtitle}
-            </DialogDescription>
-          )}
-          {!title && <DialogTitle className="sr-only">{t.expandChart}</DialogTitle>}
+        <div className="flex items-start justify-between gap-2 pr-8">
+          <div className="min-w-0">
+            <DialogTitle className="text-lg font-medium leading-none">{title}</DialogTitle>
+            {subtitle && (
+              // Subtitles can carry legend rows (divs), which are invalid inside the default <p>.
+              <DialogDescription asChild className="mt-1.5 text-xs text-muted-foreground">
+                <div>{subtitle}</div>
+              </DialogDescription>
+            )}
+            {!title && <DialogTitle className="sr-only">{t.expandChart}</DialogTitle>}
+          </div>
+          {actions}
         </div>
         {sharedZoom ? children : <ChartZoom>{children}</ChartZoom>}
       </DialogContent>
@@ -214,40 +241,66 @@ export function ExpandableChart({
   title,
   subtitle,
   children,
+  actions,
   sharedZoom = false,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode | ((expanded: boolean, close: () => void) => ReactNode);
+  /** `ChartActions` for the header row, next to the title. */
+  actions?: ReactNode;
   sharedZoom?: boolean;
 }) {
+  const chartId = useChartId();
   const [open, setOpen] = useState(false);
   useDialogCloseTracking(open, 'agentic_workload_chart_closed');
   const [bodyHeight, setBodyHeight] = useState<number>();
+  const [inlineTriggers, setInlineTriggers] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
   const isRender = typeof children === 'function';
   const close = () => setOpen(false);
   const render = (expanded: boolean) => (isRender ? children(expanded, close) : children);
+  const expand = useCallback(() => {
+    setBodyHeight(bodyRef.current?.offsetHeight);
+    setOpen(true);
+    track('agentic_workload_chart_expanded');
+  }, []);
+  // Chart actions inside the body bring their own expand icon, so the header
+  // button steps aside and expand + download sit together at the right edge.
+  const register = useCallback(() => {
+    setInlineTriggers((n) => n + 1);
+    return () => setInlineTriggers((n) => n - 1);
+  }, []);
+  const titleText = typeof title === 'string' ? title : undefined;
+  const expandContext = useMemo(
+    () => ({ open: expand, register, title: titleText }),
+    [expand, register, titleText],
+  );
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <CardTitle className="text-sm">{title}</CardTitle>
-            {subtitle && <div className="text-3xs font-mono text-subtle mt-0.5">{subtitle}</div>}
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+          <div className="min-w-0 grow basis-48">
+            <CardTitle>{title}</CardTitle>
+            {subtitle && <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>}
           </div>
-          <ExpandButton
-            onClick={() => {
-              setBodyHeight(bodyRef.current?.offsetHeight);
-              setOpen(true);
-              track('agentic_workload_chart_expanded');
-            }}
-          />
+          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
+            {actions !== undefined && (
+              <ExpandContext.Provider value={expandContext}>
+                <ChartIdContext.Provider value={chartId}>{actions}</ChartIdContext.Provider>
+              </ExpandContext.Provider>
+            )}
+            {inlineTriggers === 0 && <ExpandChartButton onClick={expand} chartTitle={titleText} />}
+          </div>
         </div>
       </CardHeader>
       <CardContent ref={bodyRef} style={open && !isRender ? { minHeight: bodyHeight } : undefined}>
-        {(isRender || !open) && render(false)}
+        <ExpandContext.Provider value={expandContext}>
+          <ChartExportFrame chartId={chartId} title={title}>
+            {(isRender || !open) && render(false)}
+          </ChartExportFrame>
+        </ExpandContext.Provider>
       </CardContent>
       <ChartDialog
         open={open}
@@ -255,18 +308,39 @@ export function ExpandableChart({
         title={title}
         subtitle={subtitle}
         sharedZoom={sharedZoom}
+        actions={
+          actions !== undefined && (
+            <ExpandContext.Provider value={null}>
+              <ChartIdContext.Provider value={`${chartId}-expanded`}>
+                {actions}
+              </ChartIdContext.Provider>
+            </ExpandContext.Provider>
+          )
+        }
       >
         {open && (
-          <div className={isRender ? undefined : '[&_svg]:!max-h-[calc(92vh-180px)]'}>
-            {render(true)}
-          </div>
+          <ExpandContext.Provider value={null}>
+            <ChartExportFrame chartId={`${chartId}-expanded`} title={title}>
+              <div className={isRender ? undefined : '[&_svg]:!max-h-[calc(92vh-180px)]'}>
+                {render(true)}
+              </div>
+            </ChartExportFrame>
+          </ExpandContext.Provider>
         )}
       </ChartDialog>
     </Card>
   );
 }
 
-const ExpandContext = createContext<(() => void) | null>(null);
+interface ExpandContextValue {
+  open: () => void;
+  /** Called by an inline ExpandTrigger so the owner can hide its own expand button. */
+  register?: () => () => void;
+  title?: string;
+}
+
+/** Non-null while a chart renders inline; the expanded dialog renders it without this context. */
+export const ExpandContext = createContext<ExpandContextValue | null>(null);
 
 export function Expandable({
   title,
@@ -279,33 +353,35 @@ export function Expandable({
   corner?: boolean;
   children: ReactNode;
 }) {
+  const chartId = useChartId();
   const [open, setOpen] = useState(false);
   useDialogCloseTracking(open, 'agentic_workload_chart_closed');
   const [generation, setGeneration] = useState(0);
-  return (
-    <ExpandContext.Provider
-      value={() => {
+  const titleText = typeof title === 'string' ? title : undefined;
+  const expandContext = useMemo(
+    () => ({
+      open: () => {
         setOpen(true);
         track('agentic_workload_chart_expanded');
-      }}
-    >
-      <Fragment key={generation}>
+      },
+      title: titleText,
+    }),
+    [titleText],
+  );
+  return (
+    <ExpandContext.Provider value={expandContext}>
+      <ChartExportFrame key={generation} chartId={chartId} title={title}>
         {corner ? (
           <div className="relative">
             {children}
-            <div className="absolute right-2 top-2">
-              <ExpandButton
-                onClick={() => {
-                  setOpen(true);
-                  track('agentic_workload_chart_expanded');
-                }}
-              />
+            <div className="absolute right-4 top-4 md:right-6 md:top-6">
+              <ExpandTrigger />
             </div>
           </div>
         ) : (
           children
         )}
-      </Fragment>
+      </ChartExportFrame>
       <ChartDialog
         open={open}
         onOpenChange={(next) => {
@@ -317,9 +393,11 @@ export function Expandable({
       >
         {open && (
           <ExpandContext.Provider value={null}>
-            <div className="mx-auto w-full max-w-[1100px] [&_svg:not(.lucide)]:!max-h-[70vh]">
-              {children}
-            </div>
+            <ChartExportFrame chartId={`${chartId}-expanded`} title={title}>
+              <div className="mx-auto w-full max-w-[1100px] [&_svg:not(.lucide)]:!max-h-[70vh]">
+                {children}
+              </div>
+            </ChartExportFrame>
           </ExpandContext.Provider>
         )}
       </ChartDialog>
@@ -328,6 +406,45 @@ export function Expandable({
 }
 
 export function ExpandTrigger() {
-  const open = useContext(ExpandContext);
-  return open ? <ExpandButton onClick={open} /> : null;
+  const context = useContext(ExpandContext);
+  const register = context?.register;
+  useLayoutEffect(() => register?.(), [register]);
+  return context ? <ExpandChartButton onClick={context.open} chartTitle={context.title} /> : null;
+}
+
+/** Expand and download buttons for an explorer chart inside `Expandable` or `ExpandableChart`. */
+export function ChartActions({
+  fileName,
+  onExportPng,
+}: {
+  fileName: string;
+  /** Fires the chart's own analytics event when a PNG export starts. */
+  onExportPng?: () => void;
+}) {
+  const chartId = useContext(ChartIdContext);
+  const expand = useContext(ExpandContext);
+  if (!chartId) return null;
+  return (
+    <ChartButtons
+      chartId={chartId}
+      exportFileName={fileName}
+      hideZoomReset
+      onExportPng={onExportPng}
+      leadingControls={expand ? <ExpandTrigger /> : undefined}
+      className="mb-0 ml-auto shrink-0 flex-nowrap"
+    />
+  );
+}
+
+/** A chart's small label with its actions on the same row. The dialog title replaces the label. */
+export function ChartLabelRow({ label, children }: { label: ReactNode; children: ReactNode }) {
+  const inline = useContext(ExpandContext) !== null;
+  return (
+    <div className="mb-2 flex items-center justify-between gap-2">
+      {inline && (
+        <div className="no-export min-w-0 text-xs font-medium text-muted-foreground">{label}</div>
+      )}
+      {children}
+    </div>
+  );
 }

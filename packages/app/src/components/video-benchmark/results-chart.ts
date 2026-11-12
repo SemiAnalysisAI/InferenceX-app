@@ -1,7 +1,11 @@
-import { chipConfigKey } from './deployment';
+import { frontierArea } from '@/components/inference/utils/best-series-per-sku';
+import { chipConfigKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
+import { engineSort } from './engines';
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
-import type { ResultCell } from './results';
+import { isLossy, optimizationsOf } from './optimizations';
+import type { VideoPoint } from './metrics';
+import type { ResultCell, ResultsState } from './results';
 
 export type CostBasis = 'participating' | 'allocated';
 export const COST_BASES: readonly CostBasis[] = ['participating', 'allocated'];
@@ -21,14 +25,18 @@ export interface ResultsChartMetric {
   label: { en: string; zh: string };
   /** The axis title once the plotted clip is known, so a latency names the clip it measures. */
   clipLabel?: (clip: ResultsClip) => { en: string; zh: string };
+  /** Its name under a hover-card value, which no axis title qualifies on the GPU axis. */
+  hoverLabel?: { en: string; zh: string };
   /** Empty when the label already names the unit. */
   unit: string;
   better: 'lower' | 'higher';
   digits: number;
+  scale?: 'log';
+  rankOn?: ResultsXMetric;
   value: (cell: ResultCell, context: ResultsMetricContext) => number | null;
 }
 
-export const RESULTS_X_METRIC_KEYS = ['p50', 'p90'] as const;
+export const RESULTS_X_METRIC_KEYS = ['p50', 'p90', 'gpus'] as const;
 export const RESULTS_Y_METRIC_KEYS = [
   'videoSecondsPerDollar',
   'videosPerGpuHour',
@@ -44,6 +52,7 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
       en: `Median latency per ${seconds} s clip at ${fps} fps`,
       zh: `生成一段 ${seconds} 秒、${fps} fps 视频的中位延迟`,
     }),
+    hoverLabel: { en: 'Median s', zh: '中位延迟 (s)' },
     unit: 's',
     better: 'lower',
     digits: 1,
@@ -55,10 +64,21 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
       en: `P90 latency per ${seconds} s clip at ${fps} fps`,
       zh: `生成一段 ${seconds} 秒、${fps} fps 视频的 P90 延迟`,
     }),
+    hoverLabel: { en: 'P90 s', zh: 'P90 延迟 (s)' },
     unit: 's',
     better: 'lower',
     digits: 1,
     value: (cell) => cell.point.p90,
+  },
+  gpus: {
+    label: { en: 'GPUs per deployment', zh: '每个部署的 GPU 数' },
+    unit: '',
+    better: 'lower',
+    digits: 0,
+    scale: 'log',
+    rankOn: 'p50',
+    value: ({ point }) =>
+      point.participating !== null && point.participating > 0 ? point.participating : null,
   },
 };
 
@@ -99,6 +119,9 @@ export const isResultsXMetric = (value: string | null): value is ResultsXMetric 
 export const isResultsYMetric = (value: string | null): value is ResultsYMetric =>
   value !== null && Object.hasOwn(RESULTS_Y_METRICS, value);
 
+export const plottedXMetric = (x: ResultsXMetric, history: boolean): ResultsXMetric =>
+  (history && RESULTS_X_METRICS[x].rankOn) || x;
+
 export function resultsMetricLabel(
   metric: ResultsChartMetric,
   locale: 'en' | 'zh',
@@ -128,14 +151,20 @@ export interface ResultsChartPoint {
   cell: ResultCell;
   x: number;
   y: number;
-  /** On its series' Pareto frontier for the selected axes. */
+  /** On its series' Pareto frontier for the selected axes, or for `rankOn` when the x axis has one. */
   optimal: boolean;
 }
 
 export interface ResultsChartSeries {
-  /** Hardware key, suffixed `-overlay` for the named run. */
+  /** Unique per hardware, runtime (engine and optimizations) and run channel. */
   key: string;
   hardwareKey: string;
+  /** Serving engine; null when the cells did not record one. */
+  engine: string | null;
+  /** Declared runtime optimizations, sorted. */
+  optimizations: readonly string[];
+  /** Any optimization changes the generated video, so the series never ranks against exact ones. */
+  lossy: boolean;
   overlay: boolean;
   /** Plotted points: the frontier only when Optimal Only is on. */
   points: ResultsChartPoint[];
@@ -143,6 +172,8 @@ export interface ResultsChartSeries {
   frontier: ResultsChartPoint[];
   /** Deployments with both axis values, before Optimal Only. */
   measured: number;
+  /** Drawn only as a drawn lossy line's lossless twin, so it never stands for its hardware. */
+  twin?: boolean;
 }
 
 export interface ResultsChartSelection extends ResultsMetricContext {
@@ -150,7 +181,31 @@ export interface ResultsChartSelection extends ResultsMetricContext {
   y: ResultsYMetric;
   optimal: boolean;
   hidden: readonly string[];
+  lossy: boolean;
 }
+
+export const resultsSelection = (state: ResultsState): ResultsChartSelection => ({
+  x: state.xMetric,
+  y: state.yMetric,
+  basis: state.costBasis,
+  tier: state.costTier,
+  optimal: state.optimal,
+  hidden: state.hidden,
+  lossy: state.lossy,
+});
+
+/** Series order: hardware, then engine, lossless before lossy, the named run after the official one. */
+const seriesOrder = (a: ResultsChartSeries, b: ResultsChartSeries) =>
+  hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
+  engineSort(a.engine) - engineSort(b.engine) ||
+  Number(a.lossy) - Number(b.lossy) ||
+  Number(a.overlay) - Number(b.overlay);
+
+const seriesRuntime = (cell: ResultCell) => ({
+  engine: cell.metadata.engine,
+  optimizations: optimizationsOf(cell.point),
+  lossy: isLossy(cell.point),
+});
 
 /** Points the chart can place: visible hardware with finite values on both axes. */
 function plottedPoints(
@@ -197,52 +252,199 @@ export function resultsHistorySeries(
       return {
         key,
         hardwareKey: ordered[0].cell.point.hardwareKey!,
+        ...seriesRuntime(ordered[0].cell),
         overlay: ordered[0].cell.overlay,
         points: ordered,
         frontier: ordered,
         measured: ordered.length,
       };
     })
-    .toSorted(
-      (a, b) =>
-        hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
-        Number(a.overlay) - Number(b.overlay),
-    );
+    .toSorted(seriesOrder);
 }
 
-/** One series per hardware and per named run, each with its own deployment frontier. */
+/** A hardware's official cells and a named run's cells are ranked apart. */
+const channelKey = (hardwareKey: string | null, overlay: boolean) =>
+  `${hardwareKey}${overlay ? '-overlay' : ''}`;
+
+const seriesKey = ({ point, overlay }: Pick<ResultCell, 'point' | 'overlay'>) =>
+  `${point.hardwareKey}:${runtimeKey(point)}${overlay ? '-overlay' : ''}`;
+
+/**
+ * Each hardware's lossless series with the largest frontier area, per run channel:
+ * InferenceX's best-series rule, so one engine is the default line per hardware.
+ * Ties keep the earlier series in display order.
+ */
+function bestPerHardware(
+  series: readonly ResultsChartSeries[],
+  selection: ResultsChartSelection,
+): ResultsChartSeries[] {
+  const maximizeX = RESULTS_X_METRICS[selection.x].better === 'higher',
+    maximizeY = RESULTS_Y_METRICS[selection.y].better === 'higher';
+  const best = new Map<string, { item: ResultsChartSeries; area: number }>();
+  for (const item of series.toSorted(seriesOrder)) {
+    const channel = channelKey(item.hardwareKey, item.overlay);
+    const area = frontierArea(item.frontier, maximizeX, maximizeY);
+    if (area > (best.get(channel)?.area ?? -1)) best.set(channel, { item, area });
+  }
+  return [...best.values()].map(({ item }) => item);
+}
+
+/**
+ * Series to plot, one per hardware, runtime and run channel, each with its own
+ * deployment frontier so Optimal Only never lets one runtime hide another's.
+ * Lossless series compete for each hardware's default line; comparing engines
+ * keeps all of them. Lossy series never compete and appear only when requested.
+ */
 export function resultsChartSeries(
   cells: readonly ResultCell[],
   selection: ResultsChartSelection,
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x],
     y = RESULTS_Y_METRICS[selection.y];
-  const groups = new Map<
-    string,
-    { hardwareKey: string; overlay: boolean; points: ResultsChartPoint[] }
-  >();
-  for (const { hardwareKey, point } of plottedPoints(cells, selection)) {
-    const key = point.cell.overlay ? `${hardwareKey}-overlay` : hardwareKey;
-    const group = groups.get(key) ?? { hardwareKey, overlay: point.cell.overlay, points: [] };
-    group.points.push(point);
-    groups.set(key, group);
+  if (x.rankOn) return onAttributeAxis(cells, selection, x.rankOn);
+  const groups = Map.groupBy(plottedPoints(cells, selection), ({ point }) => seriesKey(point.cell));
+  const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
+    const points = plotted.map(({ point }) => point);
+    const frontier = paretoFrontier(points, x.better, y.better);
+    for (const point of frontier) point.optimal = true;
+    return {
+      key,
+      hardwareKey: plotted[0].hardwareKey,
+      ...seriesRuntime(points[0].cell),
+      overlay: points[0].cell.overlay,
+      points: selection.optimal ? frontier : points,
+      frontier,
+      measured: points.length,
+    };
+  });
+  const lossless = series.filter((item) => !item.lossy);
+  const lossy = selection.lossy ? series.filter((item) => item.lossy) : [];
+  const shown = bestPerHardware(lossless, selection);
+  // A lossy line keeps the lossless line it is compared with, even where another engine leads.
+  const pool = cells.map((cell) => cell.point);
+  const twinKeys = new Set(
+    lossy.flatMap((item) =>
+      item.points.flatMap(({ cell }) => {
+        const twin = losslessTwin(cell.point, pool);
+        return twin ? [seriesKey({ point: twin, overlay: cell.overlay })] : [];
+      }),
+    ),
+  );
+  const twins = lossless
+    .filter((item) => twinKeys.has(item.key) && !shown.includes(item))
+    .map((item) => ({ ...item, twin: true }));
+  return [...shown, ...twins, ...lossy].toSorted(seriesOrder);
+}
+
+/**
+ * The series the results chart plots: Chip config runs when `history` is set, else the
+ * deployments. Hidden hardware stays in, so the legend can still name its engines.
+ */
+export const resultsPlotSeries = (
+  cells: readonly ResultCell[],
+  history: readonly ResultCell[] | null,
+  state: ResultsState,
+): ResultsChartSeries[] =>
+  (history ? resultsHistorySeries : resultsChartSeries)(history ?? cells, {
+    ...resultsSelection(state),
+    x: plottedXMetric(state.xMetric, history !== null),
+    hidden: [],
+  });
+
+/**
+ * Ranks the cells the axis can place on `rankOn`, then moves each point to its
+ * attribute value. A deployment the axis cannot place never ranks, so it cannot
+ * dominate a sibling and then vanish.
+ */
+function onAttributeAxis(
+  cells: readonly ResultCell[],
+  selection: ResultsChartSelection,
+  rankOn: ResultsXMetric,
+): ResultsChartSeries[] {
+  const x = RESULTS_X_METRICS[selection.x];
+  const placed = cells.filter((cell) => x.value(cell, selection) !== null);
+  const ranked = resultsChartSeries(placed, { ...selection, x: rankOn, optimal: false });
+  // More GPUs usually buy lower latency, so within one GPU count the slower
+  // deployment comes first and the line keeps the latency frontier's order.
+  const worseFirst = RESULTS_X_METRICS[rankOn].better === 'lower' ? -1 : 1;
+  return ranked.map((item) => {
+    const points = item.points
+      .toSorted((a, b) => worseFirst * (a.x - b.x))
+      .map((point) => ({ ...point, x: x.value(point.cell, selection)! }))
+      .toSorted((a, b) => a.x - b.x);
+    const frontier = points.filter((point) => point.optimal);
+    return {
+      ...item,
+      points: selection.optimal ? frontier : points,
+      frontier,
+      measured: points.length,
+    };
+  });
+}
+
+/**
+ * Some hardware shows two engines in one run channel, which asks for the
+ * engine-comparison consent first. A named run is ranked on its own, so its
+ * engine differing from the official one is not a comparison.
+ */
+export function comparesEngines(series: readonly ResultsChartSeries[]): boolean {
+  const engines = new Map<string, Set<string | null>>();
+  for (const { hardwareKey, overlay, engine } of series) {
+    const channel = channelKey(hardwareKey, overlay);
+    const seen = engines.get(channel) ?? new Set();
+    if (seen.add(engine).size > 1) return true;
+    engines.set(channel, seen);
   }
-  return [...groups]
-    .map(([key, { hardwareKey, overlay, points }]) => {
-      const frontier = paretoFrontier(points, x.better, y.better);
-      for (const point of frontier) point.optimal = true;
-      return {
-        key,
-        hardwareKey,
-        overlay,
-        points: selection.optimal ? frontier : points,
-        frontier,
-        measured: points.length,
-      };
-    })
-    .toSorted(
-      (a, b) =>
-        hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
-        Number(a.overlay) - Number(b.overlay),
-    );
+  return false;
+}
+
+/**
+ * Cells that may stand for their hardware in cards, profit bars and clips: those of
+ * a runtime the chart draws for that hardware and run channel, other than a lossy
+ * line's twin, so they name the chart's engine. A channel the chart draws nothing for
+ * keeps every cell. The page, its server seed and the overview API all pick clips
+ * from these cells.
+ */
+export function chartedCells(
+  projection: Record<
+    'cells' | 'overlayCells' | 'deploymentCells' | 'overlayDeploymentCells',
+    readonly ResultCell[]
+  >,
+  state: ResultsState,
+): ResultCell[] {
+  const series = resultsChartSeries(
+    [...projection.deploymentCells, ...projection.overlayDeploymentCells],
+    { ...resultsSelection(state), hidden: [] },
+  ).filter((item) => !item.twin);
+  const drawn = new Set(series.map((item) => item.key));
+  const channels = new Set(series.map((item) => channelKey(item.hardwareKey, item.overlay)));
+  return [...projection.cells, ...projection.overlayCells].filter(
+    (cell) =>
+      !channels.has(channelKey(cell.point.hardwareKey, cell.overlay)) || drawn.has(seriesKey(cell)),
+  );
+}
+
+/**
+ * The deployment the clip stage opens on in place of each clip lead: the lower-median latency
+ * point of the lead's frontier, so the stage starts mid-curve (B200's 4 GPUs among 1, 2, 4 and 8)
+ * instead of at the efficient end `leadCell` picks for cards, or at the costliest
+ * fastest end. A lead whose series the chart does not draw opens as itself.
+ */
+export function stageOpenings(
+  projection: Record<'deploymentCells' | 'overlayDeploymentCells', readonly ResultCell[]>,
+  state: ResultsState,
+  leads: readonly VideoPoint[],
+): VideoPoint[] {
+  const series = resultsChartSeries(
+    [...projection.deploymentCells, ...projection.overlayDeploymentCells],
+    { ...resultsSelection(state), hidden: [] },
+  );
+  return leads.map((lead) => {
+    const key = seriesKey({ point: lead, overlay: lead.runId === state.unofficialRun });
+    const frontier = (series.find((item) => !item.twin && item.key === key)?.frontier ?? [])
+      .map(({ cell }) => cell.point)
+      .filter((point) => point.p50 !== null && !isQueueing(point))
+      .toSorted((a, b) => a.p50! - b.p50!);
+    return frontier[Math.floor((frontier.length - 1) / 2)] ?? lead;
+  });
 }

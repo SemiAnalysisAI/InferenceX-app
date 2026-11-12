@@ -24,7 +24,7 @@ const AI_RADAR_METRIC_LABELS = {
     y_inputTputPerGpu: 'Input Tput/Chip',
     y_tpPerMw: 'Tput/MW',
     y_costh: 'Cost (Hyperscaler Vol.)',
-    y_costr: 'Cost (Rent - 3 Year Commit)',
+    y_costr: 'Cost (Rent – 3-year commit)',
     y_jTotal: 'J/Token',
     y_jOutput: 'J/Output',
     y_jInput: 'J/Input',

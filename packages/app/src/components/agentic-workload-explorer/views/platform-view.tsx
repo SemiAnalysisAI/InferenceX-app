@@ -1,43 +1,51 @@
 'use client';
 
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import { bucketLabel, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
-import type {
-  PlatformData,
-  PlatformStat,
-  PlatformTimeSeries,
-} from '@/lib/agentic-workload-explorer/api-types';
-import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import type { PlatformData, PlatformStat } from '@/lib/agentic-workload-explorer/api-types';
+import {
+  formatAxisNumber,
+  formatDayLabel,
+  TrendsStackedChart,
+  buildColorMap,
+  type StackedDayPoint,
+} from '@/components/agentic-workload-explorer/trends-charts';
+import {
+  CHART_COLORS,
+  NEUTRAL_SERIES_COLOR,
+} from '@/components/agentic-workload-explorer/series-colors';
 
 const STRINGS = {
   en: {
+    ySessions: 'Sessions',
     stats: 'Stats',
     uniqueOs: 'Unique OS',
-    uniqueCliVersions: 'Unique CLI Versions',
-    mostCommonOs: 'Most Common OS',
-    totalSessions: 'Total Sessions',
+    uniqueCliVersions: 'Unique CLI versions',
+    mostCommonOs: 'Most common OS',
+    totalSessions: 'Total sessions',
     failedToLoad: 'Failed to load platform data',
-    osDist: 'OS Distribution',
-    cliVersionDist: 'CLI Version Distribution',
-    nodeVersionDist: 'Node.js Version Distribution',
-    archDist: 'Architecture Distribution',
-    platformTrends: 'Platform Trends',
+    osDist: 'OS distribution',
+    cliVersionDist: 'CLI version distribution',
+    nodeVersionDist: 'Node.js version distribution',
+    archDist: 'Architecture distribution',
+    platformTrends: 'Platform trends',
     noData: 'No data',
     noTimeSeries: 'No time series data',
-    sessionsPerDay: 'Sessions per day',
-    tooltipSessions: (os: string, count: number, day: string) =>
-      `${os}: ${count} sessions (${day})`,
+    sessionsPerDay: 'Sessions per day by OS',
   },
   zh: {
+    ySessions: '会话数',
     stats: '统计',
     uniqueOs: '操作系统种类',
     uniqueCliVersions: 'CLI 版本种类',
@@ -51,10 +59,11 @@ const STRINGS = {
     platformTrends: '平台趋势',
     noData: '暂无数据',
     noTimeSeries: '暂无时间序列数据',
-    sessionsPerDay: '每日会话数',
-    tooltipSessions: (os: string, count: number, day: string) => `${os}: ${count} 个会话 (${day})`,
+    sessionsPerDay: '按操作系统统计的每日会话数',
   },
 } as const;
+
+const UNKNOWN = 'unknown';
 
 function aggregate(
   stats: PlatformStat[],
@@ -63,7 +72,7 @@ function aggregate(
   const map = new Map<string, number>();
   for (const s of stats) {
     const val = s[key] as string | null;
-    const label = val ?? 'unknown';
+    const label = val ?? UNKNOWN;
     map.set(label, (map.get(label) || 0) + Number(s.sessionCount));
   }
   return [...map.entries()]
@@ -71,67 +80,58 @@ function aggregate(
     .toSorted((a, b) => b.count - a.count);
 }
 
-const TREND_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-1">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
+const BAR_COLOR = CHART_COLORS[0];
 
 function HorizontalBars({
   data,
-  color,
   limit,
+  mono = false,
   emptyLabel,
 }: {
   data: { label: string; count: number }[];
-  color: string;
   limit?: number;
-  emptyLabel?: string;
+  mono?: boolean;
+  emptyLabel: string;
 }) {
+  const locale = useLocale();
   const items = limit ? data.slice(0, limit) : data;
-  const maxCount = items.length > 0 ? items[0].count : 0;
+  const maxCount = items.reduce((max, d) => Math.max(max, d.count), 0);
 
   if (items.length === 0) {
-    return (
-      <div className="text-2xs font-mono text-muted-foreground">{emptyLabel ?? 'No data'}</div>
-    );
+    return <div className="text-xs text-muted-foreground">{emptyLabel}</div>;
   }
 
   return (
     <div className="space-y-1.5">
       {items.map((d) => {
         const widthPct = maxCount > 0 ? (d.count / maxCount) * 100 : 0;
+        const unknown = d.label === UNKNOWN;
+        const label = bucketLabel(d.label, locale);
         return (
-          <div key={d.label} className="flex items-center gap-3">
-            <span className="text-2xs font-mono w-36 truncate shrink-0" title={d.label}>
-              {d.label}
+          <div
+            key={d.label}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:flex"
+          >
+            <span
+              className={`min-w-0 sm:w-36 shrink-0 truncate text-xs ${unknown ? 'text-muted-foreground' : 'text-foreground'} ${mono && !unknown ? 'font-mono' : ''}`}
+              title={label}
+            >
+              {label}
             </span>
-            <div className="flex-1 h-5 bg-surface-hover rounded-sm overflow-hidden">
+            <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
               <div
                 className="h-full rounded-sm"
-                style={{ width: `${Math.max(widthPct, 1)}%`, backgroundColor: color }}
+                style={{
+                  width: `${widthPct}%`,
+                  minWidth: d.count > 0 ? 2 : 0,
+                  backgroundColor: unknown ? NEUTRAL_SERIES_COLOR : BAR_COLOR,
+                  opacity: unknown ? 0.5 : 1,
+                }}
               />
             </div>
-            <span className="text-3xs font-mono text-muted-foreground w-12 text-right shrink-0">
+            <span
+              className={`sm:w-14 shrink-0 text-right text-xs tabular-nums ${unknown ? 'text-muted-foreground' : 'text-foreground'}`}
+            >
               {formatNumber(d.count)}
             </span>
           </div>
@@ -141,256 +141,11 @@ function HorizontalBars({
   );
 }
 
-const CHART_W = 600;
-const CHART_H = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
-
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
-
-function formatAxisValue(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
-}
-
-function PlatformTrendsChart({
-  timeSeries,
-  allOsList,
-  colorMap,
-  noDataLabel,
-  sessionsPerDayLabel,
-  tooltipSessions,
-}: {
-  timeSeries: PlatformTimeSeries[];
-  allOsList: string[];
-  colorMap: Record<string, string>;
-  noDataLabel: string;
-  sessionsPerDayLabel: string;
-  tooltipSessions: (os: string, count: number, day: string) => string;
-}) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const { days, maxY, yTicks } = useMemo(() => {
-    const dayMap = new Map<string, Record<string, number>>();
-    for (const entry of timeSeries) {
-      if (!dayMap.has(entry.day)) dayMap.set(entry.day, {});
-      const dayData = dayMap.get(entry.day)!;
-      const os = entry.os ?? 'unknown';
-      dayData[os] = (dayData[os] || 0) + Number(entry.sessionCount);
-    }
-
-    const sortedDays = [...dayMap.keys()].toSorted((a, b) => Date.parse(a) - Date.parse(b));
-
-    let max = 0;
-    for (const dayData of dayMap.values()) {
-      let total = 0;
-      for (const count of Object.values(dayData)) total += count;
-      if (total > max) max = total;
-    }
-
-    const ticks = max > 0 ? generateTicks(0, max, 5) : [0];
-    const yMax = ticks.at(-1) || max || 1;
-
-    return {
-      days: sortedDays.map((day) => ({ day, data: dayMap.get(day)! })),
-      maxY: yMax,
-      yTicks: ticks,
-    };
-  }, [timeSeries]);
-
-  if (days.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-40 text-2xs font-mono text-muted-foreground">
-        {noDataLabel}
-      </div>
-    );
-  }
-
-  const barWidth = Math.max(1, PLOT_W / days.length - 2);
-  const barGap = PLOT_W / days.length - barWidth;
-
-  const sx = (i: number) => MARGIN.left + i * (barWidth + barGap) + barGap / 2;
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / maxY) * PLOT_H;
-
-  const labelInterval = Math.max(1, Math.floor(days.length / 6));
-
-  return (
-    <>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground">
-          {allOsList.map((os) => (
-            <span key={os} className="flex items-center gap-1">
-              <span
-                className="inline-block w-2.5 h-2.5 rounded-sm"
-                style={{ backgroundColor: colorMap[os] }}
-              />
-              {os}
-            </span>
-          ))}
-        </div>
-        <ExportPngButton
-          locale={locale}
-          analyticsChart="platform-trends"
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: 'Platform Trends',
-                filename: 'platform-trends.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            {tick > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tick)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tick)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tick) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {formatAxisValue(tick)}
-            </text>
-          </g>
-        ))}
-
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {days.map(({ day, data }, i) => {
-          let yOffset = 0;
-          const rects: React.ReactNode[] = [];
-
-          for (const os of allOsList) {
-            const count = data[os] || 0;
-            if (count === 0) continue;
-            const barH = (count / maxY) * PLOT_H;
-            rects.push(
-              <rect
-                key={`${day}-${os}`}
-                x={sx(i)}
-                y={sy(yOffset + count)}
-                width={barWidth}
-                height={barH}
-                fill={colorMap[os]}
-                rx={1}
-              >
-                <title>{tooltipSessions(os, count, formatSnapshotDate(day))}</title>
-              </rect>,
-            );
-            yOffset += count;
-          }
-
-          return <g key={day}>{rects}</g>;
-        })}
-
-        {days.map(({ day }, i) => {
-          if (i % labelInterval !== 0 && i !== days.length - 1) return null;
-          const d = new Date(day);
-          const label = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-          return (
-            <text
-              key={`x-${day}`}
-              x={sx(i) + barWidth / 2}
-              y={MARGIN.top + PLOT_H + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {label}
-            </text>
-          );
-        })}
-
-        <text
-          x={MARGIN.left + PLOT_W / 2}
-          y={CHART_H - 2}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {sessionsPerDayLabel}
-        </text>
-      </svg>
-    </>
-  );
-}
-
 export default function PlatformPage() {
-  const t = STRINGS[useLocale()];
   return (
-    <Expandable title={t.platformTrends}>
-      <Suspense>
-        <PlatformPageContent />
-      </Suspense>
-    </Expandable>
+    <Suspense>
+      <PlatformPageContent />
+    </Suspense>
   );
 }
 
@@ -416,23 +171,29 @@ function PlatformPageContent() {
   const nodeDist = useMemo(() => (data ? aggregate(data.stats, 'nodeVersion') : []), [data]);
   const archDist = useMemo(() => (data ? aggregate(data.stats, 'arch') : []), [data]);
 
-  const uniqueOs = useMemo(() => osDist.filter((d) => d.label !== 'unknown').length, [osDist]);
-  const uniqueCli = useMemo(() => cliDist.filter((d) => d.label !== 'unknown').length, [cliDist]);
-  const mostCommonOs = useMemo(() => (osDist.length > 0 ? osDist[0].label : '--'), [osDist]);
+  const uniqueOs = useMemo(() => osDist.filter((d) => d.label !== UNKNOWN).length, [osDist]);
+  const uniqueCli = useMemo(() => cliDist.filter((d) => d.label !== UNKNOWN).length, [cliDist]);
+  const mostCommonOs = useMemo(
+    () => osDist.find((d) => d.label !== UNKNOWN)?.label ?? '—',
+    [osDist],
+  );
   const totalSessions = useMemo(() => osDist.reduce((sum, d) => sum + d.count, 0), [osDist]);
 
-  const { allOsList, osColorMap } = useMemo(() => {
-    if (!data) return { allOsList: [], osColorMap: {} };
+  const trend = useMemo(() => {
+    const dayMap = new Map<string, Record<string, number>>();
     const osSet = new Set<string>();
-    for (const entry of data.timeSeries) {
-      osSet.add(entry.os ?? 'unknown');
+    for (const entry of data?.timeSeries ?? []) {
+      const os = entry.os ?? UNKNOWN;
+      osSet.add(os);
+      const values = dayMap.get(entry.day) ?? {};
+      values[os] = (values[os] ?? 0) + Number(entry.sessionCount);
+      dayMap.set(entry.day, values);
     }
-    const list = [...osSet].toSorted();
-    const cMap: Record<string, string> = {};
-    for (let i = 0; i < list.length; i++) {
-      cMap[list[i]] = TREND_COLORS[i % TREND_COLORS.length];
-    }
-    return { allOsList: list, osColorMap: cMap };
+    const keys = [...osSet].toSorted();
+    const days: StackedDayPoint[] = [...dayMap.entries()]
+      .toSorted(([a], [b]) => Date.parse(a) - Date.parse(b))
+      .map(([day, values]) => ({ day, values }));
+    return { keys, days, colors: buildColorMap(keys) };
   }, [data]);
 
   return (
@@ -442,23 +203,21 @@ function PlatformPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : data ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard label={t.uniqueOs} value={String(uniqueOs)} />
-            <StatCard label={t.uniqueCliVersions} value={String(uniqueCli)} />
-            <StatCard label={t.mostCommonOs} value={mostCommonOs} />
-            <StatCard label={t.totalSessions} value={formatNumber(totalSessions)} />
-          </div>
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat boxed label={t.uniqueOs} value={String(uniqueOs)} />
+            <Stat boxed label={t.uniqueCliVersions} value={String(uniqueCli)} />
+            <Stat boxed label={t.mostCommonOs} value={bucketLabel(mostCommonOs, locale)} />
+            <Stat boxed label={t.totalSessions} value={formatNumber(totalSessions)} />
+          </dl>
         ) : (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         )}
       </div>
 
@@ -466,45 +225,46 @@ function PlatformPageContent() {
         <>
           <div>
             <SectionHeader label={t.osDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
-              <HorizontalBars data={osDist} color="#6366f1" emptyLabel={t.noData} />
-            </div>
+            <Card>
+              <HorizontalBars data={osDist} emptyLabel={t.noData} />
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.cliVersionDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
-              <HorizontalBars data={cliDist} color="#06b6d4" limit={15} emptyLabel={t.noData} />
-            </div>
+            <Card>
+              <HorizontalBars data={cliDist} limit={15} mono emptyLabel={t.noData} />
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.nodeVersionDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
-              <HorizontalBars data={nodeDist} color="#10b981" emptyLabel={t.noData} />
-            </div>
+            <Card>
+              <HorizontalBars data={nodeDist} mono emptyLabel={t.noData} />
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.archDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
-              <HorizontalBars data={archDist} color="#f59e0b" emptyLabel={t.noData} />
-            </div>
+            <Card>
+              <HorizontalBars data={archDist} emptyLabel={t.noData} />
+            </Card>
           </div>
 
-          <div>
-            <SectionHeader label={t.platformTrends} />
-            <div className="rounded-md border border-border bg-surface p-3">
-              <PlatformTrendsChart
-                timeSeries={data.timeSeries}
-                allOsList={allOsList}
-                colorMap={osColorMap}
-                noDataLabel={t.noTimeSeries}
-                sessionsPerDayLabel={t.sessionsPerDay}
-                tooltipSessions={t.tooltipSessions}
-              />
-            </div>
-          </div>
+          <TrendsStackedChart
+            title={t.platformTrends}
+            subtext={t.sessionsPerDay}
+            days={trend.days}
+            seriesKeys={trend.keys}
+            labelFor={(key) => bucketLabel(key, locale)}
+            colorFor={(key) => trend.colors[key]}
+            mode="count"
+            yFormatter={formatAxisNumber}
+            yLabel={t.ySessions}
+            xFormatter={(day: string) => formatDayLabel(day, locale)}
+            filename="platform-trends"
+            emptyLabel={t.noTimeSeries}
+          />
         </>
       )}
     </div>

@@ -102,9 +102,9 @@ import {
 import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
-  EngineComparisonConflictToast,
+  EngineComparisonConflictProvider,
   type EngineComparisonConflictDetail,
-} from '@/components/inference/ui/engine-comparison-conflict-toast';
+} from '@/components/inference/ui/engine-comparison-conflict-notice';
 import {
   effectiveLegendItems,
   exclusionResolutionFamilies,
@@ -154,7 +154,7 @@ const InferenceActionsContext = createContext<InferenceActionsContextType | unde
 
 export const INFERENCE_CONTEXT_STRINGS = {
   en: {
-    dateRangeResetTitle: 'Date Range Reset',
+    dateRangeResetTitle: 'Date range reset',
     dateRangeResetDescription:
       'The chip configs are not available in the selected date range. The date range will be reset.',
     ok: 'OK',
@@ -1423,7 +1423,7 @@ export function InferenceProvider({
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
-      if (droppedGroups.length > 0) {
+      if (droppedGroups.length > 0 && hardwareDefaultsOverridden) {
         setEngineConflict({
           kind: 'resolved',
           ...exclusionResolutionFamilies(automaticSelection, result, exclusion),
@@ -1985,29 +1985,31 @@ export function InferenceProvider({
         actions={actionsValue}
       >
         <PerfRulerStoreContext.Provider value={perfRulerStore}>
-          {children}
+          <EngineComparisonConflictProvider
+            detail={
+              comparisonGuardLifted ||
+              (quietEngineResolution && engineConflict?.kind === 'resolved')
+                ? null
+                : engineConflict
+            }
+            onDismiss={dismissEngineConflict}
+            onCompare={
+              consentSupported
+                ? () => {
+                    const keys = selectedGpuState.length > 0 ? selectedGpuState : selectableHwTypes;
+                    requestEngineComparison(keys, () => {
+                      setBestPerSku(false);
+                      setActiveHwTypes(new Set(keys));
+                      setEngineConflict(null);
+                    });
+                  }
+                : undefined
+            }
+          >
+            {children}
+          </EngineComparisonConflictProvider>
         </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
-      <EngineComparisonConflictToast
-        detail={
-          comparisonGuardLifted || (quietEngineResolution && engineConflict?.kind === 'resolved')
-            ? null
-            : engineConflict
-        }
-        onDismiss={dismissEngineConflict}
-        onCompare={
-          consentSupported
-            ? () => {
-                const keys = selectedGpuState.length > 0 ? selectedGpuState : selectableHwTypes;
-                requestEngineComparison(keys, () => {
-                  setBestPerSku(false);
-                  setActiveHwTypes(new Set(keys));
-                  setEngineConflict(null);
-                });
-              }
-            : undefined
-        }
-      />
       <EngineComparisonConfirmation
         open={engineConsent.open}
         onCancel={() => {

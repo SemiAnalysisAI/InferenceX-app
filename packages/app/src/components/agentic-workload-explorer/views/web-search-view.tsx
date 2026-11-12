@@ -1,50 +1,61 @@
 'use client';
 
-import { Suspense, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import { Button } from '@/components/ui/button';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import { formatDollars, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import type {
   WebSearchData,
-  WebSearchDailyEntry,
   WebSearchModelEntry,
   WebSearchTopSession,
 } from '@/lib/agentic-workload-explorer/api-types';
-import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
 import {
   DAY_RANGES,
   DAY_RANGE_DAYS,
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import {
+  formatAxisDollars,
+  formatDayLabel,
+  TrendsLineChart,
+  TrendsStackedChart,
+  type LineSeries,
+} from '@/components/agentic-workload-explorer/trends-charts';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
+import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
 
 const STRINGS = {
   en: {
+    ySearches: 'Searches',
+    yCostUsd: 'Cost (USD)',
     stats: 'Stats',
-    loadError: 'Failed to load web search data.',
-    totalSearches: 'Total Searches',
-    pctWithSearches: '% with Searches',
-    estCost: 'Est. Cost',
+    loadError: 'Failed to load web search data',
+    totalSearches: 'Total searches',
+    pctWithSearches: '% with searches',
+    estCost: 'Est. cost',
     requestsWithSearch: (n: string) => `${n} requests with search`,
     ofTotal: (a: string, b: string) => `${a} of ${b}`,
     perSearch: (cost: number) => `$${cost} per search`,
-    searchesOverTime: 'Searches Over Time',
+    searchesOverTime: 'Searches over time',
     searches: (n: string) => `${n} searches`,
-    searchesByModel: 'Searches by Model',
+    searchesByModel: 'Searches by model',
     models: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
-    searchCostOverTime: 'Search Cost Over Time',
-    topSessions: 'Top Sessions',
+    searchCostOverTime: 'Search cost over time',
+    topSessions: 'Top sessions',
     sessions: (n: number) => `${n} session${n === 1 ? '' : 's'}`,
     noDailySearch: 'No daily search data available',
     noModelSearch: 'No model search data available',
@@ -52,17 +63,21 @@ const STRINGS = {
     noSessionData: 'No session data available',
     thRank: '#',
     thSession: 'Session',
-    thSearchCount: 'Search Count',
-    thRequestCount: 'Request Count',
-    thSearchesPerReq: 'Searches / Req',
-    tooltipSearches: (count: number, requests: number) =>
-      `${count} searches (${requests} requests)`,
-    tooltipCost: (cost: string, count: number) => `${cost} (${count} searches)`,
-    exportSearchesTitle: 'Web Searches Over Time',
-    exportCostTitle: 'Web Search Cost',
+    thSearchCount: 'Search count',
+    thRequestCount: 'Request count',
+    thSearchesPerReq: 'Searches / req',
+    searchesSeries: 'Searches',
+    costSeries: 'Search cost',
+    colModel: 'Model',
+    colSearches: 'Searches',
+    colSearchPct: '% of requests',
+    showNoData: (n: number) => `Show ${n} with no data`,
+    hideNoData: 'Hide models with no data',
     searchPctTooltip: "Share of this model's requests that searched",
   },
   zh: {
+    ySearches: '搜索次数',
+    yCostUsd: '成本（美元）',
     stats: '统计',
     loadError: '加载搜索数据失败',
     totalSearches: '总搜索次数',
@@ -83,237 +98,28 @@ const STRINGS = {
     noDailyCost: '暂无每日成本数据',
     noSessionData: '暂无会话数据',
     thRank: '#',
-    thSession: 'Session',
+    thSession: '会话',
     thSearchCount: '搜索次数',
     thRequestCount: '请求数',
     thSearchesPerReq: '搜索 / 请求',
-    tooltipSearches: (count: number, requests: number) => `${count} 次搜索（${requests} 个请求）`,
-    tooltipCost: (cost: string, count: number) => `${cost}（${count} 次搜索）`,
-    exportSearchesTitle: 'Web 搜索趋势',
-    exportCostTitle: 'Web 搜索成本',
+    searchesSeries: '搜索次数',
+    costSeries: '搜索成本',
+    colModel: '模型',
+    colSearches: '搜索次数',
+    colSearchPct: '请求占比',
+    showNoData: (n: number) => `显示 ${n} 个无数据的模型`,
+    hideNoData: '隐藏无数据的模型',
     searchPctTooltip: '该模型请求中包含搜索的比例',
   },
 } as const;
 
-const CHART_W = 600;
-const CHART_H = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-
-const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
-const SVG_FONT_SIZE = '9px';
-
 const COST_PER_SEARCH = 0.01;
-
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
-
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
-
-function formatAxisValue(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
-}
-
-function formatDollarsAxis(v: number): string {
-  if (v >= 1000) return `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`;
-  if (v >= 1) return `$${v.toFixed(v % 1 === 0 ? 0 : 2)}`;
-  return `$${v.toFixed(2)}`;
-}
-
-function formatDollars(v: number): string {
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
-  if (v >= 100) return `$${v.toFixed(0)}`;
-  if (v >= 10) return `$${v.toFixed(1)}`;
-  return `$${v.toFixed(2)}`;
-}
+const SEARCH_KEYS = ['searches'];
+const ZERO_ROW_COLLAPSE_THRESHOLD = 5;
+const searchColor = () => CHART_COLORS[0];
 
 function shortenModel(model: string): string {
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
-}
-
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
-function SearchesOverTimeChart({
-  data,
-  controls,
-  locale,
-}: {
-  data: WebSearchDailyEntry[];
-  controls: ReactNode;
-  locale: Locale;
-}) {
-  const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
-  const labelEvery = Math.ceil(data.length / 7);
-  if (data.length === 0) {
-    return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
-        {t.noDailySearch}
-      </div>
-    );
-  }
-
-  const maxCount = Math.max(...data.map((d) => d.searchCount), 1);
-  const yTicks = generateTicks(0, maxCount, 5);
-  const yMax = yTicks.at(-1) || maxCount;
-
-  const barGap = 2;
-  const barWidth = Math.max(1, (PLOT_W - barGap * data.length) / data.length);
-
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  return (
-    <Expandable title={t.exportSearchesTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          {controls}
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="web-searches-over-time"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportSearchesTitle,
-                  filename: 'web-searches-over-time.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
-          />
-        </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
-          {yTicks.map((tick) => (
-            <g key={`y-${tick}`}>
-              {tick > 0 && (
-                <line
-                  x1={MARGIN.left}
-                  y1={sy(tick)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={sy(tick)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={MARGIN.left - 6}
-                y={sy(tick) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-              >
-                {formatAxisValue(tick)}
-              </text>
-            </g>
-          ))}
-
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top + PLOT_H}
-            x2={MARGIN.left + PLOT_W}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-border"
-            strokeWidth={0.5}
-          />
-
-          {data.map((d, i) => {
-            const x = MARGIN.left + i * (barWidth + barGap);
-            const barH = (d.searchCount / yMax) * PLOT_H;
-            return (
-              <g key={d.day}>
-                <rect
-                  x={x}
-                  y={sy(d.searchCount)}
-                  width={barWidth}
-                  height={Math.max(barH, 0.5)}
-                  fill="#6366f1"
-                  rx={1}
-                >
-                  <title>
-                    {formatSnapshotDate(d.day)}:{' '}
-                    {t.tooltipSearches(d.searchCount, d.requestsWithSearch)}
-                  </title>
-                </rect>
-                {i % labelEvery === 0 && (
-                  <text
-                    x={x + barWidth / 2}
-                    y={MARGIN.top + PLOT_H + 14}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                  >
-                    {formatSnapshotDate(d.day)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    </Expandable>
-  );
 }
 
 function SearchesByModelChart({
@@ -324,204 +130,108 @@ function SearchesByModelChart({
   locale: Locale;
 }) {
   const t = STRINGS[locale];
-  const merged = new Map<string, WebSearchModelEntry>();
-  for (const m of byModel) {
-    const model = shortenModel(m.model);
-    const prev = merged.get(model);
-    merged.set(
-      model,
-      prev
-        ? {
-            ...prev,
-            searchCount: prev.searchCount + m.searchCount,
-            requestsWithSearch: prev.requestsWithSearch + m.requestsWithSearch,
-            totalRequests: prev.totalRequests + m.totalRequests,
-          }
-        : { ...m, model },
+  const [showZero, setShowZero] = useState(false);
+  const sorted = useMemo(() => {
+    const merged = new Map<string, WebSearchModelEntry>();
+    for (const m of byModel) {
+      const model = shortenModel(m.model);
+      const prev = merged.get(model);
+      merged.set(
+        model,
+        prev
+          ? {
+              ...prev,
+              searchCount: prev.searchCount + m.searchCount,
+              requestsWithSearch: prev.requestsWithSearch + m.requestsWithSearch,
+              totalRequests: prev.totalRequests + m.totalRequests,
+            }
+          : { ...m, model },
+      );
+    }
+    return [...merged.values()].toSorted(
+      (a, b) => b.searchCount - a.searchCount || a.model.localeCompare(b.model),
     );
-  }
-  const sorted = [...merged.values()].toSorted((a, b) => b.searchCount - a.searchCount);
-  const maxCount = sorted.length > 0 ? sorted[0].searchCount : 1;
+  }, [byModel]);
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
-        {t.noModelSearch}
-      </div>
+      <Card>
+        <EmptyState bare className="py-8">
+          {t.noModelSearch}
+        </EmptyState>
+      </Card>
     );
   }
 
+  const maxCount = sorted[0].searchCount;
+  const zeroCount = sorted.filter((m) => m.searchCount === 0).length;
+  const collapsible = zeroCount > ZERO_ROW_COLLAPSE_THRESHOLD;
+  const rows = collapsible && !showZero ? sorted.filter((m) => m.searchCount > 0) : sorted;
+
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
+      <div className="flex items-center gap-3 border-b border-border/30 pb-1.5 mb-2 text-xs font-medium text-muted-foreground">
+        <span className="w-32 shrink-0 sm:w-44">{t.colModel}</span>
+        <span className="flex-1" />
+        <span className="w-14 shrink-0 text-right">{t.colSearches}</span>
+        <span className="w-24 shrink-0 text-right" title={t.searchPctTooltip}>
+          {t.colSearchPct}
+        </span>
+      </div>
       <div className="space-y-1.5">
-        {sorted.map((m) => {
+        {rows.map((m) => {
           const pct = maxCount > 0 ? (m.searchCount / maxCount) * 100 : 0;
           const searchPct =
             m.totalRequests > 0
               ? ((m.requestsWithSearch / m.totalRequests) * 100).toFixed(1)
               : '0.0';
           return (
-            <div key={m.model} className="flex items-center gap-2">
+            <div
+              key={m.model}
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 sm:flex"
+            >
               <span
-                className="text-2xs font-mono text-foreground shrink-0 w-[180px] truncate"
+                className={`min-w-0 sm:w-32 shrink-0 truncate text-xs sm:w-44 ${m.searchCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}
                 title={m.model}
               >
                 {m.model}
               </span>
-              <div className="flex-1 h-4 bg-border/30 rounded-sm overflow-hidden relative">
+              <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
                 <div
-                  className="h-full bg-indigo-500 rounded-sm"
-                  style={{ width: m.searchCount > 0 ? `${Math.max(pct, 1)}%` : 0 }}
+                  className="h-full rounded-sm"
+                  style={{
+                    width: `${pct}%`,
+                    minWidth: m.searchCount > 0 ? 2 : 0,
+                    backgroundColor: CHART_COLORS[0],
+                  }}
                 />
               </div>
-              <span className="text-2xs font-mono text-foreground shrink-0 w-[56px] text-right">
+              <span className="sm:w-14 shrink-0 text-right text-xs tabular-nums whitespace-nowrap text-foreground">
                 {formatNumber(m.searchCount)}
               </span>
-              <span
-                className="text-3xs font-mono text-muted-foreground shrink-0 w-[56px] text-right"
-                title={t.searchPctTooltip}
-              >
+              <span className="sm:w-24 shrink-0 text-right text-xs tabular-nums whitespace-nowrap text-muted-foreground">
                 {searchPct}%
               </span>
             </div>
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; locale: Locale }) {
-  const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
-  const data = daily.slice(-30);
-  if (data.length === 0) {
-    return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
-        {t.noDailyCost}
-      </div>
-    );
-  }
-
-  const costs = data.map((d) => d.searchCount * COST_PER_SEARCH);
-  const maxCost = Math.max(...costs, 0.01);
-  const yTicks = generateTicks(0, maxCost, 5);
-  const yMax = yTicks.at(-1) || maxCost;
-
-  const sx = (i: number) => MARGIN.left + (i / Math.max(data.length - 1, 1)) * PLOT_W;
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  const linePoints = data.map((_, i) => `${sx(i)},${sy(costs[i])}`).join(' ');
-  const areaPath = [
-    `M ${sx(0)},${MARGIN.top + PLOT_H}`,
-    ...data.map((_, i) => `L ${sx(i)},${sy(costs[i])}`),
-    `L ${sx(data.length - 1)},${MARGIN.top + PLOT_H}`,
-    'Z',
-  ].join(' ');
-
-  const labelInterval = Math.max(1, Math.floor(data.length / 6));
-
-  return (
-    <Expandable title={t.exportCostTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
-        <div className="flex items-center justify-end mb-2">
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="web-search-cost"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportCostTitle,
-                  filename: 'web-search-cost.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
-          />
-        </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
+      {collapsible && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="mt-2"
+          aria-expanded={showZero}
+          onClick={() => {
+            setShowZero((v) => !v);
+            track('agentic_workload_web_search_zero_models_toggled', { shown: !showZero });
+          }}
         >
-          {yTicks.map((tick) => (
-            <g key={`y-${tick}`}>
-              {tick > 0 && (
-                <line
-                  x1={MARGIN.left}
-                  y1={sy(tick)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={sy(tick)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={MARGIN.left - 6}
-                y={sy(tick) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-              >
-                {formatDollarsAxis(tick)}
-              </text>
-            </g>
-          ))}
-
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top + PLOT_H}
-            x2={MARGIN.left + PLOT_W}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-border"
-            strokeWidth={0.5}
-          />
-
-          <path d={areaPath} fill="#10b981" opacity={0.15} />
-
-          <polyline
-            points={linePoints}
-            fill="none"
-            stroke="#10b981"
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-
-          {data.map((_, i) => (
-            <circle key={i} cx={sx(i)} cy={sy(costs[i])} r={2} fill="#10b981">
-              <title>
-                {data[i].day}: {t.tooltipCost(formatDollars(costs[i]), data[i].searchCount)}
-              </title>
-            </circle>
-          ))}
-
-          {data.map((d, i) => {
-            if (i % labelInterval !== 0 && i !== data.length - 1) return null;
-            return (
-              <text
-                key={`x-${d.day}`}
-                x={sx(i)}
-                y={MARGIN.top + PLOT_H + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-              >
-                {new Date(d.day).toLocaleDateString('en-US', {
-                  timeZone: 'UTC',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </text>
-            );
-          })}
-        </svg>
-      </div>
-    </Expandable>
+          {showZero ? t.hideNoData : t.showNoData(zeroCount)}
+        </Button>
+      )}
+    </Card>
   );
 }
 
@@ -536,33 +246,23 @@ function WebSearchTopSessionsTable({
   const explorerHref = useExplorerHref();
   if (sessions.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noSessionData}
-      </div>
+      </EmptyState>
     );
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="overflow-x-auto">
-        <table className="w-full font-mono text-2xs">
+        <table className="w-full text-xs tabular-nums">
           <thead>
-            <tr className="text-muted-foreground text-left border-b border-border">
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-                {t.thRank}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-                {t.thSession}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-                {t.thSearchCount}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-                {t.thRequestCount}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-                {t.thSearchesPerReq}
-              </th>
+            <tr className="text-muted-foreground text-left border-b border-border/20">
+              <th className="py-1.5 px-2 font-medium text-xs">{t.thRank}</th>
+              <th className="py-1.5 px-2 font-medium text-xs">{t.thSession}</th>
+              <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thSearchCount}</th>
+              <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thRequestCount}</th>
+              <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thSearchesPerReq}</th>
             </tr>
           </thead>
           <tbody>
@@ -570,17 +270,17 @@ function WebSearchTopSessionsTable({
               const ratio =
                 s.requestCount > 0 ? (s.searchCount / s.requestCount).toFixed(2) : '0.00';
               return (
-                <tr key={s.sessionId} className="border-b border-border/50 hover:bg-surface-hover">
+                <tr key={s.sessionId} className="border-b border-border/20 hover:bg-surface-hover">
                   <td className="py-1.5 px-2 text-muted-foreground">{i + 1}</td>
                   <td className="py-1.5 px-2">
                     <Link
                       href={explorerHref(`/sessions/${s.sessionId}/conversation`)}
-                      className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                      className="font-mono text-brand underline underline-offset-2"
                     >
-                      {s.sessionId.split('-')[0]}...
+                      {s.sessionId.split('-')[0]}…
                     </Link>
                   </td>
-                  <td className="py-1.5 px-2 text-right font-bold">
+                  <td className="py-1.5 px-2 text-right font-medium">
                     {formatNumber(s.searchCount)}
                   </td>
                   <td className="py-1.5 px-2 text-right text-muted-foreground">
@@ -593,7 +293,7 @@ function WebSearchTopSessionsTable({
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -622,7 +322,24 @@ function WebSearchPageContent() {
     key: String(traceVersionParam),
   });
   const [range, setRange] = useState<DayRange>('30d');
-  const days = data?.daily.slice(-DAY_RANGE_DAYS[range]) ?? [];
+  const { searchDays, searchTotal, costSeries } = useMemo(() => {
+    const days = data?.daily.slice(-DAY_RANGE_DAYS[range]) ?? [];
+    const series: LineSeries[] = [
+      {
+        key: 'cost',
+        label: t.costSeries,
+        color: CHART_COLORS[0],
+        points: (data?.daily ?? [])
+          .slice(-30)
+          .map((d) => ({ day: d.day, value: d.searchCount * COST_PER_SEARCH })),
+      },
+    ];
+    return {
+      searchDays: days.map((d) => ({ day: d.day, values: { searches: d.searchCount } })),
+      searchTotal: days.reduce((sum, d) => sum + d.searchCount, 0),
+      costSeries: series,
+    };
+  }, [data, range, t]);
 
   return (
     <div className="space-y-6">
@@ -631,24 +348,24 @@ function WebSearchPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.loadError}
-          </div>
+          <EmptyState>{t.loadError}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Stat
+              boxed
               label={t.totalSearches}
               value={formatNumber(data.stats.totalSearches)}
               detail={t.requestsWithSearch(formatNumber(data.stats.requestsWithSearch))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.pctWithSearches}
               value={`${data.stats.searchPct.toFixed(1)}%`}
               detail={t.ofTotal(
@@ -656,47 +373,57 @@ function WebSearchPageContent() {
                 formatNumber(data.stats.totalRequests),
               )}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.estCost}
               value={formatDollars(data.stats.totalSearches * COST_PER_SEARCH)}
               detail={t.perSearch(COST_PER_SEARCH)}
             />
-          </div>
+          </dl>
         )}
       </div>
 
       {data && (
         <>
-          <div>
-            <SectionHeader
-              label={t.searchesOverTime}
-              detail={t.searches(formatNumber(days.reduce((sum, d) => sum + d.searchCount, 0)))}
-            />
-            <SearchesOverTimeChart
-              data={days}
-              locale={locale}
-              controls={
-                <RangeToggle
-                  value={range}
-                  options={DAY_RANGES}
-                  onChange={(v) => {
-                    setRange(v);
-                    track('agentic_workload_web_search_range_changed', { range: v });
-                  }}
-                />
-              }
-            />
-          </div>
+          <TrendsStackedChart
+            title={t.searchesOverTime}
+            subtext={t.searches(formatNumber(searchTotal))}
+            days={searchDays}
+            seriesKeys={SEARCH_KEYS}
+            labelFor={() => t.searchesSeries}
+            colorFor={searchColor}
+            mode="count"
+            yLabel={t.ySearches}
+            xFormatter={(day: string) => formatDayLabel(day, locale)}
+            filename="web-searches-over-time"
+            emptyLabel={t.noDailySearch}
+            controls={
+              <RangeToggle
+                value={range}
+                options={DAY_RANGES}
+                onChange={(v) => {
+                  setRange(v);
+                  track('agentic_workload_web_search_range_changed', { range: v });
+                }}
+              />
+            }
+          />
 
           <div>
             <SectionHeader label={t.searchesByModel} detail={t.models(data.byModel.length)} />
             <SearchesByModelChart byModel={data.byModel} locale={locale} />
           </div>
 
-          <div>
-            <SectionHeader label={t.searchCostOverTime} detail={`$${COST_PER_SEARCH}/search`} />
-            <SearchCostChart daily={data.daily} locale={locale} />
-          </div>
+          <TrendsLineChart
+            title={t.searchCostOverTime}
+            subtext={t.perSearch(COST_PER_SEARCH)}
+            series={costSeries}
+            yFormatter={formatAxisDollars}
+            yLabel={t.yCostUsd}
+            xFormatter={(day: string) => formatDayLabel(day, locale)}
+            filename="web-search-cost"
+            emptyLabel={t.noDailyCost}
+          />
 
           <div>
             <SectionHeader label={t.topSessions} detail={t.sessions(data.topSessions.length)} />

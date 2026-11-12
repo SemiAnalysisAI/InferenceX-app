@@ -21,8 +21,8 @@ import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
-    eyebrowSuffix: 'Precision Comparison',
-    h1Prefix: 'Precision Comparison',
+    eyebrowSuffix: 'Precision comparison',
+    h1Prefix: 'precision comparison',
     mainChartLinkText: 'the main inference chart',
     allComparisonsLinkText: 'All precision comparisons →',
     dashboardLinkText: 'Open the full dashboard →',
@@ -104,10 +104,10 @@ export default function ComparePrecisionPageClient({
       <div className="flex flex-col gap-4">
         <Card className="flex w-full min-w-0 flex-col gap-3">
           <header>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {modelLabel} · {gpuLabel} · {t.eyebrowSuffix}
-            </div>
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-balance lg:text-3xl">
               {isZh
                 ? `${gpuLabel}：${aLabel} 与 ${bLabel} ${t.h1Prefix}`
                 : `${gpuLabel}: ${aLabel} vs ${bLabel} ${t.h1Prefix}`}
@@ -137,7 +137,7 @@ export default function ComparePrecisionPageClient({
             )}
             {agenticIntro && (
               <p
-                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                className="mt-3 max-w-3xl text-sm text-foreground"
                 data-testid="compare-agentic-intro"
               >
                 {agenticIntro.paragraph}{' '}
@@ -156,12 +156,12 @@ export default function ComparePrecisionPageClient({
                 data-testid="compare-precision-narrative"
               >
                 {narrative.map((para, i) => (
-                  <p key={i} className="text-sm text-foreground/80">
+                  <p key={i} className="text-sm text-foreground">
                     {para}
                     {i === narrative.length - 1 && (
                       <>
                         {' '}
-                        <span className="text-muted-foreground italic">
+                        <span className="text-muted-foreground">
                           {isZh
                             ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} 配置；在控件中切换序列长度或模型后，下方表格和图表会同步更新。两侧均采用各自精度下可用的最优推理配置；只有存在相应测试配置时，才可能纳入 MTP 等投机解码方法。该口径与其他对比页面一致。）`
                             : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} selection for this URL — table and chart below update if you change sequence or model in the controls. Each side uses the best available serving configuration for that precision, which may include speculative decoding such as MTP where recipes exist — the same convention as the other comparison pages.)`}
@@ -175,43 +175,20 @@ export default function ComparePrecisionPageClient({
             <div className="mt-2 flex flex-wrap gap-4 text-sm">
               <Link
                 href={isZh ? '/zh/compare-precision' : '/compare-precision'}
-                className="underline hover:text-primary text-muted-foreground"
+                className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_precision_cross_link_index', { slug })}
               >
                 {t.allComparisonsLinkText}
               </Link>
               <Link
                 href={isZh ? '/zh' : '/'}
-                className="underline hover:text-primary text-muted-foreground"
+                className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_precision_cross_link_dashboard', { slug })}
               >
                 {t.dashboardLinkText}
               </Link>
             </div>
           </header>
-          <figure
-            className="mt-2 flex flex-col gap-2"
-            data-testid="compare-precision-indexed-image"
-          >
-            <img
-              src={heroImageSrc}
-              alt={
-                isZh
-                  ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的吞吐量与成本`
-                  : `${modelLabel}: ${aLabel} versus ${bLabel} throughput and cost at matched interactivity levels on ${gpuLabel}`
-              }
-              width={1200}
-              height={675}
-              loading="eager"
-              fetchPriority="high"
-              className="w-full rounded-lg border border-border/50"
-            />
-            <figcaption className="text-xs text-muted-foreground">
-              {isZh
-                ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在此对比默认工作负载下的吞吐量与每百万 token 成本。`
-                : `${aLabel} versus ${bLabel} throughput and cost per million tokens on ${gpuLabel} for this comparison's canonical default workload.`}
-            </figcaption>
-          </figure>
           <CompareTableSection
             gpu={gpu}
             precA={precA}
@@ -224,6 +201,38 @@ export default function ComparePrecisionPageClient({
             ssrPrecisions={initialPrecisions}
             emptyStateText={t.emptyState}
           />
+          <figure
+            className="mt-2 flex max-w-sm flex-col gap-2"
+            data-testid="compare-precision-indexed-image"
+          >
+            <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              <img
+                src={heroImageSrc}
+                alt={
+                  isZh
+                    ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的吞吐量与成本`
+                    : `${modelLabel}: ${aLabel} versus ${bLabel} throughput and cost at matched interactivity levels on ${gpuLabel}`
+                }
+                width={1200}
+                height={675}
+                loading="lazy"
+                className="w-full rounded-lg"
+              />
+            </a>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在此对比默认工作负载下的吞吐量与每百万 token 成本`
+                : `${aLabel} versus ${bLabel} throughput and cost per million tokens on ${gpuLabel} for this comparison's canonical default workload`}
+            </figcaption>
+            <a
+              href={heroImageSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-foreground underline underline-offset-2"
+            >
+              {isZh ? '查看大图 ↗' : 'Open full-size image ↗'}
+            </a>
+          </figure>
         </Card>
         <LazyCompareInferenceChart activeTab="compare" initialActiveHwTypes={[gpu]} />
       </div>

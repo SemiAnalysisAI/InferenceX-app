@@ -16,16 +16,26 @@ import { Expandable } from '@/components/agentic-workload-explorer/expandable-ch
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const STRINGS = {
   en: {
-    cachedVsUncached: 'Cached vs Uncached',
-    contextTrajectories: 'Context Trajectories',
-    apiCache: 'API Cache',
-    hashBlocks: 'Hash Blocks',
+    cachedVsUncached: 'Cached vs uncached',
+    contextTrajectories: 'Context trajectories',
+    apiCache: 'API cache',
+    hashBlocks: 'Hash blocks',
     agentLabel: 'Agent',
-    mainAgent: 'Main Agent',
-    tokensOverTimeTitle: 'Tokens Over Time',
+    mainAgent: 'Main agent',
+    tokensOverTimeTitle: 'Tokens over time',
+    viewLabel: 'Chart',
+    modeLabel: 'Cache view',
   },
   zh: {
     cachedVsUncached: '已缓存 vs 未缓存',
@@ -35,6 +45,8 @@ const STRINGS = {
     agentLabel: '智能体',
     mainAgent: '主智能体',
     tokensOverTimeTitle: 'Token 时间分布',
+    viewLabel: '图表',
+    modeLabel: '缓存视图',
   },
 } as const;
 
@@ -99,68 +111,52 @@ function TokensOverTimePageContent() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1">
-          {VIEWS.map((v) => (
-            <button
-              key={v.value}
-              type="button"
-              onClick={() => {
-                setParam('view', v.value, 'cached');
-                track('agentic_workload_tokens_view_changed', { view: v.value });
-              }}
-              className={`rounded-md px-2.5 py-1 font-mono text-3xs uppercase tracking-wider transition-colors ${
-                view === v.value
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedToggle
+          role="group"
+          ariaLabel={t.viewLabel}
+          value={view}
+          onValueChange={(next) => {
+            setParam('view', next, 'cached');
+            track('agentic_workload_tokens_view_changed', { view: next });
+          }}
+          options={VIEWS}
+        />
 
         {view === 'cached' && (
           <>
-            <div className="flex items-center overflow-hidden rounded-md border border-border">
-              {MODES.map((m, idx) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => {
-                    setParam('mode', m.value, 'api');
-                    track('agentic_workload_tokens_mode_changed', { mode: m.value });
-                  }}
-                  className={`px-2.5 py-1 font-mono text-3xs transition-colors ${
-                    idx > 0 ? 'border-l border-border' : ''
-                  } ${
-                    mode === m.value
-                      ? 'bg-surface-hover text-foreground'
-                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={t.modeLabel}
+              value={mode}
+              onValueChange={(next) => {
+                setParam('mode', next, 'api');
+                track('agentic_workload_tokens_mode_changed', { mode: next });
+              }}
+              options={MODES}
+            />
 
             {agentOptions.length > 1 && (
-              <label className="flex items-center gap-2 font-mono text-3xs uppercase tracking-wider text-muted-foreground">
-                {t.agentLabel}
-                <select
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                <span id="tokens-agent-label">{t.agentLabel}</span>
+                <Select
                   value={agentKey}
-                  onChange={(e) => {
-                    setParam('agent', e.target.value, MAIN_AGENT_KEY);
-                    track('agentic_workload_tokens_agent_changed', { agent: e.target.value });
+                  onValueChange={(value) => {
+                    setParam('agent', value, MAIN_AGENT_KEY);
+                    track('agentic_workload_tokens_agent_changed', { agent: value });
                   }}
-                  className="rounded-md border border-border bg-surface px-2 py-1 font-mono text-3xs normal-case tracking-normal text-foreground transition-colors hover:bg-surface-hover focus:outline-none"
                 >
-                  {agentOptions.map((opt) => (
-                    <option key={opt.key} value={opt.key}>
-                      {opt.label} ({opt.requestCount})
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <SelectTrigger aria-labelledby="tokens-agent-label">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agentOptions.map((opt) => (
+                      <SelectItem key={opt.key} value={opt.key}>
+                        {opt.label} ({opt.requestCount})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </>
         )}
@@ -169,7 +165,7 @@ function TokensOverTimePageContent() {
       <Expandable
         title={view === 'cached' ? t.tokensOverTimeTitle : t.contextTrajectories}
         subtitle={view === 'cached' ? (activeAgent?.label ?? t.mainAgent) : undefined}
-        corner
+        corner={view !== 'cached'}
       >
         {view === 'cached' ? (
           <TokensOverTimeChart

@@ -75,6 +75,18 @@ export interface ProfitModelDefaults {
  * list prices and a 0% fee because their weights ship under the MIT license.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
+  [Model.Muse_Spark_Open]: {
+    // Editable scenario target, not a P90 measurement of Meta's hosted endpoint.
+    interactivity: 100,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: {
+      vendor: 'Meta (Vercel AI Gateway)',
+      inputPerMillion: 1.25,
+      cachedInputPerMillion: 0.15,
+      outputPerMillion: 4.25,
+      sourceUrl: 'https://vercel.com/ai-gateway/models/muse-spark-1.3',
+    },
+  },
   [Model.DeepSeek_V4_Pro]: {
     interactivity: 170,
     labCutPct: 0,
@@ -170,8 +182,8 @@ export const DEFAULT_CACHE_HIT_MODE: CacheHitMode = 'theoretical';
 export const DEFAULT_UTILIZATION_PCT = 60;
 
 /**
- * Denominator every figure is expressed in. `/profit-estimator` is per chip-hour;
- * `/profit-estimator-per-gigawatt` scales by the GPU-hours one GW-year buys.
+ * Denominator every figure is expressed in. `/infx/profit-estimator` is per chip-hour;
+ * `/infx/profit-estimator-per-gigawatt` scales by the GPU-hours one GW-year buys.
  */
 export type ProfitBasis = 'chip-hour' | 'gw-year';
 
@@ -363,7 +375,7 @@ export function estimateProfitRows(
  */
 export function formatUsdCompact(value: number, digits = 1): string {
   if (!Number.isFinite(value)) return '—';
-  const sign = value < 0 ? '-' : '';
+  const sign = value < 0 ? '−' : '';
   const abs = Math.abs(value);
   if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(digits)}B`;
   if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(digits)}M`;
@@ -374,7 +386,7 @@ export function formatUsdCompact(value: number, digits = 1): string {
 /** Format a $/GPU/hr figure: cents matter, so a fixed two decimals with the sign in front. */
 export function formatUsdPerChipHour(value: number, digits = 2): string {
   if (!Number.isFinite(value)) return '—';
-  const sign = value < 0 ? '-' : '';
+  const sign = value < 0 ? '−' : '';
   return `${sign}$${Math.abs(value).toFixed(digits)}`;
 }
 

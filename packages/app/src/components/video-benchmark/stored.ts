@@ -1,7 +1,7 @@
 import { at, type Bundle, type Json } from './bundle';
 import type { CIArtifact } from './archive';
 import { fidelityEvidence, type FidelityBundle } from './fidelity';
-import type { ClipQuality } from './reference-quality';
+import type { ArtifactQuality, ClipQuality, UnscoredClip } from './reference-quality';
 import type { DiagnosticPair } from './diagnostic-quality';
 
 export interface StoredMedia {
@@ -10,6 +10,11 @@ export interface StoredMedia {
   downloadUrl: string;
   /** Web playback rendition of `url`, attached at read time and never stored in the index. */
   previewUrl?: string;
+  /**
+   * JPEG of the first decoded frame of `url`, attached at read time like `previewUrl`.
+   * Presentation only; metrics, PSNR and Difference read the sealed original.
+   */
+  posterUrl?: string;
 }
 export interface StoredSource {
   id: string;
@@ -37,8 +42,31 @@ export interface StoredArtifact {
   sources: StoredSource[];
   /** Independently sealed reference pairs; never an approval or part of the original ZIP. */
   quality?: ClipQuality[];
+  /** Measured clips the quality scorer listed without a comparison. */
+  unscored?: UnscoredClip[];
+  /** The quality scorer could not read this artifact, so none of its clips were compared. */
+  qualityUnreadable?: true;
   /** Native single-case diagnostics retain separate media and never become performance points. */
   diagnostics?: DiagnosticPair[];
+}
+/**
+ * A verified quality attachment for one published artifact, stored apart from its immutable
+ * index so later quality never rewrites the index or its approval.
+ */
+export interface StoredQuality extends ArtifactQuality {
+  version: 1;
+  runId: string;
+  artifactId: number;
+  /** The trusted Video Quality artifact the pairs were verified from. */
+  source: { artifactId: number; name: string; workflowRunId: number };
+}
+export function withQuality(saved: StoredArtifact, quality: ArtifactQuality): StoredArtifact {
+  return {
+    ...saved,
+    quality: quality.pairs,
+    unscored: quality.unscored,
+    ...(quality.unreadable ? { qualityUnreadable: true as const } : {}),
+  };
 }
 export function storedBundle(source: StoredSource): Bundle {
   const documents = new Map(source.documents);

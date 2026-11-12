@@ -6,9 +6,9 @@ publishDate: '2026-10-19'
 lede: 'At 200 tok/s/user on Qwen3.5-397B, TPU v7 FP8 delivers **1.85x** the tokens per $1 TCO of GB300 NVL72 FP8 on external TCO and 2.17x on internal TCO. GB300 NVL72 FP4 on Dynamo TensorRT-LLM leads at every matched point on both TCO bases. On Kimi K3, GB300 NVL72 leads on external TCO and TPU v7 on internal TCO from ~53 to ~149 tok/s/user.'
 links:
   - label: 'Open the AgentX dashboard'
-    href: 'https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH'
+    href: 'https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH'
   - label: 'Read the methodology'
-    href: '/agentx/methodology'
+    href: '/infx/agentx/methodology'
 tags:
   - agentx
   - agentic
@@ -59,7 +59,7 @@ Charts load live dashboard data and can include newer runs than the tables and n
 | TCO, owning (external / internal)    |            $1.21 / $1.03 per hr |                  $2.31 per hr | 0.52x / 0.45x |
 | All-in power per chip (provisioned)  |                        1.207 kW |                       2.12 kW |         0.57x |
 
-TPU v7 values are from Google Cloud's [TPU7x documentation](https://docs.cloud.google.com/tpu/docs/tpu7x), which lists inter-chip interconnect bandwidth as 1,200 GB/s per chip across both directions. Blackwell Ultra values come from the [InferenceX GPU specs](/gpu-specs).
+TPU v7 values are from Google Cloud's [TPU7x documentation](https://docs.cloud.google.com/tpu/docs/tpu7x), which lists inter-chip interconnect bandwidth as 1,200 GB/s per chip across both directions. Blackwell Ultra values come from the [InferenceX GPU specs](/infx/gpu-specs).
 
 A fully bandwidth-bound decode step would cap TPU v7's per-dollar advantage at the HBM bandwidth ratio over the hourly cost ratio, 0.92x / 0.52x ≈ 1.8x on the external cost and ~2x on the internal cost. The per-dollar ratios in the Qwen3.5 table exceed that at 200, 300 and 400 tok/s/user on both bases, because GB300 NVL72's FP8 curve falls away faster than TPU v7's in that band and has a gap in coverage there. Just above 200 tok/s/user, where TPU v7's frontier drops from its 22-agent to its 18-agent point, the ratio dips to ~1.6x on the external cost and ~1.9x on the internal cost.
 

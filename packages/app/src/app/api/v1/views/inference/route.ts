@@ -109,7 +109,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/v1/views/inference
  *
- * Chart-ready series for the main /inference scatter chart: the same dedupe →
+ * Chart-ready series for the main /infx/inference scatter chart: the same dedupe →
  * transform → filter → remap → Pareto pipeline `useChartData` runs client-side,
  * executed server-side via `buildInferenceSeries` (lib/views-api/series.ts).
  *
@@ -267,17 +267,18 @@ function observedPointIdentity(point: InferenceData) {
   };
 }
 
+const estimate = (value: EqualServiceEstimate | null) =>
+  value === null
+    ? null
+    : {
+        ...value,
+        endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
+          ...endpoint,
+          point: observedPointIdentity(point),
+        })),
+      };
+
 function publicServiceComparison(comparison: EqualServiceComparison) {
-  const estimate = (value: EqualServiceEstimate | null) =>
-    value === null
-      ? null
-      : {
-          ...value,
-          endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
-            ...endpoint,
-            point: observedPointIdentity(point),
-          })),
-        };
   return {
     ...comparison,
     metrics: Object.fromEntries(

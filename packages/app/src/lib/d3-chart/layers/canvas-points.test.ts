@@ -335,7 +335,7 @@ describe('CanvasPointLayer', () => {
     });
     frames.run(0);
     const alphas = calls.filter((call) => call[0] === 'set:globalAlpha').map((call) => call[1]);
-    expect(alphas).toEqual([0.5, 0.45, 0.1, 1]);
+    expect(alphas).toEqual([0.45, 0.5, 0.1, 1]);
     expect(calls.filter((call) => call[0] === 'set:strokeStyle')).toEqual([
       ['set:strokeStyle', 'green'],
     ]);

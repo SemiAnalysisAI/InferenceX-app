@@ -570,6 +570,24 @@ describe('mapBenchmarkRow', () => {
       expect(tracker.unmappedModels.has('nonexistent_model_xyz')).toBe(true);
     });
 
+    it('keeps an unregistered model and hardware under their raw identities only when allowed', () => {
+      const row = makeV1Row({
+        infmax_model_prefix: 'nonexistent_model_xyz',
+        model: undefined,
+        hw: 'cluster:imaginary9-lab',
+      });
+      expect(mapBenchmarkRow(row, createSkipTracker())).toBeNull();
+
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(row, tracker, undefined, undefined, {
+        allowUnregistered: true,
+      });
+      expect(result?.config.model).toBe('nonexistent_model_xyz');
+      expect(result?.config.hardware).toBe('imaginary9');
+      expect(tracker.skips.unmappedModel).toBe(0);
+      expect(tracker.skips.unmappedHw).toBe(0);
+    });
+
     it('skips and counts unmapped hardware', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(makeV1Row({ hw: 'imaginary-gpu-999' }), tracker);
@@ -1005,12 +1023,12 @@ describe('mapBenchmarkRow', () => {
   });
 });
 
-describe('scrubWithheldPowerMetrics (direct)', () => {
-  function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
-    const { workers: _workers, ...measured } = dirtyPowerPayload();
-    return { tput_per_gpu: 567.8, ...measured, ...overrides };
-  }
+function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
+  const { workers: _workers, ...measured } = dirtyPowerPayload();
+  return { tput_per_gpu: 567.8, ...measured, ...overrides };
+}
 
+describe('scrubWithheldPowerMetrics (direct)', () => {
   it('strips every measured key on power_valid=0 and reports withheld', () => {
     const metrics = supplementalMetrics({ power_valid: 0, power_metric_schema_version: 2 });
 

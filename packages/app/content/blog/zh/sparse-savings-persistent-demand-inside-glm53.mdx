@@ -44,7 +44,7 @@ tags:
 
 在我们的实时基准测试平台 InferenceX 上，当响应速度为每秒 150 token 时，GB300 在本次比较中取得了最低的建模服务成本。GB300 的单 GPU token 吞吐量更高，尽管每小时成本也更高，其成本效率仍优于 GB200。GB300 结果使用 Dynamo-TRT-LLM，GB200 结果使用 Dynamo-SGLang。
 
-我们采用 [9 月 28 日的 AgentX 快照](https://inferencex.semianalysis.com/inference/glm-5-3?g_model=GLM-5.2&g_rundate=2026-09-28&i_seq=agentic-traces&i_prec=fp4%2Cfp8&i_pctl=p90&i_best=0&i_optimal=1&i_metric=y_costh&i_xmode=interactivity)，说明 GLM-5.3 的推理服务特征。成本估算使用 InferenceX 的超大规模基础设施自有及运营成本模型。总 token 包含输入与生成的输出，也包含跨轮次复用的缓存输入历史。流式生成速度以 p90 interactivity 衡量，首 token 延迟则单独评估。
+我们采用 [9 月 28 日的 AgentX 快照](https://inferencex.semianalysis.com/infx/inference/glm-5-3?g_model=GLM-5.2&g_rundate=2026-09-28&i_seq=agentic-traces&i_prec=fp4%2Cfp8&i_pctl=p90&i_best=0&i_optimal=1&i_metric=y_costh&i_xmode=interactivity)，说明 GLM-5.3 的推理服务特征。成本估算使用 InferenceX 的超大规模基础设施自有及运营成本模型。总 token 包含输入与生成的输出，也包含跨轮次复用的缓存输入历史。流式生成速度以 p90 interactivity 衡量，首 token 延迟则单独评估。
 
 在每秒 150 token 的响应速度下，GB200 每百万总 token 的成本约为 $0.044，运行 ATOM 的 MI355X 则为 $0.049。在相同流式生成速度目标下，前者成本约低 12%。这些数值根据实测曲线估算，并非另行进行的、恰好达到每秒 150 token 的测试结果。
 
@@ -87,7 +87,7 @@ GLM 5.2 / 5.3 的注意力架构降低了内存需求，但长时间运行的智
 <Figure
   src="/images/sparse-savings-persistent-demand-inside-glm53/b200-cache-reuse.png"
   alt="不同并发下 B200 GPU 与主机内存的 prompt 缓存复用比例"
-  caption="来源：SemiAnalysis InferenceX；InferenceX B200 数据行 [440962](https://inferencex.semianalysis.com/inference/agentic/440962)、[440961](https://inferencex.semianalysis.com/inference/agentic/440961) 和 [440959](https://inferencex.semianalysis.com/inference/agentic/440959)；[工作流运行 33683520699](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33683520699/attempts/1)"
+  caption="来源：SemiAnalysis InferenceX；InferenceX B200 数据行 [440962](https://inferencex.semianalysis.com/infx/inference/agentic/440962)、[440961](https://inferencex.semianalysis.com/infx/inference/agentic/440961) 和 [440959](https://inferencex.semianalysis.com/infx/inference/agentic/440959)；[工作流运行 33683520699](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33683520699/attempts/1)"
 />
 
 除了缓存管理，推理引擎执行 prefill 和 decode 的方式也会影响性能。两项独立的 GLM-5.2 研究说明了这一点：

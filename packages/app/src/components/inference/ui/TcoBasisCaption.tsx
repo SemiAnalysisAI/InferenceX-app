@@ -11,7 +11,7 @@ import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 const STRINGS = {
   en: {
-    label: 'TCO Basis',
+    label: 'TCO basis',
     external: 'External',
     internal: 'Internal',
     tooltip:
@@ -30,10 +30,12 @@ export function TcoBasisCaption({
   hardwareKeys,
   source,
   interactive = true,
+  footer = false,
 }: {
   hardwareKeys: ReadonlySet<string>;
   source: 'inference' | 'historical';
   interactive?: boolean;
+  footer?: boolean;
 }) {
   const t = STRINGS[useLocale()];
   const { selectedModel, selectedSequence } = useInferenceFilters();
@@ -52,10 +54,11 @@ export function TcoBasisCaption({
       label={t.label}
       value={t[tcoBasis]}
       testId="result-context-tco-basis"
+      hideLabel={footer}
       control={
         interactive ? (
           <span className="inline-flex items-center gap-0.5">
-            <TcoBasisToggle source={source} caption />
+            <TcoBasisToggle source={source} caption={!footer} />
             <InfoHelp
               label={t.label}
               value="tco-basis"

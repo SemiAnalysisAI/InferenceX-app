@@ -27,7 +27,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/agentic-workload-explorer/sessions',
+  usePathname: () => '/infx/agentic-workload-explorer/sessions',
   useRouter: () => ({ replace: mocks.routerReplace }),
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -200,10 +200,10 @@ function buttonNamed(name: string): HTMLButtonElement {
 }
 
 describe('sessions hash upper bound', () => {
-  it('waits for an explicit Load click before requesting and rendering hash stats', async () => {
+  it('waits for an explicit Compute click before requesting and rendering hash stats', async () => {
     await settle(() => root.render(<SessionsPage />));
 
-    const loadButton = buttonNamed('Load');
+    const loadButton = buttonNamed('Compute');
     expect(hashStatsRequests()).toEqual([]);
     expect(ControlledIntersectionObserver.instances.length).toBeGreaterThan(0);
 
@@ -217,6 +217,7 @@ describe('sessions hash upper bound', () => {
     });
 
     expect(hashStatsRequests()).toEqual([hashStatsUrl]);
-    expect(loadButton.textContent?.trim()).toBe('73.3%');
+    expect(loadButton.isConnected).toBe(false);
+    expect(container.textContent).toContain('73.3%');
   });
 });

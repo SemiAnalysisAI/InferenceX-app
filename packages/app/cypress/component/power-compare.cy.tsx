@@ -56,7 +56,7 @@ function mountCompare(
   { locale = 'en', width = 1000 }: { locale?: 'en' | 'zh'; width?: number } = {},
 ) {
   mountWithProviders(
-    <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+    <PathnameContext.Provider value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}>
       <div style={{ width, height: 640 }}>
         <ScatterGraph
           chartId="power-compare-test"
@@ -182,49 +182,50 @@ describe('ScatterGraph power comparison series', () => {
 describe('Modeled power source links', () => {
   for (const width of [1280, 390]) {
     const overlay = width === 390;
+    const modeledCurve = (hwKey: string, runUrl?: string) =>
+      measuredCurve(hwKey, runUrl).map((point) =>
+        createMockInferenceData({
+          ...point,
+          disagg: false,
+          modeledSystemPower: {
+            status: 'supported',
+            unit: 'chassis',
+            hardware: hwKey,
+            modelRevision: SYSTEM_POWER_MODEL_REVISION,
+            operatingState: { workload: 'fixed-seq-len', scaleOut: false },
+            gpuCount: 8,
+            chassisCount: 1,
+            modeledGpuCount: 8,
+            measuredGpuWattsPerGpu: 600,
+            itWatts: 6400,
+            itWattsPerGpu: 800,
+            facilityWatts: 8320,
+            deploymentItWatts: 6400,
+            deploymentFacilityWatts: 8320,
+            deploymentBreakdownWatts: {
+              gpu: 4800,
+              measuredCpu: 0,
+              cpu: 375,
+              memory: 150,
+              nic: 250,
+              nvswitch: 125,
+              storage: 60,
+              other: 40,
+              fans: 200,
+              psuLoss: 200,
+              network: 200,
+              facility: 1920,
+            },
+            pue: 1.3,
+            topologyBasis: 'single-node',
+            chassisBasis: 'full',
+            telemetryBasis: 'validated-v2',
+          },
+        }),
+      );
+
     it(`links to the pinned power model from a en ${overlay ? 'mobile overlay' : 'desktop official'} tooltip`, () => {
       cy.viewport(width, 720);
-      const modeledCurve = (hwKey: string, runUrl?: string) =>
-        measuredCurve(hwKey, runUrl).map((point) =>
-          createMockInferenceData({
-            ...point,
-            disagg: false,
-            modeledSystemPower: {
-              status: 'supported',
-              unit: 'chassis',
-              hardware: hwKey,
-              modelRevision: SYSTEM_POWER_MODEL_REVISION,
-              operatingState: { workload: 'fixed-seq-len', scaleOut: false },
-              gpuCount: 8,
-              chassisCount: 1,
-              modeledGpuCount: 8,
-              measuredGpuWattsPerGpu: 600,
-              itWatts: 6400,
-              itWattsPerGpu: 800,
-              facilityWatts: 8320,
-              deploymentItWatts: 6400,
-              deploymentFacilityWatts: 8320,
-              deploymentBreakdownWatts: {
-                gpu: 4800,
-                measuredCpu: 0,
-                cpu: 375,
-                memory: 150,
-                nic: 250,
-                nvswitch: 125,
-                storage: 60,
-                other: 40,
-                fans: 200,
-                psuLoss: 200,
-                network: 200,
-                facility: 1920,
-              },
-              pue: 1.3,
-              topologyBasis: 'single-node',
-              chassisBasis: 'full',
-              telemetryBasis: 'validated-v2',
-            },
-          }),
-        );
       mountCompare(modeledCurve('b200'), modeledCurve('h100', OVERLAY_RUN_URL), {
         locale: 'en',
         width: Math.min(1000, width - 32),
@@ -236,7 +237,7 @@ describe('Modeled power source links', () => {
           .should((points) => expect(points).to.have.length.at.least(2))
           .then((points) => clickScatterPoint(points[1]));
       }
-      cy.get('[data-chart-tooltip]:visible').within(() => {
+      cy.get('[data-testid="point-details-panel"]').within(() => {
         if (overlay) cy.contains('powerx-compare').should('exist');
         cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {
           cy.get(`a[href="${SYSTEM_POWER_MODEL_SOURCE_URL}"]`)
@@ -250,7 +251,7 @@ describe('Modeled power source links', () => {
               const bounds = $link[0].getBoundingClientRect();
               expect(bounds.left).to.be.at.least(0);
               expect(bounds.right).to.be.at.most(width);
-              const shell = $link.closest('[data-chart-tooltip]')[0].firstElementChild!;
+              const shell = $link.closest('[data-testid="point-details-panel"]')[0];
               const frame = shell.getBoundingClientRect();
               expect(bounds.top).to.be.at.least(frame.top);
               expect(bounds.bottom).to.be.at.most(frame.bottom);

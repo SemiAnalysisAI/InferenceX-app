@@ -93,8 +93,8 @@ describe('plotVideoPoints', () => {
   it('builds a per-hardware frontier over deployments and, with Optimal Only off, draws the dominated ones faded', () => {
     const out = plot([...h200, b200], { ...state, optimal: false });
     expect(Object.keys(out).toSorted()).toEqual(['frontiers', 'multiLayout', 'plotted']);
-    expect(ids(out.frontiers.h200)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
-    expect(ids(out.frontiers.b200)).toEqual(['b200-4g']);
+    expect(ids(out.frontiers['h200:na'])).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
+    expect(ids(out.frontiers['b200:na'])).toEqual(['b200-4g']);
     expect(ids(out.plotted)).toEqual([
       'h200-4g-c1',
       'h200-8g',
@@ -114,7 +114,7 @@ describe('plotVideoPoints', () => {
   it('never plots a queued cell: more clients than replicas only queue on the batch-one server', () => {
     const out = plot([...h200, queued]);
     expect(ids(out.plotted)).not.toContain('h200-4g-c2');
-    expect(ids(out.frontiers.h200)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
+    expect(ids(out.frontiers['h200:na'])).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
     // No axis pair or cost tier re-admits it.
     for (const x of X_METRICS) {
       for (const y of Y_METRICS) {
@@ -168,7 +168,7 @@ describe('plotVideoPoints', () => {
       new Set(['b200']),
     );
     expect(ids(out.plotted)).toEqual(['h200-4g-c1']);
-    expect(out.frontiers).not.toHaveProperty('b200');
+    expect(out.frontiers).not.toHaveProperty(['b200:na']);
   });
 });
 
@@ -178,8 +178,8 @@ describe('Optimal Only', () => {
     const off = plot([...h200, b200], { ...state, optimal: false });
     expect(ids(on.plotted)).toEqual(['h200-4g-c1', 'h200-8g', 'h200-2g', 'b200-4g']);
     expect(on.plotted.every((p) => p.optimal)).toBe(true);
-    expect(ids(on.frontiers.h200)).toEqual(ids(off.frontiers.h200));
-    expect(ids(on.frontiers.b200)).toEqual(ids(off.frontiers.b200));
+    expect(ids(on.frontiers['h200:na'])).toEqual(ids(off.frontiers['h200:na']));
+    expect(ids(on.frontiers['b200:na'])).toEqual(ids(off.frontiers['b200:na']));
     expect(on.multiLayout).toBe(true);
   });
   it('lists the same cells in the table: frontier only when on, every non-queued deployment when off', () => {

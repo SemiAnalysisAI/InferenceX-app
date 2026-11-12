@@ -17,7 +17,7 @@ import {
 } from './video-storage';
 
 /** Bump when projected entries can change, so snapshots written by older code are ignored. */
-export const VIDEO_HISTORY_PROJECTION = 2;
+export const VIDEO_HISTORY_PROJECTION = 4;
 const BUILD_BATCH = 8;
 const HISTORY = `${PREFIX}/runs/history/`;
 const SNAPSHOTS = `${HISTORY}v${VIDEO_HISTORY_PROJECTION}/`;

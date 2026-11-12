@@ -1,4 +1,4 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { getGpuMetricsPointRevision } from '@semianalysisai/inferencex-db/queries/gpu-metrics-revision';
 import type { NextRequest } from 'next/server';
 import {
@@ -16,8 +16,8 @@ export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v2';
 const CACHE_CONTROL = 'private, no-cache';
 
 const getCachedGpuMetricsForPoint = cachedQuery(
-  (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>
-    getGpuMetricsForPoint(getDb(), id),
+  async (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>
+    getGpuMetricsForPoint(await getPayloadDb(id), id),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
@@ -28,7 +28,7 @@ async function handleGet(request: NextRequest): Promise<Response> {
     return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
   }
   try {
-    const revision = await getGpuMetricsPointRevision(getDb(), id);
+    const revision = await getGpuMetricsPointRevision(await getPayloadDb(id), id);
     if (revision === null) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     const cacheOptions = {
       cacheControl: CACHE_CONTROL,

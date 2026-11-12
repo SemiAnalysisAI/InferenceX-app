@@ -1,16 +1,16 @@
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 const MODEL_LABELS = [
-  'Muse Spark Open 816B',
+  'Muse Spark 1.3/Open 816B',
   'DeepSeek V4.1 Flash 552B',
-  'Kimi K3.1 Pro',
+  'Kimi K3.1 Pro 2.8T',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
 ];
 
 const PLATFORM_HEADERS = [
-  'Model · Scenario',
+  'Model · scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
@@ -21,22 +21,23 @@ const PLATFORM_HEADERS = [
 const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
-const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
+const AGENTX_LABEL = 'Long-context multi-turn realistic agentic scenario (AgentX)';
 const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Agentic Inference Costs';
+const PAGE_TITLE = 'Agentic inference costs';
 const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
-const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
+const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION}`;
 const SCOPE_METRIC_ZH = '超大规模云厂商成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
-const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
+const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH}`;
 const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 
 function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
   const targetIndex = OVERVIEW_TIERS.indexOf(tier);
+  cy.get('[data-testid="overview-page"] [aria-busy]').should('have.attr', 'aria-busy', 'false');
   return cy.get<HTMLInputElement>('[data-testid="overview-tier-slider"]').should(([slider]) => {
     const view = slider.ownerDocument.defaultView;
     if (view === null) throw new Error('Slider has no window');
@@ -53,6 +54,11 @@ function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
     slider.dispatchEvent(new view.Event('input', { bubbles: true }));
     expect(slider.dataset.tier, 'slider committed tier').to.eq(String(tier));
   });
+}
+
+function expectScope(line: string, sourceNote: string) {
+  cy.get('[data-testid="overview-scope"]').should('have.text', line);
+  cy.get('[data-testid="overview-source-link"]').parent().should('have.text', sourceNote);
 }
 
 function expectNoHorizontalOverflow() {
@@ -112,9 +118,23 @@ function mobileModel(model: string, scenario?: string) {
   return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]${row}`);
 }
 
-function expectCellTint(hardware: string, expected: string) {
+function expectCellTint(hardware: string, token: '--success' | '--destructive', alpha: number) {
   platform(hardware).then(([cell]) => {
-    expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.contain(expected);
+    const probe = cell.ownerDocument.createElement('span');
+    probe.style.backgroundColor = `oklch(from var(${token}) l c h)`;
+    cell.ownerDocument.body.append(probe);
+    const tokenColor = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const background = getComputedStyle(cell.closest('td')!).backgroundColor;
+    expect(tokenColor).to.match(/^oklch\(/);
+    expect(background).to.match(/^oklch\(/);
+    const [tokenChannels, cellChannels] = [tokenColor, background].map((color) =>
+      color.match(/[\d.]+/g)!.map(Number),
+    );
+    tokenChannels.forEach((channel, index) => {
+      expect(cellChannels[index]).to.be.closeTo(channel, 0.01);
+    });
+    expect(cellChannels[3]).to.eq(alpha);
   });
 }
 
@@ -135,9 +155,28 @@ function textRect(element: Element) {
 
 describe('Overview page', () => {
   for (const locale of ['', '/zh']) {
+    it(`defaults to one month ago at 100 tok/s/user in ${locale || 'en'}`, () => {
+      cy.visit(`${locale}/overview`);
+      cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '100');
+      cy.get('[data-overview-comparison="30d"]').should('have.attr', 'aria-current', 'true');
+      cy.request('/api/v1/views/overview').then(({ body }) => {
+        expect(body.params).to.include({ tier: 100, compare: '30d' });
+        expect(body.historicalWindow.key).to.eq('30d');
+      });
+      cy.get('[data-overview-comparison="hardware"]').click();
+      cy.location('search').should('eq', '?compare=hardware');
+      selectOverviewTier(50);
+      cy.location('search').should('eq', '?tier=50&compare=hardware');
+      cy.reload();
+      cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
+      cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
+    });
+  }
+
+  for (const locale of ['', '/zh']) {
     it(`gates the Flash matrix row through unlock, reload, and relock in ${locale || 'en'}`, () => {
       cy.viewport(1280, 900);
-      cy.visit(`${locale}/overview`, {
+      cy.visit(`${locale}/overview?tier=50&compare=hardware`, {
         onBeforeLoad(win) {
           win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         },
@@ -151,8 +190,11 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
       desktopModel('GLM-5.3-Flash', AGENTX)
         .should('contain.text', 'GLM 5.3 Flash')
-        .find('[data-testid="overview-platform"]')
-        .should('have.length', 5);
+        .then(($row) => {
+          const platforms = $row.find('[data-testid="overview-platform"]').length;
+          const blank = $row.find('[data-testid="overview-row-no-results"]').length;
+          expect(platforms === 5 || (platforms === 0 && blank === 1)).to.equal(true);
+        });
       cy.reload();
       cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
       desktopModel('GLM-5.3-Flash', AGENTX).scrollIntoView().should('be.visible');
@@ -167,7 +209,8 @@ describe('Overview page', () => {
 
   it('updates selectors through cached overview JSON without an RSC round trip', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
+    cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
     let jsonRequests = 0;
     let rscRequests = 0;
     const rscUrls: string[] = [];
@@ -191,13 +234,13 @@ describe('Overview page', () => {
 
     selectOverviewTier(75);
     cy.wait('@overviewJson');
-    cy.location('search').should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75&compare=hardware');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     selectOverviewTier(50);
-    cy.location('search').should('eq', '');
+    cy.location('search').should('eq', '?tier=50&compare=hardware');
     selectOverviewTier(75);
-    cy.location('search').should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75&compare=hardware');
     cy.then(() => {
       expect(jsonRequests, 'one request; both visited selections are cached').to.equal(1);
       expect(rscUrls, 'selector RSC requests').to.deep.equal([]);
@@ -207,17 +250,17 @@ describe('Overview page', () => {
       .find('[data-overview-engine-scope="all"]')
       .click();
     cy.wait('@overviewJson');
-    cy.location('search').should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all&compare=hardware');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-overview-comparison="30d"]').click();
     cy.wait('@overviewJson');
-    cy.location('search').should('eq', '?tier=75&engine=all&compare=30d');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
     cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
-    cy.location('search').should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all&compare=hardware');
     cy.then(() => {
       expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
     });
@@ -225,35 +268,36 @@ describe('Overview page', () => {
 
   it('keeps one history entry when the overview request fails', () => {
     cy.viewport(1280, 900);
-    cy.visit('/inference');
-    cy.visit('/overview');
+    cy.visit('/infx/inference');
+    cy.visit('/overview?tier=50&compare=hardware');
+    cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
     cy.intercept('GET', '**/api/v1/overview*', { statusCode: 500 }).as('overviewJsonFailure');
 
     cy.window().then((win) => {
       const before = win.history.length;
       selectOverviewTier(75);
       cy.wait('@overviewJsonFailure');
-      cy.location('search').should('eq', '?tier=75');
+      cy.location('search').should('eq', '?tier=75&compare=hardware');
       cy.window().then((after) => {
         expect(after.history.length - before, 'one entry for one selection').to.equal(1);
       });
       selectOverviewTier(75);
       cy.wait('@overviewJsonFailure');
-      cy.location('search').should('eq', '?tier=75');
+      cy.location('search').should('eq', '?tier=75&compare=hardware');
       cy.window().then((after) => {
         expect(after.history.length - before, 'retry adds no history entry').to.equal(1);
       });
     });
 
     cy.go('back');
-    cy.location('search').should('eq', '');
+    cy.location('search').should('eq', '?tier=50&compare=hardware');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.location('pathname').should('eq', '/infx/inference/kimi-k31-pro');
   });
 
-  it('reveals deprecated and maintenance models via the bottom toggle', () => {
+  it('reveals deprecated and maintenance models via the toolbar toggle', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
     desktopModel('MiniMax-M3').should('not.exist');
     desktopModel('DeepSeek-V4-Pro').should('not.exist');
@@ -262,7 +306,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-model-scope-toggle"]')
       .find('[data-overview-model-scope="all"]')
       .click();
-    cy.location('search').should('eq', '?models=all');
+    cy.location('search').should('eq', '?tier=50&compare=hardware&models=all');
 
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
@@ -286,13 +330,13 @@ describe('Overview page', () => {
     });
 
     selectOverviewTier(75);
-    cy.location('search').should('eq', '?tier=75&models=all');
+    cy.location('search').should('eq', '?tier=75&compare=hardware&models=all');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('exist');
 
     cy.get('[data-testid="overview-model-scope-toggle"]')
       .find('[data-overview-model-scope="default"]')
       .click();
-    cy.location('search').should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75&compare=hardware');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
     desktopModel('MiniMax-M3').should('not.exist');
     desktopModel('DeepSeek-V4-Pro').should('not.exist');
@@ -300,11 +344,11 @@ describe('Overview page', () => {
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     cy.get('[data-testid="overview-reference-select"]').click();
     cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search').should('eq', '?ref=b300');
+    cy.location('search').should('eq', '?tier=50&ref=b300&compare=hardware');
 
     cy.get('[data-overview-comparison="hardware"]')
       .should('have.attr', 'aria-current', 'true')
@@ -319,20 +363,16 @@ describe('Overview page', () => {
     });
 
     selectOverviewTier(100);
-    cy.location('search').should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?ref=b300&compare=hardware');
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
-      .should('have.attr', 'href', '/overview?tier=100&engine=all&ref=b300');
-    cy.get('[data-overview-comparison="30d"]').should(
-      'have.attr',
-      'href',
-      '/overview?tier=100&ref=b300&compare=30d',
-    );
+      .should('have.attr', 'href', '/overview?engine=all&ref=b300&compare=hardware');
+    cy.get('[data-overview-comparison="30d"]').should('have.attr', 'href', '/overview?ref=b300');
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?tier=100&ref=b300')
+      .should('have.attr', 'href', '/zh/overview?ref=b300&compare=hardware')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?ref=b300&compare=hardware');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', '对比 B300');
   });
 
@@ -348,24 +388,24 @@ describe('Overview page', () => {
       });
     });
 
-    cy.visit('/overview?tier=100&ref=b300');
+    cy.visit('/overview?ref=b300&compare=hardware');
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?tier=100&ref=b300')
+      .should('have.attr', 'href', '/zh/overview?ref=b300&compare=hardware')
       .click();
 
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?ref=b300&compare=hardware');
     cy.then(() => expect(zhOverviewRscRequests).to.equal(1));
   });
 
   it('switches between B200 and 30-day comparison without losing page state', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     cy.get('[data-testid="overview-presentation-surface"]')
       .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
-      .and('have.class', 'justify-center');
+      .and('have.class', 'justify-start');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', 'Compare')
       .within(() => {
@@ -379,12 +419,12 @@ describe('Overview page', () => {
             expect(style.backgroundColor).to.match(/rgba\(0, 0, 0, 0\)|transparent/);
           });
         cy.get('[data-overview-comparison="30d"]')
-          .should('have.attr', 'href', '/overview?compare=30d')
+          .should('have.attr', 'href', '/overview?tier=50')
           .and('have.text', 'Change over time')
           .click();
       });
 
-    cy.location('search').should('eq', '?compare=30d');
+    cy.location('search').should('eq', '?tier=50');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .find('[data-overview-comparison="30d"]')
       .should('have.attr', 'aria-current', 'true')
@@ -393,15 +433,13 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('not.contain.text', 'Reference');
 
     selectOverviewTier(100);
-    cy.location('search').should('eq', '?tier=100&compare=30d');
+    cy.location('search').should('eq', '');
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
-      .should('have.attr', 'href', '/overview?tier=100&engine=all&compare=30d');
-    cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?tier=100&compare=30d')
-      .click();
+      .should('have.attr', 'href', '/overview?engine=all');
+    cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/zh/overview').click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?tier=100&compare=30d');
+    cy.location('search').should('eq', '');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', '对比方式')
       .within(() => {
@@ -423,11 +461,11 @@ describe('Overview page', () => {
 
   it('switches the history window through the embedded selector', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?compare=30d');
+    cy.visit('/overview?tier=50');
 
     cy.get('[data-testid="overview-history-window-select"]').click();
     cy.get('[data-overview-window="7d"]').click();
-    cy.location('search').should('eq', '?compare=7d');
+    cy.location('search').should('eq', '?tier=50&compare=7d');
     cy.get('[data-overview-comparison="7d"]').should('have.attr', 'aria-current', 'true');
     cy.contains(
       'Current cost and change versus the latest validated platform result 7–14 days earlier.',
@@ -435,7 +473,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-history-window-select"]').click();
     cy.get('[data-overview-window="90d"]').click();
-    cy.location('search').should('eq', '?compare=90d');
+    cy.location('search').should('eq', '?tier=50&compare=90d');
     cy.contains(
       'Current cost and change versus the latest validated platform result 90–180 days earlier.',
     ).should('exist');
@@ -443,7 +481,7 @@ describe('Overview page', () => {
 
   it('compares each platform with its own validated result from 30–60 days earlier', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?compare=30d&models=all');
+    cy.visit('/overview?tier=50&models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       cy.contains('a', 'View details').should('not.exist');
@@ -478,7 +516,7 @@ describe('Overview page', () => {
         .and('have.attr', 'href')
         .then((href) => {
           const url = new URL(String(href), 'https://inferencex.local');
-          expect(url.pathname).to.equal('/inference');
+          expect(url.pathname).to.equal('/infx/inference');
           expect(url.searchParams.get('g_model')).to.equal('Qwen-3.5-397B-A17B');
           expect(url.searchParams.get('i_metric')).to.equal('y_costh');
           expect(url.searchParams.get('i_xmode')).to.equal('interactivity');
@@ -516,7 +554,7 @@ describe('Overview page', () => {
 
   it('releases the exact history pair after a model change', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?compare=30d');
+    cy.visit('/overview?tier=50');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
       .find('[data-testid="overview-history-detail-link"]')
@@ -526,7 +564,7 @@ describe('Overview page', () => {
         cy.visit(href);
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
-        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('Comparison date range').should('be.visible');
         cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
         cy.get('[data-testid="model-selector"]').click();
         cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
@@ -544,7 +582,7 @@ describe('Overview page', () => {
 
   it('keeps a benchmark result usable without comparison dates', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
       .find(
@@ -555,7 +593,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('Comparison date range').should('be.visible');
         cy.contains('button', 'Select date range')
           .should('not.have.class', 'animate-pulse')
           .and('not.have.class', 'border-red-500');
@@ -567,7 +605,7 @@ describe('Overview page', () => {
 
   it('does not require comparison dates when opening AgentX details', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     desktopModel('Qwen-3.5-397B-A17B', AGENTX)
       .contains('a', 'View details')
@@ -577,14 +615,14 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison Date Range').should('not.exist');
+        cy.contains('Comparison date range').should('not.exist');
       });
   });
 
   it('keeps the historical comparison complete and non-scrolling across desktop, tablet and phone', () => {
     for (const width of [320, 390, 768, 1024, 1279, 1280, 1440]) {
       cy.viewport(width, 900);
-      cy.visit('/overview?compare=30d');
+      cy.visit('/overview?tier=50');
 
       cy.get('[data-testid="overview-comparison-switcher"]')
         .should('be.visible')
@@ -613,9 +651,9 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
 
     for (const [href, attribute, key, sentence] of [
-      ['/overview?compare=30d', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+      ['/overview?tier=50', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
       [
-        '/overview',
+        '/overview?tier=50&compare=hardware',
         'data-overview-hardware-row-scope',
         'hwrows=priced',
         'no result on any platform',
@@ -673,7 +711,7 @@ describe('Overview page', () => {
 
   it('defaults to community engine scope and switches with canonical links preserving tier and locale', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .should('have.attr', 'aria-label', 'Engine scope')
@@ -681,44 +719,53 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)')
+          .and('have.text', 'Open-source community engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
-          .should('have.attr', 'href', '/overview?engine=all')
-          .and('have.text', 'All Platforms');
+          .should('have.attr', 'href', '/overview?tier=50&engine=all&compare=hardware')
+          .and('have.text', 'All platforms');
       });
 
+    cy.get('[data-testid="overview-controls-panel"]')
+      .should('match', 'fieldset')
+      .and('contain.text', 'Benchmark config')
+      .within(() => {
+        cy.get('label').should('contain.text', 'SLO (tok/s/user)');
+        cy.get('label').should('contain.text', 'Engine scope');
+      });
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
       cy.get('[data-testid="overview-engine-scope-switcher"]').then(([scope]) => {
-        const tierRect = tier.getBoundingClientRect();
-        const scopeRect = scope.getBoundingClientRect();
-        expect((scopeRect.top + scopeRect.bottom) / 2).to.be.closeTo(
-          (tierRect.top + tierRect.bottom) / 2,
-          8,
+        expect(scope.getBoundingClientRect().top).to.be.closeTo(
+          tier.getBoundingClientRect().top,
+          2,
         );
       });
     });
 
     desktopModel('GLM-5.2').within(() => {
       expectAgentxScenario(AGENTX_LABEL);
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
+      cy.get('[data-testid="overview-row-no-results"]').should(
+        'have.text',
+        'No results at this SLO',
+      );
     });
     cy.get(
       '[data-testid="overview-engine-scope-switcher"] [data-overview-engine-scope="all"]',
     ).click();
-    cy.location('search').should('eq', '?engine=all');
-    desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('have.length', 5);
+    cy.location('search').should('eq', '?tier=50&engine=all&compare=hardware');
+    desktopModel('GLM-5.2').find('[data-testid="overview-row-no-results"]').should('exist');
     selectOverviewTier(100);
-    cy.location('search').should('eq', '?tier=100&engine=all');
+    cy.location('search').should('eq', '?engine=all&compare=hardware');
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="community"]')
-      .should('have.attr', 'href', '/overview?tier=100');
+      .should('have.attr', 'href', '/overview?compare=hardware');
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?tier=100&engine=all')
+      .should('have.attr', 'href', '/zh/overview?engine=all&compare=hardware')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?tier=100&engine=all');
+    cy.location('search').should('eq', '?engine=all&compare=hardware');
     cy.get('[data-testid="overview-engine-scope-switcher"]').within(() => {
       cy.get('[data-overview-engine-scope="all"]')
         .should('have.attr', 'aria-current', 'true')
@@ -734,7 +781,7 @@ describe('Overview page', () => {
 
   it('prefers speculative decode and falls back to labelled standard-decode reads', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?models=all');
+    cy.visit('/overview?tier=50&compare=hardware&models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
@@ -787,7 +834,7 @@ describe('Overview page', () => {
 
   it('color-grades the whole cell against B200 and badges a missing baseline with a neutral ∞', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?models=all');
+    cy.visit('/overview?tier=50&compare=hardware&models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
@@ -798,7 +845,7 @@ describe('Overview page', () => {
         .then(($badge) => {
           expect($badge.attr('style') ?? '').not.to.contain('background');
         });
-      expectCellTint('mi355x', 'rgba(16, 185, 129,');
+      expectCellTint('mi355x', '--success', 0.15);
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
@@ -806,7 +853,7 @@ describe('Overview page', () => {
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+71%')
         .and('have.attr', 'data-cost-polarity', 'pricier');
-      expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
+      expectCellTint('gb200', '--destructive', 0.32);
       platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('gb300').then(([cell]) => {
         expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
@@ -819,7 +866,7 @@ describe('Overview page', () => {
       platform('b200').then(([cell]) => {
         const td = cell.closest('td')!;
         expect(td.getAttribute('style') ?? '').not.to.contain('background');
-        expect(td.className).to.contain('bg-muted/30');
+        expect(td.className).to.contain('bg-muted/15');
       });
     });
 
@@ -829,23 +876,20 @@ describe('Overview page', () => {
         .should('contain.text', '∞')
         .and('have.attr', 'data-cost-polarity', 'no-baseline');
       platform('gb300').then(([cell]) => {
-        const [r, g, b] = getComputedStyle(cell.closest('td')!)
-          .backgroundColor.match(/\d+/g)!
-          .map(Number);
-        expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
+        expect(cell.closest('td')!.getAttribute('style') ?? '').not.to.contain('background');
       });
     });
   });
 
   it('renders the full platform matrix for every publicly visible active model', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="nav-link-overview"]')
       .should('have.attr', 'href', '/overview')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.class', 'text-brand');
+      .and('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.attr', 'aria-current');
 
     cy.get('[data-testid="overview-source-link"]')
       .should('have.attr', 'href', TCO_SOURCE_URL)
@@ -866,12 +910,15 @@ describe('Overview page', () => {
           expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
             PLATFORM_HEADERS,
           );
-          for (const header of $headers) {
-            expect(getComputedStyle(header).fontSize).to.equal('14px');
-          }
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
-        cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
+        cy.root().then(($root) => {
+          const blankRows = $root.find('[data-testid="overview-row-no-results"]').length;
+          cy.get('[data-testid="overview-platform"]').should(
+            'have.length',
+            (MATRIX_ROWS - blankRows) * 5,
+          );
+        });
         cy.get('a').contains('View details').should('exist');
         cy.get('th[scope="row"]')
           .find('a')
@@ -895,7 +942,7 @@ describe('Overview page', () => {
 
   it('gives a model benchmarked on both scenarios one row each, priced independently', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?models=all');
+    cy.visit('/overview?tier=50&compare=hardware&models=all');
 
     cy.get('[data-testid="overview-desktop-model"][data-model="Qwen-3.5-397B-A17B"]').should(
       'have.length',
@@ -947,7 +994,7 @@ describe('Overview page', () => {
   it('stacks the metric definition under the title at every width', () => {
     for (const width of [320, 390, 768, 1280, 1440]) {
       cy.viewport(width, 900);
-      cy.visit('/overview');
+      cy.visit('/overview?tier=50&compare=hardware');
       cy.contains('h1', PAGE_TITLE).then(([title]) => {
         cy.get('[data-testid="overview-scope"]').then(([scope]) => {
           expect(
@@ -962,7 +1009,7 @@ describe('Overview page', () => {
 
   it('links each cost to the raw source dashboard for exactly that configuration', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?models=all');
+    cy.visit('/overview?tier=50&compare=hardware&models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('mi355x').within(() => {
@@ -982,7 +1029,7 @@ describe('Overview page', () => {
             '$0.062. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .should('have.attr', 'href')
-          .and('include', '/inference?')
+          .and('include', '/infx/inference?')
           .and('include', 'g_model=Qwen-3.5-397B-A17B')
           .and('include', 'g_rundate=2026-07-18')
           .and('include', 'i_prec=fp8')
@@ -1009,7 +1056,7 @@ describe('Overview page', () => {
 
   it('distinguishes per-platform and whole-row missing results with a plain dash', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?models=all');
+    cy.visit('/overview?tier=50&compare=hardware&models=all');
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('mi355x').within(() => {
@@ -1048,19 +1095,17 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-row-no-results"]').should('have.length', 1);
     });
     cy.get('[data-testid="overview-pair-missing"]').each(($cell) => {
       expect($cell.text()).not.to.contain('∞');
     });
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /∞\s*%/);
+    cy.get('body').invoke('text').should('not.match', /∞\s*%/);
   });
 
   it('re-renders the whole matrix from the six-stop SLO slider', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     cy.get('[data-testid="overview-tier-switcher"]')
       .should('have.attr', 'aria-label', 'SLO')
@@ -1085,8 +1130,8 @@ describe('Overview page', () => {
 
     selectOverviewTier(100);
 
-    cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
+    cy.location('search').should('eq', '?compare=hardware');
+    expectScope(SCOPE_LINE, SOURCE_NOTE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
       cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'filled');
@@ -1099,9 +1144,9 @@ describe('Overview page', () => {
         .and('have.attr', 'aria-valuetext', '100 tok/s/user');
     });
     selectOverviewTier(75);
-    cy.location('search').should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75&compare=hardware');
     selectOverviewTier(100);
-    cy.location('search').should('eq', '?tier=100');
+    cy.location('search').should('eq', '?compare=hardware');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').should('contain.text', '$0.124').and('contain.text', 'FP8');
@@ -1118,19 +1163,19 @@ describe('Overview page', () => {
       });
     });
 
-    cy.visit('/overview?tier=30&models=all');
+    cy.visit('/overview?tier=30&compare=hardware&models=all');
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      platform('b300').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
-          .should('contain.text', '—')
-          .and('contain.text', 'no exact @30 result');
-      });
+      cy.get('[data-testid="overview-platform"]').should('not.exist');
+      cy.get('[data-testid="overview-row-no-results"]').should(
+        'have.text',
+        'No results at this SLO',
+      );
+    });
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
         .and('contain.text', 'no exact @30 result');
-    });
-    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
           'contain.text',
@@ -1141,34 +1186,33 @@ describe('Overview page', () => {
           .and('have.attr', 'data-cost-polarity', 'no-baseline');
       });
     });
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /∞\s*%/);
+    cy.get('body').invoke('text').should('not.match', /∞\s*%/);
 
-    cy.visit('/overview?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
+    cy.visit('/overview?compare=hardware');
+    expectScope(SCOPE_LINE, SOURCE_NOTE);
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?tier=100')
+      .should('have.attr', 'href', '/zh/overview?compare=hardware')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
+    cy.location('search').should('eq', '?compare=hardware');
+    expectScope(SCOPE_LINE_ZH, SOURCE_NOTE_ZH);
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
     for (const width of [390, 320]) {
       cy.viewport(width, 844);
-      cy.visit('/overview?models=all');
+      cy.visit('/overview?tier=50&compare=hardware&models=all');
 
       cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
       cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
-      cy.get('[data-testid="overview-engine-scope-switcher"]')
+      cy.get('[data-testid="overview-engine-scope-switcher"]').should('be.visible');
+      cy.get('[data-testid="overview-engine-scope-select"]')
         .should('be.visible')
-        .find('[data-overview-engine-scope]')
-        .each(($option) => {
-          expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
+        .then(([select]) => {
+          expect(select.getBoundingClientRect().height).to.be.at.least(44);
         });
+      cy.get('[data-overview-engine-scope]').should('not.be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
       mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-platform"]').should('have.length', 5);
@@ -1197,7 +1241,7 @@ describe('Overview page', () => {
   it('aligns every platform to the same compact row axes on phones', () => {
     for (const width of [390, 320]) {
       cy.viewport(width, 844);
-      cy.visit('/overview?models=all');
+      cy.visit('/overview?tier=50&compare=hardware&models=all');
 
       mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]')
@@ -1224,7 +1268,7 @@ describe('Overview page', () => {
 
     for (const width of [320, 390, 768, 1024, 1279]) {
       cy.viewport(width, 900);
-      cy.visit('/overview?models=all');
+      cy.visit('/overview?tier=50&compare=hardware&models=all');
 
       mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
@@ -1243,7 +1287,7 @@ describe('Overview page', () => {
   it('keeps percentage badges beside the value and typographically aligned below desktop', () => {
     for (const width of [320, 390, 768, 1024, 1279]) {
       cy.viewport(width, 900);
-      cy.visit('/overview');
+      cy.visit('/overview?tier=50&compare=hardware');
 
       mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         platform('mi355x').within(() => {
@@ -1268,7 +1312,7 @@ describe('Overview page', () => {
     }
 
     cy.viewport(390, 844);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
 
     mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('mi355x').within(() => {
@@ -1289,7 +1333,8 @@ describe('Overview page', () => {
 
   it('pins the matrix header to the top of the viewport while the page scrolls', () => {
     cy.viewport(1280, 700);
-    cy.visit('/overview');
+    cy.visit('/overview?tier=50&compare=hardware');
+    cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
 
     cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
       expect(table.getBoundingClientRect().height).to.be.greaterThan(700);
@@ -1316,7 +1361,7 @@ describe('Overview page', () => {
   it('fits the full matrix without overlap or clipping at desktop widths', () => {
     for (const width of [1280, 1440]) {
       cy.viewport(width, 900);
-      cy.visit('/overview');
+      cy.visit('/overview?tier=50&compare=hardware');
 
       cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {

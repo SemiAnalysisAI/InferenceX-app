@@ -9,8 +9,10 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import { mergeReliabilityStats } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import {
   getReliabilityStats,
   type ReliabilityRow,
@@ -34,7 +36,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/v1/views/reliability
  *
  * Aggregated benchmark-run success rates per hardware over a date-range
- * preset — the same numbers the `/reliability` dashboard chart renders,
+ * preset — preserving the retired Chip reliability chart's calculations,
  * computed by the shared `aggregateByDateRange` (components/reliability).
  *
  * Query params:
@@ -45,7 +47,10 @@ export const dynamic = 'force-dynamic';
 
 // Same cache key as /api/v1/reliability: both routes read the identical raw
 // run_stats rows, so they intentionally share one cached payload.
-const getCachedReliabilityRows = cachedQuery(() => getReliabilityStats(getDb()), 'reliability');
+const getCachedReliabilityRows = cachedQuery(
+  async () => mergeReliabilityStats(await readEachDb(getReliabilityStats)),
+  'reliability',
+);
 
 export function GET(request: NextRequest) {
   return runViewsRoute('reliability', async () => {

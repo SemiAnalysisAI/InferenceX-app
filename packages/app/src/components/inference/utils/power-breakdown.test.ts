@@ -368,36 +368,37 @@ describe('sparklineGeometry', () => {
   });
 });
 
+const breakdownPoint = (gpu: number, cpu: number, facility: number): PowerBreakdownPoint => ({
+  point: point(gpu),
+  concurrency: 1,
+  interactivity: 1,
+  configKey: '',
+  configLabel: '',
+  wattsPerGpu: {
+    gpu,
+    measuredCpu: 0,
+    cpu,
+    memory: 0,
+    nic: 0,
+    nvswitch: 0,
+    storage: 0,
+    other: 0,
+    fans: 0,
+    psuLoss: 0,
+    network: 0,
+    facility,
+  },
+  totalWattsPerGpu: gpu + cpu + facility,
+  pue: 1.2,
+  cpuBasis: null,
+  chassisBasis: 'full',
+});
+
 describe('stackedBandsAt', () => {
   const bands = ['gpu', 'server', 'facility'] as const;
-  const entry = (gpu: number, cpu: number, facility: number): PowerBreakdownPoint => ({
-    point: point(gpu),
-    concurrency: 1,
-    interactivity: 1,
-    configKey: '',
-    configLabel: '',
-    wattsPerGpu: {
-      gpu,
-      measuredCpu: 0,
-      cpu,
-      memory: 0,
-      nic: 0,
-      nvswitch: 0,
-      storage: 0,
-      other: 0,
-      fans: 0,
-      psuLoss: 0,
-      network: 0,
-      facility,
-    },
-    totalWattsPerGpu: gpu + cpu + facility,
-    pue: 1.2,
-    cpuBasis: null,
-    chassisBasis: 'full',
-  });
   const points = [
-    { x: 0, entry: entry(100, 20, 30) },
-    { x: 100, entry: entry(200, 40, 30) },
+    { x: 0, entry: breakdownPoint(100, 20, 30) },
+    { x: 100, entry: breakdownPoint(200, 40, 30) },
   ];
 
   it('interpolates every band linearly between the neighbouring points', () => {

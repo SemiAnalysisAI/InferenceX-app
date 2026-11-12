@@ -77,7 +77,7 @@ const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.Muse_Spark_Open]: {
-    label: 'Muse Spark Open 816B',
+    label: 'Muse Spark 1.3/Open 816B',
     prefix: 'musespark',
     category: 'default',
     logo: 'muse-mascot.webp',
@@ -98,7 +98,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     logo: 'deepseek-color.svg',
   },
   [Model.Kimi_K3_1_Pro]: {
-    label: 'Kimi K3.1 Pro',
+    label: 'Kimi K3.1 Pro 2.8T',
     prefix: 'kimik3.1',
     category: 'default',
     openRouterModelId: 'moonshotai/kimi-k3.1-pro',
@@ -229,25 +229,24 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
 
 // Selector order is independent of the overview registry order and selected defaults.
 const MODEL_SELECTOR_ORDER: readonly Model[] = [
+  Model.Kimi_K3_1_Pro,
   Model.DeepSeek_V4_1_Flash,
   Model.GLM_5_2,
   Model.GLM_5_3_Flash,
-  Model.Kimi_K3_1_Pro,
   Model.MiniMax_M3_1_Flash,
   Model.Muse_Spark_Open,
   Model.Qwen3_5,
   Model.Qwen3_8_Flash_Next,
 ];
 
+const rank = (model: Model) => {
+  const index = MODEL_SELECTOR_ORDER.indexOf(model);
+  return index === -1 ? MODEL_SELECTOR_ORDER.length : index;
+};
+
 export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
   .filter((m) => MODEL_CONFIG[m].category !== 'hidden')
-  .sort((a, b) => {
-    const rank = (model: Model) => {
-      const index = MODEL_SELECTOR_ORDER.indexOf(model);
-      return index === -1 ? MODEL_SELECTOR_ORDER.length : index;
-    };
-    return rank(a) - rank(b);
-  });
+  .sort((a, b) => rank(a) - rank(b));
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
 
@@ -302,6 +301,11 @@ export function getModelExclusion(model: Model | string | null | undefined): Exc
 
 export function hasExclusion(model: Model | string | null | undefined): boolean {
   return getModelExclusion(model).length > 0;
+}
+
+/** False for a model that only an unofficial-run overlay carries, identified by its raw prefix. */
+export function isRegisteredModel(model: string): model is Model {
+  return Object.hasOwn(MODEL_CONFIG, model);
 }
 
 export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
@@ -457,7 +461,9 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
 
 const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.GLM_5_3_Flash]: new Set(
-    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+    SEQUENCE_OPTIONS.filter(
+      (sequence) => sequence !== Sequence.AgenticTraces && sequence !== Sequence.EightK_OneK,
+    ),
   ),
   [Model.Muse_Spark_Open]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),

@@ -116,8 +116,10 @@ describe('Blog', () => {
       cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
       cy.get('[data-testid="hardware-hero"]').within(() => {
         cy.get('[data-testid="hardware-lede"]').should('be.visible');
-        cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand');
-        cy.get('[data-testid="hardware-hero-link"]').eq(1).should('not.have.class', 'bg-brand');
+        cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand-fill');
+        cy.get('[data-testid="hardware-hero-link"]')
+          .eq(1)
+          .should('not.have.class', 'bg-brand-fill');
         cy.get('a[href="/zh/hardware"]').should('be.visible');
       });
       cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);

@@ -2,9 +2,9 @@
 
 import type { AgenticAggregateMap, MetricPercentiles } from '@/hooks/api/use-agentic-aggregates';
 import type { BenchmarkSibling } from '@/hooks/api/use-benchmark-siblings';
+import { EmptyState } from '@/components/ui/empty-state';
 
 import { AggregateChart, type AggregatePoint, type PercentileKey } from './aggregate-chart';
-import { CHART_SIZES } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
 import { chipLabel } from './sibling-nav';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -55,18 +55,10 @@ export function AggregatesGrid({
           prefix: 'Prefix cache hit rate (across configs)',
         };
   if (siblings.length === 0) {
-    return (
-      <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-        {t.missing}
-      </div>
-    );
+    return <EmptyState>{t.missing}</EmptyState>;
   }
   if (isLoading && !aggregates) {
-    return (
-      <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-        {t.loading(siblings.length)}
-      </div>
-    );
+    return <EmptyState>{t.loading(siblings.length)}</EmptyState>;
   }
   const labeled = siblings.map((s) => ({ id: s.id, label: chipLabel(s) }));
   const islPoints = labeled.map((s) => toAggPoint(s, aggregates?.[s.id]?.isl));
@@ -74,48 +66,48 @@ export function AggregatesGrid({
   const kvPoints = labeled.map((s) => toAggPoint(s, aggregates?.[s.id]?.kvCacheUtil));
   const prefixPoints = labeled.map((s) => toAggPoint(s, aggregates?.[s.id]?.prefixCacheHitRate));
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
       <ExpandableChart
         title={t.isl}
-        render={(expanded) => (
+        render={(size) => (
           <AggregateChart
             points={islPoints}
             unit={locale === 'zh' ? 'token' : 'tokens'}
-            {...(expanded ? CHART_SIZES.expanded : CHART_SIZES.inline)}
+            {...size}
           />
         )}
       />
       <ExpandableChart
         title={t.osl}
-        render={(expanded) => (
+        render={(size) => (
           <AggregateChart
             points={oslPoints}
             unit={locale === 'zh' ? 'token' : 'tokens'}
-            {...(expanded ? CHART_SIZES.expanded : CHART_SIZES.inline)}
+            {...size}
           />
         )}
       />
       <ExpandableChart
         title={t.kv}
-        render={(expanded) => (
+        render={(size) => (
           <AggregateChart
             points={kvPoints}
             unit="%"
             yMax={1}
             yFmt={(v) => `${(v * 100).toFixed(0)}%`}
-            {...(expanded ? CHART_SIZES.expanded : CHART_SIZES.inline)}
+            {...size}
           />
         )}
       />
       <ExpandableChart
         title={t.prefix}
-        render={(expanded) => (
+        render={(size) => (
           <AggregateChart
             points={prefixPoints}
             unit="%"
             yMax={1}
             yFmt={(v) => `${(v * 100).toFixed(0)}%`}
-            {...(expanded ? CHART_SIZES.expanded : CHART_SIZES.inline)}
+            {...size}
           />
         )}
       />

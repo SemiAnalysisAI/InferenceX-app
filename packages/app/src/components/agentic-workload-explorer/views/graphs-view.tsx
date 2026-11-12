@@ -1,9 +1,12 @@
 'use client';
 
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   useGraphDataset,
@@ -14,8 +17,10 @@ import {
   formatNumber,
   formatPrefillSpeed,
 } from '@/lib/agentic-workload-explorer/format';
-import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import {
+  ChartActions,
+  ExpandableChart,
+} from '@/components/agentic-workload-explorer/expandable-chart';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
@@ -24,63 +29,78 @@ import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
-import {
-  HARNESS_LABELS,
-  HARNESSES,
-  type Harness,
-} from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { HARNESSES, type Harness } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { harnessLabel } from '@/lib/agentic-workload-explorer/harness-label';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 import { SUBAGENT_STATS_WINDOW_DAYS } from '@semianalysisai/inferencex-db/proxytrace/shared/subagent';
 import { IDLE_GAP_CUTOFF_MS } from '@semianalysisai/inferencex-db/proxytrace/shared/wall-clock';
 import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
+import {
+  formatAxisDollars,
+  formatAxisNumber,
+  formatDayLabel,
+  formatHourLabel,
+  TrendsLineChart,
+  TrendsStackedChart,
+  type LineSeries,
+  type StackedDayPoint,
+} from '@/components/agentic-workload-explorer/trends-charts';
+import { DistributionHistogram } from '@/components/agentic-workload-explorer/distribution-histogram';
+import {
+  CHART_COLORS,
+  TOKEN_SERIES_COLORS,
+} from '@/components/agentic-workload-explorer/series-colors';
 
 const STRINGS = {
   en: {
+    yTokens: 'Tokens',
+    ySessions: 'Sessions',
+    yCostUsd: 'Cost (USD)',
+    yRequestsPerSecond: 'Requests / second',
     loading: 'Loading…',
     failedToLoad: 'Failed to load',
     noData: 'No data available',
-    requests: 'Requests',
-    tokens: 'Tokens',
     sessions: 'Sessions',
-    usd: 'USD',
     total: 'Total',
-    tokenVolumePerHour: 'Token Volume per Hour',
-    final48h: '(final 48h)',
-    hourlyTokenVolume: 'Hourly Token Volume',
+    tokenVolumePerHour: 'Token volume per hour',
+    final48h: 'Final 48 hours',
     input: 'Input',
-    cacheRead: 'Cache Read',
-    cacheWrite: 'Cache Write',
+    cacheRead: 'Cache read',
+    cacheWrite: 'Cache write',
     output: 'Output',
-    weeklySessionsByHarness: 'Weekly Sessions by Harness',
+    weeklySessionsByHarness: 'Weekly sessions by harness',
     noSessionsInSnapshot: (v: number) =>
       `No sessions with > 20 requests at trace v${v} in this snapshot`,
-    weekOf: (label: string) => `Week of ${label}`,
-    estimatedCostPerHour: 'Estimated Cost per Hour',
-    hourlyCost: 'Hourly Cost',
-    estCost: 'Est. Cost',
-    p50CpuGpuTime: 'P50 CPU vs GPU Time',
+    estimatedCostPerHour: 'Estimated cost per hour',
+    estCost: 'Est. cost',
+    p50CpuGpuTime: 'P50 CPU vs GPU time',
     cpuTimeBetweenTurns: 'CPU (time between turns)',
     gpuE2eLatency: 'GPU (E2E latency)',
     p50Cpu: 'P50 CPU',
     p50Gpu: 'P50 GPU',
-    maxConcurrentSubagentsPerSession: 'Max Concurrent Subagents per Session',
+    maxConcurrentSubagentsPerSession: 'Max concurrent subagents per session',
     noEligibleSessions: 'No eligible sessions in this snapshot',
-    requestsPerSecond: 'Requests per Second',
-    finalOfSnapshot: (label: string) => `(final ${label} of snapshot)`,
-    requestsPerSecondYAxis: 'Requests / second',
+    requestsPerSecond: 'Requests per second',
+    timeRangeLabel: 'Time range',
+    agentLabel: 'Agent',
+    rpsWindow: {
+      '3h': 'Final 3 hours',
+      '12h': 'Final 12 hours',
+      '24h': 'Final 24 hours',
+      '3d': 'Final 3 days',
+      '7d': 'Final 7 days',
+    },
     rpsBucketLabel: (label: string) => `RPS (${label})`,
-    rollingAvg: 'Rolling avg',
     rollingAvgLegend: (window: number) => `Rolling avg (window=${window})`,
     meanRps: 'Mean RPS',
     peakRps: 'Peak RPS',
-    totalRequests: 'Total Requests',
+    totalRequests: 'Total requests',
     bucketMinutes: (min: number) => `${min}m buckets`,
     bucketHours: (h: number) => `${h}h buckets`,
-    wallClockTitle: 'Wall Clock: Tool/CPU vs LLM/GPU vs Idle',
-    wallClockFinal: (days: number) => `(final ${days}d, UTC)`,
-    wallClockComposition: 'Wall Clock Composition',
-    shareOfWallClock: 'Share of Wall Clock',
-    wallClockHoursYAxis: 'Wall Clock Hours',
+    wallClockTitle: 'Wall clock: tool/CPU vs LLM/GPU vs idle',
+    wallClockFinal: (days: number) => `Final ${days} days · UTC`,
+    shareOfWallClock: 'Share of wall clock',
+    wallClockHoursYAxis: 'Wall clock hours',
     llmGpuLegend: 'LLM / GPU (E2E latency)',
     toolCpuLegend: 'Tool / CPU (client-side)',
     userIdleLegend: 'User idle (between turns)',
@@ -88,88 +108,94 @@ const STRINGS = {
     modeHours: 'Hours',
     modeShare: 'Share',
     traffic: 'Traffic',
-    hourlyActivity: 'Hourly Activity',
-    weeklySessions: 'Weekly Sessions',
-    wallClock: 'Wall Clock',
-    islTotalDist: 'ISL Total Distribution',
-    islTotalAxis: 'ISL Total Tokens (Cache Read + Cache Write + Input)',
-    cacheReadDist: 'Cache Read Distribution',
-    cacheReadAxis: 'Cache Read Tokens',
-    cacheWriteDist: 'Cache Write Distribution',
-    cacheWriteAxis: 'Cache Write Tokens',
-    outputDist: 'Output Distribution',
-    outputAxis: 'Output Tokens',
-    timeBetweenTurns: 'Time Between Turns',
+    hourlyActivity: 'Hourly activity',
+    weeklySessions: 'Weekly sessions',
+    wallClock: 'Wall clock',
+    islTotalDist: 'ISL total distribution',
+    islTotalAxis: 'ISL total tokens (cache read + cache write + input)',
+    cacheReadDist: 'Cache read distribution',
+    cacheReadAxis: 'Cache read tokens',
+    cacheWriteDist: 'Cache write distribution',
+    cacheWriteAxis: 'Cache write tokens',
+    outputDist: 'Output distribution',
+    outputAxis: 'Output tokens',
+    timeBetweenTurns: 'Time between turns',
     seconds: 'Seconds',
-    userIdleTimeBetweenTurns: (min: number) => `User Idle Time Between Turns (< ${min} min)`,
-    userIdleAxis: 'User Idle (seconds)',
-    cpuGpuRatioTitle: 'CPU Tool-Use Time : GPU Time Ratio',
+    userIdleTimeBetweenTurns: (min: number) => `User idle time between turns (< ${min} min)`,
+    userIdleAxis: 'User idle (seconds)',
+    cpuGpuRatioTitle: 'CPU tool-use time : GPU time ratio',
     cpuGpuRatioAxis: 'Ratio (time between turns / E2E latency)',
-    cacheReadOutputRatioReq: 'Cache Read : Output Ratio (per request)',
+    cacheReadOutputRatioReq: 'Cache read : output ratio (per request)',
     ratioAxis: 'Ratio',
-    cacheReadWriteRatio: 'Cache Read : Write Ratio (per request)',
-    cacheReadOutputRatioSess: 'Cache Read : Output Ratio (per session)',
-    turnsPerSession: 'Turns per Session',
+    cacheReadWriteRatio: 'Cache read : write ratio (per request)',
+    cacheReadOutputRatioSess: 'Cache read : output ratio (per session)',
+    turnsPerSession: 'Turns per session',
     turnsAxis: 'Turns',
-    ttftDist: 'TTFT Distribution',
-    ttftAxis: 'Time to First Token',
-    tpotDist: 'TPOT Distribution',
-    tpotAxis: 'Time per Output Token',
-    prefillSpeedDist: 'Prefill Speed Distribution',
-    prefillSpeedAxis: 'Prefill Speed (input tok/s/query)',
-    tokensPerChunkDist: 'Tokens per SSE Chunk Distribution',
-    tokensPerChunkAxis: 'Output Tokens / SSE Event (tok/chunk)',
-    prefillShareTitle: 'Prefill Share of E2E Latency (TTFT / E2E)',
+    ttftDist: 'TTFT distribution',
+    ttftAxis: 'Time to first token',
+    tpotDist: 'TPOT distribution',
+    tpotAxis: 'Time per output token',
+    prefillSpeedDist: 'Prefill speed distribution',
+    prefillSpeedAxis: 'Prefill speed (input tok/s/query)',
+    tokensPerChunkDist: 'Tokens per SSE chunk distribution',
+    tokensPerChunkAxis: 'Output tokens / SSE event (tok/chunk)',
+    prefillShareTitle: 'Prefill share of E2E latency (TTFT / E2E)',
     prefillShareAxis: 'TTFT / E2E (% of latency spent in prefill)',
-    interactivityDist: 'Interactivity Distribution',
+    interactivityDist: 'Interactivity distribution',
     interactivityAxis: 'Interactivity (output tok/s/user)',
-    sessionDurationTitle: (v: number) => `Session Duration (> 20 reqs, trace v${v})`,
-    sessionDurationAxis: 'Session Duration (hours)',
+    sessionDurationTitle: (v: number) => `Session duration (> 20 reqs, trace v${v})`,
+    sessionDurationAxis: 'Session duration (hours)',
     subagentCountTitle: (days: number, v: number) =>
-      `Subagents per Session — Final ${days}d (> 20 reqs, trace v${v})`,
-    subagentCountAxis: 'Subagents per Session',
+      `Subagents per session · Final ${days} days (> 20 reqs, trace v${v})`,
+    subagentCountAxis: 'Subagents per session',
     maxConcurrentHistTitle: (days: number, v: number) =>
-      `Max Concurrent Subagents per Session — Final ${days}d (> 20 reqs, trace v${v})`,
-    maxConcurrentAxis: 'Peak Concurrent Subagents',
+      `Max concurrent subagents per session · Final ${days} days (> 20 reqs, trace v${v})`,
+    maxConcurrentAxis: 'Peak concurrent subagents',
     bins: (n: number) => `${n} bins`,
-    p50PrefillDecodeTime: 'P50 Prefill vs Decode Time',
+    p50PrefillDecodeTime: 'P50 prefill vs decode time',
     prefillTtft: 'Prefill (TTFT)',
     decodeE2eMinusTtft: 'Decode (E2E − TTFT)',
-    p50Prefill: 'P50 Prefill',
-    p50Decode: 'P50 Decode',
-    cpuGpuOpus47Fast: 'P50 CPU vs GPU Time — Opus 4.7 (fast mode)',
-    cpuGpuOpus47NonFast: 'P50 CPU vs GPU Time — Opus 4.7 (non-fast)',
-    cpuGpuOpus48Fast: 'P50 CPU vs GPU Time — Opus 4.8 (fast mode)',
-    cpuGpuOpus48NonFast: 'P50 CPU vs GPU Time — Opus 4.8 (non-fast)',
-    prefillDecodeOpus47Fast: 'P50 Prefill vs Decode Time — Opus 4.7 (fast mode)',
-    prefillDecodeOpus47NonFast: 'P50 Prefill vs Decode Time — Opus 4.7 (non-fast)',
-    prefillDecodeOpus48Fast: 'P50 Prefill vs Decode Time — Opus 4.8 (fast mode)',
-    prefillDecodeOpus48NonFast: 'P50 Prefill vs Decode Time — Opus 4.8 (non-fast)',
-    maxConcSubLazy: (days: number) => `Max Concurrent Subagents per Session — Final ${days}d`,
-    costPerHour: 'Cost per Hour',
-    gt20ReqsTrace: (v: number) => `(> 20 reqs, trace v${v})`,
+    p50Prefill: 'P50 prefill',
+    p50Decode: 'P50 decode',
+    cpuGpuOpus47Fast: 'P50 CPU vs GPU time · Opus 4.7 (fast mode)',
+    cpuGpuOpus47NonFast: 'P50 CPU vs GPU time · Opus 4.7 (non-fast)',
+    cpuGpuOpus48Fast: 'P50 CPU vs GPU time · Opus 4.8 (fast mode)',
+    cpuGpuOpus48NonFast: 'P50 CPU vs GPU time · Opus 4.8 (non-fast)',
+    prefillDecodeOpus47Fast: 'P50 prefill vs decode time · Opus 4.7 (fast mode)',
+    prefillDecodeOpus47NonFast: 'P50 prefill vs decode time · Opus 4.7 (non-fast)',
+    prefillDecodeOpus48Fast: 'P50 prefill vs decode time · Opus 4.8 (fast mode)',
+    prefillDecodeOpus48NonFast: 'P50 prefill vs decode time · Opus 4.8 (non-fast)',
+    maxConcSubLazy: (days: number) => `Max concurrent subagents per session · Final ${days} days`,
+    costPerHour: 'Cost per hour',
+    gt20ReqsTrace: (v: number) => `> 20 requests, trace v${v}`,
+    weeklySessionsSubtext: (v: number) => `Sessions with more than 20 requests · trace v${v}`,
+    nSamples: (n: string) => `N = ${n}`,
+    requestOne: 'request',
+    requestOther: 'requests',
+    sessionOne: 'session',
+    sessionOther: 'sessions',
+    peakSubagents: 'Peak subagents',
+    share: 'Share',
   },
   zh: {
+    yTokens: 'Token 数',
+    ySessions: '会话数',
+    yCostUsd: '成本（美元）',
+    yRequestsPerSecond: '请求数 / 秒',
     loading: '加载中…',
     failedToLoad: '加载失败',
     noData: '暂无数据',
-    requests: '请求数',
-    tokens: 'Token 数',
     sessions: '会话数',
-    usd: 'USD',
     total: '合计',
     tokenVolumePerHour: '每小时 Token 用量',
-    final48h: '（最后 48 小时）',
-    hourlyTokenVolume: '每小时 Token 用量',
+    final48h: '最后 48 小时',
     input: '输入',
     cacheRead: '缓存读取',
     cacheWrite: '缓存写入',
     output: '输出',
     weeklySessionsByHarness: '每周会话数（按 Harness）',
     noSessionsInSnapshot: (v: number) => `当前快照中没有请求数超过 20 次且 trace 为 v${v} 的会话`,
-    weekOf: (label: string) => `${label} 当周`,
     estimatedCostPerHour: '每小时预估成本',
-    hourlyCost: '每小时成本',
     estCost: '预估成本',
     p50CpuGpuTime: 'P50 CPU vs GPU 耗时',
     cpuTimeBetweenTurns: 'CPU（对话间隔）',
@@ -179,10 +205,16 @@ const STRINGS = {
     maxConcurrentSubagentsPerSession: '每会话最大并发 Subagent 数',
     noEligibleSessions: '当前快照中无符合条件的会话',
     requestsPerSecond: '每秒请求数',
-    finalOfSnapshot: (label: string) => `（快照最后 ${label}）`,
-    requestsPerSecondYAxis: '请求数 / 秒',
+    timeRangeLabel: '时间范围',
+    agentLabel: '智能体',
+    rpsWindow: {
+      '3h': '最后 3 小时',
+      '12h': '最后 12 小时',
+      '24h': '最后 24 小时',
+      '3d': '最后 3 天',
+      '7d': '最后 7 天',
+    },
     rpsBucketLabel: (label: string) => `RPS（${label}）`,
-    rollingAvg: '滑动平均',
     rollingAvgLegend: (window: number) => `滑动平均（窗口=${window}）`,
     meanRps: '平均 RPS',
     peakRps: '峰值 RPS',
@@ -190,8 +222,7 @@ const STRINGS = {
     bucketMinutes: (min: number) => `${min} 分钟分桶`,
     bucketHours: (h: number) => `${h} 小时分桶`,
     wallClockTitle: '墙钟时间：Tool/CPU vs LLM/GPU vs 空闲',
-    wallClockFinal: (days: number) => `（最后 ${days} 天，UTC）`,
-    wallClockComposition: '墙钟时间构成',
+    wallClockFinal: (days: number) => `最后 ${days} 天 · UTC`,
     shareOfWallClock: '墙钟时间占比',
     wallClockHoursYAxis: '墙钟时间（小时）',
     llmGpuLegend: 'LLM / GPU（E2E 延迟）',
@@ -204,12 +235,12 @@ const STRINGS = {
     hourlyActivity: '每小时活跃度',
     weeklySessions: '每周会话',
     wallClock: '墙钟时间',
-    islTotalDist: 'ISL Total 分布',
-    islTotalAxis: 'ISL 总 Token（Cache Read + Cache Write + Input）',
-    cacheReadDist: 'Cache Read 分布',
-    cacheReadAxis: 'Cache Read Token 数',
-    cacheWriteDist: 'Cache Write 分布',
-    cacheWriteAxis: 'Cache Write Token 数',
+    islTotalDist: 'ISL 总量分布',
+    islTotalAxis: 'ISL 总 token（缓存读取 + 缓存写入 + 输入）',
+    cacheReadDist: '缓存读取分布',
+    cacheReadAxis: '缓存读取 token 数',
+    cacheWriteDist: '缓存写入分布',
+    cacheWriteAxis: '缓存写入 token 数',
     outputDist: '输出分布',
     outputAxis: '输出 Token 数',
     timeBetweenTurns: '对话间隔时间',
@@ -218,16 +249,16 @@ const STRINGS = {
     userIdleAxis: '用户空闲（秒）',
     cpuGpuRatioTitle: 'CPU 工具调用时间 : GPU 时间比值',
     cpuGpuRatioAxis: '比值（对话间隔 / E2E 延迟）',
-    cacheReadOutputRatioReq: 'Cache Read : Output 比（按请求）',
+    cacheReadOutputRatioReq: '缓存读取 : 输出比（按请求）',
     ratioAxis: '比值',
-    cacheReadWriteRatio: 'Cache Read : Write 比（按请求）',
-    cacheReadOutputRatioSess: 'Cache Read : Output 比（按会话）',
+    cacheReadWriteRatio: '缓存读取 : 写入比（按请求）',
+    cacheReadOutputRatioSess: '缓存读取 : 输出比（按会话）',
     turnsPerSession: '每会话对话轮数',
     turnsAxis: '轮数',
     ttftDist: 'TTFT 分布',
-    ttftAxis: 'Time to First Token',
+    ttftAxis: '首 token 延迟',
     tpotDist: 'TPOT 分布',
-    tpotAxis: 'Time per Output Token',
+    tpotAxis: '每输出 token 耗时',
     prefillSpeedDist: 'Prefill 速度分布',
     prefillSpeedAxis: 'Prefill 速度（input tok/s/query）',
     tokensPerChunkDist: '每 SSE Chunk Token 数分布',
@@ -235,14 +266,14 @@ const STRINGS = {
     prefillShareTitle: 'Prefill 占 E2E 延迟比例（TTFT / E2E）',
     prefillShareAxis: 'TTFT / E2E（prefill 占延迟比例）',
     interactivityDist: '交互性分布',
-    interactivityAxis: 'Interactivity（output tok/s/user）',
+    interactivityAxis: '交互性（output tok/s/user）',
     sessionDurationTitle: (v: number) => `会话时长（> 20 次请求，trace v${v}）`,
     sessionDurationAxis: '会话时长（小时）',
     subagentCountTitle: (days: number, v: number) =>
-      `每会话 Subagent 数 — 最后 ${days} 天（> 20 次请求，trace v${v}）`,
+      `每会话 Subagent 数 · 最后 ${days} 天（> 20 次请求，trace v${v}）`,
     subagentCountAxis: '每会话 Subagent 数',
     maxConcurrentHistTitle: (days: number, v: number) =>
-      `每会话最大并发 Subagent 数 — 最后 ${days} 天（> 20 次请求，trace v${v}）`,
+      `每会话最大并发 Subagent 数 · 最后 ${days} 天（> 20 次请求，trace v${v}）`,
     maxConcurrentAxis: '峰值并发 Subagent 数',
     bins: (n: number) => `${n} 个分箱`,
     p50PrefillDecodeTime: 'P50 Prefill vs Decode 耗时',
@@ -250,73 +281,69 @@ const STRINGS = {
     decodeE2eMinusTtft: 'Decode (E2E − TTFT)',
     p50Prefill: 'P50 Prefill',
     p50Decode: 'P50 Decode',
-    cpuGpuOpus47Fast: 'P50 CPU vs GPU 耗时 — Opus 4.7（fast mode）',
-    cpuGpuOpus47NonFast: 'P50 CPU vs GPU 耗时 — Opus 4.7（non-fast）',
-    cpuGpuOpus48Fast: 'P50 CPU vs GPU 耗时 — Opus 4.8（fast mode）',
-    cpuGpuOpus48NonFast: 'P50 CPU vs GPU 耗时 — Opus 4.8（non-fast）',
-    prefillDecodeOpus47Fast: 'P50 Prefill vs Decode 耗时 — Opus 4.7（fast mode）',
-    prefillDecodeOpus47NonFast: 'P50 Prefill vs Decode 耗时 — Opus 4.7（non-fast）',
-    prefillDecodeOpus48Fast: 'P50 Prefill vs Decode 耗时 — Opus 4.8（fast mode）',
-    prefillDecodeOpus48NonFast: 'P50 Prefill vs Decode 耗时 — Opus 4.8（non-fast）',
-    maxConcSubLazy: (days: number) => `每会话最大并发 Subagent 数 — 最后 ${days} 天`,
+    cpuGpuOpus47Fast: 'P50 CPU vs GPU 耗时 · Opus 4.7（Fast Mode）',
+    cpuGpuOpus47NonFast: 'P50 CPU vs GPU 耗时 · Opus 4.7（非 Fast Mode）',
+    cpuGpuOpus48Fast: 'P50 CPU vs GPU 耗时 · Opus 4.8（Fast Mode）',
+    cpuGpuOpus48NonFast: 'P50 CPU vs GPU 耗时 · Opus 4.8（非 Fast Mode）',
+    prefillDecodeOpus47Fast: 'P50 Prefill vs Decode 耗时 · Opus 4.7（Fast Mode）',
+    prefillDecodeOpus47NonFast: 'P50 Prefill vs Decode 耗时 · Opus 4.7（非 Fast Mode）',
+    prefillDecodeOpus48Fast: 'P50 Prefill vs Decode 耗时 · Opus 4.8（Fast Mode）',
+    prefillDecodeOpus48NonFast: 'P50 Prefill vs Decode 耗时 · Opus 4.8（非 Fast Mode）',
+    maxConcSubLazy: (days: number) => `每会话最大并发 Subagent 数 · 最后 ${days} 天`,
     costPerHour: '每小时成本',
-    gt20ReqsTrace: (v: number) => `（> 20 次请求，trace v${v}）`,
+    gt20ReqsTrace: (v: number) => `> 20 次请求，trace v${v}`,
+    weeklySessionsSubtext: (v: number) => `超过 20 次请求的会话 · trace v${v}`,
+    nSamples: (n: string) => `N = ${n}`,
+    requestOne: '请求',
+    requestOther: '请求',
+    sessionOne: '会话',
+    sessionOther: '会话',
+    peakSubagents: '峰值 Subagent 数',
+    share: '占比',
   },
 };
+
+function ChartStateCard({
+  title,
+  pending = false,
+  children,
+}: {
+  title?: string;
+  pending?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        {title ? <CardTitle>{title}</CardTitle> : pending && <Skeleton className="h-4 w-32" />}
+      </CardHeader>
+      <CardContent>
+        <EmptyState bare className="h-40">
+          {children}
+        </EmptyState>
+      </CardContent>
+    </Card>
+  );
+}
 
 function ChartSkeletonCard({ title }: { title?: string }) {
   const t = STRINGS[useLocale()];
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        {title ? (
-          <CardTitle className="text-sm">{title}</CardTitle>
-        ) : (
-          <Skeleton className="h-4 w-32" />
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col items-center justify-center gap-2 h-40">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          <span className="text-3xs font-mono uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.loading}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
+    <ChartStateCard title={title} pending>
+      <span className="flex flex-col items-center gap-2">
+        <Loader2 className="size-6 animate-spin" />
+        {t.loading}
+      </span>
+    </ChartStateCard>
   );
 }
 
 function ChartErrorCard({ title }: { title?: string }) {
-  const t = STRINGS[useLocale()];
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        {title && <CardTitle className="text-sm">{title}</CardTitle>}
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          {t.failedToLoad}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <ChartStateCard title={title}>{STRINGS[useLocale()].failedToLoad}</ChartStateCard>;
 }
 
 function EmptyDataCard({ title }: { title: string }) {
-  const t = STRINGS[useLocale()];
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          {t.noData}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <ChartStateCard title={title}>{STRINGS[useLocale()].noData}</ChartStateCard>;
 }
 
 function LazyDatasetCard<T>({
@@ -361,8 +388,6 @@ interface WeeklySessionRow {
   harness: Harness;
   sessionCount: number;
 }
-
-type WeeklySessionPoint = { week: string; total: number } & Record<Harness, number>;
 
 interface WallClockDay {
   day: string;
@@ -424,589 +449,66 @@ interface ConcurrencyBucket {
   value: number;
 }
 
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
-
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
-
-function formatAxisValue(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  if (v < 1) return v.toFixed(2);
-  return v.toFixed(1);
-}
-
-const CHART_WIDTH = 520;
-const CHART_HEIGHT = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
-const PLOT_W = CHART_WIDTH - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_HEIGHT - MARGIN.top - MARGIN.bottom;
-
-function Histogram({
-  buckets,
-  color,
-  percentiles,
-  axisLabel,
-  format,
-  tickFormat,
-  tailDirection = 'high',
-  title,
-  exportFilename,
-}: {
-  buckets: Bucket[];
-  color: string;
-  percentiles: Percentile[];
-  axisLabel: string;
-  format?: (v: number) => string;
-  tickFormat?: (v: number) => string;
-  tailDirection?: 'high' | 'low';
-  title?: string;
-  exportFilename?: string;
-}) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const locale = useLocale();
-  const t = STRINGS[locale];
-
-  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
-  const xMin = buckets[0].min;
-  const xMax = buckets.at(-1)!.max;
-
-  const yTicks = generateTicks(0, maxCount, 5);
-  const yMax = yTicks.at(-1) || maxCount;
-
-  const xTicks = generateTicks(xMin, xMax, 10);
-  const fmt = format || formatAxisValue;
-  const tickFmt = tickFormat || formatAxisValue;
-
-  const sx = (v: number) => MARGIN.left + ((v - xMin) / (xMax - xMin || 1)) * PLOT_W;
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
+function LegendSwatches({ items }: { items: { key: string; label: string; color: string }[] }) {
   return (
-    <div>
-      {title && (
-        <div className="flex justify-end mb-1">
-          <ExportPngButton
-            locale={locale}
-            analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'histogram'}
-            onClick={() => {
-              if (svgRef.current) {
-                exportSvgToPng(svgRef.current, {
-                  title,
-                  filename: exportFilename || 'histogram.png',
-                  svgWidth: CHART_WIDTH,
-                  svgHeight: CHART_HEIGHT,
-                });
-              }
-            }}
-          />
-        </div>
-      )}
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        className="w-full"
-        style={{ maxHeight: 220 }}
-      >
-        {yTicks.map((tv) => (
-          <g key={`y-${tv}`}>
-            {tv > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tv)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tv)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tv) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {formatAxisValue(tv)}
-            </text>
-          </g>
-        ))}
-
-        <text
-          x={12}
-          y={MARGIN.top + PLOT_H / 2}
-          textAnchor="middle"
-          transform={`rotate(-90, 12, ${MARGIN.top + PLOT_H / 2})`}
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {t.requests}
-        </text>
-
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top}
-          x2={MARGIN.left}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-
-        {buckets.map((bucket, i) => {
-          const x = sx(bucket.min);
-          const w = sx(bucket.max) - sx(bucket.min);
-          const h = (bucket.count / yMax) * PLOT_H;
-          if (bucket.count === 0) return null;
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={sy(bucket.count)}
-              width={Math.max(w - 0.5, 1)}
-              height={h}
-              fill={color}
-              opacity={0.75}
-              stroke={color}
-              strokeWidth={0.5}
-            />
-          );
-        })}
-
-        {percentiles.map(({ label, value: val }) => {
-          const px = sx(val);
-          if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
-          const isBadTail = tailDirection === 'low' ? label === 'p1' : label === 'p99';
-          const isWarnTail =
-            tailDirection === 'low'
-              ? label === 'p5' || label === 'p10'
-              : label === 'p90' || label === 'p95';
-          const lineColor = isBadTail
-            ? '#f43f5e'
-            : isWarnTail
-              ? '#f59e0b'
-              : label === 'p50'
-                ? '#ef4444'
-                : '#94a3b8';
-          return (
-            <g key={label}>
-              <line
-                x1={px}
-                y1={MARGIN.top}
-                x2={px}
-                y2={MARGIN.top + PLOT_H}
-                stroke={lineColor}
-                strokeWidth={1}
-                strokeDasharray="4 3"
-              />
-              <text
-                x={px}
-                y={MARGIN.top - 2}
-                textAnchor="middle"
-                fill={lineColor}
-                style={{ fontSize: '7px', fontFamily: 'var(--font-mono)' }}
-              >
-                {label}
-              </text>
-            </g>
-          );
-        })}
-
-        {xTicks.map((tv) => {
-          const x = sx(tv);
-          if (x < MARGIN.left - 1 || x > MARGIN.left + PLOT_W + 1) return null;
-          return (
-            <g key={`x-${tv}`}>
-              <line
-                x1={x}
-                y1={MARGIN.top + PLOT_H}
-                x2={x}
-                y2={MARGIN.top + PLOT_H + 4}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                strokeWidth={1}
-              />
-              <text
-                x={x}
-                y={MARGIN.top + PLOT_H + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                {tickFmt(tv)}
-              </text>
-            </g>
-          );
-        })}
-
-        <text
-          x={MARGIN.left + PLOT_W / 2}
-          y={CHART_HEIGHT - 2}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {axisLabel}
-        </text>
-      </svg>
-
-      <div className="grid grid-cols-5 gap-1.5 mt-3 pt-3 border-t border-border">
-        {percentiles.map((p) => (
-          <div
-            key={p.label}
-            className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
-          >
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-              {p.label}
-            </div>
-            <div className="text-sm font-mono font-bold tracking-tight mt-0.5">{fmt(p.value)}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const HOURLY_COLORS = {
-  input: '#6b7280',
-  cacheRead: '#06b6d4',
-  cacheWrite: '#f59e0b',
-  output: '#10b981',
-};
-
-function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const locale = useLocale();
-  const t = STRINGS[locale];
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    item: HourlyToken;
-  } | null>(null);
-
-  const CW = 900;
-  const CH = 220;
-  const M = { top: 8, right: 12, bottom: 40, left: 54 };
-  const PW = CW - M.left - M.right;
-  const PH = CH - M.top - M.bottom;
-
-  const maxTotal = Math.max(
-    ...data.map(
-      (d) => Number(d.input) + Number(d.cacheRead) + Number(d.cacheWrite) + Number(d.output),
-    ),
-    1,
-  );
-
-  const yTicks = generateTicks(0, maxTotal, 5);
-  const yMax = yTicks.at(-1) || maxTotal;
-
-  const barWidth = Math.max(PW / data.length - 1, 2);
-  const sy = (v: number) => M.top + PH - (v / yMax) * PH;
-
-  const hourlyLegendItems = [
-    { label: t.input, color: HOURLY_COLORS.input },
-    { label: t.cacheRead, color: HOURLY_COLORS.cacheRead },
-    { label: t.cacheWrite, color: HOURLY_COLORS.cacheWrite },
-    { label: t.output, color: HOURLY_COLORS.output },
-  ];
-  const legendEl = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-      {hourlyLegendItems.map((item) => (
-        <div key={item.label} className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      {items.map((item) => (
+        <span key={item.key} className="inline-flex items-center gap-1.5">
           <span
-            className="inline-block w-2.5 h-2.5 rounded-sm"
+            aria-hidden="true"
+            className="size-2 rounded-sm"
             style={{ backgroundColor: item.color }}
           />
-          <span className="text-3xs font-mono text-muted-foreground">{item.label}</span>
-        </div>
+          {item.label}
+        </span>
       ))}
     </div>
   );
+}
 
+const TOKEN_KEYS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const;
+const tokenColor = (key: string) => TOKEN_SERIES_COLORS[key as (typeof TOKEN_KEYS)[number]];
+const COST_KEYS = ['cost'];
+const costColor = () => CHART_COLORS[0];
+
+function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const xFormatter = useCallback((iso: string) => formatHourLabel(iso, locale), [locale]);
+  const days = useMemo(
+    () =>
+      data.map((d) => ({
+        day: d.hour,
+        values: {
+          input: Number(d.input),
+          cacheRead: Number(d.cacheRead),
+          cacheWrite: Number(d.cacheWrite),
+          output: Number(d.output),
+        },
+      })),
+    [data],
+  );
+  const labels: Record<string, string> = {
+    input: t.input,
+    cacheRead: t.cacheRead,
+    cacheWrite: t.cacheWrite,
+    output: t.output,
+  };
   return (
-    <ExpandableChart
-      title={
-        <>
-          {t.tokenVolumePerHour}{' '}
-          <span className="text-muted-foreground font-normal">{t.final48h}</span>
-        </>
-      }
-      subtitle={legendEl}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'hourly-token-volume' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Hourly Token Volume',
-                filename: 'hourly-token-volume.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
-        />
-      </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 240 }}>
-        {yTicks.map((tv) => (
-          <g key={`y-${tv}`}>
-            {tv > 0 && (
-              <line
-                x1={M.left}
-                y1={sy(tv)}
-                x2={M.left + PW}
-                y2={sy(tv)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={M.left - 6}
-              y={sy(tv) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {formatAxisValue(tv)}
-            </text>
-          </g>
-        ))}
-
-        <text
-          x={12}
-          y={M.top + PH / 2}
-          textAnchor="middle"
-          transform={`rotate(-90, 12, ${M.top + PH / 2})`}
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {t.tokens}
-        </text>
-
-        <line
-          x1={M.left}
-          y1={M.top}
-          x2={M.left}
-          y2={M.top + PH}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        <line
-          x1={M.left}
-          y1={M.top + PH}
-          x2={M.left + PW}
-          y2={M.top + PH}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-
-        {data.map((d, i) => {
-          const x = M.left + (i / data.length) * PW;
-          const input = Number(d.input);
-          const cacheRead = Number(d.cacheRead);
-          const cacheWrite = Number(d.cacheWrite);
-          const output = Number(d.output);
-
-          const segments = [
-            { value: output, color: HOURLY_COLORS.output },
-            { value: cacheWrite, color: HOURLY_COLORS.cacheWrite },
-            { value: cacheRead, color: HOURLY_COLORS.cacheRead },
-            { value: input, color: HOURLY_COLORS.input },
-          ];
-
-          let cumulative = 0;
-          return (
-            <g
-              key={i}
-              onMouseMove={(e) => setTooltip({ x: e.clientX, y: e.clientY, item: d })}
-              onMouseLeave={() => setTooltip(null)}
-            >
-              {segments.map((seg, si) => {
-                cumulative += seg.value;
-                if (seg.value === 0) return null;
-                const barY = sy(cumulative);
-                const barH = (seg.value / yMax) * PH;
-                return (
-                  <rect
-                    key={si}
-                    x={x}
-                    y={barY}
-                    width={barWidth}
-                    height={Math.max(barH, 0.5)}
-                    fill={seg.color}
-                    opacity={0.85}
-                  />
-                );
-              })}
-            </g>
-          );
-        })}
-
-        {data.map((d, i) => {
-          const date = new Date(d.hour);
-          const hour = date.getUTCHours();
-          if (hour % 6 !== 0) return null;
-          const x = M.left + (i / data.length) * PW + barWidth / 2;
-          const dayStr = date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            timeZone: 'UTC',
-          });
-          return (
-            <g key={`x-${i}`}>
-              <line
-                x1={x}
-                y1={M.top + PH}
-                x2={x}
-                y2={M.top + PH + 4}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                strokeWidth={1}
-              />
-              <text
-                x={x}
-                y={M.top + PH + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{
-                  fontSize: '8px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                {`${String(hour).padStart(2, '0')}:00`}
-              </text>
-              <text
-                x={x}
-                y={M.top + PH + 24}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{
-                  fontSize: '7px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                {dayStr}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {new Date(tooltip.item.hour).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{Number(tooltip.item.requestCount)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.input }}>{t.input}</span>
-              <span>{formatNumber(Number(tooltip.item.input))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.cacheRead }}>{t.cacheRead}</span>
-              <span>{formatNumber(Number(tooltip.item.cacheRead))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.cacheWrite }}>{t.cacheWrite}</span>
-              <span>{formatNumber(Number(tooltip.item.cacheWrite))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.output }}>{t.output}</span>
-              <span>{formatNumber(Number(tooltip.item.output))}</span>
-            </div>
-            <div className="flex justify-between gap-4 font-bold">
-              <span className="text-foreground">{t.total}</span>
-              <span>
-                {formatNumber(
-                  Number(tooltip.item.input) +
-                    Number(tooltip.item.cacheRead) +
-                    Number(tooltip.item.cacheWrite) +
-                    Number(tooltip.item.output),
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-    </ExpandableChart>
+    <TrendsStackedChart
+      title={t.tokenVolumePerHour}
+      subtext={t.final48h}
+      days={days}
+      seriesKeys={[...TOKEN_KEYS]}
+      labelFor={(key) => labels[key]}
+      colorFor={tokenColor}
+      mode="count"
+      yFormatter={formatAxisNumber}
+      yLabel={t.yTokens}
+      xFormatter={xFormatter}
+      filename="hourly-token-volume"
+      emptyLabel={t.noData}
+    />
   );
 }
 
@@ -1017,473 +519,83 @@ const HARNESS_COLORS: Record<Harness, string> = {
   omp: '#0ea5e9',
   other: '#a1a1aa',
 };
+const harnessColor = (key: string) => HARNESS_COLORS[key as Harness];
 
-const HARNESS_LEGEND = HARNESSES.map((key) => ({ key, label: HARNESS_LABELS[key] }));
-
-function pivotWeeklySessions(rows: WeeklySessionRow[]): WeeklySessionPoint[] {
-  const byWeek = new Map<string, WeeklySessionPoint>();
+function pivotWeeklySessions(rows: WeeklySessionRow[]): StackedDayPoint[] {
+  const byWeek = new Map<string, Record<string, number>>();
   for (const r of rows) {
-    let point = byWeek.get(r.week);
-    if (!point) {
-      point = { week: r.week, 'claude-code': 0, codex: 0, pi: 0, omp: 0, other: 0, total: 0 };
-      byWeek.set(r.week, point);
-    }
-    point[r.harness] = r.sessionCount;
-    point.total += r.sessionCount;
+    const values = byWeek.get(r.week) ?? {};
+    values[r.harness] = r.sessionCount;
+    byWeek.set(r.week, values);
   }
-  return [...byWeek.values()].toSorted((a, b) => a.week.localeCompare(b.week));
+  return [...byWeek.entries()]
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([day, values]) => ({ day, values }));
 }
 
-function formatWeekLabel(week: string): string {
-  const d = new Date(`${week}T00:00:00Z`);
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
+function WeeklySessionsByHarnessChart({ data }: { data: StackedDayPoint[] }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    item: WeeklySessionPoint;
-  } | null>(null);
-
-  const CW = 900;
-  const CH = 260;
-  const M = { top: 8, right: 12, bottom: 44, left: 54 };
-  const PW = CW - M.left - M.right;
-  const PH = CH - M.top - M.bottom;
-
-  const maxTotal = Math.max(...data.map((d) => d.total), 1);
-  const yTicks = generateTicks(0, maxTotal, 5);
-  const yMax = yTicks.at(-1) || maxTotal;
-  const sy = (v: number) => M.top + PH - (v / yMax) * PH;
-
-  const slotWidth = PW / Math.max(data.length, 1);
-  const barWidth = Math.max(slotWidth * 0.7, 4);
-  const slotX = (i: number) => M.left + i * slotWidth + (slotWidth - barWidth) / 2;
-
-  const legendEl = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-      {HARNESS_LEGEND.map((item) => (
-        <div key={item.key} className="flex items-center gap-1.5">
-          <span
-            className="inline-block w-2.5 h-2.5 rounded-sm"
-            style={{ backgroundColor: HARNESS_COLORS[item.key] }}
-          />
-          <span className="text-3xs font-mono text-muted-foreground">{item.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-
-  const labelStride = data.length > 12 ? Math.ceil(data.length / 12) : 1;
-
+  const xFormatter = useCallback((week: string) => formatDayLabel(week, locale), [locale]);
   return (
-    <ExpandableChart
-      title={
-        <>
-          {t.weeklySessionsByHarness}{' '}
-          <span className="text-muted-foreground font-normal">
-            {t.gt20ReqsTrace(CURRENT_TRACE_VERSION)}
-          </span>
-        </>
-      }
-      subtitle={legendEl}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'weekly-sessions-by-harness' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Weekly Sessions by Harness',
-                filename: 'weekly-sessions-by-harness.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
-        />
-      </div>
-      {data.length === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          {t.noSessionsInSnapshot(CURRENT_TRACE_VERSION)}
-        </div>
-      ) : (
-        <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 280 }}>
-          {yTicks.map((tv) => (
-            <g key={`y-${tv}`}>
-              {tv > 0 && (
-                <line
-                  x1={M.left}
-                  y1={sy(tv)}
-                  x2={M.left + PW}
-                  y2={sy(tv)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={M.left - 6}
-                y={sy(tv) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                {formatAxisValue(tv)}
-              </text>
-            </g>
-          ))}
-
-          <text
-            x={12}
-            y={M.top + PH / 2}
-            textAnchor="middle"
-            transform={`rotate(-90, 12, ${M.top + PH / 2})`}
-            className="fill-muted-foreground"
-            style={{
-              fontSize: '9px',
-              fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-            }}
-          >
-            {t.sessions}
-          </text>
-
-          <line
-            x1={M.left}
-            y1={M.top}
-            x2={M.left}
-            y2={M.top + PH}
-            stroke="currentColor"
-            className="text-muted-foreground"
-            strokeWidth={1}
-          />
-          <line
-            x1={M.left}
-            y1={M.top + PH}
-            x2={M.left + PW}
-            y2={M.top + PH}
-            stroke="currentColor"
-            className="text-muted-foreground"
-            strokeWidth={1}
-          />
-
-          {data.map((d, i) => {
-            const x = slotX(i);
-            const segments = HARNESSES.map((key) => ({ key, value: d[key] }));
-            let cumulative = 0;
-            return (
-              <g
-                key={d.week}
-                onMouseMove={(e) => setTooltip({ x: e.clientX, y: e.clientY, item: d })}
-                onMouseLeave={() => setTooltip(null)}
-              >
-                <rect x={x} y={M.top} width={barWidth} height={PH} fill="transparent" />
-                {segments.map((seg) => {
-                  if (seg.value === 0) return null;
-                  cumulative += seg.value;
-                  const barY = sy(cumulative);
-                  const barH = (seg.value / yMax) * PH;
-                  return (
-                    <rect
-                      key={seg.key}
-                      x={x}
-                      y={barY}
-                      width={barWidth}
-                      height={Math.max(barH, 0.5)}
-                      fill={HARNESS_COLORS[seg.key]}
-                      opacity={0.9}
-                    />
-                  );
-                })}
-              </g>
-            );
-          })}
-
-          {data.map((d, i) => {
-            const isEdge = i === 0 || i === data.length - 1;
-            if (!isEdge && i % labelStride !== 0) return null;
-            const x = slotX(i) + barWidth / 2;
-            return (
-              <g key={`x-${d.week}`}>
-                <line
-                  x1={x}
-                  y1={M.top + PH}
-                  x2={x}
-                  y2={M.top + PH + 4}
-                  stroke="currentColor"
-                  className="text-muted-foreground"
-                  strokeWidth={1}
-                />
-                <text
-                  x={x}
-                  y={M.top + PH + 16}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '9px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {formatWeekLabel(d.week)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      )}
-
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {t.weekOf(formatWeekLabel(tooltip.item.week))}
-            </div>
-            <div className="h-px bg-border" />
-            {HARNESS_LEGEND.map((item) => (
-              <div key={item.key} className="flex justify-between gap-4">
-                <span style={{ color: HARNESS_COLORS[item.key] }}>{item.label}</span>
-                <span>{formatNumber(tooltip.item[item.key])}</span>
-              </div>
-            ))}
-            <div className="flex justify-between gap-4 font-bold">
-              <span className="text-foreground">{t.total}</span>
-              <span>{formatNumber(tooltip.item.total)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </ExpandableChart>
+    <TrendsStackedChart
+      title={t.weeklySessionsByHarness}
+      subtext={t.weeklySessionsSubtext(CURRENT_TRACE_VERSION)}
+      days={data}
+      seriesKeys={[...HARNESSES]}
+      labelFor={(key) => harnessLabel(key as Harness, locale)}
+      colorFor={harnessColor}
+      mode="count"
+      xFormatter={xFormatter}
+      yLabel={t.ySessions}
+      filename="weekly-sessions-by-harness"
+      emptyLabel={t.noSessionsInSnapshot(CURRENT_TRACE_VERSION)}
+    />
   );
 }
 
 function HourlyCostChart({ data }: { data: HourlyToken[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    item: HourlyToken;
-  } | null>(null);
-
-  const CW = 900;
-  const CH = 180;
-  const M = { top: 8, right: 12, bottom: 40, left: 54 };
-  const PW = CW - M.left - M.right;
-  const PH = CH - M.top - M.bottom;
-
-  const costs = data.map((d) => Number(d.cost));
-  const maxCost = Math.max(...costs, 0.01);
-  const yTicks = generateTicks(0, maxCost, 5);
-  const yMax = yTicks.at(-1) || maxCost;
-
-  const barWidth = Math.max(PW / data.length - 1, 2);
-  const sy = (v: number) => M.top + PH - (v / yMax) * PH;
-
+  const xFormatter = useCallback((iso: string) => formatHourLabel(iso, locale), [locale]);
+  const days = useMemo(
+    () => data.map((d) => ({ day: d.hour, values: { cost: Number(d.cost) } })),
+    [data],
+  );
   return (
-    <ExpandableChart
-      title={
-        <>
-          {t.estimatedCostPerHour}{' '}
-          <span className="text-muted-foreground font-normal">{t.final48h}</span>
-        </>
-      }
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'hourly-cost' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Hourly Cost',
-                filename: 'hourly-cost.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
-        />
-      </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 200 }}>
-        {yTicks.map((tv) => (
-          <g key={`y-${tv}`}>
-            {tv > 0 && (
-              <line
-                x1={M.left}
-                y1={sy(tv)}
-                x2={M.left + PW}
-                y2={sy(tv)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={M.left - 6}
-              y={sy(tv) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              ${tv < 1 ? tv.toFixed(2) : tv.toFixed(1)}
-            </text>
-          </g>
-        ))}
+    <TrendsStackedChart
+      title={t.estimatedCostPerHour}
+      subtext={t.final48h}
+      days={days}
+      seriesKeys={COST_KEYS}
+      labelFor={() => t.estCost}
+      colorFor={costColor}
+      mode="count"
+      yFormatter={formatAxisDollars}
+      yLabel={t.yCostUsd}
+      xFormatter={xFormatter}
+      filename="hourly-cost"
+      emptyLabel={t.noData}
+    />
+  );
+}
 
-        <text
-          x={12}
-          y={M.top + PH / 2}
-          textAnchor="middle"
-          transform={`rotate(-90, 12, ${M.top + PH / 2})`}
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {t.usd}
-        </text>
-
-        <line
-          x1={M.left}
-          y1={M.top}
-          x2={M.left}
-          y2={M.top + PH}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        <line
-          x1={M.left}
-          y1={M.top + PH}
-          x2={M.left + PW}
-          y2={M.top + PH}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-
-        {data.map((d, i) => {
-          const cost = Number(d.cost);
-          if (cost === 0) return null;
-          const x = M.left + (i / data.length) * PW;
-          const barH = (cost / yMax) * PH;
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={sy(cost)}
-              width={barWidth}
-              height={Math.max(barH, 0.5)}
-              fill="#10b981"
-              opacity={0.75}
-              stroke="#10b981"
-              strokeWidth={0.5}
-              onMouseMove={(e) => setTooltip({ x: e.clientX, y: e.clientY, item: d })}
-              onMouseLeave={() => setTooltip(null)}
-            />
-          );
-        })}
-
-        {data.map((d, i) => {
-          const date = new Date(d.hour);
-          const hour = date.getUTCHours();
-          if (hour % 6 !== 0) return null;
-          const x = M.left + (i / data.length) * PW + barWidth / 2;
-          const dayStr = date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            timeZone: 'UTC',
-          });
-          return (
-            <g key={`x-${i}`}>
-              <line
-                x1={x}
-                y1={M.top + PH}
-                x2={x}
-                y2={M.top + PH + 4}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                strokeWidth={1}
-              />
-              <text
-                x={x}
-                y={M.top + PH + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{
-                  fontSize: '8px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                {`${String(hour).padStart(2, '0')}:00`}
-              </text>
-              <text
-                x={x}
-                y={M.top + PH + 24}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{
-                  fontSize: '7px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                {dayStr}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {new Date(tooltip.item.hour).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{Number(tooltip.item.requestCount)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-emerald-500">{t.estCost}</span>
-              <span>${Number(tooltip.item.cost).toFixed(4)}</span>
-            </div>
+function SplitBar({ segments }: { segments: { key: string; value: number; color: string }[] }) {
+  const total = segments.reduce((sum, seg) => sum + seg.value, 0);
+  return (
+    <div className="flex h-6 w-full overflow-hidden rounded-sm bg-muted/40">
+      {segments.map((seg) =>
+        seg.value > 0 ? (
+          <div
+            key={seg.key}
+            className="flex h-full items-center justify-center text-xs font-medium tabular-nums text-white"
+            style={{ width: `${(seg.value / total) * 100}%`, backgroundColor: seg.color }}
+          >
+            {seg.value / total >= 0.08 ? `${((seg.value / total) * 100).toFixed(0)}%` : ''}
           </div>
-        </div>
+        ) : null,
       )}
-    </ExpandableChart>
+    </div>
   );
 }
 
@@ -1497,8 +609,8 @@ function CpuGpuPieChart({
   bLabel,
   aStatLabel,
   bStatLabel,
-  aColor = '#a855f7',
-  bColor = '#10b981',
+  aColor = CHART_COLORS[4],
+  bColor = CHART_COLORS[2],
 }: {
   p50a: number;
   p50b: number;
@@ -1512,358 +624,109 @@ function CpuGpuPieChart({
   aColor?: string;
   bColor?: string;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const resolvedTitle = title ?? t.p50CpuGpuTime;
-  const resolvedALabel = aLabel ?? t.cpuTimeBetweenTurns;
-  const resolvedBLabel = bLabel ?? t.gpuE2eLatency;
-  const resolvedAStatLabel = aStatLabel ?? t.p50Cpu;
-  const resolvedBStatLabel = bStatLabel ?? t.p50Gpu;
-  const p50Cpu = p50a;
-  const p50Gpu = p50b;
-  const total = p50Cpu + p50Gpu;
-
-  const CW = 520;
-  const CH = 220;
-  const cx = CW / 2;
-  const cy = CH / 2;
-  const r = 80;
-
-  const cpuFrac = total > 0 ? p50Cpu / total : 0;
-  const gpuFrac = 1 - cpuFrac;
-
-  const cpuColor = aColor;
-  const gpuColor = bColor;
-
-  const cpuAngle = cpuFrac * Math.PI * 2;
-  const cpuEndX = cx + r * Math.sin(cpuAngle);
-  const cpuEndY = cy - r * Math.cos(cpuAngle);
-  const cpuLarge = cpuFrac > 0.5 ? 1 : 0;
-  const gpuLarge = gpuFrac > 0.5 ? 1 : 0;
-
-  const cpuPath =
-    total === 0
-      ? ''
-      : cpuFrac >= 1
-        ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
-        : `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${cpuLarge} 1 ${cpuEndX} ${cpuEndY} Z`;
-  const gpuPath =
-    total === 0
-      ? ''
-      : gpuFrac >= 1
-        ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
-        : `M ${cx} ${cy} L ${cpuEndX} ${cpuEndY} A ${r} ${r} 0 ${gpuLarge} 1 ${cx} ${cy - r} Z`;
-
-  const subtitle = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-      <div className="flex items-center gap-1.5">
-        <span
-          className="inline-block w-2.5 h-2.5 rounded-sm"
-          style={{ backgroundColor: cpuColor }}
-        />
-        <span className="text-3xs font-mono text-muted-foreground">{resolvedALabel}</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span
-          className="inline-block w-2.5 h-2.5 rounded-sm"
-          style={{ backgroundColor: gpuColor }}
-        />
-        <span className="text-3xs font-mono text-muted-foreground">{resolvedBLabel}</span>
-      </div>
-    </div>
-  );
+  const total = p50a + p50b;
+  const fileName = exportFilename.replace(/\.png$/u, '');
 
   return (
     <ExpandableChart
-      title={
-        <>
-          {resolvedTitle}{' '}
-          <span className="text-muted-foreground font-normal">(N={n.toLocaleString()})</span>
-        </>
-      }
-      subtitle={subtitle}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: exportFilename });
-              exportSvgToPng(svgRef.current, {
-                title: resolvedTitle,
-                filename: exportFilename,
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      title={resolvedTitle}
+      subtitle={t.nSamples(n.toLocaleString())}
+      actions={
+        <ChartActions
+          fileName={fileName}
+          onExportPng={() => track('agentic_workload_export_png', { chart: exportFilename })}
         />
-      </div>
+      }
+    >
       {total === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        <EmptyState bare className="h-40">
           {t.noData}
-        </div>
+        </EmptyState>
       ) : (
-        <>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CW} ${CH}`}
-            className="w-full"
-            style={{ maxHeight: 240 }}
-          >
-            {cpuFrac > 0 && (
-              <path
-                d={cpuPath}
-                fill={cpuColor}
-                opacity={0.85}
-                stroke={cpuColor}
-                strokeWidth={0.5}
-              />
-            )}
-            {gpuFrac > 0 && (
-              <path
-                d={gpuPath}
-                fill={gpuColor}
-                opacity={0.85}
-                stroke={gpuColor}
-                strokeWidth={0.5}
-              />
-            )}
-            {cpuFrac > 0.05 && (
-              <text
-                x={cx + r * 0.6 * Math.sin(cpuAngle / 2)}
-                y={cy - r * 0.6 * Math.cos(cpuAngle / 2)}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="#fff"
-                style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
-              >
-                {`${(cpuFrac * 100).toFixed(0)}%`}
-              </text>
-            )}
-            {gpuFrac > 0.05 && (
-              <text
-                x={cx + r * 0.6 * Math.sin(cpuAngle + (Math.PI * 2 - cpuAngle) / 2)}
-                y={cy - r * 0.6 * Math.cos(cpuAngle + (Math.PI * 2 - cpuAngle) / 2)}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="#fff"
-                style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
-              >
-                {`${(gpuFrac * 100).toFixed(0)}%`}
-              </text>
-            )}
-          </svg>
-          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border">
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {resolvedAStatLabel}
-              </div>
-              <div
-                className="text-sm font-mono font-bold tracking-tight mt-0.5"
-                style={{ color: cpuColor }}
-              >
-                {`${p50Cpu.toFixed(2)}s`}
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {resolvedBStatLabel}
-              </div>
-              <div
-                className="text-sm font-mono font-bold tracking-tight mt-0.5"
-                style={{ color: gpuColor }}
-              >
-                {`${p50Gpu.toFixed(2)}s`}
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.total}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {`${total.toFixed(2)}s`}
-              </div>
-            </div>
-          </div>
-        </>
+        <div className="space-y-3">
+          <LegendSwatches
+            items={[
+              { key: 'a', label: aLabel ?? t.cpuTimeBetweenTurns, color: aColor },
+              { key: 'b', label: bLabel ?? t.gpuE2eLatency, color: bColor },
+            ]}
+          />
+          <SplitBar
+            segments={[
+              { key: 'a', value: p50a, color: aColor },
+              { key: 'b', value: p50b, color: bColor },
+            ]}
+          />
+          <dl className="flex flex-wrap gap-x-8 gap-y-2 border-t border-border/20 pt-3">
+            <Stat size="sm" label={aStatLabel ?? t.p50Cpu} value={`${p50a.toFixed(2)}s`} />
+            <Stat size="sm" label={bStatLabel ?? t.p50Gpu} value={`${p50b.toFixed(2)}s`} />
+            <Stat size="sm" label={t.total} value={`${total.toFixed(2)}s`} />
+          </dl>
+        </div>
       )}
     </ExpandableChart>
   );
 }
 
-interface PieSlice {
-  label: string;
-  value: number;
-  color: string;
-}
-
-const CONCURRENCY_BUCKET_COLORS = [
-  '#475569',
-  '#0ea5e9',
-  '#06b6d4',
-  '#10b981',
-  '#f59e0b',
-  '#f97316',
-  '#f43f5e',
-];
-
-function concurrencySlices(buckets: ConcurrencyBucket[]): PieSlice[] {
-  return buckets.map((b, i) => ({
-    label: b.label,
-    value: b.value,
-    color: CONCURRENCY_BUCKET_COLORS[i] ?? '#475569',
-  }));
-}
-
-function MaxConcurrentSubagentsPieChart({ slices }: { slices: PieSlice[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const locale = useLocale();
-  const t = STRINGS[locale];
-  const total = slices.reduce((acc, s) => acc + s.value, 0);
-
-  const CW = 520;
-  const CH = 240;
-  const cx = CW / 2;
-  const cy = CH / 2;
-  const r = 90;
-
-  const nonZeroSlices = slices.filter((s) => s.value > 0);
-  const arcs: { slice: PieSlice; path: string; midAngle: number; frac: number }[] = [];
-  if (total > 0) {
-    if (nonZeroSlices.length === 1) {
-      const slice = nonZeroSlices[0];
-      arcs.push({
-        slice,
-        path: `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`,
-        midAngle: Math.PI,
-        frac: 1,
-      });
-    } else {
-      let startAngle = 0;
-      for (const slice of slices) {
-        if (slice.value === 0) continue;
-        const frac = slice.value / total;
-        const endAngle = startAngle + frac * Math.PI * 2;
-        const startX = cx + r * Math.sin(startAngle);
-        const startY = cy - r * Math.cos(startAngle);
-        const endX = cx + r * Math.sin(endAngle);
-        const endY = cy - r * Math.cos(endAngle);
-        const large = frac > 0.5 ? 1 : 0;
-        arcs.push({
-          slice,
-          path: `M ${cx} ${cy} L ${startX} ${startY} A ${r} ${r} 0 ${large} 1 ${endX} ${endY} Z`,
-          midAngle: (startAngle + endAngle) / 2,
-          frac,
-        });
-        startAngle = endAngle;
-      }
-    }
-  }
-
-  const legend = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-      {slices.map((s) => (
-        <div key={s.label} className="flex items-center gap-1.5">
-          <span
-            className="inline-block w-2.5 h-2.5 rounded-sm"
-            style={{ backgroundColor: s.color }}
-          />
-          <span className="text-3xs font-mono text-muted-foreground">{s.label}</span>
-        </div>
-      ))}
-    </div>
-  );
+function MaxConcurrentSubagentsChart({ buckets }: { buckets: ConcurrencyBucket[] }) {
+  const t = STRINGS[useLocale()];
+  const total = buckets.reduce((acc, b) => acc + b.value, 0);
+  const max = buckets.reduce((acc, b) => Math.max(acc, b.value), 0);
 
   return (
     <ExpandableChart
-      title={
-        <>
-          {t.maxConcurrentSubagentsPerSession}{' '}
-          <span className="text-muted-foreground font-normal">
-            (N={total.toLocaleString()}, {t.gt20ReqsTrace(CURRENT_TRACE_VERSION)})
-          </span>
-        </>
-      }
-      subtitle={legend}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'max-concurrent-subagents-pie' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Max Concurrent Subagents per Session',
-                filename: 'max-concurrent-subagents-pie.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      title={t.maxConcurrentSubagentsPerSession}
+      subtitle={`${t.nSamples(total.toLocaleString())} · ${t.gt20ReqsTrace(CURRENT_TRACE_VERSION)}`}
+      actions={
+        <ChartActions
+          fileName="max-concurrent-subagents-pie"
+          onExportPng={() =>
+            track('agentic_workload_export_png', { chart: 'max-concurrent-subagents-pie' })
+          }
         />
-      </div>
+      }
+    >
       {total === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        <EmptyState bare className="h-40">
           {t.noEligibleSessions}
-        </div>
+        </EmptyState>
       ) : (
-        <>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CW} ${CH}`}
-            className="w-full"
-            style={{ maxHeight: 260 }}
-          >
-            {arcs.map((arc) => (
-              <path
-                key={arc.slice.label}
-                d={arc.path}
-                fill={arc.slice.color}
-                opacity={0.9}
-                stroke={arc.slice.color}
-                strokeWidth={0.5}
-              />
-            ))}
-            {arcs
-              .filter((a) => a.frac >= 0.05)
-              .map((arc) => (
-                <text
-                  key={`${arc.slice.label}-label`}
-                  x={cx + r * 0.65 * Math.sin(arc.midAngle)}
-                  y={cy - r * 0.65 * Math.cos(arc.midAngle)}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill="#fff"
-                  style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
-                >
-                  {`${(arc.frac * 100).toFixed(0)}%`}
-                </text>
-              ))}
-          </svg>
-          <div className="grid grid-cols-7 gap-1 mt-3 pt-3 border-t border-border">
-            {slices.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-md border border-border bg-surface-hover px-1.5 py-1.5 text-center"
-              >
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                  {s.label}
-                </div>
-                <div
-                  className="text-xs font-mono font-bold tracking-tight mt-0.5"
-                  style={{ color: s.color }}
-                >
-                  {s.value.toLocaleString()}
-                </div>
-                <div className="text-3xs font-mono text-muted-foreground mt-0.5">
-                  {total > 0 ? `${((s.value / total) * 100).toFixed(1)}%` : '0%'}
-                </div>
-              </div>
-            ))}
+        <div className="space-y-1.5">
+          <div className="mb-2 flex items-center gap-3 border-b border-border/30 pb-1.5 text-xs font-medium text-muted-foreground">
+            <span className="w-16 shrink-0">{t.peakSubagents}</span>
+            <span className="flex-1" />
+            <span className="w-16 shrink-0 text-right">{t.sessions}</span>
+            <span className="w-14 shrink-0 text-right">{t.share}</span>
           </div>
-        </>
+          {buckets.map((b) => (
+            <div
+              key={b.label}
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 sm:flex"
+            >
+              <span className="min-w-0 sm:w-16 shrink-0 text-xs tabular-nums text-foreground">
+                {b.label}
+              </span>
+              <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
+                <div
+                  className="h-full rounded-sm"
+                  style={{
+                    width: `${max > 0 ? (b.value / max) * 100 : 0}%`,
+                    minWidth: b.value > 0 ? 2 : 0,
+                    backgroundColor: CHART_COLORS[0],
+                  }}
+                />
+              </div>
+              <span className="sm:w-16 shrink-0 text-right text-xs tabular-nums text-foreground">
+                {b.value.toLocaleString()}
+              </span>
+              <span className="sm:w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                {((b.value / total) * 100).toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </ExpandableChart>
   );
@@ -1908,375 +771,82 @@ function RpsTimeseriesChart({
   onRangeChange: (range: RpsRangeKey) => void;
   loading: boolean;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    item: RpsPoint;
-    avg: number;
-  } | null>(null);
-
-  const CW = 900;
-  const CH = 240;
-  const M = { top: 12, right: 16, bottom: 44, left: 60 };
-  const PW = CW - M.left - M.right;
-  const PH = CH - M.top - M.bottom;
-
-  const points = data?.points ?? [];
-  const rpsValues = points.map((p) => p.rps);
-  const window = rollingWindow(points.length);
-  const smoothed = useMemo(() => rollingAverage(rpsValues, window), [rpsValues, window]);
-
-  const maxRps = Math.max(...rpsValues, ...smoothed, 0.001);
-  const yTicks = generateTicks(0, maxRps, 5);
-  const yMax = yTicks.at(-1) || maxRps;
-
-  const barColor = '#0ea5e9';
-  const avgColor = '#f59e0b';
-
-  const barWidth = points.length > 0 ? Math.max(PW / points.length - 1, 1) : 0;
-  const sy = (v: number) => M.top + PH - (v / yMax) * PH;
-  const bucketX = (i: number) => M.left + (i / Math.max(points.length, 1)) * PW;
-
-  const linePath =
-    points.length > 1
-      ? points
-          .map((_, i) => {
-            const x = bucketX(i) + barWidth / 2;
-            const y = sy(smoothed[i]);
-            return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-          })
-          .join(' ')
-      : '';
-
-  const rangeLabel = RPS_RANGES.find((r) => r.key === range)?.label ?? range;
+  const xFormatter = useCallback((iso: string) => formatHourLabel(iso, locale), [locale]);
   const bucketMin = data?.bucketMinutes ?? 0;
   const bucketLabel = bucketMin >= 60 ? t.bucketHours(bucketMin / 60) : t.bucketMinutes(bucketMin);
 
-  const tickInterval = Math.max(1, Math.floor(points.length / 6));
+  const summary = useMemo(() => {
+    const points = data?.points ?? [];
+    const rps = points.map((p) => p.rps);
+    const window = rollingWindow(points.length);
+    const smoothed = rollingAverage(rps, window);
+    const series: LineSeries[] = [
+      {
+        key: 'rps',
+        label: t.rpsBucketLabel(bucketLabel),
+        color: CHART_COLORS[0],
+        points: points.map((p) => ({ day: p.bucket, value: p.rps })),
+      },
+      {
+        key: 'avg',
+        label: t.rollingAvgLegend(window),
+        color: CHART_COLORS[1],
+        points: points.map((p, i) => ({ day: p.bucket, value: smoothed[i] })),
+      },
+    ];
+    return {
+      series,
+      totalRequests: points.reduce((acc, p) => acc + p.requestCount, 0),
+      meanRps: rps.length > 0 ? rps.reduce((a, b) => a + b, 0) / rps.length : 0,
+      peakRps: rps.reduce((a, b) => Math.max(a, b), 0),
+    };
+  }, [data, t, bucketLabel]);
 
-  const subtitle = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-      <div className="flex items-center gap-1.5">
-        <span
-          className="inline-block w-2.5 h-2.5 rounded-sm"
-          style={{ backgroundColor: barColor }}
-        />
-        <span className="text-3xs font-mono text-muted-foreground">
-          {t.rpsBucketLabel(bucketLabel)}
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="inline-block w-3 h-0.5" style={{ backgroundColor: avgColor }} />
-        <span className="text-3xs font-mono text-muted-foreground">
-          {t.rollingAvgLegend(window)}
-        </span>
-      </div>
-    </div>
-  );
-
-  const totalRequests = points.reduce((acc, p) => acc + p.requestCount, 0);
-  const meanRps = points.length > 0 ? rpsValues.reduce((a, b) => a + b, 0) / points.length : 0;
-  const peakRps = points.length > 0 ? Math.max(...rpsValues) : 0;
+  if (loading && !data) return <ChartSkeletonCard title={t.requestsPerSecond} />;
 
   return (
-    <ExpandableChart
-      title={
-        <>
-          {t.requestsPerSecond}{' '}
-          <span className="text-muted-foreground font-normal">{t.finalOfSnapshot(rangeLabel)}</span>
-        </>
+    <TrendsLineChart
+      title={t.requestsPerSecond}
+      subtext={`${t.rpsWindow[range]} · ${bucketLabel}`}
+      series={summary.series}
+      yFormatter={formatAxisNumber}
+      yLabel={t.yRequestsPerSecond}
+      xFormatter={xFormatter}
+      showPoints={false}
+      filename={`rps-${range}`}
+      emptyLabel={t.noData}
+      controls={
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.timeRangeLabel}
+            value={range}
+            onValueChange={(next) => {
+              track('agentic_workload_rps_range_changed', { range: next });
+              onRangeChange(next);
+            }}
+            options={RPS_RANGES.map((r) => ({ value: r.key, label: r.label }))}
+          />
+          <dl className="flex flex-wrap gap-x-6 gap-y-1">
+            <Stat size="sm" label={t.meanRps} value={formatRpsValue(summary.meanRps)} />
+            <Stat size="sm" label={t.peakRps} value={formatRpsValue(summary.peakRps)} />
+            <Stat size="sm" label={t.totalRequests} value={formatNumber(summary.totalRequests)} />
+          </dl>
+        </div>
       }
-      subtitle={subtitle}
-    >
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-1" role="group" aria-label="Time range">
-          {RPS_RANGES.map((r) => {
-            const active = r.key === range;
-            return (
-              <button
-                key={r.key}
-                onClick={() => {
-                  track('agentic_workload_rps_range_changed', { range: r.key });
-                  onRangeChange(r.key);
-                }}
-                className={`px-2 py-1 text-3xs font-mono font-bold uppercase tracking-eyebrow rounded-md border transition-colors ${
-                  active
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'bg-surface text-muted-foreground border-border hover:bg-surface-hover hover:text-foreground'
-                }`}
-                aria-pressed={active}
-              >
-                {r.label}
-              </button>
-            );
-          })}
-        </div>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: `rps-${range}` });
-              exportSvgToPng(svgRef.current, {
-                title: `Requests per Second (final ${rangeLabel} of snapshot)`,
-                filename: `rps-${range}.png`,
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
-        />
-      </div>
-
-      {loading && !data ? (
-        <Skeleton className="h-[200px] w-full" />
-      ) : points.length === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          {t.noData}
-        </div>
-      ) : (
-        <>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CW} ${CH}`}
-            className="w-full"
-            style={{ maxHeight: 260 }}
-          >
-            {yTicks.map((tv) => (
-              <g key={`y-${tv}`}>
-                {tv > 0 && (
-                  <line
-                    x1={M.left}
-                    y1={sy(tv)}
-                    x2={M.left + PW}
-                    y2={sy(tv)}
-                    stroke="currentColor"
-                    className="text-border"
-                    strokeWidth={0.5}
-                    strokeDasharray="3 3"
-                  />
-                )}
-                <text
-                  x={M.left - 6}
-                  y={sy(tv) + 3}
-                  textAnchor="end"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '9px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {formatRpsValue(tv)}
-                </text>
-              </g>
-            ))}
-
-            <text
-              x={12}
-              y={M.top + PH / 2}
-              textAnchor="middle"
-              transform={`rotate(-90, 12, ${M.top + PH / 2})`}
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {t.requestsPerSecondYAxis}
-            </text>
-
-            <line
-              x1={M.left}
-              y1={M.top}
-              x2={M.left}
-              y2={M.top + PH}
-              stroke="currentColor"
-              className="text-muted-foreground"
-              strokeWidth={1}
-            />
-            <line
-              x1={M.left}
-              y1={M.top + PH}
-              x2={M.left + PW}
-              y2={M.top + PH}
-              stroke="currentColor"
-              className="text-muted-foreground"
-              strokeWidth={1}
-            />
-
-            {points.map((p, i) => {
-              if (p.rps === 0) return null;
-              const x = bucketX(i);
-              const barH = (p.rps / yMax) * PH;
-              return (
-                <rect
-                  key={i}
-                  x={x}
-                  y={sy(p.rps)}
-                  width={barWidth}
-                  height={Math.max(barH, 0.5)}
-                  fill={barColor}
-                  opacity={0.6}
-                />
-              );
-            })}
-
-            {linePath && (
-              <path
-                d={linePath}
-                fill="none"
-                stroke={avgColor}
-                strokeWidth={1.5}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            )}
-
-            {points.map((p, i) => {
-              const x = bucketX(i);
-              return (
-                <rect
-                  key={`hover-${i}`}
-                  x={x}
-                  y={M.top}
-                  width={Math.max(barWidth, 2)}
-                  height={PH}
-                  fill="transparent"
-                  onMouseMove={(e) =>
-                    setTooltip({ x: e.clientX, y: e.clientY, item: p, avg: smoothed[i] })
-                  }
-                  onMouseLeave={() => setTooltip(null)}
-                />
-              );
-            })}
-
-            {points.map((p, i) => {
-              if (i % tickInterval !== 0) return null;
-              const x = bucketX(i) + barWidth / 2;
-              const date = new Date(p.bucket);
-              const showDate = bucketMin >= 30;
-              const hourStr = date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-              });
-              const dayStr = date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              });
-              return (
-                <g key={`x-${i}`}>
-                  <line
-                    x1={x}
-                    y1={M.top + PH}
-                    x2={x}
-                    y2={M.top + PH + 4}
-                    stroke="currentColor"
-                    className="text-muted-foreground"
-                    strokeWidth={1}
-                  />
-                  <text
-                    x={x}
-                    y={M.top + PH + 14}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{
-                      fontSize: '8px',
-                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                    }}
-                  >
-                    {hourStr}
-                  </text>
-                  {showDate && (
-                    <text
-                      x={x}
-                      y={M.top + PH + 24}
-                      textAnchor="middle"
-                      className="fill-muted-foreground"
-                      style={{
-                        fontSize: '7px',
-                        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                      }}
-                    >
-                      {dayStr}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-
-          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border">
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.meanRps}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {formatRpsValue(meanRps)}
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.peakRps}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {formatRpsValue(peakRps)}
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.totalRequests}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {formatNumber(totalRequests)}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {new Date(tooltip.item.bucket).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span style={{ color: barColor }}>RPS</span>
-              <span>{formatRpsValue(tooltip.item.rps)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: avgColor }}>{t.rollingAvg}</span>
-              <span>{formatRpsValue(tooltip.avg)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{formatNumber(tooltip.item.requestCount)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </ExpandableChart>
+    />
   );
 }
 
-const WALL_CLOCK_COLORS = {
-  llm: '#10b981',
-  tool: '#a855f7',
-  idle: '#f59e0b',
+const WALL_CLOCK_COLORS: Record<string, string> = {
+  llm: CHART_COLORS[2],
+  tool: CHART_COLORS[4],
+  idle: CHART_COLORS[1],
 };
+const WALL_CLOCK_KEYS = ['llm', 'tool', 'idle'];
+const wallClockColor = (key: string) => WALL_CLOCK_COLORS[key];
 
 const WALL_CLOCK_RANGES = [
   { days: 14, label: '14d' },
@@ -2284,356 +854,100 @@ const WALL_CLOCK_RANGES = [
   { days: 90, label: '90d' },
 ] as const;
 
-const WALL_CLOCK_AGENTS = [
-  { key: 'both', label: 'Both' },
-  { key: 'claude', label: 'Claude' },
-  { key: 'codex', label: 'Codex' },
-] as const;
-type WallClockAgent = (typeof WALL_CLOCK_AGENTS)[number]['key'];
-
-const totalOf = (d: WallClockDay) => d.llmMs + d.toolMs + d.idleMs;
-const fmtHours = (ms: number) => `${(ms / 3_600_000).toFixed(1)}h`;
-const pct = (ms: number, total: number) =>
-  total > 0 ? `${((ms / total) * 100).toFixed(1)}%` : '—';
+type WallClockAgent = 'both' | 'claude' | 'codex';
 
 function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const [share, setShare] = useState(false);
   const [rangeDays, setRangeDays] = useState<number>(14);
   const [agent, setAgent] = useState<WallClockAgent>('both');
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; item: WallClockDay } | null>(null);
 
-  const { visibleData, rangeStartMs, tickDays } = useMemo(() => {
+  const days = useMemo(() => {
     const now = snapshotNow();
     const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const startMs = todayMs - (rangeDays - 1) * 86_400_000;
-    const cutoffDay = new Date(startMs).toISOString().slice(0, 10);
-    const ticks = Array.from({ length: rangeDays }, (_, i) => {
-      const date = new Date(startMs + i * 86_400_000);
-      return { day: date.toISOString().slice(0, 10), dayIndex: i, weekday: date.getUTCDay() };
-    }).filter((tick) => rangeDays === 14 || tick.weekday === 1);
-    return {
-      visibleData: [...data]
-        .filter(
-          (d) =>
-            d.day >= cutoffDay && (agent === 'both' ? d.agent !== 'openai' : d.agent === agent),
-        )
-        .reduce<WallClockDay[]>((days, row) => {
-          const existing = days.at(-1);
-          if (existing?.day === row.day) {
-            existing.llmMs += row.llmMs;
-            existing.toolMs += row.toolMs;
-            existing.idleMs += row.idleMs;
-            existing.requests += row.requests;
-          } else {
-            days.push({ ...row });
-          }
-          return days;
-        }, []),
-      rangeStartMs: startMs,
-      tickDays: ticks,
-    };
+    const byDay = new Map<string, Record<string, number>>();
+    for (const row of data) {
+      if (agent === 'both' ? row.agent === 'openai' : row.agent !== agent) continue;
+      const values = byDay.get(row.day) ?? { llm: 0, tool: 0, idle: 0 };
+      values.llm += row.llmMs / 3_600_000;
+      values.tool += row.toolMs / 3_600_000;
+      values.idle += row.idleMs / 3_600_000;
+      byDay.set(row.day, values);
+    }
+    return Array.from({ length: rangeDays }, (_, i): StackedDayPoint => {
+      const day = new Date(startMs + i * 86_400_000).toISOString().slice(0, 10);
+      return { day, values: byDay.get(day) ?? { llm: 0, tool: 0, idle: 0 } };
+    });
   }, [agent, data, rangeDays]);
 
-  const CW = 900;
-  const CH = 240;
-  const M = { top: 8, right: 12, bottom: 40, left: 54 };
-  const PW = CW - M.left - M.right;
-  const PH = CH - M.top - M.bottom;
-
-  const scaleOf = (d: WallClockDay) => {
-    if (!share) return 1 / 3_600_000;
-    const total = totalOf(d);
-    return total > 0 ? 1 / total : 0;
+  const labels: Record<string, string> = {
+    llm: t.llmGpuLegend,
+    tool: t.toolCpuLegend,
+    idle: t.userIdleLegend,
   };
 
-  const maxTotal = share ? 1 : Math.max(...visibleData.map((d) => totalOf(d) / 3_600_000), 0.001);
-  const yTicks = share ? [0, 0.25, 0.5, 0.75, 1] : generateTicks(0, maxTotal, 5);
-  const yMax = yTicks.at(-1) || maxTotal;
-
-  const dayWidth = PW / rangeDays;
-  const barWidth = Math.max(dayWidth - 2, 2);
-  const dayIndex = (day: string) =>
-    Math.round((new Date(`${day}T00:00:00Z`).getTime() - rangeStartMs) / 86_400_000);
-  const sy = (v: number) => M.top + PH - (v / yMax) * PH;
-  const fmtY = (v: number) => (share ? `${Math.round(v * 100)}%` : `${formatAxisValue(v)}h`);
-
-  const wallClockLegendItems = [
-    { key: 'llm' as const, label: t.llmGpuLegend, color: WALL_CLOCK_COLORS.llm },
-    { key: 'tool' as const, label: t.toolCpuLegend, color: WALL_CLOCK_COLORS.tool },
-    { key: 'idle' as const, label: t.userIdleLegend, color: WALL_CLOCK_COLORS.idle },
-  ];
-  const legendEl = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-      {wallClockLegendItems.map((item) => (
-        <div key={item.key} className="flex items-center gap-1.5">
-          <span
-            className="inline-block w-2.5 h-2.5 rounded-sm"
-            style={{ backgroundColor: item.color }}
-          />
-          <span className="text-3xs font-mono text-muted-foreground">{item.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-
   return (
-    <ExpandableChart
-      title={
-        <>
-          {t.wallClockTitle}{' '}
-          <span className="text-muted-foreground font-normal">{t.wallClockFinal(rangeDays)}</span>
-        </>
+    <TrendsStackedChart
+      title={t.wallClockTitle}
+      subtext={t.wallClockFinal(rangeDays)}
+      days={days}
+      seriesKeys={WALL_CLOCK_KEYS}
+      labelFor={(key) => labels[key]}
+      colorFor={wallClockColor}
+      mode={share ? 'share' : 'count'}
+      yLabel={share ? t.shareOfWallClock : t.wallClockHoursYAxis}
+      yFormatter={(v: number) => `${formatAxisNumber(v)}h`}
+      xFormatter={(day: string) => formatDayLabel(day, locale)}
+      filename="wall-clock-composition"
+      emptyLabel={t.noData}
+      controls={
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.agentLabel}
+            value={agent}
+            onValueChange={(next) => {
+              track('agentic_workload_wallclock_agent_changed', { agent: next });
+              setAgent(next);
+            }}
+            options={[
+              { value: 'both' as const, label: t.agentBoth },
+              { value: 'claude' as const, label: 'Claude' },
+              { value: 'codex' as const, label: 'Codex' },
+            ]}
+          />
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.timeRangeLabel}
+            value={String(rangeDays)}
+            onValueChange={(next) => {
+              const nextDays = Number(next);
+              track('agentic_workload_wallclock_range_changed', { days: nextDays });
+              setRangeDays(nextDays);
+            }}
+            options={WALL_CLOCK_RANGES.map((range) => ({
+              value: String(range.days),
+              label: range.label,
+            }))}
+          />
+          <SegmentedToggle
+            role="group"
+            ariaLabel={`${t.modeHours} / ${t.modeShare}`}
+            value={share ? 'share' : 'hours'}
+            onValueChange={(next) => {
+              track('agentic_workload_wallclock_mode_changed', { mode: next });
+              setShare(next === 'share');
+            }}
+            options={[
+              { value: 'hours', label: t.modeHours },
+              { value: 'share', label: t.modeShare },
+            ]}
+          />
+        </div>
       }
-      subtitle={legendEl}
-    >
-      <div className="flex items-center justify-end gap-2 mb-1">
-        <div
-          className="flex rounded-md border border-border overflow-hidden"
-          role="group"
-          aria-label="Agent"
-        >
-          {[
-            { key: 'both' as const, label: t.agentBoth },
-            { key: 'claude' as const, label: 'Claude' },
-            { key: 'codex' as const, label: 'Codex' },
-          ].map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => {
-                track('agentic_workload_wallclock_agent_changed', { agent: option.key });
-                setAgent(option.key);
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono uppercase tracking-eyebrow transition-colors ${
-                agent === option.key
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div
-          className="flex rounded-md border border-border overflow-hidden"
-          role="group"
-          aria-label="Time range"
-        >
-          {WALL_CLOCK_RANGES.map((range) => (
-            <button
-              key={range.days}
-              type="button"
-              onClick={() => {
-                track('agentic_workload_wallclock_range_changed', { days: range.days });
-                setRangeDays(range.days);
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono uppercase tracking-eyebrow transition-colors ${
-                rangeDays === range.days
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex rounded-md border border-border overflow-hidden">
-          {[
-            { key: false, label: t.modeHours },
-            { key: true, label: t.modeShare },
-          ].map((mode) => (
-            <button
-              key={String(mode.key)}
-              type="button"
-              onClick={() => {
-                track('agentic_workload_wallclock_mode_changed', {
-                  mode: mode.key ? 'share' : 'hours',
-                });
-                setShare(mode.key);
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono uppercase tracking-eyebrow transition-colors ${
-                share === mode.key
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'wall-clock-composition' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Wall Clock Composition',
-                filename: 'wall-clock-composition.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
-        />
-      </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 260 }}>
-        {yTicks.map((tv) => (
-          <g key={`y-${tv}`}>
-            {tv > 0 && (
-              <line
-                x1={M.left}
-                y1={sy(tv)}
-                x2={M.left + PW}
-                y2={sy(tv)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={M.left - 6}
-              y={sy(tv) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-            >
-              {fmtY(tv)}
-            </text>
-          </g>
-        ))}
-
-        <text
-          x={12}
-          y={M.top + PH / 2}
-          textAnchor="middle"
-          transform={`rotate(-90, 12, ${M.top + PH / 2})`}
-          className="fill-muted-foreground"
-          style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-        >
-          {share ? t.shareOfWallClock : t.wallClockHoursYAxis}
-        </text>
-
-        <line
-          x1={M.left}
-          y1={M.top}
-          x2={M.left}
-          y2={M.top + PH}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        <line
-          x1={M.left}
-          y1={M.top + PH}
-          x2={M.left + PW}
-          y2={M.top + PH}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-
-        {visibleData.map((d) => {
-          const x = M.left + dayIndex(d.day) * dayWidth + 1;
-          const k = scaleOf(d);
-          const segments = [
-            { value: d.llmMs * k, color: WALL_CLOCK_COLORS.llm },
-            { value: d.toolMs * k, color: WALL_CLOCK_COLORS.tool },
-            { value: d.idleMs * k, color: WALL_CLOCK_COLORS.idle },
-          ];
-          let cumulative = 0;
-          return (
-            <g
-              key={d.day}
-              onMouseMove={(e) => setTooltip({ x: e.clientX, y: e.clientY, item: d })}
-              onMouseLeave={() => setTooltip(null)}
-            >
-              <rect x={x} y={M.top} width={barWidth} height={PH} fill="transparent" />
-              {segments.map((seg, si) => {
-                cumulative += seg.value;
-                if (seg.value <= 0) return null;
-                return (
-                  <rect
-                    key={si}
-                    x={x}
-                    y={sy(cumulative)}
-                    width={barWidth}
-                    height={Math.max((seg.value / yMax) * PH, 0.5)}
-                    fill={seg.color}
-                    opacity={0.85}
-                  />
-                );
-              })}
-            </g>
-          );
-        })}
-
-        {tickDays.map((tick) => {
-          const x = M.left + tick.dayIndex * dayWidth + dayWidth / 2;
-          return (
-            <g key={`x-${tick.day}`}>
-              <line
-                x1={x}
-                y1={M.top + PH}
-                x2={x}
-                y2={M.top + PH + 4}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                strokeWidth={1}
-              />
-              <text
-                x={x}
-                y={M.top + PH + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{ fontSize: '8px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-              >
-                {tick.day.slice(5)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">{tooltip.item.day}</div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{formatNumber(tooltip.item.requests)}</span>
-            </div>
-            {wallClockLegendItems.map((seg) => {
-              const ms =
-                seg.key === 'llm'
-                  ? tooltip.item.llmMs
-                  : seg.key === 'tool'
-                    ? tooltip.item.toolMs
-                    : tooltip.item.idleMs;
-              return (
-                <div key={seg.key} className="flex justify-between gap-4">
-                  <span style={{ color: seg.color }}>{seg.label}</span>
-                  <span>
-                    {fmtHours(ms)} · {pct(ms, totalOf(tooltip.item))}
-                  </span>
-                </div>
-              );
-            })}
-            <div className="flex justify-between gap-4 font-bold">
-              <span className="text-foreground">{t.total}</span>
-              <span>{fmtHours(totalOf(tooltip.item))}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </ExpandableChart>
+    />
   );
 }
 
@@ -2674,11 +988,9 @@ interface SubagentPayload {
 interface HistogramSpec {
   key: string;
   title: string;
-  color: string;
   axisLabel: string;
   format?: (v: number) => string;
-  tickFormat?: (v: number) => string;
-  tailDirection?: 'high' | 'low';
+  perSession?: boolean;
   exportFilename?: string;
   datasetKey: string;
   select: (payload: unknown) => GraphHistogram;
@@ -2709,28 +1021,35 @@ function HistogramChartCard({ spec, ctx }: { spec: HistogramSpec; ctx: GraphData
       </div>
     );
   }
+  const fileName = (spec.exportFilename ?? `${spec.key}-distribution`).replace(/\.png$/u, '');
   return (
     <div ref={ref}>
       <ExpandableChart
-        title={
-          <>
-            {spec.title}{' '}
-            <span className="text-muted-foreground font-normal">(N={hist.n.toLocaleString()})</span>
-          </>
+        title={spec.title}
+        subtitle={`${t.nSamples(hist.n.toLocaleString())} · ${t.bins(hist.buckets.length)}`}
+        actions={
+          <ChartActions
+            fileName={fileName}
+            onExportPng={() => track('agentic_workload_export_png', { chart: fileName })}
+          />
         }
-        subtitle={t.bins(hist.buckets.length)}
       >
-        <Histogram
-          buckets={hist.buckets}
-          color={spec.color}
-          percentiles={hist.percentiles}
-          axisLabel={spec.axisLabel}
-          format={spec.format}
-          tickFormat={spec.tickFormat}
-          tailDirection={spec.tailDirection}
-          title={spec.title}
-          exportFilename={spec.exportFilename || `${spec.key}-distribution.png`}
-        />
+        {(expanded) => (
+          <DistributionHistogram
+            buckets={hist.buckets}
+            percentiles={hist.percentiles}
+            format={spec.format ?? formatAxisNumber}
+            axisLabel={spec.axisLabel}
+            total={hist.n}
+            expanded={expanded}
+            color={CHART_COLORS[0]}
+            countLabel={
+              spec.perSession
+                ? { one: t.sessionOne, other: t.sessionOther }
+                : { one: t.requestOne, other: t.requestOther }
+            }
+          />
+        )}
       </ExpandableChart>
     </div>
   );
@@ -2775,7 +1094,6 @@ function GraphsPageContent() {
     {
       key: 'islTotal',
       title: t.islTotalDist,
-      color: '#ec4899',
       axisLabel: t.islTotalAxis,
       datasetKey: 'requestStats',
       select: (d) => (d as RequestStatsPayload).islTotal,
@@ -2783,7 +1101,6 @@ function GraphsPageContent() {
     {
       key: 'cacheRead',
       title: t.cacheReadDist,
-      color: '#06b6d4',
       axisLabel: t.cacheReadAxis,
       datasetKey: 'requestStats',
       select: (d) => (d as RequestStatsPayload).cacheRead,
@@ -2791,7 +1108,6 @@ function GraphsPageContent() {
     {
       key: 'cacheWrite',
       title: t.cacheWriteDist,
-      color: '#f59e0b',
       axisLabel: t.cacheWriteAxis,
       datasetKey: 'requestStats',
       select: (d) => (d as RequestStatsPayload).cacheWrite,
@@ -2799,7 +1115,6 @@ function GraphsPageContent() {
     {
       key: 'output',
       title: t.outputDist,
-      color: '#10b981',
       axisLabel: t.outputAxis,
       datasetKey: 'requestStats',
       select: (d) => (d as RequestStatsPayload).output,
@@ -2807,7 +1122,6 @@ function GraphsPageContent() {
     {
       key: 'gap',
       title: t.timeBetweenTurns,
-      color: '#3b82f6',
       axisLabel: t.seconds,
       format: (v) => `${v.toFixed(1)}s`,
       datasetKey: 'requestStats',
@@ -2816,7 +1130,6 @@ function GraphsPageContent() {
     {
       key: 'userIdle',
       title: t.userIdleTimeBetweenTurns(Math.round(IDLE_GAP_CUTOFF_MS / 60_000)),
-      color: '#f59e0b',
       axisLabel: t.userIdleAxis,
       format: (v) => `${v.toFixed(1)}s`,
       datasetKey: 'wallClock',
@@ -2825,7 +1138,6 @@ function GraphsPageContent() {
     {
       key: 'cpuGpuRatio',
       title: t.cpuGpuRatioTitle,
-      color: '#a855f7',
       axisLabel: t.cpuGpuRatioAxis,
       format: (v) => `${v.toFixed(2)}x`,
       datasetKey: 'requestStats',
@@ -2834,7 +1146,6 @@ function GraphsPageContent() {
     {
       key: 'reqRatio',
       title: t.cacheReadOutputRatioReq,
-      color: '#8b5cf6',
       axisLabel: t.ratioAxis,
       format: (v) => `${v.toFixed(1)}x`,
       datasetKey: 'requestStats',
@@ -2843,7 +1154,6 @@ function GraphsPageContent() {
     {
       key: 'readWriteRatio',
       title: t.cacheReadWriteRatio,
-      color: '#14b8a6',
       axisLabel: t.ratioAxis,
       format: (v) => `${v.toFixed(1)}x`,
       datasetKey: 'requestStats',
@@ -2851,8 +1161,8 @@ function GraphsPageContent() {
     },
     {
       key: 'sessRatio',
+      perSession: true,
       title: t.cacheReadOutputRatioSess,
-      color: '#ec4899',
       axisLabel: t.ratioAxis,
       format: (v) => `${v.toFixed(1)}x`,
       datasetKey: 'sessionAggregates',
@@ -2860,8 +1170,8 @@ function GraphsPageContent() {
     },
     {
       key: 'turns',
+      perSession: true,
       title: t.turnsPerSession,
-      color: '#f97316',
       axisLabel: t.turnsAxis,
       format: (v) => String(Math.round(v)),
       datasetKey: 'sessionAggregates',
@@ -2870,7 +1180,6 @@ function GraphsPageContent() {
     {
       key: 'ttft',
       title: t.ttftDist,
-      color: '#10b981',
       axisLabel: t.ttftAxis,
       format: formatDuration,
       datasetKey: 'ttftValues',
@@ -2879,7 +1188,6 @@ function GraphsPageContent() {
     {
       key: 'tpot',
       title: t.tpotDist,
-      color: '#8b5cf6',
       axisLabel: t.tpotAxis,
       format: (v) => `${v.toFixed(1)}ms/tok`,
       datasetKey: 'tpotValues',
@@ -2888,70 +1196,59 @@ function GraphsPageContent() {
     {
       key: 'prefill-speed',
       title: t.prefillSpeedDist,
-      color: '#0ea5e9',
       axisLabel: t.prefillSpeedAxis,
       format: formatPrefillSpeed,
-      tailDirection: 'low',
       datasetKey: 'prefillSpeedValues',
       select: (d) => d as GraphHistogram,
     },
     {
       key: 'tokens-per-chunk',
       title: t.tokensPerChunkDist,
-      color: '#22d3ee',
       axisLabel: t.tokensPerChunkAxis,
       format: (v) => `${v.toFixed(2)} tok/chunk`,
-      tickFormat: (v) => v.toFixed(2),
       datasetKey: 'tokensPerChunkValues',
       select: (d) => d as GraphHistogram,
     },
     {
       key: 'prefill-share',
       title: t.prefillShareTitle,
-      color: '#f97316',
       axisLabel: t.prefillShareAxis,
       format: (v) => `${(v * 100).toFixed(1)}%`,
-      tickFormat: (v) => `${Math.round(v * 100)}%`,
       datasetKey: 'prefillDecodeValues',
       select: (d) => (d as PrefillDecodePayload).prefillShare,
     },
     {
       key: 'interactivity',
       title: t.interactivityDist,
-      color: '#f59e0b',
       axisLabel: t.interactivityAxis,
       format: (v) => `${v.toFixed(1)} tok/s`,
-      tailDirection: 'low',
       datasetKey: 'tpotValues',
       select: (d) => (d as TpotPayload).interactivity,
     },
     {
       key: 'session-duration',
+      perSession: true,
       title: t.sessionDurationTitle(CURRENT_TRACE_VERSION),
-      color: '#ec4899',
       axisLabel: t.sessionDurationAxis,
       format: (v) => `${v.toFixed(2)}h`,
-      tickFormat: (v) => `${v.toFixed(1)}h`,
       datasetKey: 'sessionDurationValues',
       select: (d) => d as GraphHistogram,
     },
     {
       key: 'subagent-count',
+      perSession: true,
       title: t.subagentCountTitle(SUBAGENT_STATS_WINDOW_DAYS, CURRENT_TRACE_VERSION),
-      color: '#06b6d4',
       axisLabel: t.subagentCountAxis,
       format: (v) => String(Math.round(v)),
-      tickFormat: (v) => String(Math.round(v)),
       datasetKey: 'subagentStatsPerSession',
       select: (d) => (d as SubagentPayload).subagentCount,
     },
     {
       key: 'max-concurrent-subagents',
+      perSession: true,
       title: t.maxConcurrentHistTitle(SUBAGENT_STATS_WINDOW_DAYS, CURRENT_TRACE_VERSION),
-      color: '#14b8a6',
       axisLabel: t.maxConcurrentAxis,
       format: (v) => String(Math.round(v)),
-      tickFormat: (v) => String(Math.round(v)),
       datasetKey: 'subagentStatsPerSession',
       select: (d) => (d as SubagentPayload).maxConcurrent,
     },
@@ -2972,10 +1269,8 @@ function GraphsPageContent() {
         </div>
       )}
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.traffic}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.traffic}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <RpsTimeseriesChart
         data={rpsData}
@@ -2984,10 +1279,8 @@ function GraphsPageContent() {
         loading={rpsLoading}
       />
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.hourlyActivity}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.hourlyActivity}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<
@@ -3037,10 +1330,8 @@ function GraphsPageContent() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.weeklySessions}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.weeklySessions}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <div className="grid grid-cols-1 gap-4">
         <LazyDatasetCard<WeeklySessionRow[]>
@@ -3052,10 +1343,8 @@ function GraphsPageContent() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.wallClock}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.wallClock}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <div className="grid grid-cols-1 gap-4">
         <LazyDatasetCard<WallClockPayload>
@@ -3087,9 +1376,7 @@ function GraphsPageContent() {
           datasetKey="subagentStatsPerSession"
           ctx={ctx}
           title={t.maxConcSubLazy(SUBAGENT_STATS_WINDOW_DAYS)}
-          render={(d) => (
-            <MaxConcurrentSubagentsPieChart slices={concurrencySlices(d.concurrencyPie)} />
-          )}
+          render={(d) => <MaxConcurrentSubagentsChart buckets={d.concurrencyPie} />}
         />
       </div>
 
@@ -3112,8 +1399,8 @@ function GraphsPageContent() {
                 bLabel={t.decodeE2eMinusTtft}
                 aStatLabel={t.p50Prefill}
                 bStatLabel={t.p50Decode}
-                aColor="#f97316"
-                bColor="#0ea5e9"
+                aColor={CHART_COLORS[1]}
+                bColor={CHART_COLORS[0]}
               />
             );
           }}
@@ -3178,8 +1465,8 @@ function GraphsPageContent() {
                 bLabel={t.decodeE2eMinusTtft}
                 aStatLabel={t.p50Prefill}
                 bStatLabel={t.p50Decode}
-                aColor="#f97316"
-                bColor="#0ea5e9"
+                aColor={CHART_COLORS[1]}
+                bColor={CHART_COLORS[0]}
               />
             )
           }
@@ -3202,8 +1489,8 @@ function GraphsPageContent() {
                 bLabel={t.decodeE2eMinusTtft}
                 aStatLabel={t.p50Prefill}
                 bStatLabel={t.p50Decode}
-                aColor="#f97316"
-                bColor="#0ea5e9"
+                aColor={CHART_COLORS[1]}
+                bColor={CHART_COLORS[0]}
               />
             )
           }
@@ -3268,8 +1555,8 @@ function GraphsPageContent() {
                 bLabel={t.decodeE2eMinusTtft}
                 aStatLabel={t.p50Prefill}
                 bStatLabel={t.p50Decode}
-                aColor="#f97316"
-                bColor="#0ea5e9"
+                aColor={CHART_COLORS[1]}
+                bColor={CHART_COLORS[0]}
               />
             )
           }
@@ -3292,8 +1579,8 @@ function GraphsPageContent() {
                 bLabel={t.decodeE2eMinusTtft}
                 aStatLabel={t.p50Prefill}
                 bStatLabel={t.p50Decode}
-                aColor="#f97316"
-                bColor="#0ea5e9"
+                aColor={CHART_COLORS[1]}
+                bColor={CHART_COLORS[0]}
               />
             )
           }

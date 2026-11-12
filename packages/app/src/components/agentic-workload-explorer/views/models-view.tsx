@@ -1,59 +1,68 @@
 'use client';
 
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
-import { CHART_COLORS } from '@/components/agentic-workload-explorer/trends-charts';
+import {
+  CHART_COLORS,
+  TOKEN_SERIES_COLORS,
+  NEUTRAL_SERIES_COLOR,
+} from '@/components/agentic-workload-explorer/series-colors';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import type {
-  ModelsData,
-  TokensByModel,
-  ModelTimeSeries,
-} from '@/lib/agentic-workload-explorer/api-types';
-import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import type { ModelsData, TokensByModel } from '@/lib/agentic-workload-explorer/api-types';
+import {
+  formatAxisNumber,
+  formatDayLabel,
+  TrendsStackedChart,
+  type StackedDayPoint,
+} from '@/components/agentic-workload-explorer/trends-charts';
+import { Button } from '@/components/ui/button';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
   en: {
+    yRequests: 'Requests',
     stats: 'Stats',
-    modelsUsed: 'Models Used',
-    totalTokens: 'Total Tokens',
-    fastModePct: 'Fast Mode % (tokens)',
-    cacheHitRatio: 'Cache Hit Ratio',
+    modelsUsed: 'Models used',
+    totalTokens: 'Total tokens',
+    fastModePct: 'Fast mode % (tokens)',
+    cacheHitRatio: 'Cache hit ratio',
     failedToLoad: 'Failed to load model data',
-    tokenDistByModel: 'Token Distribution by Model',
-    input: 'input',
-    cacheRead: 'cache_read',
-    cacheWrite: 'cache_write',
-    output: 'output',
-    inputTooltip: (n: string) => `Input: ${n}`,
-    cacheReadTooltip: (n: string) => `Cache Read: ${n}`,
-    cacheWriteTooltip: (n: string) => `Cache Write: ${n}`,
-    outputTooltip: (n: string) => `Output: ${n}`,
-    fastModeAnalysis: 'Fast Mode Analysis',
-    regular: 'regular',
-    fast: 'fast',
-    regularTooltip: (n: string) => `Regular: ${n}`,
-    fastTooltip: (n: string) => `Fast: ${n}`,
-    regFastDetail: (reg: string, fast: string) => `${reg} reg / ${fast} fast`,
-    modelUsageOverTime: 'Model Usage Over Time',
+    tokenDistByModel: 'Token distribution by model',
+    input: 'Input',
+    cacheRead: 'Cache read',
+    cacheWrite: 'Cache write',
+    output: 'Output',
+    total: 'Total',
+    modelCount: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
+    fastModeAnalysis: 'Fast mode analysis',
+    sortedByFast: 'sorted by fast mode tokens',
+    regular: 'Regular',
+    fast: 'Fast mode',
+    fastShare: (pct: string) => `${pct}% of tokens in fast mode`,
+    regFastDetail: (reg: string, fast: string) => `${reg} regular / ${fast} fast`,
+    showList: 'Show list',
+    hideList: 'Hide list',
+    modelUsageOverTime: 'Model usage over time',
     noTimeSeriesData: 'No time series data',
     requestsPerDay: 'Requests per day',
-    requestsTooltip: (model: string, count: number, day: string) =>
-      `${model}: ${count} requests (${day})`,
     inOut: (inp: string, out: string) => `${inp} in / ${out} out`,
     fastOfTotal: (fast: string, total: string) => `${fast} fast of ${total} tokens`,
     readEligible: (read: string, eligible: string) => `${read} read / ${eligible} eligible`,
-    exportModelUsage: 'Model Usage Over Time',
   },
   zh: {
+    yRequests: '请求数',
     stats: '统计',
     modelsUsed: '使用模型数',
     totalTokens: '总 Token 数',
@@ -61,29 +70,26 @@ const STRINGS = {
     cacheHitRatio: 'Cache 命中率',
     failedToLoad: '加载模型数据失败',
     tokenDistByModel: '按模型的 Token 分布',
-    input: 'input',
-    cacheRead: 'cache_read',
-    cacheWrite: 'cache_write',
-    output: 'output',
-    inputTooltip: (n: string) => `Input: ${n}`,
-    cacheReadTooltip: (n: string) => `Cache Read: ${n}`,
-    cacheWriteTooltip: (n: string) => `Cache Write: ${n}`,
-    outputTooltip: (n: string) => `Output: ${n}`,
+    input: '输入',
+    cacheRead: '缓存读取',
+    cacheWrite: '缓存写入',
+    output: '输出',
+    total: '合计',
+    modelCount: (n: number) => `${n} 个模型`,
     fastModeAnalysis: 'Fast Mode 分析',
+    sortedByFast: '按 Fast Mode Token 排序',
     regular: '常规',
-    fast: 'fast',
-    regularTooltip: (n: string) => `Regular: ${n}`,
-    fastTooltip: (n: string) => `Fast: ${n}`,
-    regFastDetail: (reg: string, fast: string) => `${reg} reg / ${fast} fast`,
+    fast: 'Fast Mode',
+    fastShare: (pct: string) => `${pct}% 的 Token 为 Fast Mode`,
+    regFastDetail: (reg: string, fast: string) => `常规 ${reg} / Fast ${fast}`,
+    showList: '显示列表',
+    hideList: '隐藏列表',
     modelUsageOverTime: '模型使用趋势',
     noTimeSeriesData: '暂无时序数据',
     requestsPerDay: '每日请求数',
-    requestsTooltip: (model: string, count: number, day: string) =>
-      `${model}: ${count} 次请求（${day}）`,
-    inOut: (inp: string, out: string) => `${inp} in / ${out} out`,
-    fastOfTotal: (fast: string, total: string) => `${fast} fast / ${total} token`,
-    readEligible: (read: string, eligible: string) => `${read} read / ${eligible} 可用`,
-    exportModelUsage: '模型使用趋势',
+    inOut: (inp: string, out: string) => `输入 ${inp} / 输出 ${out}`,
+    fastOfTotal: (fast: string, total: string) => `${total} token 中 ${fast} 为 Fast Mode`,
+    readEligible: (read: string, eligible: string) => `读取 ${read} / 可用 ${eligible}`,
   },
 };
 
@@ -91,501 +97,243 @@ function shortenModel(model: string): string {
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
 }
 
-function buildModelColorMap(models: string[]): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (let i = 0; i < models.length; i++) {
-    map[models[i]] = CHART_COLORS[i % CHART_COLORS.length];
-  }
-  return map;
+type Strings = (typeof STRINGS)['en'];
+
+const TOKEN_KEYS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const;
+const FAST_COLORS = { regular: NEUTRAL_SERIES_COLOR, fast: CHART_COLORS[1] } as const;
+
+interface RowHover {
+  model: string;
+  x: number;
+  y: number;
 }
 
-function SectionHeader({ label }: { label: string }) {
+function tokenParts(m: TokensByModel) {
+  return {
+    input: Number(m.inputTokens),
+    cacheRead: Number(m.cacheReadInputTokens),
+    cacheWrite: Number(m.cacheWriteTokens),
+    output: Number(m.outputTokens),
+  };
+}
+
+function fastParts(m: TokensByModel) {
+  const fast =
+    Number(m.fastInputTokens) +
+    Number(m.fastOutputTokens) +
+    Number(m.fastCacheReadInputTokens) +
+    Number(m.fastCacheWriteTokens);
+  const all =
+    Number(m.inputTokens) +
+    Number(m.outputTokens) +
+    Number(m.cacheReadInputTokens) +
+    Number(m.cacheWriteTokens);
+  return { regular: all - fast, fast };
+}
+
+function LegendSwatches({ items }: { items: { key: string; label: string; color: string }[] }) {
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
+    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      {items.map((item) => (
+        <span key={item.key} className="inline-flex items-center gap-1.5">
+          <span className="size-2 rounded-sm" style={{ backgroundColor: item.color }} />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
 
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-1">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
-function TokenDistribution({
-  data,
-  strings: s,
-}: {
-  data: TokensByModel[];
-  strings: (typeof STRINGS)['en'];
-}) {
-  const sorted = useMemo(
+function TokenDistribution({ data, strings: s }: { data: TokensByModel[]; strings: Strings }) {
+  const [hover, setHover] = useState<RowHover | null>(null);
+  const rows = useMemo(
     () =>
-      [...data].toSorted((a, b) => {
-        const totalA =
-          Number(a.inputTokens) +
-          Number(a.cacheReadInputTokens) +
-          Number(a.cacheWriteTokens) +
-          Number(a.outputTokens);
-        const totalB =
-          Number(b.inputTokens) +
-          Number(b.cacheReadInputTokens) +
-          Number(b.cacheWriteTokens) +
-          Number(b.outputTokens);
-        return totalB - totalA;
-      }),
+      data
+        .map((m) => {
+          const parts = tokenParts(m);
+          return {
+            model: m.model,
+            parts,
+            total: parts.input + parts.cacheRead + parts.cacheWrite + parts.output,
+          };
+        })
+        .filter((r) => r.total > 0)
+        .toSorted((a, b) => b.total - a.total),
+    [data],
+  );
+  const globalMax = rows[0]?.total ?? 0;
+  const labels = {
+    input: s.input,
+    cacheRead: s.cacheRead,
+    cacheWrite: s.cacheWrite,
+    output: s.output,
+  };
+  const hovered = hover ? rows.find((r) => r.model === hover.model) : undefined;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle>{s.tokenDistByModel}</CardTitle>
+        <div className="text-xs text-muted-foreground">{s.modelCount(rows.length)}</div>
+      </CardHeader>
+      <LegendSwatches
+        items={TOKEN_KEYS.map((key) => ({
+          key,
+          label: labels[key],
+          color: TOKEN_SERIES_COLORS[key],
+        }))}
+      />
+      <div className="space-y-1.5" onMouseLeave={() => setHover(null)}>
+        {rows.map((r) => (
+          <div
+            key={r.model}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:flex"
+            onMouseMove={(e) => setHover({ model: r.model, x: e.clientX, y: e.clientY })}
+          >
+            <span
+              className="min-w-0 sm:w-32 shrink-0 truncate text-xs text-foreground"
+              title={r.model}
+            >
+              {shortenModel(r.model)}
+            </span>
+            <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
+              <div
+                className="flex h-full overflow-hidden rounded-sm"
+                style={{ width: `${(r.total / globalMax) * 100}%`, minWidth: 2 }}
+              >
+                {TOKEN_KEYS.map((key) =>
+                  r.parts[key] > 0 ? (
+                    <div
+                      key={key}
+                      className="h-full"
+                      style={{
+                        width: `${(r.parts[key] / r.total) * 100}%`,
+                        backgroundColor: TOKEN_SERIES_COLORS[key],
+                      }}
+                    />
+                  ) : null,
+                )}
+              </div>
+            </div>
+            <span className="sm:w-16 shrink-0 text-right text-xs tabular-nums whitespace-nowrap text-foreground">
+              {formatNumber(r.total)}
+            </span>
+          </div>
+        ))}
+      </div>
+      {hover && hovered && (
+        <FloatingTooltip x={hover.x} y={hover.y}>
+          <ChartHoverCardBody
+            title={shortenModel(hovered.model)}
+            metrics={TOKEN_KEYS.map((key) => ({
+              value: formatNumber(hovered.parts[key]),
+              label: labels[key],
+              color: TOKEN_SERIES_COLORS[key],
+            }))}
+            summary={`${s.total} ${formatNumber(hovered.total)}`}
+          />
+        </FloatingTooltip>
+      )}
+    </Card>
+  );
+}
+
+function FastModeAnalysis({ data, strings: s }: { data: TokensByModel[]; strings: Strings }) {
+  const [hover, setHover] = useState<RowHover | null>(null);
+  const rows = useMemo(
+    () =>
+      data
+        .filter((m) => Number(m.fastModeCount) > 0)
+        .map((m) => {
+          const parts = fastParts(m);
+          return { model: m.model, ...parts, total: parts.regular + parts.fast };
+        })
+        .toSorted((a, b) => b.fast - a.fast),
     [data],
   );
 
-  const globalMax = useMemo(() => {
-    let max = 0;
-    for (const m of sorted) {
-      const total =
-        Number(m.inputTokens) +
-        Number(m.cacheReadInputTokens) +
-        Number(m.cacheWriteTokens) +
-        Number(m.outputTokens);
-      if (total > max) max = total;
-    }
-    return max;
-  }, [sorted]);
+  if (rows.length === 0) return null;
+  const maxTokens = rows.reduce((max, r) => Math.max(max, r.total), 0);
+  const hovered = hover ? rows.find((r) => r.model === hover.model) : undefined;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <SectionHeader label={s.tokenDistByModel} />
-      <div className="space-y-2 mt-3">
-        <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground mb-2">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500" /> {s.input}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" /> {s.cacheRead}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" /> {s.cacheWrite}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-violet-500" /> {s.output}
-          </span>
-        </div>
-        {sorted.map((m) => {
-          const input = Number(m.inputTokens);
-          const cacheRead = Number(m.cacheReadInputTokens);
-          const cacheWrite = Number(m.cacheWriteTokens);
-          const output = Number(m.outputTokens);
-          const total = input + cacheRead + cacheWrite + output;
-          if (total === 0) return null;
-
-          const pctInput = (input / total) * 100;
-          const pctCacheRead = (cacheRead / total) * 100;
-          const pctCacheWrite = (cacheWrite / total) * 100;
-          const pctOutput = (output / total) * 100;
-          const barWidth = globalMax > 0 ? (total / globalMax) * 100 : 0;
-
-          return (
-            <div key={m.model} className="flex items-center gap-3">
-              <div
-                className="w-28 shrink-0 text-2xs font-mono text-foreground truncate"
-                title={m.model}
-              >
-                {shortenModel(m.model)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div
-                  className="flex h-5 rounded overflow-hidden"
-                  style={{ width: `${Math.max(barWidth, 2)}%` }}
-                >
-                  {pctInput > 0 && (
-                    <div
-                      className="bg-sky-500 h-full"
-                      style={{ width: `${pctInput}%` }}
-                      title={s.inputTooltip(formatNumber(input))}
-                    />
-                  )}
-                  {pctCacheRead > 0 && (
-                    <div
-                      className="bg-emerald-500 h-full"
-                      style={{ width: `${pctCacheRead}%` }}
-                      title={s.cacheReadTooltip(formatNumber(cacheRead))}
-                    />
-                  )}
-                  {pctCacheWrite > 0 && (
-                    <div
-                      className="bg-amber-500 h-full"
-                      style={{ width: `${pctCacheWrite}%` }}
-                      title={s.cacheWriteTooltip(formatNumber(cacheWrite))}
-                    />
-                  )}
-                  {pctOutput > 0 && (
-                    <div
-                      className="bg-violet-500 h-full"
-                      style={{ width: `${pctOutput}%` }}
-                      title={s.outputTooltip(formatNumber(output))}
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="w-16 shrink-0 text-right text-3xs font-mono text-muted-foreground">
-                {formatNumber(total)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function FastModeAnalysis({
-  data,
-  strings: s,
-}: {
-  data: TokensByModel[];
-  strings: (typeof STRINGS)['en'];
-}) {
-  const fastModels = useMemo(() => data.filter((m) => Number(m.fastModeCount) > 0), [data]);
-
-  const maxTokens = useMemo(() => {
-    let max = 0;
-    for (const m of fastModels) {
-      const regular =
-        Number(m.inputTokens) -
-        Number(m.fastInputTokens) +
-        (Number(m.outputTokens) - Number(m.fastOutputTokens)) +
-        (Number(m.cacheReadInputTokens) - Number(m.fastCacheReadInputTokens)) +
-        (Number(m.cacheWriteTokens) - Number(m.fastCacheWriteTokens));
-      const fast =
-        Number(m.fastInputTokens) +
-        Number(m.fastOutputTokens) +
-        Number(m.fastCacheReadInputTokens) +
-        Number(m.fastCacheWriteTokens);
-      const total = regular + fast;
-      if (total > max) max = total;
-    }
-    return max;
-  }, [fastModels]);
-
-  if (fastModels.length === 0) return null;
-
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <SectionHeader label={s.fastModeAnalysis} />
-      <div className="space-y-3 mt-3">
-        <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground mb-1">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" /> {s.regular}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" /> {s.fast}
-          </span>
-        </div>
-        {fastModels.map((m) => {
-          const regularTokens =
-            Number(m.inputTokens) -
-            Number(m.fastInputTokens) +
-            (Number(m.outputTokens) - Number(m.fastOutputTokens)) +
-            (Number(m.cacheReadInputTokens) - Number(m.fastCacheReadInputTokens)) +
-            (Number(m.cacheWriteTokens) - Number(m.fastCacheWriteTokens));
-          const fastTokens =
-            Number(m.fastInputTokens) +
-            Number(m.fastOutputTokens) +
-            Number(m.fastCacheReadInputTokens) +
-            Number(m.fastCacheWriteTokens);
-          const total = regularTokens + fastTokens;
-          const barScale = maxTokens > 0 ? (total / maxTokens) * 100 : 0;
-          const regularPct = total > 0 ? (regularTokens / total) * 100 : 0;
-          const fastPct = total > 0 ? (fastTokens / total) * 100 : 0;
-
-          return (
-            <div key={m.model} className="flex items-center gap-3">
-              <div
-                className="w-28 shrink-0 text-2xs font-mono text-foreground truncate"
-                title={m.model}
-              >
-                {shortenModel(m.model)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div
-                  className="flex h-5 rounded overflow-hidden"
-                  style={{ width: `${Math.max(barScale, 2)}%` }}
-                >
-                  {regularPct > 0 && (
-                    <div
-                      className="bg-muted h-full"
-                      style={{ width: `${regularPct}%` }}
-                      title={s.regularTooltip(formatNumber(regularTokens))}
-                    />
-                  )}
-                  {fastPct > 0 && (
-                    <div
-                      className="bg-amber-500 h-full"
-                      style={{ width: `${fastPct}%` }}
-                      title={s.fastTooltip(formatNumber(fastTokens))}
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="w-36 shrink-0 text-right text-3xs font-mono text-muted-foreground">
-                {s.regFastDetail(formatNumber(regularTokens), formatNumber(fastTokens))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-const CHART_W = 600;
-const CHART_H = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
-
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
-
-function formatAxisValue(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
-}
-
-function ModelUsageChart({
-  timeSeries,
-  colorMap,
-  allModels,
-  strings: s,
-}: {
-  timeSeries: ModelTimeSeries[];
-  colorMap: Record<string, string>;
-  allModels: string[];
-  strings: (typeof STRINGS)[keyof typeof STRINGS];
-}) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const { days, maxY, yTicks } = useMemo(() => {
-    const dayMap = new Map<string, Record<string, number>>();
-    for (const entry of timeSeries) {
-      if (!dayMap.has(entry.day)) dayMap.set(entry.day, {});
-      const dayData = dayMap.get(entry.day)!;
-      dayData[entry.model] = (dayData[entry.model] || 0) + Number(entry.requestCount);
-    }
-
-    const sortedDays = [...dayMap.keys()].toSorted((a, b) => Date.parse(a) - Date.parse(b));
-
-    let max = 0;
-    for (const dayData of dayMap.values()) {
-      let total = 0;
-      for (const count of Object.values(dayData)) total += count;
-      if (total > max) max = total;
-    }
-
-    const ticks = max > 0 ? generateTicks(0, max, 5) : [0];
-    const yMax = ticks.at(-1) || max || 1;
-
-    return {
-      days: sortedDays.map((day) => ({ day, data: dayMap.get(day)! })),
-      maxY: yMax,
-      yTicks: ticks,
-    };
-  }, [timeSeries]);
-
-  if (days.length === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-3">
-        <SectionHeader label={s.modelUsageOverTime} />
-        <div className="flex items-center justify-center h-40 text-2xs font-mono text-muted-foreground">
-          {s.noTimeSeriesData}
-        </div>
-      </div>
-    );
-  }
-
-  const barWidth = Math.max(1, PLOT_W / days.length - 2);
-  const barGap = PLOT_W / days.length - barWidth;
-
-  const sx = (i: number) => MARGIN.left + i * (barWidth + barGap) + barGap / 2;
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / maxY) * PLOT_H;
-
-  const labelInterval = Math.max(1, Math.floor(days.length / 6));
-
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between mb-2">
-        <SectionHeader label={s.modelUsageOverTime} />
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_model_usage_export');
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: s.exportModelUsage,
-                filename: 'model-usage-over-time.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
+    <div>
+      <SectionHeader label={s.fastModeAnalysis} detail={s.sortedByFast} />
+      <Card>
+        <LegendSwatches
+          items={[
+            { key: 'regular', label: s.regular, color: FAST_COLORS.regular },
+            { key: 'fast', label: s.fast, color: FAST_COLORS.fast },
+          ]}
         />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground mb-2">
-        {allModels.map((model) => (
-          <span key={model} className="flex items-center gap-1">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
-              style={{ backgroundColor: colorMap[model] }}
+        <div className="space-y-1.5" onMouseLeave={() => setHover(null)}>
+          {rows.map((r) => (
+            <div
+              key={r.model}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:flex"
+              onMouseMove={(e) => setHover({ model: r.model, x: e.clientX, y: e.clientY })}
+            >
+              <span
+                className="min-w-0 sm:w-32 shrink-0 truncate text-xs text-foreground"
+                title={r.model}
+              >
+                {shortenModel(r.model)}
+              </span>
+              <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
+                <div
+                  className="flex h-full overflow-hidden rounded-sm"
+                  style={{
+                    width: `${maxTokens > 0 ? (r.total / maxTokens) * 100 : 0}%`,
+                    minWidth: 2,
+                  }}
+                >
+                  {r.regular > 0 && (
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${(r.regular / r.total) * 100}%`,
+                        backgroundColor: FAST_COLORS.regular,
+                      }}
+                    />
+                  )}
+                  {r.fast > 0 && (
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${(r.fast / r.total) * 100}%`,
+                        backgroundColor: FAST_COLORS.fast,
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+              <span className="sm:w-40 shrink-0 text-right text-xs tabular-nums whitespace-nowrap text-muted-foreground">
+                {s.regFastDetail(formatNumber(r.regular), formatNumber(r.fast))}
+              </span>
+            </div>
+          ))}
+        </div>
+        {hover && hovered && (
+          <FloatingTooltip x={hover.x} y={hover.y}>
+            <ChartHoverCardBody
+              title={shortenModel(hovered.model)}
+              metrics={[
+                {
+                  value: formatNumber(hovered.regular),
+                  label: s.regular,
+                  color: FAST_COLORS.regular,
+                },
+                { value: formatNumber(hovered.fast), label: s.fast, color: FAST_COLORS.fast },
+              ]}
+              summary={
+                hovered.total > 0
+                  ? s.fastShare(((hovered.fast / hovered.total) * 100).toFixed(1))
+                  : undefined
+              }
             />
-            {shortenModel(model)}
-          </span>
-        ))}
-      </div>
-
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {formatAxisValue(t)}
-            </text>
-          </g>
-        ))}
-
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {days.map(({ day, data }, i) => {
-          let yOffset = 0;
-          const rects: React.ReactNode[] = [];
-
-          for (const model of allModels) {
-            const count = data[model] || 0;
-            if (count === 0) continue;
-            const barH = (count / maxY) * PLOT_H;
-            rects.push(
-              <rect
-                key={`${day}-${model}`}
-                x={sx(i)}
-                y={sy(yOffset + count)}
-                width={barWidth}
-                height={barH}
-                fill={colorMap[model]}
-                rx={1}
-              >
-                <title>
-                  {s.requestsTooltip(shortenModel(model), count, formatSnapshotDate(day))}
-                </title>
-              </rect>,
-            );
-            yOffset += count;
-          }
-
-          return <g key={day}>{rects}</g>;
-        })}
-
-        {days.map(({ day }, i) => {
-          if (i % labelInterval !== 0 && i !== days.length - 1) return null;
-          const d = new Date(day);
-          const label = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-          return (
-            <text
-              key={`x-${day}`}
-              x={sx(i) + barWidth / 2}
-              y={MARGIN.top + PLOT_H + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {label}
-            </text>
-          );
-        })}
-
-        <text
-          x={MARGIN.left + PLOT_W / 2}
-          y={CHART_H - 2}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {s.requestsPerDay}
-        </text>
-      </svg>
+          </FloatingTooltip>
+        )}
+      </Card>
     </div>
   );
 }
@@ -623,7 +371,27 @@ function ModelsPageContent() {
     return [...modelSet].toSorted();
   }, [data]);
 
-  const colorMap = useMemo(() => buildModelColorMap(allModels), [allModels]);
+  const [showModels, setShowModels] = useState(false);
+
+  const usage = useMemo(() => {
+    const dayMap = new Map<string, Record<string, number>>();
+    const modelSet = new Set<string>();
+    for (const entry of data?.timeSeries ?? []) {
+      modelSet.add(entry.model);
+      const values = dayMap.get(entry.day) ?? {};
+      values[entry.model] = (values[entry.model] ?? 0) + Number(entry.requestCount);
+      dayMap.set(entry.day, values);
+    }
+    const days: StackedDayPoint[] = [...dayMap.entries()]
+      .toSorted(([a], [b]) => Date.parse(a) - Date.parse(b))
+      .map(([day, values]) => ({ day, values }));
+    return { days, keys: allModels.filter((m) => modelSet.has(m)) };
+  }, [data, allModels]);
+
+  const colorMap = useMemo(
+    () => Object.fromEntries(allModels.map((m, i) => [m, CHART_COLORS[i % CHART_COLORS.length]])),
+    [allModels],
+  );
 
   let totalTokens = 0;
   let totalInput = 0;
@@ -665,30 +433,49 @@ function ModelsPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : data ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat
+              boxed
               label={t.modelsUsed}
               value={String(data.tokensByModel.length)}
-              detail={allModels.map(shortenModel).join(', ')}
+              detail={
+                <Button
+                  type="button"
+                  variant="link"
+                  size="xs"
+                  className="h-auto p-0 text-xs"
+                  aria-expanded={showModels}
+                  aria-controls="models-used-list"
+                  onClick={() => {
+                    setShowModels((v) => !v);
+                    track('agentic_workload_models_list_toggled', { shown: !showModels });
+                  }}
+                >
+                  {showModels ? t.hideList : t.showList}
+                </Button>
+              }
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.totalTokens}
               value={formatNumber(totalTokens)}
               detail={t.inOut(formatNumber(totalInput), formatNumber(totalOutput))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.fastModePct}
               value={`${fastModePct}%`}
               detail={t.fastOfTotal(formatNumber(totalFastTokens), formatNumber(totalTokens))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.cacheHitRatio}
               value={`${cacheHitRatio}%`}
               detail={t.readEligible(
@@ -696,11 +483,21 @@ function ModelsPageContent() {
                 formatNumber(totalCacheRead + totalInput),
               )}
             />
-          </div>
+          </dl>
         ) : (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
+        )}
+        {data && showModels && (
+          <ul
+            id="models-used-list"
+            className="mt-2 flex flex-wrap gap-x-4 gap-y-1 rounded-xl border border-border/30 bg-card p-3 text-xs text-foreground"
+          >
+            {allModels.map((m) => (
+              <li key={m} title={m}>
+                {shortenModel(m)}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -712,14 +509,20 @@ function ModelsPageContent() {
 
           <FastModeAnalysis data={data.tokensByModel} strings={t} />
 
-          <Expandable title={t.modelUsageOverTime}>
-            <ModelUsageChart
-              timeSeries={data.timeSeries}
-              colorMap={colorMap}
-              allModels={allModels}
-              strings={t}
-            />
-          </Expandable>
+          <TrendsStackedChart
+            title={t.modelUsageOverTime}
+            subtext={t.requestsPerDay}
+            days={usage.days}
+            seriesKeys={usage.keys}
+            labelFor={shortenModel}
+            colorFor={(key) => colorMap[key]}
+            mode="count"
+            yFormatter={formatAxisNumber}
+            yLabel={t.yRequests}
+            xFormatter={(day: string) => formatDayLabel(day, locale)}
+            filename="model-usage-over-time"
+            emptyLabel={t.noTimeSeriesData}
+          />
         </>
       )}
     </div>

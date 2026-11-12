@@ -27,6 +27,18 @@ export interface ResidentSequenceLengthSketches {
   requestedPoints: number;
 }
 
+export function mergeResidentSequenceLengthSketches(
+  parts: readonly ResidentSequenceLengthSketches[],
+): ResidentSequenceLengthSketches {
+  if (parts.length === 1) return parts[0]!;
+  return {
+    isl: mergeTokenLengthSketches(parts.map((part) => part.isl)),
+    osl: mergeTokenLengthSketches(parts.map((part) => part.osl)),
+    coveredPoints: parts.reduce((sum, part) => sum + part.coveredPoints, 0),
+    requestedPoints: parts.reduce((sum, part) => sum + part.requestedPoints, 0),
+  };
+}
+
 export async function getResidentSequenceLengthSketches(
   sql: DbClient,
   benchmarkResultIds: number[],

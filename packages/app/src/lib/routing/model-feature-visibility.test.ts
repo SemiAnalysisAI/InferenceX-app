@@ -18,10 +18,10 @@ describe('model presentation visibility', () => {
   });
 
   it.each([
-    '/inference/glm-5-3-flash',
-    '/zh/inference/GLM-5.3-Flash',
-    '/calculator/glm-5-3-flash',
-    '/zh/historical/glm-5-3-flash',
+    '/infx/inference/glm-5-3-flash',
+    '/zh/infx/inference/GLM-5.3-Flash',
+    '/infx/calculator/glm-5-3-flash',
+    '/zh/infx/historical/glm-5-3-flash',
     '/compare/glm-5-3-flash-b200-vs-b300/agentx',
     '/compare/kimi-k3-vs-glm-5-3-flash',
     '/zh/compare-per-dollar/kimi-k3-vs-GLM-5.3-Flash',
@@ -35,8 +35,13 @@ describe('model presentation visibility', () => {
     expect(isFeatureGatedModelPath(path)).toBe(true);
   });
 
-  it.each(['/inference/glm-5-3', '/zh/inference/kimi-k3', '/api', '/inference', '/%zz'])(
-    'leaves existing public page %s alone',
-    (path) => expect(isFeatureGatedModelPath(path)).toBe(false),
+  it.each([
+    '/infx/inference/glm-5-3',
+    '/zh/infx/inference/kimi-k3',
+    '/api',
+    '/infx/inference',
+    '/%zz',
+  ])('leaves existing public page %s alone', (path) =>
+    expect(isFeatureGatedModelPath(path)).toBe(false),
   );
 });

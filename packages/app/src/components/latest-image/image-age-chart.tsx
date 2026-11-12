@@ -3,7 +3,10 @@
 import { line, scaleLinear, scaleUtc, utcFormat } from 'd3';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { useImageAgeHistory } from '@/hooks/api/use-image-age-history';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { track } from '@/lib/analytics/analytics';
@@ -48,172 +51,211 @@ export function ImageAgeChart({
   const hasData = points.some((p) => p.p90AgeDays !== null);
   const dayLabel = (days: number | null) =>
     days === null ? (zh ? '暂无数据' : 'No data') : `${days}${zh ? ' 天' : 'd'}`;
+  const fullDate = new Intl.DateTimeFormat(zh ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 
   return (
-    <section
-      className="mb-6 rounded-lg border border-border p-4 md:p-6"
-      aria-labelledby="image-age-title"
-      data-testid="image-age-panel"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <Heading as="h2" level="card" id="image-age-title">
-          {zh ? 'P90 最旧镜像' : 'P90 oldest image'}
-        </Heading>
-        <p className="text-xl font-semibold tabular-nums" data-testid="image-age-p90">
-          {dayLabel(summary.p90AgeDays)}
-        </p>
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {zh
-          ? `当前筛选下 ${summary.configurationCount} 个配置的提交年龄第 90 百分位，按最近秩法计算。年龄指距上次成功提交的天数，不是镜像构建时间。`
-          : `90th-percentile submission age across ${summary.configurationCount} filtered configurations, using nearest rank. Age is days since the last successful submission, not the image build date.`}
-      </p>
-      <p className="mt-4 text-sm font-medium">{zh ? '过去 90 天 · UTC' : 'Past 90 days · UTC'}</p>
-      <div ref={setContainerRef} className="min-w-0">
-        {isLoading ? (
-          <p className="py-16 text-center text-sm text-muted-foreground" role="status">
-            {zh ? '正在加载历史数据……' : 'Loading history…'}
+    <section className="mb-6" aria-labelledby="image-age-title" data-testid="image-age-panel">
+      <Card>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <Heading as="h2" level="card" id="image-age-title">
+            {zh ? 'P90 最旧镜像' : 'P90 oldest image'}
+          </Heading>
+          <p className="text-xl font-medium tabular-nums" data-testid="image-age-p90">
+            {dayLabel(summary.p90AgeDays)}
           </p>
-        ) : error ? (
-          <div className="py-10 text-center" data-testid="image-age-error">
-            <p className="mb-3 text-sm text-destructive">
-              {zh
-                ? '历史数据加载失败，当前指标和镜像表仍可查看。'
-                : 'History could not be loaded. The current metric and image table remain available.'}
-            </p>
-            <Button
-              variant="outline"
-              disabled={isFetching}
-              onClick={() => {
-                track('current_image_history_retry_clicked');
-                void refetch();
-              }}
-            >
-              {zh ? '重试' : 'Retry'}
-            </Button>
-          </div>
-        ) : hasData ? (
-          <>
-            <svg
-              width="100%"
-              height="250"
-              viewBox={`0 0 ${width} 250`}
-              role="img"
-              aria-label={
-                zh
-                  ? '过去 90 天的 P90 镜像提交年龄，横轴为日期，纵轴为天数。'
-                  : 'P90 image submission age over the past 90 days. X-axis: date. Y-axis: days.'
-              }
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-                event.preventDefault();
-                setHovered((previous) =>
-                  Math.max(
-                    0,
-                    Math.min(
-                      points.length - 1,
-                      (previous ?? points.length - 1) + (event.key === 'ArrowLeft' ? -1 : 1),
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {zh
+            ? `当前筛选下 ${summary.configurationCount} 个配置的提交年龄第 90 百分位，按最近秩法计算。年龄指距上次成功提交的天数，不是镜像构建时间。`
+            : `90th-percentile submission age across ${summary.configurationCount} filtered configurations, using nearest rank. Age is days since the last successful submission, not the image build date.`}
+        </p>
+        <p className="mt-4 text-sm font-medium">{zh ? '过去 90 天 · UTC' : 'Past 90 days · UTC'}</p>
+        <div ref={setContainerRef} className="min-w-0">
+          {isLoading ? (
+            <EmptyState bare role="status" className="py-16">
+              {zh ? '正在加载历史数据……' : 'Loading history…'}
+            </EmptyState>
+          ) : error ? (
+            <div className="py-10 text-center" data-testid="image-age-error">
+              <p className="mb-3 text-sm text-destructive">
+                {zh
+                  ? '历史数据加载失败，当前指标和镜像表仍可查看。'
+                  : 'History could not be loaded. The current metric and image table remain available.'}
+              </p>
+              <Button
+                variant="outline"
+                disabled={isFetching}
+                onClick={() => {
+                  track('current_image_history_retry_clicked');
+                  void refetch();
+                }}
+              >
+                {zh ? '重试' : 'Retry'}
+              </Button>
+            </div>
+          ) : hasData ? (
+            <>
+              <svg
+                width="100%"
+                height="250"
+                viewBox={`0 0 ${width} 250`}
+                role="img"
+                aria-label={
+                  zh
+                    ? '过去 90 天的 P90 镜像提交年龄，横轴为日期，纵轴为天数。'
+                    : 'P90 image submission age over the past 90 days. X-axis: date. Y-axis: days.'
+                }
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                  event.preventDefault();
+                  setHovered((previous) =>
+                    Math.max(
+                      0,
+                      Math.min(
+                        points.length - 1,
+                        (previous ?? points.length - 1) + (event.key === 'ArrowLeft' ? -1 : 1),
+                      ),
                     ),
-                  ),
-                );
-              }}
-              onPointerMove={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                const position = ((event.clientX - rect.left) * width) / rect.width;
-                setHovered(
-                  Math.max(
-                    0,
-                    Math.min(
-                      points.length - 1,
-                      Math.round(((position - 42) / (width - 58)) * (points.length - 1)),
+                  );
+                }}
+                onPointerMove={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const position = ((event.clientX - rect.left) * width) / rect.width;
+                  setHovered(
+                    Math.max(
+                      0,
+                      Math.min(
+                        points.length - 1,
+                        Math.round(((position - 42) / (width - 58)) * (points.length - 1)),
+                      ),
                     ),
-                  ),
-                );
-              }}
-              onPointerLeave={() => setHovered(null)}
-            >
-              <text x="0" y="14" fill="currentColor" fontSize={CHART_TYPE.axisLabel}>
-                {zh ? '天' : 'Days'}
-              </text>
-              {y.ticks(4).map((value) => (
-                <g key={value}>
-                  <line
-                    x1="42"
-                    x2={width - 16}
-                    y1={y(value)}
-                    y2={y(value)}
-                    className="stroke-border"
-                  />
-                  <text
-                    x="34"
-                    y={y(value) + 4}
-                    textAnchor="end"
-                    className="fill-muted-foreground"
-                    fontSize={CHART_TYPE.axisLabel}
-                  >
-                    {value}
-                  </text>
-                </g>
-              ))}
-              {x.ticks(width < 500 ? 3 : 6).map((date) => (
+                  );
+                }}
+                onPointerLeave={() => setHovered(null)}
+              >
                 <text
-                  key={date.toISOString()}
-                  x={x(date)}
-                  y="236"
-                  textAnchor="middle"
+                  x="0"
+                  y="14"
                   className="fill-muted-foreground"
                   fontSize={CHART_TYPE.axisLabel}
                 >
-                  {utcFormat('%m/%d')(date)}
+                  {zh ? '天' : 'Days'}
                 </text>
-              ))}
-              <path d={path ?? ''} fill="none" className="stroke-primary" strokeWidth="2" />
-              {points
-                .filter((p) => p.p90AgeDays !== null)
-                .map((p) => (
-                  <circle
-                    key={p.date}
-                    cx={x(new Date(`${p.date}T00:00:00Z`))}
-                    cy={y(p.p90AgeDays!)}
-                    r="2"
-                    className="fill-primary"
-                  />
+                {y.ticks(4).map((value) => (
+                  <g key={value}>
+                    <line
+                      x1="42"
+                      x2={width - 16}
+                      y1={y(value)}
+                      y2={y(value)}
+                      className="stroke-border"
+                    />
+                    <text
+                      x="34"
+                      y={y(value) + 4}
+                      textAnchor="end"
+                      className="fill-muted-foreground"
+                      fontSize={CHART_TYPE.axisLabel}
+                    >
+                      {value}
+                    </text>
+                  </g>
                 ))}
-              {active && active.p90AgeDays !== null && (
-                <circle
-                  cx={x(new Date(`${active.date}T00:00:00Z`))}
-                  cy={y(active.p90AgeDays)}
-                  r="4"
-                  className="fill-primary stroke-background"
-                  strokeWidth="2"
-                />
-              )}
-            </svg>
-            <p className="min-h-5 text-sm tabular-nums" data-testid="image-age-readout">
-              {active
-                ? `${active.date} · P90 ${dayLabel(active.p90AgeDays)} · ${active.configurationCount} ${zh ? '个配置' : 'configurations'}`
-                : ''}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
+                {x.ticks(width < 500 ? 3 : 6).map((date) => (
+                  <text
+                    key={date.toISOString()}
+                    x={x(date)}
+                    y="236"
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    fontSize={CHART_TYPE.axisLabel}
+                  >
+                    {utcFormat(zh ? '%-m月%-d日' : '%b %-d')(date)}
+                  </text>
+                ))}
+                {hovered !== null && active && (
+                  <line
+                    x1={x(new Date(`${active.date}T00:00:00Z`))}
+                    x2={x(new Date(`${active.date}T00:00:00Z`))}
+                    y1={26}
+                    y2={212}
+                    className="stroke-foreground"
+                    strokeOpacity={0.35}
+                    pointerEvents="none"
+                  />
+                )}
+                <path d={path ?? ''} fill="none" className="stroke-primary" strokeWidth="2" />
+                {points
+                  .filter((p) => p.p90AgeDays !== null)
+                  .map((p) => (
+                    <circle
+                      key={p.date}
+                      cx={x(new Date(`${p.date}T00:00:00Z`))}
+                      cy={y(p.p90AgeDays!)}
+                      r="2"
+                      className="fill-primary"
+                    />
+                  ))}
+                {active && active.p90AgeDays !== null && (
+                  <circle
+                    cx={x(new Date(`${active.date}T00:00:00Z`))}
+                    cy={y(active.p90AgeDays)}
+                    r="4"
+                    className="fill-primary stroke-background"
+                    strokeWidth="2"
+                  />
+                )}
+              </svg>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p
+                  className="min-h-5 text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+                  data-testid="image-age-readout"
+                >
+                  {active && (
+                    <>
+                      {fullDate.format(new Date(`${active.date}T00:00:00Z`))} ·{' '}
+                      <span className="text-base font-semibold text-foreground">
+                        P90 {dayLabel(active.p90AgeDays)}
+                      </span>{' '}
+                      · {active.configurationCount} {zh ? '个配置' : 'configurations'}
+                    </>
+                  )}
+                </p>
+                <p className="no-export ml-auto text-right text-2xs leading-4 text-muted-foreground">
+                  {zh
+                    ? '移动指针或聚焦图表后按左右方向键查看每日数值'
+                    : 'Hover, or focus the chart and use the arrow keys to inspect each day'}
+                </p>
+              </div>
+            </>
+          ) : (
+            <EmptyState bare className="py-16">
               {zh
-                ? '移动指针或聚焦图表后按左右方向键查看每日数值。'
-                : 'Hover, or focus the chart and use the arrow keys to inspect each day.'}
-            </p>
-          </>
-        ) : (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            {zh
-              ? '当前筛选下，过去 90 天没有历史记录。'
-              : 'No historical observations for these filters in the past 90 days.'}
-          </p>
-        )}
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        {zh
-          ? '历史曲线只统计下表中的配置，按每日已知的最近成功提交重建。无新提交时年龄继续增加；新配置从首次提交当天起计入。'
-          : 'History tracks the configurations in the table below, using the latest successful submission known on each day. Ages increase on days without submissions; new configurations enter on their first submission date.'}
-      </p>
+                ? '当前筛选下，过去 90 天没有历史记录'
+                : 'No historical observations for these filters in the past 90 days'}
+            </EmptyState>
+          )}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {zh
+            ? '历史曲线只统计下表中的配置，按每日已知的最近成功提交重建。无新提交时年龄继续增加；新配置从首次提交当天起计入。'
+            : 'History tracks the configurations in the table below, using the latest successful submission known on each day. Ages increase on days without submissions; new configurations enter on their first submission date.'}
+        </p>
+        <div className="mt-3">
+          <ResultContext
+            locale={locale}
+            layout="footer"
+            date={summary.date}
+            source="SemiAnalysis InferenceX™"
+          />
+        </div>
+      </Card>
     </section>
   );
 }

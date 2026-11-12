@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import { ChevronDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import { ControlPanel } from '@/components/ui/control-panel';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -15,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RunChangelog } from '@/components/ui/run-changelog';
 import { updateRepoUrl } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -41,12 +40,11 @@ const WORKFLOW_STRINGS = {
     runCountShort: (index: number, total: number) => workflowRunCountShortLabel(index, total, 'en'),
     previousRun: 'Previous run',
     nextRun: 'Next run',
-    changelog: 'Changelog',
     description: 'Description',
-    updatedConfigs: 'Updated Configs',
-    gitCommit: 'Git Commit',
-    noChangelog: 'No changelog data available.',
-    trackingHistory: 'This date predates changelog tracking.',
+    updatedConfigs: 'Updated configs',
+    gitCommit: 'Git commit',
+    noChangelog: 'No changelog data available',
+    trackingHistory: 'This date predates changelog tracking',
   },
   zh: {
     conclusions: { success: '运行成功', failure: '运行失败', cancelled: '运行已取消' },
@@ -57,16 +55,16 @@ const WORKFLOW_STRINGS = {
     runCountShort: (index: number, total: number) => workflowRunCountShortLabel(index, total, 'zh'),
     previousRun: '上一次运行',
     nextRun: '下一次运行',
-    changelog: '变更日志',
     description: '说明',
     updatedConfigs: '已更新配置',
-    gitCommit: 'Git Commit',
-    noChangelog: '暂无变更日志数据。',
-    trackingHistory: '该日期早于变更日志开始记录的时间。',
+    gitCommit: 'Git commit',
+    noChangelog: '暂无变更日志数据',
+    trackingHistory: '该日期早于变更日志开始记录的时间',
   },
 } as const;
 
-export const RUN_CONTEXT_GRID = 'grid min-w-0 items-start gap-3 sm:grid-cols-2 lg:max-w-3xl';
+export const RUN_CONTEXT_GRID =
+  'grid min-w-0 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,24rem)_minmax(0,24rem)_minmax(max-content,1fr)]';
 
 export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
   return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;
@@ -95,12 +93,12 @@ function RunConclusionDot({ conclusion, locale }: { conclusion: string | null; l
   if (!conclusion) return null;
   const color =
     conclusion === 'success'
-      ? 'bg-green-500'
+      ? 'bg-success'
       : conclusion === 'failure'
-        ? 'bg-red-500'
+        ? 'bg-destructive'
         : conclusion === 'cancelled'
-          ? 'bg-yellow-500'
-          : 'bg-gray-400';
+          ? 'bg-warning'
+          : 'bg-muted-foreground';
   const label = WORKFLOW_STRINGS[locale].conclusions[conclusion as 'success'] ?? conclusion;
   return (
     <span
@@ -139,19 +137,17 @@ export interface RunFieldRun {
   runUrl: string;
 }
 
-/** The Run select with previous/next steppers; the external-link icon opens the selected GitHub Actions run. */
+/** The run select with previous/next steppers. The external-link icon opens the selected GitHub Actions run. */
 export function RunField({
   runIds,
   runs,
   selectedRunId,
   onSelect,
-  changelog,
 }: {
   runIds: readonly string[];
   runs: Readonly<Record<string, RunFieldRun>>;
   selectedRunId: string;
   onSelect: (runId: string | undefined, source: 'previous' | 'next' | 'select') => void;
-  changelog?: ReactNode;
 }) {
   const locale = useLocale();
   const t = WORKFLOW_STRINGS[locale];
@@ -160,10 +156,7 @@ export function RunField({
   const nextRunId = getAdjacentRunId(runIds, selectedRunId, 'next');
   return (
     <div className="flex min-w-0 flex-col space-y-1.5" data-slot="run-field">
-      <div className="flex items-center justify-between gap-2">
-        <Label htmlFor="run-select">{t.run}</Label>
-        {changelog}
-      </div>
+      <Label htmlFor="run-select">{t.run}</Label>
       <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
         <Button
           variant="outline"
@@ -296,62 +289,45 @@ export default function WorkflowInfoDisplay() {
   })();
 
   const changelogPopover = (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-my-1.5 h-8 px-2"
-          data-testid="run-changelog-trigger"
-        >
-          <strong>{t.changelog}</strong>
-          <ChevronDownIcon />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        collisionPadding={12}
-        className="max-h-[min(32rem,calc(100dvh-1.5rem))] w-[min(400px,calc(100vw-1.5rem))] overflow-y-auto"
-      >
-        <div className="break-words">
-          {changelog && changelog.entries.length > 0 ? (
-            <>
-              {changelog.entries.map((entry, index) => (
-                <div key={index}>
-                  {index > 0 && <hr className="my-3" />}
-                  <div className="flex flex-col gap-2 text-xs line-break-words">
-                    <div className="text-xs font-bold">{t.description}</div>
-                    {formatChangelogDescription(entry.description)}
-                    <div className="text-xs font-bold">{t.updatedConfigs}</div>
-                    <ul className="list-disc pl-4">
-                      {entry.config_keys.map((key: string) => (
-                        <li key={key}>{formatConfigKeys(key)}</li>
-                      ))}
-                    </ul>
-                  </div>
+    <RunChangelog testId="run-changelog-trigger" className="sm:justify-self-end">
+      <div className="break-words">
+        {changelog && changelog.entries.length > 0 ? (
+          <>
+            {changelog.entries.map((entry, index) => (
+              <div key={index}>
+                {index > 0 && <hr className="my-3" />}
+                <div className="flex flex-col gap-2 text-xs line-break-words">
+                  <div className="text-xs font-medium">{t.description}</div>
+                  {formatChangelogDescription(entry.description)}
+                  <div className="text-xs font-medium">{t.updatedConfigs}</div>
+                  <ul className="list-disc pl-4">
+                    {entry.config_keys.map((key: string) => (
+                      <li key={key}>{formatConfigKeys(key)}</li>
+                    ))}
+                  </ul>
                 </div>
-              ))}
-              {changelog.entries[0]?.head_ref && (
-                <a
-                  href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs hover:underline text-foreground underline"
-                >
-                  {t.gitCommit}
-                </a>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col gap-2 text-xs">
-              <div className="text-xs font-bold">{t.description}</div>
-              <span className="text-muted-foreground">{t.noChangelog}</span>
-              <span className="text-muted-foreground">{t.trackingHistory}</span>
-            </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+              </div>
+            ))}
+            {changelog.entries[0]?.head_ref && (
+              <a
+                href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs hover:underline text-foreground underline"
+              >
+                {t.gitCommit}
+              </a>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col gap-2 text-xs">
+            <div className="text-xs font-medium">{t.description}</div>
+            <span className="text-muted-foreground">{t.noChangelog}</span>
+            <span className="text-muted-foreground">{t.trackingHistory}</span>
+          </div>
+        )}
+      </div>
+    </RunChangelog>
   );
 
   return (
@@ -371,8 +347,8 @@ export default function WorkflowInfoDisplay() {
           runs={availableRuns}
           selectedRunId={selectedRunId}
           onSelect={selectRun}
-          changelog={changelogPopover}
         />
+        {changelogPopover}
       </div>
     </ControlPanel>
   );

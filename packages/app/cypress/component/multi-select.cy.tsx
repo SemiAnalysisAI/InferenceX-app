@@ -203,7 +203,7 @@ describe('MultiSelect', () => {
 
   it('localizes visible and accessible defaults on Chinese routes', () => {
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <MultiSelectWrapper initial={['h100-sxm']} maxSelections={2} useDefaults />
       </PathnameContext.Provider>,
     );

@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
+import ChartLegend from '@/components/ui/chart-legend';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
-import { HardwareLegend, OpxChart, tooltipHtml } from '../charts/kit';
+import { hardwareLegend, OpxChart } from '../charts/kit';
 import { originBarsLayer } from '../charts/layers';
 import { formatRatio, ratioScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
@@ -17,6 +20,31 @@ import type { VizDefinition } from './types';
 type Grouping = 'none' | 'precision' | 'size';
 
 const PRECISIONS = ['fp4', 'fp8', 'bf16', 'other'];
+
+const STRINGS = {
+  en: {
+    pick: 'Pick a baseline GPU',
+    groupBy: 'Group by',
+    overall: 'Overall',
+    byPrecision: 'By precision',
+    bySize: (size: string) => `By ${size}`,
+    tokens: 'Tokens',
+    none: 'No cases shared with the baseline',
+    axis: (hw: string) => `Geomean Advantage over ${hw}`,
+    shared: (n: number) => `${n} shared cases`,
+  },
+  zh: {
+    pick: '请选择基线 GPU',
+    groupBy: '分组方式',
+    overall: '总体',
+    byPrecision: '按精度',
+    bySize: (size: string) => `按 ${size}`,
+    tokens: 'Token 数',
+    none: '没有与基线共同的用例',
+    axis: (hw: string) => `相对 ${hw} 的几何平均优势`,
+    shared: (n: number) => `${n} 个共同用例`,
+  },
+};
 
 interface Bar {
   group: string;
@@ -39,9 +67,12 @@ function groupCases(model: ComparisonModel, grouping: Grouping): [string, number
 }
 
 function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
+  const strings = STRINGS[useLocale()];
   const { baseline, view } = model;
   const [grouping, setGrouping] = useState<Grouping>('none');
-  if (!baseline) return <EmptyChart>Pick a baseline GPU.</EmptyChart>;
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const legendId = useId();
+  if (!baseline) return <EmptyChart>{strings.pick}</EmptyChart>;
   const grouped = grouping !== 'none';
   const series = grouped ? model.hardware.filter((hw) => hw !== baseline) : model.hardware;
   const bars: Bar[] = groupCases(model, grouping).flatMap(([group, idx]) =>
@@ -51,7 +82,7 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
     }),
   );
   const groups = [...new Set(bars.map((b) => b.group))];
-  const sizeLabel = view.op === 'gemm' ? 'M' : 'Tokens';
+  const sizeLabel = view.op === 'gemm' ? 'M' : strings.tokens;
   const xScale = ratioScale(bars.map((b) => b.value));
   return (
     <div className="space-y-3">
@@ -61,15 +92,15 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
           track('operatorx_speedup_grouping_selected', { grouping: value });
           setGrouping(value);
         }}
-        ariaLabel="Group by"
+        ariaLabel={strings.groupBy}
         options={[
-          { value: 'none', label: 'Overall' },
-          { value: 'precision', label: 'By precision' },
-          { value: 'size', label: `By ${sizeLabel}` },
+          { value: 'none', label: strings.overall },
+          { value: 'precision', label: strings.byPrecision },
+          { value: 'size', label: strings.bySize(sizeLabel) },
         ]}
       />
       {bars.length === 0 ? (
-        <EmptyChart>No cases shared with the baseline.</EmptyChart>
+        <EmptyChart>{strings.none}</EmptyChart>
       ) : (
         <OpxChart<Bar>
           chartId="operatorx-speedup-vs-baseline"
@@ -86,7 +117,7 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
             padding: grouped ? 0.2 : 0.3,
           }}
           xAxis={{
-            label: `Geomean Advantage over ${hardwareLabel(baseline)}`,
+            label: strings.axis(hardwareLabel(baseline)),
             tickFormat: (v) => formatRatio(Number(v)),
           }}
           yAxis={{
@@ -108,15 +139,33 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
           tooltip={{
             rulerType: 'none',
             content: (b) =>
-              tooltipHtml({
+              chartHoverCard({
                 title: hardwareLabel(b.hw),
+                subtitle: grouped
+                  ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group}`
+                  : undefined,
                 color: model.colors[b.hw],
-                rows: [
-                  `${grouped ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group} · ` : ''}${b.cases} shared cases`,
+                metrics: [
+                  { value: formatRatio(b.value), label: strings.axis(hardwareLabel(baseline)) },
                 ],
+                summary: strings.shared(b.cases),
               }),
           }}
-          legendElement={grouped ? <HardwareLegend model={model} hardware={series} /> : undefined}
+          legendElement={
+            grouped ? (
+              <ChartLegend
+                variant="sidebar"
+                isLegendExpanded={legendExpanded}
+                onExpandedChange={setLegendExpanded}
+                {...hardwareLegend(
+                  model,
+                  legendId,
+                  undefined,
+                  model.available.filter((hw) => hw !== baseline),
+                )}
+              />
+            ) : undefined
+          }
         />
       )}
     </div>
@@ -125,7 +174,7 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
 
 export const speedupVsBaseline: VizDefinition = {
   id: 'speedup-vs-baseline',
-  title: 'Advantage over baseline',
+  title: { en: 'Advantage over baseline', zh: '相对基线的优势' },
   needsBaseline: true,
   ops: ['gemm', 'moe', 'attention'],
   Component: SpeedupVsBaseline,

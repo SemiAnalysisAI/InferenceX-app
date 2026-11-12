@@ -11,7 +11,7 @@ import { RouteTransition } from '@/components/motion/route-transition';
 import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
-import { CircuitBackground } from '@/components/effects/circuit-background';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -31,6 +31,7 @@ import {
   landingBannerPrepaintScript as buildLandingBannerPrepaintScript,
   landingBannerPrepaintStyle as buildLandingBannerPrepaintStyle,
 } from '@/lib/nudges/landing-banner';
+import { unofficialDomainPrepaintScript as buildUnofficialDomainPrepaintScript } from '@/lib/runtime/unofficial-domain';
 
 const dm_sans = DM_Sans({
   subsets: ['latin'],
@@ -168,6 +169,7 @@ const jsonLd = {
 
 const landingBannerPrepaintScript = buildLandingBannerPrepaintScript();
 const landingBannerPrepaintStyle = buildLandingBannerPrepaintStyle();
+const unofficialDomainPrepaintScript = buildUnofficialDomainPrepaintScript();
 
 export default function RootLayout({
   children,
@@ -186,7 +188,11 @@ export default function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
-        <CircuitBackground />
+        <script
+          id="unofficial-domain-prepaint"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: unofficialDomainPrepaintScript }}
+        />
         <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
@@ -200,6 +206,7 @@ export default function RootLayout({
             >
               <PostHogPageView />
               <Header />
+              <UnofficialDomainNotice />
               <EasterEggThemeLazy />
               <div className="grow flex flex-col">
                 <ModelFeatureBoundary>

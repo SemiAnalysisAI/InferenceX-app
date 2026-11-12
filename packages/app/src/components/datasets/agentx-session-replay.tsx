@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useReducedMotion } from '@/components/inference/replay/useReducedMotion';
+import { rangeTickAnchorClass } from '@/components/ui/range-ticks';
+import { Stat } from '@/components/ui/stat';
 import { cn } from '@/lib/shared/utils';
 
 import {
@@ -67,9 +69,9 @@ const STRINGS = {
   zh: {
     eyebrow: '会话回放',
     request: (range: string, total: number) => `请求 ${range} / ${total}`,
-    context: (n: number) => `context ${tokens(n)}`,
-    main: 'main',
-    sub: (n: number) => `sub ${n}`,
+    context: (n: number) => `上下文 ${tokens(n)}`,
+    main: '主',
+    sub: (n: number) => `子 ${n}`,
     notes: {
       warmStart: `回放从会话中途开始。warmup 已将 ${tokens(WARM_PREFIX)} token 的 prefix 写入 KV cache。`,
       fanOut: '三个 subagent 并行启动。它们的 KV cache 为空，prompt 需要从头 prefill。',
@@ -120,17 +122,17 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
   const shown = visibleTokens(row, frame);
   const active = row.step === frame.step;
   return (
-    <li className="flex items-center gap-2" data-testid="agentx-session-replay-row">
+    <li className="flex h-3.5 items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'w-12 shrink-0 text-right font-mono text-3xs',
+          'min-w-12 shrink-0 whitespace-nowrap text-right text-xs leading-3.5 tabular-nums',
           active ? 'font-semibold text-foreground' : 'text-muted-foreground',
-          shown ? 'opacity-100' : 'opacity-0',
+          shown ? 'opacity-100' : 'opacity-60',
         )}
       >
         {label}
       </span>
-      <div className="flex h-2 flex-1">
+      <div className={cn('flex h-2.5 flex-1', !shown && 'bg-foreground/5')}>
         <Segment value={shown?.cached ?? 0} color={SEG.cached} className="opacity-40" />
         <Segment
           value={shown?.fresh ?? 0}
@@ -226,31 +228,43 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
   return (
     <figure
       ref={ref}
-      className="border-b border-border/60 px-5 py-5 sm:px-6"
+      className="border-b border-border/20 px-5 py-5 sm:px-6"
       data-testid="agentx-session-replay"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="font-mono text-2xs font-medium uppercase tracking-eyebrow text-primary">
-          {t.eyebrow}
-        </p>
-        <p className="font-mono text-2xs uppercase tracking-eyebrow text-muted-foreground tabular-nums">
+        <p className="text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
+        <p className="text-xs text-muted-foreground tabular-nums font-medium">
           {t.request(range, REPLAY_ROWS.length)}
           {mainRow ? ` · ${t.context(mainRow.cached + mainRow.fresh)}` : null}
         </p>
       </div>
       <p className="mt-2 min-h-10 text-sm leading-5 text-foreground sm:min-h-5">{caption}</p>
 
-      <div className="relative mt-3" aria-hidden="true">
+      <p className="mt-3 ml-14 text-xs text-muted-foreground" aria-hidden="true">
+        {t.axis}
+      </p>
+      <div className="relative mt-0.5" aria-hidden="true">
         <div className="pointer-events-none absolute inset-y-0 right-0 left-14">
           {TICKS.map((tick) => (
             <span
               key={tick}
-              className="absolute inset-y-0 border-l border-border/60"
+              className="absolute inset-y-0 border-l border-border/20"
               style={{ left: pct(tick) }}
             />
           ))}
         </div>
-        <ol className="relative space-y-1">
+        <div className="relative mb-1 ml-14 h-4 text-xs text-muted-foreground tabular-nums">
+          {[0, ...TICKS].map((tick, index) => (
+            <span
+              key={tick}
+              className={`absolute top-0 ${rangeTickAnchorClass(index, TICKS.length + 1)}`}
+              style={{ left: pct(tick) }}
+            >
+              {tokens(tick)}
+            </span>
+          ))}
+        </div>
+        <ol className="relative">
           {REPLAY_ROWS.map((row, index) => (
             <Row
               key={index}
@@ -260,37 +274,26 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             />
           ))}
         </ol>
-        <div className="relative mt-1 ml-14 h-4 font-mono text-3xs text-muted-foreground tabular-nums">
-          {TICKS.map((tick) => (
-            <span
-              key={tick}
-              className="absolute top-0 -translate-x-full pr-1"
-              style={{ left: pct(tick) }}
-            >
-              {tokens(tick)}
-            </span>
-          ))}
-        </div>
-        <p className="mt-0.5 ml-14 font-mono text-3xs text-muted-foreground">{t.axis}</p>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-border/60 pt-4 sm:grid-cols-4">
+      <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-border/20 pt-4 sm:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.key} className="flex flex-col">
-            <dt className="order-2 mt-0.5 flex items-center gap-1.5 text-xs leading-5 text-muted-foreground">
-              {stat.color ? (
+          <Stat
+            key={stat.key}
+            valueFirst
+            valueClassName="pl-3.5"
+            value={stat.value}
+            label={
+              <span className="inline-flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
                   className={cn('size-2 shrink-0', stat.key === 'cached' && 'opacity-40')}
-                  style={{ backgroundColor: stat.color }}
+                  style={stat.color ? { backgroundColor: stat.color } : undefined}
                 />
-              ) : null}
-              {stat.label}
-            </dt>
-            <dd className="order-1 font-mono text-lg font-semibold text-foreground tabular-nums">
-              {stat.value}
-            </dd>
-          </div>
+                {stat.label}
+              </span>
+            }
+          />
         ))}
       </dl>
 

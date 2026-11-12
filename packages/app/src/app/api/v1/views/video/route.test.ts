@@ -2,6 +2,7 @@ import { compareMetrics } from '@/components/video-benchmark/compare';
 import { resolveCompareSelection } from '@/components/video-benchmark/compare-url-state';
 import { concurrencyPlateau, powerUtilization } from '@/components/video-benchmark/evidence';
 import {
+  liveHistoryEntry,
   videoHistoryEntry,
   type VideoHistoryObservation,
   type VideoHistoryPage,
@@ -10,15 +11,16 @@ import { metricValue } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
 import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { chartedCells } from '@/components/video-benchmark/results-chart';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
-import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
+import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import {
   publishedResultsSide,
   resultsClipEvidence,
   resultsClipPoints,
 } from '@/components/video-benchmark/results-clips';
-import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { withQuality, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   metricOptions,
   readVideoDashboardState,
@@ -194,12 +196,12 @@ describe('published VideoGenX dashboard projection', () => {
     const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
     official.attachment.pairs[0].comparison.metrics.video_psnr_db = 35;
     for (const f of [named, official]) {
-      f.stored.quality = verifiedReferencePairs(
+      f.stored.quality = verifiedQuality(
         f.attachment,
-        f.receipts,
-        [f.stored],
+        f.descriptor,
+        f.stored,
         '9'.repeat(64),
-      );
+      ).pairs;
       const mediaPath = f.attachment.pairs[0].candidate.media_path;
       f.stored.sources[0].assets = [
         [mediaPath, { url: `/${f.stored.runId}.mp4`, downloadUrl: `/${f.stored.runId}.mp4` }],
@@ -236,14 +238,13 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.clipQuality.groups[0].clips[0].quality.releaseQualified).toBe(false);
     expect(body.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('123');
     expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
+    const state = parseResultsState('unofficialrun=123');
     const projection = resultProjection(
       videoPoints([history]),
-      parseResultsState('unofficialrun=123'),
+      state,
       namedRunPoints([history], '123'),
     );
-    const uiPoints = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
-      tier: 'h',
-    });
+    const uiPoints = resultsClipPoints(chartedCells(projection, state), { tier: 'h' });
     expect(uiPoints.map((point) => point.runId)).toEqual(['123']);
     expect(body.clipQuality.groups).toEqual(
       resultsClipEvidence(uiPoints.map((point) => publishedResultsSide(named.stored, point))),
@@ -254,12 +255,90 @@ describe('published VideoGenX dashboard projection', () => {
     expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
   });
 
+  it('scores the clip of the engine the chart draws when two engines share a GPU', async () => {
+    const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
+    const mediaPath = official.attachment.pairs[0].candidate.media_path;
+    official.stored.sources[0].assets = [[mediaPath, { url: '/124.mp4', downloadUrl: '/124.mp4' }]];
+    const entry = { ...videoHistoryEntry(official.stored, null), approved: true };
+    const [source0] = entry.sources;
+    // vLLM-Omni rates more videos per GPU-hour but is slower at the same cost per
+    // video-second, so the chart draws SGLang.
+    source0.observations = source0.observations.flatMap((o) => [
+      { ...o, results: { ...o.results!, engine: 'sglang' } },
+      {
+        ...o,
+        id: `${o.id}-vllm`,
+        p50: o.p50! + 10,
+        wallSeconds: 1,
+        results: { ...o.results!, engine: 'vllm-omni' },
+      },
+    ]);
+    source.mockImplementation((req: NextRequest) =>
+      Response.json(
+        req.nextUrl.searchParams.get('format') === 'history'
+          ? { schemaVersion: 1, nextPage: null, entries: [entry] }
+          : official.stored,
+      ),
+    );
+    const response = await GET(request('view=overview'));
+    const body = await response.json();
+    const clips = body.clipQuality.groups.flatMap((group: { clips: { pointId: string }[] }) =>
+      group.clips.map((clip) => clip.pointId),
+    );
+    expect(clips).toEqual([source0.observations[0].id]);
+  });
+
+  it('overlays an unstored named run from its live artifact read without approving it', async () => {
+    const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64)).stored;
+    const history: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [{ ...videoHistoryEntry(official, '2026-09-20T00:00:00Z'), approved: true }],
+    };
+    const named = referenceQualityFixture(20);
+    const live: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [liveHistoryEntry(named.stored)],
+    };
+    const liveArtifact = withQuality(
+      named.stored,
+      verifiedQuality(named.attachment, named.descriptor, named.stored, '9'.repeat(64)),
+    );
+    source.mockImplementation((req: NextRequest) => {
+      const query = req.nextUrl.searchParams;
+      if (query.get('format') === 'history') return Response.json(history);
+      if (query.get('format') === 'live' && query.get('run') === '123')
+        return Response.json(query.get('artifact') === '7' ? liveArtifact : live);
+      return new Response(null, { status: 204 });
+    });
+    const response = await GET(request('view=overview&unofficialrun=123'));
+    const body = await response.json();
+    const overlay = body.overlayCells.map(
+      (cell: { point: { runId: string; approved: boolean } }) => [
+        cell.point.runId,
+        cell.point.approved,
+      ],
+    );
+    expect(overlay.length).toBeGreaterThan(0);
+    expect(overlay).toEqual(overlay.map(() => ['123', false]));
+    expect(body.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).toEqual([
+      '124',
+    ]);
+    const [clip] = body.clipQuality.groups[0].clips;
+    expect([
+      clip.quality.candidate.run_id,
+      clip.quality.psnrDb,
+      clip.quality.reference.url,
+    ]).toEqual(['123', 25, '']);
+  });
+
   it('returns the same results-page selection and economics with read-only stored media metadata', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;
     source.mockImplementation(() => Response.json(history));
     const query =
-      'view=overview&r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123';
+      'view=overview&r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123&r_gpus=999&r_basis=allocated&r_x=p90';
     const response = await GET(request(query));
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -267,10 +346,22 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body).toMatchObject(expected);
     expect(body.cells.length).toBeGreaterThan(0);
     expect(body.params.view).toBe('overview');
+    expect(body.params).toMatchObject({
+      gpuCount: null,
+      xMetric: 'p90',
+      costBasis: 'participating',
+    });
+    const defaults = resultProjection(
+      videoPoints([history]),
+      parseResultsState(
+        'r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123',
+      ),
+    );
+    expect(body.cells).toEqual(defaults.cells);
     expect(body.coverage.pagesRead).toBe(1);
     expect(
       source.mock.calls.every(([req]) =>
-        ['history', 'published'].includes(req.nextUrl.searchParams.get('format')),
+        ['history', 'live', 'published'].includes(req.nextUrl.searchParams.get('format')),
       ),
     ).toBe(true);
     const mixed = await GET(request('view=overview&v_api=0.08'));

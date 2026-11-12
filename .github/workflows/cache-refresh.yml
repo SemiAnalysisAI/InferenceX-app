@@ -2,16 +2,39 @@ name: Cache Refresh
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
 
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: Check trigger
+    if: github.event_name != 'schedule' || github.repository != 'SemiAnalysisAI/InferenceX-app'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: Check trigger
+        id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          PUBLIC_DATABASE_READONLY_URL: ${{ secrets.PUBLIC_DATABASE_READONLY_URL }}
+        run: |
+          if [ "$EVENT" != schedule ] || [ -n "$PUBLIC_DATABASE_READONLY_URL" ]; then
+            echo run=true >>"$GITHUB_OUTPUT"
+          fi
+
   refresh:
     name: Refresh cache
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
@@ -46,9 +69,14 @@ jobs:
           APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+          EVENT: ${{ github.event_name }}
         run: |
           : "${APP_URL:?APP_URL repository variable is not set}"
-          bun run admin:cache:invalidate "$APP_URL" --immediate
+          if [ "$EVENT" = schedule ]; then
+            bun run admin:cache:invalidate "$APP_URL"
+          else
+            bun run admin:cache:invalidate "$APP_URL" --immediate
+          fi
 
       - name: Warm up cache
         env:

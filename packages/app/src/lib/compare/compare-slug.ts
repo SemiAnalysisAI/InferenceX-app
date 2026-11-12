@@ -25,14 +25,14 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'muse-spark-open',
     displayName: 'Muse-Spark-Open',
     dbKeys: ['musespark'],
-    label: 'Muse Spark Open 816B',
-    seoName: 'Muse Spark Open',
+    label: 'Muse Spark 1.3/Open 816B',
+    seoName: 'Muse Spark 1.3/Open',
   },
   {
     slug: 'deepseek-v4',
     displayName: 'DeepSeek-V4-Pro',
     dbKeys: ['dsv4'],
-    label: 'DeepSeekv4 Pro 0813 1.6T',
+    label: 'DeepSeek V4 Pro 0813 1.6T',
     seoName: 'DeepSeek V4 Pro',
   },
   {
@@ -53,7 +53,7 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'kimi-k31-pro',
     displayName: 'Kimi-K3.1-Pro',
     dbKeys: ['kimik3.1'],
-    label: 'Kimi K3.1 Pro',
+    label: 'Kimi K3.1 Pro 2.8T',
     seoName: 'Kimi K3.1 Pro',
   },
   {

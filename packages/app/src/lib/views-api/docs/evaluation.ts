@@ -184,8 +184,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/evaluation',
     summary: text('Get the evaluation chart view', '获取评测图表视图'),
     description: text(
-      'Returns the aggregated evaluation bars the /evaluation dashboard renders for a model, benchmark, and run date: latest rows per config, with same-config retries averaged into one row (score is the mean; stderr covers the min/max error range; n counts the averaged runs). benchmarks lists every benchmark available for the model.',
-      '返回 /evaluation 页面为指定模型、基准和运行日期渲染的聚合评测柱状数据：每个配置取最新数据，同配置的重试合并为一行（score 为平均值，stderr 覆盖最小/最大误差范围，n 为参与平均的运行次数）。benchmarks 列出该模型的全部可用基准。',
+      'Returns the aggregated evaluation bars the /infx/evaluation dashboard renders for a model, benchmark, and run date: latest rows per config, with same-config retries averaged into one row (score is the mean; stderr covers the min/max error range; n counts the averaged runs). benchmarks lists every benchmark available for the model.',
+      '返回 /infx/evaluation 页面为指定模型、基准和运行日期渲染的聚合评测柱状数据：每个配置取最新数据，同配置的重试合并为一行（score 为平均值，stderr 覆盖最小/最大误差范围，n 为参与平均的运行次数）。benchmarks 列出该模型的全部可用基准。',
     ),
     audience: 'public',
     stability: 'beta',

@@ -9,7 +9,10 @@ import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from '../catalog/consta
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      tracking: ['eyebrow', 'eyebrow-wide', 'heading'],
+      container: ['measure'],
+      leading: ['reading'],
+      text: ['title'],
+      tracking: ['eyebrow', 'heading'],
     },
   },
 });

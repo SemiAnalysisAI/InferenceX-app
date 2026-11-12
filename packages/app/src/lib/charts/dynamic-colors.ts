@@ -1,3 +1,5 @@
+import { rgb } from 'd3';
+
 import {
   GOOGLE_BLUE,
   HUAWEI_CHART_COLORS,
@@ -32,6 +34,23 @@ function pickLightness(index: number, count: number, theme: 'light' | 'dark'): n
   return max - (index / (count - 1)) * (max - min);
 }
 
+function chipPair(key: string): string {
+  return key.split('_')[0].replace(/^gb/u, 'b');
+}
+
+function sortPairedByChip(keys: string[]): void {
+  keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+  const pairRank = new Map<string, number>();
+  for (const key of keys)
+    if (!pairRank.has(chipPair(key))) pairRank.set(chipPair(key), pairRank.size);
+  keys.sort(
+    (a, b) =>
+      pairRank.get(chipPair(a))! - pairRank.get(chipPair(b))! ||
+      getModelSortIndex(a) - getModelSortIndex(b) ||
+      a.localeCompare(b),
+  );
+}
+
 export function generateVendorColors(
   activeKeys: string[],
   theme: 'light' | 'dark',
@@ -50,7 +69,7 @@ export function generateVendorColors(
   }
 
   for (const [vendor, keys] of groups) {
-    keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+    sortPairedByChip(keys);
 
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
@@ -78,6 +97,24 @@ export function generateVendorColors(
   return result;
 }
 
+export const VENDOR_LABELS: Record<Vendor, string> = {
+  nvidia: 'NVIDIA',
+  amd: 'AMD',
+  openai: 'OpenAI',
+  google: 'Google',
+  huawei: 'Huawei',
+  unknown: 'Unknown',
+};
+
+const VENDOR_BRAND_COLORS: Partial<Record<Vendor, string>> = {
+  nvidia: '#76b900',
+  amd: '#ed1c24',
+};
+
+export function vendorColor(vendor: Vendor, theme: 'light' | 'dark'): string {
+  return VENDOR_BRAND_COLORS[vendor] ?? generateVendorColors([vendor], theme)[vendor];
+}
+
 export function generateGpuDateColors(
   gpuKeys: string[],
   dateCount: number,
@@ -99,7 +136,7 @@ export function generateGpuDateColors(
   const { min: lMin, max: lMax } = LIGHTNESS[theme];
 
   for (const [vendor, keys] of groups) {
-    keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+    sortPairedByChip(keys);
 
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
@@ -205,6 +242,8 @@ export function generateHighContrastGpuDateColors(
   return result;
 }
 
+const OKLCH_PATTERN = /^oklch\(\s*(?<l>[\d.]+)\s+(?<c>[\d.]+)\s+(?<h>[\d.]+)\s*\)$/u;
+
 /**
  * Lighter/darker variant of an `oklch(L C H)` color for the nth series that shares one
  * hardware color: 0 keeps the base, then alternates darker/lighter in widening steps.
@@ -212,9 +251,105 @@ export function generateHighContrastGpuDateColors(
  */
 export function shadeOklch(color: string, index: number): string {
   if (index <= 0) return color;
-  const groups = /^oklch\(\s*(?<l>[\d.]+)\s+(?<c>[\d.]+)\s+(?<h>[\d.]+)\s*\)$/u.exec(color)?.groups;
+  const groups = OKLCH_PATTERN.exec(color)?.groups;
   if (!groups) return color;
   const step = Math.ceil(index / 2) * 0.09 * (index % 2 === 1 ? -1 : 1);
   const lightness = Math.min(0.92, Math.max(0.3, Number(groups.l) + step));
   return `oklch(${lightness.toFixed(3)} ${groups.c} ${groups.h})`;
+}
+
+function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, number] {
+  const a = c * Math.cos((h * Math.PI) / 180);
+  const b = c * Math.sin((h * Math.PI) / 180);
+  const lc = (l + 0.396_337_777_4 * a + 0.215_803_757_3 * b) ** 3;
+  const mc = (l - 0.105_561_345_8 * a - 0.063_854_172_8 * b) ** 3;
+  const sc = (l - 0.089_484_177_5 * a - 1.291_485_548 * b) ** 3;
+  return [
+    4.076_741_662_1 * lc - 3.307_711_591_3 * mc + 0.230_969_929_2 * sc,
+    -1.268_438_004_6 * lc + 2.609_757_401_1 * mc - 0.341_319_396_5 * sc,
+    -0.004_196_086_3 * lc - 0.703_418_614_7 * mc + 1.707_614_701 * sc,
+  ];
+}
+
+function gammaDecode(channel: number): number {
+  return channel <= 0.040_45 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function srgbToOklch(color: string): [number, number, number] | null {
+  const parsed = rgb(color);
+  if (Number.isNaN(parsed.r)) return null;
+  const [r, g, b] = [parsed.r, parsed.g, parsed.b].map((channel) => gammaDecode(channel / 255));
+  const lc = Math.cbrt(0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b);
+  const mc = Math.cbrt(0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b);
+  const sc = Math.cbrt(0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b);
+  const a = 1.977_998_495_1 * lc - 2.428_592_205 * mc + 0.450_593_709_9 * sc;
+  const bb = 0.025_904_037_1 * lc + 0.782_771_766_2 * mc - 0.808_675_766 * sc;
+  const hue = (Math.atan2(bb, a) * 180) / Math.PI;
+  return [
+    0.210_454_255_3 * lc + 0.793_617_785 * mc - 0.004_072_046_8 * sc,
+    Math.hypot(a, bb),
+    hue < 0 ? hue + 360 : hue,
+  ];
+}
+
+function gamutChroma(l: number, c: number, h: number): number {
+  const fits = (chroma: number) =>
+    oklchToLinearSrgb(l, chroma, h).every((channel) => channel >= -1e-4 && channel <= 1 + 1e-4);
+  if (fits(c)) return c;
+  let lo = 0;
+  let hi = c;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function oklchLuminance(l: number, c: number, h: number): number {
+  const [r, g, b] = oklchToLinearSrgb(l, c, h).map((channel) => Math.min(1, Math.max(0, channel)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function parseOklch(color: string): number[] | null {
+  const groups = OKLCH_PATTERN.exec(color)?.groups;
+  return groups ? [Number(groups.l), Number(groups.c), Number(groups.h)] : srgbToOklch(color);
+}
+
+function darkenToLuminance(
+  [l, c, h]: number[],
+  maxLuminance: number,
+  luminanceAt: (lightness: number) => number,
+): string {
+  let lo = 0;
+  let hi = l;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    if (luminanceAt(mid) <= maxLuminance) lo = mid;
+    else hi = mid;
+  }
+  const lightness = Math.floor(lo * 1000) / 1000;
+  const chroma = Math.floor(gamutChroma(lightness, c, h) * 1000) / 1000;
+  return `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} ${h.toFixed(1)})`;
+}
+
+const WHITE_TEXT_MIN_CONTRAST = 4.6;
+const WHITE_TEXT_MAX_LUMINANCE = 1.05 / WHITE_TEXT_MIN_CONTRAST - 0.05;
+const whiteTextFills = new Map<string, string>();
+
+export function whiteTextFill(color: string): string {
+  const cached = whiteTextFills.get(color);
+  if (cached) return cached;
+  const lch = parseOklch(color);
+  let fill = color;
+  if (lch) {
+    const [, c, h] = lch;
+    const luminanceAt = (lightness: number) =>
+      oklchLuminance(lightness, gamutChroma(lightness, c, h), h);
+    if (luminanceAt(lch[0]) > WHITE_TEXT_MAX_LUMINANCE) {
+      fill = darkenToLuminance(lch, WHITE_TEXT_MAX_LUMINANCE, luminanceAt);
+    }
+  }
+  whiteTextFills.set(color, fill);
+  return fill;
 }

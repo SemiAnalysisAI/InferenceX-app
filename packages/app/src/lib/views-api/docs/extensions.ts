@@ -68,7 +68,7 @@ const clipQuality: ApiSchema & { 'x-description-zh': string } = {
                     reference: {
                       ...object,
                       description:
-                        'Original receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points and read-only media URL. Reference execution is not a hardware performance result.',
+                        'Reference case from the public descriptor: receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points, and the stored MP4 url (empty for an unstored named run) with optional previewUrl and posterUrl (first-frame JPEG). Reference execution is not a hardware performance result.',
                     },
                     scorer: {
                       ...object,
@@ -100,8 +100,35 @@ const clipQuality: ApiSchema & { 'x-description-zh': string } = {
                     'releaseQualified',
                   ],
                 },
+                unscored: {
+                  type: ['object', 'null'],
+                  description:
+                    'Why the scorer did not compare this clip; unreadable when it could not read the artifact. Null when the clip has a pair or no quality attachment exists.',
+                  properties: {
+                    reason: {
+                      type: 'string',
+                      enum: [
+                        'invalid_candidate',
+                        'checksum_mismatch',
+                        'no_reference',
+                        'settings_mismatch',
+                        'unreadable',
+                      ],
+                    },
+                    fields: { ...strings, description: 'Settings that differ from the reference.' },
+                  },
+                  required: ['reason', 'fields'],
+                },
               },
-              required: ['hardware', 'pointId', 'slotId', 'caseId', 'mediaPath', 'quality'],
+              required: [
+                'hardware',
+                'pointId',
+                'slotId',
+                'caseId',
+                'mediaPath',
+                'quality',
+                'unscored',
+              ],
             },
           },
         },
@@ -176,8 +203,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170 and DeepSeek V4.1 Flash 150 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable SKU-coverage assumptions, not OpenRouter P90-equivalent measurements.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是用于扩大 SKU 覆盖范围的可修改假设，并非与 OpenRouter P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -208,8 +235,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'data.recipes 中的方案键，对应仪表板 c_recipe。省略或未知键按缓存层级数据行数、总行数和标签依次选择默认方案；仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
   ],
   cacheHitMode: [
-    'actual or theoretical (default, displayed as Theroticial Roofline). Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace, falling back to the measured rate when unavailable.',
-    'actual 或 theoretical（默认，界面显示为 Theroticial Roofline）。Actual 使用基准测试中服务端实测的 cache 命中率；theoretical 使用 trace 计算的无限缓存理论命中率，缺失时回退到实测值。',
+    'actual or theoretical (default, displayed as Theoretical roofline). Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace, falling back to the measured rate when unavailable.',
+    'actual 或 theoretical（默认，界面显示为“理论上限”）。Actual 使用基准测试中服务端实测的 cache 命中率；theoretical 使用 trace 计算的无限缓存理论命中率，缺失时回退到实测值。',
   ],
   customCosts: [
     'JSON object from base hardware keys to finite nonnegative USD/chip-hour values, at most 100 entries.',
@@ -224,8 +251,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON 对象，将硬件键映射为有限非负千瓦/芯片功率假设。',
   ],
   priceSource: [
-    'Profit: list, openrouter or custom. Inference/history: normalized or openrouter. Returned pricing records the prices actually used.',
-    '利润视图支持 list、openrouter、custom；推理和历史视图支持 normalized、openrouter。响应 pricing 记录实际使用的价格。',
+    'Profit: list, openrouter or custom. Inference/history: normalized or openrouter. Returned pricing records the prices actually used. Muse-Spark-Open defaults to list: Muse Spark 1.3 rates published at https://vercel.com/ai-gateway/models/muse-spark-1.3 ($1.25 input, $0.15 cached input and $4.25 output per million tokens). It prices Open checkpoint measurements, not Meta production costs or profits; the default 30% labCut is an editable assumption, not actual license terms.',
+    '利润视图支持 list、openrouter、custom；推理和历史视图支持 normalized、openrouter。响应 pricing 记录实际使用的价格。Muse-Spark-Open 默认使用 list，即 https://vercel.com/ai-gateway/models/muse-spark-1.3 公布的 Muse Spark 1.3 价格：每百万 token 输入 $1.25、缓存输入 $0.15、输出 $4.25。估算使用 Open checkpoint 的实测数据，并非 Meta 生产环境成本或利润；默认 30% labCut 为可修改的假设，并非实际许可条款。',
   ],
   inputPrice: [
     'Custom uncached input USD/million tokens, default 1.',
@@ -283,7 +310,7 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'CollectiveX dataset schema version; default 1.',
     'CollectiveX 数据集 schema 版本，默认 1。',
   ],
-  suite: ['Run-list filter: all, ep, kv or swap.', '运行列表筛选：all、ep、kv 或 swap。'],
+  suite: ['Run-list filter: all, ep or swap.', '运行列表筛选：all、ep 或 swap。'],
   epSize: [
     'EP size, default 8 when available, otherwise the first available size.',
     'EP 大小，有 8 时默认选 8，否则选首个可用值。',
@@ -301,8 +328,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '精度键；CollectiveX 有 fp8 时默认使用 fp8。镜像视图去除首尾空白、不区分大小写，默认 all。',
   ],
   operation: [
-    'EP operation: roundtrip (default), dispatch or combine.',
-    'EP 操作：roundtrip（默认）、dispatch 或 combine。',
+    'EP operation: pair_period (default when the run carries it, else roundtrip; the chained steady-state period), roundtrip (fresh entry), dispatch or combine.',
+    'EP 操作：pair_period（运行包含该指标时为默认，否则为 roundtrip；连续成对的稳态周期）、roundtrip（单次）、dispatch 或 combine。',
   ],
   yAxis: [
     'CollectiveX: latency, tokens-per-second, activation-rate or payload-rate. Video: dollar, clipsGpu, secondsGpu, clipsAllocatedGpu, secondsAllocatedGpu or energy.',
@@ -312,32 +339,18 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Comma-separated run-namespaced EP series IDs. Omit for all.',
     '以逗号分隔、带运行命名空间的 EP 曲线 ID。省略时选择全部。',
   ],
-  kvSeries: [
-    'Comma-separated run:case IDs for KV series. Omit for all.',
-    '以逗号分隔的 KV run:case ID。省略时选择全部。',
-  ],
   swapSeries: [
     'Comma-separated swap series IDs. Omit for all.',
     '以逗号分隔的 swap 曲线 ID。省略时选择全部。',
   ],
-  kvX: [
-    'KV projection: isl (default), batch, frontier or overlap.',
-    'KV 展示方式：isl（默认）、batch、frontier 或 overlap。',
-  ],
-  kvY: ['KV metric: latency (default) or bandwidth.', 'KV 指标：latency（默认）或 bandwidth。'],
-  kvOp: ['KV operation: push (default) or pull.', 'KV 操作：push（默认）或 pull。'],
-  pageTokens: [
-    'Deprecated and ignored: KV rows move whole cache rows, with no page size.',
-    '已弃用，将被忽略：KV 数据按整行缓存搬运，不再区分页大小。',
-  ],
-  overlapIsl: [
-    'Overlap input length: auto (default; the ISL with the widest batch sweep) or a positive integer.',
-    '重叠测试输入长度：auto（默认，取批大小扫描最宽的 ISL）或正整数。',
-  ],
   swapDirection: ['h2d (default), d2h or d2d.', 'h2d（默认）、d2h 或 d2d。'],
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
   swapMetric: ['bandwidth (default) or latency.', 'bandwidth（默认）或 latency。'],
-  swapPercentile: ['p50 (default), p95 or p99.', 'p50（默认）、p95 或 p99。'],
+  swapPercentile: ['p50 (default), p90, p95 or p99.', 'p50（默认）、p90、p95 或 p99。'],
+  swapView: [
+    'best (default), range or series. best and range return swap.ranges: one entry per run and SKU with, at each block size, the lowest, median and highest value across block counts and every block count in members, best first (highest bandwidth, lowest latency). The best view plots members[0]; the range view plots the band and median. series returns an empty swap.ranges.',
+    'best（默认）、range 或 series。best 和 range 返回 swap.ranges：按运行和 SKU 各一项，包含每个块大小下各块数量的最低值、中位数和最高值，并在 members 中按最佳优先（带宽最高、延迟最低）列出各块数量。best 视图绘制 members[0]，range 视图绘制色带与中位数；series 返回空的 swap.ranges。',
+  ],
   backend: ['Backend filter; omit for all.', '后端筛选；省略时选择全部。'],
   sku: ['CollectiveX chip SKU filter; default all.', 'CollectiveX 芯片 SKU 筛选，默认 all。'],
   page: [
@@ -394,8 +407,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '布尔值，默认 true。仅周图按仪表板规则应用按变更运行的统计起点。',
   ],
   lines: [
-    'Submission chart lines: comma-separated nvidia, amd, total; amd includes non-NVIDIA rows as in the UI.',
-    '提交图曲线：nvidia、amd、total，以逗号分隔；amd 与界面一致，包含非 NVIDIA 行。',
+    'Submission chart lines, comma-separated from nvidia, amd, openai, google, huawei, unknown and total. Defaults to every vendor with submissions plus total, as in the UI.',
+    '提交图曲线，以逗号分隔，可选 nvidia、amd、openai、google、huawei、unknown 和 total。默认与界面一致，包含所有有提交记录的厂商及 total。',
   ],
   hardware: [
     'Image-view hardware key; whitespace is trimmed and case ignored. Default all.',
@@ -455,8 +468,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '加速器键，如 "H100 SXM"、"Huawei 950PR"、"B200 SXM" 或 "Ascend 950PR_9579"。core-memory-profiles 和 tpc-skyline 默认 "all"，其他测试默认首个可用设备。"all" 返回全部设备；显式选择设备时，没有数据的测试保留空 gpus 数组。',
   ],
   test: [
-    'ubenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, core-memory-profiles, or all (default). Determines which benchmark data is returned.',
-    'ubenchX 测试选择：mem-bw、sm-l2-distance、tpc-skyline、core-memory-profiles 或 all（默认），决定返回哪种基准测试数据。',
+    'uBenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, core-memory-profiles, or all (default). Determines which benchmark data is returned.',
+    'uBenchX 测试选择：mem-bw、sm-l2-distance、tpc-skyline、core-memory-profiles 或 all（默认），决定返回哪种基准测试数据。',
   ],
   view: [
     'Video overview (chart, results table, deployment detail; r_* selectors), dashboard (default without run/artifact), compare (published matched cases), or legacy discovery/results/tradeoff. run/artifact defaults to results. Selector families cannot be mixed.',
@@ -484,12 +497,20 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   r_steps: ['Recorded denoising step count.', '记录的去噪步数。'],
   r_gpus: [
-    'Participating GPU count for the results table and clips. deploymentCells and overlayDeploymentCells retain the official and named-run GPU-count series before this filter.',
-    '结果表格和视频对比使用的参与计算 GPU 数。deploymentCells 和 overlayDeploymentCells 分别保留正式结果及指定运行在此筛选前的 GPU 数序列。',
+    'Deprecated overview control, accepted but ignored. All GPU counts are included; params.gpuCount is null.',
+    '已弃用的概览控件参数，仍可传入但会被忽略。始终包含全部 GPU 数量，params.gpuCount 返回 null。',
   ],
   r_engine: [
-    'Recorded engine name, separate from runtime revision.',
-    '记录的引擎名称，与 runtime revision 分开。',
+    'Recorded engine name, such as sglang or vllm-omni, separate from runtime revision. Limits cells, runs and chip configs to that engine.',
+    '记录的引擎名称（如 sglang 或 vllm-omni），与 runtime revision 分开。将数据点、运行和芯片配置限定为该引擎。',
+  ],
+  r_compare: [
+    'Retired engine comparison, accepted but ignored. Each hardware plots the lossless series with the largest Pareto frontier area, or the r_engine series.',
+    '已停用的引擎对比参数，仍可传入但会被忽略。每种硬件只绘制 Pareto 前沿面积最大的无损曲线，或 r_engine 指定引擎的曲线。',
+  ],
+  r_lossy: [
+    'Lossy optimizations: 1 also plots series whose declared optimizations skip or approximate computation, such as cross-step caching or sparse attention. They never compete for a hardware’s default series. Presentation only.',
+    '有损优化：为 1 时同时绘制声明了跳过或近似部分计算的优化（例如跨步 cache 或稀疏注意力）的曲线。这些曲线不参与每种硬件默认曲线的评选。仅影响展示。',
   ],
   r_date: [
     'As-of execution date, YYYY-MM-DD; never publication date. Each official deployment shows its latest run measured on or before this date; named-run overlays are not filtered. runs lists every official run of the workload and run names the selected one.',
@@ -500,8 +521,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'r_date 当天要查看截至哪一次运行的 GitHub Actions 运行 ID；默认为当天最后一次运行。',
   ],
   r_configs: [
-    'Comma-separated chip configs (hardware:GPUs:tp:ulysses keys from chipConfigs, at most 4) whose official runs history returns for the Compare history chart.',
-    '以逗号分隔的芯片配置（chipConfigs 中的 hardware:GPU 数:tp:ulysses 键，最多 4 个）；history 返回这些配置的正式运行，用于对比历史趋势图。',
+    'Comma-separated chip configs (hardware:runtime:GPUs:tp:ulysses keys from chipConfigs, at most 4) whose official runs history returns for the Compare history chart. A key the selected workload does not offer, such as one written before engines were part of the key, is ignored and left out of state.configs.',
+    '以逗号分隔的芯片配置（chipConfigs 中的 hardware:runtime:GPU 数:tp:ulysses 键，最多 4 个）；history 返回这些配置的正式运行，用于对比历史趋势图。所选工作负载不提供的键（例如引擎加入键之前生成的旧键）会被忽略，也不出现在 state.configs 中。',
   ],
   r_from: [
     'Earliest execution date, YYYY-MM-DD, of the runs history returns; default unbounded.',
@@ -544,16 +565,16 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '估算利用率，范围 0–1，默认 1。收入随利用率变化，预留 GPU 每小时成本不变。',
   ],
   r_x: [
-    'Chart x metric: p50 (default) or p90 per-clip latency. Presentation only; echoed in params without changing returned cells.',
-    '图表 X 轴指标：单条视频 p50（默认）或 p90 延迟。仅影响展示，在 params 中返回，不改变返回的 cells。',
+    'Chart x metric: p50 (default) or p90 per-clip latency, or gpus (participating GPUs per deployment). Presentation only; echoed in params without changing returned cells, and invalid values use the default.',
+    '图表 X 轴指标：单条视频 p50（默认）或 p90 延迟，或 gpus（每个部署参与计算的 GPU 数）。仅影响展示，在 params 中返回，不改变返回的 cells；无效值使用默认值。',
   ],
   r_y: [
     'Chart y metric: videoSecondsPerDollar (default), videosPerGpuHour or kjPerClip. Presentation only; invalid values use the default.',
     '图表 Y 轴指标：videoSecondsPerDollar（默认）、videosPerGpuHour 或 kjPerClip。仅影响展示；无效值使用默认值。',
   ],
   r_basis: [
-    'GPU basis for the chart and table costs and videos per GPU-hour: participating (default) or allocated. Both bases are always returned.',
-    '图表和表格计算成本及每 GPU 小时生成视频数时采用的 GPU 口径：participating（默认）或 allocated。响应始终同时返回两种口径。',
+    'Deprecated overview control, accepted but ignored. The chart always uses participating GPUs; params.costBasis is participating. Both cost bases remain in the evidence and CSV.',
+    '已弃用的概览控件参数，仍可传入但会被忽略。图表始终采用参与计算的 GPU 口径，params.costBasis 返回 participating。证据数据和 CSV 仍保留两种成本口径。',
   ],
   r_optimal: [
     'Optimal Only: 0 also plots dominated deployments; any other value plots each hardware frontier only. Presentation only.',
@@ -614,8 +635,8 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
         ]
       : view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
         ? [
-            'Single stored run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells and overlayDeploymentCells, whether approved or unapproved. Actual approval is preserved; the selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No publication is triggered.',
-            '单个已存储运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行无论是否已批准，都只放入 overview 中独立的 overlayCells 和 overlayDeploymentCells，保留实际批准状态，并从正式结果中排除；未知或未达准入要求的运行不返回叠加结果。该参数不会触发发布。',
+            'Single run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells and overlayDeploymentCells. A stored run keeps its actual approval. A run absent from the five History pages is read live from the JSON documents of its public native h3-results artifacts and is always unapproved, with publishedAt null and no media. The selected run is excluded from official cells. Unknown, unreadable or ineligible runs return no overlay. No storage or publication is triggered.',
+            '单个运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行只放入 overview 中独立的 overlayCells 和 overlayDeploymentCells，并从正式结果中排除。已存储的运行保留实际批准状态；不在前五页 History 中的运行，会从其公开的原生 h3-results 产物实时读取 JSON 文档，始终视为未批准，publishedAt 为 null，且不附带媒体。未知、无法读取或未达准入要求的运行不返回叠加结果。该参数不会触发存储或发布。',
           ]
         : view === 'current-inferencex-image' && name === 'sequence'
           ? ([
@@ -689,12 +710,11 @@ const NEW_VIEWS = {
     { pricing: object, data: object, overlays: object, comparisons: objects },
   ],
   collectivex: [
-    'CollectiveX EP, KV and swap views',
-    'CollectiveX EP、KV 与 swap 视图',
+    'CollectiveX EP and swap views',
+    'CollectiveX EP 与 swap 视图',
     {
       runs: objects,
       ep: object,
-      kv: object,
       swap: object,
       options: object,
       knownSupport: object,
@@ -772,16 +792,16 @@ const NEW_VIEWS = {
       chipConfigs: {
         ...objects,
         description:
-          'Every official deployment of the selected workload as { key, point }, the r_configs choices.',
+          'Every official deployment (hardware, runtime, GPUs and TP × Ulysses split) of the selected workload as { key, point }, the r_configs choices.',
         'x-description-zh':
-          '所选工作负载的全部正式部署，每项为 { key, point }，即 r_configs 的可选项。',
+          '所选工作负载的全部正式部署（硬件、runtime、GPU 数及 TP × Ulysses 并行配置），每项为 { key, point }，即 r_configs 的可选项。',
       },
       history: {
         ...objects,
         description:
-          "Cells for every official run of the r_configs chip configs within r_from and r_to, each run contributing its newest publication of each deployment, plus the named overlay run's cells for those configs; empty when r_configs is empty.",
+          "Cells for every official run of the r_configs chip configs within r_from and r_to, each run contributing its newest publication of each deployment, plus the named overlay run's cells for those configs; empty when r_configs names no offered chip config.",
         'x-description-zh':
-          'r_configs 所选芯片配置在 r_from 至 r_to 期间每次正式运行的结果（每次运行中的每个部署取最新发布的结果），以及指定叠加运行中这些配置的结果；r_configs 为空时为空数组。',
+          'r_configs 所选芯片配置在 r_from 至 r_to 期间每次正式运行的结果（每次运行中的每个部署取最新发布的结果），以及指定叠加运行中这些配置的结果；r_configs 中没有可选的芯片配置时为空数组。',
       },
       excludedCount: { type: 'integer', minimum: 0 },
       sampleFloor: { type: 'integer', const: 10 },
@@ -819,8 +839,8 @@ const NEW_VIEWS = {
     },
   ],
   ubenchx: [
-    'ubenchX microbenchmarks with per-device protocols and bandwidth references (mem-bw, sm-l2-distance, tpc-skyline, and core-memory-profiles)',
-    'ubenchX 微基准测试及各设备的测试协议和带宽参考值（mem-bw、sm-l2-distance、tpc-skyline 和 core-memory-profiles）',
+    'uBenchX microbenchmarks with per-device protocols and bandwidth references (mem-bw, sm-l2-distance, tpc-skyline, and core-memory-profiles)',
+    'uBenchX 微基准测试及各设备的测试协议和带宽参考值（mem-bw、sm-l2-distance、tpc-skyline 和 core-memory-profiles）',
     {
       gpus: objects,
       tests: strings,
@@ -834,8 +854,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the /video results UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput, both per-video-second cost bases and modelled revenue use this output rate. Missing valid output durations or older History without this optional field leave these metrics and profit null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts) with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与 /video 结果页共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标及利润均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the /vgx results UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Deployment cells are keyed by hardware, runtime (serving engine plus the optimizations its run configuration declared), participating GPUs, TP × Ulysses split and concurrency, so cells of two engines, or of one engine with and without an optimization, never replace each other. metadata.optimizations lists the declared optimization keys; runs recorded before the field existed list none. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput, both per-video-second cost bases and modelled revenue use this output rate. Missing valid output durations or older History without this optional field leave these metrics and profit null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts), excluding it from official cells, deployments and workload mix. A stored run keeps its actual approval; a run absent from History is read live from its public h3-results artifact documents, unapproved and without media; its clips still carry PSNR and unscored reasons from a trusted h3-quality artifact of the same run attempt. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与 /vgx 结果页共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。部署数据点按硬件、runtime（引擎加上运行配置声明的优化项）、参与计算的 GPU 数、TP × Ulysses 并行配置和并发数区分，不同引擎、或同一引擎开与不开某项优化的数据点互不覆盖。metadata.optimizations 列出声明的优化项 key；该字段出现之前记录的运行为空列表。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标及利润均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），并将其排除在正式结果、部署和工作负载构成之外。已存储的运行保留实际批准状态；不在 History 中的运行从其公开的 h3-results 产物实时读取文档，视为未批准，且不附带媒体；其视频仍会附上同一运行尝试的可信 h3-quality 产物中的 PSNR 与未评分原因。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
@@ -850,7 +870,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
       description: text(
         `${view === 'video' ? RESULTS_OVERVIEW_NOTES.en : ''}Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${view === 'ubenchx' ? ' tpc-skyline also returns skuConfigurations separately from measured NVIDIA gpus. gpu=all (default) or Huawei 950PR includes all nine supplied 950PR configurations; an exact Ascend 950PR_<suffix> selects one. Rows preserve Cube/Vector/AICPU counts, MHz clocks, GiB memory, MiB L2, virtualisationOptions and raw ddrRate values with unit=null. Source metadata links the supplied screenshot and marks vendorSourceVerified=false; these are not topology measurements. test=all includes the same array inside tpcSkyline, honoring explicit gpu filters. core-memory-profiles defaults to gpu=all and returns Ascend 950PR_9579 first, followed by B200 SXM; gpu selects either device. B200 retains orderedSms, smInfo, gpcBounds, matrix, stats and metadata, with unit=clock64 cycles and its own colorLimits. The legacy sm-l2-distance API remains available with its original shape. Ascend returns panels with actual coreIds, dieGroups, full matrices, raw SYS_CNT tick units and unique-pair within/between-group statistics; a missing pair class is null. Shared colorLimits and limitations preserve the interpretation. These are profile differences, not core-to-core latency or a floorplan. mem-bw includes Huawei rotating-pool FP16 graph results. timeMs is amortized per copy for metadata.protocol=rotating-pool-npu-graph. peakBandwidthSource documents the per-run normalization reference; optional rows retain observations, bandwidthP10Gbps, bandwidthP90Gbps, processBandwidthGbps, slots and combinedPoolBytes. Missing sizes are listed in metadata.missingSizesBytes. Huawei now covers 8 B through 16 GiB. metadata.smallMessageExtension identifies the separate CANN 9.2.1 run for 8 B–2 KiB, its 4096-byte slot stride, archive digest and cache qualification; the original run metadata applies from 4 KiB upward.' : ''}${
           view === 'video'
-            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. Discovery includes standard run-sweep runs; these may have no video artifacts. Run artifact listings cover all GitHub pages and retain legacy and unique native matrix names. Allocated GPU counts require retained scheduler allocation evidence; native power device counts cannot substitute for it. Missing allocation and allocation-normalized metrics remain null. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. HTTP responses remain private, no-store. Published History and media metadata are cached across instances under the video tag, without a GitHub read. Errors, History pages whose index or approval reads failed and missing media are not retained; publication, History backfill or ?scope=video expires that cache at once. Server page seeding and first-frame preloading are presentation-only and change no selectors, metrics or source membership.'
+            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor. Cells stay separate per hardware, runtime, layout and concurrency; plot.frontiers holds one frontier per hardware and runtime, keyed <hardware>:<runtime>, where runtime is the engine (na when none was recorded) followed by any declared optimizations, joined by +. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. Discovery includes standard run-sweep runs; these may have no video artifacts. Run artifact listings cover all GitHub pages and retain legacy and unique native matrix names. Allocated GPU counts require retained scheduler allocation evidence; native power device counts cannot substitute for it. Missing allocation and allocation-normalized metrics remain null. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. HTTP responses remain private, no-store. Published History and media metadata are cached across instances under the video tag, without a GitHub read. Errors, History pages whose index or approval reads failed and missing media are not retained; publication, History backfill or ?scope=video expires that cache at once. Server page seeding and first-frame preloading are presentation-only and change no selectors, metrics or source membership.'
             : view === 'current-inferencex-image'
               ? " ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from the successful image-bearing submissions of those same configurations, so the last point equals ageSummary. Configurations absent from the current table, such as speculation or node-type variants replaced by a newer run, are excluded. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age. A row is outdated when its tag version is below the base engine's latest vLLM or SGLang release. A nightly whose commit GitHub resolves is outdated only when that commit is an ancestor of the release. Other nightlies compare their build date with the release's publish date: the tag's date, else the build's earliest submission in the catalog. Other tags, and engines without a release stream, are not flagged."
               : view === 'gpu-metrics'
@@ -859,7 +879,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
         }`,
         `${view === 'video' ? RESULTS_OVERVIEW_NOTES.zh : ''}只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${view === 'ubenchx' ? ' tpc-skyline 另外返回 skuConfigurations，与 NVIDIA 实测的 gpus 分开列出。gpu=all（默认）或 Huawei 950PR 时返回所提供的全部九种 950PR 配置；指定完整的 Ascend 950PR_<suffix> 时只返回该 SKU。每行保留 Cube/Vector/AICPU 数量、频率（MHz）、内存（GiB）、L2（MiB）、virtualisationOptions，以及原始 ddrRate 数值（unit=null）。来源元数据链接到所提供的截图，并标记 vendorSourceVerified=false；这些配置数据不是拓扑实测结果。test=all 时，tpcSkyline 中返回同一数组，并遵循显式指定的 gpu 筛选。 core-memory-profiles 默认 gpu=all，先返回 Ascend 950PR_9579，再返回 B200 SXM；gpu 可单独选择设备。B200 保留 orderedSms、smInfo、gpcBounds、matrix、stats 和 metadata，单位为 clock64 cycles，使用独立 colorLimits。旧版 sm-l2-distance API 仍可使用，响应结构不变。Ascend 返回各面板的实际 coreIds、dieGroups、完整矩阵、原始 SYS_CNT tick 单位及去重核心对的组内和组间统计；没有对应核心对时为 null。colorLimits 和 limitations 保留统一色标及解释限制。这些数据是访存特征差异，不是核心间通信延迟或物理布局图。 mem-bw 包含 Huawei FP16 轮转缓冲池图执行结果。metadata.protocol=rotating-pool-npu-graph 时，timeMs 为每次拷贝的摊销时间。peakBandwidthSource 说明该次测量采用的归一化参考值；行数据可保留 observations、bandwidthP10Gbps、bandwidthP90Gbps、processBandwidthGbps、slots 和 combinedPoolBytes。缺失大小列在 metadata.missingSizesBytes。Huawei 现覆盖 8 B 至 16 GiB。metadata.smallMessageExtension 记录 8 B–2 KiB 的独立 CANN 9.2.1 测量、4096 字节槽间距、归档摘要及缓存影响说明；原测量元数据适用于 4 KiB 及以上。' : ''}${
           view === 'video'
-            ? ' 默认 dashboard 模式复用已发布历史 → videoPoints → dashboardCells → metrics/plot/compare/evidence。与界面一样最多读取前五页历史，返回覆盖范围和截断状态，选择一个 canonical workload 并应用相同样本门槛。v_hidden 只影响图表和表格。view=compare 额外读取最多两份已发布媒体产物，复用界面配对函数，仅返回相对媒体路径，不返回 asset URL；媒体缺失或读取失败会明确标记。run/artifact 或显式 discovery/results/tradeoff 保留原有契约。发现列表包括标准 run-sweep 运行，其中可能没有视频产物。单次运行的产物列表读取 GitHub 全部分页，兼容旧名称和原生矩阵的唯一名称。已分配 GPU 数须有保留的调度器分配证据，原生功率设备数不能替代；缺失的分配数量及按其归一化的指标保持 null。不代表日期区间、完整历史、功率/质量验收或瓶颈因果判断。不读取本地数据包或任意 URL。HTTP 响应仍为 private, no-store。已发布 History 和媒体元数据以 video 标签跨实例缓存，读取时不调用 GitHub；错误、索引或批准回执读取失败的 History 页和缺失媒体不保留，发布、History 补建或 ?scope=video 会立即使缓存失效。页面首屏数据和真实首帧预读仅影响展示，不改变选择项、指标或来源归属。'
+            ? ' 默认 dashboard 模式复用已发布历史 → videoPoints → dashboardCells → metrics/plot/compare/evidence。与界面一样最多读取前五页历史，返回覆盖范围和截断状态，选择一个 canonical workload 并应用相同样本门槛。数据点按硬件、runtime、并行配置和并发数分别保留；plot.frontiers 按硬件和 runtime 分别给出 Pareto 前沿，键为 <hardware>:<runtime>；runtime 为引擎名（未记录时为 na），后接声明的优化项，以 + 连接。v_hidden 只影响图表和表格。view=compare 额外读取最多两份已发布媒体产物，复用界面配对函数，仅返回相对媒体路径，不返回 asset URL；媒体缺失或读取失败会明确标记。run/artifact 或显式 discovery/results/tradeoff 保留原有契约。发现列表包括标准 run-sweep 运行，其中可能没有视频产物。单次运行的产物列表读取 GitHub 全部分页，兼容旧名称和原生矩阵的唯一名称。已分配 GPU 数须有保留的调度器分配证据，原生功率设备数不能替代；缺失的分配数量及按其归一化的指标保持 null。不代表日期区间、完整历史、功率/质量验收或瓶颈因果判断。不读取本地数据包或任意 URL。HTTP 响应仍为 private, no-store。已发布 History 和媒体元数据以 video 标签跨实例缓存，读取时不调用 GitHub；错误、索引或批准回执读取失败的 History 页和缺失媒体不保留，发布、History 补建或 ?scope=video 会立即使缓存失效。页面首屏数据和真实首帧预读仅影响展示，不改变选择项、指标或来源归属。'
             : view === 'current-inferencex-image'
               ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于同一批配置的带镜像成功提交，重建 90 个每日 ageHistory 点，因此最后一个点与 ageSummary 一致。当前表格中没有的配置（例如已被更新 run 取代的投机解码或节点类型变体）不计入。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。镜像标签中的版本号低于对应基础引擎（vLLM 或 SGLang）的最新 release 时，该行标记为 outdated。nightly 镜像的 commit 若能在 GitHub 上解析，则仅当该 commit 是此 release 的祖先提交时才标记；其余 nightly 镜像比较构建日期与 release 发布日期，构建日期取标签中的日期，标签无日期时取该构建在镜像目录中最早的提交日期。其他标签以及没有 release 来源的引擎不作标记。'
               : view === 'gpu-metrics'

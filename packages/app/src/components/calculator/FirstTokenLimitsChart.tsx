@@ -4,15 +4,20 @@ import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import {
+  ChartPointDetails,
+  type ChartPointDetailsProps,
+} from '@/components/ui/chart-point-details';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import type { CustomLayerConfig, D3ChartHandle, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   formatCap,
@@ -37,20 +42,20 @@ const STRINGS = {
     xTitle: (stat: string) => `Maximum ${stat} time to first token`,
     yTitle: (tokenType: string) => `$ per million ${tokenType} tokens`,
     noConfig: 'No measured config',
-    instructions: 'Hover a bar for the configuration · Click to pin its tooltip',
+    instructions: 'Hover a bar for the configuration',
     lower: (pct: number) => `${pct}% lower`,
     only: (label: string) => `${label} only`,
-    unofficialRun: 'UNOFFICIAL RUN',
-    branch: 'Branch:',
-    dismiss: 'Click elsewhere to dismiss',
-    cost: 'Cost:',
-    ttft: (stat: string) => `${stat} TTFT:`,
-    interactivity: (stat: string) => `${stat} interactivity:`,
-    concurrency: 'Concurrency:',
-    precision: 'Precision:',
-    parallelism: 'Parallelism:',
-    disaggregated: 'Disaggregated:',
+    unofficialRun: 'Unofficial run',
+    cost: 'Cost',
+    ttft: (stat: string) => `${stat} TTFT`,
+    interactivity: (stat: string) => `${stat} interactivity`,
+    concurrency: 'Concurrency',
+    precision: 'Precision',
+    parallelism: 'Parallelism',
+    disaggregated: 'Disaggregated',
     yes: 'Yes',
+    no: 'No',
+    throughput: 'Total · input · output tok/s/chip',
     viewRun: 'View workflow run',
     viewOfficial: 'View raw result on GitHub',
   },
@@ -59,20 +64,20 @@ const STRINGS = {
     xTitle: (stat: string) => `${zhStatPhrase('首 token 延迟', stat)}上限`,
     yTitle: (tokenType: string) => `每百万${tokenType} token 成本（$）`,
     noConfig: '无实测配置',
-    instructions: '悬停柱形查看配置 · 点击固定提示框',
+    instructions: '悬停柱形查看配置',
     lower: (pct: number) => `低 ${pct}%`,
     only: (label: string) => `仅 ${label}`,
     unofficialRun: '非官方运行',
-    branch: '分支：',
-    dismiss: '点击其他区域关闭',
-    cost: '成本：',
-    ttft: (stat: string) => `${zhStatPhrase('TTFT', stat)}：`,
-    interactivity: (stat: string) => `${zhStatPhrase('交互性', stat)}：`,
-    concurrency: '并发数：',
-    precision: '精度：',
-    parallelism: '并行策略：',
-    disaggregated: '分离式：',
+    cost: '成本',
+    ttft: (stat: string) => zhStatPhrase('TTFT', stat),
+    interactivity: (stat: string) => zhStatPhrase('交互性', stat),
+    concurrency: '并发数',
+    precision: '精度',
+    parallelism: '并行策略',
+    disaggregated: '分离式',
     yes: '是',
+    no: '否',
+    throughput: '总 · 输入 · 输出 tok/s/chip',
     viewRun: '查看工作流运行',
     viewOfficial: '在 GitHub 查看原始结果',
   },
@@ -111,30 +116,15 @@ export function barsFromCells(cells: readonly FirstTokenCell[]): FirstTokenBar[]
   return bars;
 }
 
-function row(html: string): string {
-  return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">${html}</div>`;
-}
-
-function parallelismText(
-  winner: FirstTokenWinner,
-  t: (typeof STRINGS)[Locale],
-  locale: Locale,
-): string {
+function parallelismText(winner: FirstTokenWinner, dpaValue: string): string {
   const { tp, ep, dp_attention: dpa } = winner.point;
-  const colon = locale === 'zh' ? '：' : ':';
-  const dpaValue = locale === 'zh' ? t.yes : 'True';
-  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
-    return `<strong>${t.parallelism}</strong> ${dpa ? 'DEP' : 'TEP'}${tp}`;
-  }
-  if (ep !== null && ep !== undefined && ep > 1) {
-    return `<strong>TP${colon}</strong> ${tp}, <strong>EP${colon}</strong> ${ep}${
-      dpa ? `, <strong>DPA${colon}</strong> ${dpaValue}` : ''
-    }`;
-  }
-  return `<strong>TP${colon}</strong> ${tp}${dpa ? `, <strong>DPA${colon}</strong> ${dpaValue}` : ''}`;
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) return `${dpa ? 'DEP' : 'TEP'}${tp}`;
+  const dpaText = dpa ? ` · DPA ${dpaValue}` : '';
+  if (ep !== null && ep !== undefined && ep > 1) return `TP ${tp} · EP ${ep}${dpaText}`;
+  return `TP ${tp}${dpaText}`;
 }
 
-export function generateFirstTokenTooltipHTML(
+export function firstTokenPointDetails(
   bar: FirstTokenBar,
   options: {
     hardwareConfig: HardwareConfig;
@@ -143,44 +133,60 @@ export function generateFirstTokenTooltipHTML(
     interactivityStat: string;
     runInfoByIndex: Record<number, { branch: string; url: string }>;
     locale: Locale;
-    isPinned: boolean;
   },
-): string {
+): Omit<ChartPointDetailsProps<'run'>, 'onClose'> & { summary: string } {
   const { hardwareConfig, costType, ttftStat, interactivityStat, runInfoByIndex, locale } = options;
   const t = STRINGS[locale];
   const { winner } = bar;
   const isOverlay = winner.runIndex !== undefined;
   const runInfo = isOverlay ? runInfoByIndex[winner.runIndex!] : undefined;
-  const label = escapeHtml(configLabel(winner.hwKey, hardwareConfig));
   const runUrl = isOverlay ? runInfo?.url : winner.point.sourceRow?.run_url;
-  const runLink = runUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(
-        runUrl,
-      )}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${
-        isOverlay ? t.viewRun : t.viewOfficial
-      } &#8599;</a></div>`
-    : '';
-  const overlayHeader = isOverlay
-    ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${t.unofficialRun}</div>${
-        runInfo?.branch ? row(`<strong>${t.branch}</strong> ${escapeHtml(runInfo.branch)}`) : ''
-      }`
-    : '';
-
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${options.isPinned ? 'text' : 'none'};">
-      ${options.isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      ${overlayHeader}
-      <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
-      ${row(`<strong>${t.cost}</strong> ${formatCost(winner.cost)}${getCostTypeLabel(costType)}`)}
-      ${row(`<strong>${t.ttft(ttftStat)}</strong> ${winner.ttft.toFixed(2)} s`)}
-      ${row(`<strong>${t.interactivity(interactivityStat)}</strong> ${winner.interactivity.toFixed(1)} tok/s/user`)}
-      ${row(`<strong>${t.concurrency}</strong> ${winner.point.concurrency}`)}
-      ${row(`<strong>${t.precision}</strong> ${escapeHtml(winner.precision.toUpperCase())}`)}
-      ${row(parallelismText(winner, t, locale))}
-      ${winner.point.disagg ? row(`<strong>${t.disaggregated}</strong> ${t.yes}`) : ''}
-      ${runLink}
-    </div>
-  `;
+  const config = hardwareConfig[winner.hwKey] ?? getHardwareConfig(winner.hwKey);
+  const cost = `${formatCost(winner.cost)}${getCostTypeLabel(costType)}`;
+  const ttft = `${winner.ttft.toFixed(2)} s`;
+  const interactivity = `${winner.interactivity.toFixed(1)} tok/s/user`;
+  const parallelism = parallelismText(winner, locale === 'zh' ? t.yes : 'True');
+  return {
+    title: config?.label ?? winner.hwKey,
+    subtitle: [
+      config?.suffix?.replace(/^\((?<inner>.*)\)$/u, '$<inner>'),
+      winner.precision.toUpperCase(),
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    warning: isOverlay ? `✕ ${runInfo?.branch || t.unofficialRun}` : undefined,
+    date: winner.point.date,
+    metrics: [
+      { value: formatCost(winner.cost), label: getCostTypeLabel(costType) },
+      { value: winner.ttft.toFixed(2), label: `${t.ttft(ttftStat)} (s)` },
+    ],
+    summary: [interactivity, `${t.concurrency} ${winner.point.concurrency}`, parallelism].join(
+      ' · ',
+    ),
+    rows: [
+      { label: t.cost, value: cost },
+      { label: t.ttft(ttftStat), value: ttft },
+      { label: t.interactivity(interactivityStat), value: interactivity },
+      {
+        label: t.throughput,
+        value: `${winner.point.throughput.toFixed(1)} · ${winner.point.inputThroughput.toFixed(1)} · ${winner.point.outputThroughput.toFixed(1)}`,
+      },
+      { label: t.concurrency, value: String(winner.point.concurrency) },
+      { label: t.precision, value: winner.precision.toUpperCase() },
+      { label: t.parallelism, value: parallelism },
+      { label: t.disaggregated, value: winner.point.disagg ? t.yes : t.no },
+    ],
+    links: runUrl
+      ? [
+          {
+            action: 'run',
+            label: isOverlay ? t.viewRun : t.viewOfficial,
+            href: runUrl,
+            external: true,
+          },
+        ]
+      : [],
+  };
 }
 
 interface FirstTokenLimitsChartProps {
@@ -193,6 +199,7 @@ interface FirstTokenLimitsChartProps {
   runInfoByIndex: Record<number, { branch: string; url: string }>;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 const MARGIN = { top: 24, right: 20, bottom: 104, left: 76 };
@@ -210,6 +217,7 @@ const FirstTokenLimitsChart = React.memo(
     runInfoByIndex,
     legendElement,
     caption,
+    footer,
   }: FirstTokenLimitsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
@@ -352,7 +360,7 @@ const FirstTokenLimitsChart = React.memo(
           .text((s) => (s.pctLower === null ? '' : t.lower(Math.round(s.pctLower * 100))));
 
         let xTitle = g.select<SVGTextElement>('.ft-x-title');
-        if (xTitle.empty()) xTitle = g.append('text').attr('class', 'ft-x-title');
+        if (xTitle.empty()) xTitle = g.append('text').attr('class', 'x-axis-label ft-x-title');
         xTitle
           .attr('x', ctx.width / 2)
           .attr('y', ctx.height + 82)
@@ -381,17 +389,50 @@ const FirstTokenLimitsChart = React.memo(
       runInfoByIndex,
       locale,
     };
-    const hoveredBarWidthRef = useRef(0);
+    const hoveredBarRef = useRef({ x: 0, y: 0 });
+    const barColorRef = useRef(barColor);
+    barColorRef.current = barColor;
 
     const tooltip = useMemo(
       () => ({
         rulerType: 'none' as const,
-        content: (bar: FirstTokenBar, isPinned: boolean) =>
-          generateFirstTokenTooltipHTML(bar, { ...tooltipStateRef.current, isPinned }),
-        getRulerX: () => hoveredBarWidthRef.current,
+        content: (bar: FirstTokenBar) => {
+          const { title, subtitle, warning, metrics, summary } = firstTokenPointDetails(
+            bar,
+            tooltipStateRef.current,
+          );
+          return chartHoverCard({
+            title,
+            subtitle,
+            warning,
+            metrics: [...metrics],
+            summary,
+            color: barColorRef.current(bar),
+          });
+        },
+        details: (bar: FirstTokenBar, _isOverlay: boolean, close: () => void) => {
+          const { summary: _summary, ...details } = firstTokenPointDetails(
+            bar,
+            tooltipStateRef.current,
+          );
+          return (
+            <ChartPointDetails
+              {...details}
+              color={barColorRef.current(bar)}
+              onClose={close}
+              onAction={(_action, event) => event.stopPropagation()}
+            />
+          );
+        },
+        getRulerX: () => hoveredBarRef.current.x,
+        getRulerY: () => hoveredBarRef.current.y,
         onHoverStart: (
           selection: d3.Selection<SVGRectElement, FirstTokenBar, SVGGElement, unknown>,
         ) => {
+          hoveredBarRef.current = {
+            x: Number(selection.attr('x')) + Number(selection.attr('width')) / 2,
+            y: Number(selection.attr('y')),
+          };
           selection
             .attr('opacity', 1)
             .attr('stroke', 'var(--foreground)')
@@ -431,6 +472,7 @@ const FirstTokenLimitsChart = React.memo(
         onExportRender={onRender}
         legendElement={legendElement}
         caption={caption}
+        footer={footer}
       />
     );
   },

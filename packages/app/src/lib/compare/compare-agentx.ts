@@ -1,9 +1,10 @@
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
 import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/inference-model-slug';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
-  'deepseek-v41-flash',
   'kimi-k31-pro',
+  'deepseek-v41-flash',
   'muse-spark-open',
   'kimi-k3',
   'deepseek-v4',
@@ -47,7 +48,7 @@ export const AGENTX_NEW_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
 
 export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug): string {
   const entry = getInferenceModelBySlug(model.slug);
-  const path = entry ? inferenceModelPath(entry.slug) : '/inference';
+  const path = entry ? inferenceModelPath(entry.slug) : getDashboardRoute('inference').path;
   const localizedPath = locale === 'zh' ? `/zh${path}` : path;
   const query = new URLSearchParams();
   if (!entry) query.set('g_model', model.displayName);

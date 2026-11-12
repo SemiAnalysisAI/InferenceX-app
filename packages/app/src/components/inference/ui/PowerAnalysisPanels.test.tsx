@@ -275,14 +275,14 @@ const segmentsOf = (row: HTMLElement) => [
   ...row.querySelectorAll<HTMLElement>('[data-testid="power-chip-compare-segment"]'),
 ];
 
-describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded parts)', () => {
-  const phone = (data = [...sglang, ...vllm], overlayData: InferenceData[] = []) => {
-    unmount();
-    media.mobile = true;
-    media.coarsePointer = true;
-    mount(data, overlayData);
-  };
+const phone = (data = [...sglang, ...vllm], overlayData: InferenceData[] = []) => {
+  unmount();
+  media.mobile = true;
+  media.coarsePointer = true;
+  mount(data, overlayData);
+};
 
+describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded parts)', () => {
   it('colours an overlay run’s compact card and its folded parts with the run colour', () => {
     const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777/attempts/1';
     const overlay = [

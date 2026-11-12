@@ -9,27 +9,22 @@ interface ExportRoute {
 
 const routes: readonly ExportRoute[] = [
   {
-    route: '/inference?g_model=DeepSeek-V4-Pro',
+    route: '/infx/inference?g_model=DeepSeek-V4-Pro',
     ready: `${SCATTER_GRAPH} ${JOINED_POINT_LAYER}`,
     headers: ['Hardware Key', 'Throughput/Chip (tok/s)', 'Mean TTFT (s)'],
   },
   {
-    route: '/reliability?r_range=all-time',
-    ready: '#reliability-chart svg rect.bar',
-    headers: ['Chip Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'],
-  },
-  {
-    route: '/evaluation',
+    route: '/infx/evaluation',
     ready: '[data-testid="evaluation-chart-display"]',
     headers: ['Benchmark', 'Mean Score', 'Hardware Key'],
   },
   {
-    route: '/calculator',
+    route: '/infx/calculator',
     ready: '[data-testid="calculator-bar-chart"] svg .bar',
     headers: ['Hardware Key', 'Total Throughput (tok/s/chip)', 'Target Interactivity (tok/s/user)'],
   },
   {
-    route: '/historical',
+    route: '/infx/historical',
     ready: '[data-testid="historical-trend-figure"] svg circle',
     headers: ['Hardware Key', 'Date', 'Synthetic', 'Target Interactivity (tok/s/user)'],
   },
@@ -46,7 +41,7 @@ describe('CSV download route contract', () => {
         },
       });
       cy.get(ready).should('be.visible');
-      if (route === '/evaluation') {
+      if (route === '/infx/evaluation') {
         cy.get('[data-testid="evaluation-chart-view-btn"]').click();
         cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
       }

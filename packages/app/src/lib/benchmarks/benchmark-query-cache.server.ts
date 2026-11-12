@@ -1,19 +1,22 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getReadDbs, getRunDb, readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import {
+  getLatestBenchmarksAcross,
+  mergeBenchmarkHistory,
+} from '@semianalysisai/inferencex-db/queries/across-dbs';
 import {
   type BenchmarkRow,
   getAllBenchmarksForHistory,
   getBenchmarksForRun,
-  getLatestBenchmarks,
 } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedQuery } from '@/lib/cache/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 
 const getCachedLatestBenchmarks = cachedQuery(
-  (dbModelKeys: string[], date: string | null, exact: boolean, runId: string | null) =>
-    getLatestBenchmarks(
-      getDb(),
+  async (dbModelKeys: string[], date: string | null, exact: boolean, runId: string | null) =>
+    getLatestBenchmarksAcross(
+      await getReadDbs(),
       dbModelKeys,
       date ?? undefined,
       exact || undefined,
@@ -39,7 +42,8 @@ export function getCachedBenchmarks(
 }
 
 export const getCachedBenchmarksForRun = cachedQuery(
-  (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
+  async (dbModelKeys: string[], runId: string) =>
+    getBenchmarksForRun(await getRunDb(Number(runId)), dbModelKeys, runId),
   'benchmarks-run-agentic-curve-scope-v2',
   { blobOnly: true },
 );
@@ -53,14 +57,18 @@ export const getCachedCalculatorBenchmarks = cachedQuery(
 
 export const getCachedBenchmarkHistory = cachedQuery(
   (modelKeys: string[], isl: number, osl: number) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl),
+    readEachDb((sql) => getAllBenchmarksForHistory(sql, modelKeys, isl, osl)).then(
+      mergeBenchmarkHistory,
+    ),
   'benchmark-history',
   { blobOnly: true },
 );
 
 export const getCachedAgenticBenchmarkHistory = cachedQuery(
   (modelKeys: string[]) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, null, null, 'agentic_traces'),
+    readEachDb((sql) =>
+      getAllBenchmarksForHistory(sql, modelKeys, null, null, 'agentic_traces'),
+    ).then(mergeBenchmarkHistory),
   'benchmark-history-agentic-curve-scope-v2',
   { blobOnly: true },
 );

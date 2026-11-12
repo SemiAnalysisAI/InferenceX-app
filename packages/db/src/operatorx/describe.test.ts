@@ -47,6 +47,26 @@ const gemm = (parallel?: Record<string, number>) => ({
   ...(parallel ? { parallel } : {}),
 });
 
+/** A DeepSeek-V4.1-Flash ratio-1 attention layer (full-length compressed cache), 16 decode requests. */
+const v4 = (indexer: string, ctx: number) => ({
+  hidden: 5120,
+  heads: 64,
+  head_dim: 512,
+  rope_dim: 64,
+  q_lora_rank: 1280,
+  window: 128,
+  o_groups: 8,
+  o_lora_rank: 1024,
+  compress_ratio: 1,
+  source: false,
+  indexer,
+  topk: 512,
+  index_heads: 32,
+  index_dim: 128,
+  kv_cache_dtype: 'fp8',
+  batch: { groups: [{ count: 16, q: 1, ctx }] },
+});
+
 describe('OperatorX useful FLOPs and bytes', () => {
   it('keeps the single-device MoE counts unchanged', () => {
     // Values the comparison projection stored for T=8 before sharding was accounted for.
@@ -104,6 +124,24 @@ describe('OperatorX useful FLOPs and bytes', () => {
       expect(usefulBytes('moe', args)).toBeNull();
     },
   );
+
+  it('reads only the top-k compressed entries a DeepSeek-V4 indexer selects', () => {
+    // reuse takes another layer's top-k: no scoring, and past the top-k more context costs nothing
+    expect(usefulFlops('dsv4_attn', v4('reuse', 131072))).toBe(
+      usefulFlops('dsv4_attn', v4('reuse', 65536)),
+    );
+    expect(usefulBytes('dsv4_attn', v4('reuse', 131072))).toBe(
+      usefulBytes('dsv4_attn', v4('reuse', 65536)),
+    );
+    // shared scores every compressed entry, reading its fp8 index key
+    expect(
+      usefulBytes('dsv4_attn', v4('shared', 131072))! -
+        usefulBytes('dsv4_attn', v4('shared', 65536))!,
+    ).toBe(16 * 65536 * 128);
+    expect(usefulFlops('dsv4_attn', v4('shared', 131072))!).toBeGreaterThan(
+      usefulFlops('dsv4_attn', v4('reuse', 131072))!,
+    );
+  });
 
   it('returns no count for an unsupported op', () => {
     expect(usefulFlops('attention', { tokens: 8 })).toBeNull();
@@ -191,9 +229,10 @@ describe('OperatorX case labels', () => {
   });
 });
 
+const withGate = (dtype: string) => ({ ...v41Flash(8), router: { gate: { dtype } } });
+
 describe('OperatorX router gate bytes', () => {
   it('reads the router gate at its stored width', () => {
-    const withGate = (dtype: string) => ({ ...v41Flash(8), router: { gate: { dtype } } });
     const extra = usefulBytes('moe', withGate('fp32'))! - usefulBytes('moe', withGate('bf16'))!;
     // hidden x experts gate weights, 2 extra bytes each.
     expect(extra).toBeCloseTo(5120 * 384 * 2, 3);

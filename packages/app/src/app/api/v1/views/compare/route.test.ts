@@ -122,6 +122,20 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/compare', () => {
+  it('uses the shared Muse label without changing the measured model identity', async () => {
+    const response = await GET(request('/api/v1/views/compare?slug=muse-spark-open-b200-vs-h200'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    expect(body.model).toEqual({
+      slug: 'muse-spark-open',
+      displayName: 'Muse-Spark-Open',
+      label: 'Muse Spark 1.3/Open 816B',
+    });
+    expect(body.params.model).toBe('Muse-Spark-Open');
+    expect(mockGetComparePageDerivedData.mock.calls[0][0]).toEqual(['musespark']);
+  });
+
   it('serves a slug pair with page-parity table rows', async () => {
     const response = await GET(request('/api/v1/views/compare?slug=deepseek-r1-h200-vs-b200'));
     expect(response.status).toBe(200);

@@ -21,7 +21,7 @@ tags:
 
 在 DeepSeek R1 0528 FP4 1k/1k 工作负载下，使用 Dynamo TRT-LLM + MTP 并在两款 SKU 上均采用分离式预填充/解码，GB200 NVL72 在等交互性下的**每 GPU 吞吐量最高可达 B200 的 4.39 倍** — 峰值出现在 125 tok/s/user（GB200 NVL72 为 4,130 tok/s/GPU，B200 为 941 tok/s/GPU）。
 
-NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) 通过 NVLink 5 连接全部 72 块 GPU，单向带宽 **900 GB/s/GPU**（双向 1.8 TB/s，Jensen 计算法 rx + tx 之和）。[B200](https://inferencex.semianalysis.com/gpu-specs) 服务器仅通过 NVLink 连接 8 块 GPU；当解码 EP 需要超过 8 个 rank 时，all-to-all 通信必须离开 NVLink 岛，转而通过 **ConnectX-7 RoCEv2 以太网，每 GPU 400 Gbit/s**。因此任何超过 8 路 EP 的集合通信可用每 GPU 带宽从 900 GB/s 降至 50 GB/s，降幅 18 倍。DeepSeek R1 的 256 个路由专家在 all-to-all 通信全程通过 NVLink 在 16 或 32 个 rank 间传输时能充分摊薄开销。
+NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/infx/gpu-specs) 通过 NVLink 5 连接全部 72 块 GPU，单向带宽 **900 GB/s/GPU**（双向 1.8 TB/s，Jensen 计算法 rx + tx 之和）。[B200](https://inferencex.semianalysis.com/infx/gpu-specs) 服务器仅通过 NVLink 连接 8 块 GPU；当解码 EP 需要超过 8 个 rank 时，all-to-all 通信必须离开 NVLink 岛，转而通过 **ConnectX-7 RoCEv2 以太网，每 GPU 400 Gbit/s**。因此任何超过 8 路 EP 的集合通信可用每 GPU 带宽从 900 GB/s 降至 50 GB/s，降幅 18 倍。DeepSeek R1 的 256 个路由专家在 all-to-all 通信全程通过 NVLink 在 16 或 32 个 rank 间传输时能充分摊薄开销。
 
 <Figure
   srcLight="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-light.png"
@@ -30,7 +30,7 @@ NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) 通过 NVLin
   caption="GB200 NVL72 机柜布局 — 18 个计算托盘 × 每个 4 块 GPU = 72 块 GPU 组成一个 NVLink-5 扩展域，由 9 个 NVSwitch5 托盘互联。整个机柜使用与 HGX B200 节点内部 GPU 相同的互联架构；B200 多节点分离式部署跨机柜通过 InfiniBand 或 RoCEv2 以太网通信，每 GPU 带宽低 18 倍。"
 />
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -129,7 +129,7 @@ DeepSeek R1 0528 是 DeepSeek 于 2025 年 5 月发布的 671B 参数 MoE 模型
   caption="DeepSeek R1 0528 FP4 1k/1k Pareto 前沿。GB200 NVL72 对比 B200，均使用 Dynamo TRT-LLM + MTP，均采用分离式预填充/解码。数据来自 InferenceX 2026-05-22 测量。标签标注解码 TP。"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp)，预筛选为 2026-05-22 测试中 B200 和 GB200 NVL72 Dynamo TRT MTP 在 DeepSeek R1 FP4 1k/1k 上的结果。
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp)，预筛选为 2026-05-22 测试中 B200 和 GB200 NVL72 Dynamo TRT MTP 在 DeepSeek R1 FP4 1k/1k 上的结果。
 
 ## 各 SKU 的优势区间
 
@@ -141,7 +141,7 @@ NVIDIA 的 [SGLang GB200 NVL72 结果](https://lmsys.org/blog/2025-09-25-gb200-p
 
 感谢 NVIDIA 的 Dynamo 和 TensorRT-LLM 团队 — 包括 Jatin Gangani、Kedar Potdar、Sridhar Ramaswamy、Ishan Dhanani 和 Sahithi Chigurupati — 交付了 B200 多节点 RoCEv2 和 GB200 NVL72 上的分离式部署方案。请查看我们另一篇关于 [GB200 NVL72 对比 B200 运行 Kimi K2.5 的博文](https://inferencex.semianalysis.com/zh/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200)。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

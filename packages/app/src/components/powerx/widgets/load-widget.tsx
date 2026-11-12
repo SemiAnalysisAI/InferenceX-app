@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import {
   buildLadder,
   LADDER_HARDWARE,
@@ -18,14 +19,9 @@ import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { CATEGORY_TITLES } from './strings';
-import {
-  formatWatts,
-  GrammarSwatch,
-  useHydrated,
-  useWidgetHash,
-  WidgetFrame,
-  type WidgetProps,
-} from './widget-chrome';
+import { WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { formatWatts, GrammarSwatch, useHydrated, useWidgetHash } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -84,7 +80,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
   const shownFraction = shown.gpu / sweep.tdpWatts;
 
   return (
-    <WidgetFrame name="load" alt={alt}>
+    <WidgetFrame scope="powerx" name="load" alt={alt}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex min-w-0 flex-1 basis-64 items-center gap-3">
           <span className="shrink-0 text-sm font-medium text-foreground">{t.slider}</span>
@@ -99,7 +95,8 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
               setRaw(event.target.value);
               track('powerx_tutorial_load_watts', { value: Number(event.target.value) });
             }}
-            className="h-11 min-w-0 flex-1 accent-foreground md:h-9"
+            className="range-slider h-11 min-w-0 flex-1 md:h-9"
+            style={rangeProgressStyle(gpuWatts, 0, sweep.tdpWatts)}
           />
         </label>
         <span className="font-mono text-sm tabular-nums text-foreground">

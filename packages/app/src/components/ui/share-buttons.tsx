@@ -55,8 +55,7 @@ export function ShareTwitterButton({
   return (
     <Button
       variant="outline"
-      size="icon"
-      className="size-7"
+      size="icon-xs"
       title={t.twitter}
       data-testid="share-twitter"
       onClick={(event) => {
@@ -85,8 +84,7 @@ export function ShareLinkedInButton({ analyticsProperties }: SocialShareButtonPr
   return (
     <Button
       variant="outline"
-      size="icon"
-      className="size-7"
+      size="icon-xs"
       title={t.linkedin}
       data-testid="share-linkedin"
       onClick={(event) => {

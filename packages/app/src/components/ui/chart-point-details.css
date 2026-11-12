@@ -1,0 +1,119 @@
+.inferencex-pinned-tooltip {
+  margin-top: 6px;
+  color: var(--foreground);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
+.inferencex-pinned-tooltip .pinned-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 6px;
+}
+
+.inferencex-pinned-tooltip .pinned-metrics > div {
+  display: flex;
+  flex: 1 1 80px;
+  flex-direction: column;
+}
+
+.inferencex-pinned-tooltip .pinned-metric-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inferencex-pinned-tooltip .pinned-metric-value {
+  order: -1;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.4px;
+}
+
+.inferencex-pinned-tooltip .pinned-exact {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.inferencex-pinned-tooltip .pinned-strip {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.inferencex-pinned-tooltip .pinned-strip > div {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.inferencex-pinned-tooltip .pinned-strip > div + div::before {
+  content: '·';
+  margin-left: 6px;
+  color: var(--muted-foreground);
+}
+
+.inferencex-pinned-tooltip .pinned-strip dt {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.inferencex-pinned-tooltip .pinned-strip dd {
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-section {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.inferencex-pinned-tooltip .tooltip-line {
+  display: grid;
+  grid-template-columns: fit-content(60%) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--foreground);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.inferencex-pinned-tooltip .tooltip-line > :is(strong, dt) {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.inferencex-pinned-tooltip .tooltip-line.pinned-line-wide {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  text-align: left;
+}
+
+.inferencex-pinned-tooltip .pinned-lines {
+  container-type: inline-size;
+}
+
+@container (max-width: 239px) {
+  .inferencex-pinned-tooltip .tooltip-line:not(.pinned-line-wide) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    column-gap: 16px;
+    row-gap: 0;
+  }
+
+  .inferencex-pinned-tooltip .tooltip-line:not(.pinned-line-wide) > dd {
+    margin-left: auto;
+  }
+}

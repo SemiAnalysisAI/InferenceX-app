@@ -19,6 +19,12 @@ import {
 // The chart renders as the PowerX tab on a touch-primary device; the readout setter is
 // captured so the test can read what the scrub reports.
 const mocks = vi.hoisted(() => ({ coarse: true, setActivePoint: vi.fn() }));
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 vi.mock('@/components/inference/ui/powerx-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof PowerXSurface>()),
   usePowerXSurface: () => true,

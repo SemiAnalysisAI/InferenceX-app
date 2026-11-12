@@ -71,6 +71,7 @@ const GRAPHS_STATS_CACHE_SCHEMA = 4;
 const ROLLUP_BACKED_STATS_CACHE_SCHEMA = 3;
 const COSTS_STATS_CACHE_SCHEMA = 2;
 const ERRORS_STATS_CACHE_SCHEMA = 2;
+const SESSION_INSIGHTS_STATS_CACHE_SCHEMA = 2;
 
 const LONG_CONTEXT_MODEL_NAMES = Object.keys(LONG_CONTEXT_PRICING_MODELS);
 export const ROLLUP_REFRESH_LAG_DAYS = 3;
@@ -105,7 +106,9 @@ export function statsCacheKey(
           ? ERRORS_STATS_CACHE_SCHEMA
           : kind === 'graphs'
             ? GRAPHS_STATS_CACHE_SCHEMA
-            : STATS_CACHE_SCHEMA;
+            : kind === 'session-insights'
+              ? SESSION_INSIGHTS_STATS_CACHE_SCHEMA
+              : STATS_CACHE_SCHEMA;
   return `sc:${schema}:${kind}:${scope}:${traceVersion ?? 'all'}`;
 }
 
@@ -1058,16 +1061,24 @@ export function sessionInsightsPercentiles(sorted: number[]): SessionInsightsPer
 export function sessionInsightsHistogram(
   values: number[],
   bucketCount: number,
-): { bins: SessionInsightsBin[]; percentiles: SessionInsightsPercentiles } {
+): { bins: SessionInsightsBin[]; percentiles: SessionInsightsPercentiles; total: number } {
   if (values.length === 0) {
-    return { bins: [], percentiles: { p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 } };
+    return {
+      bins: [],
+      percentiles: { p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 },
+      total: 0,
+    };
   }
   const sorted = [...values].toSorted((a, b) => a - b);
   const percentiles = sessionInsightsPercentiles(sorted);
 
   const min = sorted[0];
   if (min === sorted.at(-1)) {
-    return { bins: [{ min, max: min + 1, count: values.length }], percentiles };
+    return {
+      bins: [{ min, max: min + 1, count: values.length }],
+      percentiles,
+      total: values.length,
+    };
   }
 
   const p95Idx = Math.min(Math.floor(0.95 * sorted.length), sorted.length - 1);
@@ -1086,7 +1097,7 @@ export function sessionInsightsHistogram(
     if (idx >= bucketCount) idx = bucketCount - 1;
     bins[idx].count++;
   }
-  return { bins, percentiles };
+  return { bins, percentiles, total: values.length };
 }
 
 export async function computeSessionInsightsPayload(
@@ -1110,10 +1121,13 @@ export async function computeSessionInsightsPayload(
     stats: data.stats,
     durationBins: duration.bins,
     durationPercentiles: duration.percentiles,
+    durationTotal: duration.total,
     turnBins: turn.bins,
     turnPercentiles: turn.percentiles,
+    turnTotal: turn.total,
     costBins: cost.bins,
     costPercentiles: cost.percentiles,
+    costTotal: cost.total,
     dailySessions: data.dailySessions,
     hourlyConcurrent: data.hourlyConcurrent,
   };

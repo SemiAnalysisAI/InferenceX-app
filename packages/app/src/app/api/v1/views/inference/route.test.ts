@@ -102,6 +102,41 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/inference', () => {
+  it('filters A100 overlays and uses the dashboard ownership rate', async () => {
+    const a100 = makeRow({
+      hardware: 'a100',
+      framework: 'vllm',
+      model: 'dsv41flash',
+      precision: 'fp4',
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 28,
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42940055863',
+      metrics: {
+        tput_per_gpu: 21089.85878,
+        output_tput_per_gpu: 135.93515,
+        median_full_response_itl: 0.00775,
+        p90_full_response_itl: 0.01509,
+      },
+    });
+    mockGetLatestBenchmarks.mockResolvedValue([]);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({ benchmarks: [a100, { ...a100, hardware: 'h100' }], evaluations: [] }),
+    );
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-V4.1-Flash&sequence=agentic-traces&metric=tokensPerDollarH&gpus=a100&optimal=false&unofficialrun=42940055863',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.overlays).toHaveLength(1);
+    expect(body.overlays[0].series).toHaveLength(1);
+    expect(body.overlays[0].series[0].hwKey).toBe('a100_vllm');
+    expect(body.overlays[0].series[0].points[0].y).toBeCloseTo((21089.85878 * 3600) / 0.78);
+  });
+
   it('keeps unavailable all-in table rows in official, compared and unofficial scopes and CSV', async () => {
     const untiled = makeRow({
       hardware: 'gb200',

@@ -76,7 +76,7 @@ describe('PricingCoverageCard', () => {
       ),
     );
 
-    expect(container.textContent).toContain('All usage-bearing model IDs have cost estimates.');
+    expect(container.textContent).toContain('All usage-bearing model IDs have cost estimates');
     expect(container.querySelector('table')).toBeNull();
   });
 });

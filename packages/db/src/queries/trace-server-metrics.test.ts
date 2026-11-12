@@ -243,16 +243,16 @@ function workerSource(
   };
 }
 
-describe('getTraceServerMetrics all-endpoints KV overlay', () => {
-  function run(metricSources: unknown[], fallback: unknown[] = []) {
-    const series = {
-      ...currentSeries(),
-      kvCacheUsageByEngine: fallback,
-    } as unknown as ChartSeries;
-    const { sql } = mockSql([[metaRow({ chart_series: series, metric_sources: metricSources })]]);
-    return getTraceServerMetrics(sql, 42);
-  }
+function run(metricSources: unknown[], fallback: unknown[] = []) {
+  const series = {
+    ...currentSeries(),
+    kvCacheUsageByEngine: fallback,
+  } as unknown as ChartSeries;
+  const { sql } = mockSql([[metaRow({ chart_series: series, metric_sources: metricSources })]]);
+  return getTraceServerMetrics(sql, 42);
+}
 
+describe('getTraceServerMetrics all-endpoints KV overlay', () => {
   it("averages each worker's ranks into one line", async () => {
     const result = await run([
       workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { filterAndSortLegendItems } from '@/lib/charts/legend-utils';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/shared/utils';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
+import { DisclosureToggle } from './disclosure-toggle';
 import { Label } from './label';
 import { InfoHelp } from './option-info';
 import { Switch } from './switch';
@@ -19,6 +20,7 @@ export type { CommonLegendItemProps } from './chart-legend-item';
 const STRINGS = {
   en: {
     advanced: 'Advanced',
+    resetFilter: 'Reset filter',
     moreInfo: (label: string) => `More info about ${label}`,
     hideLegend: 'Hide legend',
     showLegend: 'Show legend',
@@ -27,6 +29,7 @@ const STRINGS = {
   },
   zh: {
     advanced: '高级',
+    resetFilter: '重置筛选',
     moreInfo: (label: string) => `查看${label}的更多信息`,
     hideLegend: '隐藏图例',
     showLegend: '显示图例',
@@ -34,6 +37,10 @@ const STRINGS = {
     showPoints: (label: string) => `显示${label}的全部数据点`,
   },
 } as const;
+
+const SCROLL_FADE_PX = 24;
+const OVERFLOW_STRIP_PX = 14;
+const STRETCHED_LEGEND_QUERY = '(min-width: 64rem)';
 
 export interface LegendSwitchConfig {
   id: string;
@@ -50,11 +57,18 @@ export interface LegendActionConfig {
   onClick: () => void;
 }
 
+export interface LegendResetConfig {
+  id: string;
+  onClick: () => void;
+  disabled: boolean;
+}
+
 export interface ChartLegendProps {
   legendItems: CommonLegendItemProps[];
   isLegendExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   switches?: LegendSwitchConfig[];
+  reset?: LegendResetConfig;
   actions?: LegendActionConfig[];
   grouped?: boolean;
   keyIndicators?: React.ReactNode;
@@ -78,6 +92,7 @@ export default function ChartLegend({
   isLegendExpanded: expandedProp,
   onExpandedChange,
   switches,
+  reset,
   actions,
   grouped = false,
   keyIndicators,
@@ -100,6 +115,7 @@ export default function ChartLegend({
   const isSidebar = variant === 'sidebar';
   if (readOnly) {
     switches = undefined;
+    reset = undefined;
     actions = undefined;
     onItemRemove = undefined;
     enableTooltips = false;
@@ -118,6 +134,8 @@ export default function ChartLegend({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
+  const [stripHeight, setStripHeight] = useState<number | null>(null);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
@@ -133,12 +151,39 @@ export default function ChartLegend({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => {
+    const panel = el.parentElement;
+    const updateScroll = () => {
       setIsOverflowing(el.scrollHeight > el.clientHeight - 0.5);
-    });
+      setHasMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 1);
+    };
+    const update = () => {
+      updateScroll();
+      if (!isSidebar || !panel || window.matchMedia(STRETCHED_LEGEND_QUERY).matches) {
+        setStripHeight(null);
+        return;
+      }
+      const strip = panel.querySelector<HTMLElement>('[data-testid="legend-overflow-strip"]');
+      const room = Math.min(
+        el.scrollHeight,
+        Number.parseFloat(getComputedStyle(panel).maxHeight) -
+          (panel.offsetHeight - el.offsetHeight - (strip?.offsetHeight ?? 0)),
+      );
+      let lastRowBottom = 0;
+      for (const row of el.querySelectorAll('li')) {
+        const bottom = row.offsetTop + row.offsetHeight;
+        if (bottom + OVERFLOW_STRIP_PX <= room) lastRowBottom = Math.max(lastRowBottom, bottom);
+      }
+      setStripHeight(el.scrollHeight > room + 0.5 && lastRowBottom > 0 ? lastRowBottom : null);
+    };
+    const observer = new ResizeObserver(update);
     observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    if (panel) observer.observe(panel);
+    el.addEventListener('scroll', updateScroll, { passive: true });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener('scroll', updateScroll);
+    };
+  }, [items, isLegendExpanded, isSidebar]);
 
   const sortedItems = useMemo(() => {
     if (!isSidebar) return items;
@@ -169,22 +214,22 @@ export default function ChartLegend({
 
   const outerClasses = isSidebar
     ? cn(
-        'px-2 py-3 rounded-md border bg-background text-sm flex flex-col w-full',
+        'relative px-2 py-3 rounded-lg border bg-background text-sm flex flex-col w-full min-h-0',
         isLegendExpanded
-          ? 'border-border/60 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
+          ? 'border-border/30 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
           : 'border-transparent no-export',
       )
     : grouped
       ? cn(
-          'py-1 px-2 md:py-1 rounded-sm border text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
+          'py-1 px-2 rounded-lg border text-sm top-0 right-0 transition-colors md:flex md:flex-col legend-container',
           isLegendExpanded
-            ? 'md:max-w-none md:w-auto md:min-w-fit'
+            ? 'border-border/30 bg-card md:max-w-none md:w-auto md:min-w-fit'
             : 'md:max-w-40 bg-transparent border-transparent px-1',
         )
       : cn(
-          'mt-4 md:pt-8 md:p-2 rounded-sm border md:absolute text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
+          'mt-4 md:pt-8 md:p-2 rounded-lg border md:absolute text-sm top-0 right-0 transition-colors md:flex md:flex-col legend-container',
           isLegendExpanded
-            ? 'md:max-w-none md:w-auto md:min-w-fit'
+            ? 'border-border/30 bg-card md:max-w-none md:w-auto md:min-w-fit'
             : 'md:max-w-40 bg-transparent border-transparent',
         );
 
@@ -198,35 +243,35 @@ export default function ChartLegend({
     [items, hideAtomFootnote],
   );
 
-  const hasSidebarControls =
-    isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
+  const headerButtons: (LegendActionConfig & { disabled?: boolean })[] = [
+    ...(reset ? [{ ...reset, label: t.resetFilter }] : []),
+    ...(actions ?? []),
+  ];
   const scrollClasses = isSidebar
-    ? cn(
-        'overflow-y-auto flex-initial min-h-0 space-y-0.5',
-        hasSidebarControls && 'border-b border-border pb-2',
-      )
+    ? 'relative overflow-y-auto flex-initial min-h-0 space-y-0.5 pb-2'
     : grouped
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
       : 'flex flex-row flex-wrap gap-x-4 gap-y-2 md:block md:overflow-y-auto md:flex-1 md:min-h-0';
 
   const actionElements =
-    actions && actions.length > 0 ? (
+    headerButtons.length > 0 ? (
       <div
         className={cn(
           'no-export flex flex-wrap gap-y-1',
           isSidebar ? 'min-w-0 gap-x-1' : 'w-full gap-x-3',
         )}
       >
-        {actions.map((action) => (
+        {headerButtons.map((action) => (
           <button
             type="button"
             key={action.id}
             data-testid={action.id}
             onClick={action.onClick}
+            disabled={action.disabled}
             className={cn(
-              'text-xs text-muted-foreground hover:text-foreground cursor-pointer',
+              'text-xs text-muted-foreground enabled:hover:text-foreground enabled:cursor-pointer disabled:opacity-80',
               isSidebar
-                ? 'min-h-8 rounded-md px-2 hover:bg-muted transition-colors'
+                ? 'min-h-8 rounded-md px-2 enabled:hover:bg-muted transition-colors'
                 : 'mt-2 underline',
             )}
           >
@@ -237,26 +282,27 @@ export default function ChartLegend({
     ) : null;
 
   const LegendToggleIcon = isLegendExpanded ? PanelRightClose : PanelRightOpen;
+  const toggleButton = collapsible ? (
+    <button
+      type="button"
+      data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
+      onClick={toggleLegendOpen}
+      aria-expanded={isLegendExpanded}
+      aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
+      title={isLegendExpanded ? t.hideLegend : t.showLegend}
+      className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+    >
+      <LegendToggleIcon size={16} aria-hidden="true" />
+    </button>
+  ) : null;
   const panelHeader =
-    isSidebar && !readOnly ? (
+    isSidebar && (collapsible || actionElements) ? (
       <div
         data-testid="legend-toolbar"
         className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
       >
         <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
-        {collapsible && (
-          <button
-            type="button"
-            data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
-            onClick={toggleLegendOpen}
-            aria-expanded={isLegendExpanded}
-            aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
-            title={isLegendExpanded ? t.hideLegend : t.showLegend}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-          >
-            <LegendToggleIcon size={16} aria-hidden="true" />
-          </button>
-        )}
+        {toggleButton}
       </div>
     ) : null;
 
@@ -306,26 +352,24 @@ export default function ChartLegend({
         {renderSwitches(standardSwitches)}
         {advancedSwitches.length > 0 && (
           <div className="mt-2">
-            <button
-              type="button"
+            <DisclosureToggle
+              open={isAdvancedExpanded}
               data-testid="legend-advanced-toggle"
-              aria-expanded={isAdvancedExpanded}
               aria-controls={advancedControlsId}
               onClick={() => {
                 const expanded = !isAdvancedExpanded;
                 setIsAdvancedExpanded(expanded);
                 onAdvancedExpandedChange?.(expanded);
               }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs"
             >
-              {isAdvancedExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               {t.advanced}
-            </button>
+            </DisclosureToggle>
             {isAdvancedExpanded && (
               <div
                 id={advancedControlsId}
                 data-testid="legend-advanced-controls"
-                className="ml-1 pl-3 border-l border-border"
+                className="ml-1 pl-3 border-l border-border/50"
               >
                 {renderSwitches(advancedSwitches)}
               </div>
@@ -396,10 +440,16 @@ export default function ChartLegend({
 
   const hasBottomControls =
     switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
+  // Sidebar controls cap at the panel cap minus 6rem so the toolbar and one legend row stay visible.
+  // The mobile padding keeps the Advanced toggle's enlarged tap area inside the scroller.
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
-      className={cn('shrink-0 grow-0', isSidebar && 'min-w-0 [contain:inline-size]')}
+      className={cn(
+        'shrink-0 grow-0',
+        isSidebar &&
+          'min-w-0 border-t border-border/50 [contain:inline-size] custom-scrollbar overflow-y-auto max-h-72 lg:max-h-[479px] max-md:pb-2.5 max-md:-mb-2.5',
+      )}
     >
       {!isSidebar && actionElements}
       {switchElements}
@@ -408,49 +458,44 @@ export default function ChartLegend({
     </div>
   ) : null;
 
+  const fadeMask = `linear-gradient(to bottom, black calc(100% - ${SCROLL_FADE_PX}px), transparent)`;
+  const scrollStyle: React.CSSProperties = {
+    ...(!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined),
+    ...(stripHeight === null ? undefined : { maxHeight: stripHeight, paddingBottom: 0 }),
+    ...(hasMoreBelow && stripHeight === null
+      ? { maskImage: fadeMask, WebkitMaskImage: fadeMask }
+      : undefined),
+  };
+  const overflowStrip =
+    stripHeight === null ? null : (
+      <div
+        aria-hidden="true"
+        data-testid="legend-overflow-strip"
+        className="shrink-0"
+        style={{
+          height: OVERFLOW_STRIP_PX,
+          background: hasMoreBelow
+            ? 'linear-gradient(to bottom, color-mix(in srgb, var(--background) 0%, transparent), var(--background))'
+            : undefined,
+        }}
+      />
+    );
+
   const scrollContent =
     grouped && rows ? (
-      <div
-        ref={scrollRef}
-        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={cn(scrollClasses, 'custom-scrollbar')}
-      >
+      <div ref={scrollRef} style={scrollStyle} className={cn(scrollClasses, 'custom-scrollbar')}>
         {rows.map((row, i) => (
-          <div key={i} className={cn('p-1 rounded-sm shrink-0', i > 0 && 'mt-2')}>
+          <div key={i} className={cn('shrink-0', i > 0 && 'mt-2', !isSidebar && 'p-1')}>
             <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
               {row[0].title}
             </div>
             <ul
               className={cn(
-                'flex flex-wrap gap-x-2 gap-y-1',
+                isSidebar ? 'space-y-0.5' : 'flex flex-wrap gap-x-2 gap-y-1',
                 itemsExpanded && 'md:block md:space-y-1',
               )}
             >
-              {row.map((item: CommonLegendItemProps) => (
-                <li key={item.name}>
-                  <ChartLegendItem
-                    name={item.name}
-                    hw={item.hw}
-                    label={item.label}
-                    color={item.color}
-                    lineDasharray={item.lineDasharray}
-                    title={item.title}
-                    isActive={item.isActive}
-                    onClick={item.onClick}
-                    onHover={onItemHover}
-                    onHoverEnd={onItemHoverEnd}
-                    onRemove={removeFor(item)}
-                    onShowPoints={item.onShowPoints}
-                    hideAriaLabel={t.hide(item.label)}
-                    showPointsAriaLabel={t.showPoints(item.label)}
-                    isLegendExpanded={itemsExpanded}
-                    sidebarMode={isSidebar}
-                    blockedReason={item.blockedReason}
-                    idScope={item.idScope}
-                    asFragment
-                  />
-                </li>
-              ))}
+              {row.map((item: CommonLegendItemProps) => renderItem(item))}
             </ul>
           </div>
         ))}
@@ -458,7 +503,7 @@ export default function ChartLegend({
     ) : (
       <ul
         ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
-        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        style={scrollStyle}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {(isSidebar ? sortedItems : items)
@@ -484,7 +529,13 @@ export default function ChartLegend({
     );
 
   const content = (
-    <div className={isSidebar ? 'min-w-0' : 'relative'}>
+    <div
+      className={
+        isSidebar
+          ? 'min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:in-data-[slot=chart-legend-wrapper]:flex-1'
+          : 'relative'
+      }
+    >
       <div
         data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
         className={outerClasses}
@@ -492,6 +543,7 @@ export default function ChartLegend({
       >
         {panelHeader}
         {(!isSidebar || isLegendExpanded) && scrollContent}
+        {(!isSidebar || isLegendExpanded) && overflowStrip}
         {(!isSidebar || isLegendExpanded) && bottomControls}
       </div>
     </div>

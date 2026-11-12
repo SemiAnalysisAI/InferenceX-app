@@ -124,17 +124,17 @@ describe('renderScatterPoints with getShapeKey', () => {
   });
 });
 
-describe('syncPointShape', () => {
-  function makeDotGroup() {
-    const group = makeZoomGroup();
-    return group.append('g').attr('class', 'dot-group') as d3.Selection<
-      SVGGElement,
-      unknown,
-      null,
-      undefined
-    >;
-  }
+function makeDotGroup() {
+  const group = makeZoomGroup();
+  return group.append('g').attr('class', 'dot-group') as d3.Selection<
+    SVGGElement,
+    unknown,
+    null,
+    undefined
+  >;
+}
 
+describe('syncPointShape', () => {
   it('creates the shape element when missing', () => {
     const g = makeDotGroup();
     syncPointShape(g, 'circle', '#ff0000');
@@ -355,11 +355,17 @@ function recordMutations(root: Node, run: () => void): string[] {
   );
 }
 
-describe('syncPointLabel', () => {
-  function makePointGroup() {
-    return makeZoomGroup().append('g').attr('class', 'dot-group').node()!;
-  }
+function makePointGroup() {
+  return makeZoomGroup().append('g').attr('class', 'dot-group').node()!;
+}
 
+const childOrder = (group: d3.Selection<SVGGElement, unknown, null, undefined>) =>
+  group
+    .selectAll<SVGGElement, TestPoint>('.dot-group')
+    .nodes()
+    .map((node) => [...node.children].map((child) => child.getAttribute('class') ?? child.tagName));
+
+describe('syncPointLabel', () => {
   it('creates the label with its tspans', () => {
     const group = makePointGroup();
     syncPointLabel(group, 'TP8\nEP4', '#fff', false);
@@ -443,13 +449,6 @@ describe('syncPointLabel', () => {
     renderScatterPoints(late, POINTS, xScale, yScale, config(true), keyFn);
     renderScatterPoints(late, POINTS, xScale, yScale, config(false), keyFn);
 
-    const childOrder = (group: d3.Selection<SVGGElement, unknown, null, undefined>) =>
-      group
-        .selectAll<SVGGElement, TestPoint>('.dot-group')
-        .nodes()
-        .map((node) =>
-          [...node.children].map((child) => child.getAttribute('class') ?? child.tagName),
-        );
     expect(childOrder(late)).toEqual(childOrder(eager));
     expect(childOrder(late)[0]).toEqual(['circle', 'point-label', 'visible-shape']);
   });

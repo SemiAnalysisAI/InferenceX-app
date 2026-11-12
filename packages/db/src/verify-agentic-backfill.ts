@@ -82,7 +82,7 @@ async function main(): Promise<void> {
         ${runFilter}
       order by br.id
     `;
-    if (ids.length === 0) throw new Error('No AgentX points matched the audit scope');
+    if (ids.length === 0 && runId) throw new Error('No AgentX points matched the audit scope');
     const rows = await states(ids.map((row) => row.id));
     await writeFile(file!, JSON.stringify({ database, rows }));
     console.log(`Saved immutable-data fingerprints for ${rows.length} points`);

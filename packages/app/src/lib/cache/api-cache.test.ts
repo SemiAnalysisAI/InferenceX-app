@@ -6,6 +6,7 @@ import {
   gzipSync,
 } from 'node:zlib';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as WorkUnitStorage from 'next/dist/server/app-render/work-unit-async-storage.external';
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
@@ -20,10 +21,11 @@ vi.mock('next/server', () => ({
 }));
 
 const workStore = vi.hoisted(() => ({
-  current: undefined as { isStaticGeneration: boolean } | undefined,
+  current: undefined as { type: string; consumerWillServerCache?: boolean } | undefined,
 }));
-vi.mock('next/dist/server/app-render/work-async-storage.external', () => ({
-  workAsyncStorage: { getStore: () => workStore.current },
+vi.mock('next/dist/server/app-render/work-unit-async-storage.external', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkUnitStorage>()),
+  workUnitAsyncStorage: { getStore: () => workStore.current },
 }));
 
 const fixtures = vi.hoisted(() => ({ mode: false }));
@@ -141,7 +143,21 @@ describe('cachedQuery', () => {
       expect(mockBlobSet).not.toHaveBeenCalled();
     });
 
-    it('reads a separate page-tagged entry while an ISR page regenerates', async () => {
+    it.each([
+      { type: 'prerender', expected: 'page' },
+      { type: 'prerender-client', expected: 'page' },
+      { type: 'prerender-legacy', expected: 'page' },
+      { type: 'request', expected: 'route' },
+      { type: 'prerender-runtime', expected: 'route' },
+      { type: 'validation-client', expected: 'route' },
+      { type: 'build-time-generator', expected: 'route' },
+      { type: 'cache', consumerWillServerCache: true, expected: 'page' },
+      { type: 'cache', consumerWillServerCache: false, expected: 'route' },
+      { type: 'private-cache', consumerWillServerCache: true, expected: 'page' },
+      { type: 'private-cache', consumerWillServerCache: false, expected: 'route' },
+      { type: 'unstable-cache', consumerWillServerCache: true, expected: 'page' },
+      { type: 'unstable-cache', consumerWillServerCache: false, expected: 'route' },
+    ])('selects the $expected cache for $type ($consumerWillServerCache)', async (context) => {
       const routeFn = vi.fn(() => Promise.resolve({ value: 'route' }));
       const pageFn = vi.fn(() => Promise.resolve({ value: 'page' }));
       // The mock returns plain stand-ins for unstable_cache's wrapped function.
@@ -161,9 +177,9 @@ describe('cachedQuery', () => {
         { tags: ['db-page'] },
       );
       await expect(wrapped()).resolves.toBe('route');
-      workStore.current = { isStaticGeneration: true };
-      await expect(wrapped()).resolves.toBe('page');
-      workStore.current = { isStaticGeneration: false };
+      workStore.current = context;
+      await expect(wrapped()).resolves.toBe(context.expected);
+      workStore.current = { type: 'request' };
       await expect(wrapped()).resolves.toBe('route');
     });
 
@@ -198,7 +214,7 @@ describe('cachedQuery', () => {
         model: 'dsr1',
         metrics: { score: id / 7, em_strict: null },
         run_url: `https://github.com/org/repo/actions/runs/${id}`,
-        note: 'quote " and \\ backslash',
+        note: String.raw`quote " and \ backslash`,
       }));
       const fn = vi.fn((model: string) => Promise.resolve(model === 'big' ? rows : null));
       const wrapped = cachedQuery(fn, 'large');
@@ -436,9 +452,9 @@ describe('cachedQuery', () => {
   });
 });
 
-describe('purgeAll', () => {
-  const runAfterTasks = () => Promise.all(afterTasks.pending.map((task) => task()));
+const runAfterTasks = () => Promise.all(afterTasks.pending.map((task) => task()));
 
+describe('purgeAll', () => {
   it('expires route data now but only marks page data and CDN responses stale', async () => {
     await purgeAll();
 
@@ -637,6 +653,15 @@ describe('negotiateEncoding', () => {
   });
 });
 
+const brotli = (data: unknown, headers: Record<string, string> = {}, version?: string) =>
+  cachedJson(apiRequest({ 'Accept-Encoding': 'br', ...headers }), data, { version });
+
+const encodedEtag = (data: unknown, acceptEncoding: string) =>
+  cachedJson(apiRequest({ 'Accept-Encoding': acceptEncoding }), data).headers.get('ETag');
+
+const versionedEtag = (data: unknown, version: string) =>
+  cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data, { version }).headers.get('ETag');
+
 describe('cachedJson', () => {
   it('lets browsers reuse responses for a minute and the CDN for a day', () => {
     const res = cachedJson(apiRequest(), { ok: true });
@@ -751,21 +776,19 @@ describe('cachedJson', () => {
   });
 
   it('derives a strong ETag from the payload and the chosen encoding', () => {
-    const etag = (data: unknown, acceptEncoding: string) =>
-      cachedJson(apiRequest({ 'Accept-Encoding': acceptEncoding }), data).headers.get('ETag');
-
-    expect(etag({ a: 1 }, 'br')).toMatch(/^"[\w-]+"$/u);
-    expect(etag({ a: 1 }, 'br')).toBe(etag({ a: 1 }, 'br'));
-    expect(etag({ a: 2 }, 'br')).not.toBe(etag({ a: 1 }, 'br'));
+    expect(encodedEtag({ a: 1 }, 'br')).toMatch(/^"[\w-]+"$/u);
+    expect(encodedEtag({ a: 1 }, 'br')).toBe(encodedEtag({ a: 1 }, 'br'));
+    expect(encodedEtag({ a: 2 }, 'br')).not.toBe(encodedEtag({ a: 1 }, 'br'));
     expect(
-      new Set([etag({ a: 1 }, 'br'), etag({ a: 1 }, 'gzip'), etag({ a: 1 }, 'identity')]).size,
+      new Set([
+        encodedEtag({ a: 1 }, 'br'),
+        encodedEtag({ a: 1 }, 'gzip'),
+        encodedEtag({ a: 1 }, 'identity'),
+      ]).size,
     ).toBe(3);
   });
 
   it('compresses large bodies at a lower brotli quality and names it in the ETag', async () => {
-    const brotli = (data: unknown, headers: Record<string, string> = {}, version?: string) =>
-      cachedJson(apiRequest({ 'Accept-Encoding': 'br', ...headers }), data, { version });
-
     expect(brotli(numberedRows(10)).headers.get('ETag')).toMatch(/^"[\w-]{32}-br"$/u);
     const versionTag = brotli(numberedRows(10), {}, 'rev').headers.get('ETag')!;
     for (const [count, quality, minBytes] of [
@@ -827,22 +850,22 @@ describe('cachedJson', () => {
   });
 
   it('derives the ETag from a supplied version instead of the payload', () => {
-    const etag = (data: unknown, version: string) =>
-      cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data, { version }).headers.get('ETag');
-
-    expect(etag({ v: 1 }, 'rev-1')).toBe(etag({ v: 2 }, 'rev-1'));
-    expect(etag({ v: 1 }, 'rev-2')).not.toBe(etag({ v: 1 }, 'rev-1'));
+    expect(versionedEtag({ v: 1 }, 'rev-1')).toBe(versionedEtag({ v: 2 }, 'rev-1'));
+    expect(versionedEtag({ v: 1 }, 'rev-2')).not.toBe(versionedEtag({ v: 1 }, 'rev-1'));
   });
 });
 
-describe('cachedJsonResponse', () => {
-  const sameResponse = async (actual: Response, expected: Response) => {
-    expect(actual.status).toBe(expected.status);
-    expect([...actual.headers]).toEqual([...expected.headers]);
-    expect(await bodyText(actual)).toBe(await bodyText(expected));
-  };
-  const storedBytes = () => mockBlobSetBytes.mock.calls.at(-1)![1];
+const sameResponse = async (actual: Response, expected: Response) => {
+  expect(actual.status).toBe(expected.status);
+  expect([...actual.headers]).toEqual([...expected.headers]);
+  expect(await bodyText(actual)).toBe(await bodyText(expected));
+};
 
+const storedBytes = () => mockBlobSetBytes.mock.calls.at(-1)![1];
+
+const fullEncodingRequest = () => apiRequest({ 'Accept-Encoding': 'gzip, deflate, br, zstd' });
+
+describe('cachedJsonResponse', () => {
   it.each([
     ['br', numberedRows(10)],
     ['gzip', numberedRows(10)],
@@ -890,8 +913,10 @@ describe('cachedJsonResponse', () => {
     const options = { compression: 'cdn' } as const;
     mockBlobGetBytes.mockResolvedValueOnce(null);
     const respond = cachedJsonResponse(() => Promise.resolve(data), 'cdn', options);
-    const request = () => apiRequest({ 'Accept-Encoding': 'gzip, deflate, br, zstd' });
-    await sameResponse(await respond(request()), cachedJson(request(), data, options));
+    await sameResponse(
+      await respond(fullEncodingRequest()),
+      cachedJson(fullEncodingRequest(), data, options),
+    );
     expect(mockBlobSetBytes).toHaveBeenCalledWith(
       expect.stringMatching(/^generation\/g1\/cdn:v2:.+\.response\.json$/u),
       expect.any(Uint8Array),
@@ -900,7 +925,10 @@ describe('cachedJsonResponse', () => {
     expect(Buffer.from(stored.subarray(33)).toString('utf8')).toBe(JSON.stringify(data));
     mockBlobGetBytes.mockResolvedValueOnce(stored);
 
-    await sameResponse(await respond(request()), cachedJson(request(), data, options));
+    await sameResponse(
+      await respond(fullEncodingRequest()),
+      cachedJson(fullEncodingRequest(), data, options),
+    );
   });
 
   it('answers a held ETag from the stored digest with a 304', async () => {

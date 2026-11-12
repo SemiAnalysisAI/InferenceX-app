@@ -5,21 +5,22 @@ import { leadCell } from './deployment';
 import { RESULTS_HARDWARE, type ResultCell } from './results';
 import { servingCells } from './serving';
 import { storedBundle, type StoredArtifact } from './stored';
-import type { ClipQuality } from './reference-quality';
+import type { ClipQuality, UnscoredClip } from './reference-quality';
 import type { DiagnosticPair } from './diagnostic-quality';
 
-/** A named result owns its hardware's clip, even when the official result is newer or faster. */
+/**
+ * A named result owns its hardware's clip, even when the official result is newer,
+ * faster or exact while the named run is lossy; a lossless named cell still comes first.
+ */
 export function resultsClipPoints(
   cells: readonly Pick<ResultCell, 'point' | 'overlay'>[],
   options: MetricOptions,
 ): VideoPoint[] {
   return RESULTS_HARDWARE.flatMap((key) => {
     const choices = cells.filter((cell) => cell.point.hardwareKey === key);
-    const named = leadCell(
-      choices.filter((cell) => cell.overlay).map((cell) => cell.point),
-      key,
-      options,
-    );
+    const namedPoints = choices.filter((cell) => cell.overlay).map((cell) => cell.point);
+    const named =
+      leadCell(namedPoints, key, options) ?? leadCell(namedPoints, key, options, { lossy: true });
     const lead =
       named ??
       leadCell(
@@ -31,12 +32,19 @@ export function resultsClipPoints(
   });
 }
 
+/** Why a clip has no PSNR; `unreadable` when the scorer could not read its artifact. */
+export interface ClipUnscored {
+  reason: UnscoredClip['reason'] | 'unreadable';
+  fields: string[];
+}
+
 export interface ResultsClipSide extends CompareSide {
   pointId: string;
   hardwareKey: string;
   /** Exact recorded model, revision and generation settings, not a display label. */
   generationKey: string;
   quality: Map<string, ClipQuality>;
+  unscored: Map<string, ClipUnscored>;
   diagnostics?: DiagnosticPair[];
 }
 
@@ -80,12 +88,27 @@ export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): 
     });
     if (matches.length === 1) quality.set(record.slotId, matches[0]);
   }
+  const unscored = new Map<string, ClipUnscored>();
+  for (const record of side.records) {
+    if (quality.has(record.slotId)) continue;
+    const listed = (saved.unscored ?? []).find(
+      ({ candidate: c }) =>
+        c.source_id === sources[0].id &&
+        c.manifest_sha256 === manifestSha &&
+        c.cell_id === cellId &&
+        c.slot_id === record.slotId,
+    );
+    if (listed) unscored.set(record.slotId, { reason: listed.reason, fields: listed.fields });
+    else if (saved.qualityUnreadable)
+      unscored.set(record.slotId, { reason: 'unreadable', fields: [] });
+  }
   return {
     ...side,
     pointId: point.id,
     hardwareKey: point.hardwareKey ?? '',
     generationKey: identified ? (point.workloadKey ?? '') : '',
     quality,
+    unscored,
     diagnostics: (saved.diagnostics ?? []).filter((pair) => {
       const origin = pair.origin;
       return (
@@ -114,11 +137,14 @@ export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): 
 export interface ResultsClip {
   side: ResultsClipSide;
   record: CaseRecord;
-  /** Sealed original: Difference, PSNR pairing and the media link. */
+  /** Sealed original: Difference, PSNR pairing and the media link; empty for an unpublished run. */
   url: string;
   /** Lighter web rendition of `url` for Clip view playback. */
   previewUrl?: string;
+  /** JPEG of the first decoded frame of `url`; presentation only. */
+  posterUrl?: string;
   quality: ClipQuality | DiagnosticPair | null;
+  unscored?: ClipUnscored;
 }
 export interface ResultsClipGroup {
   scope?: 'matched-noise-diagnostic';
@@ -136,6 +162,8 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
     for (const record of side.records) {
       const take = Number(/^measurement-r(?<take>\d+)-c\d+$/u.exec(record.slotId)?.groups?.take);
       const media = record.mediaPath === null ? undefined : side.media.get(record.mediaPath);
+      const quality = side.quality.get(record.slotId);
+      const unscored = side.unscored.get(record.slotId);
       if (
         !record.prompt ||
         record.seed === null ||
@@ -144,7 +172,8 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
         take < 1 ||
         record.valid !== true ||
         record.status !== 'succeeded' ||
-        !media
+        // An unpublished run stores no media; its clips still carry their PSNR or unscored reason.
+        (!media && (side.media.size > 0 || (!quality && !unscored)))
       )
         continue;
       const key = JSON.stringify([side.generationKey, record.prompt, record.seed, take]);
@@ -160,9 +189,11 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
       group.clips.set(side.hardwareKey, {
         side,
         record,
-        url: media.url,
-        previewUrl: media.previewUrl,
-        quality: side.quality.get(record.slotId) ?? null,
+        url: media?.url ?? '',
+        previewUrl: media?.previewUrl,
+        posterUrl: media?.posterUrl,
+        quality: quality ?? null,
+        ...(unscored ? { unscored } : {}),
       });
       groups.set(key, group);
     }
@@ -248,6 +279,7 @@ export function resultsClipEvidence(sides: ResultsClipSide[]) {
       caseId: clip.record.caseId,
       mediaPath: clip.record.mediaPath,
       quality: clip.quality,
+      unscored: clip.unscored ?? null,
     })),
   }));
 }

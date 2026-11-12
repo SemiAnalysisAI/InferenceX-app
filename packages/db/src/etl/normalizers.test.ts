@@ -180,8 +180,14 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('MI355X-AMD')).toBe('mi355x');
   });
 
+  it.each(['a100', 'a100-nv', 'cluster:a100-cw', 'CLUSTER:A100-CW'])(
+    'normalizes A100 hardware %s',
+    (hardware) => {
+      expect(hwToGpuKey(hardware)).toBe('a100');
+    },
+  );
+
   it('returns null for unknown hardware', () => {
-    expect(hwToGpuKey('a100-nv')).toBeNull();
     expect(hwToGpuKey('v100')).toBeNull();
     expect(hwToGpuKey('')).toBeNull();
     expect(hwToGpuKey('unknown-gpu')).toBeNull();

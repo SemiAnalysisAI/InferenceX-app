@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import { publishedVideoHistory } from './video-history-store';
-import { readStoredArtifact, renditionPreviews, storedArtifacts } from './video-storage';
+import { readPublishedArtifact, derivedMedia, storedArtifacts } from './video-storage';
 import {
   cachedPublishedArtifact,
   cachedVideoHistory,
@@ -16,8 +16,8 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: fals
 vi.mock('./video-history-store', () => ({ publishedVideoHistory: vi.fn() }));
 vi.mock('./video-storage', () => ({
   storedArtifacts: vi.fn(),
-  readStoredArtifact: vi.fn(),
-  renditionPreviews: vi.fn(),
+  readPublishedArtifact: vi.fn(),
+  derivedMedia: vi.fn(),
 }));
 
 const page = (entries: VideoHistoryPage['entries'] = []): VideoHistoryPage => ({
@@ -38,7 +38,7 @@ const artifact = { id: 20, name: 'h3-results-10-1', expired: false, size_in_byte
 const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
 
 beforeEach(() => {
-  vi.mocked(renditionPreviews).mockResolvedValue(new Map());
+  vi.mocked(derivedMedia).mockResolvedValue(new Map());
 });
 afterEach(() => {
   resetFakeNextCache();
@@ -55,7 +55,8 @@ describe('shared VideoGenX read cache', () => {
     const second = await cachedVideoHistory(2, 1);
     const bounded = await cachedVideoHistory(1, 5);
     expect(again).toEqual(first);
-    expect(second.entries[0]?.runId).toBe('2');
+    expect(first.complete).toBe(true);
+    expect(second.page.entries[0]?.runId).toBe('2');
     expect(bounded).toEqual(first);
     expect(publishedVideoHistory).toHaveBeenCalledTimes(3);
     expect(publishedVideoHistory).toHaveBeenNthCalledWith(1, 1, 1);
@@ -98,8 +99,9 @@ describe('shared VideoGenX read cache', () => {
     });
     const first = await cachedVideoHistory(1, 1);
     const second = await cachedVideoHistory(1, 1);
-    expect(first.entries).toHaveLength(1);
-    expect(second.entries).toHaveLength(1);
+    expect(first).toMatchObject({ complete: false });
+    expect(first.page.entries).toHaveLength(1);
+    expect(second.page.entries).toHaveLength(1);
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
   });
 
@@ -107,25 +109,31 @@ describe('shared VideoGenX read cache', () => {
     vi.mocked(storedArtifacts).mockImplementation((runId) =>
       Promise.resolve(runId === '10' ? [artifact] : []),
     );
-    vi.mocked(readStoredArtifact).mockResolvedValue(saved);
+    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
     await expect(cachedPublishedArtifact('10', '20')).resolves.toEqual(saved);
     await expect(cachedPublishedArtifact('10', '20')).resolves.toEqual(saved);
-    expect(readStoredArtifact).toHaveBeenCalledTimes(1);
+    expect(readPublishedArtifact).toHaveBeenCalledTimes(1);
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     expect(storedArtifacts).toHaveBeenCalledTimes(3);
+    // A failed quality read still serves the media but is read again next time.
+    vi.mocked(storedArtifacts).mockResolvedValue([{ ...artifact, id: 21 }]);
+    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: false });
+    await expect(cachedPublishedArtifact('12', '21')).resolves.toEqual(saved);
+    await expect(cachedPublishedArtifact('12', '21')).resolves.toEqual(saved);
+    expect(readPublishedArtifact).toHaveBeenCalledTimes(3);
   });
 
   it('relists renditions on a short clock, because they are encoded after the publication purge', async () => {
     vi.useFakeTimers();
     try {
       vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
-      vi.mocked(readStoredArtifact).mockResolvedValue(saved);
+      vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
       await cachedPublishedArtifact('10', '20');
       vi.advanceTimersByTime(RENDITION_LISTING_REVALIDATE_SECONDS * 1000);
       await cachedPublishedArtifact('10', '20');
-      expect(renditionPreviews).toHaveBeenCalledTimes(2);
-      expect(readStoredArtifact).toHaveBeenCalledTimes(1);
+      expect(derivedMedia).toHaveBeenCalledTimes(2);
+      expect(readPublishedArtifact).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
@@ -134,13 +142,13 @@ describe('shared VideoGenX read cache', () => {
   it('rereads every page and artifact after a publication purge', async () => {
     vi.mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
     vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
-    vi.mocked(readStoredArtifact).mockResolvedValue(saved);
+    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
     await cachedVideoHistory(1, 1);
     await cachedPublishedArtifact('10', '20');
     purgeVideo();
     await cachedVideoHistory(1, 1);
     await cachedPublishedArtifact('10', '20');
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
-    expect(readStoredArtifact).toHaveBeenCalledTimes(2);
+    expect(readPublishedArtifact).toHaveBeenCalledTimes(2);
   });
 });

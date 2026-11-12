@@ -36,7 +36,7 @@ A loaded unofficial run contributes an extra bar per (hardware × run) to the ba
 
 Both paths share one row → `GPUDataPoint` mapper, `buildGpuGroups`, so an overlay bar and its official twin can never differ because of a mapping drift. Group identity is carried in `gpuGroupMeta` / `overlayGroupMeta` rather than re-parsed out of the key string; `CostTargetPanel` still splits keys itself, which is safe because it only receives official keys.
 
-Overlay rows arrive unfiltered by model (the unofficial-run API returns every model in the run, while `/api/v1/benchmarks` is already model-scoped), so the hook filters them with `DB_MODEL_TO_DISPLAY`.
+Overlay rows arrive unfiltered by model (the unofficial-run API returns every model in the run, while `/api/v1/benchmarks` is already model-scoped), so the hook filters them with `DB_MODEL_TO_DISPLAY`. A model missing from that map is matched by its raw key, which is also its display name, so overlay rows for an unregistered model still reach the bar chart. The dashboard's `benchmarkQueryOptions` resolves such a model's official rows to an empty list without calling `/api/v1/benchmarks`, which would reject the unknown model.
 
 **Only the bar chart and its legend show overlay data.** The table view, CSV export, and cost-target panel deliberately stay official-only. An exported sheet or an MW projection that silently blends in numbers from an unmerged branch is worse than one that omits them. This is why `barResults` (official + overlay) exists separately from `results` (official) and only reaches `ThroughputBarChart`.
 
@@ -97,12 +97,12 @@ The direction and size of the difference depend on frontier density and can
 change as benchmark runs land. Re-deriving the metric preserves its definition
 at every interpolated point.
 
-`/inference` plots these metrics only at measured points (`lib/charts/chart-utils.ts`,
+`/infx/inference` plots these metrics only at measured points (`lib/charts/chart-utils.ts`,
 `roof: false`), where both methods agree exactly. Leave-one-out measurements can
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
-The `/inference` page exposes infrastructure tokens-per-dollar and token revenue
+The `/infx/inference` page exposes infrastructure tokens-per-dollar and token revenue
 as separate Y-axis metric families. Revenue selects the total-throughput Pareto
 knots, interpolates throughput, token mix, and cache hit independently, and then
 applies the selected token sale prices. When input and output sell at one price
@@ -172,7 +172,7 @@ Agreement at every knot and one-sided divergence between them identifies this
 as interpolation bias, not a modelling disagreement.
 
 Scored against the oracle, the splined read is simply **less accurate**.
-`/inference` plots cost only at measured points, as `specs.costh / millionTokensPerHour`
+`/infx/inference` plots cost only at measured points, as `specs.costh / millionTokensPerHour`
 (`buildDerivedChartFields` in `lib/charts/chart-utils.ts`, `roof: false`). Holding out each interior frontier
 knot in turn, rebuilding the frontier from the rest and predicting the held-out
 point's real cost:
@@ -189,7 +189,7 @@ up to 2026%, i.e. it reported an operating point no real config could occupy.
 Deriving cost from the interpolated throughput satisfies the identity by
 construction.
 
-## Fleet Lifecycle (`/fleet`)
+## Fleet Lifecycle (`/infx/fleet`)
 
 Everything above answers "which chip is cheapest at this interactivity, right
 now?". This section answers "what has a fleet of it earned and cost since the
@@ -453,15 +453,19 @@ the notes now carry the correction instead: which figures are affected (Input an
 never Total), in which direction (flattering), by how much, and that the Fleet Lifecycle
 page is deliberately on a different basis.
 
-## Profit Estimator (`/profit-estimator`, `/profit-estimator-per-gigawatt`)
+## Profit Estimator (`/infx/profit-estimator`, `/infx/profit-estimator-per-gigawatt`)
 
-Fleet Lifecycle answers "what did a fixed fleet earn over its life". These two tabs
-answer a narrower, present-tense question: at one interactivity operating point, what
-does each chip earn today, and who keeps it? The two tabs differ only in the denominator
+Fleet Lifecycle answers "what did a fixed fleet earn over its life". This tab
+answers a narrower, present-tense question: at one interactivity operating point, what
+does each chip earn today, and who keeps it? The two pages differ only in the denominator
 (`ProfitBasis`), either one GPU-hour (`chip-hour`) or the GPU-hours one all-in utility
-gigawatt-year buys for that SKU (`gw-year`).
+gigawatt-year buys for that SKU (`gw-year`). They share one dashboard tab. The
+"Estimate basis" switch in the Chart config panel moves between the two URLs with a
+client-side push that keeps the model slug, path filters, query and hash, and both URLs
+mark the Profit estimator tab active (`navGroup: 'merged'` in `dashboard-routes.ts`).
+Each page keeps its own title, metadata and canonical URL.
 
-Both tabs offer the same model list. A model needs AgentX (`agentic_traces`)
+Both pages offer the same model list. A model needs AgentX (`agentic_traces`)
 measurements with an interpolable operating point and a token price source.
 The page intersects its supported routes with live AgentX availability, so a
 model without current trace data disappears from the selector.
@@ -502,7 +506,7 @@ that historical target.
   drawn and not offered in the legend. This matches the fleet page, which drops
   those points rather than showing an edge value that was never measured.
 
-## First-Token Limits (`/first-token`)
+## First-Token Limits (`/infx/first-token`)
 
 The calculator answers "what does each chip cost at this interactivity". This tab adds
 the constraint an interactivity target leaves out: how long the user waits for the first

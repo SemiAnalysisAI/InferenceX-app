@@ -1,22 +1,5 @@
 const MODEL_SITE_URL = 'https://inferencex.semianalysis.com';
 
-function waitForScrollToSettle(): void {
-  cy.window().then(
-    (win) =>
-      new Cypress.Promise<void>((resolve) => {
-        let last = Number.NaN;
-        let stable = 0;
-        const tick = () => {
-          stable = win.scrollY === last ? stable + 1 : 0;
-          last = win.scrollY;
-          if (stable >= 3) resolve();
-          else win.setTimeout(tick, 100);
-        };
-        tick();
-      }),
-  );
-}
-
 function dismissStarModal(win: Window): void {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
 }
@@ -38,7 +21,13 @@ function visitModelPage(slug: string) {
     },
   });
   cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
-  cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+  // Force-clicks on server-rendered markup are lost until React attaches its handlers.
+  cy.get('[data-testid="model-architecture-svg"]')
+    .should('be.visible')
+    .and(([svg]) => {
+      const hydrated = Object.keys(svg).some((key) => key.startsWith('__reactProps'));
+      expect(hydrated, 'architecture diagram is hydrated').to.equal(true);
+    });
 }
 
 describe('Model Architecture Diagram', () => {
@@ -50,7 +39,7 @@ describe('Model Architecture Diagram', () => {
     it('expands dense transformer block on click', () => {
       cy.get('[data-testid="model-architecture-inline"]').should(
         'contain.text',
-        'Model Architecture',
+        'Model architecture',
       );
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
@@ -265,7 +254,7 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('lists every model page with architecture badges', () => {
-      cy.get('h1').should('contain.text', 'Model Architectures');
+      cy.get('h1').should('contain.text', 'Model architectures');
       cy.get('[data-testid="model-index-list"] a').should('have.length.at.least', 11);
       cy.get('[data-testid="model-index-link-kimi-k3"]')
         .should('contain.text', 'Kimi K3')
@@ -285,7 +274,7 @@ describe('Model Architecture Diagram', () => {
     it('is linked from the footer', () => {
       cy.get('[data-testid="footer-link-model-architectures"]')
         .should('have.attr', 'href', '/model')
-        .and('contain.text', 'Model Architectures');
+        .and('contain.text', 'Model architectures');
     });
   });
 
@@ -346,7 +335,7 @@ describe('Model Architecture Diagram', () => {
         cy.get('[data-testid="model-page-article"]').should('have.attr', 'lang', 'en');
         cy.get('[data-testid="model-page-dashboard"]')
           .should('contain.text', 'DeepSeek R1 0528 推理性能')
-          .find('a[href^="/zh/inference?"]')
+          .find('a[href^="/zh/infx/inference?"]')
           .should('contain.text', '在完整仪表板中查看');
         cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
 
@@ -373,7 +362,7 @@ describe('Model Architecture Diagram', () => {
 
     it('keeps the dashboard architecture link inside the Chinese route tree', () => {
       cy.viewport(1440, 900);
-      cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+      cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad: dismissStarModal,
       });
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
@@ -394,12 +383,12 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('can still be expanded manually', () => {
-      cy.contains('button', 'Config Changelog')
+      cy.contains('button', 'Config changelog')
         .should('be.visible')
         .and('have.attr', 'aria-expanded', 'false');
 
-      cy.contains('button', 'Config Changelog').click();
-      cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
+      cy.contains('button', 'Config changelog').click();
+      cy.contains('button', 'Config changelog').should('have.attr', 'aria-expanded', 'true');
     });
 
     it('retains the axis selector even though the full filter panel is hidden', () => {
@@ -412,7 +401,7 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', 'Formula')
         .type('{esc}');
       cy.get('[data-testid^="axis-metric-row-"]').should('not.exist');
-      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click();
+      cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
       cy.get('[data-testid="x-axis-mode-ttft"]').click();
       cy.get('[data-testid="x-axis-mode-selector"]')
         .should('contain.text', 'TTFT')
@@ -427,7 +416,7 @@ describe('Model Architecture Diagram', () => {
   describe('Dashboard architecture icon link (replaces the banner row)', () => {
     before(() => {
       cy.viewport(1280, 800);
-      cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+      cy.visit('/infx/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad(win) {
           dismissStarModal(win);
         },
@@ -446,10 +435,7 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-link"]')
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
-      // The inference page smooth-scrolls the chart into view on first load, and a
-      // scroll closes the tooltip; let that finish before opening it.
-      cy.window().its('scrollY').should('be.greaterThan', 0);
-      waitForScrollToSettle();
+      cy.window().its('scrollY').should('equal', 0);
       cy.get('[data-testid="model-architecture-link"]').scrollIntoView().focus();
       cy.get('[data-testid="model-architecture-tooltip"]')
         .should('be.visible')

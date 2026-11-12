@@ -167,7 +167,7 @@ describe('subagent timeline hierarchy', () => {
 
   it('deep-links a main-agent aux request to the parent conversation without sa', () => {
     expect(conversationHref('slug', { ...request(0, 10), cid: 'abc123::aux:red:002', ti: 3 })).toBe(
-      '/agentx/slug/conversations/abc123?turn=3',
+      '/infx/agentx/slug/conversations/abc123?turn=3',
     );
   });
 });
@@ -237,13 +237,13 @@ describe('conversationHref', () => {
   it('builds a turn-carrying dataset link for a main-conversation request', () => {
     expect(
       conversationHref('cc-traces-weka-062126', { ...request(0, 10), cid: 'abc123', ti: 4 }),
-    ).toBe('/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
+    ).toBe('/infx/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
   });
 
   it('keeps Chinese conversation links inside the /zh tree', () => {
     expect(
       conversationHref('cc-traces-weka-062126', { ...request(0, 10), cid: 'abc123', ti: 4 }, 'zh'),
-    ).toBe('/zh/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
+    ).toBe('/zh/infx/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
   });
 
   it('carries the subagent id and strips the ::sa suffix from the conv id', () => {
@@ -253,7 +253,7 @@ describe('conversationHref', () => {
         cid: 'abc123::sa:subagent_001_bf1c5c16:s2',
         ti: 7,
       }),
-    ).toBe('/agentx/slug/conversations/abc123?turn=7&sa=subagent_001_bf1c5c16');
+    ).toBe('/infx/agentx/slug/conversations/abc123?turn=7&sa=subagent_001_bf1c5c16');
   });
 
   it('uses raw source provenance for flattened-agent dataset links', () => {
@@ -266,7 +266,7 @@ describe('conversationHref', () => {
         srcOuter: 204,
         srcKind: 'weka_flat',
       }),
-    ).toBe('/agentx/slug/conversations/02bc0afb13f7a2d9efa86c28511261d85c0e?turn=3&raw=204');
+    ).toBe('/infx/agentx/slug/conversations/02bc0afb13f7a2d9efa86c28511261d85c0e?turn=3&raw=204');
   });
 
   it('uses raw nested source provenance for subagent child links', () => {
@@ -281,7 +281,7 @@ describe('conversationHref', () => {
         srcKind: 'weka_subagent',
       }),
     ).toBe(
-      '/agentx/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
+      '/infx/agentx/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
     );
   });
 });
@@ -309,13 +309,14 @@ describe('timelineWheelZoomDirection', () => {
   });
 });
 
+const rec = (
+  cid: string,
+  phase: RequestRecord['phase'],
+  start: number,
+  end: number,
+): RequestRecord => ({ ...request(start, end), cid, phase });
+
 describe('stable row order + color across phase filters', () => {
-  const rec = (
-    cid: string,
-    phase: RequestRecord['phase'],
-    start: number,
-    end: number,
-  ): RequestRecord => ({ ...request(start, end), cid, phase });
   const full: RequestRecord[] = [
     rec('A', 'warmup', 0, 5),
     rec('A', 'profiling', 100, 110),

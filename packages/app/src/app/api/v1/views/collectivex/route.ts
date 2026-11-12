@@ -6,17 +6,12 @@ import { GET as run } from '@/app/api/v1/collectivex/runs/[runId]/route';
 import { GET as runs } from '@/app/api/v1/collectivex/runs/route';
 import {
   chartPoints,
-  collectiveXKvChartPoints,
-  collectiveXKvFrontierPoints,
-  collectiveXKvIslValues,
-  collectiveXKvOverlapPoints,
-  collectiveXKvWireCeilings,
   collectiveXSeriesForRun,
   fitAlphaBeta,
   normalizeCollectiveXSku,
   seriesMatchesSelection,
 } from '@/components/collectivex/data';
-import { swapChartPoints, swapRooflines } from '@/components/collectivex/swap-data';
+import { swapChartPoints, swapRangeBands, swapRooflines } from '@/components/collectivex/swap-data';
 import { cachedJson } from '@/lib/cache/api-cache';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
@@ -51,7 +46,7 @@ export function GET(request: NextRequest) {
     const list = await readResponse<{ runs: CollectiveXRunSummary[]; discovery_complete: boolean }>(
       await runs(source),
     );
-    const suite = parseEnumParam(s.get('suite'), 'suite', ['all', 'ep', 'kv', 'swap'], 'all');
+    const suite = parseEnumParam(s.get('suite'), 'suite', ['all', 'ep', 'swap'], 'all');
     const runIds = s.has('runs')
       ? parseRunIdListParam(s.get('runs'), 'runs')
       : [list.runs.find((r) => r.measured_cases > 0)?.run_id ?? list.runs[0]?.run_id].filter(
@@ -115,21 +110,29 @@ export function GET(request: NextRequest) {
     const operation = parseEnumParam(
       s.get('operation'),
       'operation',
-      ['roundtrip', 'dispatch', 'combine'],
-      'roundtrip',
+      ['pair_period', 'roundtrip', 'dispatch', 'combine'],
+      // Runs older than the chained family carry no pair period: default to the round trip there.
+      combined.some((item) => item.points.some((point) => point.components.pair_period !== null))
+        ? 'pair_period'
+        : 'roundtrip',
     );
     const percentile = parseEnumParam(
       s.get('percentile'),
       'percentile',
       ['p50', 'p95', 'p99'],
-      'p99',
+      'p50',
     );
-    const yAxis = parseEnumParam(
+    const requestedYAxis = parseEnumParam(
       s.get('yAxis'),
       'yAxis',
       ['latency', 'tokens-per-second', 'activation-rate', 'payload-rate'],
       'latency',
     );
+    // Token rate exists for the round trip only; fold to latency as the EP chart does.
+    const yAxis =
+      requestedYAxis === 'tokens-per-second' && operation !== 'roundtrip'
+        ? 'latency'
+        : requestedYAxis;
     const sku = s.get('sku') ?? 'all',
       backend = s.get('backend') ?? 'all';
     const active = (key: string, id: string) => !s.has(key) || s.get(key)!.split(',').includes(id);
@@ -140,23 +143,6 @@ export function GET(request: NextRequest) {
         (backend === 'all' || item.backend === backend) &&
         active('activeSeries', item.series_id),
     );
-    const cases = datasets
-      .flatMap((d, i) => (d.kv ?? []).map((k) => ({ ...k, run_id: d.run.run_id, run_index: i })))
-      .filter((k) => active('kvSeries', `${k.run_id}:${k.case_id}`));
-    const kvOp = parseEnumParam(s.get('kvOp'), 'kvOp', ['pull', 'push'], 'push');
-    const kvX = parseEnumParam(s.get('kvX'), 'kvX', ['isl', 'batch', 'frontier', 'overlap'], 'isl');
-    const kvY = parseEnumParam(s.get('kvY'), 'kvY', ['bandwidth', 'latency'], 'latency');
-    const overlapIsl =
-      s.has('overlapIsl') && !['auto', 'max'].includes(s.get('overlapIsl') ?? '')
-        ? parseNumberParam(s.get('overlapIsl'), 'overlapIsl', 1, { min: 1, integer: true })
-        : undefined;
-    const kvSelection = { op: kvOp, isl: overlapIsl };
-    const kvPoints =
-      kvX === 'frontier'
-        ? collectiveXKvFrontierPoints(cases, kvSelection)
-        : kvX === 'overlap'
-          ? collectiveXKvOverlapPoints(cases, kvSelection)
-          : collectiveXKvChartPoints(cases, { op: kvOp, x: kvX, y: kvY });
     const swapDirection = parseEnumParam(
       s.get('swapDirection'),
       'swapDirection',
@@ -178,8 +164,14 @@ export function GET(request: NextRequest) {
     const swapPercentile = parseEnumParam(
       s.get('swapPercentile'),
       'swapPercentile',
-      ['p50', 'p95', 'p99'],
+      ['p50', 'p90', 'p95', 'p99'],
       'p50',
+    );
+    const swapView = parseEnumParam(
+      s.get('swapView'),
+      'swapView',
+      ['best', 'range', 'series'],
+      'best',
     );
     const swapPoints = swapChartPoints(datasets, {
       direction: swapDirection,
@@ -206,26 +198,20 @@ export function GET(request: NextRequest) {
         sku,
         backend,
         activeSeries: series.map((item) => item.series_id),
-        kvX,
-        kvY,
-        kvOp,
-        overlapIsl: overlapIsl ?? 'auto',
-        kvSeries: cases.map((k) => `${k.run_id}:${k.case_id}`),
         swapDirection,
         swapLayout,
         swapMetric,
         swapPercentile,
+        swapView,
         swapSeries: [...new Set(swapPoints.map((p) => p.seriesId))],
       },
       runs: list.runs.filter(
         (r) =>
           suite === 'all' ||
-          (suite === 'kv'
-            ? (r.kv_cases?.requested ?? 0) > 0
-            : suite === 'swap'
-              ? (r.swap_cases?.requested ?? 0) > 0
-              : r.requested_cases - (r.kv_cases?.requested ?? 0) - (r.swap_cases?.requested ?? 0) >
-                0),
+          (suite === 'swap'
+            ? (r.swap_cases?.requested ?? 0) > 0
+            : r.requested_cases - (r.kv_cases?.requested ?? 0) - (r.swap_cases?.requested ?? 0) >
+              0),
       ),
       discoveryComplete: list.discovery_complete,
       coverage: datasets.map((d) => ({ runId: d.run.run_id, coverage: d.coverage })),
@@ -237,18 +223,17 @@ export function GET(request: NextRequest) {
           fit: fitAlphaBeta(item, operation, percentile),
         })),
       },
-      kv: {
-        cases,
-        points: kvPoints,
-        wireCeilings: Object.fromEntries(collectiveXKvWireCeilings(cases, kvOp)),
+      swap: {
+        points: swapPoints,
+        // Best and Range by SKU share the bands: best is members[0], range is lo/mid/hi.
+        ranges: swapView === 'series' ? [] : swapRangeBands(swapPoints, swapMetric),
+        rooflines: swapRooflines(swapPoints, swapDirection),
       },
-      swap: { points: swapPoints, rooflines: swapRooflines(swapPoints, swapDirection) },
       options: {
         epSizes,
         phases,
         modes: availableModes,
         precisions: availablePrecisions,
-        overlapIsls: collectiveXKvIslValues(cases, kvOp),
       },
     });
   });

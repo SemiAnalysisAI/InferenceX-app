@@ -84,7 +84,7 @@ function buildIndex(): SiteSearchIndex {
       source: 'page',
     },
     {
-      url: '/agentx/methodology',
+      url: '/infx/agentx/methodology',
       pageTitle: 'AgentX Methodology',
       text: 'Multi-turn coding traces replayed against each serving stack.',
       source: 'page',
@@ -105,7 +105,7 @@ describe('SiteSearchIndex', () => {
   });
 
   it('completes the word still being typed', () => {
-    expect(buildIndex().search('methodol')[0].url).toBe('/agentx/methodology');
+    expect(buildIndex().search('methodol')[0].url).toBe('/infx/agentx/methodology');
     expect(buildIndex().search('methodol ')).toEqual([]);
   });
 
@@ -175,20 +175,20 @@ describe('buildSnippet', () => {
     const index = new SiteSearchIndex();
     index.replacePages([
       {
-        url: '/ubenchx',
+        url: '/ubx',
         pageTitle: 'uBenchX',
         section: 'MI355X bandwidth',
         text: 'MI355X',
         source: 'page',
       },
       {
-        url: '/ubenchx',
+        url: '/ubx',
         pageTitle: 'uBenchX',
         section: 'MI355X latency',
         text: 'MI355X',
         source: 'page',
       },
     ]);
-    expect(index.search('mi355x').map((r) => r.url)).toEqual(['/ubenchx']);
+    expect(index.search('mi355x').map((r) => r.url)).toEqual(['/ubx']);
   });
 });

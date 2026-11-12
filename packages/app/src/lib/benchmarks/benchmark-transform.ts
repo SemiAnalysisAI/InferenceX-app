@@ -262,7 +262,7 @@ export function rowToAggDataEntry(
   // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
   // is NaN — collapse any non-persisted value to undefined so downstream link /
   // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
-  // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
+  // emitting `?ids=NaN` or an `/infx/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   const entry: AggDataEntry = {
     rawMetricKeys: Object.keys(m),
@@ -523,6 +523,12 @@ const runScopeKey = (r: BenchmarkRow): string =>
     r.metrics.dp ?? null,
   ]);
 
+// AgentX run reads already reconstruct the complete logical snapshot, including
+// explicit append-only ancestors. Filling from the current base would reinsert
+// removed topologies or points from a later run into a historical selection.
+const rowIdentityKey = (row: BenchmarkRow) =>
+  row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
+
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.
  *
@@ -536,13 +542,8 @@ export function mergeRunScopedRows(
   baseRows: BenchmarkRow[],
 ): BenchmarkRow[] {
   if (runRows.length === 0) return baseRows;
-  // AgentX run reads already reconstruct the complete logical snapshot, including
-  // explicit append-only ancestors. Filling from the current base would reinsert
-  // removed topologies or points from a later run into a historical selection.
-  const key = (row: BenchmarkRow) =>
-    row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
-  const claimed = new Set(runRows.map(key));
-  return [...runRows, ...baseRows.filter((row) => !claimed.has(key(row)))];
+  const claimed = new Set(runRows.map(rowIdentityKey));
+  return [...runRows, ...baseRows.filter((row) => !claimed.has(rowIdentityKey(row)))];
 }
 
 /**

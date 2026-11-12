@@ -31,6 +31,22 @@ describe('computeAutoSwitchDecision', () => {
     expect(decision.nextKey).toBe('');
   });
 
+  it('restores a pinned unregistered g_model once the overlay carries it, then stops re-firing', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK),
+      entry('futuremodel9' as Model, Sequence.OneK_OneK),
+    ];
+    const first = computeAutoSwitchDecision(run, 'futuremodel9', Model.Kimi_K3_1_Pro, '');
+    expect(first.modelToSet).toBe('futuremodel9');
+    const again = computeAutoSwitchDecision(
+      run,
+      'futuremodel9',
+      Model.DeepSeek_V4_Pro,
+      first.nextKey,
+    );
+    expect(again.modelToSet).toBeNull();
+  });
+
   it('does not switch when the current model is already covered by the overlay', () => {
     const run = [
       entry(Model.DeepSeek_R1, Sequence.OneK_OneK),

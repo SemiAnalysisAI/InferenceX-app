@@ -1,27 +1,37 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import * as d3 from 'd3';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useSession, type SessionRequest } from '@/lib/agentic-workload-explorer/session-context';
+import { formatDollars } from '@/lib/agentic-workload-explorer/format';
+import { formatAxisNumber } from '@/components/agentic-workload-explorer/trends-charts';
 import {
   useSessionReplay,
   ReplayControls,
 } from '@/components/agentic-workload-explorer/session-replay';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const STRINGS = {
   en: {
-    hiddenFullMode: 'Hash radix tree is hidden for full-mode sessions.',
+    hiddenFullMode: 'Hash radix tree is hidden for full-mode sessions',
     hiddenFullModeDetail: (
       <>
         Hash blocks are still stored — query the <code>hash_ids</code> column directly for
         debugging.
       </>
     ),
-    noHashIds: 'No hash IDs in this session.',
+    noHashIds: 'No hash IDs in this session',
     noHashIdsDetail: 'Hash chains are generated on requests through /proxy/v1/messages.',
-    renderingTree: 'Rendering tree...',
+    renderingTree: 'Rendering tree…',
     root: 'Root',
     leafNode: 'Leaf node',
     block: (n: number) => `${n} block${n === 1 ? '' : 's'}`,
@@ -29,35 +39,35 @@ const STRINGS = {
     branch: (n: number) => `${n} branch${n === 1 ? '' : 'es'}`,
     req: (n: number) => `${n} req${n === 1 ? '' : 's'}`,
     requestsStat: 'Requests',
-    uniqueHashes: 'Unique Hashes',
-    totalBlocks: 'Total Blocks',
-    blockReuse: 'Block Reuse',
-    treeNodes: 'Tree Nodes',
-    maxDepth: 'Max Depth',
-    radixTree: 'Radix Tree',
+    uniqueHashes: 'Unique hashes',
+    totalBlocks: 'Total blocks',
+    blockReuse: 'Block reuse',
+    treeNodes: 'Tree nodes',
+    maxDepth: 'Max depth',
+    radixTree: 'Radix tree',
     list: 'List',
     graph: 'Graph',
     compact: 'Compact',
-    expandAll: 'Expand All',
-    collapseAll: 'Collapse All',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
     summary: (reqs: number, branches: number) =>
       `${reqs} requests · ${branches} top-level branches`,
-    exitReplay: '⏹ Exit Replay',
-    replay: '▶ Replay',
+    exitReplay: 'Exit replay',
+    replay: 'Replay',
     inLabel: 'in',
     outLabel: 'out',
     blocksLabel: 'blocks',
   },
   zh: {
-    hiddenFullMode: '此会话为 full 模式，哈希 Radix Tree 已隐藏。',
+    hiddenFullMode: '此会话为 full 模式，哈希 Radix Tree 已隐藏',
     hiddenFullModeDetail: (
       <>
         哈希块仍有存储，可直接查询 <code>hash_ids</code> 列进行调试。
       </>
     ),
-    noHashIds: '此会话无 hash ID。',
+    noHashIds: '此会话无 hash ID',
     noHashIdsDetail: '哈希链由 /proxy/v1/messages 请求生成。',
-    renderingTree: '正在渲染树...',
+    renderingTree: '正在渲染树…',
     root: '根节点',
     leafNode: '叶节点',
     block: (n: number) => `${n} 个块`,
@@ -77,8 +87,8 @@ const STRINGS = {
     expandAll: '全部展开',
     collapseAll: '全部折叠',
     summary: (reqs: number, branches: number) => `${reqs} 个请求 · ${branches} 个顶层分支`,
-    exitReplay: '⏹ 退出回放',
-    replay: '▶ 回放',
+    exitReplay: '退出回放',
+    replay: '回放',
     inLabel: '输入',
     outLabel: '输出',
     blocksLabel: '块',
@@ -169,37 +179,7 @@ function truncHash(h: string) {
 
 function formatTokens(n: number | null) {
   if (n === null || n === undefined) return '—';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
-const DEPTH_COLORS = [
-  'text-cyan-400 border-cyan-500/30 bg-cyan-500/8',
-  'text-emerald-400 border-emerald-500/30 bg-emerald-500/8',
-  'text-violet-400 border-violet-500/30 bg-violet-500/8',
-  'text-amber-400 border-amber-500/30 bg-amber-500/8',
-  'text-sky-400 border-sky-500/30 bg-sky-500/8',
-  'text-rose-400 border-rose-500/30 bg-rose-500/8',
-  'text-orange-400 border-orange-500/30 bg-orange-500/8',
-];
-
-function depthColor(depth: number) {
-  return DEPTH_COLORS[depth % DEPTH_COLORS.length];
-}
-
-const DEPTH_LINE_COLORS = [
-  'border-cyan-500/20',
-  'border-emerald-500/20',
-  'border-violet-500/20',
-  'border-amber-500/20',
-  'border-sky-500/20',
-  'border-rose-500/20',
-  'border-orange-500/20',
-];
-
-function depthLineColor(depth: number) {
-  return DEPTH_LINE_COLORS[depth % DEPTH_LINE_COLORS.length];
+  return formatAxisNumber(n);
 }
 
 const DEPTH_SVG_COLORS = [
@@ -394,33 +374,21 @@ function D3Tree({
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('fill', '#fff')
-      .attr('font-family', 'monospace')
+      .attr('font-family', CHART_FONT_SANS)
       .attr('font-weight', 'bold')
       .attr('font-size', (d) => {
         const r = rScale(d.data.reqs);
-        return r < 10 ? '6px' : r < 16 ? '8px' : '10px';
+        return px(r < 16 ? CHART_TYPE.micro : CHART_TYPE.dataLabel);
       })
       .text((d) => (d.data.blocks > 0 ? String(d.data.blocks) : 'R'))
       .style('pointer-events', 'none');
 
     nodeGroups
       .on('mouseenter', (event, d) => {
-        const el = containerRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        setTooltip({
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-          data: d.data,
-        });
+        setTooltip({ x: event.clientX, y: event.clientY, data: d.data });
       })
       .on('mousemove', (event) => {
-        const el = containerRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        setTooltip((prev) =>
-          prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top } : null,
-        );
+        setTooltip((prev) => (prev ? { ...prev, x: event.clientX, y: event.clientY } : null));
       })
       .on('mouseleave', () => setTooltip(null));
 
@@ -473,9 +441,8 @@ function D3Tree({
 
     const vc = visibleCount!;
 
-    g.selectAll<SVGGElement, d3.HierarchyPointNode<D3TreeNode>>('.tree-node').attr(
-      'opacity',
-      (d) => (d.data.chronoIndex < vc ? 1 : 0.08),
+    g.selectAll<SVGGElement, d3.HierarchyPointNode<D3TreeNode>>('.tree-node').attr('opacity', (d) =>
+      d.data.chronoIndex < vc ? 1 : 0.08,
     );
 
     g.selectAll<SVGPathElement, d3.HierarchyLink<D3TreeNode>>('.tree-link').attr('opacity', (d) =>
@@ -508,35 +475,24 @@ function D3Tree({
   }, [visibleCount, isReplay]);
 
   return (
-    <div
-      ref={containerRef}
-      className="rounded-md border border-border bg-surface overflow-hidden relative"
-      style={{ height: 500 }}
-    >
+    <div ref={containerRef} className="overflow-hidden relative" style={{ height: 500 }}>
       {!rendered && (
         <div className="flex items-center justify-center py-16 gap-2">
           <span className="h-4 w-4 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
-          <span className="text-2xs font-mono text-subtle">{t.renderingTree}</span>
+          <span className="text-2xs text-muted-foreground">{t.renderingTree}</span>
         </div>
       )}
       <svg ref={svgRef} className={`min-w-full ${rendered ? '' : 'h-0 overflow-hidden'}`} />
       {tooltip && (
-        <div
-          className="absolute z-50 pointer-events-none rounded-md border border-border bg-background shadow-lg px-3 py-2 text-2xs font-mono space-y-1"
-          style={{
-            left: Math.min(tooltip.x + 12, (containerRef.current?.clientWidth || 500) - 200),
-            top: tooltip.y > 350 ? tooltip.y - 80 : tooltip.y + 12,
-          }}
-        >
-          <div className="font-bold text-foreground">
-            {tooltip.data.blocks > 0 ? t.block(tooltip.data.blocks) : t.root}
-          </div>
-          <div className="text-muted-foreground">{t.request(tooltip.data.reqs)}</div>
-          {tooltip.data.branches > 0 && (
-            <div className="text-muted-foreground">{t.branch(tooltip.data.branches)}</div>
-          )}
-          {tooltip.data.branches === 0 && <div className="text-subtle">{t.leafNode}</div>}
-        </div>
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={tooltip.data.blocks > 0 ? t.block(tooltip.data.blocks) : t.root}
+            metrics={[]}
+            summary={`${t.request(tooltip.data.reqs)} · ${
+              tooltip.data.branches > 0 ? t.branch(tooltip.data.branches) : t.leafNode
+            }`}
+          />
+        </FloatingTooltip>
       )}
     </div>
   );
@@ -616,7 +572,7 @@ function TreeNode({
   if (!visible) return null;
 
   return (
-    <div className={depth > 0 ? `ml-4 pl-3 border-l ${depthLineColor(depth)}` : ''}>
+    <div className={depth > 0 ? 'ml-4 pl-3 border-l border-border/30' : ''}>
       <div className="flex items-start gap-2 py-0.5">
         {!isReplay && (hasChildren || node.leaves.length > 0) ? (
           <button
@@ -625,9 +581,13 @@ function TreeNode({
               setOpen(!open);
               track('agentic_workload_radix_node_toggled', { enabled: !open, depth });
             }}
-            className="mt-0.5 w-4 h-4 flex items-center justify-center text-3xs text-subtle hover:text-foreground transition-colors shrink-0"
+            className="mt-0.5 w-4 h-4 flex items-center justify-center text-3xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
-            {shouldOpen ? '▼' : '▶'}
+            {shouldOpen ? (
+              <ChevronDown className="size-3" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="size-3" aria-hidden="true" />
+            )}
           </button>
         ) : (
           <span className="w-4 shrink-0" />
@@ -635,7 +595,7 @@ function TreeNode({
 
         {node.segment.length > 0 && (
           <span
-            className={`text-2xs font-mono px-1.5 py-0.5 rounded border ${depthColor(depth)} cursor-pointer`}
+            className="text-2xs font-mono px-1.5 py-0.5 rounded-md border border-border/30 bg-card text-foreground cursor-pointer"
             onClick={() => !isReplay && setOpen(!open)}
             title={node.segment.join(' → ')}
           >
@@ -654,10 +614,10 @@ function TreeNode({
           </span>
         )}
 
-        <span className="text-3xs font-mono text-muted-foreground mt-0.5">
+        <span className="text-3xs tabular-nums text-muted-foreground mt-0.5">
           {t.req(node.totalLeaves)}
           {node.children.size > 0 && (
-            <span className="text-subtle ml-1.5">{t.branch(node.children.size)}</span>
+            <span className="text-muted-foreground ml-1.5">{t.branch(node.children.size)}</span>
           )}
         </span>
       </div>
@@ -669,9 +629,9 @@ function TreeNode({
               {node.leaves.map((req) => (
                 <div
                   key={req.id}
-                  className="flex items-center gap-2 text-3xs font-mono text-muted-foreground"
+                  className="flex items-center gap-2 text-3xs tabular-nums text-muted-foreground"
                 >
-                  <span className="text-subtle">{'●'}</span>
+                  <span aria-hidden="true" className="size-1 rounded-full bg-muted-foreground" />
                   <span>{req.model?.replace('claude-', '') || '—'}</span>
                   <span>
                     {formatTokens(req.inputTokens)} {t.inLabel} / {formatTokens(req.outputTokens)}{' '}
@@ -681,7 +641,7 @@ function TreeNode({
                     {req.hashIds?.length || 0} {t.blocksLabel}
                   </span>
                   {req.costUsd !== null && req.costUsd !== undefined && (
-                    <span className="text-emerald-400/70">${req.costUsd.toFixed(4)}</span>
+                    <span>{formatDollars(req.costUsd)}</span>
                   )}
                 </div>
               ))}
@@ -714,7 +674,8 @@ export default function RadixTreePage() {
   const [listForceOpen, setListForceOpen] = useState<boolean | undefined>(undefined);
   const [listKey, setListKey] = useState(0);
   const [replayMode, setReplayMode] = useState(false);
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   const hashRequests = useMemo(
     () => requests.filter((r) => r.hashIds && r.hashIds.length > 0),
@@ -755,19 +716,17 @@ export default function RadixTreePage() {
 
   if (session.privacyMode === 'full') {
     return (
-      <div className="text-center py-16 space-y-1">
-        <p className="text-sm font-mono text-muted-foreground">{t.hiddenFullMode}</p>
-        <p className="text-xs font-mono text-subtle">{t.hiddenFullModeDetail}</p>
-      </div>
+      <EmptyState title={t.hiddenFullMode} className="py-16">
+        {t.hiddenFullModeDetail}
+      </EmptyState>
     );
   }
 
   if (hashRequests.length === 0) {
     return (
-      <div className="text-center py-16">
-        <p className="text-sm font-mono text-muted-foreground">{t.noHashIds}</p>
-        <p className="text-xs font-mono text-subtle mt-1">{t.noHashIdsDetail}</p>
-      </div>
+      <EmptyState title={t.noHashIds} className="py-16">
+        {t.noHashIdsDetail}
+      </EmptyState>
     );
   }
 
@@ -775,173 +734,152 @@ export default function RadixTreePage() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {[
-          { label: t.requestsStat, value: stats.requests },
-          { label: t.uniqueHashes, value: stats.uniqueHashes },
-          { label: t.totalBlocks, value: stats.totalBlocks },
+          { label: t.requestsStat, value: stats.requests.toLocaleString(locale) },
+          { label: t.uniqueHashes, value: stats.uniqueHashes.toLocaleString(locale) },
+          { label: t.totalBlocks, value: stats.totalBlocks.toLocaleString(locale) },
           { label: t.blockReuse, value: `${stats.compressionRatio}×` },
-          { label: t.treeNodes, value: stats.treeNodes },
-          { label: t.maxDepth, value: stats.maxDepth },
+          { label: t.treeNodes, value: stats.treeNodes.toLocaleString(locale) },
+          { label: t.maxDepth, value: stats.maxDepth.toLocaleString(locale) },
         ].map((item) => (
-          <div key={item.label} className="rounded-md border border-border bg-surface p-3">
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground mb-1.5">
-              {item.label}
-            </div>
-            <div className="text-lg font-mono font-bold tracking-tight">{item.value}</div>
+          <div key={item.label} className="rounded-xl border border-border/30 bg-card p-3">
+            <div className="text-xs font-medium text-muted-foreground mb-1.5">{item.label}</div>
+            <div className="text-lg font-medium tabular-nums">{item.value}</div>
           </div>
         ))}
       </div>
 
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.radixTree}
-          </span>
-          <span className="flex-1 h-px bg-border" />
-          <div className="flex items-center gap-2">
-            <div className="flex items-center border border-border rounded-md p-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('list');
-                  track('agentic_workload_radix_view_changed', { view: 'list' });
-                }}
-                className={`px-2 py-0.5 text-3xs font-mono rounded-sm transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-subtle hover:text-foreground'
-                }`}
-              >
-                {t.list}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('graph');
-                  track('agentic_workload_radix_view_changed', { view: 'graph' });
-                }}
-                className={`px-2 py-0.5 text-3xs font-mono rounded-sm transition-colors ${
-                  viewMode === 'graph'
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-subtle hover:text-foreground'
-                }`}
-              >
-                {t.graph}
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setCompact(!compact);
-                track('agentic_workload_radix_compact_toggled', { compact: !compact });
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                compact
-                  ? 'bg-cyan-500/8 border-cyan-500/30 text-cyan-400'
-                  : 'border-border text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.compact}
-            </button>
-            {viewMode === 'list' && (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setListForceOpen(true);
-                    setListKey((k) => k + 1);
-                    track('agentic_workload_radix_expand_all');
-                  }}
-                  className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground transition-colors"
-                >
-                  {t.expandAll}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setListForceOpen(false);
-                    setListKey((k) => k + 1);
-                    track('agentic_workload_radix_collapse_all');
-                  }}
-                  className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground transition-colors"
-                >
-                  {t.collapseAll}
-                </button>
+      <Card>
+        <CardHeader className="gap-2 pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+            <div className="min-w-0 grow basis-48">
+              <CardTitle>{t.radixTree}</CardTitle>
+              <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                {t.summary(tree.totalLeaves, tree.children.size)}
               </div>
-            )}
-            <span className="text-3xs font-mono text-subtle">
-              {t.summary(tree.totalLeaves, tree.children.size)}
-            </span>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <SegmentedToggle
+                role="group"
+                ariaLabel={t.radixTree}
+                value={viewMode}
+                onValueChange={(view) => {
+                  setViewMode(view);
+                  track('agentic_workload_radix_view_changed', { view });
+                }}
+                options={[
+                  { value: 'list', label: t.list },
+                  { value: 'graph', label: t.graph },
+                ]}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                aria-pressed={compact}
+                onClick={() => {
+                  setCompact(!compact);
+                  track('agentic_workload_radix_compact_toggled', { compact: !compact });
+                }}
+              >
+                {t.compact}
+              </Button>
+              {viewMode === 'list' && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      setListForceOpen(true);
+                      setListKey((k) => k + 1);
+                      track('agentic_workload_radix_expand_all');
+                    }}
+                  >
+                    {t.expandAll}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      setListForceOpen(false);
+                      setListKey((k) => k + 1);
+                      track('agentic_workload_radix_collapse_all');
+                    }}
+                  >
+                    {t.collapseAll}
+                  </Button>
+                </>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                aria-pressed={replayMode}
+                onClick={() => {
+                  if (replayMode) {
+                    replay.reset();
+                    setReplayMode(false);
+                  } else {
+                    setReplayMode(true);
+                  }
+                  track('agentic_workload_radix_replay_toggled', { active: !replayMode });
+                }}
+              >
+                {replayMode ? t.exitReplay : t.replay}
+              </Button>
+            </div>
           </div>
-        </div>
+        </CardHeader>
+        <CardContent>
+          {replayMode && totalNodes > 0 && (
+            <div className="mb-3">
+              <ReplayControls
+                isPlaying={replay.isPlaying}
+                currentIndex={replay.currentIndex}
+                total={totalNodes}
+                speed={replay.speed}
+                onToggle={replay.toggle}
+                onSpeedChange={replay.setSpeed}
+                onSeek={replay.seekTo}
+                onReset={replay.reset}
+              />
+            </div>
+          )}
 
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => {
-              if (replayMode) {
-                replay.reset();
-                setReplayMode(false);
-              } else {
-                setReplayMode(true);
-              }
-              track('agentic_workload_radix_replay_toggled', { active: !replayMode });
-            }}
-            type="button"
-            className={`flex items-center gap-1.5 px-2 py-1 text-2xs font-mono border rounded-md transition-colors ${
-              replayMode
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20'
-                : 'bg-surface hover:bg-surface-hover border-border text-subtle hover:text-foreground'
-            }`}
-          >
-            {replayMode ? t.exitReplay : t.replay}
-          </button>
-        </div>
-        {replayMode && totalNodes > 0 && (
-          <div className="mb-3">
-            <ReplayControls
-              isPlaying={replay.isPlaying}
-              currentIndex={replay.currentIndex}
-              total={totalNodes}
-              speed={replay.speed}
-              onToggle={replay.toggle}
-              onSpeedChange={replay.setSpeed}
-              onSeek={replay.seekTo}
-              onReset={replay.reset}
+          {viewMode === 'graph' ? (
+            <D3Tree
+              tree={tree}
+              compact={compact}
+              visibleCount={replayMode ? replay.currentIndex : undefined}
+              chronoMap={chronoMap}
+              t={t}
             />
-          </div>
-        )}
-
-        {viewMode === 'graph' ? (
-          <D3Tree
-            tree={tree}
-            compact={compact}
-            visibleCount={replayMode ? replay.currentIndex : undefined}
-            chronoMap={chronoMap}
-            t={t}
-          />
-        ) : (
-          <div
-            key={replayMode ? `replay-${listKey}` : `list-${listKey}`}
-            className="rounded-md border border-border bg-surface p-4 overflow-x-auto"
-          >
-            {[...tree.children.values()]
-              .toSorted((a, b) => b.totalLeaves - a.totalLeaves)
-              .map((child) => (
-                <TreeNode
-                  key={child.segment[0]}
-                  node={child}
-                  depth={0}
-                  defaultOpen={child.totalLeaves > 1}
-                  compact={compact}
-                  forceOpen={replayMode ? true : listForceOpen}
-                  chronoMap={replayMode ? chronoMap : undefined}
-                  visibleCount={replayMode ? replay.currentIndex : undefined}
-                  t={t}
-                />
-              ))}
-            <div ref={lastNodeRef} />
-          </div>
-        )}
-      </div>
+          ) : (
+            <div
+              key={replayMode ? `replay-${listKey}` : `list-${listKey}`}
+              className="overflow-x-auto"
+            >
+              {[...tree.children.values()]
+                .toSorted((a, b) => b.totalLeaves - a.totalLeaves)
+                .map((child) => (
+                  <TreeNode
+                    key={child.segment[0]}
+                    node={child}
+                    depth={0}
+                    defaultOpen={child.totalLeaves > 1}
+                    compact={compact}
+                    forceOpen={replayMode ? true : listForceOpen}
+                    chronoMap={replayMode ? chronoMap : undefined}
+                    visibleCount={replayMode ? replay.currentIndex : undefined}
+                    t={t}
+                  />
+                ))}
+              <div ref={lastNodeRef} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

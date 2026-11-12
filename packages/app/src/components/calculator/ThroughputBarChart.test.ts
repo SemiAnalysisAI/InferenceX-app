@@ -5,6 +5,7 @@ import { splitLabel } from '@/lib/d3-chart/axis-labels';
 import type { InterpolatedResult } from './types';
 import {
   generateTooltipHTML,
+  getThroughputPointDetails,
   getResultLabel,
   getCostForType,
   getCostProviderLabel,
@@ -225,7 +226,7 @@ describe('getValueLabel', () => {
   it('formats total power metric value', () => {
     const result = makeResult({ tpPerMw: 1234 });
     expect(getValueLabel(result, 'power', 'interactivity_to_throughput', 'total')).toBe(
-      '1234 tok/s/MW',
+      '1.23k tok/s/MW',
     );
   });
 
@@ -260,7 +261,7 @@ describe('getValueLabel', () => {
   it('formats total throughput value in interactivity_to_throughput mode', () => {
     const result = makeResult({ value: 456.7 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'total')).toBe(
-      '456.7 tok/s/chip',
+      '457 tok/s/chip',
     );
   });
 
@@ -274,7 +275,7 @@ describe('getValueLabel', () => {
   it('formats output throughput value when costType is output', () => {
     const result = makeResult({ outputTputValue: 401.2 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'output')).toBe(
-      '401.2 tok/s/chip',
+      '401 tok/s/chip',
     );
   });
 
@@ -292,23 +293,35 @@ describe('getCostProviderLabel', () => {
     expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年承诺');
   });
 
-  it('returns "Owning at Large Hyperscaler Volume" for costh', () => {
-    expect(getCostProviderLabel('costh')).toBe('Owning at Large Hyperscaler Volume');
+  it('returns "Owning at large hyperscaler volume" for costh', () => {
+    expect(getCostProviderLabel('costh')).toBe('Owning at large hyperscaler volume');
   });
 
-  it('returns "Rent - 3 Year Commit" for costr', () => {
-    expect(getCostProviderLabel('costr')).toBe('Rent - 3 Year Commit');
+  it('returns "Rent – 3-year commit" for costr', () => {
+    expect(getCostProviderLabel('costr')).toBe('Rent – 3-year commit');
   });
 });
 
+function fullTitle(...args: Parameters<typeof getChartTitle>) {
+  const { title, qualifier } = getChartTitle(...args);
+  return `${title} ${qualifier}`;
+}
+
 describe('getChartTitle', () => {
+  it('keeps the operating point out of the title so phones can show it as a subtitle', () => {
+    expect(getChartTitle('throughput', 'interactivity_to_throughput', 30, 'total')).toEqual({
+      title: 'Total token throughput per chip',
+      qualifier: 'at 30 tok/s/user interactivity',
+    });
+  });
+
   it('returns total throughput title with interactivity target label', () => {
-    const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'total');
-    expect(title).toBe('Total Token Throughput per Chip at 30 tok/s/user Interactivity');
+    const title = fullTitle('throughput', 'interactivity_to_throughput', 30, 'total');
+    expect(title).toBe('Total token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('includes the selected percentile in an agentic interactivity title', () => {
-    const title = getChartTitle(
+    const title = fullTitle(
       'throughput',
       'interactivity_to_throughput',
       30,
@@ -316,63 +329,63 @@ describe('getChartTitle', () => {
       undefined,
       'p90',
     );
-    expect(title).toBe('Total Token Throughput per Chip at 30 tok/s/user P90 Interactivity');
+    expect(title).toBe('Total token throughput per chip at 30 tok/s/user P90 interactivity');
   });
 
   it('returns input throughput title when costType is input', () => {
-    const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'input');
-    expect(title).toBe('Input Token Throughput per Chip at 30 tok/s/user Interactivity');
+    const title = fullTitle('throughput', 'interactivity_to_throughput', 30, 'input');
+    expect(title).toBe('Input token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('returns output throughput title when costType is output', () => {
-    const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'output');
-    expect(title).toBe('Output Token Throughput per Chip at 30 tok/s/user Interactivity');
+    const title = fullTitle('throughput', 'interactivity_to_throughput', 30, 'output');
+    expect(title).toBe('Output token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('returns interactivity title in throughput_to_interactivity mode', () => {
-    const title = getChartTitle('throughput', 'throughput_to_interactivity', 500, 'total');
-    expect(title).toBe('Interactivity at 500 tok/s/chip Throughput');
+    const title = fullTitle('throughput', 'throughput_to_interactivity', 500, 'total');
+    expect(title).toBe('Interactivity at 500 tok/s/chip throughput');
   });
 
   it('returns total power title with target label', () => {
-    const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'total');
+    const title = fullTitle('power', 'interactivity_to_throughput', 25, 'total');
     expect(title).toBe(
-      'Total Tokens per Provisioned All-in Megawatt at 25 tok/s/user Interactivity',
+      'Total tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns input power title when costType is input', () => {
-    const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'input');
+    const title = fullTitle('power', 'interactivity_to_throughput', 25, 'input');
     expect(title).toBe(
-      'Input Tokens per Provisioned All-in Megawatt at 25 tok/s/user Interactivity',
+      'Input tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns output power title when costType is output', () => {
-    const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'output');
+    const title = fullTitle('power', 'interactivity_to_throughput', 25, 'output');
     expect(title).toBe(
-      'Output Tokens per Provisioned All-in Megawatt at 25 tok/s/user Interactivity',
+      'Output tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with provider and cost type', () => {
-    const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
+    const title = fullTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
     expect(title).toBe(
-      'Cost per Million Input Tokens (Owning at Large Hyperscaler Volume) at 30 tok/s/user Interactivity',
+      'Cost per million input tokens (Owning at large hyperscaler volume) at 30 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with output cost type and rental provider', () => {
-    const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
+    const title = fullTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
     expect(title).toBe(
-      'Cost per Million Output Tokens (Rent - 3 Year Commit) at 30 tok/s/user Interactivity',
+      'Cost per million output tokens (Rent – 3-year commit) at 30 tok/s/user interactivity',
     );
   });
 
   it('defaults to hyperscaler when no costProvider is specified for cost', () => {
-    const title = getChartTitle('cost', 'throughput_to_interactivity', 500, 'total');
+    const title = fullTitle('cost', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe(
-      'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume) at 500 tok/s/chip Throughput',
+      'Cost per million total tokens (Owning at large hyperscaler volume) at 500 tok/s/chip throughput',
     );
   });
 });
@@ -485,6 +498,15 @@ describe('getResultLabel', () => {
     );
   });
 
+  it('joins the framework and precision with a middle dot in one bracket', () => {
+    const config = {
+      b300: { label: 'B300', suffix: '(Dynamo SGLang)' },
+    } as unknown as Parameters<typeof getResultLabel>[1];
+    const label = getResultLabel(makeResult({ hwKey: 'b300', precision: 'fp4' }), config);
+    expect(label).toBe('B300 (Dynamo SGLang · FP4)');
+    expect(splitLabel(label, 'parens')).toEqual(['B300', '(Dynamo SGLang · FP4)']);
+  });
+
   it('marks an overlay bar with ✕ and the branch name', () => {
     const label = getResultLabel(
       makeResult({ hwKey: 'b300', isOverlay: true, runIndex: 0, runLabel: 'feat/my-branch' }),
@@ -515,25 +537,41 @@ describe('getResultLabel', () => {
   });
 });
 
-describe('generateTooltipHTML overlay treatment', () => {
+const throughputDetails = (
+  result: InterpolatedResult,
+  runUrl?: string,
+  locale: 'en' | 'zh' = 'en',
+) =>
+  getThroughputPointDetails(
+    result,
+    {},
+    'interactivity_to_throughput',
+    'throughput',
+    'total',
+    runUrl,
+    locale,
+  );
+
+describe('getThroughputPointDetails', () => {
   const officialRunUrl = 'https://github.com/org/repo/actions/runs/999';
   const overlayRunUrl = 'https://github.com/org/repo/actions/runs/111';
 
-  it('omits the unofficial header for official bars', () => {
-    const html = generateTooltipHTML(
-      makeResult({ hwKey: 'b300' }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
-      officialRunUrl,
-    );
-    expect(html).not.toContain('UNOFFICIAL RUN');
-    expect(html).toContain(officialRunUrl);
+  it('omits the unofficial warning for official bars and links the official run', () => {
+    const d = throughputDetails(makeResult({ hwKey: 'b300' }), officialRunUrl);
+    expect(d.warning).toBeUndefined();
+    expect(d.links).toEqual([
+      {
+        action: 'run',
+        label: 'View raw result on GitHub',
+        href: officialRunUrl,
+        external: true,
+      },
+    ]);
+    expect(generateTooltipHTML(d, 'red')).not.toContain('Unofficial run');
   });
 
-  it('adds the unofficial header, branch, and run link for overlay bars', () => {
-    const html = generateTooltipHTML(
+  it('adds the branch notice and overlay run link for overlay bars', () => {
+    const d = throughputDetails(
       makeResult({
         hwKey: 'b300',
         isOverlay: true,
@@ -541,20 +579,19 @@ describe('generateTooltipHTML overlay treatment', () => {
         runLabel: 'feat/my-branch',
         runUrl: overlayRunUrl,
       }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
       officialRunUrl,
     );
-    expect(html).toContain('UNOFFICIAL RUN');
-    expect(html).toContain('feat/my-branch');
-    expect(html).toContain(overlayRunUrl);
-    expect(html).not.toContain(officialRunUrl);
+    expect(d.warning).toBe('✕ feat/my-branch');
+    expect(d.rows?.map((row) => row.label)).not.toContain('Branch');
+    expect(d.links[0]).toMatchObject({
+      label: 'View workflow run',
+      href: overlayRunUrl,
+    });
+    expect(generateTooltipHTML(d, 'red')).toContain('✕ feat/my-branch');
   });
 
-  it('localizes the overlay strings when Chinese strings are supplied', () => {
-    const html = generateTooltipHTML(
+  it('localizes the overlay strings in Chinese', () => {
+    const d = throughputDetails(
       makeResult({
         hwKey: 'b300',
         isOverlay: true,
@@ -562,74 +599,39 @@ describe('generateTooltipHTML overlay treatment', () => {
         runLabel: 'feat/my-branch',
         runUrl: overlayRunUrl,
       }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
       undefined,
-      false,
-      {
-        unofficialRun: '非官方运行',
-        branch: '分支：',
-        dismiss: '点击其他区域关闭',
-        viewRun: '查看工作流运行',
-        clamped: '超出实测范围——显示最接近的数据点',
-        parallelism: '并行策略：',
-        cost: '成本：',
-        concurrency: '并发数：',
-        precision: '精度：',
-        disaggregated: '分离式：',
-        yes: '是',
-      },
-    );
-    expect(html).toContain('非官方运行');
-    expect(html).toContain('分支：');
-    expect(html).toContain('查看工作流运行');
-    expect(html).not.toContain('UNOFFICIAL RUN');
-  });
-
-  it('localizes the complete Chinese tooltip including raw link and parallelism values', () => {
-    const html = generateTooltipHTML(
-      makeResult({
-        hwKey: 'b300',
-        nearestPoints: [
-          {
-            tp: 4,
-            ep: 2,
-            dp_attention: true,
-            precision: 'fp8',
-          } as InterpolatedResult['nearestPoints'][number],
-        ],
-      }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
-      officialRunUrl,
-      false,
-      {
-        unofficialRun: '非官方运行',
-        branch: '分支：',
-        dismiss: '点击其他区域关闭',
-        viewRun: '查看工作流运行',
-        clamped: '超出实测范围——显示最接近的数据点',
-        parallelism: '并行策略：',
-        cost: '成本：',
-        concurrency: '并发数：',
-        precision: '精度：',
-        disaggregated: '分离式：',
-        yes: '是',
-      },
       'zh',
     );
-    expect(html).toContain('<strong>吞吐量：</strong>');
-    expect(html).toContain('<strong>DPA：</strong> 是');
-    expect(html).toContain('在 GitHub 查看原始结果');
-    expect(html).not.toContain('View raw result on GitHub');
+    expect(d.warning).toBe('✕ feat/my-branch');
+    expect(d.rows?.map((row) => row.label)).not.toContain('分支');
+    expect(d.links[0]?.label).toBe('查看工作流运行');
   });
 
-  it('preserves the existing English DPA value in official tooltips', () => {
-    const html = generateTooltipHTML(
+  it('localizes parallelism and the raw link in Chinese', () => {
+    const d = throughputDetails(
+      makeResult({
+        hwKey: 'b300',
+        nearestPoints: [
+          {
+            tp: 4,
+            ep: 2,
+            dp_attention: true,
+            precision: 'fp8',
+          } as InterpolatedResult['nearestPoints'][number],
+        ],
+      }),
+      officialRunUrl,
+      'zh',
+    );
+    expect(d.rows).toContainEqual({
+      label: '并行策略',
+      value: 'TP 4 · EP 2 · DPA 是',
+    });
+    expect(d.links[0]?.label).toBe('在 GitHub 查看原始结果');
+  });
+
+  it('keeps the English DPA value as True and puts the plotted metric first', () => {
+    const d = throughputDetails(
       makeResult({
         nearestPoints: [
           {
@@ -640,15 +642,14 @@ describe('generateTooltipHTML overlay treatment', () => {
           } as InterpolatedResult['nearestPoints'][number],
         ],
       }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
       officialRunUrl,
     );
-
-    expect(html).toContain('<strong>DPA:</strong> True');
-    expect(html).not.toContain('<strong>DPA:</strong> Yes');
+    expect(d.rows).toContainEqual({
+      label: 'Parallelism',
+      value: 'TP 4 · EP 2 · DPA True',
+    });
+    expect(d.metrics[0]).toEqual({ value: '500.0', label: 'tok/s/chip' });
+    expect(d.subtitle).toBe('FP8');
   });
 });
 

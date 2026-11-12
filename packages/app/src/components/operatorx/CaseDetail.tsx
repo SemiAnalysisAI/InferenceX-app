@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { useOperatorXTimelines } from '@/hooks/api/use-operatorx';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { hardwareLabel } from './compare/hardware';
 import { caseRefs } from './compare/model';
@@ -55,10 +56,73 @@ const CATEGORY_COLORS: Record<'light' | 'dark', CategoryColors> = {
   },
 };
 
-const CATEGORY_LABEL = Object.fromEntries(KERNEL_CATEGORIES.map((c) => [c.id, c.label])) as Record<
-  KernelCategory,
-  string
->;
+const STRINGS = {
+  en: {
+    categories: {
+      gemm: 'GEMM',
+      'expert-gemm': 'Expert GEMM',
+      quantize: 'Quantize',
+      activation: 'Activation',
+      routing: 'Routing',
+      reduce: 'Reduce',
+      memory: 'Elementwise / memory',
+      other: 'Other',
+    } satisfies Record<KernelCategory, string>,
+    latency: 'latency',
+    time: (unit: string) => `time (${unit})`,
+    stream: 'stream',
+    start: 'start',
+    truncated: (n: number) => `First ${n} kernels of the replay`,
+    kernel: 'Kernel',
+    timePerCall: 'Time / call',
+    share: 'Share',
+    launches: 'Launches',
+    grid: 'Grid',
+    block: 'Block',
+    regs: 'Regs',
+    occupancy: 'Occupancy',
+    notProfiled: 'Not profiled',
+    noneMeasured: 'No selected GPU measured this case',
+    gpus: 'GPUs',
+    fastestRank: 'fastest rank',
+    skew: 'skew',
+    eachRank: (list: string) => `Each rank: ${list}. The timeline below is rank 0’s.`,
+    rankTimes:
+      'Kernel times are from this replay; collectives include waiting for the other ranks.',
+  },
+  zh: {
+    categories: {
+      gemm: 'GEMM',
+      'expert-gemm': '专家 GEMM',
+      quantize: '量化',
+      activation: '激活',
+      routing: '路由',
+      reduce: '归约',
+      memory: '逐元素 / 访存',
+      other: '其他',
+    } satisfies Record<KernelCategory, string>,
+    latency: '延迟',
+    time: (unit: string) => `时间（${unit}）`,
+    stream: 'stream',
+    start: '开始',
+    truncated: (n: number) => `仅显示重放中的前 ${n} 个 kernel`,
+    kernel: 'Kernel',
+    timePerCall: '单次耗时',
+    share: '占比',
+    launches: '启动次数',
+    grid: 'Grid',
+    block: 'Block',
+    regs: '寄存器',
+    occupancy: '占用率',
+    notProfiled: '没有 profiling 数据',
+    noneMeasured: '所选 GPU 均未实测此用例',
+    gpus: 'GPU 数',
+    fastestRank: '最快 rank',
+    skew: '偏差',
+    eachRank: (list: string) => `各 rank 延迟：${list}。下方为 rank 0 的时间线。`,
+    rankTimes: 'kernel 耗时取自本次重放，集合通信的耗时包含等待其他 rank 的时间。',
+  },
+};
 
 function formatUs(us: number): string {
   if (us >= 1000) return `${Number((us / 1000).toPrecision(3))} ms`;
@@ -104,6 +168,7 @@ function CategoryLegend({
   timelines: OperatorXTimeline[];
   palette: CategoryColors;
 }) {
+  const strings = STRINGS[useLocale()];
   const present = new Set(timelines.flatMap((t) => t.categories));
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -113,7 +178,7 @@ function CategoryLegend({
             className="inline-block size-2.5 rounded-sm"
             style={{ background: palette[c.id] }}
           />
-          {c.label}
+          {strings.categories[c.id]}
         </span>
       ))}
     </div>
@@ -121,10 +186,11 @@ function CategoryLegend({
 }
 
 function TimeAxis({ scaleUs }: { scaleUs: number }) {
+  const strings = STRINGS[useLocale()];
   const [unit, div] = scaleUs >= 2000 ? ['ms', 1000] : ['µs', 1];
   return (
     <div className="flex h-4 text-3xs text-muted-foreground tabular-nums">
-      <span className="w-20 shrink-0 pr-2">time ({unit})</span>
+      <span className="w-20 shrink-0 pr-2">{strings.time(unit)}</span>
       <div className="relative flex-1">
         {ticks(0, scaleUs, 5).map((t) => (
           <span
@@ -142,19 +208,21 @@ function TimeAxis({ scaleUs }: { scaleUs: number }) {
 
 /** A split case's GPU count, its fastest rank's latency and the rank skew. */
 function RankSummary({ ranks }: { ranks: TimelineRanks }) {
+  const strings = STRINGS[useLocale()];
   return (
     <>
       <span className="tabular-nums">
-        <span className="text-muted-foreground">GPUs</span> {ranks.world}
+        <span className="text-muted-foreground">{strings.gpus}</span> {ranks.world}
       </span>
       {ranks.latencyUsMin !== null && (
         <span className="tabular-nums">
-          <span className="text-muted-foreground">fastest rank</span> {formatUs(ranks.latencyUsMin)}
+          <span className="text-muted-foreground">{strings.fastestRank}</span>{' '}
+          {formatUs(ranks.latencyUsMin)}
         </span>
       )}
       {ranks.skewUs !== null && (
         <span className="tabular-nums">
-          <span className="text-muted-foreground">skew</span> {formatUs(ranks.skewUs)}
+          <span className="text-muted-foreground">{strings.skew}</span> {formatUs(ranks.skewUs)}
         </span>
       )}
     </>
@@ -188,6 +256,7 @@ function GpuTimeline({
   scaleUs: number;
   palette: CategoryColors;
 }) {
+  const strings = STRINGS[useLocale()];
   const [hovered, setHovered] = useState<number | null>(null);
   const colorOf = (name: number) => (timeline ? palette[timeline.categories[name]] : OTHER);
   const event = timeline && hovered !== null ? timeline.events[hovered] : null;
@@ -202,7 +271,7 @@ function GpuTimeline({
         </span>
         {latencyUs !== null && (
           <span className="tabular-nums">
-            <span className="text-muted-foreground">latency</span> {formatUs(latencyUs)}
+            <span className="text-muted-foreground">{strings.latency}</span> {formatUs(latencyUs)}
           </span>
         )}
         {timeline?.ranks && <RankSummary ranks={timeline.ranks} />}
@@ -212,11 +281,11 @@ function GpuTimeline({
           className="text-xs text-muted-foreground tabular-nums"
           data-testid="operatorx-rank-latencies"
         >
-          Each rank:{' '}
-          {timeline.ranks.latencyUs
-            .map((us, rank) => `${rank} ${us === null ? '—' : formatUs(us)}`)
-            .join(' · ')}
-          . The timeline below is rank 0’s.
+          {strings.eachRank(
+            timeline.ranks.latencyUs
+              .map((us, rank) => `${rank} ${us === null ? '—' : formatUs(us)}`)
+              .join(' · '),
+          )}
         </p>
       )}
       {timeline ? (
@@ -225,7 +294,7 @@ function GpuTimeline({
             {timeline.lanes.map((lane, li) => (
               <div key={lane} className="flex items-center">
                 <span className="w-20 shrink-0 truncate pr-2 text-3xs text-muted-foreground">
-                  stream {lane}
+                  {strings.stream} {lane}
                 </span>
                 <div className="relative h-5 flex-1 rounded-sm bg-muted/40">
                   {timeline.events.map(([name, l, start, dur], ei) =>
@@ -250,29 +319,33 @@ function GpuTimeline({
           <p className="ml-20 min-h-4 truncate text-xs text-muted-foreground tabular-nums">
             {event ? (
               <>
-                {CATEGORY_LABEL[timeline.categories[event[0]]]} ·{' '}
+                {strings.categories[timeline.categories[event[0]]]} ·{' '}
                 <span className="font-mono text-foreground">
                   {shortName(timeline.names[event[0]])}
                 </span>{' '}
-                · start {formatUs(event[2])} · {formatUs(event[3])}
+                · {strings.start} {formatUs(event[2])} · {formatUs(event[3])}
               </>
             ) : timeline.truncated ? (
-              `First ${timeline.events.length} kernels of the replay`
+              strings.truncated(timeline.events.length)
             ) : timeline.ranks ? (
-              'Kernel times are from this replay; collectives include waiting for the other ranks.'
+              strings.rankTimes
             ) : null}
           </p>
           <table className="w-full table-fixed text-xs">
             <thead className="text-muted-foreground">
               <tr className="border-b border-border/60">
-                <th className="w-2/5 py-1 text-left font-normal md:w-1/3">Kernel</th>
-                <th className="py-1 text-right font-normal">Time / call</th>
-                <th className="py-1 text-right font-normal">Share</th>
-                <th className="py-1 text-right font-normal">Launches</th>
-                <th className="hidden py-1 text-right font-normal md:table-cell">Grid</th>
-                <th className="hidden py-1 text-right font-normal md:table-cell">Block</th>
-                <th className="hidden py-1 text-right font-normal md:table-cell">Regs</th>
-                <th className="hidden py-1 text-right font-normal md:table-cell">Occupancy</th>
+                <th className="w-2/5 py-1 text-left font-normal md:w-1/3">{strings.kernel}</th>
+                <th className="py-1 text-right font-normal">{strings.timePerCall}</th>
+                <th className="py-1 text-right font-normal">{strings.share}</th>
+                <th className="py-1 text-right font-normal">{strings.launches}</th>
+                <th className="hidden py-1 text-right font-normal md:table-cell">{strings.grid}</th>
+                <th className="hidden py-1 text-right font-normal md:table-cell">
+                  {strings.block}
+                </th>
+                <th className="hidden py-1 text-right font-normal md:table-cell">{strings.regs}</th>
+                <th className="hidden py-1 text-right font-normal md:table-cell">
+                  {strings.occupancy}
+                </th>
               </tr>
             </thead>
             <tbody className="tabular-nums">
@@ -311,7 +384,7 @@ function GpuTimeline({
           </table>
         </>
       ) : (
-        <p className="text-xs text-muted-foreground">Not profiled.</p>
+        <p className="text-xs text-muted-foreground">{strings.notProfiled}</p>
       )}
     </section>
   );
@@ -330,6 +403,7 @@ function CaseTimelines({
   colors: Record<string, string>;
   caseIndex: number;
 }) {
+  const strings = STRINGS[useLocale()];
   const refs = useMemo(() => caseRefs(view, hardware, caseIndex), [view, hardware, caseIndex]);
   const palette = CATEGORY_COLORS[isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light'];
   const { data, error, isLoading, refetch } = useOperatorXTimelines(
@@ -337,7 +411,7 @@ function CaseTimelines({
     refs.map((r) => r.ref),
   );
   if (refs.length === 0)
-    return <p className="text-sm text-muted-foreground">No selected GPU measured this case.</p>;
+    return <p className="text-sm text-muted-foreground">{strings.noneMeasured}</p>;
   if (error)
     return (
       <RetryableQueryError
@@ -405,6 +479,7 @@ export function CaseDetail({
   caseIndex: number | null;
   onClose: () => void;
 }) {
+  const locale = useLocale();
   const c = caseIndex === null ? null : view.cases[caseIndex];
   return (
     <Dialog open={c !== null && c !== undefined} onOpenChange={(open) => !open && onClose()}>
@@ -418,7 +493,7 @@ export function CaseDetail({
               <DialogTitle>{c.shape}</DialogTitle>
               <DialogDescription className="font-mono text-xs">{c.precision}</DialogDescription>
             </DialogHeader>
-            <CaseOrigin origin={caseOrigin(view, caseIndex)} />
+            <CaseOrigin origin={caseOrigin(view, caseIndex, locale)} />
             <CaseTimelines
               op={op}
               view={view}

@@ -5,6 +5,7 @@ import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type SortKey = 'model' | 'totalCount' | 'errorCount' | 'errorRate' | 'severity';
 type SortDirection = 'ascending' | 'descending';
@@ -18,40 +19,40 @@ type ModelRow = ErrorData['byModel'][number] & {
 const SEVERITY_META: Record<ModelSeverity, { rank: number; badge: string; marker: string }> = {
   critical: {
     rank: 4,
-    badge: 'border-rose-500/30 bg-rose-500/10 text-rose-500',
-    marker: 'bg-rose-500',
+    badge: 'border-destructive/30 bg-destructive/10 text-destructive',
+    marker: 'bg-destructive',
   },
   elevated: {
     rank: 3,
-    badge: 'border-orange-500/30 bg-orange-500/10 text-orange-500',
-    marker: 'bg-orange-500',
+    badge: 'border-warning/50 bg-warning/20 text-warning',
+    marker: 'bg-warning',
   },
   watch: {
     rank: 2,
-    badge: 'border-amber-500/30 bg-amber-500/10 text-amber-500',
-    marker: 'bg-amber-500',
+    badge: 'border-warning/30 bg-warning/10 text-warning',
+    marker: 'bg-warning/60',
   },
   nominal: {
     rank: 1,
-    badge: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500',
-    marker: 'bg-emerald-500',
+    badge: 'border-success/30 bg-success/10 text-success',
+    marker: 'bg-success',
   },
   'no-traffic': {
     rank: 0,
-    badge: 'border-border bg-surface-hover text-muted-foreground',
+    badge: 'border-border/30 bg-muted/40 text-muted-foreground',
     marker: 'bg-muted-foreground',
   },
 };
 
 const STRINGS = {
   en: {
-    emptyState: 'No model impact data is available for this trace version.',
+    emptyState: 'No model impact data is available for this trace version',
     modelsRanked: (n: number) => `${formatNumber(n)} models ranked by all-time error burden`,
     peakSeverity: 'Peak severity',
     caption:
       'Sortable all-time model impact matrix showing request volume, errors, error rate, and explicit severity for every model.',
     severityBands:
-      'Severity bands: Critical ≥10% · Elevated ≥5% · Watch ≥1% · Nominal <1% error rate.',
+      'Severity bands: critical ≥10% · elevated ≥5% · watch ≥1% · nominal <1% error rate.',
     sortByLabel: (col: string, dir?: string) => `Sort by ${col}${dir ? `, currently ${dir}` : ''}`,
     columns: {
       model: 'Model',
@@ -69,12 +70,13 @@ const STRINGS = {
     } as Record<ModelSeverity, string>,
   },
   zh: {
-    emptyState: '该 trace 版本暂无模型影响数据。',
+    emptyState: '该 trace 版本暂无模型影响数据',
     modelsRanked: (n: number) => `${formatNumber(n)} 个模型，按累计错误量排序`,
     peakSeverity: '最高严重度',
     caption: '可排序的模型影响矩阵，展示各模型的请求量、错误数、错误率及严重度。',
     severityBands: '严重度区间：严重 ≥10% · 偏高 ≥5% · 关注 ≥1% · 正常 <1% 错误率。',
-    sortByLabel: (col: string, dir?: string) => `按${col}排序${dir ? `，当前为${dir}` : ''}`,
+    sortByLabel: (col: string, dir?: string) =>
+      `按${col}排序${dir ? `，当前为${dir === 'ascending' ? '升序' : '降序'}` : ''}`,
     columns: {
       model: '模型',
       totalCount: '请求量',
@@ -134,12 +136,9 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
 
   if (rows.length === 0) {
     return (
-      <div
-        role="status"
-        className="flex min-h-32 items-center justify-center px-4 text-center text-2xs font-mono text-muted-foreground"
-      >
+      <EmptyState role="status" bare className="min-h-32 px-4">
         {t.emptyState}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -163,23 +162,23 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-3xs font-mono text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{t.modelsRanked(rows.length)}</span>
         <span className="inline-flex items-center gap-1.5">
           {t.peakSeverity}
           <span
-            className={`inline-flex border px-1.5 py-0.5 text-3xs font-bold uppercase tracking-eyebrow ${SEVERITY_META[highestSeverity].badge}`}
+            className={`inline-flex rounded-md border px-1.5 py-0.5 text-xs font-medium ${SEVERITY_META[highestSeverity].badge}`}
           >
             {t.severity[highestSeverity]}
           </span>
         </span>
       </div>
 
-      <div className="overflow-x-auto border border-border">
-        <table className="w-full min-w-[640px] text-2xs font-mono">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-xs tabular-nums">
           <caption className="sr-only">{t.caption}</caption>
           <thead>
-            <tr className="border-b border-border bg-surface-hover/50">
+            <tr className="border-b border-border/20">
               {columnKeys.map((key) => {
                 const numeric = key === 'totalCount' || key === 'errorCount' || key === 'errorRate';
                 const sortIndicator =
@@ -194,14 +193,14 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
                     <button
                       type="button"
                       onClick={() => changeSort(key)}
-                      className={`inline-flex w-full items-center gap-1.5 text-3xs font-bold uppercase tracking-eyebrow text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 ${numeric ? 'justify-end' : 'justify-start'}`}
+                      className={`inline-flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 ${numeric ? 'justify-end' : 'justify-start'}`}
                       aria-label={t.sortByLabel(
                         t.columns[key],
                         key === sortKey ? sortDirection : undefined,
                       )}
                     >
                       {t.columns[key]}
-                      <span aria-hidden="true" className="text-3xs tracking-normal">
+                      <span aria-hidden="true" className="text-3xs">
                         {sortIndicator}
                       </span>
                     </button>
@@ -214,7 +213,7 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
             {rows.map((row) => (
               <tr
                 key={row.model}
-                className="border-b border-border transition-colors last:border-b-0 hover:bg-surface-hover/70"
+                className="border-b border-border/20 transition-colors last:border-b-0 hover:bg-surface-hover/70"
               >
                 <th
                   scope="row"
@@ -225,21 +224,21 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
                 <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                   {formatNumber(row.totalCount)}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-bold text-foreground">
+                <td className="px-3 py-2.5 text-right tabular-nums font-medium text-foreground">
                   {formatNumber(row.errorCount)}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
-                  <span className="font-bold">
+                  <span className="font-medium">
                     {row.errorRate.toFixed(row.errorRate < 1 ? 2 : 1)}%
                   </span>
                 </td>
                 <td className="px-3 py-2.5">
                   <span
-                    className={`inline-flex items-center gap-1.5 border px-1.5 py-0.5 text-3xs font-bold uppercase tracking-eyebrow ${SEVERITY_META[row.severity].badge}`}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs font-medium ${SEVERITY_META[row.severity].badge}`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`size-1.5 ${SEVERITY_META[row.severity].marker}`}
+                      className={`size-1.5 rounded-full ${SEVERITY_META[row.severity].marker}`}
                     />
                     {t.severity[row.severity]}
                   </span>
@@ -249,7 +248,7 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-3xs font-mono text-muted-foreground">{t.severityBands}</p>
+      <p className="text-xs text-muted-foreground">{t.severityBands}</p>
     </div>
   );
 }

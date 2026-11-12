@@ -58,7 +58,7 @@ describe('POST /api/v1/feedback', () => {
   it('inserts a row with every user-supplied column encrypted and returns 204', async () => {
     const res = await POST(
       buildReq(
-        { doingWell: 'love it', pagePath: '/inference' },
+        { doingWell: 'love it', pagePath: '/infx/inference' },
         { 'user-agent': 'Mozilla/5.0 (Test)' },
       ),
     );
@@ -73,7 +73,7 @@ describe('POST /api/v1/feedback', () => {
     expect(typeof userAgentCt).toBe('string');
     expect(userAgentCt).not.toContain('Mozilla');
     expect(typeof pagePathCt).toBe('string');
-    expect(pagePathCt).not.toContain('/inference');
+    expect(pagePathCt).not.toContain('/infx/inference');
   });
 
   it('returns 204 silently for honeypot-tripped submissions and does not insert', async () => {

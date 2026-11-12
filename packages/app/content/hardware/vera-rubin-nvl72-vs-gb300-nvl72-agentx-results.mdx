@@ -6,9 +6,9 @@ publishDate: '2026-10-19'
 lede: 'On InferenceX AgentX at 100 tok/s/user (120 on GLM-5.2), Vera Rubin NVL72 leads GB300 NVL72 by **1.8x to 2.0x** in total tokens per $1 TCO and in token throughput per MW on all four models with Vera Rubin results. The per-dollar ratio for each model peaks where every GB300 NVL72 config serves 4 agents or fewer, up to ~10.2x on MiniMax-M3.'
 links:
   - label: 'Open the AgentX dashboard'
-    href: 'https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH'
+    href: 'https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH'
   - label: 'Read the methodology'
-    href: '/agentx/methodology'
+    href: '/infx/agentx/methodology'
 tags:
   - agentx
   - agentic
@@ -36,7 +36,7 @@ tags:
 
 ## Method
 
-[AgentX](/agentx/methodology) replays real Claude Code sessions as deterministic [AIPerf](/glossary/aiperf) workloads. AgentX v1.0 has 393 published sessions, the median request in the full v1.0 corpus has 142,016 input tokens and 444 output tokens, and each run is profiled for 1 hour after a seeded warmup and prefix primers. The x-axis of every chart is p90 interactivity, 1 / p90 inter-token latency, in tok/s/user. The y-axis is the dashboard's default metric, total tokens per $1 TCO: total token throughput, which counts input tokens (including KV-cache hits) and output tokens, divided by the hourly cost of the GPUs serving it. Input is ~99% of that total.
+[AgentX](/infx/agentx/methodology) replays real Claude Code sessions as deterministic [AIPerf](/glossary/aiperf) workloads. AgentX v1.0 has 393 published sessions, the median request in the full v1.0 corpus has 142,016 input tokens and 444 output tokens, and each run is profiled for 1 hour after a seeded warmup and prefix primers. The x-axis of every chart is p90 interactivity, 1 / p90 inter-token latency, in tok/s/user. The y-axis is the dashboard's default metric, total tokens per $1 TCO: total token throughput, which counts input tokens (including KV-cache hits) and output tokens, divided by the hourly cost of the GPUs serving it. Input is ~99% of that total.
 
 Per-dollar figures use the hyperscaler owning cost from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/): $3.61/GPU/hr for Vera Rubin NVL72 and $2.31/GPU/hr for GB300 NVL72. InferenceX's [external and internal TCO bases](/glossary/internal-vs-external-tco) differ only for TPU v7, so both systems cost the same on either basis and every per-dollar ratio in this article holds on both. Per-MW figures divide throughput by the all-in power provisioned per GPU in the [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/): 3.3 kW for Vera Rubin NVL72 and 2.12 kW for GB300 NVL72. These are planning figures for a deployed rack, including CPUs, networking and cooling. They are not measured draw during these runs.
 
@@ -60,7 +60,7 @@ Vera Rubin NVL72 keeps the 72-GPU NVLink domain and MGX rack design of GB300 NVL
 | TCO, owning at hyperscaler volume  |             $3.61/GPU/hr |                  $2.31/GPU/hr |      1.56x |
 | All-in power per GPU (provisioned) |                   3.3 kW |                       2.12 kW |      1.56x |
 
-Rubin values come from the Rubin GPU column of NVIDIA's [Vera Rubin NVL72 specifications](https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/), which also lists 50 PFLOP/s per GPU of NVFP4 inference compute, footnoted as a sparse specification. NVIDIA's [Rubin](https://www.nvidia.com/en-us/data-center/technologies/rubin/) page says Vera Rubin NVL72 has a new Transformer Engine with adaptive compression to boost NVFP4 inference performance. NVIDIA quotes [NVLink 6 at 3 TB/s per GPU](https://www.nvidia.com/en-us/data-center/nvlink/), counting both directions, and 1.7x NVLink 5's 1.8 TB/s on the same basis. Blackwell Ultra values come from the [InferenceX GPU specs](/gpu-specs). TCO and power are the figures the dashboard uses.
+Rubin values come from the Rubin GPU column of NVIDIA's [Vera Rubin NVL72 specifications](https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/), which also lists 50 PFLOP/s per GPU of NVFP4 inference compute, footnoted as a sparse specification. NVIDIA's [Rubin](https://www.nvidia.com/en-us/data-center/technologies/rubin/) page says Vera Rubin NVL72 has a new Transformer Engine with adaptive compression to boost NVFP4 inference performance. NVIDIA quotes [NVLink 6 at 3 TB/s per GPU](https://www.nvidia.com/en-us/data-center/nvlink/), counting both directions, and 1.7x NVLink 5's 1.8 TB/s on the same basis. Blackwell Ultra values come from the [InferenceX GPU specs](/infx/gpu-specs). TCO and power are the figures the dashboard uses.
 
 Divided by the 1.56x cost ratio, the silicon ratios give Rubin 1.54x per dollar on HBM bandwidth, 1.49x on dense NVFP4 compute and 2.24x on dense FP8 compute. The per-dollar leads in the Summary table are above the HBM-bandwidth and NVFP4 figures and below the FP8 figure.
 

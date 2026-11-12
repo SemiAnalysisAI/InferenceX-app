@@ -1,10 +1,12 @@
 'use client';
 
+import { ArrowUpRight } from 'lucide-react';
 import { type CSSProperties, useMemo, useRef, useState } from 'react';
 
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import {
   decodeMmView,
@@ -19,18 +21,10 @@ import {
   type PairedSeries,
   pairSeries,
 } from '@/lib/powerx/measured-vs-modeled';
-import { cn } from '@/lib/shared/utils';
 
-import {
-  Chips,
-  CopyButton,
-  GrammarLegend,
-  GrammarSwatch,
-  useView,
-  useWidgetHash,
-  WidgetFrame,
-  type WidgetProps,
-} from './widget-chrome';
+import { Chips, WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
+
+import { CopyButton, GrammarLegend, GrammarSwatch, useView, useWidgetHash } from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -50,8 +44,8 @@ const STRINGS = {
     open: 'Open in PowerX',
     copy: 'Copy API URL',
     loading: 'Loading validated points…',
-    empty: 'No validated power points for this pair in this data set.',
-    failed: 'The views API did not answer; reload to try again.',
+    empty: 'No validated power points for this pair in this data set',
+    failed: 'The views API did not answer. Reload to try again',
     tooltip: {
       measured: 'Measured GPU',
       modeled: 'Measured facility',
@@ -78,8 +72,8 @@ const STRINGS = {
     open: '在 PowerX 中打开',
     copy: '复制 API URL',
     loading: '正在加载通过校验的数据点…',
-    empty: '当前数据集中，这一对硬件没有通过校验的功耗数据点。',
-    failed: 'views API 没有响应，请刷新页面重试。',
+    empty: '当前数据集中，这一对硬件没有通过校验的功耗数据点',
+    failed: 'views API 没有响应，请刷新页面重试',
     tooltip: {
       measured: '实测 GPU',
       modeled: '实测数据中心',
@@ -130,6 +124,8 @@ interface Hover {
   point: PairedPoint;
   px: number;
   py: number;
+  clientX: number;
+  clientY: number;
 }
 
 export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
@@ -194,7 +190,14 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
           const distance = Math.hypot(px - mx, py - my);
           if (distance < bestDistance) {
             bestDistance = distance;
-            best = { series, point, px, py };
+            best = {
+              series,
+              point,
+              px,
+              py,
+              clientX: rect.left + px,
+              clientY: rect.top + py,
+            };
           }
         }
       }
@@ -211,7 +214,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
       .join(' ');
 
   return (
-    <WidgetFrame name="measured-vs-modeled" alt={alt}>
+    <WidgetFrame scope="powerx" name="measured-vs-modeled" alt={alt}>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <Chips<MmView>
           label={t.view}
@@ -379,15 +382,11 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
               )}
             </svg>
             {hover && (
-              <div
+              <FloatingTooltip
                 role="status"
-                className={cn(
-                  'pointer-events-none absolute z-10 w-56 rounded-md border border-border bg-background/95 px-3 py-2 text-xs shadow-md',
-                )}
-                style={{
-                  left: Math.min(hover.px + 12, width - 232),
-                  top: Math.max(0, Math.min(hover.py - 20, height - 110)),
-                }}
+                x={hover.clientX}
+                y={hover.clientY}
+                className="w-56 text-xs"
               >
                 <p className="font-semibold text-foreground">{hover.series.label}</p>
                 <p className="text-muted-foreground">
@@ -416,7 +415,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
                     </span>
                   </p>
                 )}
-              </div>
+              </FloatingTooltip>
             )}
           </>
         ) : (
@@ -435,8 +434,9 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
           <a
             href={mmDashboardUrl(view)}
             onClick={() => track('powerx_tutorial_chart_opened', { value: view })}
-            className="inline-flex min-h-11 items-center rounded-md px-2 text-xs font-medium text-brand hover:underline md:min-h-8"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground motion-reduce:transition-none md:min-h-8"
           >
+            <ArrowUpRight aria-hidden="true" className="size-3.5" />
             {t.open}
           </a>
           <CopyButton

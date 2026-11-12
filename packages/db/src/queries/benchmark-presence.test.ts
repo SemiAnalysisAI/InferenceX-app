@@ -2,7 +2,11 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
-import { getBenchmarkPresence, type BenchmarkPresence } from './benchmark-presence';
+import {
+  getBenchmarkPresence,
+  mergeBenchmarkPresence,
+  type BenchmarkPresence,
+} from './benchmark-presence';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -172,4 +176,57 @@ describe('getBenchmarkPresence', () => {
       await expectMaintained(`step ${step}: ${writes}`);
     }
   }, 60_000);
+});
+
+function decode(runs: number[]): number[] {
+  const ids: number[] = [];
+  let end = 0;
+  for (let r = 0; r < runs.length; r += 2) {
+    const start = end + runs[r]!;
+    end = start + runs[r + 1]!;
+    for (let id = start; id < end; id++) ids.push(id);
+  }
+  return ids;
+}
+
+describe('mergeBenchmarkPresence', () => {
+  it('holds exactly the ids of every part, downstream ids included', () => {
+    const downstream = 1_000_000_000_000;
+    const merged = mergeBenchmarkPresence([
+      encode([
+        { trace: false, start: 1, length: 1 },
+        { trace: true, start: 3, length: 2 },
+        { trace: false, start: 7, length: 3 },
+      ]),
+      encode([
+        { trace: true, start: downstream, length: 2 },
+        { trace: false, start: downstream + 5, length: 1 },
+      ]),
+    ]);
+    expect(decode(merged.trace)).toEqual([3, 4, downstream, downstream + 1]);
+    expect(decode(merged.log)).toEqual([1, 7, 8, 9, downstream + 5]);
+  });
+
+  it('joins spans that touch or overlap into one run', () => {
+    const merged = mergeBenchmarkPresence([
+      encode([{ trace: false, start: 1, length: 3 }]),
+      encode([{ trace: false, start: 3, length: 3 }]),
+      encode([{ trace: false, start: 6, length: 1 }]),
+    ]);
+    expect(merged.log).toEqual([1, 6]);
+  });
+
+  it('returns a single database unchanged', () => {
+    const only = encode([{ trace: true, start: 4, length: 2 }]);
+    expect(mergeBenchmarkPresence([only])).toEqual(only);
+  });
+
+  it('takes parts in any order and keeps spans that lie inside others', () => {
+    const merged = mergeBenchmarkPresence([
+      encode([{ trace: false, start: 20, length: 2 }]),
+      encode([{ trace: false, start: 1, length: 9 }]),
+      encode([{ trace: false, start: 3, length: 2 }]),
+    ]);
+    expect(decode(merged.log)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21]);
+  });
 });

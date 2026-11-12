@@ -7,7 +7,7 @@ export const OFFLOAD_HALO_STROKE_WIDTH = 1.5;
 export const OFFLOAD_HALO_DASHARRAY = '3 2';
 
 export function offloadHaloLabel(locale: Locale): string {
-  return locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON';
+  return locale === 'zh' ? 'KV offload 已开启' : 'KV offload on';
 }
 
 export function OffloadHaloLegendKey() {

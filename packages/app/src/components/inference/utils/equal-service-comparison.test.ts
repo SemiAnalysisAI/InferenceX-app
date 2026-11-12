@@ -76,6 +76,22 @@ const options = {
   xField: 'mean_intvty' as const,
 };
 
+const role = (overrides: Partial<InferenceData>) =>
+  point({
+    disagg: true,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    joules_per_input_token: 1,
+    joules_per_output_token: 8,
+    prefill_joules_per_input_token: 0.4,
+    decode_joules_per_output_token: 4.8,
+    measuredPrefillAvgPower: metric(300),
+    measuredDecodeAvgPower: metric(500),
+    ...overrides,
+  });
+
 describe('equal-service comparison', () => {
   it('interpolates each raw quantity first, retains endpoints, and uses one percentage sign convention', () => {
     const result = buildEqualServiceComparison([...a, ...b], options);
@@ -224,21 +240,6 @@ describe('equal-service comparison', () => {
   );
 
   it('plots role panels on the trace-derived P75/P90 axes from point.x without interpolating on them', () => {
-    const role = (overrides: Partial<InferenceData>) =>
-      point({
-        disagg: true,
-        num_prefill_gpu: 4,
-        num_decode_gpu: 4,
-        power_valid: 1,
-        power_metric_schema_version: 2,
-        joules_per_input_token: 1,
-        joules_per_output_token: 8,
-        prefill_joules_per_input_token: 0.4,
-        decode_joules_per_output_token: 4.8,
-        measuredPrefillAvgPower: metric(300),
-        measuredDecodeAvgPower: metric(500),
-        ...overrides,
-      });
     const rows = [
       role({ id: 1, x: 31.2 }),
       role({ id: 2, x: 24.8, conc: 16 }),

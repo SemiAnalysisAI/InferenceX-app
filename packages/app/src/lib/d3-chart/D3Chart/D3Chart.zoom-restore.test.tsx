@@ -7,6 +7,12 @@ import { renderChartForExport } from '../export-renderer';
 import { D3Chart } from './D3Chart';
 import type { D3ChartProps } from './types';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
@@ -216,18 +222,18 @@ describe('D3Chart proximity overlay', () => {
   });
 });
 
-describe('D3Chart PNG export', () => {
-  function exportedPointPosition() {
-    const svg = container.querySelector('svg')!;
-    const clone = svg.cloneNode(true) as SVGSVGElement;
-    document.body.append(clone);
-    renderChartForExport(svg, clone, 1000, 500);
-    const point = clone.querySelector('.point')!;
-    const position = [point.getAttribute('cx'), point.getAttribute('cy')];
-    clone.remove();
-    return position;
-  }
+function exportedPointPosition() {
+  const svg = container.querySelector('svg')!;
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  document.body.append(clone);
+  renderChartForExport(svg, clone, 1000, 500);
+  const point = clone.querySelector('.point')!;
+  const position = [point.getAttribute('cx'), point.getAttribute('cy')];
+  clone.remove();
+  return position;
+}
 
+describe('D3Chart PNG export', () => {
   it('draws the clone at the live zoom', () => {
     draw(lineChart(undefined));
     const [cx, cy] = exportedPointPosition();

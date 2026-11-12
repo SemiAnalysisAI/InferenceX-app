@@ -129,10 +129,13 @@ export interface SessionInsightsData {
   };
   durationBins: HistogramBin[];
   durationPercentiles: PercentileStats;
+  durationTotal: number;
   turnBins: HistogramBin[];
   turnPercentiles: PercentileStats;
+  turnTotal: number;
   costBins: HistogramBin[];
   costPercentiles: PercentileStats;
+  costTotal: number;
   dailySessions: { day: string; sessionCount: number }[];
   hourlyConcurrent: { hour: string; activeSessions: number }[];
 }

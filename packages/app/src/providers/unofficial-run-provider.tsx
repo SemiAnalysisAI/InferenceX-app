@@ -21,7 +21,7 @@ import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { type Model, Sequence } from '@/lib/catalog/data-mappings';
 import { ApiRequestError } from '@/lib/api/api-request-error';
 
 import type * as UnofficialChartDataModule from './unofficial-chart-data';
@@ -125,12 +125,12 @@ export function parseAvailableModelsAndSequences(
   if (!chartData) return [];
 
   const result: AvailableModelSequence[] = [];
-  const allModels = Object.values(Model);
   const allSequences = Object.values(Sequence);
   for (const key of Object.keys(chartData)) {
     const lastUnderscoreIndex = key.lastIndexOf('_');
     if (lastUnderscoreIndex === -1) continue;
-    const model = allModels.find((candidate) => candidate === key.slice(0, lastUnderscoreIndex));
+    // An unregistered model keeps its raw prefix as its identity, see isRegisteredModel.
+    const model = key.slice(0, lastUnderscoreIndex) as Model;
     const sequence = allSequences.find(
       (candidate) => candidate === key.slice(lastUnderscoreIndex + 1),
     );

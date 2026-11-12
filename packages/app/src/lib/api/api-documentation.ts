@@ -493,6 +493,16 @@ const evaluationsSchema = arraySchema(
     model: stringSchema,
     precision: stringSchema,
     spec_method: stringSchema,
+    spec_algorithm: {
+      ...nullableStringSchema,
+      description:
+        'Speculative algorithm recorded by a benchmark result for the same config and workflow run, or null when none was recorded.',
+    },
+    spec_draft_model: {
+      ...nullableStringSchema,
+      description:
+        'Draft model recorded alongside spec_algorithm ("native" for built-in heads), or null when none was recorded.',
+    },
     disagg: booleanSchema,
     is_multinode: booleanSchema,
     prefill_tp: integerSchema,
@@ -1058,8 +1068,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'string',
-        'Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected.',
-        '展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。',
+        'Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3, and supports 8k/1k and agentic-traces. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected.',
+        '展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开，支持 8k/1k 和 agentic-traces。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。',
         { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
         'DeepSeek-R1-0528',
       ),
@@ -1335,6 +1345,8 @@ export const apiOperations: readonly ApiOperation[] = [
           model: 'dsr1',
           precision: 'fp8',
           spec_method: 'none',
+          spec_algorithm: null,
+          spec_draft_model: null,
           disagg: false,
           is_multinode: false,
           prefill_tp: 8,
@@ -1960,8 +1972,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. series[].library_version is the backend build the case ran (null where the result recorded none). Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。series[].library_version 为该 case 运行的后端构建版本（结果未记录时为 null）。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
+      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. series[].library_version is the backend build the case ran (null where the result recorded none). Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result. Each series carries maturity (candidate when no serving engine can select the configuration), and components.pair_period is the chained steady-state period, the headline latency.',
+      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。series[].library_version 为该 case 运行的后端构建版本（结果未记录时为 null）。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。 每个序列带有 maturity（candidate 表示目前没有推理引擎可以选用该配置），components.pair_period 为连续成对的稳态周期，即主延迟指标。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2183,8 +2195,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs/{runId}',
     summary: text('Read a CollectiveX run', '读取 CollectiveX 运行'),
     description: text(
-      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number.',
-      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。',
+      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. Each series carries maturity (candidate when no serving engine can select the configuration), and components.pair_period is the chained steady-state period, the headline latency.',
+      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。 每个序列带有 maturity（candidate 表示目前没有推理引擎可以选用该配置），components.pair_period 为连续成对的稳态周期，即主延迟指标。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2587,8 +2599,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log',
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
-      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
-      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
+      'Returns one stored file for a benchmark result ID: a .log/.out file or a launch file such as recipe.lock.yaml. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
+      '返回某个基准测试结果 ID 对应的一份已存储文件：.log/.out 文件，或 recipe.lock.yaml 等启动文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2703,8 +2715,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-search',
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
-      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
-      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
+      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. Launch files such as recipe.lock.yaml are not searched. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
+      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索，不搜索 recipe.lock.yaml 等启动文件。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2799,8 +2811,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-files',
     summary: text('List stored benchmark log files', '列出已存储的基准测试日志文件'),
     description: text(
-      'Lists every .log and .out filename retained from the matching server-log artifact. Paths are returned relative to the artifact root, with the primary file first.',
-      '列出匹配服务器日志产物中保留的所有 .log 和 .out 文件名。路径相对于产物根目录返回，主文件排在首位。',
+      'Lists every file retained from the matching server-log artifact: each .log and .out file, plus the launch files srtctl and the engines write (recipe.lock.yaml, srtctl config.yaml, fingerprint_<role>_w<N>.json, trtllm_config_*.yaml, SGLang *_config.json and benchmark_command.txt). Paths are returned relative to the artifact root, with the primary log file first. Bundles ingested before launch files were kept list only logs until they are backfilled.',
+      '列出匹配服务器日志产物中保留的所有文件：每个 .log 和 .out 文件，以及 srtctl 和推理引擎写出的启动文件（recipe.lock.yaml、srtctl 的 config.yaml、fingerprint_<role>_w<N>.json、trtllm_config_*.yaml、SGLang 的 *_config.json 和 benchmark_command.txt）。路径相对于产物根目录返回，主日志文件排在首位。早于此改动导入的文件集合在完成回填前只包含日志文件。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2818,8 +2830,8 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Artifact-relative .log/.out filenames.',
-        '相对于产物根目录的 .log/.out 文件名。',
+        'Artifact-relative log and launch filenames.',
+        '相对于产物根目录的日志和启动文件名。',
         arraySchema(stringSchema),
         ['results/server.log', 'results/benchmark.log', 'results/router.log'],
       ),
@@ -2844,6 +2856,154 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responseShapeName: 'ServerLogFileNames',
     curlUrl: `${API_BASE_URL}/api/v1/server-log-files?id=421`,
+  },
+  {
+    id: 'get-reproduce',
+    group: 'diagnostics',
+    method: 'GET',
+    path: '/api/v1/reproduce',
+    summary: text('Read how a benchmark result was produced', '读取基准测试结果的复现信息'),
+    description: text(
+      'Returns the stored configuration of one benchmark result, its producing workflow run, and the launch facts its stored logs record. config is identical to the Config JSON the dashboard Reproduce drawer shows. logs.launch lists the services, workers, frontends and benchmark command with each exact environment and command line that srtctl wrote to its sweep log (first 2 MiB); it is null for runs launched without srtctl. logs.engine has the arguments vLLM or SGLang printed at startup and the NCCL, CUDA (NCCL build) and TensorRT-LLM versions found in the first 1 MiB of one engine log. logs is null when no log bundle is stored. Nothing is inferred from the configuration, and no stored artifact records the GPU driver version.',
+      '返回某个基准测试结果的已存储配置、产生该结果的工作流运行，以及其已存储日志中记录的启动信息。config 与仪表盘复现抽屉中显示的 Config JSON 完全一致。logs.launch 列出 srtctl 写入 sweep 日志（前 2 MiB）的各个服务、worker、前端和基准测试命令，以及每一项的完整环境变量和命令行；未使用 srtctl 启动的运行该字段为 null。logs.engine 包含 vLLM 或 SGLang 启动时输出的参数，以及在某个引擎日志前 1 MiB 中找到的 NCCL、CUDA（NCCL 构建版本）和 TensorRT-LLM 版本。没有已存储日志时 logs 为 null。所有信息均不从配置推断；任何已存储的产物都不记录 GPU 驱动版本。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'id',
+        'query',
+        true,
+        'integer',
+        'Positive safe-integer benchmark result ID.',
+        '基准结果 ID，必须为正安全整数。',
+        safePositiveIdSchema,
+        447975,
+      ),
+    ],
+    responses: [
+      success(
+        'Stored config, producing run, and recorded launch facts.',
+        '已存储的配置、产生结果的运行，以及记录的启动信息。',
+        objectSchema({
+          id: integerSchema,
+          config: anyObjectSchema,
+          run: objectSchema({
+            github_run_id: integerSchema,
+            run_attempt: integerSchema,
+            head_sha: nullableStringSchema,
+            run_url: nullableStringSchema,
+            created_at: nullableStringSchema,
+          }),
+          logs: {
+            oneOf: [
+              objectSchema({
+                files: arraySchema(stringSchema),
+                launch_file: nullableStringSchema,
+                engine_file: nullableStringSchema,
+                launch: { oneOf: [anyObjectSchema, { type: 'null' }] },
+                engine: { oneOf: [anyObjectSchema, { type: 'null' }] },
+              }),
+              { type: 'null' },
+            ],
+          },
+        }),
+        {
+          id: 447975,
+          config: {
+            model: 'DeepSeek-V4.1-Flash',
+            hardware: 'gb200',
+            framework: 'vllm',
+            precision: 'fp4',
+            spec_decoding: 'mtp',
+            spec_algorithm: 'dspark',
+            spec_draft_model: 'native',
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            conc: 64,
+            disagg: false,
+            is_multinode: false,
+            physical_chips: 4,
+            topology: { tp: 4, ep: 4, dp_attention: true, dcp_size: 1, pcp_size: 1 },
+            offload_mode: 'off',
+            kv_offloading: 'none',
+            router_name: 'vllm-router',
+            router_version: '0.1.14',
+            image:
+              'vllm/vllm-openai:cu134-nightly-cf5cea2da37d3dfed27d2e0aa3041c3e553c2d57@sha256:78d6583c2d9c63d69e4250733eb0aacaa30d9afd4f867b65f1b7f1f51e20da4a',
+            recipe_fingerprint: '8b7b90a18a1fcbbc5089c61b154762795be20f836e31c0ef38b4000d7808e779',
+            date: '2026-11-11',
+            run_url:
+              'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42626988505/attempts/1',
+          },
+          run: {
+            github_run_id: 42626988505,
+            run_attempt: 1,
+            head_sha: '64c53a235e02f2686eb7cde3b20e754613cf07a6',
+            run_url:
+              'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42626988505/attempts/1',
+            created_at: '2026-11-11 04:20:48+00',
+          },
+          logs: {
+            files: [
+              'results/benchmark.log',
+              'srt-single-node-logs/logs/sweep_32572.log',
+              'srt-single-node-logs/logs/watchtower-navy-cn07_agg_w0.out',
+            ],
+            launch_file: 'srt-single-node-logs/logs/sweep_32572.log',
+            engine_file: 'srt-single-node-logs/logs/watchtower-navy-cn07_agg_w0.out',
+            launch: {
+              container: 'vllm_vllm-openai_cu134-nightly-cf5cea2d_sha256_78d6583c.sqsh',
+              srtctl_version: '2.66.2.post0+gacfb4dcc3.d20261109',
+              recipe: 'dsv41flash-fp4-gb200-vllm-agentic_dep4_0',
+              resources: {
+                nodes: '1 (host)',
+                cpu: 'ARM CPU implementer 0x41 part 0xd4f (144 logical, aarch64)',
+                gpus: '4 backend / 4 configured (4/node, gb200)',
+              },
+              steps: [
+                {
+                  kind: 'worker',
+                  role: 'agg',
+                  index: 0,
+                  hosts: ['host'],
+                  env: 'NCCL_CUMEM_ENABLE=1 VLLM_USE_V2_MODEL_RUNNER=1',
+                  command: 'vllm serve deepseek-ai/DeepSeek-V4.1-Flash --data-parallel-size 4',
+                },
+              ],
+            },
+            engine: {
+              engine_args: {
+                source: 'vllm-non-default-args',
+                args: { model_tag: 'deepseek-ai/DeepSeek-V4.1-Flash', data_parallel_size: 4 },
+              },
+              versions: { nccl: '2.32.3', cuda: '13.4', tensorrt_llm: null },
+            },
+          },
+        },
+      ),
+      errorResponse(
+        '400',
+        'id is missing or invalid.',
+        'id 缺失或无效。',
+        PUBLIC_API_ERRORS.idRequired,
+      ),
+      errorResponse(
+        '404',
+        'No benchmark result has this ID.',
+        '不存在该 ID 的基准结果。',
+        PUBLIC_API_ERRORS.notFound,
+      ),
+      errorResponse(
+        '500',
+        'The reproduce query failed.',
+        '复现信息查询失败。',
+        PUBLIC_API_ERRORS.internal,
+      ),
+    ],
+    responseShapeName: 'ReproduceRecord',
+    curlUrl: `${API_BASE_URL}/api/v1/reproduce?id=447975`,
   },
   {
     id: 'get-log-availability',
@@ -3403,6 +3563,21 @@ const quickstartText = {
   },
 } as const;
 
+/** Prose type labels and placeholder examples; schema type names stay as identifiers. */
+const PARAMETER_TEXT_ZH: Record<string, string> = {
+  'CSV list': 'CSV 列表',
+  'CSV number list': 'CSV 数字列表',
+  'CSV GPU list': 'CSV GPU 列表',
+  'CSV workload list': 'CSV 工作负载列表',
+  'comma-separated integers': '逗号分隔的整数',
+  'Exact key returned in serviceSources': 'serviceSources 中返回的完整键',
+};
+
+function localizeParameterText<T>(value: T, locale: ApiDocumentationLocale): T | string {
+  if (locale !== 'zh' || typeof value !== 'string') return value;
+  return PARAMETER_TEXT_ZH[value] ?? value;
+}
+
 function localizeOperation(
   operation: ApiOperation,
   locale: ApiDocumentationLocale,
@@ -3413,6 +3588,8 @@ function localizeOperation(
     description: operation.description[locale],
     parameters: operation.parameters.map((item) => ({
       ...item,
+      type: localizeParameterText(item.type, locale),
+      example: localizeParameterText(item.example, locale),
       description: item.description[locale],
     })),
     responses: operation.responses.map((item) => ({

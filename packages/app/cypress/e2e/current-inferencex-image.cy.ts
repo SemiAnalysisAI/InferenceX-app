@@ -1,5 +1,5 @@
 function visitCurrentImage() {
-  cy.visit('/zh/current-inferencex-image', {
+  cy.visit('/zh/infx/current-inferencex-image', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -48,7 +48,7 @@ describe('Current image P90 age history', () => {
   });
 
   it('shows p90 and a dated chart, inspects by keyboard, and refetches after model filtering', () => {
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.wait('@ageHistory').its('request.query').should('include', {
       includeHistory: 'true',
       asOf,
@@ -62,7 +62,7 @@ describe('Current image P90 age history', () => {
     cy.get('[data-testid="image-age-panel"] svg[role="img"]')
       .focus()
       .trigger('keydown', { key: 'ArrowLeft' });
-    cy.get('[data-testid="image-age-readout"]').should('contain', '2026-10-12');
+    cy.get('[data-testid="image-age-readout"]').should('contain', 'Oct 12, 2026');
     cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', (request) => {
       if (request.query.model === 'unknown-new-model') request.alias = 'filteredHistory';
       request.reply({ body: { ageHistory } });
@@ -78,7 +78,7 @@ describe('Current image P90 age history', () => {
       statusCode: 503,
       body: {},
     });
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('[data-testid="image-age-error"]').should('be.visible');
     cy.get('[data-testid="image-age-p90"]').should('have.text', '12d');
     cy.get('tbody tr').should('have.length', 2);
@@ -97,7 +97,7 @@ describe('Current image P90 age history', () => {
       },
     });
     cy.viewport(375, 812);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('[data-testid="image-age-panel"]').should('contain', 'No historical observations');
     cy.get('[data-testid="image-age-panel"] svg').should('not.exist');
     cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(375));
@@ -244,7 +244,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.wait('@latestImagesRetry');
     cy.wait('@latestImagesRetry');
     cy.get('[data-testid="current-image-error"]')
-      .should('contain.text', '无法加载镜像数据。')
+      .should('contain.text', '无法加载镜像数据')
       .and('not.contain.text', 'sensitive database detail')
       .contains('button', '重试')
       .then(($button) => {
@@ -266,7 +266,7 @@ describe('Current InferenceX Image localized routes', () => {
   it('labels agentic rows as Agentic (never null/null) and flags stale AgentX submissions', () => {
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
     cy.intercept('GET', '**/api/v1/framework-releases', releases);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
     cy.get('[data-slot="select-item"]').contains('Agentic').click();
@@ -318,7 +318,7 @@ describe('Current InferenceX Image localized routes', () => {
       { ...imageRows[1], isl: 1024, osl: 1024, image: 'vllm/vllm-openai:v0.8.0-1k1k' },
     ]);
     cy.intercept('GET', '**/api/v1/framework-releases', releases);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
 
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
     cy.get('#image-node-type-select').should('contain.text', 'All');
@@ -369,7 +369,7 @@ describe('Current InferenceX Image localized routes', () => {
       imageRows[1],
     ]);
     cy.intercept('GET', '**/api/v1/framework-releases', releases);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '2 configurations');
     cy.get('tbody tr')
       .first()
@@ -377,7 +377,7 @@ describe('Current InferenceX Image localized routes', () => {
         cy.get('th[scope="row"]')
           .should('contain.text', 'DeepSeek-R1')
           .and('contain.text', 'H200')
-          .and('contain.text', 'fp8');
+          .and('contain.text', 'FP8');
         cy.get('code')
           .first()
           .should('have.text', longImage)
@@ -387,7 +387,9 @@ describe('Current InferenceX Image localized routes', () => {
             expect(el.clientHeight).to.be.greaterThan(40);
           });
         cy.contains('Review image').should('have.attr', 'title');
-        cy.get('time').should('have.attr', 'datetime', '2026-08-20').and('have.text', '2026-08-20');
+        cy.get('time')
+          .should('have.attr', 'datetime', '2026-08-20')
+          .and('have.text', 'Aug 20, 2026');
         cy.get('td[title^="Last submission:"]').should('contain.text', '3d');
       });
     cy.get('#image-model-select').click();
@@ -422,7 +424,19 @@ describe('Current InferenceX Image localized routes', () => {
       .should('be.focused')
       .scrollTo('right');
     cy.get('table').should('contain.text', '暂无信息');
-    cy.get('time').first().should('be.visible').and('have.text', today);
+    cy.get('time')
+      .first()
+      .should('be.visible')
+      .and('have.attr', 'datetime', today)
+      .and(
+        'have.text',
+        new Intl.DateTimeFormat('zh-CN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }).format(new Date(`${today}T00:00:00Z`)),
+      );
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').contains('智能体').click();
     cy.get('table').should('contain.text', 'AgentX 提交已超过 14 天').and('contain.text', '22 天');

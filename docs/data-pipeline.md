@@ -340,13 +340,53 @@ attempt of the run is copied. An id the public database lacks fails the command,
 target already holds in full is reported and skipped. In this mode the global `availability`
 table is not copied, because it could advertise dates whose runs were not synced. Instead the
 sync inserts the availability rows implied by the selected runs' benchmark rows, exactly as
-ingest does. `--dry-run` lists the plan, `--limit <n>` caps the number of runs, and
-`--max-value-bytes <n>` skips individual log and blob values above `n` bytes for a target
-compute that cannot hold them; a later uncapped run fills what was skipped.
+ingest does. Configs and datasets are limited the same way: only the ones the selected runs
+reference are copied, so nothing of another run reaches the target. `--dry-run` lists the
+plan, `--limit <n>` caps the number of runs, and `--max-value-bytes <n>` skips individual log
+and blob values above `n` bytes for a target compute that cannot hold them; a later uncapped
+run fills what was skipped.
 
 The `Sync Runs From Public Database` workflow (`sync-run-from-public-db.yml`) runs the sync for
 the dispatched `run-ids`, migrates the target first, then invalidates and warms `APP_URL`. It
 does not run in `SemiAnalysisAI/InferenceX-app`, whose database is the source.
+
+### Reading the Public Database From a Downstream Deployment
+
+Instead of syncing, a downstream deployment can read the public database directly: set
+`PUBLIC_DATABASE_READONLY_URL` on the app. Its own database then holds only the runs it ingests,
+and every read combines the two into the answer one database holding every run would give.
+Setup is in [Deployment configuration](./deployment-configuration.md#showing-public-results-on-a-downstream-deployment).
+
+- `bun run admin:db:migrate --yes --downstream` migrates the downstream database and makes its
+  runs, benchmarks, and evals take ids from `DOWNSTREAM_ID_START` (10^12) up, so ids never
+  collide in combined responses and an id alone says which database holds a log, trace, eval
+  sample, or GPU telemetry. It refuses a database that already holds lower ids; one filled by
+  the sync must be rebuilt with only its own runs. Until the ids are reserved, the app refuses
+  to read the public database rather than route a downstream id to a public row.
+- Latest results take each curve from whichever database has its newest run, ranked as
+  `latest_benchmarks` ranks runs (`queries/across-dbs.ts`). An as-of view is bounded by the
+  selected run's start time in both databases. History, availability, evaluations,
+  reliability, submissions, latest images, workflow info, changelogs, datasets, trace and log
+  availability, and the agentic catalog are combined the same way.
+- Eval rows of a config the public database lacks get a `config_id` above 2^31, so they never
+  group with a public config.
+- A promoted run moves: it is deleted from the downstream database once public holds it in full
+  (below), so no run is counted in both databases.
+- Public ingests invalidate only the public site. `Cache Refresh` runs hourly in any
+  repository with the `PUBLIC_DATABASE_READONLY_URL` secret, so new public results reach the
+  downstream site within the hour.
+- Append-only runs extend curves only within their own database.
+
+`Promote Runs To Public Database` (`promote-to-public.yml`) publishes downstream runs. It runs
+`bun run admin:db:promote-to-public --run-id <ids>` in the `public-promotion` environment,
+which copies the selected runs, including their GPU telemetry, into the public database with
+only the configs and datasets they reference, re-counts each run in public, and only then
+deletes them from the downstream database. A run short in public is not deleted and the job
+fails; rerunning finishes it. The command refuses when the public schema lacks a column the
+downstream one has. Promoted points take new public ids, so links to their downstream ids stop
+resolving. The command only inserts into the public database, but its publication triggers
+rewrite derived tables, so the role needs the public ingest role's privileges. The job then
+invalidates and warms both sites. It does not run in `SemiAnalysisAI/InferenceX-app`.
 
 ### Connection drivers and policy
 
@@ -510,6 +550,14 @@ put the job's `logs/` directory, including the server worker log `<host>_agg_w0.
 `srt-single-node-logs.tar.gz`. Ingest extracts that archive in place, so its files are stored
 under `srt-single-node-logs/` next to the root files; artifacts without the archive read as
 before.
+
+The same walk also keeps the launch files srtctl and the engines write next to the logs:
+`recipe.lock.yaml` and srtctl's `config.yaml` (the resolved recipe), `fingerprint_<role>_w<N>.json`
+(each worker's driver, CUDA, NCCL, framework build and packages), `trtllm_config_*.yaml` and
+SGLang's `*_config.json` (engine config files the launch command points at), and the client's
+`benchmark_command.txt` (`isLaunchFileName` in `etl/launch-files.ts`). They are stored like any
+other bundle file, never become the primary file, and the log viewer hides them. Run the
+backfill below with `--force` to add them to bundles stored before the reader kept them.
 
 The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
 extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the

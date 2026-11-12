@@ -1,7 +1,8 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readFromPayloadDbs } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-shared';
 import {
   getResidentSequenceLengthSketches,
+  mergeResidentSequenceLengthSketches,
   type ResidentSequenceLengthSketches,
 } from '@semianalysisai/inferencex-db/queries/resident-sequence-lengths';
 
@@ -14,8 +15,10 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `resident-sequence-lengths-v${STATS_VERSION}`;
 
 const getCachedResidentSequenceLengths = cachedQuery(
-  (ids: number[]): Promise<ResidentSequenceLengthSketches> =>
-    getResidentSequenceLengthSketches(getDb(), ids),
+  async (ids: number[]): Promise<ResidentSequenceLengthSketches> =>
+    mergeResidentSequenceLengthSketches(
+      await readFromPayloadDbs(ids, getResidentSequenceLengthSketches),
+    ),
   CACHE_KEY_PREFIX,
 );
 

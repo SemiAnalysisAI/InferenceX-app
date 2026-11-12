@@ -40,6 +40,12 @@ vi.mock('@/hooks/agentic-workload-explorer/use-dashboard-data', () => ({
   useDashboardData: mocks.useDashboardData,
 }));
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 import ErrorsPage from '@/components/agentic-workload-explorer/views/errors-view';
 
 const staleSnapshot: ErrorData = {
@@ -119,8 +125,8 @@ describe('errors page refresh failure', () => {
     expect(normalizedText(alert)).toContain('Reload failed · showing previously loaded data');
     expect(normalizedText(alert)).toContain('refresh gateway timeout');
 
-    const totalErrorsLabel = [...container.querySelectorAll('div')].find(
-      (element) => normalizedText(element) === 'Total Errors',
+    const totalErrorsLabel = [...container.querySelectorAll('dt')].find(
+      (element) => normalizedText(element) === 'Total errors',
     );
     expect(normalizedText(totalErrorsLabel?.parentElement ?? null)).toContain('42');
     expect(normalizedText(container)).toContain('stale-model-visible');
