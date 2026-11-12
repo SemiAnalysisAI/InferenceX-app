@@ -162,7 +162,6 @@ async function insertDeferredServerLogFiles(
   sql: Sql,
   benchmarkResultIds: number[],
   files: readonly DeferredServerLogFile[],
-  redactionKey: Uint8Array,
 ): Promise<void> {
   if (benchmarkResultIds.length === 0 || files.length === 0) return;
 
@@ -179,7 +178,7 @@ async function insertDeferredServerLogFiles(
           `${capped.storedBytes} (limit ${maxBytes}); full file stays in the artifact`,
       );
     }
-    return redactText(capped.text, redactionKey);
+    return redactText(capped.text);
   };
   const primaryText = readStored(primary);
   const serverLog =
@@ -258,12 +257,10 @@ async function insertDeferredServerLogFiles(
   });
 }
 
-/** Store a run's server-log files, redacted with `redactionKey` (one key per ingest run). */
 export async function insertServerLogFiles(
   sql: Sql,
   benchmarkResultIds: number[],
   files: readonly ServerLogFile[],
-  redactionKey: Uint8Array,
 ): Promise<void> {
   await insertDeferredServerLogFiles(
     sql,
@@ -272,7 +269,6 @@ export async function insertServerLogFiles(
       fileName: file.fileName,
       readCapped: (maxBytes) => capServerLogText(file.logText, maxBytes),
     })),
-    redactionKey,
   );
 }
 
@@ -280,7 +276,6 @@ export async function insertServerLogFilePaths(
   sql: Sql,
   benchmarkResultIds: number[],
   files: readonly ServerLogFilePath[],
-  redactionKey: Uint8Array,
 ): Promise<void> {
   await insertDeferredServerLogFiles(
     sql,
@@ -289,7 +284,6 @@ export async function insertServerLogFilePaths(
       fileName: file.fileName,
       readCapped: (maxBytes) => readCappedServerLogFile(file.path, maxBytes),
     })),
-    redactionKey,
   );
 }
 
@@ -297,14 +291,10 @@ export async function insertServerLog(
   sql: Sql,
   benchmarkResultIds: number[],
   serverLog: string,
-  redactionKey: Uint8Array,
 ): Promise<void> {
-  await insertServerLogFiles(
-    sql,
-    benchmarkResultIds,
-    [{ fileName: 'server.log', logText: serverLog }],
-    redactionKey,
-  );
+  await insertServerLogFiles(sql, benchmarkResultIds, [
+    { fileName: 'server.log', logText: serverLog },
+  ]);
 }
 
 export async function bulkIngestRunStats(

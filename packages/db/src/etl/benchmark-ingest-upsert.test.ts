@@ -90,7 +90,7 @@ describe('insertServerLog', () => {
       '2026-09-11',
     );
     expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [] });
-    await insertServerLog(sql, insertedIds, 'log', Buffer.from('test-key'));
+    await insertServerLog(sql, insertedIds, 'log');
     expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [1, 3] });
   });
 });

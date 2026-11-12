@@ -169,13 +169,7 @@ describe('AsyncSemaphore', () => {
 describe('TraceReplayWorkerPool', () => {
   it('frees workers before consume, bounds the backlog, and recovers from failures', async () => {
     const fixture = await traceFixture();
-    const expected = await prepareTraceReplay(
-      fixture.profile,
-      fixture.csv,
-      fixture.metrics,
-      {},
-      Buffer.from('test-key'),
-    );
+    const expected = await prepareTraceReplay(fixture.profile, fixture.csv, fixture.metrics);
     const smokeScript = fileURLToPath(new URL('trace-replay-worker-smoke.ts', import.meta.url));
     const { stdout } = await execFileAsync(
       'bun',

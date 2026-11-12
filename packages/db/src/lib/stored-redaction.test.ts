@@ -2,16 +2,15 @@ import type { PGlite } from '@electric-sql/pglite';
 import type { TransactionSql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { decodeChartSeriesSummary, encodeChartSeriesSummary } from '../etl/chart-series-summary';
-import type { ChartSeries } from '../etl/compute-chart-series';
 import { writeTextAsBlocks } from '../etl/server-log-block-writer';
 import { readServerLogBlocks } from '../server-log-blocks';
-import { redactStoredChartSeries, redactStoredServerLogFile } from './stored-redaction';
+import { redactStoredServerLogFile } from './stored-redaction';
 import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
 
-const KEY = Buffer.from('test-key');
-const RAW = 'peer 10.0.0.21:9100 ready\nremote=[node-a.subnet1.vcn1.oraclevcn.com]:29501\n';
-const REDACTED = 'peer ***REDACTED-95c83f***:9100 ready\nremote=[node-a.***REDACTED***]:29501\n';
+const RAW =
+  'peer 198.51.100.7:9100 ready\nremote=[node-a.subnet1.vcn1.oraclevcn.com]:29501 via 10.0.0.21\n';
+const REDACTED =
+  'peer ***REDACTED***:9100 ready\nremote=[node-a.***REDACTED***]:29501 via 10.0.0.21\n';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -26,7 +25,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.exec('TRUNCATE server_logs, agentic_trace_replay RESTART IDENTITY CASCADE');
+  await db.exec('TRUNCATE server_logs RESTART IDENTITY CASCADE');
 });
 
 function redactFile(fileName: string, primary: boolean, write: boolean) {
@@ -34,18 +33,9 @@ function redactFile(fileName: string, primary: boolean, write: boolean) {
     redactStoredServerLogFile(
       tx as unknown as TransactionSql,
       { logId: '1', fileName, primary },
-      KEY,
       write,
     ),
   );
-}
-
-async function stored() {
-  const [row] = await sql<{ chart_series: ChartSeries; summary: Uint8Array }[]>`
-    select chart_series, chart_series_summary_gz as summary
-    from agentic_trace_replay where id = 5
-  `;
-  return { series: row!.chart_series, summary: decodeChartSeriesSummary(row!.summary) };
 }
 
 async function storedLogs() {
@@ -112,100 +102,12 @@ describe('redactStoredServerLogFile', () => {
     expect(await sql`select count(*)::int as n from server_log_blocks`).toEqual([{ n: 1 }]);
   });
 
-  it('finds nothing left to change in redacted text', async () => {
+  it('finds nothing left to change in sanitized text', async () => {
     await redactFile('results/router.log', false, true);
 
     expect(await redactFile('results/router.log', false, true)).toEqual({
       changed: false,
       blockBacked: false,
-    });
-  });
-});
-
-function sourceIdentity(role: string, endpointUrl: string) {
-  return {
-    id: `trtllm|${role}|${endpointUrl}`,
-    adapter: 'trtllm',
-    role,
-    endpointUrl,
-    nativeRole: role,
-    workerId: null,
-    dpRank: null,
-    engine: null,
-  };
-}
-
-function chartSeries(prefillUrl: string, decodeUrl: string, labels: string[]): ChartSeries {
-  const empty = {
-    kvCacheUsage: [],
-    prefixCacheHitRate: [],
-    queueDepth: [],
-    promptTokensBySource: {},
-    prefixCacheHitsTps: [],
-    hostKvCacheUsage: [],
-    kvCacheUsageByEngine: [],
-  };
-  return {
-    ...empty,
-    version: 20,
-    startNs: 0,
-    endNs: 1e9,
-    durationS: 1,
-    timeslicesCount: 1,
-    prefillTps: [],
-    decodeTps: [],
-    kvCacheUsageByEngine: labels.map((engineLabel) => ({ engineLabel, points: [] })),
-    metricSources: [
-      { ...empty, source: sourceIdentity('prefill', prefillUrl), promptTps: [], generationTps: [] },
-      { ...empty, source: sourceIdentity('decode', decodeUrl), promptTps: [], generationTps: [] },
-    ] as ChartSeries['metricSources'],
-  };
-}
-
-describe('redactStoredChartSeries', () => {
-  const raw = chartSeries('http://10.0.0.21:9100/metrics', 'http://10.0.0.22:9100/metrics', [
-    '10.0.0.21:9100',
-    '10.0.0.22:9100',
-  ]);
-  const expected = chartSeries(
-    'http://***REDACTED-95c83f***:9100/metrics',
-    'http://***REDACTED-9b0b8d***:9100/metrics',
-    ['***REDACTED-95c83f***:9100', '***REDACTED-9b0b8d***:9100'],
-  );
-
-  beforeEach(async () => {
-    const json = JSON.stringify(raw);
-    await sql`
-      insert into agentic_trace_replay (id, chart_series, chart_series_summary_gz)
-      values (5, ${json}::jsonb, ${encodeChartSeriesSummary(json)})
-    `;
-  });
-
-  it('leaves both columns alone in a dry run', async () => {
-    expect(await redactStoredChartSeries(sql, 5, KEY, false)).toEqual({
-      series: true,
-      summary: true,
-    });
-    const { series } = await stored();
-    expect(series).toEqual(raw);
-  });
-
-  it('redacts chart_series and its summary to the same tags, once', async () => {
-    expect(await redactStoredChartSeries(sql, 5, KEY, true)).toEqual({
-      series: true,
-      summary: true,
-    });
-
-    const { series, summary } = await stored();
-    expect(series).toEqual(expected);
-    expect(summary.metricSources).toEqual(expected.metricSources.map(({ source }) => ({ source })));
-    expect(summary.kvCacheUsageByEngine.map((engine) => engine.engineLabel)).toEqual([
-      '***REDACTED-95c83f***:9100',
-      '***REDACTED-9b0b8d***:9100',
-    ]);
-    expect(await redactStoredChartSeries(sql, 5, KEY, true)).toEqual({
-      series: false,
-      summary: false,
     });
   });
 });

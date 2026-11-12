@@ -626,8 +626,7 @@ connections at 16 and above. Each connection holds up to about 1 GB while it com
 
 #### Log sanitization
 
-Ingest and `sync-public-db` pass stored log text and chart series through `etl/log-redaction.ts`
-(rules shared with InferenceX, vectors in `etl/log-redaction.vectors.json`).
+Ingest and `sync-public-db` sanitize server-log text with `etl/log-redaction.ts`.
 `bun run admin:db:backfill-log-redaction` applies it to rows stored earlier: dry run by default,
 `--write` to apply, `--run-id` to scope it, safe to rerun. Purge the log cache afterwards with
 `bun run admin:cache:invalidate -- <app-url> --immediate`.

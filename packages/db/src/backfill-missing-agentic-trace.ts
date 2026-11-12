@@ -2,7 +2,6 @@ import { readTraceProfileChunks } from './lib/trace-profile-storage';
 import { createHash } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { createAdminSql } from './etl/db-utils.js';
-import { processRedactionKey } from './etl/log-redaction.js';
 import { prepareTraceReplay, persistPreparedTraceReplay } from './etl/trace-replay-ingest.js';
 import { confirmProceed, parseRunIdFlag, runBackfillMain } from './lib/backfill-runner.js';
 
@@ -70,13 +69,10 @@ async function main(): Promise<void> {
   const metrics = zip.readFile('aiperf_artifacts/server_metrics_export.json');
   const csv = zip.readFile('aiperf_artifacts/server_metrics_export.csv');
   if (!profile || !metrics || !csv) throw new Error('Original trace files are missing');
-  const prepared = await prepareTraceReplay(
-    profile,
-    csv,
-    metrics,
-    { framework: 'sglang', disagg: false },
-    processRedactionKey,
-  );
+  const prepared = await prepareTraceReplay(profile, csv, metrics, {
+    framework: 'sglang',
+    disagg: false,
+  });
   if (!prepared.timelineRequests || !prepared.chartWindows)
     throw new Error('Recovered trace is empty');
   prepared.cacheHitRates = null;

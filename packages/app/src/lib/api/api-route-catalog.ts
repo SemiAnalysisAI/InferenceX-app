@@ -2220,8 +2220,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    // Self-heal sanitizes source labels as ingest does; shapes are unchanged.
-    sourceSha256: '2b372a3baa0cd94ec9c81c9a14ed1b1463f7d356cdce62df387e042709c18026',
+    sourceSha256: 'f86ced13ac76b5c8ee92d2dac0ba71103ff55fa2f7bd0f6be2799d3a2a5fb848',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

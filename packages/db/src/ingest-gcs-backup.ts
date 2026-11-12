@@ -3,7 +3,6 @@ import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
-import { processRedactionKey } from './etl/log-redaction';
 import {
   applyChangelogBackfills,
   applyRunFrameworkOverridesToChangelogs,
@@ -613,7 +612,7 @@ async function main(): Promise<void> {
               serverLogArtifact.zipPath,
               serverLogArtifact.artifactName,
             );
-            await insertServerLogFiles(sql, insertedIds, logFiles, processRedactionKey);
+            await insertServerLogFiles(sql, insertedIds, logFiles);
           }
         } catch (error: any) {
           tracker.recordDbError('benchmark', zipFile, error);

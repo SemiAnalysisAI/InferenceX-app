@@ -1,5 +1,4 @@
 import { hasNoSslFlag } from './cli-utils.js';
-import { redactChartSeriesSources } from './etl/chart-series-redaction.js';
 import {
   CHART_SERIES_SUMMARY_VERSION,
   encodeChartSeriesSummary,
@@ -10,7 +9,6 @@ import {
   type ChartSeries,
 } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
-import { processRedactionKey } from './etl/log-redaction.js';
 import {
   cacheHitRatesFromPromptTokenTotals,
   writeCacheHitMetrics,
@@ -127,7 +125,6 @@ async function main(): Promise<void> {
         'hostKvCacheUsage',
       ]);
 
-      redactChartSeriesSources(series, processRedactionKey);
       const json = JSON.stringify(series);
       await sql`
         update agentic_trace_replay

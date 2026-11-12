@@ -5,7 +5,6 @@ import path from 'node:path';
 import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
-import { processRedactionKey } from './etl/log-redaction.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
 import { downloadArtifact } from './lib/github-artifacts.js';
 import {
@@ -244,7 +243,7 @@ async function main(): Promise<void> {
             console.warn(`  [WARN] ${pair.serverLogs.name}: no log or launch files`);
             continue;
           }
-          await insertServerLogFilePaths(sql, resultIds, logFiles, processRedactionKey);
+          await insertServerLogFilePaths(sql, resultIds, logFiles);
           artifactsProcessed++;
           filesStored += logFiles.length;
           pointsLinked += resultIds.length;

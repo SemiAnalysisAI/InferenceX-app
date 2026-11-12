@@ -6,8 +6,6 @@ export interface TraceReplayWorkerJob {
   serverMetricsCsv: string | null;
   serverMetricsJson: string | null;
   metricsContext: ServerMetricsContext;
-  /** The parent's key, so every worker thread tags a host the same way. */
-  redactionKey: Uint8Array;
 }
 
 export interface TraceReplayWorkerRequest {
