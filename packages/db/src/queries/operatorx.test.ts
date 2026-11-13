@@ -15,6 +15,7 @@ import {
   getOperatorXRunComparison,
   getOperatorXRunComparisons,
   listOperatorXRuns,
+  packBySize,
   saveOperatorXBundle,
 } from './operatorx';
 
@@ -365,7 +366,7 @@ it.each(['42501', '08006', '57014'])(
   },
 );
 
-it('reads requested compact run revisions in one query with full single-read parity', async () => {
+it('reads requested compact run revisions with one size query and one batch read', async () => {
   const db = new PGlite();
   try {
     await migrate(db);
@@ -382,14 +383,14 @@ it('reads requested compact run revisions in one query with full single-read par
       return sql(strings, ...values);
     };
     const result = await getOperatorXRunComparisons(counted, runs, 'gemm');
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
     expect(result.size).toBe(2);
     for (const run of runs) {
       const raw = await getOperatorXBundle(sql, run.run_id);
       expect(result.get(run.run_id)).toEqual(expectedComparison(raw!));
     }
     expect(await getOperatorXRunComparisons(counted, [], 'gemm')).toEqual(new Map());
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
 
     const captured = runs.find((run) => run.run_id === '123')!;
     await saveOperatorXBundle(sql, first);
@@ -447,4 +448,24 @@ it('reads comparisons for more runs than one batch holds', async () => {
   } finally {
     await db.close();
   }
+});
+
+const identity = (n: number) => n;
+
+it('packs reads under the byte budget, isolating any oversized item', () => {
+  expect(packBySize([5, 5, 5, 5], identity, 10)).toEqual([
+    [5, 5],
+    [5, 5],
+  ]);
+  expect(packBySize([3, 12, 4, 4, 4], identity, 10)).toEqual([[3], [12], [4, 4], [4]]);
+  expect(packBySize([], identity, 10)).toEqual([]);
+  // Regression: eight 8.5 MiB gemm comparisons exceeded Neon's 64 MiB response cap.
+  const mib = 1024 * 1024;
+  const groups = packBySize(
+    Array.from({ length: 8 }, () => 8.5 * mib),
+    identity,
+    24 * mib,
+  );
+  expect(groups.every((g) => g.reduce((a, b) => a + b, 0) <= 24 * mib)).toBe(true);
+  expect(groups.flat()).toHaveLength(8);
 });
