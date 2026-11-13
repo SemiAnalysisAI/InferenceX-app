@@ -5,7 +5,9 @@ import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visu
 import { useId, useMemo, useState } from 'react';
 
 import ChartLegend from '@/components/ui/chart-legend';
+import { Label } from '@/components/ui/label';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics/analytics';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -23,12 +25,14 @@ const STRINGS = {
     empty: 'No shape has more than one size',
     tokens: 'Tokens',
     shape: 'Shape',
+    logScale: 'Log Scale',
     axis: (label: string, unit: string) => `${label} (${unit})`,
   },
   zh: {
     empty: '没有包含多个尺寸的形状',
     tokens: 'Token 数',
     shape: '形状',
+    logScale: '对数刻度',
     axis: (label: string, unit: string) => `${label}（${unit}）`,
   },
 };
@@ -51,6 +55,10 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
   const [slice, setSlice] = useState<string | null>(null);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
+  const logSwitchId = useId();
+  // Per-metric override of the metric's default scale; switching metric restores its default.
+  const [logOverride, setLogOverride] = useState<{ metric: string; log: boolean } | null>(null);
+  const log = logOverride?.metric === metric.id ? logOverride.log : metric.log;
   const defaults = view.defaults ?? comparisonDefaults(view);
   const current =
     groups.find(([k]) => k === slice) ??
@@ -63,11 +71,11 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
             current[1].flatMap((i) => {
               const x = view.cases[i].x;
               const y = model.value(hw, i);
-              return x && y !== null ? [{ hw, i, x, y }] : [];
+              return x && y !== null && (!log || y > 0) ? [{ hw, i, x, y }] : [];
             }),
           )
         : [],
-    [current, model, view],
+    [current, model, view, log],
   );
   if (!current) return <EmptyChart>{strings.empty}</EmptyChart>;
   const lines: Record<string, { x: number; y: number }[]> = {};
@@ -79,25 +87,40 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
   const sizeLabel = view.op === 'gemm' ? 'M' : strings.tokens;
   return (
     <div className="space-y-3">
-      {/* One shape needs no picker; the Model View op detail picks it for both charts */}
-      {groups.length > 1 && (
-        <SearchableSelect
-          size="sm"
-          searchable
-          value={current[0]}
-          onValueChange={(value) => {
-            track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
-            setSlice(value);
-          }}
-          triggerAriaLabel={strings.shape}
-          groups={[
-            {
-              label: '',
-              options: groups.map(([k]) => ({ value: k, label: k })),
-            },
-          ]}
-        />
-      )}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {/* One shape needs no picker; the Model View op detail picks it for both charts */}
+        {groups.length > 1 && (
+          <SearchableSelect
+            size="sm"
+            searchable
+            value={current[0]}
+            onValueChange={(value) => {
+              track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
+              setSlice(value);
+            }}
+            triggerAriaLabel={strings.shape}
+            groups={[
+              {
+                label: '',
+                options: groups.map(([k]) => ({ value: k, label: k })),
+              },
+            ]}
+          />
+        )}
+        <div className="flex items-center gap-2">
+          <Switch
+            id={logSwitchId}
+            checked={log}
+            onCheckedChange={(enabled) => {
+              track('operatorx_metric_vs_size_log_scale_toggled', { enabled, metric: metric.id });
+              setLogOverride({ metric: metric.id, log: enabled });
+            }}
+          />
+          <Label htmlFor={logSwitchId} className="text-sm font-normal text-muted-foreground">
+            {strings.logScale}
+          </Label>
+        </div>
+      </div>
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-metric-vs-size"
@@ -106,7 +129,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
         xScale={{ type: 'log', domain: [xs[0] / 1.2, xs.at(-1)! * 1.2], nice: false }}
         yScale={valueScale(
-          metric.log,
+          log,
           points.map((p) => p.y),
         )}
         xAxis={{

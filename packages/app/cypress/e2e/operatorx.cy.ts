@@ -145,6 +145,28 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     });
 });
 
+it('toggles the Metric vs size y-axis between log and linear scales', () => {
+  const dataset = normalizeBundle(run('105', 'h200-dgxc', [64, 128]));
+  cy.intercept(
+    'GET',
+    '/api/v1/operatorx/compare?op=gemm*',
+    comparisonView(buildComparison('gemm', [{ runner: 'h200-dgxc', dataset }]), null),
+  ).as('scale');
+  cy.visit('/opx');
+  cy.wait('@scale');
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.contains('label', 'Log Scale').should('be.visible');
+      // The default metric is a log-scaled one.
+      cy.get('[role="switch"]').should('have.attr', 'aria-checked', 'true');
+      cy.get('svg circle').its('length').as('logPoints');
+      cy.get('[role="switch"]').click().should('have.attr', 'aria-checked', 'false');
+      cy.get('@logPoints').then((n) => cy.get('svg circle').should('have.length', Number(n)));
+      cy.get('[role="switch"]').click().should('have.attr', 'aria-checked', 'true');
+    });
+});
+
 it('defaults to shared cases and shows disjoint FP8 measurements per accelerator on request', () => {
   const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
     const dataset = normalizeBundle(run(`fp8-disjoint-${gpu}`, runner, [64]));
