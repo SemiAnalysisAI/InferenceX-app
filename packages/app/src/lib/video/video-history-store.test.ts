@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 4,
-      // Muse's catalog logo changed; recorded video entries are unchanged.
-      sources: 'db9aff5ef4468c7a1603cba0a93440bfcbfef2addaf4c5972aa9dcb771b30a8b',
+      // The TCO basis selector models changed; recorded video entries are unchanged.
+      sources: '7954b0c06216ef719146017da85073d24a393decb606cd6fb0f1f9417b7d4ab0',
     });
   });
 });
