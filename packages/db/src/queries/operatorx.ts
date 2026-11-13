@@ -94,10 +94,12 @@ export async function getOperatorXRunComparison(
 }
 
 /**
- * Runs per comparison read. Neon's HTTP driver rejects responses over 64 MiB, and one
- * run's gemm comparison reaches ~5 MiB, so a single query over every run overflows.
+ * Serialized comparison bytes per read. Neon's HTTP driver rejects responses over
+ * 64 MiB, and a single run's gemm comparison already reaches ~8.5 MiB, so reads are
+ * packed by stored size rather than run count. JSON transport escaping inflates the
+ * payload, so the budget leaves wide headroom under the hard limit.
  */
-const COMPARISON_READ_BATCH = 8;
+export const COMPARISON_READ_BYTES = 24 * 1024 * 1024;
 
 /**
  * Comparisons written before the encoding fix were double-encoded: the driver
@@ -107,30 +109,59 @@ function storedComparison(value: unknown): Comparison {
   return (typeof value === 'string' ? JSON.parse(value) : value) as Comparison;
 }
 
-/** Read the listed revisions in bounded batches; absent/old projections use raw fallback. */
+/**
+ * Pack items into consecutive groups whose summed size stays within `budget`.
+ * An item larger than the budget is read alone.
+ */
+export function packBySize<T>(items: T[], size: (item: T) => number, budget: number): T[][] {
+  const groups: T[][] = [];
+  let current: T[] = [];
+  let used = 0;
+  for (const item of items) {
+    const bytes = size(item);
+    if (current.length > 0 && used + bytes > budget) {
+      groups.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(item);
+    used += bytes;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
+/** Read the listed revisions in size-bounded batches; absent/old projections use raw fallback. */
 export async function getOperatorXRunComparisons(
   sql: DbClient,
   runs: Pick<OperatorXRunRef, 'run_id' | 'revision'>[],
   op: ComparisonOp,
 ): Promise<Map<string, Comparison>> {
   const comparisons = new Map<string, Comparison>();
+  if (runs.length === 0) return comparisons;
   try {
-    for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
-      // An object, not a string or array: Neon's HTTP driver and postgres.js both JSON-encode
-      // it exactly once (Neon turns arrays into Postgres arrays; postgres.js re-encodes strings).
-      const requested = {
-        runs: runs.slice(i, i + COMPARISON_READ_BATCH).map((run) => ({
-          run_key: run.run_id,
-          revision: run.revision ?? null,
-        })),
-      };
+    // An object, not a string or array: Neon's HTTP driver and postgres.js both JSON-encode
+    // it exactly once (Neon turns arrays into Postgres arrays; postgres.js re-encodes strings).
+    const requested = {
+      runs: runs.map((run) => ({ run_key: run.run_id, revision: run.revision ?? null })),
+    };
+    const sized = await sql`
+      SELECT c.run_id, octet_length(c.comparison::text)::bigint AS bytes
+      FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'runs')
+        AS requested(run_key text, revision text)
+      JOIN opx_runs r ON r.run_key = requested.run_key
+        AND (requested.revision IS NULL OR r.id::text = requested.revision)
+      JOIN opx_run_comparisons c ON c.run_id = r.id
+      WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
+    `;
+    const batches = packBySize(sized, (row) => Number(row.bytes), COMPARISON_READ_BYTES);
+    for (const batch of batches) {
+      const ids = { ids: batch.map((row) => String(row.run_id)) };
       const rows = await sql`
         SELECT r.run_key, c.comparison
-        FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'runs')
-          AS requested(run_key text, revision text)
-        JOIN opx_runs r ON r.run_key = requested.run_key
-          AND (requested.revision IS NULL OR r.id::text = requested.revision)
-        JOIN opx_run_comparisons c ON c.run_id = r.id
+        FROM jsonb_array_elements_text((${ids as never}::jsonb) -> 'ids') AS wanted(id)
+        JOIN opx_run_comparisons c ON c.run_id::text = wanted.id
+        JOIN opx_runs r ON r.id = c.run_id
         WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
       `;
       for (const row of rows)
