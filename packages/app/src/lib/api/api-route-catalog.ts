@@ -1383,7 +1383,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: '2a8bef60f2ca619773c4eb8d9c52dec4de04298ef39516892c161ed3a4cb660c',
+    sourceSha256: 'cbacce994faad1de48a48d4d1cb4c452f0467e5dfa7d3fd57fef25e94a751274',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
