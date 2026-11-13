@@ -498,6 +498,8 @@ const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = 
   // GLM-5.2 and GLM-5.3 Flash have TPUv7 results on Agentic Traces only.
   [Model.GLM_5_2]: new Set([Sequence.AgenticTraces]),
   [Model.GLM_5_3_Flash]: new Set([Sequence.AgenticTraces]),
+  // Qwen3.8 Flash Next has TPUv7 results on Agentic Traces only.
+  [Model.Qwen3_8_Flash_Next]: new Set([Sequence.AgenticTraces]),
 };
 
 export function showsTcoBasisSelector(
