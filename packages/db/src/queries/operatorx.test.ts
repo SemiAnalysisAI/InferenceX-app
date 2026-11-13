@@ -9,11 +9,13 @@ import type { OperatorXRawBundle } from '../operatorx/bundle';
 import { OPERATORX_COMPARISON_OPS } from '../operatorx/comparison-cache';
 import { buildComparison } from '../operatorx/compare';
 import { normalizeBundle } from '../operatorx/normalize';
+import { compactTimeline } from '../operatorx/timeline';
 import {
   backfillOperatorXRunComparisons,
   getOperatorXBundle,
   getOperatorXRunComparison,
   getOperatorXRunComparisons,
+  getOperatorXTimelines,
   listOperatorXRuns,
   packBySize,
   saveOperatorXBundle,
@@ -98,7 +100,9 @@ function sqlFor(db: PGlite): Sql & DbClient {
 async function migrate(db: PGlite, compact = true): Promise<void> {
   for (const name of [
     '001_initial_schema.sql',
-    ...(compact ? ['002_comparison_cache.sql', '003_comparison_attention.sql'] : []),
+    ...(compact
+      ? ['002_comparison_cache.sql', '003_comparison_attention.sql', '004_timeline_cache.sql']
+      : []),
   ]) {
     await db.exec(
       await readFile(new URL(`../../migrations-operatorx/${name}`, import.meta.url), 'utf8'),
@@ -447,6 +451,98 @@ it('reads comparisons for more runs than one batch holds', async () => {
     expect([...comparisons.values()].every((c) => c.op === 'gemm')).toBe(true);
   } finally {
     await db.close();
+  }
+});
+
+function profiledBundle(): OperatorXRawBundle {
+  const raw = bundle();
+  const [first] = (raw.shards[0].docs[0] as { rows: { metrics: Record<string, unknown> }[] }).rows;
+  first.metrics = {
+    latency_us: 10,
+    profile: {
+      timeline: [
+        { name: 'void nvjet_gemm', stream: 7, start_us: 0, dur_us: 6 },
+        { name: 'splitKreduce', stream: 7, start_us: 6, dur_us: 2 },
+      ],
+    },
+  };
+  return raw;
+}
+
+it('precomputes per-result timelines at ingest and reads them by ref', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const raw = profiledBundle();
+    await saveOperatorXBundle(sql, raw);
+    const [run] = await listOperatorXRuns(sql);
+    const ref = (index: number, revision = run.revision!) => ({ runId: '123', index, revision });
+    const key = (index: number, revision = run.revision!) => `123:${index}:${revision}`;
+    const stored = await getOperatorXBundle(sql, '123');
+    const expected = compactTimeline(normalizeBundle(stored!).metrics[0]);
+    const read = (refs: ReturnType<typeof ref>[], op: 'gemm' | 'moe' = 'gemm') =>
+      getOperatorXTimelines(sql, refs, op);
+    expect(expected).not.toBeNull();
+
+    const hits = await getOperatorXTimelines(sql, [ref(0), ref(99)], 'gemm');
+    expect(hits.get(key(0))).toEqual({ timeline: expected, known: true });
+    // An index past the run's results is answered from the projection, not raw documents.
+    expect(hits.get(key(99))).toEqual({ timeline: null, known: false });
+    // The wrong op family never returns another op's kernels.
+    const wrongOp = await read([ref(0)], 'moe');
+    expect(wrongOp.get(key(0))).toEqual({ timeline: null, known: false });
+    // A stale revision or a run ingested before the projection falls back (absent).
+    const stale = await read([ref(0, '999')]);
+    expect(stale.size).toBe(0);
+    await db.exec('DELETE FROM opx_run_timelines');
+    const unprojected = await read([ref(0)]);
+    expect(unprojected.size).toBe(0);
+
+    // Backfill restores the rows; a re-ingest replaces them under the new revision.
+    expect(await backfillOperatorXRunComparisons(sql, stored!)).toBe(true);
+    const backfilled = await read([ref(0)]);
+    expect(backfilled.get(key(0))?.timeline).toEqual(expected);
+    await saveOperatorXBundle(sql, raw);
+    const [next] = await listOperatorXRuns(sql);
+    const replaced = await read([ref(0)]);
+    expect(replaced.size).toBe(0);
+    const current = await read([ref(0, next.revision!)]);
+    expect(current.get(key(0, next.revision!))).toEqual({ timeline: expected, known: true });
+  } finally {
+    await db.close();
+  }
+});
+
+it('stores a null timeline for unprofiled results and tolerates a missing table', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    await saveOperatorXBundle(sql, bundle());
+    const [run] = await listOperatorXRuns(sql);
+    const hit = await getOperatorXTimelines(
+      sql,
+      [{ runId: '123', index: 0, revision: run.revision! }],
+      'gemm',
+    );
+    expect(hit.get(`123:0:${run.revision}`)).toEqual({ timeline: null, known: true });
+    expect(await getOperatorXTimelines(sql, [], 'gemm')).toEqual(new Map());
+  } finally {
+    await db.close();
+  }
+  const bare = new PGlite();
+  try {
+    await migrate(bare, false);
+    expect(
+      await getOperatorXTimelines(
+        sqlFor(bare),
+        [{ runId: '123', index: 0, revision: '1' }],
+        'gemm',
+      ),
+    ).toEqual(new Map());
+  } finally {
+    await bare.close();
   }
 });
 

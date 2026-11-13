@@ -108,11 +108,22 @@ suppresses a SQL error. Responses and timeline identities are preserved.
 中文：一次 SQL 查询读取所列 revision，按最新优先合并；仅缺失或过期的记录回退至原始数据，
 仅缺表错误可触发整体回退。响应和时间线标识保持一致。
 
+### Precomputed kernel timelines
+
+`opx_run_timelines` (migration 004) stores one row per result with its compact kernel
+timeline (null when unprofiled), written in the same transaction as the comparisons.
+`/api/v1/operatorx/timelines` answers refs from it in one query; only runs without rows
+at the current `TIMELINE_VERSION` load raw documents. A GEMM case previously loaded
+~300 MiB of raw documents across eight runs per click.
+
+中文：`opx_run_timelines`（迁移 004）为每个结果存储一行精简的 kernel 时间线（未 profiling 时为 null），与比较数据在同一事务中写入。时间线接口通过一次查询读取；只有缺少当前版本记录的运行才回退读取原始文档。
+
 ### Rollout and backfill
 
 1. Apply the migration: `bun run admin:db:migrate:operatorx -- --yes`.
 2. Give the role used by `DATABASE_OPERATORX_READONLY_URL` SELECT access to
-   `opx_run_comparisons` if owner default privileges do not already cover new tables.
+   `opx_run_comparisons` and `opx_run_timelines` if owner default privileges do not
+   already cover new tables.
 3. Preview existing runs: `bun run admin:db:backfill:operatorx-comparisons -- --all`.
 4. Populate compact data: `bun run admin:db:backfill:operatorx-comparisons -- --all --yes`.
 5. Deploy the reader and purge `/api/v1/invalidate?scope=operatorx`; warm

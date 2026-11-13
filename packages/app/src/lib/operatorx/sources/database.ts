@@ -8,6 +8,8 @@ import {
   getOperatorXBundle,
   getOperatorXRunComparison,
   getOperatorXRunComparisons,
+  getOperatorXTimelines,
+  type StoredTimelineRef,
   listOperatorXRuns,
   RUN_KEY_RE,
 } from '@semianalysisai/inferencex-db/queries/operatorx';
@@ -30,6 +32,10 @@ export class DatabaseSource implements OperatorXSource {
     if (runs.some((run) => !RUN_KEY_RE.test(run.run_id)))
       throw new OperatorXSourceError('Invalid run ID', 400);
     return getOperatorXRunComparisons(getOperatorXDb(), runs, op);
+  }
+
+  getTimelines(refs: StoredTimelineRef[], op: ComparisonOp) {
+    return getOperatorXTimelines(getOperatorXDb(), refs, op);
   }
 
   async getBundle(runId: string): Promise<OperatorXRawBundle> {

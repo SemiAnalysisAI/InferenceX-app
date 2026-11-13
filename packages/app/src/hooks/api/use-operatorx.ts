@@ -102,6 +102,8 @@ function timelinesQuery(op: ComparisonOp, refs: string[]) {
         signal,
       ),
     staleTime: 5 * 60_000,
+    // One retry: three default retries of a slow read kept the detail spinning for minutes.
+    retry: 1,
   };
 }
 

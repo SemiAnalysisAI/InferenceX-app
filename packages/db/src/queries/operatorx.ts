@@ -8,15 +8,17 @@ import {
   planFromManifest,
 } from '../operatorx/bundle';
 import { normalizeBundle } from '../operatorx/normalize';
-import type { Comparison, ComparisonOp } from '../operatorx/compare';
+import { type Comparison, type ComparisonOp, opFamily } from '../operatorx/compare';
 import {
   buildRunComparison,
   OPERATORX_COMPARISON_OPS,
   OPERATORX_COMPARISON_VERSION,
 } from '../operatorx/comparison-cache';
+import { compactTimeline, type OperatorXTimeline, TIMELINE_VERSION } from '../operatorx/timeline';
 
 const DOCS_INSERT_CHUNK = 20;
 const DOCS_READ_BATCH = 8;
+const TIMELINE_INSERT_CHUNK = 200;
 
 export const RUN_KEY_RE = /^[\w.-]{1,128}$/u;
 
@@ -193,6 +195,82 @@ async function writeRunComparisons(
       ON CONFLICT (run_id, op) DO UPDATE
       SET format_version = EXCLUDED.format_version, comparison = EXCLUDED.comparison
     `;
+  }
+  await writeRunTimelines(tx, dataset, revision);
+}
+
+/** One row per result, so a missing row means "not precomputed", never "not profiled". */
+async function writeRunTimelines(
+  tx: TransactionSql,
+  dataset: ReturnType<typeof normalizeBundle>,
+  revision: string,
+): Promise<void> {
+  await tx`DELETE FROM opx_run_timelines WHERE run_id = ${revision}`;
+  const rows = dataset.results.map((result, index) => ({
+    result_index: index,
+    op: opFamily(result.opType),
+    timeline: compactTimeline(dataset.metrics[index]),
+  }));
+  for (let i = 0; i < rows.length; i += TIMELINE_INSERT_CHUNK) {
+    const chunk = { rows: rows.slice(i, i + TIMELINE_INSERT_CHUNK) };
+    await tx`
+      INSERT INTO opx_run_timelines (run_id, result_index, format_version, op, timeline)
+      SELECT ${revision}, t.result_index, ${TIMELINE_VERSION}, t.op, t.timeline
+      FROM jsonb_to_recordset((${chunk as never}::jsonb) -> 'rows')
+        AS t(result_index int, op text, timeline jsonb)
+    `;
+  }
+}
+
+export interface StoredTimelineRef {
+  runId: string;
+  index: number;
+  revision: string;
+}
+
+/**
+ * Precomputed timelines keyed by `runId:index:revision`. A ref whose run revision has no
+ * rows at the current format is absent from the map (caller falls back to raw documents);
+ * otherwise `known` is false when the index is out of range or belongs to another op.
+ */
+export async function getOperatorXTimelines(
+  sql: DbClient,
+  refs: StoredTimelineRef[],
+  op: ComparisonOp,
+): Promise<Map<string, { timeline: OperatorXTimeline | null; known: boolean }>> {
+  const found = new Map<string, { timeline: OperatorXTimeline | null; known: boolean }>();
+  if (refs.length === 0) return found;
+  const requested = {
+    refs: refs.map((r) => ({ run_key: r.runId, revision: r.revision, result_index: r.index })),
+  };
+  try {
+    const rows = await sql`
+      SELECT q.run_key, q.revision, q.result_index,
+        t.result_index IS NOT NULL AS has_row, t.op, t.timeline,
+        EXISTS (
+          SELECT 1 FROM opx_run_timelines a
+          WHERE a.run_id = r.id AND a.format_version = ${TIMELINE_VERSION}
+        ) AS precomputed
+      FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'refs')
+        AS q(run_key text, revision text, result_index int)
+      JOIN opx_runs r ON r.run_key = q.run_key AND r.id::text = q.revision
+      LEFT JOIN opx_run_timelines t ON t.run_id = r.id
+        AND t.result_index = q.result_index AND t.format_version = ${TIMELINE_VERSION}
+    `;
+    for (const row of rows) {
+      if (!row.precomputed) continue;
+      const ref = `${row.run_key}:${row.result_index}:${row.revision}`;
+      const known = Boolean(row.has_row) && row.op === op;
+      found.set(ref, {
+        timeline: known ? ((row.timeline as OperatorXTimeline | null) ?? null) : null,
+        known,
+      });
+    }
+    return found;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '42P01')
+      return found;
+    throw error;
   }
 }
 
