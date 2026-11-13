@@ -102,7 +102,6 @@ const STRINGS = {
     precision: 'Precision',
     computePrecision: 'Compute precision',
     oneDevice: '1 GPU',
-    split: (label: string, cases: number) => `${label} (${cases})`,
     metricOption: (label: string, unit: string) => `${label} (${unit})`,
     tokens: 'Tokens',
     all: 'All',
@@ -139,7 +138,6 @@ const STRINGS = {
     precision: '精度',
     computePrecision: '计算精度',
     oneDevice: '单 GPU',
-    split: (label: string, cases: number) => `${label}（${cases}）`,
     metricOption: (label: string, unit: string) => `${label}（${unit}）`,
     tokens: 'Token 数',
     all: '全部',
@@ -829,7 +827,7 @@ const ModelControls = memo(
     requested: string;
     modelOptions: string[];
     split: string;
-    splits: { key: string; label: string; cases: number }[];
+    splits: { key: string; label: string }[];
     metric: string;
     precision: ComputePrecision | null;
     precisions: ComputePrecision[];
@@ -863,10 +861,7 @@ const ModelControls = memo(
                 label: '',
                 options: splits.map((o) => ({
                   value: o.key || ONE_DEVICE,
-                  label: STRINGS[locale].split(
-                    o.key ? o.label : STRINGS[locale].oneDevice,
-                    o.cases,
-                  ),
+                  label: o.key ? o.label : STRINGS[locale].oneDevice,
                 })),
               },
             ]}
@@ -1094,11 +1089,11 @@ export function ModelView({
 
   // Device splits any of the model's ops has cases at; one device by default.
   const splits = useMemo(() => {
-    const cases = new Map<string, number>();
+    const keys = new Set<string>();
     for (const v of [gemm.data, moe.data, attention.data])
-      for (const o of v?.parallelOptions ?? []) cases.set(o.key, (cases.get(o.key) ?? 0) + o.cases);
-    return [...cases]
-      .map(([key, n]) => ({ key, label: parallelLabel(key), cases: n }))
+      for (const o of v?.parallelOptions ?? []) keys.add(o.key);
+    return [...keys]
+      .map((key) => ({ key, label: parallelLabel(key) }))
       .sort((a, b) => compareSplits(a.key, b.key));
   }, [gemm.data, moe.data, attention.data]);
   // A split the model has; any other (e.g. the Data API's `1` for one device) opens on the
