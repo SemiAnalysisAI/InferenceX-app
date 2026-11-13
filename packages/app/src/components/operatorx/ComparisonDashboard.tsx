@@ -49,7 +49,6 @@ const STRINGS = {
     baseline: 'Baseline',
     none: 'None',
     oneDevice: '1 GPU',
-    split: (label: string, cases: number) => `${label} (${cases})`,
     loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
   },
   zh: {
@@ -62,7 +61,6 @@ const STRINGS = {
     baseline: '基线',
     none: '无',
     oneDevice: '单 GPU',
-    split: (label: string, cases: number) => `${label}（${cases}）`,
     loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
   },
 };
@@ -356,7 +354,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                   label: '',
                   options: view.parallelOptions.map((o) => ({
                     value: o.key || ONE_DEVICE,
-                    label: strings.split(o.key ? o.label : strings.oneDevice, o.cases),
+                    label: o.key ? o.label : strings.oneDevice,
                   })),
                 },
               ]}
