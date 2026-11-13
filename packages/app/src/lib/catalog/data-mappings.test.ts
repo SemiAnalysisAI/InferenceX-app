@@ -379,7 +379,7 @@ describe('showsTcoBasisSelector', () => {
     },
   );
 
-  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash])(
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash, Model.Qwen3_8_Flash_Next])(
     'shows the selector for %s only on AgentX',
     (model) => {
       for (const sequence of Object.values(Sequence)) {
