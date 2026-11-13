@@ -57,7 +57,7 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
           <ArrowLeft aria-hidden="true" className="size-4" />
           {t.back}
         </Link>
-        <p className="mt-6 font-mono text-xs text-muted-foreground">agentx-harness · 1.0.13</p>
+        <p className="mt-6 font-mono text-xs text-muted-foreground">agentx-harness · 1.0.14</p>
         <h1 className="mt-2 text-3xl font-semibold text-balance md:text-4xl">{t.title}</h1>
         <p className="mt-4 leading-reading text-muted-foreground">{t.description}</p>
       </header>
@@ -90,7 +90,7 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
               <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
             <Link
-              href="https://github.com/SemiAnalysisAI/agentx-harness/tree/agentx-v1.0.13"
+              href="https://github.com/SemiAnalysisAI/agentx-harness/tree/agentx-v1.0.14"
               className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
             >
               {t.repository}

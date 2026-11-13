@@ -9,7 +9,7 @@ chat-completions server, then set `HUGGINGFACE_MODEL_NAME` and `CONC_SESSIONS`
 for your deployment:
 
 ```bash
-pip install 'agentx-harness==1.0.13'
+pip install 'agentx-harness==1.0.14'
 
 export HUGGINGFACE_MODEL_NAME="org/model"
 export CONC_SESSIONS=16
