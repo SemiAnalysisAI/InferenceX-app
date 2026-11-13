@@ -1,3 +1,5 @@
+import type { StoredTimelineRef } from '@semianalysisai/inferencex-db/queries/operatorx';
+import type { OperatorXTimeline } from '@semianalysisai/inferencex-db/operatorx/timeline';
 import type { Comparison, ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import type {
   OperatorXRawBundle,
@@ -14,6 +16,11 @@ export interface OperatorXSource {
     runs: OperatorXRunRef[],
     op: ComparisonOp,
   ) => Promise<Map<string, Comparison>>;
+  /** Precomputed timelines; refs absent from the map fall back to raw documents. */
+  getTimelines?: (
+    refs: StoredTimelineRef[],
+    op: ComparisonOp,
+  ) => Promise<Map<string, { timeline: OperatorXTimeline | null; known: boolean }>>;
   getBundle: (runId: string) => Promise<OperatorXRawBundle>;
 }
 
