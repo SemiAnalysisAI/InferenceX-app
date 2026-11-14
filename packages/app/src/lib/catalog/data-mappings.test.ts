@@ -528,13 +528,10 @@ describe('isSequenceHiddenForModel', () => {
     ).toEqual([Sequence.EightK_OneK, Sequence.AgenticTraces]);
     expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_3_Flash)).toBe('default');
   });
-  it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
-    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
+  it('shows 8K/1K and Agentic coding for GLM-5.2 / GLM-5.3', () => {
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(false);
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
-  });
-
-  it('also marks the hidden GLM 8K/1K retired for category consumers', () => {
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('deprecated');
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('default');
     expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.GLM_5_2)).toBe('default');
   });
 
