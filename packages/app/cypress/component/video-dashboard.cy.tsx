@@ -721,6 +721,23 @@ describe('VideoGenX results', () => {
       .find('[aria-pressed="true"]')
       .should('contain', '4 GPU');
     cy.get('[data-testid="video-results-detail"] nav').should('not.exist');
+    cy.get('[data-testid="results-detail-actions"]')
+      .should('have.attr', 'role', 'group')
+      .within(() => {
+        cy.get('[data-action="run"]')
+          .should(
+            'have.attr',
+            'href',
+            'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789',
+          )
+          .and('contain', 'GitHub Actions run');
+        cy.get('[data-action="artifact"]')
+          .should('have.attr', 'href')
+          .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
+        cy.get('[data-action="reproduce"]')
+          .should('have.attr', 'href')
+          .and('contain', 'video-generation/SUBMITTING.md');
+      });
     cy.get('[data-testid="results-power-trace"] svg').should('exist');
     cy.get('[data-testid="results-detail-latency"]')
       .invoke('text')

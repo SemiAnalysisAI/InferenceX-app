@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
+import { detailLinks } from './detail-links';
 import { runtimeLabel } from './optimizations';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
@@ -97,6 +98,10 @@ const STRINGS = {
     approval: 'Publication approval',
     approved: 'Approved',
     unapproved: 'No matching approval receipt',
+    actions: 'Run actions',
+    actionRun: 'GitHub Actions run',
+    actionArtifact: 'Download artifact',
+    actionReproduce: 'Reproduce',
   },
   zh: {
     back: '返回概览',
@@ -174,6 +179,10 @@ const STRINGS = {
     approval: '发布批准',
     approved: '已批准',
     unapproved: '未找到匹配的发布批准回执',
+    actions: '运行操作',
+    actionRun: 'GitHub Actions 运行',
+    actionArtifact: '下载产物',
+    actionReproduce: '复现',
   },
 };
 
@@ -340,6 +349,32 @@ export default function VideoDeploymentDetail({
               ],
             ]}
           />
+          <div
+            className="flex flex-wrap gap-2 border-t border-border/70 pt-4"
+            role="group"
+            aria-label={s.actions}
+            data-testid="results-detail-actions"
+          >
+            {detailLinks(point).map((link) => (
+              <Button key={link.action} asChild variant="outline" size="sm">
+                <a
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-action={link.action}
+                  onClick={() =>
+                    track('video_results_detail_action_opened', { action: link.action })
+                  }
+                >
+                  {link.action === 'run'
+                    ? s.actionRun
+                    : link.action === 'artifact'
+                      ? s.actionArtifact
+                      : s.actionReproduce}
+                </a>
+              </Button>
+            ))}
+          </div>
         </div>
       </Card>
       <Card>
