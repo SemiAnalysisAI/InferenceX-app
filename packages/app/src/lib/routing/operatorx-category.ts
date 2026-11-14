@@ -13,6 +13,7 @@ export type OperatorXCategory = (typeof OPERATORX_CATEGORIES)[number]['slug'];
 const OPERATORX_PATH = getDashboardRoute('operatorx').path;
 
 export const DEFAULT_OPERATORX_CATEGORY: OperatorXCategory = 'gemm';
+export const DEFAULT_OPERATORX_MODEL = 'DeepSeek-R1-0528';
 
 export function isOperatorXCategory(value: string | null | undefined): value is OperatorXCategory {
   return OPERATORX_CATEGORIES.some((entry) => entry.slug === value);

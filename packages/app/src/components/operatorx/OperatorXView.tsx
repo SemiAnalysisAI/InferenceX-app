@@ -15,6 +15,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
 import {
   DEFAULT_OPERATORX_CATEGORY,
+  DEFAULT_OPERATORX_MODEL,
   isOperatorXCategory,
   OPERATORX_CATEGORIES,
   operatorXCategoryForPathname,
@@ -23,7 +24,7 @@ import {
 } from '@/lib/routing/operatorx-category';
 
 import { ComparisonDashboard } from './ComparisonDashboard';
-import { DEFAULT_MODEL, ModelViewLoading } from './model-view/shell';
+import { ModelViewLoading } from './model-view/shell';
 
 const ModelView = dynamic(() => import('./model-view/ModelView').then((mod) => mod.ModelView), {
   loading: ModelViewLoading,
@@ -41,7 +42,7 @@ function selectCategory(value: string) {
 
 function ModelViewTab() {
   const search = new URLSearchParams(useClientSearch());
-  const model = search.get('model') ?? DEFAULT_MODEL;
+  const model = search.get('model') ?? DEFAULT_OPERATORX_MODEL;
   const parallel = search.get('parallel');
   const gemm = useOperatorXModel('gemm', model, parallel);
   const moe = useOperatorXModel('moe', model, parallel);

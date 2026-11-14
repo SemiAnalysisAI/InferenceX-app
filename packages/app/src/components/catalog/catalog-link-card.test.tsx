@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,10 +29,13 @@ afterEach(() => {
   container.remove();
 });
 
+const renderWithClient = (ui: React.ReactNode) =>
+  root.render(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
+
 describe('CatalogLinkCard', () => {
   it('keeps catalog links focusable and exposes the scan hierarchy', () => {
     act(() => {
-      root.render(
+      renderWithClient(
         <CatalogLinkCard
           href="/run/kimi-h100"
           title="Kimi on H100"
@@ -54,7 +58,7 @@ describe('CatalogLinkCard', () => {
 
   it('renders localized titles without changing the destination contract', () => {
     act(() => {
-      root.render(
+      renderWithClient(
         <CatalogLinkCard
           href="/zh/rankings/fastest-gpu-for-kimi"
           title="Kimi 最快 GPU 排行"

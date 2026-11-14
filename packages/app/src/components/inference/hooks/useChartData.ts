@@ -4,6 +4,7 @@ import {
   applyAgenticPercentileToXLabel,
   applyScopeFilters,
   buildComparisonDates,
+  chartBenchmarkQueryDate,
   dedupeRowsToLatestPerConfig,
   filterOverviewHistoryRows,
   flipRooflineDirection,
@@ -144,11 +145,7 @@ export function useChartData(
   prefetchLatestRows = false,
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
-  const queryDate = asOfRunId
-    ? (selectedRunDate ?? '')
-    : selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
-      ? ''
-      : selectedRunDate;
+  const queryDate = chartBenchmarkQueryDate(selectedRunDate, latestAvailableDate, asOfRunId);
 
   const {
     data: queriedBaseRows,

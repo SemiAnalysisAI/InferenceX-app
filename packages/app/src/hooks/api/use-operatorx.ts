@@ -80,15 +80,23 @@ export function useOperatorXComparison(
 }
 
 /** Every case one model contributes to an op family at one device split, across hardware. */
-export function useOperatorXModel(op: ComparisonOp, model: string | null, parallel: string | null) {
+export function operatorXModelQuery(
+  op: ComparisonOp,
+  model: string | null,
+  parallel: string | null,
+) {
   const params = new URLSearchParams({ op });
   if (model) params.set('model', model);
   if (parallel !== null) params.set('parallel', parallel);
-  return useQuery({
+  return queryOptions({
     queryKey: ['operatorx', 'model', op, model, parallel],
     queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
     staleTime: 5 * 60_000,
   });
+}
+
+export function useOperatorXModel(op: ComparisonOp, model: string | null, parallel: string | null) {
+  return useQuery(operatorXModelQuery(op, model, parallel));
 }
 
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;

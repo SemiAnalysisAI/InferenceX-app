@@ -3,7 +3,11 @@ import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
 import { getDashboardRoute } from './src/lib/routing/dashboard-routes';
 import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
-import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
+import {
+  DEFAULT_INFERENCE_MODEL_SLUG,
+  DEFAULT_INFERENCE_REDIRECT_MISSING,
+  INFERENCE_MODEL_ALIAS_REDIRECTS,
+} from './src/lib/routing/inference-model-redirects';
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
 
 // Public files keep stable names across deploys, so they revalidate daily instead of being immutable.
@@ -80,13 +84,9 @@ const nextConfig: NextConfig = {
       // The featured model can change; do not permanently cache this default.
       ...LOCALE_PREFIXES.map((prefix) => ({
         source: `${prefix}${INFERENCE_PATH}`,
-        destination: `${prefix}${INFERENCE_PATH}/kimi-k31-pro`,
+        destination: `${prefix}${INFERENCE_PATH}/${DEFAULT_INFERENCE_MODEL_SLUG}`,
         permanent: false,
-        missing: [
-          { type: 'query' as const, key: 'g_model' },
-          { type: 'query' as const, key: 'i_metric', value: 'y_measured[A-Za-z]+' },
-          { type: 'query' as const, key: 'i_power', value: '(?:.*,)?(?:certified|legacy)(?:,.*)?' },
-        ],
+        missing: [...DEFAULT_INFERENCE_REDIRECT_MISSING],
       })),
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       ...HISTORICAL_MODEL_ALIAS_REDIRECTS,

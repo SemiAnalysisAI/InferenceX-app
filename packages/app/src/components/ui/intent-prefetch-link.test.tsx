@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,17 +18,23 @@ import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 let container: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
 
 beforeEach(() => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
+  queryClient = new QueryClient();
 });
 
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  queryClient.clear();
 });
+
+const renderWithClient = (ui: React.ReactNode) =>
+  root.render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 
 const link = () => container.querySelector('a')!;
 
@@ -42,14 +49,14 @@ const move = (x: number, y: number, t: number, pointerType = 'mouse') => {
   });
 };
 const renderAt = (left: number, top: number, width: number, height: number) => {
-  act(() => root.render(<IntentPrefetchLink href="/overview">Overview</IntentPrefetchLink>));
+  act(() => renderWithClient(<IntentPrefetchLink href="/overview">Overview</IntentPrefetchLink>));
   const rect = { left, top, width, height, right: left + width, bottom: top + height };
   link().getBoundingClientRect = () => rect as DOMRect;
 };
 
 describe('IntentPrefetchLink', () => {
   it('does not prefetch while the link is merely on screen', () => {
-    act(() => root.render(<IntentPrefetchLink href="/overview">Overview</IntentPrefetchLink>));
+    act(() => renderWithClient(<IntentPrefetchLink href="/overview">Overview</IntentPrefetchLink>));
     expect(link().dataset.prefetch).toBe('false');
   });
 
@@ -60,7 +67,7 @@ describe('IntentPrefetchLink', () => {
     const onMouseEnter = vi.fn();
     const onFocus = vi.fn();
     act(() =>
-      root.render(
+      renderWithClient(
         <IntentPrefetchLink href="/overview" onMouseEnter={onMouseEnter} onFocus={onFocus}>
           Overview
         </IntentPrefetchLink>,
@@ -75,7 +82,7 @@ describe('IntentPrefetchLink', () => {
 
   it('keeps an explicitly disabled prefetch off after intent', () => {
     act(() =>
-      root.render(
+      renderWithClient(
         <IntentPrefetchLink href="/overview" prefetch={false}>
           Overview
         </IntentPrefetchLink>,
@@ -85,6 +92,43 @@ describe('IntentPrefetchLink', () => {
       link().dispatchEvent(new Event('focusin', { bubbles: true }));
     });
     expect(link().dataset.prefetch).toBe('false');
+  });
+
+  describe('route data', () => {
+    beforeEach(() => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => new Promise(() => {})),
+      );
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('warms the target page queries on intent, not before', () => {
+      act(() =>
+        renderWithClient(
+          <IntentPrefetchLink href="/infx/submissions">Submissions</IntentPrefetchLink>,
+        ),
+      );
+      expect(queryClient.getQueryState(['submissions'])).toBeUndefined();
+      act(() => {
+        link().dispatchEvent(new Event('focusin', { bubbles: true }));
+      });
+      expect(queryClient.getQueryState(['submissions'])?.fetchStatus).toBe('fetching');
+    });
+
+    it('does not warm data when prefetch is disabled', () => {
+      act(() =>
+        renderWithClient(
+          <IntentPrefetchLink href="/zh/infx/submissions" prefetch={false}>
+            Submissions
+          </IntentPrefetchLink>,
+        ),
+      );
+      act(() => {
+        link().dispatchEvent(new Event('focusin', { bubbles: true }));
+      });
+      expect(queryClient.getQueryState(['submissions'])).toBeUndefined();
+    });
   });
 
   describe('pointer trajectory', () => {

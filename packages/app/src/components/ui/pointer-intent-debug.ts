@@ -125,8 +125,13 @@ export function mountPointerIntentDebug() {
       init?.headers ?? (input instanceof Request ? input.headers : undefined),
     );
     const isRsc = headers.has('rsc') || url.includes('_rsc=');
-    if (!isRsc) return realFetch(input, init);
-    const kind = headers.has('next-router-prefetch') ? '⬇ prefetch ' : '⇢ nav fetch';
+    const isData = new URL(url, location.href).pathname.startsWith('/api/');
+    if (!isRsc && !isData) return realFetch(input, init);
+    const kind = isData
+      ? '◆ data     '
+      : headers.has('next-router-prefetch')
+        ? '⬇ prefetch '
+        : '⇢ nav fetch';
     const start = performance.now();
     push(`${kind}  ${pathOf(url)}  start`);
     const res = await realFetch(input, init);
