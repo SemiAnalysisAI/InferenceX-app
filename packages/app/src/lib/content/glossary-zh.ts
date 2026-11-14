@@ -31,6 +31,146 @@ type GlossaryTranslation = Pick<
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
+  'open-loop-benchmark': {
+    term: '开环基准测试',
+    aliases: ['open-loop benchmark', '开环负载测试', '按到达时间驱动的负载'],
+    plainEnglish:
+      '开环基准测试按预定规则发送新请求，不等待先前请求完成，因此能观察请求到达速度超过服务能力时的表现。',
+    definition:
+      '开环基准测试根据外部设定的速率或时间戳序列安排请求到达，而不是等待每个客户端的上一条响应。',
+    explanation:
+      '请求可以等间隔到达，也可以按概率分布生成，或按记录的时间戳回放。服务变慢时，外部负载仍可持续到达，队列随之增长。客户端并发上限或背压可能阻止请求按计划发出，因此必须区分目标速率与实际发送速率。',
+    significance:
+      '闭环客户端会在响应变慢时减少发送请求，可能掩盖过载；开环测试能暴露这类排队问题。结果不仅取决于平均速率，还取决于到达流量的突发程度和测量窗口长度。',
+    benchmarkContext:
+      'AgentX 使用存在依赖关系的闭环智能体会话。其客户端并发量不等于开环请求速率；比较两种负载模型前，应先说明各自的请求到达规则。',
+  },
+  'request-rate': {
+    term: '请求到达速率',
+    aliases: ['request rate', 'arrival rate', 'RPS', '每秒请求数'],
+    plainEnglish:
+      '请求到达速率描述新请求进入系统的速度，不是正在运行的请求数，也不是已经完成的请求数。',
+    definition: '请求到达速率是单位时间内提交或发出的新请求数量，通常以每秒请求数表示。',
+    explanation:
+      '配置中的目标速率、客户端实际发送速率和服务器观察到的到达速率可能不同。网络延迟、客户端限制和背压都会影响请求投递。相同的平均速率既可能对应平稳流量，也可能包含短时突发；不同的 prompt 长度也会带来不同的工作量。',
+    significance:
+      '到达速率描述需求，请求吞吐量描述完成速度。如果需求持续超过处理能力，请求就会积压、失败或超时。只看完成吞吐量，会漏掉过载及其造成的延迟。',
+    benchmarkContext:
+      '应结合序列长度、并发量和到达模型理解负载。AgentX 的客户端数量表示活跃会话数，各会话的请求受前序响应和工具等待影响，并不对应固定的每秒请求数。',
+    measurement: { label: '常用单位', value: '每秒请求数（requests/s）' },
+  },
+  'request-throughput': {
+    term: '请求吞吐量',
+    aliases: ['request throughput', '请求完成速率', '每秒完成请求数'],
+    plainEnglish:
+      '请求吞吐量统计每秒完成多少个请求，token 吞吐量则统计同一时间内系统生成了多少文本。',
+    definition: '请求吞吐量是指定测量窗口内成功完成的请求数除以该窗口的持续时间。',
+    explanation:
+      '短响应和长响应都各算一个完成请求。因此，即使 token 吞吐量相近，请求组成变化也会改变完成速率。应说明失败、超时、warmup 以及跨越测量边界的请求如何计数，不同窗口规则会改变结果。',
+    significance:
+      '更高的完成速率可能只是因为请求更短，并不一定说明系统更快；它也不能证明完成的请求满足延迟目标。有效吞吐量会进一步要求被计入的工作满足明确的服务水平条件。',
+    benchmarkContext:
+      'InferenceX 吞吐量曲线主要比较 token 速率，坐标轴会标明所选归一化方式。不要把每秒 token 数改称每秒请求数，也不要把已完成的 AgentX 请求数当作已完成的智能体会话数。',
+    measurement: { label: '计算关系', value: '请求吞吐量 = 成功完成的请求数 / 测量时长（秒）' },
+  },
+  'request-queue-depth': {
+    term: '请求队列深度',
+    aliases: ['request queue depth', '等待请求数', '待处理请求数', '调度队列'],
+    plainEnglish:
+      '队列深度统计等待服务的请求数；即使加速器一直在生成 token，等待队列也可能持续增长。',
+    definition: '请求队列深度是某一时刻在指定调度或准入边界等待处理的请求数量。',
+    explanation:
+      '前端、路由器和推理引擎可能各自维护队列。服务器导出的等待请求数仅描述其自身边界，不代表客户端所有未完成请求。请求可能在等待计算资源、可用 KV cache 块或合适的 batch。采样得到的队列深度是瞬时数量，不是等待时长。',
+    significance:
+      '队列增长可以解释 prefill kernel 速度未变时 TTFT 为何升高。短时尖峰可能来自子智能体突发请求，持续增长则可能意味着到达速率超过系统接纳工作的能力。',
+    benchmarkContext:
+      'AgentX 数据点详情会在有数据时展示请求队列深度。应同时查看运行中的请求数、KV cache 利用率和吞吐量；跨服务栈比较前，先确认指标由哪个引擎导出。',
+    measurement: { label: '常用单位', value: '采样边界处的等待请求数' },
+  },
+  'queueing-latency': {
+    term: '排队延迟',
+    aliases: ['queueing latency', 'queue latency', '排队时间', '调度等待时间'],
+    plainEnglish: '排队延迟是请求等待可用资源、尚未被服务系统调度执行的时间。',
+    definition: '排队延迟衡量请求进入指定准入或调度队列后，直到被选中执行之前的等待时长。',
+    explanation:
+      '前端等待、引擎准入以及后续调度停顿可能采用不同的计时边界，引用指标时应说明它覆盖哪个区间。客户端观察到的 TTFT 还包含网络传输、prompt 处理和首个 token 的生成时间，因此不能单靠 TTFT 分离出排队时间。',
+    significance:
+      '接近饱和时，即使 kernel 运行速度不变，等待也可能成为响应延迟的主要来源。加速 prefill 不一定能解决队列过载；准入策略、请求组成和可用容量同样影响等待时间。',
+    benchmarkContext:
+      '分析不同并发点的 TTFT 变化时，应结合队列深度及可用的服务端计时指标。不能从客户端 TTFT 中减去一个无关的 prefill 估计值，就把余下部分报告为实测排队延迟。',
+    measurement: { label: '常用单位', value: '排队等待的毫秒数或秒数' },
+  },
+  'kv-working-set': {
+    term: 'KV 工作集',
+    aliases: ['KV working set', 'KV cache 工作集', '活跃 KV 占用'],
+    plainEnglish: 'KV 工作集是在特定时间段内，活跃请求和复用前缀需要使用的注意力状态。',
+    definition: 'KV 工作集是工作负载在指定时间段和存储层级内使用的一组注意力 key、value 状态。',
+    explanation:
+      '其大小取决于上下文长度、并发序列数、共享前缀、缓存精度和模型架构。统计实际驻留内存时，共享块不应按请求数重复计入。已分配的缓存容量还可能包含空闲块，或暂时不属于当前工作集的保留前缀。',
+    significance:
+      '当频繁复用的状态无法全部放入加速器内存时，系统必须传输、驱逐或重新计算这些状态。因此，即使模型权重仍有充足空间，并发增加也可能造成延迟突变。',
+    benchmarkContext:
+      'AgentX 的长会话和重叠分支会给 KV 工作集带来压力。比较吞吐量时应同时查看缓存容量及 offload 策略；仅凭加速器内存总量，无法判断一套配置能保留多少有用状态。',
+  },
+  'kv-cache-eviction': {
+    term: 'KV cache 驱逐',
+    aliases: ['KV cache eviction', '前缀驱逐', '缓存替换'],
+    plainEnglish: 'KV cache 驱逐会从某一缓存层移除保留的注意力状态，把空间交给其他工作使用。',
+    definition: 'KV cache 驱逐按替换策略回收不再保留于某一存储层的注意力状态块。',
+    explanation:
+      '前缀缓存可以丢弃非活跃块，同时保护运行中请求仍在引用的块。替换策略可依据最近访问时间、复用情况和前缀结构。移除加速器上的副本不一定意味着所有副本都已丢失；更低层缓存可能仍保留状态，供之后重新加载。',
+    significance:
+      '如果刚被驱逐的前缀很快再次使用，系统就要支付传输或重算成本。因此，缓存占用率高并不能说明有用状态被有效保留。命中率、复用间隔和工作负载的分支结构有助于解释实际代价。',
+    benchmarkContext:
+      'AgentX 的工具等待和子智能体突发会产生不同的缓存保留需求。应区分非活跃前缀驱逐与执行中请求的抢占，也应区分丢弃状态与将状态 offload 到其他存储层。',
+  },
+  preemption: {
+    term: '请求抢占',
+    aliases: ['request preemption', 'preemption', '请求重算', '调度抢占'],
+    plainEnglish:
+      '抢占会暂停执行中的请求，让其他工作使用资源；被暂停的请求恢复前，有时需要重建注意力状态。',
+    definition:
+      '请求抢占会暂停已调度的请求，并回收其他请求需要的资源；暂停的工作随后按引擎策略恢复。',
+    explanation:
+      'KV cache 空间不足时，服务引擎可能被迫停止已经开始生成的序列。继续执行前，引擎可能重新计算被丢弃的状态，或恢复之前保存的状态。这与驱逐未使用的前缀不同：即使已经输出的 token 仍然有效，活跃请求也会因暂停而延后完成。',
+    significance:
+      '反复抢占会增加工作量，并造成较长的响应停顿。重算期间加速器利用率高，不代表有效输出也保持相同速率。结合抢占次数和请求延迟，可以识别这一性能问题。',
+    benchmarkContext:
+      '并发扫描中交互性或吞吐量突然下降时，应查看引擎遥测和日志。不要假设所有服务栈都导出相同的抢占计数，也不能仅凭 KV cache 利用率高就断言发生了抢占。',
+  },
+  'acceptance-rate': {
+    term: '草稿接受率',
+    aliases: ['draft acceptance rate', 'acceptance rate', '投机接受率', '草稿接受比例'],
+    plainEnglish:
+      '草稿接受率是通过验证的 token 占所提议 token 的比例，不是每次验证输出的 token 数。',
+    definition: '草稿接受率是指定样本中被接受的草稿 token 数除以所提议的草稿 token 总数。',
+    explanation:
+      '接受率是无量纲比例，通常写成百分比；接受长度则统计每次验证的 token 数。草稿长度固定且计数口径一致时，平均接受的草稿长度等于草稿长度乘以接受率。部分引擎会把目标模型额外生成的 token 计入长度，必须另行说明这一口径。',
+    significance:
+      '草稿长度不同时，相同接受率可以对应不同的接受 token 数。接受率和接受长度都不能单独决定加速比；草稿生成、验证成本、批处理方式以及被拒绝的工作同样重要。',
+    benchmarkContext:
+      'AgentX 对合成回放使用外部校准的接受行为。比较两组数值前，应核对草稿长度、speculator、计数口径，以及采用强制接受设置还是自然验证结果。',
+    measurement: {
+      label: '计算关系',
+      value: '草稿接受率 = 被接受的草稿 token 数 / 所提议的草稿 token 数',
+    },
+  },
+  'inter-chunk-latency': {
+    term: '流式 chunk 间延迟',
+    aliases: ['inter-chunk latency', 'ICL', '流式消息间隔', 'chunk 到达间隔'],
+    plainEnglish: '流式 chunk 间延迟衡量相邻消息到达客户端之间的停顿；一条消息可能包含多个 token。',
+    definition: '流式 chunk 间延迟是客户端收到相邻两条符合统计条件的响应 chunk 之间的时间差。',
+    explanation:
+      '服务器可能把多个已生成 token 缓冲到同一个 chunk，尤其是在投机解码或设置流式发送间隔时。因此，chunk 到达间隔不同于按 token 数归一化的解码延迟。即使平均 TPOT 很低，用户仍可能看到文本成批出现，中间夹着较长停顿。',
+    significance:
+      'chunk 计时描述客户端看到的输出平滑程度，既受服务端调度影响，也包含缓冲与传输的效果。chunk 间隔的分位数和逐请求平均 token 延迟的分位数对应不同样本，不能使用同一个指标名称。',
+    benchmarkContext:
+      '应把基于 chunk 的计时与所选 InferenceX 交互性指标分开。比较不同引擎或投机配置的流式结果前，先检查基准客户端对内容 chunk 的筛选规则和 token 计数口径。',
+    measurement: {
+      label: '计算关系',
+      value: 'chunk 间隔 = 当前 chunk 到达时间 - 前一 chunk 到达时间',
+    },
+  },
   engram: {
     term: 'Engram',
     aliases: ['Engram 条件记忆'],
@@ -398,7 +538,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'TPOT 是流式回答每个新片段之间的间隔；间隔越短，回答看起来越快越顺畅。',
     definition: '每输出 token 时间（TPOT）是首 token 到达后，相邻生成 token 之间的平均时间。',
     explanation:
-      'TPOT 描述流式响应的解码节奏。在忽略单位换算时，它是每用户 token 速率的倒数；20 毫秒/token 约等于 50 tok/s/user。',
+      '一种常见的逐请求算法，是把首个输出到最后输出之间的时长除以首个 token 之后的输出 token 数。流式 chunk 可能包含多个 token，因此应核对客户端对首个 chunk 的计数口径。对同一请求、同一口径而言，20 毫秒/token 对应 50 token/s；跨请求求平均与取倒数的顺序不能互换。',
     significance:
       'TPOT 单独刻画回答流是否顺畅。随着更多请求共享系统，TPOT 通常会变差，即便总吞吐量仍在上升。',
     benchmarkContext:
@@ -415,7 +555,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '单个并发值只代表一个运行点。生产流量持续变化，在低并发领先的方案，可能在大批次或通信占主导时被其他方案超越。',
     benchmarkContext:
-      'InferenceX 扫描多个并发值以构建吞吐量与交互性曲线，曲线标签会标出每个点的请求数，并显示方案何时饱和或性能骤降。',
+      'InferenceX 扫描多个并发值以构建吞吐量与交互性曲线。固定序列测试的并发量控制未完成请求数；AgentX 并发量统计智能体客户端，其工具等待和分支会改变同时进行的请求数。两者都不一定等于引擎调度的 batch 大小，也不代表固定的请求到达速率。',
   },
   batching: {
     term: '批处理',
@@ -1109,12 +1249,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'acceptance-length': {
     term: '接受长度',
-    aliases: ['acceptance length', 'AL', '接受率'],
+    aliases: ['acceptance length', 'AL', '每次验证接受 token 数'],
     plainEnglish:
-      '接受长度是指每次验证中完整模型实际认可的草稿 token 数，它决定了投机解码是否划算。',
-    definition: '接受长度是目标模型在一次验证中平均接受的投机草稿 token 数量。',
+      '接受长度统计每次验证接受多少 token；引用数值时，需要确认是否包含目标模型额外生成的 token。',
+    definition:
+      '接受长度表示每次验证平均接受的 token 数。部分引擎只统计被接受的草稿 token，另一些会将目标模型额外生成的 token 计入长度。',
     explanation:
-      '只有草稿能通过验证，投机解码才会省时间。接受长度接近 1 意味着起草与验证这套机制白跑了一趟；数值较高则能把一次昂贵的目标模型计算摊薄到多个输出 token 上。该数值取决于 speculator、草稿长度、模型本身以及正在生成的内容。',
+      '更多 token 通过验证，可以把目标模型验证成本分摊到多个输出上，但加速比仍取决于草稿生成和验证成本。只计草稿与计入额外 token 的口径下，接近 1 的数值含义不同。接受长度是 token 数，接受率是比例；比较时必须统一计数口径和草稿长度。',
     significance:
       '正因为接受率取决于内容，基准测试有可能在无意中左右结论。合成或匿名化文本对于在真实语料上训练的 speculator 而言属于分布外数据，实测接受率会朝任一方向偏离生产环境的真实值。',
     benchmarkContext:

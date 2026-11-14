@@ -88,6 +88,218 @@ const ENGRAM = 'engrams-embedding-entendre-codesign';
 
 const entries = [
   {
+    slug: 'open-loop-benchmark',
+    term: 'Open-loop benchmark',
+    aliases: ['open-loop load test', 'arrival-driven load'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'An open-loop benchmark schedules new requests independently of when earlier requests finish, exposing what happens when arrivals exceed serving capacity.',
+    definition:
+      'An open-loop benchmark schedules request arrivals from an external rate or timestamp sequence rather than waiting for each client’s previous response.',
+    explanation:
+      'Arrivals may be evenly spaced, sampled from a distribution, or replayed from timestamps. When service slows, the offered load can continue and the queue can grow. A client-side concurrency cap or backpressure can prevent scheduled arrivals from being dispatched, so the requested rate and actual send rate must be distinguished.',
+    significance:
+      'This load model exposes overload and queueing that a completion-driven client can hide by sending fewer requests as latency rises. Results depend on arrival burstiness and the duration of the measurement window, as well as the mean rate.',
+    benchmarkContext:
+      'AgentX uses dependent, closed-loop agent sessions. Do not interpret its client concurrency as an open-loop request rate or compare the two load models without identifying their arrival rules.',
+    relatedTerms: ['closed-loop-benchmark', 'request-rate', 'request-queue-depth', 'concurrency'],
+    articleSlugs: [AGENT_BENCHMARK, AGENTX_V3],
+  },
+  {
+    slug: 'request-rate',
+    term: 'Request rate',
+    abbreviation: 'RPS',
+    aliases: ['arrival rate', 'offered load', 'requests per second'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Request rate describes how quickly new requests arrive, rather than how many requests are already running or have finished.',
+    definition:
+      'Request arrival rate is the number of new requests offered or dispatched per unit of time, usually expressed in requests per second.',
+    explanation:
+      'A configured target rate, the actual client dispatch rate, and the rate observed by the server can differ. Network delays, client limits, and backpressure affect delivery. The same average rate can describe smooth arrivals or sharp bursts, and different prompt lengths can impose very different work at that rate.',
+    significance:
+      'Arrival rate sets demand; request throughput measures completions. If demand persistently exceeds capacity, requests accumulate, fail, or time out. Comparing only completed throughput can hide this overload and the associated latency.',
+    benchmarkContext:
+      'Read the workload’s arrival model alongside its sequence lengths and concurrency. AgentX client counts describe active sessions whose requests depend on prior completions and tool pauses; they do not specify a fixed requests-per-second load.',
+    measurement: { label: 'Typical unit', value: 'requests per second (requests/s)' },
+    relatedTerms: [
+      'open-loop-benchmark',
+      'request-throughput',
+      'concurrency',
+      'request-queue-depth',
+    ],
+    articleSlugs: [AGENT_BENCHMARK, AGENTX_V3],
+  },
+  {
+    slug: 'request-throughput',
+    term: 'Request throughput',
+    aliases: ['completed requests per second', 'completion rate'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Request throughput counts finished requests per second; token throughput counts how much generated text the system delivers in that time.',
+    definition:
+      'Request throughput is the number of successfully completed requests divided by the elapsed time in a specified measurement window.',
+    explanation:
+      'A short response and a long response each count as one completed request. Completion rate therefore changes with the request mix even when token throughput stays similar. Report how failures, timeouts, warmup, and requests crossing the measurement boundary are handled; different window rules change the result.',
+    significance:
+      'A high completion rate can come from serving shorter requests rather than a faster system. It also does not establish that completed requests met their latency targets. Goodput adds an explicit service-level requirement to the counted work.',
+    benchmarkContext:
+      'InferenceX throughput curves primarily compare token rates, with the selected normalization shown on the axis. Do not relabel tokens per second as requests per second or interpret completed AgentX requests as completed agent sessions.',
+    measurement: {
+      label: 'Relationship',
+      value: 'request throughput = successful completed requests / measurement seconds',
+    },
+    relatedTerms: ['request-rate', 'throughput', 'goodput', 'multi-turn-inference'],
+    articleSlugs: [INFERENCEX_V2, AGENTX_V3],
+  },
+  {
+    slug: 'request-queue-depth',
+    term: 'Request queue depth',
+    aliases: ['waiting requests', 'pending requests', 'scheduler queue'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Queue depth counts requests waiting for service, which can rise even while the accelerators remain busy producing tokens.',
+    definition:
+      'Request queue depth is the number of requests waiting at a specified scheduling or admission boundary at a given time.',
+    explanation:
+      'A deployment can have separate queues at the frontend, router, and engine. A server’s waiting-request metric describes its own boundary, not every outstanding client request. Requests may wait for compute, available KV-cache blocks, or a compatible batch. A sampled queue depth is an instantaneous count rather than a duration.',
+    significance:
+      'A growing queue can explain rising time to first token without a change in prefill kernel speed. Brief spikes may reflect subagent bursts; a sustained increase can indicate that arrivals exceed the system’s ability to admit work.',
+    benchmarkContext:
+      'AgentX detailed-point telemetry includes request queue depth when available. Read it alongside running requests, KV-cache utilization, and throughput, and check which engine exported the metric before comparing values across serving stacks.',
+    measurement: { label: 'Typical unit', value: 'waiting requests at the sampled boundary' },
+    relatedTerms: ['queueing-latency', 'request-rate', 'subagent-bursts', 'kv-working-set'],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'queueing-latency',
+    term: 'Queueing latency',
+    aliases: ['queue latency', 'queueing time', 'queuing latency', 'scheduler wait time'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Queueing latency is time a request spends waiting for resources before the serving system can schedule its work.',
+    definition:
+      'Queueing latency measures the elapsed time a request waits at a defined admission or scheduling queue before it is selected for execution.',
+    explanation:
+      'Frontend waiting, engine admission, and later scheduler stalls can have different timing boundaries. State which interval a metric records. Client-observed time to first token also includes network delivery, prompt processing, and first-token generation, so it cannot by itself isolate time spent in the queue.',
+    significance:
+      'Near saturation, waiting can dominate the response delay even if kernels run at their usual speed. Faster prefill does not necessarily fix an overloaded queue; admission policy, request mix, and available capacity also determine waiting time.',
+    benchmarkContext:
+      'Use queue depth and server timing metrics, when present, to investigate TTFT changes across concurrency points. Do not subtract an unrelated prefill estimate from client TTFT and report the remainder as measured queueing latency.',
+    measurement: { label: 'Typical unit', value: 'milliseconds or seconds of queue wait' },
+    relatedTerms: ['request-queue-depth', 'time-to-first-token', 'tail-latency', 'prefill'],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
+  {
+    slug: 'kv-working-set',
+    term: 'KV working set',
+    aliases: ['KV cache working set', 'active KV footprint'],
+    category: 'Serving',
+    plainEnglish:
+      'The KV working set is the attention state needed by the requests and reusable prefixes active over a particular interval.',
+    definition:
+      'A KV working set is the collection of attention key and value states used by a workload over a specified interval and memory tier.',
+    explanation:
+      'Its footprint depends on context lengths, concurrent sequences, shared prefixes, cache precision, and model architecture. Shared blocks should not be counted once per request when measuring physical residency. Allocated cache capacity can also include unused blocks or retained prefixes that are not part of the current working set.',
+    significance:
+      'When frequently reused state no longer fits in accelerator memory, the system must transfer, evict, or recompute it. This can produce a sharp latency change as concurrency rises, even though the model weights still fit comfortably.',
+    benchmarkContext:
+      'AgentX’s long sessions and overlapping branches stress the KV working set. Compare cache capacity and offload policy alongside throughput; raw accelerator memory capacity alone does not reveal how much useful state a serving configuration can retain.',
+    relatedTerms: ['kv-cache', 'kv-cache-eviction', 'kv-cache-offload', 'prefix-caching'],
+    articleSlugs: [AGENTX_DSV4_B200_B300, AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'kv-cache-eviction',
+    term: 'KV cache eviction',
+    aliases: ['prefix eviction', 'cache replacement'],
+    category: 'Serving',
+    plainEnglish:
+      'KV cache eviction removes retained attention state from a cache tier so its space can be reused for other work.',
+    definition:
+      'KV cache eviction reclaims cached attention-state blocks according to a replacement policy when they are no longer retained in a memory tier.',
+    explanation:
+      'A prefix cache can discard inactive blocks while protecting blocks still referenced by running requests. Recency, reuse, and prefix structure can guide replacement. Removing an accelerator copy does not necessarily destroy every copy: a lower-tier cache may retain the state for later reload.',
+    significance:
+      'Evicting a prefix that is reused soon adds transfer or recomputation work. A high cache occupancy therefore says little about whether useful state survives. Cache hit rate, reuse distance, and the workload’s branching pattern help explain the cost.',
+    benchmarkContext:
+      'AgentX tool pauses and subagent bursts create competing cache lifetimes. Distinguish eviction of inactive cached prefixes from preemption of an in-progress request, and distinguish discarding state from offloading it to another memory tier.',
+    relatedTerms: ['kv-working-set', 'preemption', 'prefix-cache-hit-rate', 'kv-cache-offload'],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'preemption',
+    term: 'Request preemption',
+    aliases: ['preemption', 'request recomputation', 'scheduler preemption'],
+    category: 'Serving',
+    plainEnglish:
+      'Preemption interrupts an in-progress request so other work can run, sometimes requiring its attention state to be rebuilt before it resumes.',
+    definition:
+      'Request preemption suspends a scheduled request and reclaims resources needed by other requests, with the suspended work resumed according to the engine’s policy.',
+    explanation:
+      'KV-cache pressure can force a serving engine to stop a sequence that has already begun generating. The engine may recompute discarded state or restore saved state before continuing. This differs from evicting an unused prefix because an active request now loses progress time, even if its previously emitted tokens remain valid.',
+    significance:
+      'Repeated preemption adds work and can create long response stalls. High accelerator utilization during recomputation does not imply useful progress at the same rate. Counts of preemptions and request latency together help identify this failure mode.',
+    benchmarkContext:
+      'Inspect engine telemetry and logs when a concurrency sweep suddenly loses interactivity or throughput. Do not assume every stack exports the same preemption counter or infer preemption solely from a high KV-cache utilization reading.',
+    relatedTerms: ['kv-cache-eviction', 'kv-working-set', 'tail-latency', 'concurrency'],
+    articleSlugs: [AGENTX_V3, AGENTX_DSV4_B200_B300],
+  },
+  {
+    slug: 'acceptance-rate',
+    term: 'Draft acceptance rate',
+    aliases: ['acceptance rate', 'speculative acceptance rate', 'draft acceptance ratio'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Draft acceptance rate is the fraction of proposed tokens that pass verification, rather than the number emitted by each verification step.',
+    definition:
+      'Draft acceptance rate is the number of accepted draft tokens divided by the number of proposed draft tokens over a specified sample.',
+    explanation:
+      'It is a dimensionless fraction, often reported as a percentage. Acceptance length instead counts tokens per verification step. With a fixed draft length and matching counting rules, the accepted-draft length equals draft length times acceptance rate. An engine may include a target-generated bonus token in its reported length, so that convention must be stated separately.',
+    significance:
+      'The same acceptance rate can correspond to different numbers of accepted tokens when draft lengths differ. Neither rate nor length alone determines speedup: draft generation, verification cost, batching, and rejected work also matter.',
+    benchmarkContext:
+      'AgentX uses externally calibrated acceptance behavior for synthetic replay. Compare the draft length, speculator, counting convention, and forced-versus-natural setting before treating two reported acceptance values as equivalent.',
+    measurement: {
+      label: 'Relationship',
+      value: 'draft acceptance rate = accepted draft tokens / proposed draft tokens',
+    },
+    relatedTerms: [
+      'acceptance-length',
+      'speculative-decoding',
+      'draft-model',
+      'multi-token-prediction',
+    ],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
+  {
+    slug: 'inter-chunk-latency',
+    term: 'Inter-chunk latency',
+    abbreviation: 'ICL',
+    aliases: ['streaming chunk gap', 'chunk arrival latency'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Inter-chunk latency measures pauses between streamed messages arriving at the client, and each message may contain more than one token.',
+    definition:
+      'Inter-chunk latency is the elapsed time between consecutive qualifying response chunks received by a streaming client.',
+    explanation:
+      'A server can buffer multiple generated tokens into one chunk, especially with speculative decoding or a configured streaming interval. Chunk arrival gaps then differ from token-normalized decode latency. An average TPOT can look good while users still see irregular bursts separated by long pauses.',
+    significance:
+      'Chunk timing describes delivery smoothness at the client boundary. It includes effects of buffering and transport as well as server scheduling. A percentile of chunk gaps and a percentile of per-request average token latency summarize different populations and should not share a label.',
+    benchmarkContext:
+      'Keep chunk-based timing separate from the selected InferenceX interactivity metric. Check the benchmark client’s content-chunk rules and token-count convention before comparing streamed results from different engines or speculative settings.',
+    measurement: {
+      label: 'Relationship',
+      value: 'chunk gap = current chunk arrival time - previous chunk arrival time',
+    },
+    relatedTerms: [
+      'time-per-output-token',
+      'time-to-first-token',
+      'interactivity',
+      'speculative-decoding',
+    ],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
+  {
     slug: 'ai-inference',
     term: 'AI inference',
     aliases: ['LLM inference', 'model serving'],
@@ -205,7 +417,14 @@ const entries = [
       'This load model resembles interactive agents, where the next action depends on the previous result. Throughput and latency remain coupled: a faster response advances the session and creates later work sooner. Low-concurrency runs can show more sampling variation than large pooled runs.',
     benchmarkContext:
       'AgentX uses closed-loop concurrency. Its concurrency value is the number of agent clients; request batch size changes as the sessions advance. Read throughput, time to first token, and interactivity together.',
-    relatedTerms: ['agentx', 'trace-replay', 'concurrency', 'throughput', 'latency'],
+    relatedTerms: [
+      'agentx',
+      'trace-replay',
+      'concurrency',
+      'throughput',
+      'latency',
+      'open-loop-benchmark',
+    ],
     articleSlugs: [AGENT_BENCHMARK, TILERT, INFERENCEX_V2, AGENTX_V3],
   },
   {
@@ -344,13 +563,19 @@ const entries = [
     definition:
       'Time per output token is the average delay between generated tokens after the first token has arrived.',
     explanation:
-      'TPOT measures the decode cadence of a streaming response. Ignoring unit conversion, it is the inverse of per-user token rate: 20 ms per token corresponds to about 50 tokens per second per user.',
+      'A common per-request calculation is the time from first to last output divided by the number of output tokens after the first. Streaming chunks may contain multiple tokens, so check the client’s first-chunk counting convention. For a matching per-request metric, 20 ms per token corresponds to 50 tokens per second; taking reciprocals does not commute with averaging across requests.',
     significance:
       'TPOT isolates the part of latency that controls how fluid a streamed answer feels. It normally worsens as more requests share the system, even while aggregate throughput rises.',
     benchmarkContext:
       'InferenceX often presents the reciprocal measure, tok/s/user, because higher is visually better. Recipe tables may include TPOT directly, especially when comparing scheduler or kernel changes at matched concurrency.',
     measurement: { label: 'Relationship', value: 'interactivity ≈ 1000 / TPOT(ms)' },
-    relatedTerms: ['interactivity', 'time-to-first-token', 'decode', 'concurrency'],
+    relatedTerms: [
+      'interactivity',
+      'time-to-first-token',
+      'decode',
+      'concurrency',
+      'inter-chunk-latency',
+    ],
     articleSlugs: [INFERENCEX_V2, SGLANG_056, MI355X_GLM5, TILERT],
   },
   {
@@ -366,8 +591,8 @@ const entries = [
     significance:
       'A single concurrency value reveals only one operating point. Production traffic changes over time, and a recipe that looks best at low concurrency may be overtaken when batches become large or communication begins to dominate.',
     benchmarkContext:
-      'InferenceX sweeps concurrency to build a throughput-interactivity curve. Labels on the curve identify the request count behind each point and expose where a configuration saturates or collapses.',
-    relatedTerms: ['throughput', 'interactivity', 'batching', 'pareto-frontier'],
+      'InferenceX sweeps concurrency to build a throughput-interactivity curve. Fixed-sequence concurrency controls outstanding requests; AgentX concurrency counts agent clients whose tool pauses and branches change the simultaneous request count. Neither value is necessarily the engine’s scheduled batch size or a fixed request arrival rate.',
+    relatedTerms: ['throughput', 'interactivity', 'batching', 'pareto-frontier', 'request-rate'],
     articleSlugs: [SGLANG_056, GB200_KIMI, MI355X_QWEN],
   },
   {
@@ -1517,19 +1742,25 @@ const entries = [
     slug: 'acceptance-length',
     term: 'Acceptance length',
     abbreviation: 'AL',
-    aliases: ['acceptance rate', 'draft acceptance'],
+    aliases: ['accepted tokens per verification step', 'draft acceptance length'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'Acceptance length is how many drafted tokens the full model actually approves per verification step, which is what decides whether speculation pays off.',
+      'Acceptance length counts how many tokens each verification step accepts; check whether the reported count includes a target-generated bonus token.',
     definition:
-      'Acceptance length is the average number of speculatively drafted tokens accepted by the target model in one verification pass.',
+      'Acceptance length reports average accepted tokens per verification pass. Some engines count only accepted draft tokens, while others include a target-generated bonus token in the reported length.',
     explanation:
-      'Speculative decoding only saves time when drafts survive verification. An acceptance length near one means the draft and verify machinery ran for nothing, while a high value amortizes one expensive target-model step across several emitted tokens. The value depends on the speculator, the draft length, the model, and the content being generated.',
+      'More accepted tokens can amortize target-model verification across several outputs, but the speedup also depends on draft and verification costs. A value near one has different meanings under draft-only and bonus-inclusive conventions. Unlike acceptance rate, length is a token count rather than a fraction; compare values only after matching the convention and draft length.',
     significance:
       'Because acceptance depends on content, a benchmark can accidentally decide the result. Synthetic or anonymized text is out of distribution for a speculator trained on real language, so measured acceptance drifts away from what production would see, in either direction.',
     benchmarkContext:
       'AgentX replays anonymized traces filled with synthetic tokens, so it does not let acceptance emerge from that content. Runs instead apply a fixed acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset, which keeps the comparison vendor neutral.',
-    relatedTerms: ['speculative-decoding', 'multi-token-prediction', 'eagle', 'agentx'],
+    relatedTerms: [
+      'speculative-decoding',
+      'multi-token-prediction',
+      'eagle',
+      'agentx',
+      'acceptance-rate',
+    ],
     articleSlugs: [AGENTX_V3, INFERENCEX_V2, DEEPSEEK_V4],
   },
   {
