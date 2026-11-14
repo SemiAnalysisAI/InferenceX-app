@@ -157,6 +157,24 @@ and AgentX runs alike. The AgentX producer divides all three rates by every chip
 backfill move those rows to the per-pool basis and keep the producer's original
 rates as `input_tput_per_total_gpu` and `output_tput_per_total_gpu`.
 
+## Glossary terminology
+
+Read `/glossary` and `/glossary/<slug>` for static definitions; Chinese siblings use
+`/zh/glossary` and `/zh/glossary/<slug>`. The glossary now distinguishes arrival
+rate (`request-rate`) from completions (`request-throughput`), queue counts
+(`request-queue-depth`) from wait time (`queueing-latency`), and draft acceptance
+fractions (`acceptance-rate`) from per-step lengths (`acceptance-length`).
+Other serving diagnostics include `open-loop-benchmark`, `kv-working-set`,
+`kv-cache-eviction`, `preemption`, and `inter-chunk-latency`.
+
+These are editorial definitions, not additional measurements or view API fields.
+The existing glossary search, categories, and alphabet controls only filter
+static entries. No benchmark selector, calculation, response schema, or API
+contract changes with this content update. Glossary pages expose `DefinedTerm`
+JSON-LD and localized sitemap URLs; `/llms-full.txt` remains an article and
+hardware-results feed, not a glossary export. Use the existing view contracts for
+measured data rather than treating an example formula as a measured result.
+
 ## Historical editorial articles
 
 The GLM-5.3 article at

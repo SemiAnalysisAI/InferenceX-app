@@ -123,6 +123,33 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('Glossary pages', () => {
+    for (const { prefix, label, relatedLabel } of [
+      { prefix: '', label: 'Draft acceptance rate', relatedLabel: 'Acceptance length' },
+      { prefix: '/zh', label: '草稿接受率', relatedLabel: '接受长度' },
+    ]) {
+      it(`finds the new acceptance-rate entry and follows its distinct length concept in ${prefix || 'English'}`, () => {
+        cy.viewport(375, 844);
+        cy.visit(`${prefix}/glossary`);
+        cy.get('main input[type="search"]').type('acceptance rate');
+        cy.get(`a[href="${prefix}/glossary/acceptance-rate"]`)
+          .should('contain.text', label)
+          .click();
+        cy.location('pathname').should('eq', `${prefix}/glossary/acceptance-rate`);
+        cy.get('h1').should('contain.text', label);
+        cy.get(`aside a[href="${prefix}/glossary/acceptance-length"]`)
+          .should('contain.text', relatedLabel)
+          .click();
+        cy.location('pathname').should('eq', `${prefix}/glossary/acceptance-length`);
+        cy.get('h1').should('contain.text', relatedLabel);
+        cy.get('main').should('contain.text', prefix ? '额外生成的 token' : 'bonus token');
+        cy.document().then((document) => {
+          expect(document.documentElement.scrollWidth).to.be.at.most(
+            document.documentElement.clientWidth,
+          );
+        });
+      });
+    }
+
     it('supports a mobile Chinese search, filter, and term navigation journey without overflow', () => {
       cy.viewport(375, 844);
       cy.visit('/zh/glossary');
