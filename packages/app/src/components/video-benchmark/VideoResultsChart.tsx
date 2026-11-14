@@ -57,6 +57,7 @@ import {
   type ResultsChartPoint,
   type ResultsChartSeries,
 } from './results-chart';
+import { detailLinks } from './detail-links';
 import { resultsNumber as n } from './VideoResultsCharts';
 
 export const VIDEO_RESULTS_CHART_ID = 'video-results-chart';
@@ -82,6 +83,9 @@ const STRINGS = {
     deployment: 'Deployment',
     replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,
     replicasUnknown: 'replicas not recorded',
+    notRecorded: 'Not recorded',
+    artifactLink: 'Download artifact',
+    reproduceLink: 'Reproduce',
     attention: (backend: string) => `${backend} attention`,
     concurrency: 'Concurrency',
     perVideo: 'Cost per video',
@@ -127,6 +131,9 @@ const STRINGS = {
     deployment: '部署',
     replicas: (count: number) => `${count} 个副本`,
     replicasUnknown: '未记录副本数',
+    notRecorded: '未记录',
+    artifactLink: '下载产物',
+    reproduceLink: '复现',
     attention: (backend: string) => `${backend} 注意力`,
     concurrency: '并发数',
     perVideo: '每条视频成本',
@@ -829,11 +836,22 @@ export default function VideoResultsChart({
               },
               {
                 label: s.deployment,
-                value: [
-                  `TP${point.server?.tp ?? '?'} × Ulysses ${point.server?.ulysses ?? '?'}`,
-                  d.replicas ?? s.replicasUnknown,
-                  s.attention(point.server?.attention ?? '?'),
-                ].join(' · '),
+                // Only recorded parts are listed; a "?" placeholder reads as broken data.
+                value:
+                  [
+                    [
+                      typeof point.server?.tp === 'number' ? `TP${point.server.tp}` : null,
+                      typeof point.server?.ulysses === 'number'
+                        ? `Ulysses ${point.server.ulysses}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' × '),
+                    d.replicas,
+                    point.server?.attention ? s.attention(point.server.attention) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || s.notRecorded,
                 wide: true,
               },
               ...latencies.map((latency) => ({
@@ -868,6 +886,14 @@ export default function VideoResultsChart({
                 href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
                 external: true,
               },
+              ...detailLinks(point)
+                .filter((link) => link.action !== 'run')
+                .map((link) => ({
+                  action: link.action,
+                  label: link.action === 'artifact' ? s.artifactLink : s.reproduceLink,
+                  href: link.href,
+                  external: true,
+                })),
               { action: 'view-telemetry', label: `${s.viewTelemetry} →` },
             ]}
             onClose={close}
@@ -1095,120 +1121,124 @@ export default function VideoResultsChart({
           </>
         ) : undefined
       }
+      // An 18rem sidebar keeps a pinned point's details readable; it is sized before
+      // the pin so pinning never reflows the plot.
       legendElement={
-        <ChartLegend
-          variant="sidebar"
-          legendItems={legendItems}
-          onItemRemove={toggle}
-          isLegendExpanded={legendExpanded}
-          onExpandedChange={(expanded) => {
-            onLegendExpandedChange(expanded);
-            track('video_results_legend_expanded', { enabled: expanded });
-          }}
-          reset={{
-            id: 'video-results-legend-reset',
-            disabled: state.hidden.length === 0,
-            onClick: () => {
-              onUpdate({ hidden: [] });
-              track('video_results_legend_reset');
-            },
-          }}
-          switches={[
-            {
-              id: 'video-results-optimal',
-              label: s.optimal,
-              checked: state.optimal,
-              infoTooltip: s.optimalHelp,
-              onCheckedChange: (optimal) => {
-                onUpdate({ optimal });
-                track('video_results_optimal_toggled', { enabled: optimal });
+        <div className="flex min-h-0 flex-1 flex-col lg:min-w-72">
+          <ChartLegend
+            variant="sidebar"
+            legendItems={legendItems}
+            onItemRemove={toggle}
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={(expanded) => {
+              onLegendExpandedChange(expanded);
+              track('video_results_legend_expanded', { enabled: expanded });
+            }}
+            reset={{
+              id: 'video-results-legend-reset',
+              disabled: state.hidden.length === 0,
+              onClick: () => {
+                onUpdate({ hidden: [] });
+                track('video_results_legend_reset');
               },
-            },
-            {
-              id: 'video-results-labels',
-              label: s.labels,
-              checked: labels,
-              onCheckedChange: (enabled) => {
-                onLabelsChange(enabled);
-                track('video_results_labels_toggled', { enabled });
+            }}
+            switches={[
+              {
+                id: 'video-results-optimal',
+                label: s.optimal,
+                checked: state.optimal,
+                infoTooltip: s.optimalHelp,
+                onCheckedChange: (optimal) => {
+                  onUpdate({ optimal });
+                  track('video_results_optimal_toggled', { enabled: optimal });
+                },
               },
-            },
-            ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
-              ? [
-                  {
-                    id: 'video-results-lossy',
-                    label: s.lossy,
-                    checked: state.lossy,
-                    infoTooltip: s.lossyHelp,
-                    onCheckedChange: (lossy: boolean) => {
-                      onUpdate({ lossy });
-                      track('video_results_lossy_toggled', { enabled: lossy });
+              {
+                id: 'video-results-labels',
+                label: s.labels,
+                checked: labels,
+                onCheckedChange: (enabled) => {
+                  onLabelsChange(enabled);
+                  track('video_results_labels_toggled', { enabled });
+                },
+              },
+              ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
+                ? [
+                    {
+                      id: 'video-results-lossy',
+                      label: s.lossy,
+                      checked: state.lossy,
+                      infoTooltip: s.lossyHelp,
+                      onCheckedChange: (lossy: boolean) => {
+                        onUpdate({ lossy });
+                        track('video_results_lossy_toggled', { enabled: lossy });
+                      },
                     },
-                  },
-                ]
-              : []),
-          ]}
-          keyIndicators={
-            engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
-              <>
-                {engines.length > 1 && (
-                  <ul
-                    className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                    aria-label={s.engines}
-                    data-testid="results-engine-key"
-                  >
-                    {engines.map((engine) => (
-                      <li
-                        key={engine ?? 'na'}
-                        className="flex items-center gap-2"
-                        data-engine={engine ?? 'na'}
-                      >
-                        <SeriesSwatch shape={engineShape(engine)} dashed={false} />
-                        {engine === null ? s.engineNotRecorded : engineLabel(engine)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {lossySeries.length > 0 && (
-                  <ul
-                    className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                    aria-label={s.lossySeries}
-                    data-testid="results-lossy-key"
-                  >
-                    {lossySeries.map((item) => (
-                      <li
-                        key={item.key}
-                        className="flex items-center gap-2"
-                        data-series={item.key}
-                        style={{
-                          color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
-                        }}
-                      >
-                        <SeriesSwatch
-                          shape={byEngine ? engineShape(item.engine) : 'circle'}
-                          dashed
-                        />
-                        <span className="text-muted-foreground">
-                          {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {lossySeries.length > 0 && lossyNote}
-                {state.unofficialRun && (
-                  <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span
-                      className="inline-block size-3 shrink-0 rounded-full"
-                      style={{ background: overlayRunColor(0) }}
-                    />
-                    {s.unofficial} #{state.unofficialRun}
-                  </p>
-                )}
-              </>
-            ) : undefined
-          }
-        />
+                  ]
+                : []),
+            ]}
+            keyIndicators={
+              engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
+                <>
+                  {engines.length > 1 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.engines}
+                      data-testid="results-engine-key"
+                    >
+                      {engines.map((engine) => (
+                        <li
+                          key={engine ?? 'na'}
+                          className="flex items-center gap-2"
+                          data-engine={engine ?? 'na'}
+                        >
+                          <SeriesSwatch shape={engineShape(engine)} dashed={false} />
+                          {engine === null ? s.engineNotRecorded : engineLabel(engine)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {lossySeries.length > 0 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.lossySeries}
+                      data-testid="results-lossy-key"
+                    >
+                      {lossySeries.map((item) => (
+                        <li
+                          key={item.key}
+                          className="flex items-center gap-2"
+                          data-series={item.key}
+                          style={{
+                            color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
+                          }}
+                        >
+                          <SeriesSwatch
+                            shape={byEngine ? engineShape(item.engine) : 'circle'}
+                            dashed
+                          />
+                          <span className="text-muted-foreground">
+                            {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {lossySeries.length > 0 && lossyNote}
+                  {state.unofficialRun && (
+                    <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className="inline-block size-3 shrink-0 rounded-full"
+                        style={{ background: overlayRunColor(0) }}
+                      />
+                      {s.unofficial} #{state.unofficialRun}
+                    </p>
+                  )}
+                </>
+              ) : undefined
+            }
+          />
+        </div>
       }
     />
   );

@@ -712,6 +712,18 @@ describe('VideoGenX results', () => {
       .and('contain', 'TP2 × Ulysses 2')
       .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
       .should('contain', 'GitHub Actions run');
+    cy.get('[data-testid="point-details-panel"]')
+      .should('not.contain', '? attention')
+      .and('not.contain', 'replicas not recorded')
+      .within(() => {
+        cy.get('[data-action="artifact"]')
+          .should('have.attr', 'href')
+          .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
+        cy.get('[data-action="reproduce"]')
+          .should('have.attr', 'href')
+          .and('contain', 'video-generation/SUBMITTING.md');
+      });
+    cy.get('[data-testid="point-details-panel"]').invoke('outerWidth').should('be.gte', 280);
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
