@@ -110,3 +110,38 @@ describe('Chinese technical Markdown rendering', () => {
     expect(renderToStaticMarkup(content)).toContain('<code>SGLANG_OPT_*</code>');
   });
 });
+
+describe('TPU AgentX newsletter port', () => {
+  const slug = 'tpu-strikes-the-king';
+  const original = 'https://newsletter.semianalysis.com/p/tpu-strikes-the-king';
+
+  it.each(['en', 'zh'])('preserves the historical scope and all figures in %s', (locale) => {
+    const raw = read(path.join(locale === 'en' ? CONTENT_DIR : ZH_DIR, `${slug}.mdx`));
+    expect(frontmatterField(raw, 'date')).toBe("'2026-11-05'");
+    expect(frontmatterField(raw, 'publishDate')).toBe("'2026-11-05'");
+    expect(raw).toContain(original);
+    expect(raw).toContain('Bryan Shan');
+    expect(raw).toContain('Myron Xie');
+    expect(raw).toContain(locale === 'en' ? 'subscriber-only continuation' : '订阅者专享');
+    expect(raw).toContain(locale === 'en' ? 'preview submissions' : '预览提交');
+    expect(raw).not.toMatch(/FIGURE(?:PLACEHOLDER|_)\d/u);
+    const figures = [...raw.matchAll(/<Figure\b[\s\S]*?\/>/gu)];
+    expect(figures).toHaveLength(25);
+    for (const [figure] of figures) {
+      expect(figure).toMatch(/alt="[^"]+"/u);
+      expect(figure).toMatch(/caption="[^"]*https:\/\//u);
+    }
+    for (const term of [
+      'decode-megakernel',
+      'kernel-launch-overhead',
+      'decode-context-parallelism',
+      'prefill-context-parallelism',
+      'attention-head-dimension',
+      'hicache',
+      'decode-admission-control',
+      'kv-cache-affinity',
+    ]) {
+      expect(raw).toContain(`](${locale === 'zh' ? '/zh' : ''}/glossary/${term})`);
+    }
+  });
+});

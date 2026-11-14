@@ -84,9 +84,190 @@ const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
+const TPU_AGENTX = 'tpu-strikes-the-king';
 const ENGRAM = 'engrams-embedding-entendre-codesign';
 
 const entries = [
+  {
+    slug: 'decode-megakernel',
+    term: 'Decode megakernel',
+    aliases: ['megakernel', 'whole-model kernel', 'MonoKernel'],
+    category: 'Software',
+    plainEnglish:
+      'A decode megakernel combines many operations across model layers into a long-running device program, reducing gaps between launches while overlapping weight transfers with computation.',
+    definition:
+      'A decode megakernel fuses a substantial part of the model forward pass across operations or layers, with explicit scheduling of computation, data movement, and sometimes collectives.',
+    explanation:
+      'Conventional execution launches many separate kernels for attention, projections, expert routing, and other operations. A megakernel can prefetch the next layer’s weights while computing the current layer. Implementations differ in how much they fuse; the name does not guarantee that every operation, communication step, or request runs in one launch. Engine scheduling and prefix-cache management can remain outside the fused forward path.',
+    significance:
+      'At low concurrency, short operations may leave the accelerator idle between launches. Reducing those gaps can improve interactivity, but long-context attention, prefill, cache transfers, and high-concurrency throughput still need separate measurement.',
+    benchmarkContext:
+      'The November 2026 TPU AgentX article describes SGLang and vLLM megakernel paths and AMD’s MonoKernel. Inferact integrates its fused forward path with vLLM scheduling and KV transfer; these results do not imply that the full serving system is a single kernel.',
+    relatedTerms: [
+      'kernel-launch-overhead',
+      'kernel-fusion',
+      'double-buffering',
+      'decode',
+      'torchtpu',
+    ],
+    articleSlugs: [TPU_AGENTX, TILERT],
+  },
+  {
+    slug: 'kernel-launch-overhead',
+    term: 'Kernel launch overhead',
+    aliases: ['launch latency', 'kernel dispatch overhead', 'launch-bound execution'],
+    category: 'Software',
+    plainEnglish:
+      'Kernel launch overhead is the work needed to dispatch device operations; when operations are short, dispatch gaps can take a noticeable share of a decode step.',
+    definition:
+      'Kernel launch overhead is the host and runtime cost of submitting device work, together with dispatch-related delays that can leave gaps between useful device operations.',
+    explanation:
+      'A CPU-side launch duration is not automatically equal to accelerator idle time because dispatch and execution may overlap. A timeline distinguishes submission work, synchronization, dependency stalls, and actual device gaps. Graph replay and fusion reduce different parts of this overhead. Neither technique eliminates the need to launch work or makes memory transfers and collectives free.',
+    significance:
+      'Low-batch decode can be launch-bound even when peak compute capability is high. Counting launches alone cannot establish speedup: the remaining kernels may take longer, and the critical path can move to memory or communication.',
+    benchmarkContext:
+      'The TPU article contrasts conventional decode with megakernels and cites an AMD reduction in launch count. Treat that count and the reported speedup as properties of the named model and recipe, not as a universal conversion between launches and tokens per second.',
+    relatedTerms: ['decode-megakernel', 'kernel-fusion', 'cuda-graphs', 'interactivity'],
+    articleSlugs: [TPU_AGENTX, TILERT],
+  },
+  {
+    slug: 'decode-context-parallelism',
+    term: 'Decode context parallelism',
+    abbreviation: 'DCP',
+    aliases: ['DCP', 'KV sequence sharding'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Decode context parallelism spreads a sequence’s KV cache across ranks, so each rank reads part of the history and their partial attention results are combined.',
+    definition:
+      'Decode context parallelism shards attention KV state along the sequence dimension and merges partial attention outputs with their normalization statistics across the participating ranks.',
+    explanation:
+      'This can reduce KV duplication when tensor parallelism has more ranks than independently shardable KV heads, especially with MLA’s shared latent cache. Each rank attends to its local token slice, and a numerically correct merge combines the results. The name describes its usual motivation, not a decode-only restriction: an implementation can use the same sharded cache during prefill.',
+    significance:
+      'Sharding increases effective KV capacity and distributes cache reads, but adds communication and merge work. The best degree depends on context length, attention structure, topology, and the engine’s supported combinations with tensor and prefill context parallelism.',
+    benchmarkContext:
+      'The TPU AgentX article explains DCP for GLM and Kimi K3. K3 uses the sharded layout during prefill too, avoiding the assumption that a DCP label means the prefill cache is replicated. Compare actual rank groups and cache layouts, not just the acronym.',
+    relatedTerms: [
+      'context-parallelism',
+      'prefill-context-parallelism',
+      'kv-head-replication',
+      'multi-head-latent-attention',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'prefill-context-parallelism',
+    term: 'Prefill context parallelism',
+    abbreviation: 'PCP',
+    aliases: ['PCP', 'prefill sequence splitting'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Prefill context parallelism divides a long prompt’s new-token computation across ranks so one accelerator does not have to process the entire prompt alone.',
+    definition:
+      'Prefill context parallelism distributes query-token computation for a prompt across ranks, exchanging the key and value information needed to preserve the model’s attention semantics.',
+    explanation:
+      'One implementation gathers keys and values while each rank owns a query chunk; another circulates KV chunks to avoid keeping the complete history on every rank. Causal attention requires load balancing because later queries can attend to more tokens. PCP’s execution partition and DCP’s KV-storage partition are related but distinct, and supported combinations vary across engines and models.',
+    significance:
+      'PCP can reduce long-prompt processing time, but additional communication, replicated weights, or a different parallel layout may consume capacity needed for KV state. The smallest prefill latency does not necessarily produce the best end-to-end serving configuration.',
+    benchmarkContext:
+      'The Kimi K3 discussion in the TPU article explains why that recipe used a DCP-sharded cache during prefill instead of its alternative PCP configuration. This is a recipe-specific memory trade-off, not a rule that PCP and DCP can never be combined.',
+    relatedTerms: [
+      'context-parallelism',
+      'decode-context-parallelism',
+      'prefill',
+      'time-to-first-token',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'attention-head-dimension',
+    term: 'Attention head dimension',
+    aliases: ['head dimension', 'head_dim', 'head dim'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Attention head dimension is the vector width used by an attention head, which affects its arithmetic, cache footprint, and fit to accelerator matrix tiles.',
+    definition:
+      'An attention head dimension is the feature width of a per-head query, key, or value representation; those widths need not all be equal in every architecture.',
+    explanation:
+      'Matrix engines compute fixed tile shapes. A kernel may pad, pack, or reshape attention dimensions to fit those tiles. Consequently, a head width smaller than a matrix array can waste work in one layout while a different mapping fills more of the array. Head count, sequence length, precision, sharding, and the query-key versus value dimensions all influence the actual utilization.',
+    significance:
+      'A dimension favorable for model quality or a GPU kernel may require a different layout on a TPU. Dividing head dimension by array width is not a universal estimate of model throughput or even of every attention matmul’s utilization.',
+    benchmarkContext:
+      'The TPU AgentX article discusses Muse Spark Open’s head dimension of 64 and the fit of model shapes to TPU matrix hardware. Read that example together with its kernel and layout context rather than turning the dimensional ratio into a whole-model performance prediction.',
+    relatedTerms: ['tile-padding', 'mxu', 'systolic-array', 'grouped-query-attention'],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
+  },
+  {
+    slug: 'hicache',
+    term: 'HiCache',
+    expansion: 'Hierarchical KV caching',
+    aliases: ['SGLang HiCache', 'hierarchical KV cache'],
+    category: 'Software',
+    plainEnglish:
+      'HiCache extends SGLang’s prefix cache beyond accelerator memory, retaining reusable attention state in host memory and optionally a storage backend.',
+    definition:
+      'HiCache is SGLang’s hierarchical KV-cache system, extending radix-based prefix reuse across accelerator memory, instance-local host memory, and an optional storage tier.',
+    explanation:
+      'The hierarchy tracks where cached state resides and manages loading, prefetching, and write-back. A host-memory hit still needs a transfer before device computation can reuse the state. Host memory is private to an inference instance; cross-instance reuse requires a storage backend configured for the intended sharing scope. Transfer implementations and supported model state depend on the serving stack.',
+    significance:
+      'A larger retained prefix cache can reduce repeated prefill in long multi-turn workloads, but transfer latency, bandwidth, and eviction policy determine whether a hit actually improves service time. High hit rate alone is not proof of lower end-to-end latency.',
+    benchmarkContext:
+      'The TPU article describes SGLang HiCache host-DRAM offload through TPU-Sync for Muse Spark Open at high concurrency. That measured recipe does not imply that every HiCache backend or configuration supports the same accelerator and model combinations.',
+    relatedTerms: [
+      'sglang',
+      'tpu-sync',
+      'kv-cache-offload',
+      'prefix-cache-hit-rate',
+      'mooncake-store',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'decode-admission-control',
+    term: 'Decode admission control',
+    aliases: ['decode concurrency cap', 'decode request limit'],
+    category: 'Serving',
+    plainEnglish:
+      'Decode admission control limits how many requests enter a decode worker, trading faster generation for admitted requests against waiting time for those still queued.',
+    definition:
+      'Decode admission control is the policy that determines when a request may occupy a decode worker’s active capacity, often using a request-count or resource limit.',
+    explanation:
+      'A request may wait at the router or engine until an eligible worker has room. A lower cap can reduce the active batch and improve per-user generation speed, while a higher cap can increase throughput through batching. The location of the queue determines which latency interval includes the wait. A router cap is distinct from client concurrency and from a physical KV-memory limit.',
+    significance:
+      'A fast decode curve can coexist with slow time to first token when requests wait outside the worker. Evaluate admission policies with queueing, TTFT, end-to-end latency, and completed work under the same offered load.',
+    benchmarkContext:
+      'The TPU article’s llm-d Qwen3.5 comparison varies the number of requests admitted to a decode host. It explicitly discusses the resulting TTFT and end-to-end trade-offs, so its fastest decode point should not be treated as the fastest complete response.',
+    relatedTerms: [
+      'llm-d',
+      'request-queue-depth',
+      'queueing-latency',
+      'concurrency',
+      'end-to-end-latency',
+    ],
+    articleSlugs: [TPU_AGENTX],
+  },
+  {
+    slug: 'kv-cache-affinity',
+    term: 'KV-cache affinity',
+    aliases: ['cache affinity', 'session affinity', 'rank-aware routing'],
+    category: 'Serving',
+    plainEnglish:
+      'KV-cache affinity sends related requests back to a worker or rank that already holds their prefix, avoiding unnecessary cache transfers or repeated prefill.',
+    definition:
+      'KV-cache affinity is a routing preference that preserves locality between a request’s reusable state and the worker or rank chosen to serve it.',
+    explanation:
+      'A host can contain multiple data-parallel ranks with separate cache ownership. Routing to the correct host alone may therefore miss the useful prefix. A policy can track prefix locations or keep a session attached to its previous worker, while allowing reassignment when the worker is full or unavailable. Affinity is a preference, not a guarantee that state has survived eviction.',
+    significance:
+      'Locality can improve cache reuse but concentrate load on a subset of workers. A scheduler must balance the saved computation or transfer against queueing, capacity, and failover. Session affinity and general prefix-aware routing overlap without being identical policies.',
+    benchmarkContext:
+      'The TPU Qwen3.5 article attributes a decode cache-hit improvement to routing to the exact data-parallel rank. It also describes keeping sessions on a decode host unless the host is full, connecting cache locality to admission control.',
+    relatedTerms: [
+      'kv-aware-routing',
+      'prefix-caching',
+      'dp-attention',
+      'decode-admission-control',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
   {
     slug: 'open-loop-benchmark',
     term: 'Open-loop benchmark',
@@ -1514,15 +1695,22 @@ const entries = [
     plainEnglish:
       'Context parallelism splits one long prompt across several chips so they share the work of reading it and of scanning its stored attention state.',
     definition:
-      'Context parallelism shards query tokens across accelerators, in a prefill form known as PCP and a decode form known as DCP.',
+      'Context parallelism distributes attention computation or KV state along the sequence dimension across accelerators, including prefill context parallelism (PCP) and decode context parallelism (DCP).',
     explanation:
-      'PCP gives each rank a chunk of the query while keys and values are passed around a ring, which parallelizes the compute-bound prefill and stops one rank absorbing an entire long prompt. DCP shards the KV cache itself, so every rank scans its own slice and the partial attention results merge flash-decode style. Because decode is memory-bandwidth bound, parallel KV reads raise the achievable token rate.',
+      'PCP partitions new query-token computation and exchanges the needed keys and values, using a gather or a ring depending on the implementation. DCP shards KV state by token position, then combines local attention results and normalization statistics. A DCP-sharded cache can also be used during prefill; the names describe common optimization goals rather than mutually exclusive execution phases.',
     significance:
-      'Tensor parallelism replicates the full KV cache on each rank and data-parallel attention pins a session to whichever rank owns its shard, so neither scales cleanly as contexts reach hundreds of thousands of tokens. Context parallelism attacks that directly, and its gain grows with input length rather than with batch size.',
+      'Tensor parallelism can shard KV heads when the architecture has enough independent heads. Replication becomes a problem when the TP degree exceeds that head count or the model shares a latent cache across heads. Context parallelism can reduce that duplication or distribute long-prompt work, with communication and memory trade-offs that depend on the recipe.',
     benchmarkContext:
-      'InferenceX surfaces DCP and PCP degrees in point tooltips and parallelism labels alongside TP, EP, and DP. Support is uneven across vendors: the technique remains part of the practical CUDA advantage because the AMD attention backends were still listed as unsupported in the vLLM matrix at the time of the AgentX 1.0 results.',
-    relatedTerms: ['tensor-parallelism', 'data-parallelism', 'kv-cache', 'prefill', 'decode'],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2, AGENTX_M3_RACK],
+      'InferenceX surfaces DCP and PCP degrees alongside TP, EP, and DP. The November 2026 TPU AgentX article describes DCP for GLM and its use during Kimi K3 prefill. Support must be checked for the selected engine, model, and version rather than inferred from an older vendor support matrix.',
+    relatedTerms: [
+      'decode-context-parallelism',
+      'prefill-context-parallelism',
+      'tensor-parallelism',
+      'kv-cache',
+      'prefill',
+      'decode',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3, INFERENCEX_V2, AGENTX_M3_RACK],
   },
   {
     slug: 'kv-cache-offload',
@@ -2848,9 +3036,9 @@ const entries = [
     significance:
       'The design trades single-chip peak for system-level cost. Wide matrix units, a low-latency torus, and compiler-driven scheduling give Google a lower cost per token than a spec sheet would predict, but tile geometry punishes model shapes that do not fill the array. External adoption depends on the PyTorch-native TorchTPU stack reaching parity with the CUDA ecosystem in vLLM and SGLang.',
     benchmarkContext:
-      'The InferenceX Official Preview publishes the first third-party TPUv7 results, comparing FP8 aggregated serving against B200 and B300. Ironwood reaches up to 50% better performance per dollar in that comparison, and AgentX and disaggregated TPU results follow once the TorchTPU stack is open sourced.',
+      'The September 2026 Official Preview covers FP8 aggregated serving against B200 and B300. The November 2026 follow-up adds TPUv7 AgentX results for Muse Spark Open, GLM, Qwen3.5, and Kimi K3, including llm-d disaggregation. Those workloads, precision choices, cost bases, and latency axes must remain distinct when comparing the two articles.',
     relatedTerms: ['tpuv7-ironwood', 'mxu', 'sparsecore', 'ici', 'torchtpu', 'xla'],
-    articleSlugs: [TPU_IRONWOOD, VR_RUBIN],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD, VR_RUBIN],
   },
   {
     slug: 'tpuv7-ironwood',
@@ -2862,7 +3050,7 @@ const entries = [
     definition:
       'TPUv7 Ironwood is the Google accelerator with two independent compute dies per chip, native FP8 hardware, a 256x256 MXU, roughly six times the HBM of Trillium, and a 3D torus ICI fabric.',
     explanation:
-      'Ironwood drops the MegaCore convention of TPU v4 and v5p, where two cores shared one memory space. Its two dies run as separate logical devices joined by a die-to-die link, so frameworks see two devices per chip. Each chip carries two TensorCores and four third-generation SparseCores. The base pod unit is a 4x4x4 cube of 64 chips, and optical circuit switches stitch cubes into a 9,216-chip superpod. Ironwood has no native FP4, so the current comparison against NVIDIA uses FP8 on both sides.',
+      'Ironwood drops the MegaCore convention of TPU v4 and v5p, where two cores shared one memory space. Its two dies run as separate logical devices joined by a die-to-die link, so frameworks see two devices per chip. Each chip carries two TensorCores and four third-generation SparseCores. The base pod unit is a 4x4x4 cube of 64 chips, and optical circuit switches stitch cubes into a 9,216-chip superpod. Ironwood lacks native FP4 matrix arithmetic, but a serving recipe can still store quantized FP4 weights and convert them for computation. Weight format and arithmetic support are different properties.',
     significance:
       'This is the first generation where Google competes for outside inference workloads with chips that can be bought outright or rented. Anthropic alone committed to more than one million TPUs. The FP8-only compute path caps the comparison against Blackwell until TPUv8i adds native FP4.',
     benchmarkContext:
@@ -2888,8 +3076,16 @@ const entries = [
       ],
       caption: 'Source: SemiAnalysis, [Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
-    relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
-    articleSlugs: [TPU_IRONWOOD],
+    relatedTerms: [
+      'tpu',
+      'mxu',
+      'sparsecore',
+      'ici',
+      'fp8',
+      'weight-only-quantization',
+      'performance-per-dollar',
+    ],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
   },
   {
     slug: 'mxu',
@@ -3066,9 +3262,9 @@ const entries = [
     significance:
       'vLLM and SGLang can reuse upstream model code, schedulers, continuous batching, and feature logic instead of rebuilding them across a PyTorch-to-JAX boundary. That lowers the cost of bringing up new models and moves TPU toward day-zero support alongside NVIDIA. TorchTPU replaces TorchAX, which will be deprecated.',
     benchmarkContext:
-      'The TPUv7 results in the InferenceX Official Preview come from the native TorchTPU vLLM stack serving Qwen3.5 397B in FP8. TorchTPU is in private beta as of early September 2026 and is expected to be open sourced around mid-October at the PyTorch Conference, at which point SemiAnalysis moves TPU benchmarking from its fork to the public InferenceX repo.',
-    relatedTerms: ['torchax', 'xla', 'pallas', 'vllm', 'sglang', 'tpu'],
-    articleSlugs: [TPU_IRONWOOD],
+      'The September 2026 preview used TorchTPU vLLM for Qwen3.5 FP8 while the stack was in private beta. The November follow-up reports both SGLang-TorchTPU and vLLM-TorchTPU AgentX submissions, and links Inferact’s open-source Kimi K3 megakernel reproduction guide. Availability and model support should be read from the dated release and recipe, not the earlier beta forecast.',
+    relatedTerms: ['torchax', 'xla', 'pallas', 'vllm', 'sglang', 'tpu', 'decode-megakernel'],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
   },
   {
     slug: 'torchax',
@@ -3156,9 +3352,9 @@ const entries = [
     explanation:
       'Prefill-decode disaggregation needs a fast path to move a finished prefill’s KV cache from one pool of chips to another, and KV-cache offloading needs a path from HBM to host DRAM and back. TPU-Sync supplies both. It works natively with JAX and with the TorchTPU stack, and it supports native TPU KV-cache DRAM offloading for large models and medium-to-large batches where HBM cannot hold every user’s cache. Google has run disaggregation internally for Gemini for years; externalizing it began only a couple of months before the Official Preview, alongside TPU support in llm-d.',
     significance:
-      'Without a transfer library, TPU external serving is limited to aggregated mode, which is where the current results sit and where GB200 and GB300 NVL72 disaggregated serving currently leads on part of the curve. SemiAnalysis expects Mooncake Store support on TPU to be built on TPU-Sync primitives.',
+      'The transfer path determines whether retained state is cheaper to move than to recompute. Disaggregation requires compatible cache layouts between pools, while offload needs enough host bandwidth and capacity to keep useful prefixes available. A transfer library alone does not establish that a complete serving recipe is faster.',
     benchmarkContext:
-      'The InferenceX Official Preview compares aggregated TPUv7 against aggregated B200 and B300. A TPUv7 disaggregated versus GB200 and GB300 NVL72 disaggregated comparison is planned for a follow-up once TPU-Sync-based disaggregation is optimized in the external stack.',
+      'The November 2026 TPU AgentX article describes TPU-Sync host-DRAM offload for SGLang HiCache and for Qwen3.5 KV and linear-attention state. It also reports llm-d disaggregated serving, superseding the September preview’s plan to benchmark that path later.',
     relatedTerms: [
       'disaggregated-inference',
       'kv-cache-offload',
@@ -3166,8 +3362,9 @@ const entries = [
       'mooncake-store',
       'llm-d',
       'torchtpu',
+      'hicache',
     ],
-    articleSlugs: [TPU_IRONWOOD],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
   },
   {
     slug: 'mooncake-store',
@@ -3206,17 +3403,19 @@ const entries = [
     explanation:
       'A single vLLM instance serves one replica. Production deployments need a layer that routes each request to the replica most likely to hold its prefix in cache, splits prefill and decode across separate pools, and scales those pools independently. llm-d supplies that orchestration, backed by Red Hat, Google, and other contributors. TPU support in llm-d is part of Google’s externalization work for prefill-decode disaggregation, alongside the TPU-Sync transfer library, so external TPU customers can run the same disaggregated topology Google uses internally for Gemini.',
     significance:
-      'Disaggregation and KV-aware routing are where much of the remaining performance-per-dollar gain sits for TPU, and they only exist above the engine. Shipping TPU support in a widely used orchestrator matters as much as the engine backend for making those features usable outside Google.',
+      'Separating prefill and decode can protect generation from long prefills, while cache-aware routing can reduce repeated work. The router’s admission policy also introduces queueing trade-offs. Evaluate complete request latency and throughput rather than assuming that improved decode interactivity makes every request faster.',
     benchmarkContext:
-      'InferenceX single-node aggregated results do not exercise llm-d. The planned TPUv7 disaggregated comparison against GB200 and GB300 NVL72 depends on the llm-d and TPU-Sync work landing in the external stack.',
+      'The November 2026 TPU AgentX article reports Qwen3.5 llm-d disaggregation with four TPUv7 chips per host and 24 to 32 chips per result. It distinguishes decode interactivity gains from TTFT and end-to-end trade-offs, and describes rank-aware cache routing and decode admission limits.',
     relatedTerms: [
       'disaggregated-inference',
       'kv-aware-routing',
       'tpu-sync',
       'vllm',
       'nvidia-dynamo',
+      'decode-admission-control',
+      'kv-cache-affinity',
     ],
-    articleSlugs: [TPU_IRONWOOD, AGENTX_V3, AGENTIC_WORKLOADS],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD, AGENTX_V3, AGENTIC_WORKLOADS],
   },
   {
     slug: 'double-buffering',

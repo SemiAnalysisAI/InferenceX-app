@@ -31,6 +31,130 @@ type GlossaryTranslation = Pick<
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
+  'decode-megakernel': {
+    term: 'Decode megakernel',
+    aliases: ['megakernel', '整模型融合 kernel', 'MonoKernel'],
+    plainEnglish:
+      'Decode megakernel 把多个模型层中的操作合并为长时间运行的设备程序，减少 launch 间隙，并让权重传输与计算重叠。',
+    definition:
+      'Decode megakernel 跨算子或跨层融合模型前向计算中的较大部分，显式安排计算、数据搬运，有时也包括集合通信。',
+    explanation:
+      '常规执行会分别为注意力、投影、专家路由等操作启动许多 kernel。Megakernel 可以在计算当前层时预取下一层权重。不同实现的融合范围不同；这个名称并不保证所有算子、通信步骤或请求都在一次 launch 中完成。引擎调度和前缀缓存管理仍可位于融合后的前向路径之外。',
+    significance:
+      '低并发时，短算子之间的 launch 间隙可能让加速器空闲。减少这些间隙能提高交互速度，但长上下文注意力、prefill、缓存传输和高并发吞吐量仍需单独测量。',
+    benchmarkContext:
+      '2026 年 11 月的 TPU AgentX 文章介绍了 SGLang、vLLM 的 megakernel 路径和 AMD 的 MonoKernel。Inferact 将融合前向路径接入 vLLM 的调度及 KV 传输系统；这些结果不意味着整个推理服务只有一个 kernel。',
+  },
+  'kernel-launch-overhead': {
+    term: 'Kernel launch 开销',
+    aliases: [
+      'kernel launch overhead',
+      'launch latency',
+      'kernel 派发开销',
+      'launch-bound execution',
+    ],
+    plainEnglish:
+      'Kernel launch 开销是向设备派发操作所需的工作；算子很短时，派发间隙可能占据 decode 步骤中的相当一部分时间。',
+    definition:
+      'Kernel launch 开销包括主机和运行时提交设备任务的成本，以及派发过程在有效设备操作之间引入的延迟。',
+    explanation:
+      'CPU 侧的 launch 耗时不直接等于加速器空闲时间，因为派发与执行可能重叠。时间线需要区分提交工作、同步、依赖停顿和实际的设备空闲间隙。图重放与融合减少的是不同部分的开销，两者都不会免去启动任务的需要，也不会让内存传输和集合通信变得免费。',
+    significance:
+      '低 batch decode 即使运行在峰值算力很高的设备上，也可能受 launch 限制。仅凭 launch 数量不能推导加速比：剩余 kernel 可能更慢，关键路径也可能转移到内存或通信。',
+    benchmarkContext:
+      'TPU 文章对比了常规 decode 与 megakernel，并引用 AMD 减少 launch 次数的结果。该次数和加速比属于指定模型与测试配置，不能据此建立 launch 数量与每秒 token 数之间的通用换算关系。',
+  },
+  'decode-context-parallelism': {
+    term: 'Decode 上下文并行',
+    aliases: ['DCP', 'decode context parallelism', 'KV 序列切分'],
+    plainEnglish:
+      'Decode 上下文并行把一条序列的 KV cache 分散到多个 rank，每个 rank 读取部分历史，再合并各自的注意力结果。',
+    definition:
+      'Decode 上下文并行沿序列维度切分注意力 KV 状态，并跨参与 rank 合并局部注意力输出及其归一化统计量。',
+    explanation:
+      '当张量并行的 rank 数超过可独立切分的 KV head 数时，这种方式能减少 KV 重复存储，对 MLA 的共享 latent cache 尤其有用。每个 rank 对自己的 token 分片计算注意力，再通过数值正确的归并得到完整结果。名称反映常见优化目标，并非限定只能用于 decode；实现也可以在 prefill 中使用同一套分片缓存。',
+    significance:
+      '切分能增加有效 KV 容量并分摊缓存读取，但也带来通信与归并开销。最合适的并行度取决于上下文长度、注意力结构、拓扑，以及引擎支持的张量并行和 prefill 上下文并行组合。',
+    benchmarkContext:
+      'TPU AgentX 文章介绍了 GLM 和 Kimi K3 的 DCP。K3 在 prefill 阶段也采用分片布局，因此不能看到 DCP 标签就认定 prefill 缓存在各 rank 上完整复制。应比较实际 rank 分组与缓存布局，而不只看缩写。',
+  },
+  'prefill-context-parallelism': {
+    term: 'Prefill 上下文并行',
+    aliases: ['PCP', 'prefill context parallelism', 'prefill 序列切分'],
+    plainEnglish:
+      'Prefill 上下文并行把长 prompt 的新增 token 计算分给多个 rank，不让一个加速器独自处理整条 prompt。',
+    definition:
+      'Prefill 上下文并行把 prompt 的 query-token 计算分配到多个 rank，并交换保持模型注意力语义所需的 key 和 value。',
+    explanation:
+      '一种实现让每个 rank 持有一段 query，并 gather 所需的 key 和 value；另一种让 KV 分块循环传递，避免每个 rank 都保存完整历史。因果注意力中，靠后的 query 能看到更多 token，因此还需要均衡负载。PCP 的计算分工与 DCP 的 KV 存储分工有关，但并不相同，可用组合随引擎和模型而变。',
+    significance:
+      'PCP 可以缩短长 prompt 的处理时间，但额外通信、权重复制或不同并行布局也可能占用原本留给 KV 状态的容量。Prefill 延迟最低的方案，不一定是端到端推理服务的最佳配置。',
+    benchmarkContext:
+      'TPU 文章的 Kimi K3 部分解释了为何该配置在 prefill 中选择 DCP 分片缓存，而没有采用另一种 PCP 配置。这是具体配置下的内存取舍，不是 PCP 与 DCP 永远不能组合使用的规则。',
+  },
+  'attention-head-dimension': {
+    term: '注意力 head dimension',
+    aliases: ['attention head dimension', 'head dimension', 'head_dim', 'head dim', '注意力头维度'],
+    plainEnglish:
+      '注意力 head dimension 是每个注意力头使用的向量宽度，会影响计算量、缓存占用，以及它与加速器矩阵 tile 的匹配程度。',
+    definition:
+      '注意力 head dimension 是每个头的 query、key 或 value 表示的特征宽度；并非所有架构中这几个宽度都相等。',
+    explanation:
+      '矩阵引擎按固定 tile 形状计算，kernel 可以通过 padding、打包或改变布局来适配注意力维度。因此，同一个小于矩阵阵列宽度的 head，在一种布局中可能浪费计算，在另一种映射中却能更充分地利用阵列。Head 数、序列长度、精度、切分方式，以及 query-key 与 value 各自的维度都会影响实际利用率。',
+    significance:
+      '有利于模型质量或 GPU kernel 的维度，在 TPU 上可能需要不同布局。用 head dimension 除以阵列宽度，不能通用地估计整模型吞吐量，甚至不能概括所有注意力矩阵乘法的利用率。',
+    benchmarkContext:
+      'TPU AgentX 文章讨论了 Muse Spark Open 的 head dimension 64，以及模型形状与 TPU 矩阵硬件的匹配。应结合具体 kernel 和布局理解这一例子，不应把维度比直接当作整模型的性能预测。',
+  },
+  hicache: {
+    term: 'HiCache',
+    expansion: '分层 KV 缓存',
+    aliases: ['SGLang HiCache', 'hierarchical KV cache', '分层 KV cache'],
+    plainEnglish:
+      'HiCache 把 SGLang 的前缀缓存扩展到加速器内存之外，在主机内存和可选的存储后端中保留可复用的注意力状态。',
+    definition:
+      'HiCache 是 SGLang 的分层 KV-cache 系统，将基于 radix 的前缀复用扩展到加速器内存、实例私有的主机内存及可选的存储层。',
+    explanation:
+      '该系统记录缓存状态所在的层级，并管理加载、预取与回写。命中主机内存后，仍需把状态传入设备才能用于计算。主机内存属于单个推理实例；跨实例复用需要配置具有相应共享范围的存储后端。具体传输实现和可支持的模型状态取决于服务栈。',
+    significance:
+      '保留更多前缀可减少长多轮负载中的重复 prefill，但缓存命中能否缩短服务时间，还取决于传输延迟、带宽和驱逐策略。高命中率本身不能证明端到端延迟更低。',
+    benchmarkContext:
+      'TPU 文章介绍了 Muse Spark Open 在高并发下通过 TPU-Sync 使用 SGLang HiCache 进行主机 DRAM offload 的配置。这一实测配置并不意味着所有 HiCache 后端或配置都支持相同的加速器与模型组合。',
+  },
+  'decode-admission-control': {
+    term: 'Decode 准入控制',
+    aliases: ['decode admission control', 'decode 并发上限', 'decode 请求限制'],
+    plainEnglish:
+      'Decode 准入控制限制进入 decode worker 的请求数，在已接纳请求的生成速度与排队请求的等待时间之间取舍。',
+    definition:
+      'Decode 准入控制决定何时允许请求占用 decode worker 的活跃处理容量，通常依据请求数或资源上限。',
+    explanation:
+      '请求可能在路由器或引擎中等待，直到合适的 worker 有空位。较低上限可减小活跃 batch、提高单用户生成速度；较高上限则可能借助批处理提高吞吐量。队列所在位置决定等待时间计入哪个延迟区间。路由器的准入上限与客户端并发量不同，也不等于物理 KV 内存上限。',
+    significance:
+      '请求在 worker 外排队时，即使 decode 曲线很快，首 token 仍可能很慢。应在相同到达负载下，结合排队、TTFT、端到端延迟和完成的工作量评估准入策略。',
+    benchmarkContext:
+      'TPU 文章中的 llm-d Qwen3.5 对比调整了每个 decode 主机可接纳的请求数，并明确讨论由此产生的 TTFT 与端到端取舍。因此，decode 最快的点不应被当作完整响应最快的点。',
+  },
+  'kv-cache-affinity': {
+    term: 'KV-cache 亲和性',
+    aliases: [
+      'KV-cache affinity',
+      'cache affinity',
+      'session affinity',
+      'rank-aware routing',
+      '会话亲和性',
+    ],
+    plainEnglish:
+      'KV-cache 亲和性让相关请求回到已经保存其前缀的 worker 或 rank，减少不必要的缓存传输或重复 prefill。',
+    definition:
+      'KV-cache 亲和性是一种路由偏好，让请求复用的状态与被选中处理请求的 worker 或 rank 尽量保持局部性。',
+    explanation:
+      '一台主机可以包含多个数据并行 rank，各自持有独立缓存，因此只选对主机仍可能无法命中所需前缀。策略可以追踪前缀位置，或让会话继续使用原 worker；当该 worker 满载或不可用时，仍允许改派。亲和性是一种偏好，并不保证状态未被驱逐。',
+    significance:
+      '局部性可以提高缓存复用，却也可能让负载集中于少数 worker。调度器需要权衡省下的计算或传输与排队、容量及故障切换成本。会话亲和性与一般的前缀感知路由有所重叠，但不是完全相同的策略。',
+    benchmarkContext:
+      'TPU Qwen3.5 文章将 decode 缓存命中率提升归因于路由到准确的数据并行 rank，也描述了在 decode 主机未满时保持会话绑定的策略，说明缓存局部性与准入控制相互关联。',
+  },
   'open-loop-benchmark': {
     term: '开环基准测试',
     aliases: ['open-loop benchmark', '开环负载测试', '按到达时间驱动的负载'],
@@ -1118,13 +1242,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish:
       '上下文并行把一条长提示词拆到多颗芯片上，让它们分担读取提示词和扫描注意力状态的工作。',
     definition:
-      '上下文并行把 query token 切分到多个加速器上，用于 prefill 的形式称为 PCP，用于 decode 的形式称为 DCP。',
+      '上下文并行沿序列维度将注意力计算或 KV 状态分布到多个加速器，包括 prefill 上下文并行（PCP）和 decode 上下文并行（DCP）。',
     explanation:
-      'PCP 让每个 rank 处理一段 query，keys 和 values 以环形方式传递，从而并行化计算受限的 prefill，也避免某个 rank 独自承担整条长提示词。DCP 则切分 KV cache 本身，每个 rank 扫描各自分片，再以 flash-decode 方式合并部分注意力结果；由于 decode 受显存带宽限制，并行读取 KV 可以提高可达 token 速率。',
+      'PCP 划分新增 query-token 的计算，并通过 gather 或环形传递交换所需的 key 和 value，具体方式由实现决定。DCP 按 token 位置切分 KV 状态，再合并各 rank 的局部注意力结果和归一化统计量。Prefill 也可以使用 DCP 分片缓存；这些名称描述常见优化目标，并不对应互斥的执行阶段。',
     significance:
-      '张量并行会在每个 rank 上复制完整 KV cache，数据并行注意力则把会话绑定在持有其分片的 rank 上，两者在上下文达到几十万 token 时都难以扩展。上下文并行直接针对这一点，而且收益随输入长度增长，而不是随 batch 大小增长。',
+      '架构有足够多独立 KV head 时，张量并行可以切分这些 head。当 TP 并行度超过 head 数，或模型让多个 head 共享 latent cache 时，重复存储才成为问题。上下文并行可减少这种重复或分摊长 prompt 的计算，其通信与内存取舍取决于具体配置。',
     benchmarkContext:
-      'InferenceX 在数据点提示框和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
+      'InferenceX 将 DCP、PCP 并行度与 TP、EP、DP 一起展示。2026 年 11 月的 TPU AgentX 文章介绍了 GLM 的 DCP，以及 Kimi K3 在 prefill 阶段使用 DCP 的配置。应核对所选引擎、模型和版本的实际支持，不能从旧的厂商支持矩阵推断。',
   },
   'kv-cache-offload': {
     term: 'KV cache offloading',
@@ -1996,7 +2120,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '这种设计用单芯片峰值换取系统级成本优势。宽矩阵单元、低延迟 torus 网络和编译器驱动的调度，让 Google 的每 token 成本低于规格表的推算；但 tile 几何会惩罚填不满阵列的模型形状。TPU 能否被外部广泛采用，取决于 PyTorch 原生的 TorchTPU 栈能否在 vLLM 和 SGLang 中追平 CUDA 生态。',
     benchmarkContext:
-      'InferenceX Official Preview 发布了首批第三方 TPUv7 结果，在 FP8 聚合服务下与 B200、B300 对比，Ironwood 的每美元性能最高高出 50%。TorchTPU 栈开源后，AgentX 和 TPU 分离式服务的结果也会陆续发布。',
+      '2026 年 9 月的 Official Preview 对比了 FP8 聚合服务下的 TPUv7 与 B200、B300。11 月的后续文章新增 Muse Spark Open、GLM、Qwen3.5 和 Kimi K3 的 TPUv7 AgentX 结果，包括 llm-d 分离式服务。比较两篇文章时，必须区分负载、精度、成本口径和延迟坐标轴。',
   },
   'tpuv7-ironwood': {
     term: 'TPUv7 Ironwood',
@@ -2006,7 +2130,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'TPUv7 Ironwood 是 Google 的加速器，每颗芯片有两个独立计算 die、原生 FP8 硬件、256x256 的 MXU、约为 Trillium 六倍的 HBM 容量，以及 3D torus 结构的 ICI 网络。',
     explanation:
-      'Ironwood 放弃了 TPU v4 和 v5p 的 MegaCore 设计，后者把两个核心融合为共享同一内存空间的单个逻辑设备。Ironwood 的两个 die 各自作为独立逻辑设备运行，通过 die-to-die 链路相连，因此框架看到的是每颗芯片两个设备。每颗芯片有 2 个 TensorCore 和 4 个第三代 SparseCore。pod 的基本单元是 4x4x4 共 64 颗芯片的立方体，再通过光电路交换机拼接成 9,216 颗芯片的 superpod。Ironwood 没有原生 FP4，因此目前与 NVIDIA 的对比两边都使用 FP8。',
+      'Ironwood 放弃了 TPU v4 和 v5p 的 MegaCore 设计，后者把两个核心融合为共享同一内存空间的单个逻辑设备。Ironwood 的两个 die 各自作为独立逻辑设备运行，通过 die-to-die 链路相连，因此框架看到的是每颗芯片两个设备。每颗芯片有 2 个 TensorCore 和 4 个第三代 SparseCore。pod 的基本单元是 4x4x4 共 64 颗芯片的立方体，再通过光电路交换机拼接成 9,216 颗芯片的 superpod。Ironwood 没有原生 FP4 矩阵运算，但服务配置仍可存储量化后的 FP4 权重，并在计算时转换。权重格式与硬件运算支持是不同属性。',
     significance:
       '这是 Google 第一次用可直接购买或租用的芯片，去争夺外部推理负载。仅 Anthropic 就承诺采购超过一百万颗 TPU。在 TPUv8i 加入原生 FP4 之前，只有 FP8 的计算路径限制了它与 Blackwell 的对比范围。',
     benchmarkContext:
@@ -2153,7 +2277,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'vLLM 和 SGLang 可以复用上游的模型代码、调度器、continuous batching 和功能逻辑，不必跨 PyTorch 到 JAX 的边界重建。这降低了新模型 bring-up 的成本，让 TPU 朝着与 NVIDIA 同步的 day-0 支持靠近。TorchTPU 将取代即将弃用的 TorchAX。',
     benchmarkContext:
-      'InferenceX Official Preview 中的 TPUv7 结果来自原生 TorchTPU vLLM 栈以 FP8 服务 Qwen3.5 397B。截至 2026 年 9 月初 TorchTPU 仍处于私有测试阶段，预计 10 月中旬 PyTorch Conference 前后开源，届时 SemiAnalysis 会把 TPU 基准测试从 fork 迁移到公开的 InferenceX 仓库。',
+      '2026 年 9 月的预览使用 TorchTPU vLLM 运行 Qwen3.5 FP8，当时服务栈仍处于私有测试阶段。11 月的后续文章已报告 SGLang-TorchTPU 和 vLLM-TorchTPU 的 AgentX 提交，并链接到 Inferact 开源的 Kimi K3 megakernel 复现指南。可用性和模型支持应以带日期的发布及配置为准，而不是沿用此前的 beta 阶段预测。',
   },
   torchax: {
     term: 'TorchAX',
@@ -2221,9 +2345,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'prefill-decode 分离需要一条快速通路，把完成 prefill 的 KV cache 从一组芯片搬到另一组；KV cache offload 需要 HBM 与主机 DRAM 之间的往返通路。TPU-Sync 同时提供两者。它原生支持 JAX 和 TorchTPU 栈，并支持原生 TPU KV cache DRAM offload，用于 HBM 放不下所有用户 cache 的大模型和中大 batch 场景。Google 内部为 Gemini 运行分离式服务已有多年，对外开放的工作在 Official Preview 发布前几个月才开始，与 llm-d 的 TPU 支持同步推进。',
     significance:
-      '没有传输库，TPU 外部服务只能停留在聚合模式，这正是当前结果所处的位置，也是 GB200 和 GB300 NVL72 分离式服务目前在部分曲线上领先的原因。SemiAnalysis 预期 TPU 上的 Mooncake Store 支持会基于 TPU-Sync 的原语实现。',
+      '传输路径决定搬运已保留状态是否比重新计算更划算。分离式服务要求不同资源池的缓存布局兼容，offload 则需要足够的主机带宽与容量来保留有用前缀。仅有传输库，不能证明完整服务配置更快。',
     benchmarkContext:
-      'InferenceX Official Preview 比较的是 TPUv7 聚合服务与 B200、B300 聚合服务。基于 TPU-Sync 的分离式服务在外部栈中优化完成后，TPUv7 分离式与 GB200、GB300 NVL72 分离式的对比将在后续文章发布。',
+      '2026 年 11 月的 TPU AgentX 文章介绍了 SGLang HiCache 通过 TPU-Sync 进行主机 DRAM offload，以及 Qwen3.5 的 KV 和线性注意力状态 offload。文章也报告了 llm-d 分离式服务结果，不再只是 9 月预览中留待后续测试的计划。',
   },
   'mooncake-store': {
     term: 'Mooncake Store',
@@ -2249,9 +2373,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '单个 vLLM 实例只服务一个副本。生产部署需要一层把每个请求路由到最可能缓存了其前缀的副本，把 prefill 和 decode 拆到不同的池，并独立扩缩这些池。llm-d 提供这种编排，由 Red Hat、Google 等贡献者支持。llm-d 的 TPU 支持是 Google 外部化 prefill-decode 分离工作的一部分，与 TPU-Sync 传输库配套，让外部 TPU 客户能运行 Google 内部为 Gemini 使用的同一种分离式拓扑。',
     significance:
-      '分离式服务和 KV 感知路由是 TPU 剩余每美元性能收益的主要来源，而它们只存在于引擎之上。让这些功能在 Google 之外可用，在广泛使用的编排层中提供 TPU 支持与引擎后端同样重要。',
+      'Prefill 与 decode 分离可以减少长 prefill 对生成的干扰，缓存感知路由则能减少重复计算。路由器的准入策略也会带来排队取舍，应评估完整请求延迟和吞吐量，不能假定 decode 交互速度提高就意味着每个请求都更快。',
     benchmarkContext:
-      'InferenceX 的单节点聚合结果不涉及 llm-d。计划中的 TPUv7 分离式与 GB200、GB300 NVL72 的对比，取决于 llm-d 和 TPU-Sync 的工作在外部栈中落地。',
+      '2026 年 11 月的 TPU AgentX 文章报告了 Qwen3.5 的 llm-d 分离式服务，每台主机 4 颗 TPUv7，每个结果使用 24 至 32 颗芯片。文章区分 decode 交互速度收益与 TTFT、端到端延迟的取舍，并介绍按 rank 感知缓存的路由及 decode 准入限制。',
   },
   'double-buffering': {
     term: '双缓冲',
