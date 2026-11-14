@@ -887,11 +887,11 @@ export default function VideoResultsChart({
                 external: true,
               },
               ...detailLinks(point)
-                .filter((link) => link.action !== 'run')
-                .map((link) => ({
-                  action: link.action,
-                  label: link.action === 'artifact' ? s.artifactLink : s.reproduceLink,
-                  href: link.href,
+                .filter((entry) => entry.action !== 'run')
+                .map((entry) => ({
+                  action: entry.action,
+                  label: entry.action === 'artifact' ? s.artifactLink : s.reproduceLink,
+                  href: entry.href,
                   external: true,
                 })),
               { action: 'view-telemetry', label: `${s.viewTelemetry} →` },
