@@ -57,6 +57,7 @@ import {
   type ResultsChartPoint,
   type ResultsChartSeries,
 } from './results-chart';
+import { detailLinks } from './detail-links';
 import { resultsNumber as n } from './VideoResultsCharts';
 
 export const VIDEO_RESULTS_CHART_ID = 'video-results-chart';
@@ -78,18 +79,29 @@ const STRINGS = {
     unofficial: 'Unofficial run',
     unofficialPill: 'unofficial',
     conc: (count: number) => `Conc ${count}`,
-    gpuSplit: 'GPUs (part. / alloc.)',
+    gpusShort: 'GPUs',
+    gpuOf: (used: number | null, allocated: number | null) =>
+      used === null ? '—' : allocated === null ? String(used) : `${used} of ${allocated}`,
+    validOf: (valid: number | null, scheduled: number | null, failed: number | null) =>
+      `${valid ?? '—'} / ${scheduled ?? '—'}${failed ? ` (${failed} failed)` : ''}`,
+    latency: 'Latency per clip',
+    latencyClip: (seconds: number, fps: number) => `Latency per ${seconds} s clip at ${fps} fps`,
+    median: 'Median',
+    throughputCost: 'Throughput and cost',
+    powerSection: 'Power',
     deployment: 'Deployment',
     replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,
     replicasUnknown: 'replicas not recorded',
+    notRecorded: 'Not recorded',
+    artifactLink: 'Download artifact',
+    reproduceLink: 'Reproduce',
     attention: (backend: string) => `${backend} attention`,
     concurrency: 'Concurrency',
     perVideo: 'Cost per video',
     energy: 'Energy per clip',
     power: 'Avg board power',
     valid: 'Valid clips',
-    completedFailed: 'Completed / failed',
-    meets: (seconds: string) => `Meets ${seconds} s deadline`,
+    meets: (seconds: string) => `Within ${seconds} s deadline`,
     videoSecondsPerHour: 'Video-seconds per hour',
     powerLimit: 'Enforced power limit',
     runtime: 'Runtime',
@@ -123,17 +135,28 @@ const STRINGS = {
     unofficial: '非官方运行',
     unofficialPill: '非官方',
     conc: (count: number) => `并发 ${count}`,
-    gpuSplit: 'GPU（参与 / 分配）',
+    gpusShort: 'GPU',
+    gpuOf: (used: number | null, allocated: number | null) =>
+      used === null ? '—' : allocated === null ? String(used) : `${used} / ${allocated}`,
+    validOf: (valid: number | null, scheduled: number | null, failed: number | null) =>
+      `${valid ?? '—'} / ${scheduled ?? '—'}${failed ? `（${failed} 失败）` : ''}`,
+    latency: '单条视频延迟',
+    latencyClip: (seconds: number, fps: number) => `生成一段 ${seconds} 秒、${fps} fps 视频的延迟`,
+    median: '中位',
+    throughputCost: '吞吐与成本',
+    powerSection: '功耗',
     deployment: '部署',
     replicas: (count: number) => `${count} 个副本`,
     replicasUnknown: '未记录副本数',
+    notRecorded: '未记录',
+    artifactLink: '下载产物',
+    reproduceLink: '复现',
     attention: (backend: string) => `${backend} 注意力`,
     concurrency: '并发数',
     perVideo: '每条视频成本',
     energy: '每条视频能耗',
     power: '板卡平均功率',
     valid: '有效视频',
-    completedFailed: '完成 / 失败',
     meets: (seconds: string) => `${seconds} s 内完成`,
     videoSecondsPerHour: '每小时视频秒数',
     powerLimit: '强制功率上限',
@@ -478,6 +501,88 @@ function SeriesSwatch({ shape, dashed }: { shape: ShapeKey; dashed: boolean }) {
   );
 }
 
+type DetailPoint = ResultCell['point'];
+
+interface PanelRow {
+  label: string;
+  value: string;
+}
+
+/** A value with its unit, or the bare dash when it was not recorded. */
+const unit = (value: string, suffix: string): string =>
+  value === '—' || !suffix ? value : `${value} ${suffix}`;
+
+/** Only recorded parts are listed; a "?" placeholder reads as broken data. */
+function deploymentText(point: DetailPoint, replicas: string | null, s: Strings): string {
+  const split = [
+    typeof point.server?.tp === 'number' ? `TP${point.server.tp}` : null,
+    typeof point.server?.ulysses === 'number' ? `Ulysses ${point.server.ulysses}` : null,
+  ]
+    .filter(Boolean)
+    .join(' × ');
+  return (
+    [split, replicas, point.server?.attention ? s.attention(point.server.attention) : null]
+      .filter(Boolean)
+      .join(' · ') || s.notRecorded
+  );
+}
+
+/** How the point ran: one row of short facts, then the deployment layout on its own line. */
+function PanelSetup({ facts, deployment }: { facts: readonly PanelRow[]; deployment: PanelRow }) {
+  return (
+    <div data-slot="point-details-setup" className="mt-1.5 border-t border-border/50 pt-1.5">
+      <dl className="grid grid-cols-3 gap-x-3">
+        {facts.map((fact) => (
+          <div key={fact.label} className="min-w-0">
+            <dt className="truncate text-muted-foreground" title={fact.label}>
+              {fact.label}
+            </dt>
+            <dd className="font-semibold tabular-nums text-foreground">{fact.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <dl className="mt-1 flex items-baseline justify-between gap-3">
+        <dt className="shrink-0 text-muted-foreground">{deployment.label}</dt>
+        <dd className="min-w-0 text-right font-semibold text-foreground">{deployment.value}</dd>
+      </dl>
+    </div>
+  );
+}
+
+/** A titled group of label and value rows, values right-aligned with their units. */
+function PanelSection({ title, rows }: { title: string; rows: readonly PanelRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <section data-slot="point-details-section" className="mt-1.5 border-t border-border/50 pt-1.5">
+      <h4 className="mb-0.5 font-semibold text-foreground">{title}</h4>
+      <dl>
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-baseline justify-between gap-3">
+            <dt className="min-w-0 text-muted-foreground">{row.label}</dt>
+            <dd className="shrink-0 text-right tabular-nums text-foreground">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** The image digest, shortened in the middle so it fits one line; the full value is the title. */
+function PanelRuntime({ label, value }: { label: string; value: string }) {
+  const short = value.length > 24 ? `${value.slice(0, 12)}…${value.slice(-8)}` : value;
+  return (
+    <div
+      data-slot="point-details-runtime"
+      className="mt-1.5 flex items-baseline justify-between gap-3 border-t border-border/50 pt-1.5"
+    >
+      <span className="text-muted-foreground">{label}</span>
+      <code className="min-w-0 truncate font-mono text-foreground" title={value}>
+        {short}
+      </code>
+    </div>
+  );
+}
+
 export default function VideoResultsChart({
   cells,
   history,
@@ -721,9 +826,7 @@ export default function VideoResultsChart({
     [s],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
-    const latencies = RESULTS_X_METRIC_KEYS.filter(
-      (key) => key !== xKey && !RESULTS_X_METRICS[key].rankOn,
-    ).map((key) => RESULTS_X_METRICS[key]);
+    const latencyKeys = RESULTS_X_METRIC_KEYS.filter((key) => !RESULTS_X_METRICS[key].rankOn);
     const hoverLatency = RESULTS_X_METRICS[x.rankOn ?? xKey];
     const selection = { basis: state.costBasis, tier: state.costTier };
     const describe = ({ cell, overlay, x: xValue, y: yValue }: PlotPoint) => {
@@ -796,69 +899,11 @@ export default function VideoResultsChart({
             color={plot.color}
             date={d.date}
             warning={d.warning}
+            // Units ride with the values and the clip shape is named once, in the latency heading,
+            // so the labels stay short.
             metrics={[
-              { value: d.yValue, label: yLabel },
-              { value: d.xValue, label: xLabel },
-            ]}
-            // Power and energy lead, so they show without scrolling the panel's default height.
-            rows={[
-              {
-                label: s.energy,
-                value: cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`,
-              },
-              {
-                label: s.power,
-                value: point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`,
-              },
-              {
-                label: s.powerLimit,
-                value: point.enforcedLimitW === null ? '—' : `${n(point.enforcedLimitW, 0)} W`,
-              },
-              {
-                label: s.concurrency,
-                value: point.concurrency === null ? '—' : String(point.concurrency),
-              },
-              {
-                label: s.gpuSplit,
-                value: `${n(point.participating, 0)} / ${n(point.allocated, 0)}`,
-              },
-              { label: s.valid, value: `${n(point.valid, 0)} / ${n(point.scheduled, 0)}` },
-              {
-                label: s.completedFailed,
-                value: `${n(point.completed, 0)} / ${n(point.failed, 0)}`,
-              },
-              {
-                label: s.deployment,
-                value: [
-                  `TP${point.server?.tp ?? '?'} × Ulysses ${point.server?.ulysses ?? '?'}`,
-                  d.replicas ?? s.replicasUnknown,
-                  s.attention(point.server?.attention ?? '?'),
-                ].join(' · '),
-                wide: true,
-              },
-              ...latencies.map((latency) => ({
-                label: resultsMetricLabel(latency, locale, clip),
-                value: n(latency.value(cell, selection), latency.digits),
-              })),
-              {
-                label: s.meets(n(state.deadlineSeconds)),
-                value:
-                  cell.deadlineAttainment === null
-                    ? '—'
-                    : `${n(cell.deadlineAttainment * 100, 0)}%`,
-              },
-              { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
-              ...RESULTS_Y_METRIC_KEYS.filter(
-                (key) => key !== state.yMetric && key !== 'kjPerClip',
-              ).map((key) => ({
-                label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
-                value: n(
-                  RESULTS_Y_METRICS[key].value(cell, selection),
-                  RESULTS_Y_METRICS[key].digits,
-                ),
-              })),
-              { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
-              ...(point.runtime ? [{ label: s.runtime, value: point.runtime, wide: true }] : []),
+              { value: unit(d.yValue, y.unit), label: y.label[locale] },
+              { value: unit(d.xValue, x.unit), label: x.label[locale] },
             ]}
             // View telemetry sits in the panel's fixed action row, so it never scrolls away.
             links={[
@@ -868,6 +913,14 @@ export default function VideoResultsChart({
                 href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
                 external: true,
               },
+              ...detailLinks(point)
+                .filter((entry) => entry.action !== 'run')
+                .map((entry) => ({
+                  action: entry.action,
+                  label: entry.action === 'artifact' ? s.artifactLink : s.reproduceLink,
+                  href: entry.href,
+                  external: true,
+                })),
               { action: 'view-telemetry', label: `${s.viewTelemetry} →` },
             ]}
             onClose={close}
@@ -878,6 +931,80 @@ export default function VideoResultsChart({
               onOpen(plot.key, 'popover');
             }}
           >
+            <PanelSetup
+              facts={[
+                {
+                  label: s.concurrency,
+                  value: point.concurrency === null ? '—' : String(point.concurrency),
+                },
+                { label: s.gpusShort, value: s.gpuOf(point.participating, point.allocated) },
+                {
+                  label: s.valid,
+                  value: s.validOf(point.valid, point.scheduled, point.failed),
+                },
+              ]}
+              deployment={{ label: s.deployment, value: deploymentText(point, d.replicas, s) }}
+            />
+            <PanelSection
+              title={clip ? s.latencyClip(clip.seconds, clip.fps) : s.latency}
+              rows={[
+                ...latencyKeys.map((key) => ({
+                  label: key === 'p50' ? s.median : 'P90',
+                  value: unit(n(RESULTS_X_METRICS[key].value(cell, selection), 1), 's'),
+                })),
+                {
+                  label: s.meets(n(state.deadlineSeconds)),
+                  value:
+                    cell.deadlineAttainment === null
+                      ? '—'
+                      : `${n(cell.deadlineAttainment * 100, 0)}%`,
+                },
+              ]}
+            />
+            <PanelSection
+              title={s.powerSection}
+              rows={[
+                ...(state.yMetric === 'kjPerClip'
+                  ? []
+                  : [
+                      {
+                        label: s.energy,
+                        value: unit(
+                          cell.joulesPerClip === null ? '—' : n(cell.joulesPerClip / 1000, 1),
+                          'kJ',
+                        ),
+                      },
+                    ]),
+                {
+                  label: s.power,
+                  value: unit(point.avgPowerW === null ? '—' : n(point.avgPowerW, 0), 'W'),
+                },
+                {
+                  label: s.powerLimit,
+                  value: unit(
+                    point.enforcedLimitW === null ? '—' : n(point.enforcedLimitW, 0),
+                    'W',
+                  ),
+                },
+              ]}
+            />
+            <PanelSection
+              title={s.throughputCost}
+              rows={[
+                ...RESULTS_Y_METRIC_KEYS.filter(
+                  (key) => key !== state.yMetric && key !== 'kjPerClip',
+                ).map((key) => ({
+                  label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
+                  value: n(
+                    RESULTS_Y_METRICS[key].value(cell, selection),
+                    RESULTS_Y_METRICS[key].digits,
+                  ),
+                })),
+                { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
+                { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
+              ]}
+            />
+            {point.runtime && <PanelRuntime label={s.runtime} value={point.runtime} />}
             {link.current && plot.clips && (
               <Button
                 type="button"
@@ -1095,120 +1222,124 @@ export default function VideoResultsChart({
           </>
         ) : undefined
       }
+      // An 18rem sidebar keeps a pinned point's details readable; it is sized before
+      // the pin so pinning never reflows the plot.
       legendElement={
-        <ChartLegend
-          variant="sidebar"
-          legendItems={legendItems}
-          onItemRemove={toggle}
-          isLegendExpanded={legendExpanded}
-          onExpandedChange={(expanded) => {
-            onLegendExpandedChange(expanded);
-            track('video_results_legend_expanded', { enabled: expanded });
-          }}
-          reset={{
-            id: 'video-results-legend-reset',
-            disabled: state.hidden.length === 0,
-            onClick: () => {
-              onUpdate({ hidden: [] });
-              track('video_results_legend_reset');
-            },
-          }}
-          switches={[
-            {
-              id: 'video-results-optimal',
-              label: s.optimal,
-              checked: state.optimal,
-              infoTooltip: s.optimalHelp,
-              onCheckedChange: (optimal) => {
-                onUpdate({ optimal });
-                track('video_results_optimal_toggled', { enabled: optimal });
+        <div className="flex min-h-0 flex-1 flex-col lg:min-w-72">
+          <ChartLegend
+            variant="sidebar"
+            legendItems={legendItems}
+            onItemRemove={toggle}
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={(expanded) => {
+              onLegendExpandedChange(expanded);
+              track('video_results_legend_expanded', { enabled: expanded });
+            }}
+            reset={{
+              id: 'video-results-legend-reset',
+              disabled: state.hidden.length === 0,
+              onClick: () => {
+                onUpdate({ hidden: [] });
+                track('video_results_legend_reset');
               },
-            },
-            {
-              id: 'video-results-labels',
-              label: s.labels,
-              checked: labels,
-              onCheckedChange: (enabled) => {
-                onLabelsChange(enabled);
-                track('video_results_labels_toggled', { enabled });
+            }}
+            switches={[
+              {
+                id: 'video-results-optimal',
+                label: s.optimal,
+                checked: state.optimal,
+                infoTooltip: s.optimalHelp,
+                onCheckedChange: (optimal) => {
+                  onUpdate({ optimal });
+                  track('video_results_optimal_toggled', { enabled: optimal });
+                },
               },
-            },
-            ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
-              ? [
-                  {
-                    id: 'video-results-lossy',
-                    label: s.lossy,
-                    checked: state.lossy,
-                    infoTooltip: s.lossyHelp,
-                    onCheckedChange: (lossy: boolean) => {
-                      onUpdate({ lossy });
-                      track('video_results_lossy_toggled', { enabled: lossy });
+              {
+                id: 'video-results-labels',
+                label: s.labels,
+                checked: labels,
+                onCheckedChange: (enabled) => {
+                  onLabelsChange(enabled);
+                  track('video_results_labels_toggled', { enabled });
+                },
+              },
+              ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
+                ? [
+                    {
+                      id: 'video-results-lossy',
+                      label: s.lossy,
+                      checked: state.lossy,
+                      infoTooltip: s.lossyHelp,
+                      onCheckedChange: (lossy: boolean) => {
+                        onUpdate({ lossy });
+                        track('video_results_lossy_toggled', { enabled: lossy });
+                      },
                     },
-                  },
-                ]
-              : []),
-          ]}
-          keyIndicators={
-            engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
-              <>
-                {engines.length > 1 && (
-                  <ul
-                    className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                    aria-label={s.engines}
-                    data-testid="results-engine-key"
-                  >
-                    {engines.map((engine) => (
-                      <li
-                        key={engine ?? 'na'}
-                        className="flex items-center gap-2"
-                        data-engine={engine ?? 'na'}
-                      >
-                        <SeriesSwatch shape={engineShape(engine)} dashed={false} />
-                        {engine === null ? s.engineNotRecorded : engineLabel(engine)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {lossySeries.length > 0 && (
-                  <ul
-                    className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                    aria-label={s.lossySeries}
-                    data-testid="results-lossy-key"
-                  >
-                    {lossySeries.map((item) => (
-                      <li
-                        key={item.key}
-                        className="flex items-center gap-2"
-                        data-series={item.key}
-                        style={{
-                          color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
-                        }}
-                      >
-                        <SeriesSwatch
-                          shape={byEngine ? engineShape(item.engine) : 'circle'}
-                          dashed
-                        />
-                        <span className="text-muted-foreground">
-                          {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {lossySeries.length > 0 && lossyNote}
-                {state.unofficialRun && (
-                  <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span
-                      className="inline-block size-3 shrink-0 rounded-full"
-                      style={{ background: overlayRunColor(0) }}
-                    />
-                    {s.unofficial} #{state.unofficialRun}
-                  </p>
-                )}
-              </>
-            ) : undefined
-          }
-        />
+                  ]
+                : []),
+            ]}
+            keyIndicators={
+              engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
+                <>
+                  {engines.length > 1 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.engines}
+                      data-testid="results-engine-key"
+                    >
+                      {engines.map((engine) => (
+                        <li
+                          key={engine ?? 'na'}
+                          className="flex items-center gap-2"
+                          data-engine={engine ?? 'na'}
+                        >
+                          <SeriesSwatch shape={engineShape(engine)} dashed={false} />
+                          {engine === null ? s.engineNotRecorded : engineLabel(engine)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {lossySeries.length > 0 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.lossySeries}
+                      data-testid="results-lossy-key"
+                    >
+                      {lossySeries.map((item) => (
+                        <li
+                          key={item.key}
+                          className="flex items-center gap-2"
+                          data-series={item.key}
+                          style={{
+                            color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
+                          }}
+                        >
+                          <SeriesSwatch
+                            shape={byEngine ? engineShape(item.engine) : 'circle'}
+                            dashed
+                          />
+                          <span className="text-muted-foreground">
+                            {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {lossySeries.length > 0 && lossyNote}
+                  {state.unofficialRun && (
+                    <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className="inline-block size-3 shrink-0 rounded-full"
+                        style={{ background: overlayRunColor(0) }}
+                      />
+                      {s.unofficial} #{state.unofficialRun}
+                    </p>
+                  )}
+                </>
+              ) : undefined
+            }
+          />
+        </div>
       }
     />
   );

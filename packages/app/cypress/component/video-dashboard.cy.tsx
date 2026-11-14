@@ -524,7 +524,10 @@ describe('VideoGenX results', () => {
     hardwarePoints('h100').should('not.exist');
     cy.get('#checkbox-h100').should('not.exist');
     points('[data-hardware="h200"] .visible-shape').click({ force: true });
-    cy.get('[data-testid="point-details-panel"]').should('contain', '4 / —');
+    // An unrecorded allocation shows only the GPUs used, not a dangling "of —".
+    cy.get('[data-slot="point-details-setup"]')
+      .should('contain', 'GPUs')
+      .and('not.contain', ' of ');
     cy.get('[data-testid="results-tco-table"]')
       .should('contain', 'B200')
       .and('not.contain', 'MI355X');
@@ -706,12 +709,24 @@ describe('VideoGenX results', () => {
       .and('contain', '4 GPU · TP2 × Ulysses 2');
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
     cy.get('[data-testid="point-details-panel"]')
-      .should('contain', 'GPUs (part. / alloc.)')
-      .and('contain', '4 / 8')
+      .should('contain', 'GPUs')
+      .and('contain', '4 of 8')
       .and('contain', 'Concurrency')
       .and('contain', 'TP2 × Ulysses 2')
       .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
       .should('contain', 'GitHub Actions run');
+    cy.get('[data-testid="point-details-panel"]')
+      .should('not.contain', '? attention')
+      .and('not.contain', 'replicas not recorded')
+      .within(() => {
+        cy.get('[data-action="artifact"]')
+          .should('have.attr', 'href')
+          .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
+        cy.get('[data-action="reproduce"]')
+          .should('have.attr', 'href')
+          .and('contain', 'video-generation/SUBMITTING.md');
+      });
+    cy.get('[data-testid="point-details-panel"]').invoke('outerWidth').should('be.gte', 280);
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
@@ -721,6 +736,38 @@ describe('VideoGenX results', () => {
       .find('[aria-pressed="true"]')
       .should('contain', '4 GPU');
     cy.get('[data-testid="video-results-detail"] nav').should('not.exist');
+    cy.get('[data-testid="results-detail-actions"]')
+      .should('have.attr', 'role', 'group')
+      .within(() => {
+        cy.get('[data-action="run"]')
+          .should(
+            'have.attr',
+            'href',
+            'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789',
+          )
+          .and('contain', 'GitHub Actions run');
+        cy.get('[data-action="artifact"]')
+          .should('have.attr', 'href')
+          .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
+        cy.get('[data-action="reproduce"]')
+          .should('have.attr', 'href')
+          .and('contain', 'video-generation/SUBMITTING.md');
+      });
+    cy.get('[data-testid="video-results-detail"]').should('contain', 'value (ms, log scale)');
+    cy.get('[data-testid="video-results-detail"]')
+      .invoke('text')
+      .should('match', /range \d{2},\d{3}–\d{2},\d{3} ms/u);
+    cy.viewport(393, 900);
+    cy.get('[data-testid="results-detail-actions"] a').then((links) => {
+      const tops = [...links].map((link) => link.getBoundingClientRect().top);
+      expect(new Set(tops).size, 'actions share one row on a phone').to.equal(1);
+    });
+    cy.get('[data-testid="results-detail-actions"] [data-action="run"]').should(
+      'have.attr',
+      'aria-label',
+      'GitHub Actions run',
+    );
+    cy.viewport(1280, 900);
     cy.get('[data-testid="results-power-trace"] svg').should('exist');
     cy.get('[data-testid="results-detail-latency"]')
       .invoke('text')

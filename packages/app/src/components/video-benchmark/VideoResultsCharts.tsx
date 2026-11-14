@@ -128,26 +128,30 @@ export function ResultsLines({
   label,
   xLabel,
   yLabel,
+  width = 630,
 }: {
   series: ResultSeries[];
   label: string;
   xLabel: string;
   yLabel: string;
+  /** viewBox width; a narrower canvas keeps axis labels legible on a phone. */
+  width?: number;
 }) {
+  const right = width - 42;
   const all = series.flatMap((s) => s.points);
   const maxX = Math.max(1, ...all.map((p) => p.x)),
     maxY = Math.max(1, ...all.map((p) => p.y));
-  const x = (v: number) => 48 + (v / maxX) * 540,
+  const x = (v: number) => 48 + (v / maxX) * (right - 48),
     y = (v: number) => 218 - (v / maxY) * 180;
   const path = (ps: { x: number; y: number }[]) =>
     ps.map((p, i) => `${i ? 'L' : 'M'}${x(p.x)},${y(p.y)}`).join(' ');
   return (
-    <svg viewBox="0 0 630 262" className="w-full" role="img" aria-label={label}>
+    <svg viewBox={`0 0 ${width} 262`} className="w-full" role="img" aria-label={label}>
       {[0, 0.25, 0.5, 0.75, 1].map((t) => (
         <g key={t}>
           <line
             x1="48"
-            x2="588"
+            x2={right}
             y1={y(t * maxY)}
             y2={y(t * maxY)}
             stroke="currentColor"
@@ -189,7 +193,7 @@ export function ResultsLines({
       <text x="48" y="18" fill="currentColor" fontSize={CHART_TYPE.axisLabel}>
         {yLabel}
       </text>
-      <text x="588" y="258" textAnchor="end" fill="currentColor" fontSize={CHART_TYPE.axisLabel}>
+      <text x={right} y="258" textAnchor="end" fill="currentColor" fontSize={CHART_TYPE.axisLabel}>
         {xLabel}
       </text>
     </svg>
