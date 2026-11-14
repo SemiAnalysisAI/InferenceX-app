@@ -1,6 +1,46 @@
 import { SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
 describe('Chinese (/zh) pages', () => {
+  describe('TPU article and glossary navigation', () => {
+    for (const prefix of ['', '/zh']) {
+      it(`reads the TPU port and follows its glossary round trip in ${prefix || 'English'}`, () => {
+        cy.viewport(prefix ? 375 : 1440, prefix ? 844 : 1000);
+        cy.visit(`${prefix}/blog/tpu-strikes-the-king`);
+        cy.get('h1').should('contain.text', prefix ? 'Google TPU' : "Google's TPU");
+        cy.get('main').should(
+          'contain.text',
+          prefix ? '订阅者专享' : 'subscriber-only continuation',
+        );
+        cy.get('main figure').should('have.length', 25);
+        cy.get('main figure img')
+          .first()
+          .should('be.visible')
+          .and(($img) => {
+            expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+          });
+        cy.get('main').should('contain.text', prefix ? '预览提交' : 'preview submissions');
+        cy.get(`main a[href="${prefix}/glossary/decode-context-parallelism"]`).click();
+        cy.location('pathname').should('eq', `${prefix}/glossary/decode-context-parallelism`);
+        cy.get('h1').should(
+          'contain.text',
+          prefix ? 'Decode 上下文并行' : 'Decode context parallelism',
+        );
+        cy.get('main').should('contain.text', 'prefill');
+        cy.get(`aside a[href="${prefix}/glossary/prefill-context-parallelism"]`).should('exist');
+        cy.get(`main a[href="${prefix}/blog/tpu-strikes-the-king"]`).click();
+        cy.location('pathname').should('eq', `${prefix}/blog/tpu-strikes-the-king`);
+        const sibling = prefix ? '' : '/zh';
+        cy.get(
+          `[data-testid="language-toggle"][href="${sibling}/blog/tpu-strikes-the-king"]`,
+        ).click();
+        cy.location('pathname').should('eq', `${sibling}/blog/tpu-strikes-the-king`);
+        cy.document().then((doc) => {
+          expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+        });
+      });
+    }
+  });
+
   describe('zh landing page', () => {
     before(() => {
       cy.visit('/zh');
