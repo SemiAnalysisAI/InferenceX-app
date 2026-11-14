@@ -17,8 +17,12 @@ const pathOf = (url: string) => {
   return u.pathname + u.search;
 };
 
+/** Opt in with `?prefetch-debug`; it then sticks for the tab session across navigations. */
 export function mountPointerIntentDebug() {
   if (mounted || typeof window === 'undefined') return;
+  if (new URLSearchParams(location.search).has('prefetch-debug'))
+    sessionStorage.setItem('prefetch-debug', '1');
+  if (!sessionStorage.getItem('prefetch-debug')) return;
   mounted = true;
 
   const canvas = document.createElement('canvas');
