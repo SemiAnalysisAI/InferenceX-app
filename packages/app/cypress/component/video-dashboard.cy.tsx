@@ -525,7 +525,9 @@ describe('VideoGenX results', () => {
     cy.get('#checkbox-h100').should('not.exist');
     points('[data-hardware="h200"] .visible-shape').click({ force: true });
     // An unrecorded allocation shows only the GPUs used, not a dangling "of —".
-    cy.get('[data-slot="point-details-setup"]').should('contain', 'GPUs').and('not.contain', ' of ');
+    cy.get('[data-slot="point-details-setup"]')
+      .should('contain', 'GPUs')
+      .and('not.contain', ' of ');
     cy.get('[data-testid="results-tco-table"]')
       .should('contain', 'B200')
       .and('not.contain', 'MI355X');
