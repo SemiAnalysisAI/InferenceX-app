@@ -524,7 +524,8 @@ describe('VideoGenX results', () => {
     hardwarePoints('h100').should('not.exist');
     cy.get('#checkbox-h100').should('not.exist');
     points('[data-hardware="h200"] .visible-shape').click({ force: true });
-    cy.get('[data-testid="point-details-panel"]').should('contain', '4 / —');
+    // An unrecorded allocation shows only the GPUs used, not a dangling "of —".
+    cy.get('[data-slot="point-details-setup"]').should('contain', 'GPUs').and('not.contain', ' of ');
     cy.get('[data-testid="results-tco-table"]')
       .should('contain', 'B200')
       .and('not.contain', 'MI355X');
@@ -706,8 +707,8 @@ describe('VideoGenX results', () => {
       .and('contain', '4 GPU · TP2 × Ulysses 2');
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
     cy.get('[data-testid="point-details-panel"]')
-      .should('contain', 'GPUs (part. / alloc.)')
-      .and('contain', '4 / 8')
+      .should('contain', 'GPUs')
+      .and('contain', '4 of 8')
       .and('contain', 'Concurrency')
       .and('contain', 'TP2 × Ulysses 2')
       .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
