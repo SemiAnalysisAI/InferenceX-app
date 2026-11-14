@@ -30,6 +30,21 @@ export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
   return mode === 'e2e-normalized-interactivity';
 }
 
+/**
+ * Date the main benchmarks query asks for. The latest run date maps to `''`, so it shares the key
+ * the chart reads before availability resolves. A pinned run keeps its date.
+ */
+export function chartBenchmarkQueryDate(
+  selectedRunDate: string | undefined,
+  latestAvailableDate: string | undefined,
+  asOfRunId: string | undefined,
+): string | undefined {
+  if (asOfRunId) return selectedRunDate ?? '';
+  return selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
+    ? ''
+    : selectedRunDate;
+}
+
 /** Build deduplicated comparison dates, excluding the main run date. */
 export function buildComparisonDates(
   selectedGPUs: string[],

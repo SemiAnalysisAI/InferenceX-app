@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 4,
-      // The TCO basis selector models changed; recorded video entries are unchanged.
-      sources: '7954b0c06216ef719146017da85073d24a393decb606cd6fb0f1f9417b7d4ab0',
+      // The chart query date moved into a shared helper; recorded video entries are unchanged.
+      sources: '3bdb0f9ed030cde63792236f551a3444d46a268d39f2ffb0e1a5844a39e47b4c',
     });
   });
 });

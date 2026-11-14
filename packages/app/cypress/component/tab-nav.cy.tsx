@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
@@ -29,15 +30,17 @@ function mountTabNav(opts: {
   const ctxValue = createMockUnofficialRunContext({ unofficialRunInfos: opts.runs ?? [] });
 
   cy.mount(
-    <AppRouterContext.Provider value={router}>
-      <PathnameContext.Provider value={pathname}>
-        <UnofficialRunContext.Provider value={ctxValue}>
-          <div className="container mx-auto px-4 lg:px-8">
-            <TabNav footer={<UnofficialRunBanner attached />} />
-          </div>
-        </UnofficialRunContext.Provider>
-      </PathnameContext.Provider>
-    </AppRouterContext.Provider>,
+    <QueryClientProvider client={new QueryClient()}>
+      <AppRouterContext.Provider value={router}>
+        <PathnameContext.Provider value={pathname}>
+          <UnofficialRunContext.Provider value={ctxValue}>
+            <div className="container mx-auto px-4 lg:px-8">
+              <TabNav footer={<UnofficialRunBanner attached />} />
+            </div>
+          </UnofficialRunContext.Provider>
+        </PathnameContext.Provider>
+      </AppRouterContext.Provider>
+    </QueryClientProvider>,
   );
 }
 
