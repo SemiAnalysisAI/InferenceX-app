@@ -87,24 +87,39 @@ export function getClientPathnameOverride(): string | null {
   return clientPathnameOverride;
 }
 
-export function replaceRouterPathname(
+function rewriteRouterPathname(
+  method: 'pushState' | 'replaceState',
   target: string,
-  dropParams: readonly string[] = [],
-  { pageview = false }: PathnameReplaceOptions = {},
+  dropParams: readonly string[],
+  pageview: boolean,
 ): void {
   const search = new URLSearchParams(window.location.search);
   for (const param of dropParams) search.delete(param);
   const qs = search.toString();
   if (window.location.pathname === target && window.location.search === (qs ? `?${qs}` : ''))
     return;
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${target}${qs ? `?${qs}` : ''}${window.location.hash}`,
-  );
+  const href = `${target}${qs ? `?${qs}` : ''}${window.location.hash}`;
+  window.history[method](window.history.state, '', href);
   clientPathnameOverride = target;
   dispatchPathnameChange(target, pageview);
-  notifyClientSearchChange(`${target}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  notifyClientSearchChange(href);
+}
+
+export function replaceRouterPathname(
+  target: string,
+  dropParams: readonly string[] = [],
+  { pageview = false }: PathnameReplaceOptions = {},
+): void {
+  rewriteRouterPathname('replaceState', target, dropParams, pageview);
+}
+
+/** Like `replaceRouterPathname`, but adds a history entry so Back returns to the previous view. */
+export function pushRouterPathname(
+  target: string,
+  dropParams: readonly string[] = [],
+  { pageview = false }: PathnameReplaceOptions = {},
+): void {
+  rewriteRouterPathname('pushState', target, dropParams, pageview);
 }
 
 export function navigateInApp(
