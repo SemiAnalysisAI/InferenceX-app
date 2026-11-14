@@ -738,6 +738,21 @@ describe('VideoGenX results', () => {
           .should('have.attr', 'href')
           .and('contain', 'video-generation/SUBMITTING.md');
       });
+    cy.get('[data-testid="video-results-detail"]').should('contain', 'value (ms, log scale)');
+    cy.get('[data-testid="video-results-detail"]')
+      .invoke('text')
+      .should('match', /range \d{2},\d{3}–\d{2},\d{3} ms/u);
+    cy.viewport(393, 900);
+    cy.get('[data-testid="results-detail-actions"] a').then((links) => {
+      const tops = [...links].map((link) => link.getBoundingClientRect().top);
+      expect(new Set(tops).size, 'actions share one row on a phone').to.equal(1);
+    });
+    cy.get('[data-testid="results-detail-actions"] [data-action="run"]').should(
+      'have.attr',
+      'aria-label',
+      'GitHub Actions run',
+    );
+    cy.viewport(1280, 900);
     cy.get('[data-testid="results-power-trace"] svg').should('exist');
     cy.get('[data-testid="results-detail-latency"]')
       .invoke('text')
