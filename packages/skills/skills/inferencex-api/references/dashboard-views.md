@@ -157,7 +157,39 @@ and AgentX runs alike. The AgentX producer divides all three rates by every chip
 backfill move those rows to the per-pool basis and keep the producer's original
 rates as `input_tput_per_total_gpu` and `output_tput_per_total_gpu`.
 
+## Glossary terminology
+
+Read `/glossary` and `/glossary/<slug>` for static definitions; Chinese siblings use
+`/zh/glossary` and `/zh/glossary/<slug>`. The glossary now distinguishes arrival
+rate (`request-rate`) from completions (`request-throughput`), queue counts
+(`request-queue-depth`) from wait time (`queueing-latency`), and draft acceptance
+fractions (`acceptance-rate`) from per-step lengths (`acceptance-length`).
+Other serving diagnostics include `open-loop-benchmark`, `kv-working-set`,
+`kv-cache-eviction`, `preemption`, and `inter-chunk-latency`.
+The TPU AgentX follow-up adds `decode-megakernel`, `kernel-launch-overhead`,
+`decode-context-parallelism`, `prefill-context-parallelism`,
+`attention-head-dimension`, `hicache`, `decode-admission-control`, and
+`kv-cache-affinity`. DCP can also shard state used during prefill; FP4 weight
+storage does not imply native FP4 arithmetic. The TPU, TorchTPU, TPU-Sync, and
+llm-d entries distinguish the September preview from the November AgentX results.
+
+These are editorial definitions, not additional measurements or view API fields.
+The existing glossary search, categories, and alphabet controls only filter
+static entries. No benchmark selector, calculation, response schema, or API
+contract changes with this content update. Glossary pages expose `DefinedTerm`
+JSON-LD and localized sitemap URLs; `/llms-full.txt` remains an article and
+hardware-results feed, not a glossary export. Use the existing view contracts for
+measured data rather than treating an example formula as a measured result.
+
 ## Historical editorial articles
+
+`/blog/tpu-strikes-the-king` and `/zh/blog/tpu-strikes-the-king` preserve the public
+portion of the November 5, 2026 TPU AgentX newsletter, with its 25 source figures.
+The original publication's precision, external-versus-internal TCO, decode-versus-
+end-to-end comparisons, and Rubin preview qualifications remain historical.
+The subscriber-only continuation stays at the original publication; this port
+does not expose it through pages, feeds, or APIs. New glossary links explain the
+serving techniques without adding measured fields or changing view contracts.
 
 The GLM-5.3 article at
 `/blog/sparse-savings-persistent-demand-inside-glm53` (Chinese:

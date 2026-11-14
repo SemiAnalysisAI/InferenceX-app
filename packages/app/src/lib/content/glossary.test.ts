@@ -69,6 +69,94 @@ describe('glossary content', () => {
     expect(getGlossaryEntry('subagent')?.relatedTerms).toContain('trace-replay');
   });
 
+  it.each([
+    'open-loop-benchmark',
+    'request-rate',
+    'request-throughput',
+    'request-queue-depth',
+    'queueing-latency',
+    'kv-working-set',
+    'kv-cache-eviction',
+    'preemption',
+    'acceptance-rate',
+    'inter-chunk-latency',
+  ])('publishes serving diagnostic term %s in both locales', (slug) => {
+    const english = getGlossaryEntry(slug)!;
+    const chinese = getZhGlossaryEntry(slug)!;
+    expect(english, slug).toBeDefined();
+    expect(chinese, slug).toBeDefined();
+    expect(chinese.definition).not.toBe(english.definition);
+    expect(chinese.relatedTerms).toEqual(english.relatedTerms);
+    expect(english.articleSlugs).toContain('agentx-inferencexv3-does-cuda-moat');
+  });
+
+  it('distinguishes draft acceptance fractions from per-step token counts', () => {
+    const rate = getGlossaryEntry('acceptance-rate')!;
+    const length = getGlossaryEntry('acceptance-length')!;
+    expect(rate.aliases).toContain('acceptance rate');
+    expect(length.aliases).not.toContain('acceptance rate');
+    expect(getZhGlossaryEntry(length.slug)?.aliases).not.toContain('接受率');
+    expect(rate.measurement?.value).toBe(
+      'draft acceptance rate = accepted draft tokens / proposed draft tokens',
+    );
+    expect(length.definition).toContain('bonus token');
+    expect(length.relatedTerms).toContain(rate.slug);
+    expect(rate.relatedTerms).toContain(length.slug);
+  });
+
+  it.each([
+    'decode-megakernel',
+    'kernel-launch-overhead',
+    'decode-context-parallelism',
+    'prefill-context-parallelism',
+    'attention-head-dimension',
+    'hicache',
+    'decode-admission-control',
+    'kv-cache-affinity',
+  ])('connects TPU AgentX term %s to its article in both languages', (slug) => {
+    const english = getGlossaryEntry(slug)!;
+    const chinese = getZhGlossaryEntry(slug)!;
+    expect(english, slug).toBeDefined();
+    expect(chinese, slug).toBeDefined();
+    expect(chinese.definition).not.toBe(english.definition);
+    expect(chinese.articleSlugs).toContain('tpu-strikes-the-king');
+    expect(getRelatedGlossaryEntries(english)).toHaveLength(english.relatedTerms.length);
+    expect(getRelatedZhGlossaryEntries(chinese)).toHaveLength(chinese.relatedTerms.length);
+  });
+
+  it('distinguishes context partitioning, native arithmetic, and cache ownership', () => {
+    expect(getGlossaryEntry('decode-context-parallelism')?.explanation).toContain('during prefill');
+    expect(getGlossaryEntry('context-parallelism')?.significance).toContain('can shard KV heads');
+    expect(getGlossaryEntry('tpuv7-ironwood')?.explanation).toContain(
+      'convert them for computation',
+    );
+    expect(getGlossaryEntry('hicache')?.explanation).toContain('private to an inference instance');
+    expect(getGlossaryEntry('decode-admission-control')?.relatedTerms).toContain(
+      'queueing-latency',
+    );
+  });
+
+  it.each(['context-parallelism', 'tpu', 'tpuv7-ironwood', 'torchtpu', 'tpu-sync', 'llm-d'])(
+    'updates %s with the published TPU AgentX follow-up',
+    (slug) => {
+      expect(getGlossaryEntry(slug)?.articleSlugs).toContain('tpu-strikes-the-king');
+      expect(getZhGlossaryEntry(slug)?.articleSlugs).toContain('tpu-strikes-the-king');
+    },
+  );
+
+  it('connects existing metrics to their distinct load and streaming concepts', () => {
+    expect(getGlossaryEntry('closed-loop-benchmark')?.relatedTerms).toContain(
+      'open-loop-benchmark',
+    );
+    expect(getGlossaryEntry('concurrency')?.relatedTerms).toContain('request-rate');
+    expect(getGlossaryEntry('request-rate')?.relatedTerms).toContain('request-throughput');
+    expect(getGlossaryEntry('request-queue-depth')?.relatedTerms).toContain('queueing-latency');
+    expect(getGlossaryEntry('time-per-output-token')?.relatedTerms).toContain(
+      'inter-chunk-latency',
+    );
+    expect(getGlossaryEntry('kv-cache-eviction')?.relatedTerms).toContain('preemption');
+  });
+
   it('links every glossary source to a real article and covers the complete article library', () => {
     const entries = getAllGlossaryEntries();
     const referencedArticles = new Set(entries.flatMap((entry) => entry.articleSlugs));

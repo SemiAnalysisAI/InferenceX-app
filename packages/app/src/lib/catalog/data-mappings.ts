@@ -452,7 +452,6 @@ const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> 
   [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
   [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
-  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
@@ -468,7 +467,6 @@ const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.Muse_Spark_Open]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
   ),
-  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {

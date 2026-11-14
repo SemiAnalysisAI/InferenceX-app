@@ -357,7 +357,7 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 4,
       // The chart query date moved into a shared helper; recorded video entries are unchanged.
-      sources: '3bdb0f9ed030cde63792236f551a3444d46a268d39f2ffb0e1a5844a39e47b4c',
+      sources: '2b77bfdad1287d25f94a6cae597e8fe06c63d998435af6306594543d21ac94c0',
     });
   });
 });
