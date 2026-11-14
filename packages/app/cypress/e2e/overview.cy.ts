@@ -16,6 +16,7 @@ const PLATFORM_HEADERS = [
   'B300',
   'GB200 NVL72',
   'GB300 NVL72',
+  'Official API',
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
@@ -106,6 +107,12 @@ function expectNoVisibleDatesOrSnapshot() {
       expect(text).not.to.match(/\d+月\d+日/);
       expect(text).not.to.match(/20\d\d-\d\d-\d\d/);
     });
+}
+
+function apiPrices() {
+  return cy
+    .get('[data-testid="overview-api-cell"]')
+    .then(($cells) => [...$cells].map((cell) => cell.textContent));
 }
 
 function desktopModel(model: string, scenario?: string) {
@@ -897,7 +904,7 @@ describe('Overview page', () => {
       .and('have.attr', 'rel', 'noopener noreferrer');
     cy.get('[data-testid="overview-source-link"] svg').should('exist');
     cy.get('body').should('not.contain.text', 'at a glance');
-    cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
+    cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 3);
     cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
     cy.get('body')
@@ -1356,6 +1363,56 @@ describe('Overview page', () => {
         expect(head.contains(hit), 'header paints over the scrolled rows').to.equal(true);
       });
     });
+  });
+
+  it('adds an Official API reference column that ignores SLO and engine scope', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?tier=50&compare=hardware');
+
+    cy.get('[data-testid="overview-desktop-matrix"] thead th')
+      .last()
+      .should('have.attr', 'data-testid', 'overview-api-header')
+      .and('have.text', 'Official API');
+    cy.get('[data-testid="overview-desktop-model"]').each(($row) => {
+      expect($row.children().last().attr('data-testid')).to.eq('overview-api-cell');
+    });
+    desktopModel('Kimi-K3.1-Pro')
+      .find('[data-testid="overview-api-source-link"]')
+      .should('have.attr', 'href', 'https://platform.kimi.ai/docs/pricing/chat')
+      .and('have.attr', 'target', '_blank')
+      .and('have.attr', 'title')
+      .and('contain', 'AgentX corpus mix');
+    cy.get('[data-testid="overview-api-ratio"]')
+      .first()
+      .should('have.attr', 'title')
+      .and('match', /per 1M total tokens/);
+
+    apiPrices().then((before) => {
+      selectOverviewTier(150);
+      cy.location('search').should('contain', 'tier=150');
+      cy.get('[data-testid="overview-page"] [aria-busy]').should('have.attr', 'aria-busy', 'false');
+      apiPrices().should('deep.equal', before);
+      cy.get('a[data-overview-engine-scope="all"]').click();
+      cy.location('search').should('contain', 'engine=all');
+      cy.get('[data-testid="overview-page"] [aria-busy]').should('have.attr', 'aria-busy', 'false');
+      apiPrices().should('deep.equal', before);
+    });
+
+    cy.get('[data-testid="overview-api-source-note"]').should(
+      'have.text',
+      'Official API prices: each model developer’s own pricing page',
+    );
+    cy.get('[data-testid="overview-api-methodology"]').should('contain.text', 'SLO, engine scope');
+  });
+
+  it('keeps an Official API row in every phone card without horizontal overflow', () => {
+    cy.viewport(393, 852);
+    cy.visit('/overview?tier=50');
+    cy.get('[data-testid="overview-mobile-model"]').each(($card) => {
+      expect($card.find('[data-testid="overview-mobile-api-row"]')).to.have.length(1);
+    });
+    expectNoHorizontalOverflow();
+    expectNoHorizontalScroller('overview-mobile-list');
   });
 
   it('fits the full matrix without overlap or clipping at desktop widths', () => {

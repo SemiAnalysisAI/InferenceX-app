@@ -156,6 +156,12 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                     <ExternalLinkIcon />
                   </a>
                 </p>
+                <p
+                  data-testid="overview-api-source-note"
+                  className="text-xs leading-tight text-muted-foreground"
+                >
+                  {strings.apiSourceSuffix}
+                </p>
               </div>
               <ShareButton className="shrink-0" />
             </div>
