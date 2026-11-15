@@ -1,3 +1,5 @@
+import { acceleratorEntries } from './glossary-accelerators';
+
 export const GLOSSARY_CATEGORIES = [
   'Benchmark metrics',
   'Serving',
@@ -88,6 +90,7 @@ const TPU_AGENTX = 'tpu-strikes-the-king';
 const ENGRAM = 'engrams-embedding-entendre-codesign';
 
 const entries = [
+  ...acceleratorEntries,
   {
     slug: 'decode-megakernel',
     term: 'Decode megakernel',
@@ -1113,9 +1116,16 @@ const entries = [
     significance:
       'The speedup depends on how many draft tokens are accepted and on the cost of drafting and verification. Dense and MoE models can behave differently because verifying several positions may activate more expert weights.',
     benchmarkContext:
-      'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset.',
-    relatedTerms: ['multi-token-prediction', 'acceptance-length', 'decode', 'batching', 'agentx'],
-    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
+      'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset. The Huawei execution profile separates DSpark drafting, sequential token sampling, and target verification. An apparently short draft block does not by itself establish the full-step gain; accepted tokens and all dependent work determine delivered decode progress.',
+    relatedTerms: [
+      'microbenchmark',
+      'multi-token-prediction',
+      'acceptance-length',
+      'decode',
+      'batching',
+      'agentx',
+    ],
+    articleSlugs: ['huawei-deepseek', INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
   },
   {
     slug: 'multi-token-prediction',
@@ -1325,9 +1335,15 @@ const entries = [
     significance:
       'A kernel waiting on memory gains little from additional tensor-core FLOPS. Quantization, batching, cache compression, and expert sharding help by reducing bytes moved or amortizing each weight read across more tokens.',
     benchmarkContext:
-      'Use the shape of the concurrency curve to infer regime changes carefully: low batches may be launch or bandwidth bound, while large batches can raise arithmetic intensity and approach compute saturation.',
-    relatedTerms: ['high-bandwidth-memory', 'decode', 'quantization', 'wide-expert-parallelism'],
-    articleSlugs: [B200_KIMI, GB300_DSV4, SGLANG_056],
+      'Use the shape of the concurrency curve to infer regime changes carefully: low batches may be launch or bandwidth bound, while large batches can raise arithmetic intensity and approach compute saturation. Identify the measured path and byte denominator. The Blackwell port separates DRAM bandwidth, SMEM fill throughput, and L2 traffic; multicast can deliver the same input to multiple destinations without fetching every delivered byte from HBM.',
+    relatedTerms: [
+      'bytes-in-flight',
+      'high-bandwidth-memory',
+      'decode',
+      'quantization',
+      'wide-expert-parallelism',
+    ],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', B200_KIMI, GB300_DSV4, SGLANG_056],
   },
   {
     slug: 'nvlink',
@@ -1494,9 +1510,16 @@ const entries = [
     significance:
       'Sparse attention can make very long context practical, but theoretical sparsity alone says little about runtime. Index construction, irregular access, kernel fusion, and precision support determine the realized speedup.',
     benchmarkContext:
-      'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly.',
-    relatedTerms: ['multi-head-latent-attention', 'kv-cache', 'decode', 'inference-engine'],
+      'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly. On Ascend, selected KV data must still be fetched in a hardware-friendly layout. Reducing the number of attended tokens does not automatically minimize physical transfers when alignment, transfer granularity, and index processing add work.',
+    relatedTerms: [
+      'memory-transfer-engine',
+      'multi-head-latent-attention',
+      'kv-cache',
+      'decode',
+      'inference-engine',
+    ],
     articleSlugs: [
+      'huawei-deepseek',
       B200_GLM5,
       MI355X_DSV4,
       GB300_DSV4,
@@ -2001,9 +2024,21 @@ const entries = [
     significance:
       'Reading a cloud of raw points invites cherry-picking, since a badly tuned configuration contributes points that no operator would ever choose. The envelope shows the achievable boundary per system, which is the shape a capacity decision is actually made against.',
     benchmarkContext:
-      'This is not the classic roofline model from HPC, which plots attainable FLOPS against arithmetic intensity to expose a compute or memory bound. The dashboard borrows only the picture of an upper bound. Roofline direction is configured per metric, so the same points can produce a different envelope on a different axis.',
-    relatedTerms: ['pareto-frontier', 'iso-interactivity', 'throughput', 'recipe'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, B200_GLM5, AGENTX_GLM_ATOM],
+      'This is not the classic roofline model from HPC, which plots attainable FLOPS against arithmetic intensity to expose a compute or memory bound. The dashboard borrows only the picture of an upper bound. Roofline direction is configured per metric, so the same points can produce a different envelope on a different axis. The Blackwell microbenchmark article instead uses the classic hardware roofline, including a shared-memory bandwidth slope. That instruction-level ceiling is distinct from the dashboard’s empirical Pareto envelope.',
+    relatedTerms: [
+      'speed-of-light',
+      'pareto-frontier',
+      'iso-interactivity',
+      'throughput',
+      'recipe',
+    ],
+    articleSlugs: [
+      'dissecting-nvidia-blackwell-tensor',
+      INFERENCEMAX,
+      INFERENCEX_V2,
+      B200_GLM5,
+      AGENTX_GLM_ATOM,
+    ],
   },
   {
     slug: 'arithmetic-intensity',
@@ -2019,9 +2054,21 @@ const entries = [
     significance:
       'The two phases are limited by different parts of the chip, which is why a specification sheet with impressive peak FLOPS can disappoint on decode and why batching helps: grouping sequences raises intensity by reusing each weight read across more tokens.',
     benchmarkContext:
-      'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput.',
-    relatedTerms: ['prefill', 'decode', 'memory-bandwidth', 'batching'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT, JALAPENO],
+      'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput. State the memory boundary when quoting FLOPs per byte: HBM, L2, and SMEM traffic give different intensities. Blackwell MMA shapes can be SMEM-bound even when an HBM-based calculation suggests sufficient reuse.',
+    relatedTerms: [
+      'matrix-multiply-accumulate',
+      'prefill',
+      'decode',
+      'memory-bandwidth',
+      'batching',
+    ],
+    articleSlugs: [
+      'dissecting-nvidia-blackwell-tensor',
+      INFERENCEMAX,
+      INFERENCEX_V2,
+      TILERT,
+      JALAPENO,
+    ],
   },
   {
     slug: 'prefix-cache-hit-rate',
@@ -2176,9 +2223,9 @@ const entries = [
     significance:
       'On long-context serving this often buys more than shrinking the weights, because at high concurrency the cache, not the weights, is what exhausts memory. Accuracy sensitivity differs by model and by which of keys and values is quantized, so it needs evaluation rather than a blanket assumption.',
     benchmarkContext:
-      'Cache precision is part of the recipe, and mixed layouts exist in practice: some models keep two cache buffers at different widths, which disaggregated transfer paths then have to move as a pair. Read a memory-capacity claim together with the cache format behind it.',
-    relatedTerms: ['kv-cache', 'quantization', 'fp8', 'high-bandwidth-memory'],
-    articleSlugs: [INFERENCEX_V2, AGENTX_V3, GB300_DSV4],
+      'Cache precision is part of the recipe, and mixed layouts exist in practice: some models keep two cache buffers at different widths, which disaggregated transfer paths then have to move as a pair. Read a memory-capacity claim together with the cache format behind it. The Huawei profile highlights quantization work on vector-related paths and opportunities to fuse producer-consumer boundaries. Reduced cache bytes must be weighed against conversion cost, layout requirements, and validated numerical quality.',
+    relatedTerms: ['cube-vector-cores', 'kv-cache', 'quantization', 'fp8', 'high-bandwidth-memory'],
+    articleSlugs: ['huawei-deepseek', INFERENCEX_V2, AGENTX_V3, GB300_DSV4],
   },
   {
     slug: 'sliding-window-attention',
@@ -2323,9 +2370,16 @@ const entries = [
     significance:
       'Because backends are selected rather than fixed, kernel availability becomes a portability question. A feature implemented only for one vendor’s backend leaves the alternative running a generic path, which on long context is not a small compromise but the wrong kernel for the shape.',
     benchmarkContext:
-      'The backend in use is part of the recipe, and a change to it can move a curve without any hardware or engine version change. Support for checkpointing recurrent state in these kernels is what allowed hybrid models to participate in prefix reuse at all.',
-    relatedTerms: ['inference-engine', 'sparse-attention', 'kv-cache', 'vllm', 'sglang'],
-    articleSlugs: [AGENTX_V3, SGLANG_056, INFERENCEX_V2],
+      'The backend in use is part of the recipe, and a change to it can move a curve without any hardware or engine version change. Support for checkpointing recurrent state in these kernels is what allowed hybrid models to participate in prefix reuse at all. The Blackwell port studies copy configurations motivated by FlashInfer attention kernels and distinguishes TMA from LDGSTS paths. Some implementation discussion is explicitly inferred from binaries, not confirmed by publicly available kernel source.',
+    relatedTerms: [
+      'tensor-memory-accelerator',
+      'inference-engine',
+      'sparse-attention',
+      'kv-cache',
+      'vllm',
+      'sglang',
+    ],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', AGENTX_V3, SGLANG_056, INFERENCEX_V2],
   },
   {
     slug: 'cuda-graphs',
@@ -2402,15 +2456,16 @@ const entries = [
     significance:
       'The binding resource decides which hardware spec matters. Memory bound decode explains why HBM capacity and bandwidth headline every accelerator launch, why quantization speeds up decode by shrinking bytes moved, and why a chip with modest FLOPs but fast memory can win interactive serving.',
     benchmarkContext:
-      'InferenceX sweeps concurrency, which walks a system between regimes: low concurrency decode is bandwidth limited while high concurrency batching pushes toward compute limits. The shape of each throughput versus interactivity curve reflects where that transition happens for a given recipe.',
+      'InferenceX sweeps concurrency, which walks a system between regimes: low concurrency decode is bandwidth limited while high concurrency batching pushes toward compute limits. The shape of each throughput versus interactivity curve reflects where that transition happens for a given recipe. A memory bottleneck can sit inside the SM rather than at HBM. Blackwell’s SS and TS MMA comparisons change operand placement, so their different throughput limits require a storage-level analysis, not merely peak HBM bandwidth versus peak FLOPs.',
     relatedTerms: [
+      'tensor-memory',
       'arithmetic-intensity',
       'roofline',
       'memory-bandwidth',
       'high-bandwidth-memory',
       'decode',
     ],
-    articleSlugs: [INFERENCEX_V2, TILERT],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', INFERENCEX_V2, TILERT],
   },
   {
     slug: 'gpu-utilization',
@@ -2426,15 +2481,16 @@ const entries = [
     significance:
       'Fleet economics hinge on utilization. The gap between a well batched, well scheduled deployment and a naive one is often several times the cost per token on identical hardware, which is why serving software and request routing get as much attention as the chips themselves.',
     benchmarkContext:
-      'InferenceX benchmarks report delivered throughput per chip at each interactivity level rather than a utilization percentage, so utilization differences between engines, precisions, and parallelism plans show up directly as separation between curves on the same hardware.',
+      'InferenceX benchmarks report delivered throughput per chip at each interactivity level rather than a utilization percentage, so utilization differences between engines, precisions, and parallelism plans show up directly as separation between curves on the same hardware. The Huawei profile separately reports stream occupancy and summed task durations. Overlapping streams and mixed task types prevent those durations from being interpreted as exclusive physical Cube or vector utilization. Warp occupancy is another distinct metric.',
     relatedTerms: [
+      'cube-vector-cores',
       'model-flops-utilization',
       'batching',
       'concurrency',
       'throughput',
       'total-cost-of-ownership',
     ],
-    articleSlugs: [INFERENCEMAX, AGENTIC_WORKLOADS],
+    articleSlugs: ['huawei-deepseek', INFERENCEMAX, AGENTIC_WORKLOADS],
   },
   {
     slug: 'continuous-batching',
@@ -2893,9 +2949,9 @@ const entries = [
     significance:
       'Block scaling is the enabling idea behind the FP4 generation of inference: without per block scales, 4 bit floating point would be unusable for frontier models. Scale format and block size choices are now genuine differentiators between hardware vendors and quantization recipes.',
     benchmarkContext:
-      'The NVFP4 and MXFP4 results across InferenceX Blackwell and MI355X coverage are block scaled formats, and the compare-precision family exists largely to show what these recipes give up or gain against FP8 baselines on identical hardware.',
-    relatedTerms: ['nvfp4', 'mxfp4', 'fp4', 'fp8', 'quantization'],
-    articleSlugs: [B200_GLM5, GB300_DSV4],
+      'The NVFP4 and MXFP4 results across InferenceX Blackwell and MI355X coverage are block scaled formats, and the compare-precision family exists largely to show what these recipes give up or gain against FP8 baselines on identical hardware. The Blackwell port compares microscaled instruction formats with other formats at matched shapes. Similar saturated throughput does not imply identical single-instruction latency, and instruction-level results do not validate a model’s quantization accuracy.',
+    relatedTerms: ['matrix-multiply-accumulate', 'nvfp4', 'mxfp4', 'fp4', 'fp8', 'quantization'],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', B200_GLM5, GB300_DSV4],
   },
   {
     slug: 'flash-attention',
@@ -2947,9 +3003,9 @@ const entries = [
     significance:
       'CUTLASS is where NVIDIA teaches the ecosystem to use each new tensor core generation, including the FP4 and FP8 paths on Blackwell. The speed at which its patterns propagate into engines is a real component of how quickly new silicon reaches its advertised performance.',
     benchmarkContext:
-      'The GEMM and attention kernels behind InferenceX results on NVIDIA hardware lean heavily on CUTLASS derived code, and version bumps of these libraries inside engine images are a recurring source of day over day curve movement the platform tracks.',
-    relatedTerms: ['cuda', 'gemm', 'kernel-fusion', 'flashinfer', 'nvfp4'],
-    articleSlugs: [SGLANG_056, GB300_DSV4],
+      'The GEMM and attention kernels behind InferenceX results on NVIDIA hardware lean heavily on CUTLASS derived code, and version bumps of these libraries inside engine images are a recurring source of day over day curve movement the platform tracks. The Blackwell port uses CuTe MMA traits and preferred/fallback cluster examples to explain execution scope and launch placement. Its public section stops before the subscriber-only practical CUTLASS discussion; glossary links do not reproduce that continuation.',
+    relatedTerms: ['thread-block-cluster', 'cuda', 'gemm', 'kernel-fusion', 'flashinfer', 'nvfp4'],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', SGLANG_056, GB300_DSV4],
   },
   {
     slug: 'nccl',
@@ -2987,15 +3043,16 @@ const entries = [
     significance:
       'GEMM efficiency is the substrate of every performance claim in the industry. The gap between delivered and peak GEMM throughput at real serving shapes, especially the thin matrices of decode, explains much of why spec sheet ratios fail to predict benchmark rankings.',
     benchmarkContext:
-      'Behind every InferenceX curve sits a stack of GEMM kernels from libraries such as CUTLASS, hipBLASLt, and Triton generated code, and quantized recipes ultimately stand on how well each vendor executes low precision GEMMs at the shapes its scheduler produces.',
+      'Behind every InferenceX curve sits a stack of GEMM kernels from libraries such as CUTLASS, hipBLASLt, and Triton generated code, and quantized recipes ultimately stand on how well each vendor executes low precision GEMMs at the shapes its scheduler produces. Blackwell instruction tests show that tile shape, operand placement, and in-flight MMA count change attainable throughput. A saturated instruction stream excludes some load, synchronization, and epilogue costs of a complete GEMM kernel.',
     relatedTerms: [
+      'matrix-multiply-accumulate',
       'cutlass',
       'arithmetic-intensity',
       'memory-bound-vs-compute-bound',
       'mixture-of-experts',
       'triton',
     ],
-    articleSlugs: [INFERENCEX_V2, MI355X_GLM5],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', INFERENCEX_V2, MI355X_GLM5],
   },
   {
     slug: 'kernel-fusion',
@@ -3011,15 +3068,16 @@ const entries = [
     significance:
       'In memory bound inference, removing intermediate traffic is worth more than raw arithmetic improvements, so fusion is one of the most reliable levers engines have. A large share of version over version engine speedups reduces to more aggressive or better targeted fusion.',
     benchmarkContext:
-      'InferenceX recipes pin engine images whose fusion inventories differ by version and by hardware backend, which is a recurring reason day over day tracking shows curves moving on unchanged silicon as fused kernels land for new models and precisions.',
+      'InferenceX recipes pin engine images whose fusion inventories differ by version and by hardware backend, which is a recurring reason day over day tracking shows curves moving on unchanged silicon as fused kernels land for new models and precisions. The Huawei profile identifies repeated quantization boundaries as fusion opportunities. Removing a boundary can save traffic or launches, but added storage pressure and dependencies may reduce overlap, so summed eliminated task time is not a guaranteed step-time saving.',
     relatedTerms: [
+      'auto-scheduling',
       'flash-attention',
       'cuda-graphs',
       'gemm',
       'memory-bandwidth',
       'inference-engine',
     ],
-    articleSlugs: [MI355X_KIMI, SGLANG_056],
+    articleSlugs: ['huawei-deepseek', MI355X_KIMI, SGLANG_056],
   },
   {
     slug: 'tpu',
@@ -4331,14 +4389,15 @@ const entries = [
     significance:
       'Sparse access makes a large parameter table a candidate for DRAM offload. Removing the table at inference changes the trained model, so an ablation is not a substitute for comparing separately trained architectures at matched quality.',
     benchmarkContext:
-      'The article reports roughly 189 GiB of Engram memory in its DeepSeek-V4.1-Flash configuration. Its DRAM and SSD comparisons retain Engram functionality while changing the serving path; the ablation experiments ask a separate model-quality question.',
+      'The article reports roughly 189 GiB of Engram memory in its DeepSeek-V4.1-Flash configuration. Its DRAM and SSD comparisons retain Engram functionality while changing the serving path; the ablation experiments ask a separate model-quality question. The Huawei profile discusses fetching Engram data from token IDs while layer 0 computes. Its DRAM overlap result depends on that schedule; a slower PCIe SSD path can expose transfer latency rather than preserve the same step time.',
     relatedTerms: [
+      'memory-transfer-engine',
       'n-gram-embedding',
       'conditional-memory',
       'parameter-offloading',
       'inference-time-ablation',
     ],
-    articleSlugs: [ENGRAM],
+    articleSlugs: ['huawei-deepseek', ENGRAM],
   },
   {
     slug: 'n-gram-embedding',

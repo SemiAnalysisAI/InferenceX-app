@@ -58,6 +58,7 @@ function segment(raw: string, isProse: boolean): string[] {
 const CHIP_UNITS = /(?:tok|tokens?)\/s\/chip|\$\/chip[/-](?:hr|hour)|[A-Za-z]Chip\b|\bChip[A-Z]/giu;
 
 const URL_LIKE = /https?:\/\/\S+/giu;
+const LOCAL_MARKDOWN_DESTINATION = /(?<=\]\()\/[^\s)]+(?=\))/giu;
 
 const ignoring = (...patterns: RegExp[]) =>
   new RegExp(patterns.map((pattern) => pattern.source).join('|'), 'giu');
@@ -67,7 +68,7 @@ const RULES: Rule[] = [
     id: 'chip-untranslated',
     corpus: 'chinese',
     fix: '写作「芯片」（单位 tok/s/chip 等除外）',
-    find: matcher(/\b[Cc]hip\b/gu, ignoring(URL_LIKE, CHIP_UNITS)),
+    find: matcher(/\b[Cc]hip\b/gu, ignoring(URL_LIKE, LOCAL_MARKDOWN_DESTINATION, CHIP_UNITS)),
   },
   {
     id: 'hardcoded-english-label',
@@ -161,6 +162,12 @@ const run = (rule: Rule, text: string) =>
   rule.corpus === 'bilingual-file' ? rule.find(text) : segment(text, false).flatMap(rule.find);
 
 describe('zh copy — every rule still catches what it was written for', () => {
+  it('ignores local Markdown destinations without hiding untranslated link labels', () => {
+    const rule = RULES.find(({ id }) => id === 'chip-untranslated')!;
+    expect(rule.find('参考[芯片分档](/zh/glossary/chip-binning)。')).toEqual([]);
+    expect(rule.find('参考[chip 分档](/zh/glossary/chip-binning)。')).toEqual(['chip']);
+    expect(rule.find('参考[芯片分档](/zh/glossary/chip-binning)，另一个 chip。')).toEqual(['chip']);
+  });
   interface Fixture {
     rule: string;
     kind: 'regression' | 'exemption';

@@ -1,6 +1,61 @@
 import { SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
 describe('Chinese (/zh) pages', () => {
+  describe('Accelerator articles and glossary navigation', () => {
+    for (const prefix of ['', '/zh']) {
+      for (const { slug, term, figures, title } of [
+        { slug: 'huawei-deepseek', term: 'ascend', figures: 24, title: 'DeepSeek' },
+        {
+          slug: 'dissecting-nvidia-blackwell-tensor',
+          term: 'tensor-memory-accelerator',
+          figures: 27,
+          title: 'Blackwell',
+        },
+      ]) {
+        it(`reads ${slug} and follows its glossary round trip in ${prefix || 'English'}`, () => {
+          cy.viewport(prefix ? 390 : 1440, prefix ? 900 : 1000);
+          cy.visit(`${prefix}/blog/${slug}`);
+          cy.get('h1').should('contain.text', title);
+          cy.get('article.prose').should(
+            'contain.text',
+            prefix ? '订阅者专享' : 'subscriber-only continuation',
+          );
+          cy.get('article.prose figure').should('have.length', figures);
+          cy.get('article.prose figure img')
+            .first()
+            .scrollIntoView()
+            .should(($img) => {
+              expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+            });
+          cy.get(`article a[href="${prefix}/glossary/${term}"]`).click();
+          cy.location('pathname').should('eq', `${prefix}/glossary/${term}`);
+          cy.get('h1').should(
+            'contain.text',
+            term === 'ascend' ? 'Ascend' : 'Tensor Memory Accelerator',
+          );
+          cy.get('script[type="application/ld+json"]').should(($scripts) => {
+            const schemas = [...$scripts].flatMap((script) => {
+              const schema = JSON.parse(script.textContent ?? '{}');
+              return schema['@graph'] ?? [schema];
+            });
+            expect(schemas.some((schema) => schema['@type'] === 'DefinedTerm')).to.eq(true);
+          });
+          cy.get(`main a[href="${prefix}/blog/${slug}"]`).click();
+          cy.location('pathname').should('eq', `${prefix}/blog/${slug}`);
+          const sibling = prefix ? '' : '/zh';
+          cy.get('[data-testid="language-toggle"]')
+            .should('have.attr', 'href', `${sibling}/blog/${slug}`)
+            .click();
+          cy.location('pathname').should('eq', `${sibling}/blog/${slug}`);
+          cy.get('article.prose figure').should('have.length', figures);
+          cy.document().then((doc) => {
+            expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+          });
+        });
+      }
+    }
+  });
+
   describe('TPU article and glossary navigation', () => {
     for (const prefix of ['', '/zh']) {
       it(`reads the TPU port and follows its glossary round trip in ${prefix || 'English'}`, () => {
