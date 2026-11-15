@@ -6,6 +6,7 @@ export * from './metric-keys';
 export * from './precision-keys';
 export * from './models';
 export * from './seo';
+export * from './sla-targets';
 export * from './tables';
 export * from './tco';
 export * from './token-length-sketch';
