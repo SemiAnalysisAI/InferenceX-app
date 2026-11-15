@@ -17,11 +17,17 @@ import {
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { CHART_SERIES_SUMMARY_VERSION, encodeChartSeriesSummary } from './chart-series-summary.js';
 import type { PromptTokenTotals } from './compute-chart-series.js';
-import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
+import { REQUEST_TIMELINE_VERSION, gunzipLines } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
 import { encodeRequestChartColumns } from './request-chart-columns.js';
 import { gzipRequestTimeline } from './request-timeline-codec.js';
+import {
+  SLA_ATTEMPTS_VERSION,
+  encodeSlaAttempts,
+  slaAttemptsFromExport,
+  slaAttemptsSha256,
+} from './sla-attempts.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -43,7 +49,8 @@ type TraceReplayUploadField =
   | 'chart_series'
   | 'chart_series_summary_gz'
   | 'request_timeline_gz'
-  | 'request_chart_data_gz';
+  | 'request_chart_data_gz'
+  | 'sla_attempts_gz';
 
 export interface TraceReplayIngestOptions {
   metricsContext?: ServerMetricsContext;
@@ -63,6 +70,8 @@ export interface PreparedTraceReplay {
   chartSeriesSummaryGz: Buffer | null;
   requestTimelineGz: Buffer | null;
   requestChartDataGz: Buffer | null;
+  /** Per-attempt data for SLA Targets; `null` when the artifact has no profile export. */
+  slaAttemptsGz: Buffer | null;
   chartWindows: number;
   timelineRequests: number;
   compressionMs: number;
@@ -167,11 +176,50 @@ export async function findUnlinkedTraceReplayIds(
   return rows.map((row) => row.id);
 }
 
+/** The harness's own files for one load point; either may be absent in an older artifact. */
+export interface TraceReplayHarnessInput {
+  /** `aiperf.log`, or the console copy in `benchmark.log`. */
+  log: TraceReplayInput;
+  /** `profile_export_aiperf.json`. */
+  aggregate: TraceReplayInput;
+}
+
+const NO_HARNESS_INPUT: TraceReplayHarnessInput = { log: null, aggregate: null };
+
+/**
+ * Per-attempt data for SLA Targets from the gzipped profile export. Without
+ * the harness log the issued-request count is unknown and the result is a
+ * lower bound; a malformed aggregate is treated as absent.
+ */
+async function prepareSlaAttempts(
+  profileGz: Buffer | null,
+  harness: TraceReplayHarnessInput,
+): Promise<Buffer | null> {
+  if (!profileGz) return null;
+  const [log, aggregate] = await Promise.all([
+    readTraceReplayInput(harness.log),
+    readTraceReplayInput(harness.aggregate),
+  ]);
+  let aggregateJson: unknown;
+  try {
+    aggregateJson = aggregate.data ? JSON.parse(aggregate.data.toString('utf8')) : undefined;
+  } catch {
+    aggregateJson = undefined;
+  }
+  return encodeSlaAttempts(
+    await slaAttemptsFromExport(gunzipLines(profileGz), {
+      harnessLog: log.data ? log.data.toString('utf8') : null,
+      aggregate: aggregateJson,
+    }),
+  );
+}
+
 export async function prepareTraceReplay(
   profileExportJsonl: TraceReplayInput,
   serverMetricsCsv: TraceReplayInput,
   serverMetricsJson: TraceReplayInput = null,
   metricsContext: ServerMetricsContext = {},
+  harness: TraceReplayHarnessInput = NO_HARNESS_INPUT,
 ): Promise<PreparedTraceReplay> {
   const compressionStart = Date.now();
   const [profile, csv, metricsJson] = await Promise.all([
@@ -192,6 +240,7 @@ export async function prepareTraceReplay(
   const chartSeriesSummaryGz = chartSeriesJson
     ? encodeChartSeriesSummary(chartSeriesJson.toString('utf8'))
     : null;
+  const slaAttemptsGz = await prepareSlaAttempts(profile.data, harness);
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -208,6 +257,7 @@ export async function prepareTraceReplay(
     chartSeriesSummaryGz,
     requestTimelineGz,
     requestChartDataGz,
+    slaAttemptsGz,
     chartWindows: chartSeries?.timeslicesCount ?? 0,
     timelineRequests: requestTimeline?.requests.length ?? 0,
     compressionMs,
@@ -267,6 +317,7 @@ export async function persistPreparedTraceReplay(
     chartSeriesSummaryGz,
     requestTimelineGz,
     requestChartDataGz,
+    slaAttemptsGz,
     timelineRequests,
     cacheHitRates,
     fullResponseMetrics,
@@ -306,6 +357,7 @@ export async function persistPreparedTraceReplay(
       ['chart_series_summary_gz', chartSeriesSummaryGz],
       ['request_timeline_gz', requestTimelineGz],
       ['request_chart_data_gz', requestChartDataGz],
+      ['sla_attempts_gz', slaAttemptsGz],
     ];
     for (const [field, payload] of payloads) {
       const uploadStart = Date.now();
@@ -335,7 +387,10 @@ export async function persistPreparedTraceReplay(
         request_chart_data_gz,
         request_chart_data_version,
         sequence_length_sketches,
-        sequence_length_sketches_version
+        sequence_length_sketches_version,
+        sla_attempts_gz,
+        sla_attempts_version,
+        sla_attempts_sha256
       )
       values (
         (
@@ -386,7 +441,14 @@ export async function persistPreparedTraceReplay(
         ),
         ${requestChartDataGz ? REQUEST_CHART_DATA_VERSION : null},
         ${sequenceLengthSketches},
-        ${sequenceLengthSketches ? SEQUENCE_LENGTH_SKETCHES_VERSION : null}
+        ${sequenceLengthSketches ? SEQUENCE_LENGTH_SKETCHES_VERSION : null},
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'sla_attempts_gz'
+        ),
+        ${slaAttemptsGz ? SLA_ATTEMPTS_VERSION : null},
+        ${slaAttemptsGz ? Buffer.from(slaAttemptsSha256(slaAttemptsGz), 'hex') : null}
       )
       returning id
     `;

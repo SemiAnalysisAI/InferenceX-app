@@ -40,6 +40,32 @@ describe('discoverTraceReplayArtifacts', () => {
     });
   });
 
+  it('finds the harness log and aggregate next to the profile export', () => {
+    const root = tempDir();
+    const dir = path.join(root, 'agentic_config-a');
+    writeTraceFiles(dir);
+    fs.mkdirSync(path.join(dir, 'aiperf_artifacts', 'logs'));
+    fs.writeFileSync(path.join(dir, 'aiperf_artifacts', 'logs', 'aiperf.log'), 'log\n');
+    fs.writeFileSync(path.join(dir, 'aiperf_artifacts', 'profile_export_aiperf.json'), '{}');
+    fs.writeFileSync(path.join(dir, 'benchmark.log'), 'console\n');
+
+    expect(discoverTraceReplayArtifacts(root).get('config-a')).toMatchObject({
+      harnessLog: expect.stringContaining(path.join('logs', 'aiperf.log')),
+      harnessAggregate: expect.stringContaining('profile_export_aiperf.json'),
+    });
+  });
+
+  it('falls back to the console log, and reports neither file when the artifact has none', () => {
+    const root = tempDir();
+    writeTraceFiles(path.join(root, 'agentic_config-a'));
+    writeTraceFiles(path.join(root, 'agentic_config-b'));
+    fs.writeFileSync(path.join(root, 'agentic_config-b', 'benchmark.log'), 'console\n');
+
+    const found = discoverTraceReplayArtifacts(root);
+    expect(found.get('config-a')).toMatchObject({ harnessLog: null, harnessAggregate: null });
+    expect(found.get('config-b')?.harnessLog).toContain('benchmark.log');
+  });
+
   it('extracts and indexes multinode traces by concurrency', () => {
     const root = tempDir();
     const artifactDir = path.join(root, 'multinode_server_logs_config-b');

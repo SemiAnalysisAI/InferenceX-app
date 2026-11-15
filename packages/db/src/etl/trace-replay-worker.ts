@@ -39,6 +39,7 @@ port.on('message', async ({ id, job }: TraceReplayWorkerRequest) => {
       job.serverMetricsCsv,
       job.serverMetricsJson,
       job.metricsContext,
+      { log: job.harnessLog ?? null, aggregate: job.harnessAggregate ?? null },
     );
     const { prepared, transfer } = toWire(result);
     const response: TraceReplayWorkerResponse = { id, ok: true, prepared };

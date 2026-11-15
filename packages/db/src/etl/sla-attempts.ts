@@ -21,6 +21,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 
 import {
   SLA_NOT_RECORDED,
+  SLA_TPOT_NOT_APPLICABLE,
   type SlaAccountingInput,
   type SlaAttemptSet,
   type SlaOutcomeCount,
@@ -218,6 +219,21 @@ function micros(ms: number | null): number {
   return ms === null || ms < 0 ? SLA_NOT_RECORDED : Math.round(ms * 1000);
 }
 
+type AttemptRow = [ttftUs: number, tpotUs: number, e2eUs: number];
+
+/**
+ * Columns in a stable order, so the encoded blob and its content hash do not
+ * depend on the order of the export lines.
+ */
+function completedColumns(rows: AttemptRow[]): SlaAttemptSet['completed'] {
+  rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  return {
+    ttftUs: rows.map((row) => row[0]),
+    tpotUs: rows.map((row) => row[1]),
+    e2eUs: rows.map((row) => row[2]),
+  };
+}
+
 /**
  * The class of an explicit failure. An HTTP rejection carries the status in
  * `code` and no `cause_chain`; an exception carries its class name.
@@ -257,7 +273,7 @@ export async function slaAttemptsFromExport(
   lines: AsyncIterable<string> | Iterable<string>,
   context: SlaExportContext = {},
 ): Promise<SlaAttemptsBlob> {
-  const rows: [ttft: number, tpot: number, e2e: number, tokens: number][] = [];
+  const rows: AttemptRow[] = [];
   const other = new Map<string, SlaOutcomeCount>();
   const bump = (outcome: SlaOutcomeCount['outcome'], failureClass: string | null): void => {
     const key = `${outcome}|${failureClass ?? ''}`;
@@ -327,14 +343,12 @@ export async function slaAttemptsFromExport(
     const tokens = metricCount(metrics.output_sequence_length);
     rows.push([
       micros(metricMs(metrics.time_to_first_token)),
-      micros(metricMs(metrics.time_per_output_token) ?? metricMs(metrics.inter_token_latency)),
+      tokens !== null && tokens < 2
+        ? SLA_TPOT_NOT_APPLICABLE
+        : micros(metricMs(metrics.time_per_output_token) ?? metricMs(metrics.inter_token_latency)),
       micros(latencyMs),
-      tokens === null || tokens < 0 ? SLA_NOT_RECORDED : Math.round(tokens),
     ]);
   }
-
-  // A stable order makes the blob, and so its content hash, independent of line order.
-  rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
 
   const log =
     typeof context.harnessLog === 'string' ? parseHarnessPhaseLog(context.harnessLog) : null;
@@ -353,12 +367,7 @@ export async function slaAttemptsFromExport(
       unparsedLines,
     },
     set: {
-      completed: {
-        ttftUs: rows.map((row) => row[0]),
-        tpotUs: rows.map((row) => row[1]),
-        e2eUs: rows.map((row) => row[2]),
-        outputTokens: rows.map((row) => row[3]),
-      },
+      completed: completedColumns(rows),
       // Code-point order, so the bytes do not depend on the locale of the machine.
       other: [...other.entries()]
         .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -412,7 +421,7 @@ export interface TimelineAttempt {
  * neither a failure nor a pass. Results from this path are exploratory.
  */
 export function slaAttemptsFromTimeline(requests: Iterable<TimelineAttempt>): SlaAttemptsBlob {
-  const rows: [number, number, number, number][] = [];
+  const rows: AttemptRow[] = [];
   let warmupExcluded = 0;
   let unknown = 0;
   let cancelled = 0;
@@ -430,13 +439,13 @@ export function slaAttemptsFromTimeline(requests: Iterable<TimelineAttempt>): Sl
     else {
       rows.push([
         micros(request.ttftMs),
-        micros(request.tpotMs),
+        request.outputTokens !== null && request.outputTokens < 2
+          ? SLA_TPOT_NOT_APPLICABLE
+          : micros(request.tpotMs),
         Math.round(request.endUs - request.startUs),
-        request.outputTokens === null ? SLA_NOT_RECORDED : Math.round(request.outputTokens),
       ]);
     }
   }
-  rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
   const other: SlaOutcomeCount[] = [];
   if (cancelled > 0) other.push({ outcome: 'cancelled', failureClass: null, count: cancelled });
   if (unknown > 0) other.push({ outcome: 'unknown', failureClass: null, count: unknown });
@@ -450,12 +459,7 @@ export function slaAttemptsFromTimeline(requests: Iterable<TimelineAttempt>): Sl
       unparsedLines: 0,
     },
     set: {
-      completed: {
-        ttftUs: rows.map((row) => row[0]),
-        tpotUs: rows.map((row) => row[1]),
-        e2eUs: rows.map((row) => row[2]),
-        outputTokens: rows.map((row) => row[3]),
-      },
+      completed: completedColumns(rows),
       other,
     },
     accounting: {
@@ -483,13 +487,39 @@ export function slaAttemptsFromTimeline(requests: Iterable<TimelineAttempt>): Sl
 // Codec
 // ---------------------------------------------------------------------------
 
+interface SlaAttemptsWire extends Omit<SlaAttemptsBlob, 'set'> {
+  set: {
+    /** `ttftUs` is sorted, so it is stored as differences between neighbours. */
+    completed: { ttftUsDelta: number[]; tpotUs: number[]; e2eUs: number[] };
+    other: SlaOutcomeCount[];
+  };
+}
+
 /** Gzip-compressed JSON. The same input always yields the same bytes. */
 export function encodeSlaAttempts(blob: SlaAttemptsBlob): Buffer {
-  return gzipSync(Buffer.from(JSON.stringify(blob), 'utf8'), { level: 9 });
+  const { ttftUs, tpotUs, e2eUs } = blob.set.completed;
+  const wire: SlaAttemptsWire = {
+    ...blob,
+    set: {
+      completed: {
+        ttftUsDelta: ttftUs.map((value, index) =>
+          index === 0 ? value : value - ttftUs[index - 1],
+        ),
+        tpotUs,
+        e2eUs,
+      },
+      other: blob.set.other,
+    },
+  };
+  return gzipSync(Buffer.from(JSON.stringify(wire), 'utf8'), { level: 9 });
 }
 
 export function decodeSlaAttempts(gz: Uint8Array): SlaAttemptsBlob {
-  return JSON.parse(gunzipSync(gz).toString('utf8')) as SlaAttemptsBlob;
+  const wire = JSON.parse(gunzipSync(gz).toString('utf8')) as SlaAttemptsWire;
+  const { ttftUsDelta, tpotUs, e2eUs } = wire.set.completed;
+  let running = 0;
+  const ttftUs = ttftUsDelta.map((delta) => (running += delta));
+  return { ...wire, set: { completed: { ttftUs, tpotUs, e2eUs }, other: wire.set.other } };
 }
 
 /** Content identity of an encoded blob: the source-data part of an evaluation cache key. */

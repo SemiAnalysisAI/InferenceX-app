@@ -162,7 +162,9 @@ function replayKey(meta: RawMetadata, maps: ReplayCorrelationMaps): string | und
  * `Readable.from([blob])` is intentional: without the array wrapper Node may
  * iterate the Buffer byte-by-byte instead of passing it as one chunk.
  */
-async function* gunzipLines(blob: Buffer | (() => AsyncIterable<Buffer>)): AsyncGenerator<string> {
+export async function* gunzipLines(
+  blob: Buffer | (() => AsyncIterable<Buffer>),
+): AsyncGenerator<string> {
   const decoder = new StringDecoder('utf8');
   let carry = '';
 

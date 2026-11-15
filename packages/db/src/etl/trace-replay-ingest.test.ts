@@ -29,6 +29,13 @@ import {
 } from './compute-request-timeline';
 import { gunzipRequestTimeline, gzipRequestTimeline } from './request-timeline-codec';
 import {
+  SLA_ATTEMPTS_VERSION,
+  decodeSlaAttempts,
+  encodeSlaAttempts,
+  slaAttemptsFromExport,
+  slaAttemptsSha256,
+} from './sla-attempts';
+import {
   TRACE_REPLAY_UPLOAD_CHUNK_BYTES,
   cacheHitRatesFromPromptTokenTotals,
   gzipTraceReplayInput,
@@ -66,6 +73,7 @@ function preparedFixture(): PreparedTraceReplay {
     chartSeriesSummaryGz: Buffer.from('chart-summary'),
     requestTimelineGz: Buffer.from('timeline-gzip'),
     requestChartDataGz: Buffer.from('chart-columns'),
+    slaAttemptsGz: null,
     chartWindows: 2,
     timelineRequests: 3,
     compressionMs: 10,
@@ -265,6 +273,71 @@ describe('gzipTraceReplayInput', () => {
 });
 
 describe('prepareTraceReplay', () => {
+  it('builds SLA attempt data from the profile export and the harness log', async () => {
+    const profile = Buffer.from(
+      [0, 1]
+        .map((sessionNum) =>
+          JSON.stringify({
+            metadata: {
+              session_num: sessionNum,
+              benchmark_phase: 'profiling',
+              credit_issued_ns: 1_000_000_000 * (sessionNum + 1),
+              request_start_ns: 1_000_000_000 * (sessionNum + 1),
+              request_end_ns: 1_000_000_000 * (sessionNum + 2),
+            },
+            metrics: {
+              time_to_first_token: { value: 120, unit: 'ms' },
+              inter_token_latency: { value: 15, unit: 'ms' },
+              request_latency: { value: 1000, unit: 'ms' },
+              output_sequence_length: { value: 60, unit: 'tokens' },
+            },
+            error: null,
+          }),
+        )
+        .join('\n'),
+    );
+    const log = Buffer.from(
+      [
+        'PhaseRunner - NOTICE - Phase profiling (profiling) started | phase_index=0 | target: 3600.0s duration',
+        'PhaseRunner - NOTICE - Phase profiling (profiling) sending complete | sent=3, completed=2, in_flight=1 | timeout_triggered=True',
+        'PhaseRunner - NOTICE - Phase profiling (profiling) complete | completed=2, cancelled=1, errors=0 | elapsed=3630.00s | grace_period_timeout=True',
+      ].join('\n'),
+    );
+    const aggregate = Buffer.from(JSON.stringify({ context_overflow_count: { avg: 0 } }));
+
+    const withLog = await prepareTraceReplay(profile, null, null, {}, { log, aggregate });
+    expect(decodeSlaAttempts(withLog.slaAttemptsGz!).accounting).toMatchObject({
+      issued: 3,
+      incompleteAtCutoff: 1,
+      contextOverflowRejected: 0,
+    });
+
+    // Without the harness files the export still yields attempt data, as a lower bound.
+    const withoutLog = await prepareTraceReplay(profile, null);
+    expect(decodeSlaAttempts(withoutLog.slaAttemptsGz!).accounting).toMatchObject({
+      issued: null,
+      issuedLowerBound: 2,
+      incompleteAtCutoff: null,
+    });
+    // A malformed aggregate is ignored, not fatal.
+    const badAggregate = await prepareTraceReplay(
+      profile,
+      null,
+      null,
+      {},
+      {
+        log,
+        aggregate: Buffer.from('{not json'),
+      },
+    );
+    expect(
+      decodeSlaAttempts(badAggregate.slaAttemptsGz!).accounting.contextOverflowRejected,
+    ).toBeNull();
+    await expect(prepareTraceReplay(null, Buffer.from('x,y\n'))).resolves.toMatchObject({
+      slaAttemptsGz: null,
+    });
+  });
+
   it('stores the computed request timeline as gzip of its JSON text', async () => {
     const profile = Buffer.from(
       [
@@ -444,7 +517,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
       INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics)
       VALUES (41, 1, 1, 'agentic_traces', '2026-10-01', 16, '{}'),
              (42, 1, 1, 'agentic_traces', '2026-10-01', 32, '{}'),
-             (43, 1, 1, 'agentic_traces', '2026-10-01', 64, '{}');
+             (43, 1, 1, 'agentic_traces', '2026-10-01', 64, '{}'),
+             (44, 1, 1, 'agentic_traces', '2026-10-01', 128, '{}');
     `);
   }, 30_000);
 
@@ -508,6 +582,49 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.sequence_length_sketches_version).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
   });
 
+  it('stores the SLA attempt data with its version and content hash', async () => {
+    const slaAttemptsGz = encodeSlaAttempts(
+      await slaAttemptsFromExport([
+        JSON.stringify({
+          metadata: {
+            session_num: 0,
+            benchmark_phase: 'profiling',
+            request_start_ns: 1,
+            request_end_ns: 9,
+          },
+          metrics: { time_to_first_token: { value: 250, unit: 'ms' } },
+          error: null,
+        }),
+      ]),
+    );
+    await expect(
+      persistPreparedTraceReplay(pg, [44], { ...preparedFixture(), slaAttemptsGz }),
+    ).resolves.toBe(1);
+
+    const [row] = (await pg`
+      select atr.sla_attempts_gz, atr.sla_attempts_version, encode(atr.sla_attempts_sha256, 'hex') as sha
+      from benchmark_results br
+      join agentic_trace_replay atr on atr.id = br.trace_replay_id
+      where br.id = 44
+    `) as unknown as { sla_attempts_gz: Uint8Array; sla_attempts_version: number; sha: string }[];
+    expect(decodeSlaAttempts(row.sla_attempts_gz).set.completed.ttftUs).toEqual([250_000]);
+    expect(row.sla_attempts_version).toBe(SLA_ATTEMPTS_VERSION);
+    expect(row.sha).toBe(slaAttemptsSha256(slaAttemptsGz));
+
+    // A row prepared without a profile export keeps all three columns null.
+    const [empty] = (await pg`
+      select atr.sla_attempts_gz, atr.sla_attempts_version, atr.sla_attempts_sha256
+      from benchmark_results br
+      join agentic_trace_replay atr on atr.id = br.trace_replay_id
+      where br.id = 41
+    `) as unknown as Record<string, unknown>[];
+    expect(empty).toEqual({
+      sla_attempts_gz: null,
+      sla_attempts_version: null,
+      sla_attempts_sha256: null,
+    });
+  });
+
   it('leaves every timeline column null when no timeline was computed', async () => {
     await expect(
       persistPreparedTraceReplay(pg, [42], {
@@ -550,7 +667,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     const restored = await readTraceProfileGz(pg, row.trace_replay_id!);
     expect(restored?.equals(profile)).toBe(true);
     const presence = await getBenchmarkPresence(pg);
-    expect(presence.trace).toEqual([41, 3]);
+    expect(presence.trace).toEqual([41, 4]);
     expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);
     expect(await persistPreparedTraceReplay(pg, [43], prepared)).toBe(0);
     const after = await storedTrace(43);

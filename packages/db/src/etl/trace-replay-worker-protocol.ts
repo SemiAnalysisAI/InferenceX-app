@@ -5,6 +5,9 @@ export interface TraceReplayWorkerJob {
   profileExportJsonl: string | null;
   serverMetricsCsv: string | null;
   serverMetricsJson: string | null;
+  /** Harness log and aggregate JSON of the point; absent in older artifacts. */
+  harnessLog?: string | null;
+  harnessAggregate?: string | null;
   metricsContext: ServerMetricsContext;
 }
 
@@ -23,6 +26,7 @@ export const PREPARED_TRACE_REPLAY_BUFFER_FIELDS = [
   'chartSeriesSummaryGz',
   'requestTimelineGz',
   'requestChartDataGz',
+  'slaAttemptsGz',
 ] as const satisfies readonly (keyof PreparedTraceReplay)[];
 
 type BufferField = (typeof PREPARED_TRACE_REPLAY_BUFFER_FIELDS)[number];

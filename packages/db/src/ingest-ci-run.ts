@@ -864,6 +864,8 @@ async function main(): Promise<void> {
                         profileExportJsonl: trace.profileJsonl,
                         serverMetricsCsv: trace.serverMetricsCsv,
                         serverMetricsJson: trace.serverMetricsJson,
+                        harnessLog: trace.harnessLog,
+                        harnessAggregate: trace.harnessAggregate,
                         metricsContext: {
                           framework: toInsert[0]?.config.framework,
                           disagg: toInsert[0]?.config.disagg,

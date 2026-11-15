@@ -4,6 +4,7 @@ import {
   evaluateSlaAttempts,
   reconcileSlaAccounting,
   SLA_NOT_RECORDED,
+  SLA_TPOT_NOT_APPLICABLE,
   type SlaLatencyTargets,
 } from '@semianalysisai/inferencex-constants';
 
@@ -278,6 +279,12 @@ describe('slaAttemptsFromExport', () => {
     );
     expect(blob.set.other).toEqual([]);
     expect(blob.set.completed.ttftUs).toEqual([SLA_NOT_RECORDED, 700_000, 700_000, 700_000]);
+    expect(blob.set.completed.tpotUs).toEqual([
+      17_000,
+      SLA_TPOT_NOT_APPLICABLE,
+      SLA_NOT_RECORDED,
+      17_000,
+    ]);
     const accounting = reconcileSlaAccounting(blob.set, blob.accounting);
     expect(accounting).toMatchObject({ completed: 4, failed: 0, reason: 'reconciled' });
     expect(evaluateSlaAttempts(blob.set, accounting, TARGETS)).toMatchObject({
@@ -359,7 +366,6 @@ describe('slaAttemptsFromExport', () => {
       ttftUs: [710_587],
       tpotUs: [17_149],
       e2eUs: [24_118_351],
-      outputTokens: [1366],
     });
   });
 });

@@ -6,6 +6,10 @@ export interface TraceReplayArtifactPaths {
   profileJsonl: string | null;
   serverMetricsCsv: string | null;
   serverMetricsJson: string | null;
+  /** Harness log with the issued and cancelled request counts of the phase. */
+  harnessLog: string | null;
+  /** `profile_export_aiperf.json`, the aggregate the harness writes for the point. */
+  harnessAggregate: string | null;
 }
 
 const TRACE_SUBDIRS = ['aiperf_artifacts', 'trace_replay'];
@@ -19,6 +23,8 @@ function traceFilesIn(dir: string): TraceReplayArtifactPaths | null {
   let profileJsonl: string | null = null;
   let serverMetricsCsv: string | null = null;
   let serverMetricsJson: string | null = null;
+  let harnessLog: string | null = null;
+  let harnessAggregate: string | null = null;
 
   for (const subdir of TRACE_SUBDIRS) {
     const traceDir = path.join(dir, subdir);
@@ -30,10 +36,17 @@ function traceFilesIn(dir: string): TraceReplayArtifactPaths | null {
     if (!profileJsonl && fs.existsSync(profilePath)) profileJsonl = profilePath;
     if (!serverMetricsCsv && fs.existsSync(csvPath)) serverMetricsCsv = csvPath;
     if (!serverMetricsJson && fs.existsSync(jsonPath)) serverMetricsJson = jsonPath;
+    const logPath = path.join(traceDir, 'logs', 'aiperf.log');
+    const aggregatePath = path.join(traceDir, 'profile_export_aiperf.json');
+    if (!harnessLog && fs.existsSync(logPath)) harnessLog = logPath;
+    if (!harnessAggregate && fs.existsSync(aggregatePath)) harnessAggregate = aggregatePath;
   }
+  // The console copy of the harness log carries the same phase lines.
+  const consoleLog = path.join(dir, 'benchmark.log');
+  if (!harnessLog && fs.existsSync(consoleLog)) harnessLog = consoleLog;
 
   if (!profileJsonl && !serverMetricsCsv && !serverMetricsJson) return null;
-  return { profileJsonl, serverMetricsCsv, serverMetricsJson };
+  return { profileJsonl, serverMetricsCsv, serverMetricsJson, harnessLog, harnessAggregate };
 }
 
 function extractMultinodeArchive(artifactDir: string): string | null {
