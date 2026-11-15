@@ -18,20 +18,6 @@ function visitModelPage(slug: string) {
   cy.visit(`/model/${slug}`, {
     onBeforeLoad(win) {
       dismissStarModal(win);
-      const log: string[] = [];
-      (win as unknown as { __clicks: string[] }).__clicks = log;
-      for (const type of ['click', 'pointerdown', 'mousedown', 'keydown']) {
-        win.addEventListener(
-          type,
-          (event) => {
-            const target = event.target as Element | null;
-            log.push(
-              `${Math.round(win.performance.now())} ${type} trusted=${event.isTrusted} target=${target?.closest?.('[data-testid]')?.getAttribute('data-testid') ?? target?.tagName} stack=${(new Error().stack ?? '').split('\n').slice(2, 7).join(' <- ')}`,
-            );
-          },
-          true,
-        );
-      }
     },
   });
   cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
@@ -42,31 +28,16 @@ function visitModelPage(slug: string) {
       const hydrated = Object.keys(svg).some((key) => key.startsWith('__reactProps'));
       expect(hydrated, 'architecture diagram is hydrated').to.equal(true);
     });
+  // The diagram redraws once its width settles; a click on a block it is about to replace is lost.
+  cy.get('[data-testid="model-architecture-svg"]').should(([svg]) => {
+    const snapshot = `${svg.getBoundingClientRect().width}:${svg.innerHTML.length}`;
+    const previous = svg.dataset.cySettled;
+    svg.dataset.cySettled = snapshot;
+    expect(previous, 'architecture diagram has settled').to.equal(snapshot);
+  });
 }
 
 describe('Model Architecture Diagram', () => {
-  afterEach(function () {
-    if (this.currentTest?.state !== 'failed') return;
-    cy.document().then((doc) => {
-      const inline = doc.querySelector('[data-testid="model-architecture-inline"]');
-      cy.writeFile(
-        `cypress/screenshots/diag-${Date.now()}.txt`,
-        [
-          this.currentTest?.title,
-          doc.location.href,
-          [
-            ...doc.querySelectorAll<HTMLElement>(
-              '[data-testid^="expand-"],[data-testid^="collapse-"]',
-            ),
-          ]
-            .map((el) => el.dataset.testid)
-            .join(','),
-          inline?.outerHTML.slice(0, 1500) ?? 'no inline',
-          ((doc.defaultView as unknown as { __clicks?: string[] }).__clicks ?? []).join('\n'),
-        ].join('\n\n'),
-      );
-    });
-  });
   describe('Collapsible Transformer Blocks (MoE model - DeepSeek R1)', () => {
     before(() => {
       visitModelPage('deepseek-r1');
