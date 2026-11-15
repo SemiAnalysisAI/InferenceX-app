@@ -251,6 +251,20 @@ export function resultMetadata(point: VideoPoint) {
     date: point.observedAt?.slice(0, 10) ?? null,
   };
 }
+/** The selected workload in one line: model, resolution, duration, fps, steps and mode. */
+export function workloadSummary(point: VideoPoint, stepsUnit: string): string {
+  const metadata = resultMetadata(point);
+  return [
+    metadata.model,
+    metadata.resolution,
+    metadata.duration === null ? null : `${Number(metadata.duration.toFixed(2))} s`,
+    metadata.fps === null ? null : `${metadata.fps} fps`,
+    metadata.steps === null ? null : `${metadata.steps} ${stepsUnit}`,
+    metadata.mode?.toUpperCase(),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 export interface ResultCost {
   perVideo: number;
   perVideoSecond: number | null;
