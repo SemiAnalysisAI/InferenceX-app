@@ -18,6 +18,20 @@ function visitModelPage(slug: string) {
   cy.visit(`/model/${slug}`, {
     onBeforeLoad(win) {
       dismissStarModal(win);
+      const log: string[] = [];
+      (win as unknown as { __clicks: string[] }).__clicks = log;
+      for (const type of ['click', 'pointerdown', 'mousedown', 'keydown']) {
+        win.addEventListener(
+          type,
+          (event) => {
+            const target = event.target as Element | null;
+            log.push(
+              `${Math.round(win.performance.now())} ${type} trusted=${event.isTrusted} target=${target?.closest?.('[data-testid]')?.getAttribute('data-testid') ?? target?.tagName} stack=${(new Error().stack ?? '').split('\n').slice(2, 7).join(' <- ')}`,
+            );
+          },
+          true,
+        );
+      }
     },
   });
   cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
@@ -47,7 +61,8 @@ describe('Model Architecture Diagram', () => {
           ]
             .map((el) => el.dataset.testid)
             .join(','),
-          inline?.outerHTML.slice(0, 6000) ?? 'no inline',
+          inline?.outerHTML.slice(0, 1500) ?? 'no inline',
+          ((doc.defaultView as unknown as { __clicks?: string[] }).__clicks ?? []).join('\n'),
         ].join('\n\n'),
       );
     });
