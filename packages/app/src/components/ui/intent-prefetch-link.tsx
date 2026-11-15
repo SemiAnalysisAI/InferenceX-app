@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 
 import { saveDataRequested, watchPointerIntent } from '@/components/ui/pointer-intent';
 import { prefetchRouteData } from '@/lib/prefetch/route-data';
@@ -16,21 +16,31 @@ import { prefetchRouteData } from '@/lib/prefetch/route-data';
  */
 export function IntentPrefetchLink({
   prefetch,
+  ref: forwardedRef,
   onMouseEnter,
   onFocus,
   onTouchStart,
   ...props
 }: ComponentProps<typeof Link>) {
   const [intent, setIntent] = useState(false);
-  const ref = useRef<HTMLAnchorElement>(null);
+  const [element, setElement] = useState<HTMLAnchorElement | null>(null);
+  // Wrappers such as Radix `asChild` triggers pass their own ref, which must still reach the anchor.
+  const ref = useCallback(
+    (node: HTMLAnchorElement | null) => {
+      setElement(node);
+      if (typeof forwardedRef === 'function') return forwardedRef(node);
+      if (forwardedRef) forwardedRef.current = node;
+    },
+    [forwardedRef],
+  );
   const queryClient = useQueryClient();
   const enabled = prefetch !== false;
   const href = typeof props.href === 'string' ? props.href : null;
   const watch = enabled && !intent;
   useEffect(() => {
-    if (!watch || !ref.current) return;
-    return watchPointerIntent(ref.current, () => setIntent(true));
-  }, [watch]);
+    if (!watch || !element) return;
+    return watchPointerIntent(element, () => setIntent(true));
+  }, [watch, element]);
   useEffect(() => {
     if (intent && enabled && href) prefetchRouteData(queryClient, href);
   }, [intent, enabled, href, queryClient]);

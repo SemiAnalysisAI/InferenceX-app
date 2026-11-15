@@ -91,6 +91,26 @@ describe('IntentPrefetchLink', () => {
     expect(onMouseEnter.mock.calls.length + onFocus.mock.calls.length).toBe(1);
   });
 
+  it('hands its anchor to a ref passed by a wrapper such as a tooltip trigger', () => {
+    const objectRef = React.createRef<HTMLAnchorElement>();
+    const callbackRef = vi.fn();
+    act(() =>
+      renderWithClient(
+        <>
+          <IntentPrefetchLink href="/overview" ref={objectRef}>
+            Overview
+          </IntentPrefetchLink>
+          <IntentPrefetchLink href="/about" ref={callbackRef}>
+            About
+          </IntentPrefetchLink>
+        </>,
+      ),
+    );
+    const [first, second] = container.querySelectorAll('a');
+    expect(objectRef.current).toBe(first);
+    expect(callbackRef).toHaveBeenCalledWith(second);
+  });
+
   it('keeps an explicitly disabled prefetch off after intent', () => {
     act(() =>
       renderWithClient(
