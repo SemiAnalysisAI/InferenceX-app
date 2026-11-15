@@ -76,6 +76,27 @@ describe('video history projection', () => {
     ]);
   });
 
+  it('keys frame-count plans that request no nominal duration (Wan-style specs)', () => {
+    const artifact = saved();
+    changePlans(artifact, (plan) => {
+      const generation = at(plan, 'generation') as Record<string, Json>;
+      delete generation.duration_seconds;
+      Object.assign(generation, { width: 832, height: 480, frame_count: 81, fps: 16 });
+    });
+    const source = videoHistoryEntry(artifact, null).sources[0];
+    expect(source.error).toBeNull();
+    const [observation] = source.observations;
+    expect(observation.workloadKey).toEqual(expect.any(String));
+    expect(observation.durationSeconds).toBe(81 / 16);
+    expect(observation.frameCount).toBe(81);
+    // Without frames or a duration the workload is still incomplete.
+    const incomplete = structuredClone(artifact);
+    changePlans(incomplete, (plan) => {
+      delete (at(plan, 'generation') as Record<string, Json>).frame_count;
+    });
+    expect(videoHistoryEntry(incomplete, null).sources[0].observations[0].workloadKey).toBeNull();
+  });
+
   it('groups concurrency cells under their original source without promoting smoke to qualification', () => {
     const entry = videoHistoryEntry(saved(), '2026-09-12T00:00:00Z');
     expect(entry.id).toBe('123.40');

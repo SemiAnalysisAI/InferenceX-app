@@ -355,9 +355,9 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 4,
-      // GLM-5.2 8K/1K left the model sequence retirement maps; recorded video entries are unchanged.
-      sources: 'b028e29c68277a2e6d1c0730306a0796984d62293624824713f924bf67666ab9',
+      projection: 5,
+      // Frame-count plans (no `duration_seconds`) now project a workload key and duration.
+      sources: '261cb8b7390cbcc50b02048b3e3f471fad2a24b6d551be57b590c0f618f075cd',
     });
   });
 });

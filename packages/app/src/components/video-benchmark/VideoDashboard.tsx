@@ -45,6 +45,7 @@ import type { VideoPoint } from './metrics';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
+  isUnofficialRunParam,
   MAX_CHIP_CONFIGS,
   parseResultsState,
   resultProjection,
@@ -369,10 +370,7 @@ export default function VideoDashboard({
     latest.current = next;
     const params = new URLSearchParams(
       [...new URLSearchParams(location.search)].filter(
-        ([key]) =>
-          (!key.startsWith('r_') || isStageParam(key)) &&
-          key !== 'unofficialrun' &&
-          key !== 'unofficialruns',
+        ([key]) => (!key.startsWith('r_') || isStageParam(key)) && !isUnofficialRunParam(key),
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
