@@ -116,6 +116,59 @@ export const OVERVIEW_STRINGS = {
     navigationError:
       'Could not load the selected comparison. Showing the last successfully loaded data.',
     emptyState: 'No overview results match this selection',
+    apiSourceSuffix: 'Official API prices: each model developer’s own pricing page',
+    apiHeader: 'Official API',
+    apiHeaderTitle:
+      'First-party API list price for the same model, converted to $ per million total tokens on the row’s workload. A reference point, not a GPU platform.',
+    apiUnavailable: {
+      no_official_api: 'No first-party API price is recorded for this model.',
+      tier_mix_unknown:
+        'The API bills by input-length tier and the per-tier token split for this workload is not measured.',
+    } as Record<string, string>,
+    apiUnavailableAria: (reason: string) => `No official API price. ${reason}`,
+    apiMixLabels: {
+      agentx_full: 'AgentX corpus',
+      agentx_256k: 'AgentX 256K corpus',
+      single_turn_8k1k: '8K/1K',
+    } as Record<string, string>,
+    apiFlatTooltip: (p: {
+      provider: string;
+      apiModelId: string;
+      cacheHit: string | null;
+      input: string;
+      output: string;
+      mixLabel: string;
+      cached: string;
+      uncached: string;
+      outputShare: string;
+      formula: string;
+      result: string;
+      note: string;
+      asOf: string;
+    }) =>
+      `${p.provider} ${p.apiModelId}: ${p.cacheHit === null ? '' : `${p.cacheHit} cache hit / `}${p.input} input / ${p.output} output per 1M tokens. ${p.mixLabel} mix: ${p.cached} cached input, ${p.uncached} uncached input, ${p.outputShare} output. ${p.formula} = ${p.result} per 1M total tokens. ${p.note} As of ${p.asOf}.`,
+    apiTieredTooltip: (p: {
+      provider: string;
+      apiModelId: string;
+      tiers: string;
+      mixLabel: string;
+      split: string;
+      result: string;
+      note: string;
+      asOf: string;
+    }) =>
+      `${p.provider} ${p.apiModelId}, billed per request by input length: ${p.tiers} (input / output per 1M tokens). ${p.mixLabel}: ${p.split}. Total ${p.result} per 1M total tokens. ${p.note} As of ${p.asOf}.`,
+    apiTierRange: (lo: string, hi: string) => `${lo}–${hi} input`,
+    apiTierUpTo: (hi: string) => `≤${hi} input`,
+    apiTierSplit: (range: string, input: string, output: string) =>
+      `${range} requests carry ${input} of input and ${output} of output tokens`,
+    apiRatioCheaper: (n: string) => `×${n} cheaper than API`,
+    apiRatioPricier: (n: string) => `×${n} pricier than API`,
+    apiRatioEven: 'About the API price',
+    apiRatioTooltip: (hardware: string, hw: string, api: string, verdict: string) =>
+      `${hardware} self-hosted ${hw} vs official API ${api} per 1M total tokens on this workload: ${verdict}.`,
+    apiMethodologyNote:
+      'Official API: the model developer’s own list price, never a reseller’s, converted with the workload’s cached-input / uncached-input / output token mix. It does not change with the SLO, engine scope, comparison or reference hardware; “Hide unchanged” and “Hide blanks” only remove whole rows, judged by their hardware results. The corpus counts every reusable prefix as a cache hit, so on cached APIs the figure is a lower bound.',
   },
   zh: {
     title: '智能体推理成本',
@@ -221,6 +274,58 @@ export const OVERVIEW_STRINGS = {
     loadingStatus: '正在加载所选对比…',
     navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
     emptyState: '没有符合当前筛选条件的总览结果',
+    apiSourceSuffix: '官方 API 价格：各模型开发商自己的定价页面',
+    apiHeader: '官方 API',
+    apiHeaderTitle:
+      '同一模型的官方（第一方）API 标价，按该行工作负载换算为每百万总 token 美元。仅作参考，不是 GPU 平台。',
+    apiUnavailable: {
+      no_official_api: '暂无该模型的官方 API 价格记录。',
+      tier_mix_unknown: '该 API 按输入长度分档计费，而此工作负载的分档 token 占比尚未测得。',
+    } as Record<string, string>,
+    apiUnavailableAria: (reason: string) => `无官方 API 价格。${reason}`,
+    apiMixLabels: {
+      agentx_full: 'AgentX 语料',
+      agentx_256k: 'AgentX 256K 语料',
+      single_turn_8k1k: '8K/1K',
+    } as Record<string, string>,
+    apiFlatTooltip: (p: {
+      provider: string;
+      apiModelId: string;
+      cacheHit: string | null;
+      input: string;
+      output: string;
+      mixLabel: string;
+      cached: string;
+      uncached: string;
+      outputShare: string;
+      formula: string;
+      result: string;
+      note: string;
+      asOf: string;
+    }) =>
+      `${p.provider} ${p.apiModelId}：每百万 token ${p.cacheHit === null ? '' : `缓存命中 ${p.cacheHit} / `}输入 ${p.input} / 输出 ${p.output}。${p.mixLabel} token 构成：缓存输入 ${p.cached}，未缓存输入 ${p.uncached}，输出 ${p.outputShare}。${p.formula} = 每百万总 token ${p.result}。${p.note} 截至 ${p.asOf}。`,
+    apiTieredTooltip: (p: {
+      provider: string;
+      apiModelId: string;
+      tiers: string;
+      mixLabel: string;
+      split: string;
+      result: string;
+      note: string;
+      asOf: string;
+    }) =>
+      `${p.provider} ${p.apiModelId}，按单次请求输入长度分档计费：${p.tiers}（每百万 token 输入 / 输出）。${p.mixLabel}：${p.split}。合计每百万总 token ${p.result}。${p.note} 截至 ${p.asOf}。`,
+    apiTierRange: (lo: string, hi: string) => `输入 ${lo}–${hi}`,
+    apiTierUpTo: (hi: string) => `输入 ≤${hi}`,
+    apiTierSplit: (range: string, input: string, output: string) =>
+      `${range} 的请求占输入 token ${input}、输出 token ${output}`,
+    apiRatioCheaper: (n: string) => `比 API 便宜 ×${n}`,
+    apiRatioPricier: (n: string) => `比 API 贵 ×${n}`,
+    apiRatioEven: '与 API 价格相当',
+    apiRatioTooltip: (hardware: string, hw: string, api: string, verdict: string) =>
+      `${hardware} 自建部署 ${hw}，官方 API ${api}（每百万总 token，同一工作负载）：${verdict}。`,
+    apiMethodologyNote:
+      '官方 API：模型开发商自己的标价（不含转售商），按工作负载的缓存输入 / 未缓存输入 / 输出 token 构成换算。该列不随 SLO、引擎范围、对比方式或基准硬件变化；“隐藏无变化”与“隐藏空行”只按硬件结果移除整行。语料把所有可复用前缀都计为缓存命中，因此对支持缓存的 API 而言该数值是下限。',
   },
 } as const;
 

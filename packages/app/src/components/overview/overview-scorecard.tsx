@@ -42,6 +42,7 @@ import {
   overviewHref,
 } from '@/lib/overview/overview-links';
 
+import { OverviewApiCell, OverviewApiRatioBadge } from './overview-api-cell';
 import { OverviewDetailLink } from './overview-detail-link';
 import { OverviewHistoryDetailLink } from './overview-history-detail-link';
 import { OverviewHistoryWindowSelect } from './overview-history-window-select';
@@ -457,6 +458,15 @@ function CellValue({
           )}
         </div>
       )}
+      <OverviewApiRatioBadge
+        model={model.model}
+        scenario={model.scenario}
+        hardware={member.hardware}
+        hardwareLabel={member.hardwareLabel}
+        hardwareCostPerMtok={member.costPerMtok}
+        strings={strings}
+        cost={formatters.cost}
+      />
       {config === null || historicalConfig === null ? null : (
         <OverviewHistoryDetailLink
           href={buildOverviewHistoryDashboardHref(locale, model, config, historicalConfig)}
@@ -586,10 +596,11 @@ export function DesktopOverviewMatrix({
             : strings.historyCaption(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}
         </caption>
         <colgroup>
-          <col className="w-[22%]" />
+          <col className="w-[19%]" />
           {platforms.map((platform) => (
-            <col key={platform.hardware} className="w-[15.6%]" />
+            <col key={platform.hardware} className="w-[13.8%]" />
           ))}
+          <col className="w-[12%]" />
         </colgroup>
         <thead className="sticky top-14 z-20 bg-card [container-type:scroll-state]">
           <tr className="text-xs text-muted-foreground">
@@ -610,6 +621,14 @@ export function DesktopOverviewMatrix({
                   : platform.hardwareLabel}
               </th>
             ))}
+            <th
+              scope="col"
+              data-testid="overview-api-header"
+              title={strings.apiHeaderTitle}
+              className={`h-10 bg-card px-3 text-left font-normal text-muted-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] ${HEADER_EDGE_COVER}`}
+            >
+              {strings.apiHeader}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -676,6 +695,18 @@ export function DesktopOverviewMatrix({
                     </td>
                   ))
                 )}
+                <td
+                  data-testid="overview-api-cell"
+                  className="bg-muted/10 px-3 py-2.5 align-top shadow-[inset_1px_0_0_var(--border)]"
+                >
+                  <OverviewApiCell
+                    model={model.model}
+                    scenario={model.scenario}
+                    locale={locale}
+                    strings={strings}
+                    cost={formatters.cost}
+                  />
+                </td>
               </tr>
             );
           })}
@@ -748,6 +779,25 @@ export function MobileOverviewList({
                   ))}
                 </div>
               )}
+              <div
+                data-testid="overview-mobile-api-row"
+                className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 border-t border-dashed border-border/60 pt-1.5"
+              >
+                <span
+                  title={strings.apiHeaderTitle}
+                  className="whitespace-nowrap text-xs font-normal text-muted-foreground"
+                >
+                  {strings.apiHeader}
+                </span>
+                <OverviewApiCell
+                  model={model.model}
+                  scenario={model.scenario}
+                  locale={locale}
+                  strings={strings}
+                  cost={formatters.cost}
+                  phoneRow
+                />
+              </div>
               {comparisonMode === 'hardware' && (
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
@@ -1271,6 +1321,7 @@ export function OverviewMethodology({
           : strings.historyCellStateLegend(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}
       </p>
       <p>{strings.methodologyNote}</p>
+      <p data-testid="overview-api-methodology">{strings.apiMethodologyNote}</p>
     </div>
   );
 }
