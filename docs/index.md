@@ -38,3 +38,4 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [Agentic Workload Explorer](./agentic-workload-explorer.md) covers the feature-gated explorer over a frozen, anonymized ProxyTrace snapshot and its separate read replica.
 - [Huawei SKU configurations](./ubenchx-huawei-skus.md) documents the 950PR table on TPC Skyline, source limitations and API coverage.
 - [OperatorX](./operatorx.md) covers the GEMM and routed MoE explorer, compact comparison reads, artifact persistence, deployment, and local verification.
+- [SLA Targets](./sla-targets.md) covers the measurement contract of the feature-gated SLA Targets tab: attempt accounting, exact target evaluation, the accounting policy, and what stored historical data can and cannot support.
