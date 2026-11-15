@@ -180,8 +180,11 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
   };
 }
 
+/** The share query of a state; a field at its default is left out, as `parseResultsState` restores it. */
 export function resultsSearch(state: ResultsState): string {
   const s = new URLSearchParams();
+  const changed = <K extends keyof ResultsState>(key: K) =>
+    state[key] === DEFAULT_RESULTS_STATE[key] ? null : state[key];
   const fields = {
     r_model: state.model,
     r_workload: state.workload,
@@ -197,22 +200,30 @@ export function resultsSearch(state: ResultsState): string {
     r_from: state.compareFrom,
     r_to: state.compareTo,
     r_hidden: state.hidden.join(',') || null,
-    r_deadline: state.deadlineSeconds,
-    r_tier: state.costTier,
+    r_deadline: changed('deadlineSeconds'),
+    r_tier: changed('costTier'),
     r_api: state.apiPrice,
     r_price_t2v: state.apiPrices.t2v,
     r_price_i2v: state.apiPrices.i2v,
     r_price_r2v: state.apiPrices.r2v,
-    r_utilization: state.utilization,
-    r_x: state.xMetric,
-    r_y: state.yMetric,
-    r_optimal: state.optimal ? 1 : 0,
+    r_utilization: changed('utilization'),
+    r_x: changed('xMetric'),
+    r_y: changed('yMetric'),
+    r_optimal: state.optimal ? null : 0,
     r_point: state.point,
     unofficialruns: state.unofficialRun,
   };
   for (const [key, value] of Object.entries(fields)) if (value !== null) s.set(key, String(value));
   return s.toString();
 }
+
+/** `Wan-AI/Wan2.2-T2V-A14B-Diffusers` becomes `wan2.2-t2v-a14b-diffusers`. */
+const modelSlug = (model: string) =>
+  model
+    .slice(model.lastIndexOf('/') + 1)
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9.]+/gu, '-')
+    .replaceAll(/^-+|-+$/gu, '');
 
 export function resultMetadata(point: VideoPoint) {
   let identity: Json = null;
@@ -427,6 +438,14 @@ function qualifies(p: VideoPoint): boolean {
   );
 }
 
+/** Workload keys, the one most hardware types cover first. */
+function byCoverage(cohort: VideoPoint[]): string[] {
+  const coverage = new Map<string, Set<string>>();
+  for (const p of cohort)
+    coverage.set(p.workloadKey!, (coverage.get(p.workloadKey!) ?? new Set()).add(p.hardwareKey!));
+  return [...coverage].toSorted((a, b) => b[1].size - a[1].size).map(([key]) => key);
+}
+
 export function resultProjection(
   points: VideoPoint[],
   state: ResultsState,
@@ -446,15 +465,17 @@ export function resultProjection(
   const approvedIds = new Set(qualified.map((point) => point.id));
   const available = [...qualified, ...named.filter((point) => !approvedIds.has(point.id))];
   const metadata = available.map(resultMetadata);
-  // Share a source point ID, not the canonical JSON containing every prompt and seed.
+  // Share a model slug or a source point ID, not the canonical JSON containing every prompt and seed.
   // Comparison still uses the complete canonical identity after resolving the selector.
-  const workloads = new Map<string, { key: string; label: string; model: string }>();
+  const workloads = new Map<string, { key: string; label: string; model: string; slug: string }>();
   for (const point of available)
     if (!workloads.has(point.workloadKey!))
       workloads.set(point.workloadKey!, {
         key: point.id,
         label: point.workload,
         model: point.model,
+        // The plan's model, as the workload selector names it.
+        slug: modelSlug(resultMetadata(point).model),
       });
   const matchesFilters = (p: VideoPoint) => {
     const m = resultMetadata(p);
@@ -469,14 +490,16 @@ export function resultProjection(
   };
   const matches = qualified.filter(matchesFilters);
   const namedMatches = named.filter(matchesFilters);
-  const coverage = new Map<string, Set<string>>();
-  for (const p of matches.length > 0 ? matches : namedMatches)
-    coverage.set(p.workloadKey!, (coverage.get(p.workloadKey!) ?? new Set()).add(p.hardwareKey!));
-  const preferred = [...coverage].toSorted((a, b) => b[1].size - a[1].size)[0]?.[0] ?? null;
+  const preferred = byCoverage(matches.length > 0 ? matches : namedMatches)[0] ?? null;
+  // A model slug is the readable selector of that model's best-covered workload. It ignores
+  // the filters, so a link keeps its workload when they change; other workloads share a point ID.
+  const ranked = byCoverage(qualified.length > 0 ? qualified : named);
+  const slugged = (slug: string) => ranked.find((key) => workloads.get(key)!.slug === slug) ?? null;
   const workloadKey =
     state.workload === null
       ? preferred
-      : (available.find((point) => point.id === state.workload)?.workloadKey ?? null);
+      : (available.find((point) => point.id === state.workload)?.workloadKey ??
+        slugged(state.workload));
   const official = matches.filter(
     (p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun,
   );
@@ -582,9 +605,13 @@ export function resultProjection(
         available.filter((p) => p.workloadKey === workloadKey).map((p) => resultMetadata(p).engine),
       ).toSorted((a, b) => engineSort(a) - engineSort(b)),
       dates: values(runs.map((r) => r.date)),
-      workloads: [...workloads.values()]
-        .filter((w) => !state.model || w.model === state.model)
-        .map(({ key, label }) => ({ key, label })),
+      workloads: [...workloads]
+        .filter(([, w]) => !state.model || w.model === state.model)
+        .map(([canonical, { key, label, slug }]) => ({
+          key,
+          label,
+          ...(slug && slugged(slug) === canonical ? { slug } : {}),
+        })),
     },
     excludedCount: points.length - qualified.length,
     sampleFloor: DASHBOARD_SAMPLE_FLOOR,

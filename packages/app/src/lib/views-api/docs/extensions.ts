@@ -480,8 +480,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '完整模型标识；未指定时选择硬件覆盖最多的合格工作负载。',
   ],
   r_workload: [
-    'Compact key from options.workloads; resolves to the complete canonical workloadKey internally. Any source point ID of the same workload also resolves, so shared links survive later publications. One shared 20-scheduled-clip C1 spec with at least 10 valid samples per hardware.',
-    'options.workloads 中的短 key，内部解析为完整 canonical workloadKey。同一工作负载任一数据点的 ID 也能解析，因此之后有新结果发布时，已分享的链接仍然有效。所有硬件共用计划 20 条视频的 C1 spec，每种硬件至少 10 个有效样本。',
+    "Model slug from options.workloads[].slug, such as minimax-h3: that model's best-covered workload under any filter. A workload without a slug uses its compact key from options.workloads. Either resolves to the complete canonical workloadKey internally. Any source point ID of the same workload also resolves, so shared links survive later publications. One shared 20-scheduled-clip C1 spec with at least 10 valid samples per hardware.",
+    'options.workloads[].slug 中的模型 slug（如 minimax-h3），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载。没有 slug 的工作负载使用 options.workloads 中的短 key。两者都在内部解析为完整 canonical workloadKey。同一工作负载任一数据点的 ID 也能解析，因此之后有新结果发布时，已分享的链接仍然有效。所有硬件共用计划 20 条视频的 C1 spec，每种硬件至少 10 个有效样本。',
   ],
   r_resolution: [
     'Exact width×height from the sealed plan, such as 1344×768.',

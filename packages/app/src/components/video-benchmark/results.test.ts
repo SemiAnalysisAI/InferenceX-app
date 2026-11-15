@@ -251,6 +251,15 @@ describe('VideoGenX results contract', () => {
     expect(explicit.options.workloads.map((workload) => workload.key)).toContain(named.id);
     expect(explicit.workloadKey).toBe(named.workloadKey);
     expect(new URLSearchParams(resultsSearch(explicit.state)).get('r_workload')).toBe(named.id);
+    // A model slug shares the model's best-covered workload under any filter; the rest keep a point ID.
+    expect(explicit.options.workloads.map((workload) => workload.slug)).toEqual([
+      'minimax-h3',
+      undefined,
+    ]);
+    expect(
+      resultProjection([eligible], { ...state(), workload: 'minimax-h3', engine: 'other' })
+        .workloadKey,
+    ).toBe(eligible.workloadKey);
     expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
     // A shared link keeps its workload after another point of it becomes the representative.
     const republished = { ...eligible, id: 'republished:c1', hardwareKey: 'h200' };
@@ -371,6 +380,7 @@ describe('VideoGenX results contract', () => {
     ).toEqual(selection);
     expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
     expect(parseResultsState(resultsSearch(state()))).toEqual(state());
+    expect(resultsSearch(state())).toBe('');
     const shared = new URLSearchParams(resultsSearch(selection));
     expect(shared.get('unofficialruns')).toBe('123');
     expect(shared.has('unofficialrun')).toBe(false);

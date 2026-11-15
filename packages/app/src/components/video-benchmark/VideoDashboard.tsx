@@ -613,7 +613,7 @@ export default function VideoDashboard({
       ),
     [projection.history, deploymentCells],
   );
-  const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
+  const apiUrl = `/api/v1/views/video?${['view=overview', resultsSearch(state)].filter(Boolean).join('&')}`;
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
@@ -709,7 +709,10 @@ export default function VideoDashboard({
                       // Run, pinned point, chip configs and workload filters (including
                       // retired URL filters) belong to the previous workload.
                       update({
-                        workload,
+                        // The readable slug when it selects this workload, else its point ID.
+                        workload:
+                          options.workloads.find((option) => option.key === workload)?.slug ??
+                          workload,
                         model: null,
                         resolution: null,
                         duration: null,
@@ -971,16 +974,11 @@ export default function VideoDashboard({
                 className="sm:ml-auto"
                 data-testid="results-overlay-dismiss"
                 onClick={() => {
-                  const approvedWorkloads = resultProjection(points, {
-                    ...state,
-                    unofficialRun: null,
-                  }).options.workloads;
+                  // A workload only the named run publishes does not resolve without it.
+                  const approved = resultProjection(points, { ...state, unofficialRun: null });
                   update({
                     unofficialRun: null,
-                    ...(state.workload !== null &&
-                    !approvedWorkloads.some((workload) => workload.key === state.workload)
-                      ? { workload: null }
-                      : {}),
+                    ...(approved.workloadKey === null ? { workload: null } : {}),
                   });
                   track('video_results_overlay_dismissed');
                 }}

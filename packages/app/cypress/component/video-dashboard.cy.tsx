@@ -343,7 +343,7 @@ describe('VideoGenX results', () => {
     cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
     cy.get('label[for="video-results-optimal"]').click();
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
-    searchParam('r_optimal').should('equal', '1');
+    searchParam('r_optimal').should('equal', null);
     for (const key of ['r_gpus', 'r_basis']) searchParam(key).should('equal', null);
     points(overlay).trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip="video-results-chart"] [data-hover-notice]').should(
@@ -475,7 +475,7 @@ describe('VideoGenX results', () => {
     hardwarePoints('b200').should('exist');
     hardwarePoints('h200').should('not.exist');
     cy.get('#video-results-chart-title').should('contain', 'Wan-AI/Wan2.2-T2V-A14B-Diffusers');
-    searchParam('r_workload').should('not.be.null');
+    searchParam('r_workload').should('equal', 'wan2.2-t2v-a14b-diffusers');
     searchParam('r_steps').should('be.null');
   });
 
