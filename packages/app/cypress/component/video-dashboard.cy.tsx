@@ -427,12 +427,15 @@ describe('VideoGenX results', () => {
 
   it('switches between approved models from the benchmark config', () => {
     mount({
+      // A filter left over from the previous workload must not hide the next one.
+      search: '?r_y=videosPerGpuHour&r_steps=50',
       editPage: (page) => {
         const entry = page.entries.find((item) => item.runId === B200_RUN)!;
         for (const source of entry.sources)
           for (const observation of source.observations) {
             const workload = JSON.parse(observation.workloadKey!);
             workload.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+            workload.plan.generation.num_inference_steps = 40;
             observation.workloadKey = JSON.stringify(workload);
           }
       },
@@ -446,6 +449,7 @@ describe('VideoGenX results', () => {
     hardwarePoints('h200').should('not.exist');
     cy.get('#video-results-chart-title').should('contain', 'Wan-AI/Wan2.2-T2V-A14B-Diffusers');
     searchParam('r_workload').should('not.be.null');
+    searchParam('r_steps').should('be.null');
   });
 
   it('opens the named re-export, not the official cell, when both share an observation ID', () => {

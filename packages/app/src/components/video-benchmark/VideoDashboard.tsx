@@ -706,9 +706,16 @@ export default function VideoDashboard({
                     onValueChange={(workload) => {
                       if (workload === projection.state.workload) return;
                       track('video_results_workload_selected', { workload });
-                      // Run, pinned point and chip configs belong to the previous workload.
+                      // Run, pinned point, chip configs and workload filters (including
+                      // retired URL filters) belong to the previous workload.
                       update({
                         workload,
+                        model: null,
+                        resolution: null,
+                        duration: null,
+                        mode: null,
+                        steps: null,
+                        engine: null,
                         date: null,
                         run: null,
                         point: null,
