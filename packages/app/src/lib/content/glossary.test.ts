@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { acceleratorEntries } from './glossary-accelerators';
 
 import { getAllPosts, getPostBySlug } from '../blog/blog';
 import {
@@ -22,6 +23,45 @@ import {
 } from './glossary-zh';
 
 describe('glossary content', () => {
+  it('connects all 30 accelerator terms to translated articles and reciprocal glossary links', () => {
+    expect(acceleratorEntries).toHaveLength(30);
+    for (const entry of acceleratorEntries) {
+      const zh = getZhGlossaryEntry(entry.slug)!;
+      expect(zh.articleSlugs).toEqual(entry.articleSlugs);
+      expect(zh.relatedTerms).toEqual(entry.relatedTerms);
+      for (const locale of ['en', 'zh'] as const) {
+        const articles = entry.articleSlugs.map((slug) => {
+          const folder = path.join(
+            import.meta.dirname,
+            '../../../content/blog',
+            locale === 'zh' ? 'zh' : '',
+          );
+          return readFileSync(path.join(folder, `${slug}.mdx`), 'utf8');
+        });
+        expect(
+          articles.some((raw) =>
+            raw.includes(`](${locale === 'zh' ? '/zh' : ''}/glossary/${entry.slug})`),
+          ),
+          entry.slug,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('keeps instruction ceilings, cache conditions, and profiler durations distinct', () => {
+    expect(getGlossaryEntry('roofline')!.benchmarkContext).toContain('empirical Pareto envelope');
+    expect(getGlossaryEntry('gpu-utilization')!.benchmarkContext).toContain(
+      'exclusive physical Cube',
+    );
+    expect(getGlossaryEntry('warm-cache-benchmark')!.benchmarkContext).toContain(
+      'does not establish end-to-end',
+    );
+    expect(getGlossaryEntry('tma-multicast')!.benchmarkContext).toContain(
+      'not automatically an application-speedup',
+    );
+    expect(getGlossaryEntry('two-sm-mma')!.significance).toContain('per-SM efficiency');
+    expect(getZhGlossaryEntry('gpu-utilization')!.benchmarkContext).toContain('独占利用率');
+  });
   it('provides unique, indexable entries with substantive explanations', () => {
     const entries = getAllGlossaryEntries();
     const slugs = entries.map((entry) => entry.slug);

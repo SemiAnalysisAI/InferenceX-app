@@ -173,6 +173,13 @@ The TPU AgentX follow-up adds `decode-megakernel`, `kernel-launch-overhead`,
 storage does not imply native FP4 arithmetic. The TPU, TorchTPU, TPU-Sync, and
 llm-d entries distinguish the September preview from the November AgentX results.
 
+The Huawei and Blackwell ports add accelerator execution and microbenchmark
+terminology: Ascend/CANN, Cube/vector cores, TileLang, DeepGEMM/DeepEP, URMA,
+SM/GPC/CTA clusters, PTX/SASS, TMEM/TMA, multicast, MMA, occupancy, bytes in flight,
+and warm-cache testing. Memory bandwidth must identify its storage level; summed
+task durations are not exclusive physical-unit utilization. Hardware rooflines
+in the Blackwell article differ from the dashboard's empirical Pareto envelopes.
+
 These are editorial definitions, not additional measurements or view API fields.
 The existing glossary search, categories, and alphabet controls only filter
 static entries. No benchmark selector, calculation, response schema, or API
@@ -182,6 +189,15 @@ hardware-results feed, not a glossary export. Use the existing view contracts fo
 measured data rather than treating an example formula as a measured result.
 
 ## Historical editorial articles
+
+`/blog/huawei-deepseek` (October 21, 2026) and
+`/blog/dissecting-nvidia-blackwell-tensor` (March 31, 2026), with matching `/zh`
+routes, preserve the two newsletters' public sections and 24/27 figures.
+Subscriber continuations remain at the original publications, not in local
+pages, feeds, or APIs. Editorial notes label the Huawei release-timeline
+inconsistency and the Blackwell arithmetic and bytes/KiB discrepancies without
+silently changing the historical claims. These static articles and glossary
+definitions add no benchmark fields, selectors, calculations, or API schemas.
 
 `/blog/tpu-strikes-the-king` and `/zh/blog/tpu-strikes-the-king` preserve the public
 portion of the November 5, 2026 TPU AgentX newsletter, with its 25 source figures.
