@@ -18,6 +18,17 @@ export function entries(value: Json): [string, Json][] {
 export function number(value: Json): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
+/**
+ * Clip length a plan requests: its `duration_seconds`, or `frame_count / fps` for plans that
+ * request frames (Wan-style specs carry no separate nominal duration).
+ */
+export function generationDuration(generation: Json): number | null {
+  const seconds = number(at(generation, 'duration_seconds'));
+  if (seconds !== null) return seconds > 0 ? seconds : null;
+  const frames = number(at(generation, 'frame_count')),
+    fps = number(at(generation, 'fps'));
+  return frames !== null && fps !== null && frames > 0 && fps > 0 ? frames / fps : null;
+}
 export function text(value: Json): string {
   return typeof value === 'string' ? value : '';
 }

@@ -1,3 +1,4 @@
+import { acceleratorTranslations } from './glossary-accelerators-zh';
 import {
   GLOSSARY_CATEGORIES,
   type GlossaryCategory,
@@ -16,7 +17,7 @@ export const GLOSSARY_CATEGORY_LABELS_ZH: Readonly<Record<GlossaryCategory, stri
   Software: '软件栈',
 };
 
-type GlossaryTranslation = Pick<
+export type GlossaryTranslation = Pick<
   GlossaryEntry,
   | 'term'
   | 'aliases'
@@ -31,6 +32,7 @@ type GlossaryTranslation = Pick<
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
+  ...acceleratorTranslations,
   'decode-megakernel': {
     term: 'Decode megakernel',
     aliases: ['megakernel', '整模型融合 kernel', 'MonoKernel'],
@@ -307,7 +309,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '稀疏访问使大型参数表具备 offload 到 DRAM 的条件。在推理时移除表会改变已经训练好的模型，因此消融不能代替对分别训练、质量匹配的架构进行比较。',
     benchmarkContext:
-      '文章中的 DeepSeek-V4.1-Flash 配置约有 189 GiB 的 Engram 内存占用。DRAM 与 SSD 对比保留了 Engram 功能，只改变服务路径；消融实验回答的则是另一类模型质量问题。',
+      '文章中的 DeepSeek-V4.1-Flash 配置约有 189 GiB 的 Engram 内存占用。DRAM 与 SSD 对比保留了 Engram 功能，只改变服务路径；消融实验回答的则是另一类模型质量问题。Huawei profile 讨论了在第 0 层计算期间，根据 token ID 获取 Engram 数据。DRAM 传输能被隐藏的结果依赖这一调度；较慢的 PCIe SSD 路径可能暴露传输延迟，无法保持相同步骤耗时。',
   },
   'n-gram-embedding': {
     term: 'N-gram embedding',
@@ -860,7 +862,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '加速取决于草稿 token 的接受数量，以及草稿与验证成本。稠密模型和 MoE 的表现可能不同，因为验证多个位置可能激活更多专家权重。',
     benchmarkContext:
-      '在固定序列场景中，投机解码属于曲线标识的一部分，因此启用和未启用 MTP 的测试配置会分别绘制。Agentic 曲线则将投机解码作为数据点级元数据，并将这些点合并到同一条曲线中；每个提示框仍会注明具体方式。这是因为 AgentX 按模型、芯片 SKU 和引擎展示可达到的最佳曲线。由于 AgentX 回放使用合成内容，speculator 接受的 draft token 数并不具有代表性，因此运行时会使用从外部 agentic 编码数据集采集的接受长度，并按模型、speculator、draft 长度和思考模式分别配置。',
+      '在固定序列场景中，投机解码属于曲线标识的一部分，因此启用和未启用 MTP 的测试配置会分别绘制。Agentic 曲线则将投机解码作为数据点级元数据，并将这些点合并到同一条曲线中；每个提示框仍会注明具体方式。这是因为 AgentX 按模型、芯片 SKU 和引擎展示可达到的最佳曲线。由于 AgentX 回放使用合成内容，speculator 接受的 draft token 数并不具有代表性，因此运行时会使用从外部 agentic 编码数据集采集的接受长度，并按模型、speculator、draft 长度和思考模式分别配置。Huawei 执行 profile 区分 DSpark drafting、顺序 token 采样和目标模型验证。Draft block 看起来较短，不能单独证明整个步骤的收益；实际 decode 进度取决于接受的 token 数和全部依赖工作。',
   },
   'multi-token-prediction': {
     term: '多 token 预测',
@@ -998,7 +1000,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '已经在等待内存的 kernel 不会因更多 tensor-core FLOPS 自动加速。量化、批处理、缓存压缩和专家分片可通过减少字节或摊薄权重读取改善性能。',
     benchmarkContext:
-      '可谨慎结合并发曲线判断性能区间：小批次可能受启动或带宽限制，大批次则提高算术强度并接近计算饱和。',
+      '可谨慎结合并发曲线判断性能区间：小批次可能受启动或带宽限制，大批次则提高算术强度并接近计算饱和。应注明测量路径和字节统计口径。Blackwell 文章区分 DRAM 带宽、SMEM 填充吞吐量和 L2 流量；multicast 可将同一输入交付给多个目标，不必为每个交付字节都重新读取 HBM。',
   },
   nvlink: {
     term: 'NVLink',
@@ -1111,7 +1113,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '稀疏注意力可让超长上下文变得可行，但理论稀疏不保证快速推理；索引构建、不规则访问、kernel 融合和精度支持决定实际收益。',
     benchmarkContext:
-      'InferenceX 跟踪 GLM-5 与 DeepSeek-V4 等模型专用稀疏注意力栈。支持快速变化，因此引擎版本与后端选择是结果的一部分。',
+      'InferenceX 跟踪 GLM-5 与 DeepSeek-V4 等模型专用稀疏注意力栈。支持快速变化，因此引擎版本与后端选择是结果的一部分。在 Ascend 上，被选中的 KV 数据仍须按适合硬件的布局读取。若对齐、传输粒度和索引处理带来额外工作，减少参与注意力的 token 数并不自动等于最小化实际传输量。',
   },
   cuda: {
     term: 'CUDA',
@@ -1424,7 +1426,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '直接看一团原始数据点容易挑选有利结果，因为调优不佳的配置也会贡献一些运营方绝不会选择的点。包络线展示的是每套系统可达的边界，而容量决策正是依据这个形状做出的。',
     benchmarkContext:
-      '这与 HPC 中经典的 roofline 模型不同：后者把可达 FLOPS 与算术强度放在一起，用于判断计算受限还是访存受限，仪表板只借用了“上界”这一图形表达。roofline 方向按指标配置，因此同一批数据点在不同坐标轴下会得到不同的包络。',
+      '这与 HPC 中经典的 roofline 模型不同：后者把可达 FLOPS 与算术强度放在一起，用于判断计算受限还是访存受限，仪表板只借用了“上界”这一图形表达。roofline 方向按指标配置，因此同一批数据点在不同坐标轴下会得到不同的包络。Blackwell 微基准测试文章使用的是经典硬件 roofline，其中包含 shared memory 带宽斜率。这种指令级上限不同于仪表板根据实测点绘制的 Pareto 包络。',
   },
   'arithmetic-intensity': {
     term: '算术强度',
@@ -1436,7 +1438,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '两个阶段受限于芯片的不同部分，这解释了为什么峰值 FLOPS 亮眼的规格书在 decode 上可能令人失望，也解释了 batching 为何有效：把多条序列合并会提高算术强度，因为每次权重读取被更多 token 复用。',
     benchmarkContext:
-      '这一区别解释了数据中反复出现的形态。低交互性的点跑大 batch、算术强度高，接近计算上限；高交互性一端跑小 batch，跟随显存带宽，因此带宽更充裕的硬件常常在这里胜出，尽管其峰值吞吐量更低。',
+      '这一区别解释了数据中反复出现的形态。低交互性的点跑大 batch、算术强度高，接近计算上限；高交互性一端跑小 batch，跟随显存带宽，因此带宽更充裕的硬件常常在这里胜出，尽管其峰值吞吐量更低。引用每字节 FLOPs 时应注明存储边界：HBM、L2 和 SMEM 流量对应不同运算强度。即使按 HBM 计算显示复用充分，Blackwell 某些 MMA 形状仍可能受 SMEM 限制。',
   },
   'prefix-cache-hit-rate': {
     term: '前缀缓存命中率',
@@ -1543,7 +1545,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '在长上下文服务中，这往往比压缩权重更划算，因为高并发下最先耗尽显存的是缓存而不是权重。不同模型对精度的敏感度不同，量化 key 还是 value 也有差别，因此需要实测评估而不能一概而论。',
     benchmarkContext:
-      '缓存精度属于测试配置的一部分，实践中还存在混合布局：有些模型会保留两份位宽不同的缓存缓冲区，分离式传输路径必须把它们成对搬运。阅读显存容量相关的结论时，请连同其背后的缓存格式一起看。',
+      '缓存精度属于测试配置的一部分，实践中还存在混合布局：有些模型会保留两份位宽不同的缓存缓冲区，分离式传输路径必须把它们成对搬运。阅读显存容量相关的结论时，请连同其背后的缓存格式一起看。Huawei profile 展示了 vector 相关路径上的量化工作，以及融合生产者与消费者边界的机会。评估缓存字节数减少的收益时，还须考虑转换成本、布局要求和经过验证的数值质量。',
   },
   'sliding-window-attention': {
     term: '滑动窗口注意力',
@@ -1640,7 +1642,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '由于后端是被选择而不是固定的，kernel 的可用性就变成了可移植性问题。只为某一家厂商后端实现的功能，会让另一方退回通用路径；而在长上下文下，这不是小小的妥协，而是选错了 kernel。',
     benchmarkContext:
-      '所使用的后端属于测试配置的一部分，改动它可以在硬件和引擎版本都不变的情况下推动曲线变化。正是这些 kernel 支持了循环状态的检查点，混合模型才得以参与前缀复用。',
+      '所使用的后端属于测试配置的一部分，改动它可以在硬件和引擎版本都不变的情况下推动曲线变化。正是这些 kernel 支持了循环状态的检查点，混合模型才得以参与前缀复用。Blackwell 文章参考 FlashInfer 注意力 kernel 选择 copy 测试配置，并区分 TMA 与 LDGSTS 路径。部分实现分析明确来自二进制推测，并非公开 kernel 源码已证实的事实。',
   },
   'cuda-graphs': {
     term: 'CUDA graph',
@@ -1693,7 +1695,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '瓶颈资源决定了哪个硬件规格才重要。decode 的访存受限特性解释了为什么每次加速器发布都把 HBM 容量和带宽放在标题上，为什么量化通过减少搬运字节数来加速 decode，以及为什么算力一般但内存很快的芯片能在交互式服务中获胜。',
     benchmarkContext:
-      'InferenceX 对并发做扫描，让系统在两种状态之间移动：低并发 decode 受带宽限制，高并发批处理则推向计算极限。每条吞吐量对交互性曲线的形状，反映了该配置发生状态切换的位置。',
+      'InferenceX 对并发做扫描，让系统在两种状态之间移动：低并发 decode 受带宽限制，高并发批处理则推向计算极限。每条吞吐量对交互性曲线的形状，反映了该配置发生状态切换的位置。内存瓶颈可能位于 SM 内，而不是 HBM。Blackwell 的 SS 与 TS MMA 对比改变了操作数位置，因此分析不同吞吐上限时必须区分存储层级，不能只对比 HBM 峰值带宽与峰值 FLOPs。',
   },
   'gpu-utilization': {
     term: 'GPU 利用率',
@@ -1707,7 +1709,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '集群经济性取决于利用率。批处理和调度做得好的部署与朴素部署之间，同样硬件上每 token 成本常常相差数倍，这正是推理软件和请求路由与芯片本身同样受重视的原因。',
     benchmarkContext:
-      'InferenceX 报告每个交互性水平下每颗芯片的实际交付吞吐量而非利用率百分比，因此引擎、精度和并行方案之间的利用率差异，会直接表现为同一硬件上曲线之间的间距。',
+      'InferenceX 报告每个交互性水平下每颗芯片的实际交付吞吐量而非利用率百分比，因此引擎、精度和并行方案之间的利用率差异，会直接表现为同一硬件上曲线之间的间距。Huawei profile 分别报告 stream 占用时间和任务耗时之和。Stream 重叠及混合任务类型，使这些耗时不能被解读为物理 Cube 或 vector 的独占利用率。Warp 占用率又是另一种指标。',
   },
   'continuous-batching': {
     term: '连续批处理',
@@ -2021,7 +2023,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '块缩放是 FP4 推理世代背后的关键思想：没有每块缩放，4 位浮点对前沿模型根本不可用。缩放格式和块大小的选择，如今是硬件厂商与量化方案之间真正的差异化点。',
     benchmarkContext:
-      'InferenceX 在 Blackwell 和 MI355X 覆盖中的 NVFP4 与 MXFP4 结果都是块缩放格式，精度对比页面很大程度上就是为了展示这些配置相对同硬件 FP8 基线的得失。',
+      'InferenceX 在 Blackwell 和 MI355X 覆盖中的 NVFP4 与 MXFP4 结果都是块缩放格式，精度对比页面很大程度上就是为了展示这些配置相对同硬件 FP8 基线的得失。Blackwell 文章在匹配形状下比较 micro-scaling 与其他指令格式。饱和吞吐量接近，不代表单条指令延迟相同；指令级结果也不能验证模型量化后的准确性。',
   },
   'flash-attention': {
     term: 'FlashAttention',
@@ -2063,7 +2065,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'CUTLASS 是 NVIDIA 教生态使用每一代新 tensor core 的地方，包括 Blackwell 上的 FP4 和 FP8 路径。其模式向引擎扩散的速度，是新芯片多快达到宣称性能的真实变量。',
     benchmarkContext:
-      'InferenceX 在 NVIDIA 硬件上的结果背后，GEMM 和注意力 kernel 大量源于 CUTLASS 衍生代码，引擎镜像里这些库的版本升级是平台追踪到的曲线逐日变化的常见来源。',
+      'InferenceX 在 NVIDIA 硬件上的结果背后，GEMM 和注意力 kernel 大量源于 CUTLASS 衍生代码，引擎镜像里这些库的版本升级是平台追踪到的曲线逐日变化的常见来源。Blackwell 文章通过 CuTe MMA traits 和首选、回退 cluster 示例解释执行作用域与 launch 放置。公开部分在订阅者专享的 CUTLASS 实践讨论前结束，术语链接不会转载后续付费内容。',
   },
   nccl: {
     term: 'NCCL',
@@ -2092,7 +2094,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'GEMM 效率是行业里一切性能主张的地基。在真实服务形状下，尤其是 decode 的细长矩阵上，实际交付与峰值 GEMM 吞吐量的差距，解释了规格表比例为何预测不了基准测试排名。',
     benchmarkContext:
-      'InferenceX 每条曲线背后都是来自 CUTLASS、hipBLASLt 和 Triton 生成代码的 GEMM kernel 堆栈，量化配置最终也站在各厂商在其调度器产生的形状上执行低精度 GEMM 的能力之上。',
+      'InferenceX 每条曲线背后都是来自 CUTLASS、hipBLASLt 和 Triton 生成代码的 GEMM kernel 堆栈，量化配置最终也站在各厂商在其调度器产生的形状上执行低精度 GEMM 的能力之上。Blackwell 指令测试表明，tile 形状、操作数位置和在途 MMA 数量会改变可达吞吐量。饱和指令流没有包含完整 GEMM kernel 的部分 load、同步和 epilogue 成本。',
   },
   'kernel-fusion': {
     term: 'Kernel 融合',
@@ -2106,7 +2108,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '在访存受限的推理中，消除中间流量比提升原始算术能力更值钱，因此融合是引擎手中最可靠的杠杆之一。引擎版本间的提速，很大一部分可以归结为更激进或更精准的融合。',
     benchmarkContext:
-      'InferenceX 配置钉住的引擎镜像在不同版本和硬件后端上的融合 kernel 构成不同，这是逐日追踪中硬件不变而曲线移动的常见原因：面向新模型和新精度的融合 kernel 落地了。',
+      'InferenceX 配置钉住的引擎镜像在不同版本和硬件后端上的融合 kernel 构成不同，这是逐日追踪中硬件不变而曲线移动的常见原因：面向新模型和新精度的融合 kernel 落地了。Huawei profile 将反复出现的量化边界视为融合机会。移除边界可能减少流量或 launch，但新增存储压力与依赖也可能降低重叠程度，因此被消除任务的耗时之和不等于有保证的步骤耗时节省。',
   },
   tpu: {
     term: 'TPU（张量处理单元）',

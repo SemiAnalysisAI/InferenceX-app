@@ -135,7 +135,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_legend: '',
   i_advlabel: '',
   i_conclabel: '',
-  i_offloadlabel: '1',
+  i_offloadlabel: '0',
   i_frameworklabel: '1',
   i_gradlabel: '',
   i_frontier: '',

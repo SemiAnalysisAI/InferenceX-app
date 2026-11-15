@@ -173,6 +173,13 @@ The TPU AgentX follow-up adds `decode-megakernel`, `kernel-launch-overhead`,
 storage does not imply native FP4 arithmetic. The TPU, TorchTPU, TPU-Sync, and
 llm-d entries distinguish the September preview from the November AgentX results.
 
+The Huawei and Blackwell ports add accelerator execution and microbenchmark
+terminology: Ascend/CANN, Cube/vector cores, TileLang, DeepGEMM/DeepEP, URMA,
+SM/GPC/CTA clusters, PTX/SASS, TMEM/TMA, multicast, MMA, occupancy, bytes in flight,
+and warm-cache testing. Memory bandwidth must identify its storage level; summed
+task durations are not exclusive physical-unit utilization. Hardware rooflines
+in the Blackwell article differ from the dashboard's empirical Pareto envelopes.
+
 These are editorial definitions, not additional measurements or view API fields.
 The existing glossary search, categories, and alphabet controls only filter
 static entries. No benchmark selector, calculation, response schema, or API
@@ -182,6 +189,15 @@ hardware-results feed, not a glossary export. Use the existing view contracts fo
 measured data rather than treating an example formula as a measured result.
 
 ## Historical editorial articles
+
+`/blog/huawei-deepseek` (October 21, 2026) and
+`/blog/dissecting-nvidia-blackwell-tensor` (March 31, 2026), with matching `/zh`
+routes, preserve the two newsletters' public sections and 24/27 figures.
+Subscriber continuations remain at the original publications, not in local
+pages, feeds, or APIs. Editorial notes label the Huawei release-timeline
+inconsistency and the Blackwell arithmetic and bytes/KiB discrepancies without
+silently changing the historical claims. These static articles and glossary
+definitions add no benchmark fields, selectors, calculations, or API schemas.
 
 `/blog/tpu-strikes-the-king` and `/zh/blog/tpu-strikes-the-king` preserve the public
 portion of the November 5, 2026 TPU AgentX newsletter, with its 25 source figures.
@@ -388,8 +404,8 @@ there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
 annotations are independent presentation controls, not data filters. Both
 Agentic and fixed-sequence charts default to line labels on and point labels off;
-Parallelism Labels is outside Advanced. Advanced's default-on Offloading Label
-uses `i_offloadlabel=0` to hide the dotted-circle “KV offload ON” footer key and
+Parallelism Labels is outside Advanced. Advanced's default-off Offloading Label
+uses `i_offloadlabel=1` to show the dotted-circle “KV offload ON” footer key and
 the dotted point halos, including in chart exports. It does not remove official,
 historical, or unofficial points or benchmark rows. These controls have no
 read-only API parameters; offload fields
@@ -1026,12 +1042,13 @@ they add no API selectors and change no metrics or official/unofficial membershi
 qualified approved evidence or the exact named diagnostic run is available; the
 same canonical workload and sample floor apply. `r_hidden=h100` hides its results
 and clips. Dismissing an unapproved H100 run removes its slot unless approved H100
-evidence remains. An older H100 workload does not qualify a newer workload.
+evidence remains. An older H100 workload does not qualify a newer workload. B300 has
+no default slot; it appears only with qualified evidence or the named run.
 
 | UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                                                                                                                                                            |
-| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value, not decoded output duration. No mode inferred from model names.                                                                                                                                                                                                                              |
+| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value (`duration_seconds`, or `frame_count ÷ fps` for frame-count plans), not decoded output duration. No mode inferred from model names.                                                                                                                                                           |
 | Engine, execution date            | `r_engine`, `r_date`                                 | Recorded engine and as-of execution date. All GPU counts are included.                                                                                                                                                                                                                                                                                      |
 | X metric                          | `r_x`                                                | `p50` (default) or `p90` per-clip latency, or `gpus` (participating GPUs per deployment, log axis). Presentation only; the GPU axis keeps the median-latency frontier and Best engine, and Chip config history plots median latency for `gpus`.                                                                                                             |
 | Fixed overview settings           | `r_gpus`, `r_basis` (deprecated)                     | Accepted but ignored: `params.gpuCount=null`, `params.costBasis=participating`. New share/export URLs omit these keys.                                                                                                                                                                                                                                      |

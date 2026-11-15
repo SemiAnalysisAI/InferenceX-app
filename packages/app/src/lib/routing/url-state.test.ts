@@ -74,6 +74,17 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
 
+  it('defaults offloading labels off and preserves the on override in share links', async () => {
+    setupWindow('?i_offloadlabel=1');
+    const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =
+      await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.i_offloadlabel).toBe('0');
+    expect(readUrlParams().i_offloadlabel).toBe('1');
+    expect(new URL(buildShareUrl()).searchParams.get('i_offloadlabel')).toBe('1');
+    writeUrlParams({ i_offloadlabel: '0' });
+    expect(new URL(buildShareUrl()).searchParams.has('i_offloadlabel')).toBe(false);
+  });
+
   it('defaults framework labels on and preserves only the off override in share links', async () => {
     setupWindow('?i_frameworklabel=0');
     const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =

@@ -247,7 +247,16 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
   });
 
-  it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
+  it('defaults offloading labels off and restores the opt-in from share links', () => {
+    expandLegendAdvanced();
+    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading label');
+    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked');
+    cy.get('[data-testid="offload-halo-key"]').should('not.exist');
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points).to.have.length.at.least(1);
+      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
+    });
+    cy.get('#scatter-offloading-label').click();
     cy.get('#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload on');
@@ -257,21 +266,11 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       expect(halos).to.be.lessThan(points.length);
     });
 
-    cy.get(
-      '#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]',
-    ).should('be.visible');
-    expandLegendAdvanced();
-    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading label');
-    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked').click();
-    cy.get('[data-testid="offload-halo-key"]').should('not.exist');
-    cy.scatterPoints('#chart-0').should((points) => {
-      expect(points).to.have.length.at.least(1);
-      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
-    });
+    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="share-button"]').click();
     cy.get('[data-testid="share-url-input"]')
       .invoke('val')
-      .should('contain', 'i_offloadlabel=0')
+      .should('contain', 'i_offloadlabel=1')
       .then((url) => {
         interceptAgenticData();
         interceptDerivedAgenticMetrics();
@@ -279,15 +278,14 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       });
     expandLegendAdvanced();
     cy.scatterPoints('#chart-0').should((points) => {
-      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
-    });
-    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked').click();
-    cy.scatterPoints('#chart-0').should((points) => {
       expect(points.filter((point) => point.halo !== null)).to.have.length.at.least(1);
     });
-    cy.get(
-      '#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]',
-    ).should('be.visible');
+    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked').click();
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points).to.have.length.at.least(1);
+      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
+    });
+    cy.get('[data-testid="offload-halo-key"]').should('not.exist');
     cy.get('[data-testid="share-button"]').click();
     cy.get('[data-testid="share-url-input"]')
       .invoke('val')
@@ -681,11 +679,8 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
-    cy.get('#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]')
-      .should('be.visible')
-      .and('contain.text', 'KV offload on');
     expandLegendAdvanced();
-    cy.get('#scatter-offloading-label').click();
+    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked');
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
     cy.get('#chart-0 .offload-halo').should('not.exist');
     cy.scatterPoints('#chart-0').should((points) => {

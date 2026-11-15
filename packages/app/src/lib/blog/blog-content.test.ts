@@ -46,6 +46,85 @@ function localImageRefs(raw: string): string[] {
 
 const countMathFences = (raw: string) => (raw.match(/^\$\$\s*$/gmu) ?? []).length;
 
+describe.each([
+  { slug: 'huawei-deepseek', date: '2026-10-21', figures: 24, author: 'Bryan Shan' },
+  {
+    slug: 'dissecting-nvidia-blackwell-tensor',
+    date: '2026-03-31',
+    figures: 27,
+    author: 'Kimbo Chen',
+  },
+])('accelerator newsletter port: $slug', ({ slug, date, figures, author }) => {
+  it.each(['en', 'zh'])(
+    'keeps attribution, public boundaries, and local figures in %s',
+    async (locale) => {
+      const raw = read(path.join(locale === 'en' ? CONTENT_DIR : ZH_DIR, `${slug}.mdx`));
+      expect(frontmatterField(raw, 'date')).toBe(`'${date}'`);
+      expect(frontmatterField(raw, 'publishDate')).toBe(`'${date}'`);
+      expect(raw).toContain(author);
+      expect(raw).toContain('Dylan Patel');
+      expect(raw).toContain(`https://newsletter.semianalysis.com/p/${slug}`);
+      expect(raw).toContain(locale === 'en' ? 'subscriber-only continuation' : '订阅者专享');
+      expect(raw).toContain(locale === 'en' ? 'The public excerpt ends here' : '公开部分到此结束');
+      expect(raw).not.toMatch(/(?:FIGURE|CODE)TOKEN\d+END/u);
+      const blocks = [...raw.matchAll(/<Figure\b[\s\S]*?\/>/gu)].map(([block]) => block);
+      expect(blocks).toHaveLength(figures);
+      expect(new Set(localImageRefs(raw)).size).toBe(figures);
+      expect(
+        localImageRefs(raw)
+          .map((ref) => path.basename(ref))
+          .toSorted(),
+      ).toEqual(
+        fs
+          .readdirSync(path.join(PUBLIC_DIR, 'images', slug))
+          .filter((file) => file.endsWith('.png'))
+          .toSorted(),
+      );
+      for (const block of blocks) {
+        expect(block).toMatch(/alt="[^"]+"/u);
+        expect(block).toMatch(/caption="[^"]*https:\/\//u);
+      }
+      const { content } = await compileMDX({
+        source: raw,
+        options: { parseFrontmatter: true },
+        components: { Figure: () => null },
+      });
+      expect(renderToStaticMarkup(content)).toContain(
+        locale === 'en' ? 'Related glossary' : '相关术语',
+      );
+    },
+  );
+
+  it('retains the source-specific caveats instead of upgrading claims', () => {
+    const en = read(path.join(CONTENT_DIR, `${slug}.mdx`));
+    const zh = read(path.join(ZH_DIR, `${slug}.mdx`));
+    if (slug === 'huawei-deepseek') {
+      expect(en).toContain('unverified DeepSeek investor meeting transcript');
+      expect(en).toContain('composition scenario, not a prediction');
+      expect(en).toContain('mixed drafting dates');
+      expect(en).toContain('warm-cache simple and naive benchmark');
+      expect(zh).toContain('未经证实');
+      for (const raw of [en, zh]) {
+        expect(raw).toContain('88.8%');
+        expect(raw).toContain('72.6%');
+        expect(raw).toContain('1.32');
+        expect(raw).not.toContain('http://deepep-ascend');
+        expect(raw.match(/```/gu)).toHaveLength(4);
+      }
+    } else {
+      expect(en).toContain('Dividing 262144 by 16384 gives 16; 8192 gives 32');
+      expect(en).toContain('source units should not be treated as verified precise thresholds');
+      expect(zh).toContain('262144 除以 16384 等于 16');
+      expect(zh).toContain('图的横轴单位是 KiB');
+      for (const raw of [en, zh]) {
+        expect(raw).toContain('`Math Cycles = FLOPs / (16384 FLOPs/clk) = 32 cycles`');
+        expect(raw).toContain('1024');
+        expect(raw).toContain('78%');
+      }
+    }
+  });
+});
+
 it('checks every current locale pair in both directions', () => {
   expect(enFiles.length).toBeGreaterThan(0);
   expect(zhFiles).toEqual(enFiles);

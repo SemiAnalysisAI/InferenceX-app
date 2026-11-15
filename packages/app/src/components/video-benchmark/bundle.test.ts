@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   at,
+  generationDuration,
   estimateEconomics,
   httpReader,
   loadBundle,
@@ -183,3 +184,14 @@ it.skipIf(!process.env.H3_ARTIFACT_DIR)(
     }
   },
 );
+
+describe('generationDuration', () => {
+  it('prefers the nominal duration and falls back to frame_count / fps', () => {
+    expect(generationDuration({ duration_seconds: 5, frame_count: 124, fps: 24 })).toBe(5);
+    expect(generationDuration({ frame_count: 81, fps: 16 })).toBe(5.0625);
+    expect(generationDuration({ duration_seconds: 0, frame_count: 81, fps: 16 })).toBeNull();
+    expect(generationDuration({ frame_count: 81 })).toBeNull();
+    expect(generationDuration({ frame_count: 81, fps: 0 })).toBeNull();
+    expect(generationDuration(null)).toBeNull();
+  });
+});
