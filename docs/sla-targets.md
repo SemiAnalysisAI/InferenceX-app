@@ -14,16 +14,17 @@ interactivity limits used elsewhere on the dashboard.
 
 ## Where the code lives
 
-| Piece                                                                       | Location                                                                                                                                |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Evaluation library: accounting, exact evaluation, qualification, selections | `packages/constants/src/sla-targets.ts`                                                                                                 |
-| Adapter from the original AgentX export, harness log and aggregate          | `packages/db/src/etl/sla-attempts.ts`                                                                                                   |
-| Storage, ingest wiring, backfill                                            | `packages/db/migrations/030_sla_attempts.sql`, `packages/db/src/etl/trace-replay-ingest.ts`, `packages/db/src/backfill-sla-attempts.ts` |
-| Reads                                                                       | `packages/db/src/queries/sla-targets.ts`                                                                                                |
-| Dataset, server evaluation, view                                            | `packages/app/src/lib/sla-targets/`                                                                                                     |
-| Routes                                                                      | `GET /api/v1/sla-targets`, `GET /api/v1/sla-evaluations`                                                                                |
-| Page                                                                        | `packages/app/src/components/sla-targets/`                                                                                              |
-| Captured fixture                                                            | `packages/app/scripts/capture-sla-targets-fixtures.ts`                                                                                  |
+| Piece                                                                       | Location                                                                                                                                        |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evaluation library: accounting, exact evaluation, qualification, selections | `packages/constants/src/sla-targets.ts`                                                                                                         |
+| Adapter from the original AgentX export, harness log and aggregate          | `packages/db/src/etl/sla-attempts.ts`                                                                                                           |
+| Storage, ingest wiring, backfill                                            | `packages/db/migrations/030_sla_attempts.sql`, `packages/db/src/etl/trace-replay-ingest.ts`, `packages/db/src/backfill-sla-attempts.ts`         |
+| Fixed-sequence request records: adapter, storage, ingest                    | `packages/db/src/etl/sla-attempts.ts`, `packages/db/migrations/031_benchmark_sla_attempts.sql`, `packages/db/src/etl/request-records-ingest.ts` |
+| Reads                                                                       | `packages/db/src/queries/sla-targets.ts`                                                                                                        |
+| Dataset, server evaluation, view                                            | `packages/app/src/lib/sla-targets/`                                                                                                             |
+| Routes                                                                      | `GET /api/v1/sla-targets`, `GET /api/v1/sla-evaluations`                                                                                        |
+| Page                                                                        | `packages/app/src/components/sla-targets/`                                                                                                      |
+| Captured fixture                                                            | `packages/app/scripts/capture-sla-targets-fixtures.ts`                                                                                          |
 
 ## Measurement contract
 
@@ -240,7 +241,7 @@ its harness log reconciles exactly:
 | Already stored, after `db:backfill-sla-attempts` (export only)                | Explicit                           | Lower bound | Exploratory: observed values, no verdict, not ranked.                                                             |
 | Already stored, before the backfill, or before migration 030 is applied       | Inferred from the derived timeline | Unknown     | Exploratory. A request with a TTFT is taken as completed; one without is `unknown`, neither a failure nor a pass. |
 | Already stored, artifacts still on GitHub (90 days)                           | Explicit                           | Recoverable | A verdict once its harness counters are attached. No tool does this for an existing row yet; see open items.      |
-| Fixed-sequence, any date                                                      | None per request                   | None        | Insufficient data: no request-level data.                                                                         |
+| Fixed-sequence, run without a `request_records` block (every run so far)      | None per request                   | None        | Insufficient data: no request-level data.                                                                         |
 
 The page never shows an unqualified "Meets target" for a point whose dispatched attempts cannot
 be established.
@@ -261,6 +262,11 @@ warmup artefacts) and carries neither the issued count nor the cutoff count.
    the export each row already holds. It writes only the three new columns.
 4. **Before 1 to 3**, the routes work unchanged: they detect that the column is absent and
    evaluate from the derived timeline, exploratory.
+
+Order matters for AgentX: the ingest change writes the three new columns, so migration 030 has to
+be applied before that code ingests into a database. Migration 031 (fixed-sequence, below) has no
+such constraint; ingest checks for its table and leaves the blocks in the artifacts when it is
+missing.
 
 The attempt data holds no policy decision, so a policy change needs no re-ingest.
 
@@ -283,11 +289,52 @@ GitHub keeps artifacts for 90 days, so the run list has to be refreshed over tim
 
 ## Fixed-sequence workloads
 
-Fixed-sequence runs store aggregates only today, so every fixed-sequence point reads
-"Insufficient data: no request-level data". The library already types their load as a
-request-concurrency limit. Retaining per-request records for future runs is a separate change to
-the benchmark client and to ingest; historical fixed-sequence runs cannot be evaluated and do
-not need to be rerun for the AgentX view to work.
+No fixed-sequence run so far kept per-request data, so every fixed-sequence point reads
+"Insufficient data: no request-level data". Historical runs cannot be evaluated and do not need
+to be rerun for the AgentX view to work. What exists is the path that retains the data for future
+runs.
+
+**Producer.** A change to the fixed-sequence client in the benchmark repository (branch
+`feat/fixed-seq-request-records`, not merged, never run on hardware) adds a `request_records`
+block to each result row: one entry per measured attempt with its outcome, TTFT, TPOT and
+end-to-end latency, the counts the client kept (requested, dispatched, completed, failed by
+class, warmup, retries), its measurement window, and what the load setting means.
+
+**Ingest.** `mapBenchmarkRow` carries the block; `slaAttemptsFromRequestRecords` adapts it into
+the same attempt data the AgentX export yields; `ingestRequestRecords` stores it in
+`benchmark_sla_attempts` (migration 031, written and not applied) keyed by the benchmark point.
+Rules:
+
+- The outcome column decides. Only `completed` is a completion; a failed attempt that streamed
+  tokens first keeps its TTFT in the block and is still a failure. An outcome name this code
+  does not know is a failure.
+- A completed attempt with fewer than two output tokens has no TPOT. Policy choice: it is stored
+  as "not applicable" and the TPOT target does not apply to it, the same rule as for AgentX and
+  the same result as the client's own goodput path, which treats that TPOT as 0. The alternative
+  is to count it as not passing. Sweeps force full-length outputs, so the case should not occur.
+- The window is count-bound: it ends when the last requested attempt returns. Nothing is cut
+  off, there is no grace period, and the duration is the client's own
+  (`durationSource: client_reported`). The configured-window time base of the AgentX policy has
+  nothing to read here, and the result says which duration it used.
+- The load is stored as `request_concurrency`: a limit on requests in flight. It is refused when
+  the block names any other kind.
+- Above 200,000 attempts the producer omits the per-attempt columns from the aggregate. The
+  point is then stored with `unavailable_reason = 'columns_omitted'`; counts alone cannot
+  evaluate a latency target. An unknown schema version, an unknown load kind, or a block that
+  contradicts its own counts is stored with its reason the same way, never read on a guess.
+- The three top-level values that repeat the block (`duration`, `completed`,
+  `request_throughput`) are not stored as metrics.
+
+**Limits.**
+
+- A point with more than 5% failed requests fails its job, and the job uploads no result row,
+  so ingest never sees it. The row and its block still exist in the job's `power_audit_*`
+  artifact; nothing reads them from there yet.
+- The comparison page lists AgentX configurations only. Reading `benchmark_sla_attempts` into
+  the view is left until an approved run has produced real blocks to check it against.
+- `benchmark_sla_attempts` is not in the public-database sync's table list.
+- The adapter is tested against one synthetic sample (the client run against a local fake
+  server, no model and no GPU), stored as a test fixture and never shown as a result.
 
 ## Not covered
 

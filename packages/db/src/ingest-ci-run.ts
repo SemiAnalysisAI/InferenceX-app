@@ -64,6 +64,7 @@ import {
   bulkUpsertAvailability,
   insertServerLogFilePaths,
 } from './etl/benchmark-ingest';
+import { ingestRequestRecords, logRequestRecordsIngest } from './etl/request-records-ingest';
 import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
   resolveTraceReplayWorkerCount,
@@ -722,6 +723,7 @@ async function main(): Promise<void> {
           totalDupBmk += dupCount;
           report.counts.benchmark.new += newCount;
           report.counts.benchmark.duplicate += dupCount;
+          logRequestRecordsIngest('    ', await ingestRequestRecords(sql, toInsert, workflowRunId));
           if (requiredPower) retainedPowerPoints.push(...toInsert);
 
           for (const r of toInsert) {

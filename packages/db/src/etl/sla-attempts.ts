@@ -1,7 +1,9 @@
 /**
- * Per-attempt data for SLA Targets, built from an original AgentX export.
+ * Per-attempt data for SLA Targets, built from what the benchmark client
+ * itself recorded: an original AgentX export, or the `request_records` block
+ * of a fixed-sequence result (see `slaAttemptsFromRequestRecords`).
  *
- * Inputs are the files the load generator writes for one load point:
+ * AgentX inputs are the files the load generator writes for one load point:
  * - `profile_export.jsonl`: one record per attempt that returned.
  * - the harness log (`aiperf.log`, or the same lines in `benchmark.log`): the
  *   only place that states how many requests were issued and how many were
@@ -39,10 +41,17 @@ const CLIENT_CANCELLATION_ERROR = 'RequestCancellationError';
 export interface SlaAttemptsBlob {
   version: number;
   source: {
-    /** `original_export`: built from the client's own records. `derived_timeline`: from the app's timeline. */
-    kind: 'original_export' | 'derived_timeline';
-    /** Whether the harness log was available, and whether the phase ran to completion in it. */
-    harnessLog: 'complete' | 'aborted' | 'absent';
+    /**
+     * `original_export`: built from the AgentX client's own records.
+     * `request_records`: built from the block a fixed-sequence client writes.
+     * `derived_timeline`: from the app's timeline.
+     */
+    kind: 'original_export' | 'request_records' | 'derived_timeline';
+    /**
+     * Whether the harness log was available, and whether the phase ran to
+     * completion in it. `not_applicable`: the source states its own counts.
+     */
+    harnessLog: 'complete' | 'aborted' | 'absent' | 'not_applicable';
     /** Why the run stopped early, as the harness logged it. */
     abortReason: string | null;
     /** Issued-request ids missing below the highest id seen; `null` when records carry no id. */
@@ -478,6 +487,227 @@ export function slaAttemptsFromTimeline(requests: Iterable<TimelineAttempt>): Sl
         clientDurationS: null,
         attemptSpanS: lastEndUs > firstStartUs ? (lastEndUs - firstStartUs) / 1e6 : null,
         cutoffReached: null,
+      },
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fixed-sequence request records
+// ---------------------------------------------------------------------------
+
+/** `request_records.schema_version` values this adapter reads. */
+export const REQUEST_RECORDS_SCHEMA_VERSION = 1;
+const REQUEST_CONCURRENCY_LIMIT = 'request_concurrency_limit';
+const COMPLETED_OUTCOME = 'completed';
+const HTTP_STATUS_OUTCOME = 'http_status';
+
+/**
+ * Why a `request_records` block yields no attempt data.
+ * - `columns_omitted`: the producer left the per-attempt columns out of the
+ *   aggregate because the point exceeds its size limit; counts alone cannot
+ *   evaluate a latency target.
+ * - `unsupported_schema_version`, `unsupported_load_kind`: written by a
+ *   producer this adapter does not know; never read on a guess.
+ * - `malformed_block`: a required field is missing or the block contradicts
+ *   its own counts.
+ */
+export type RequestRecordsUnavailableReason =
+  | 'columns_omitted'
+  | 'unsupported_schema_version'
+  | 'unsupported_load_kind'
+  | 'malformed_block';
+
+export type SlaRequestRecordsResult =
+  | {
+      kind: 'attempts';
+      blob: SlaAttemptsBlob;
+      /** The load setting is a limit on requests in flight, not a user count. */
+      loadKind: 'request_concurrency';
+      /** The limit itself; `null` when the client ran without one. */
+      concurrencyLimit: number | null;
+    }
+  | { kind: 'unavailable'; reason: RequestRecordsUnavailableReason; detail: string };
+
+function plainObject(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function wholeCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function finite(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Split the `http_status` failures by status code when the per-code totals
+ * account for every one of them; the columns carry no code per attempt.
+ */
+function httpFailureClasses(total: number, byCode: unknown): [string, number][] {
+  const codes = Object.entries(plainObject(byCode) ?? {}).flatMap(([code, value]) => {
+    const amount = wholeCount(value);
+    return /^\d{3}$/u.test(code) && amount !== null && amount > 0
+      ? [[`http_${code}`, amount] as [string, number]]
+      : [];
+  });
+  const covered = codes.reduce((sum, [, amount]) => sum + amount, 0);
+  return covered === total ? codes : [[HTTP_STATUS_OUTCOME, total]];
+}
+
+function unavailable(
+  reason: RequestRecordsUnavailableReason,
+  detail: string,
+): SlaRequestRecordsResult {
+  return { kind: 'unavailable', reason, detail };
+}
+
+/**
+ * Build the attempt data of one fixed-sequence load point from the
+ * `request_records` block of its result row.
+ *
+ * - The outcome column decides: only `completed` is a completion. A failed
+ *   attempt keeps the TTFT it observed before failing, and stays a failure.
+ * - A completed attempt without a TTFT is missing telemetry, not a failure.
+ * - A completed attempt with fewer than two output tokens has no TPOT; it is
+ *   stored as not applicable, the same rule as for AgentX.
+ * - The window is count-bound: it ends when the last requested attempt
+ *   returns, so nothing is cut off, and its length is the client's own
+ *   duration. No dispatch window is configured, and none is invented.
+ * - Warmup attempts are in no column; only their count is carried.
+ */
+export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecordsResult {
+  const root = plainObject(block);
+  if (!root) return unavailable('malformed_block', 'request_records is not an object');
+  if (root.schema_version !== REQUEST_RECORDS_SCHEMA_VERSION) {
+    return unavailable(
+      'unsupported_schema_version',
+      `schema_version ${String(root.schema_version)}`,
+    );
+  }
+  const load = plainObject(root.load) ?? {};
+  if (load.max_concurrency_kind !== REQUEST_CONCURRENCY_LIMIT) {
+    return unavailable(
+      'unsupported_load_kind',
+      `max_concurrency_kind ${String(load.max_concurrency_kind)}`,
+    );
+  }
+  const counts = plainObject(root.counts) ?? {};
+  const requested = wholeCount(counts.requested);
+  const dispatched = wholeCount(counts.dispatched);
+  if (requested === null || dispatched === null || dispatched > requested) {
+    return unavailable('malformed_block', 'counts.requested or counts.dispatched is not usable');
+  }
+  const columns = plainObject(root.columns);
+  if (!columns) {
+    const omitted = plainObject(root.columns_omitted);
+    return omitted
+      ? unavailable(
+          'columns_omitted',
+          `${String(omitted.reason)}: ${String(omitted.attempts)} attempts, limit ${String(omitted.limit)}`,
+        )
+      : unavailable('malformed_block', 'neither columns nor columns_omitted');
+  }
+  const outcomes = Array.isArray(root.outcomes) ? root.outcomes : null;
+  const { outcome, ttft_ms: ttft, tpot_ms: tpot, e2el_ms: e2el, output_len: outputLen } = columns;
+  const startOffset = columns.start_offset_ms;
+  if (
+    !outcomes ||
+    ![outcome, ttft, tpot, e2el, outputLen].every(
+      (column) => Array.isArray(column) && column.length === dispatched,
+    )
+  ) {
+    return unavailable(
+      'malformed_block',
+      'a column is missing or its length is not counts.dispatched',
+    );
+  }
+  const starts =
+    Array.isArray(startOffset) && startOffset.length === dispatched
+      ? (startOffset as unknown[])
+      : null;
+
+  const rows: AttemptRow[] = [];
+  const failures = new Map<string, number>();
+  let firstStartMs = Number.POSITIVE_INFINITY;
+  let lastEndMs = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < dispatched; index += 1) {
+    const name = outcomes[(outcome as unknown[])[index] as number];
+    const e2elMs = finite((e2el as unknown[])[index]);
+    const startMs = starts === null ? null : finite(starts[index]);
+    if (startMs !== null) {
+      if (startMs < firstStartMs) firstStartMs = startMs;
+      if (e2elMs !== null && startMs + e2elMs > lastEndMs) lastEndMs = startMs + e2elMs;
+    }
+    if (name !== COMPLETED_OUTCOME) {
+      // An index outside `outcomes`, or a name this adapter has never seen, is a failure.
+      const failureClass = typeof name === 'string' && name.length > 0 ? name : 'unclassified';
+      failures.set(failureClass, (failures.get(failureClass) ?? 0) + 1);
+      continue;
+    }
+    const tpotMs = finite((tpot as unknown[])[index]);
+    const tokens = finite((outputLen as unknown[])[index]);
+    rows.push([
+      micros(finite((ttft as unknown[])[index])),
+      tpotMs === null && tokens !== null && tokens < 2 ? SLA_TPOT_NOT_APPLICABLE : micros(tpotMs),
+      micros(e2elMs),
+    ]);
+  }
+  const statedCompleted = wholeCount(counts.completed);
+  if (statedCompleted !== null && statedCompleted !== rows.length) {
+    return unavailable(
+      'malformed_block',
+      `counts.completed ${statedCompleted} but ${rows.length} completed outcomes`,
+    );
+  }
+
+  const httpFailures = failures.get(HTTP_STATUS_OUTCOME) ?? 0;
+  failures.delete(HTTP_STATUS_OUTCOME);
+  const other: SlaOutcomeCount[] = [
+    ...failures.entries(),
+    ...(httpFailures > 0 ? httpFailureClasses(httpFailures, counts.http_status) : []),
+  ]
+    .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([failureClass, amount]) => ({ outcome: 'failed', failureClass, count: amount }));
+
+  const duration = finite(plainObject(root.window)?.duration);
+  const retries = wholeCount(counts.retries);
+  return {
+    kind: 'attempts',
+    loadKind: 'request_concurrency',
+    concurrencyLimit: wholeCount(load.max_concurrency),
+    blob: {
+      version: SLA_ATTEMPTS_VERSION,
+      source: {
+        kind: 'request_records',
+        harnessLog: 'not_applicable',
+        abortReason: null,
+        sequenceGaps: null,
+        unparsedLines: 0,
+      },
+      set: { completed: completedColumns(rows), other },
+      accounting: {
+        issued: requested,
+        issuedLowerBound: dispatched,
+        skippedBeforeDispatch: requested - dispatched,
+        // Count-bound window: every dispatched attempt returns before it closes.
+        incompleteAtCutoff: 0,
+        // The client has no such rejection; an over-long prompt is an HTTP failure.
+        contextOverflowRejected: null,
+        warmupExcluded: wholeCount(counts.warmup_excluded),
+        retryAccounting: retries === 0 ? 'no_client_retries' : 'unknown',
+        outcomeSource: 'explicit',
+        timings: {
+          configuredWindowS: null,
+          graceS: null,
+          phaseElapsedS: null,
+          clientDurationS: duration !== null && duration > 0 ? duration : null,
+          attemptSpanS: lastEndMs > firstStartMs ? (lastEndMs - firstStartMs) / 1000 : null,
+          cutoffReached: false,
+        },
       },
     },
   };

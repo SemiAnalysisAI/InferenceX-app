@@ -75,6 +75,12 @@ const NON_METRIC_KEYS = new Set([
   'power_invalid_reasons',
   'power_audit',
   'benchmark_outcome',
+  // Fixed-sequence per-request block, carried as `requestRecords`, and the
+  // three top-level values that repeat its window and counts.
+  'request_records',
+  'duration',
+  'completed',
+  'request_throughput',
 ]);
 
 export type BenchmarkType = 'single_turn' | 'agentic_traces';
@@ -138,6 +144,12 @@ export interface BenchmarkParams {
   workers?: WorkerPower[];
   powerInvalidReasons?: string[];
   powerAudit?: PowerAudit;
+  /**
+   * The `request_records` block of a fixed-sequence row, as the client wrote
+   * it. Absent on rows from runs that predate the block and on AgentX rows,
+   * whose per-request data is the profile export.
+   */
+  requestRecords?: unknown;
 }
 
 export interface MapBenchmarkRowOptions {
@@ -286,6 +298,9 @@ export function mapBenchmarkRow(
     workers,
     powerInvalidReasons,
     powerAudit,
+    ...(!isAgentic && row.request_records !== null && typeof row.request_records === 'object'
+      ? { requestRecords: row.request_records }
+      : {}),
   };
 }
 
