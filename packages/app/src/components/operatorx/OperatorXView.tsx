@@ -33,11 +33,19 @@ const ModelView = dynamic(() => import('./model-view/ModelView').then((mod) => m
 /** Category switches drop the per-view filters; every other param carries over. */
 const CATEGORY_SCOPED_PARAMS = ['workload', 'parallel'] as const;
 
-/** Plain clicks swap the view in place; modified clicks fall through to the browser. */
-function selectCategory(event: MouseEvent<HTMLAnchorElement>, category: OperatorXCategory) {
+/**
+ * Plain clicks swap the view in place; modified clicks fall through to the browser. Re-clicking
+ * the current category is a no-op, so it keeps the view's filters.
+ */
+function selectCategory(
+  event: MouseEvent<HTMLAnchorElement>,
+  category: OperatorXCategory,
+  active: boolean,
+) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return;
   event.preventDefault();
+  if (active) return;
   track('operatorx_category_selected', { category });
   pushRouterPathname(
     operatorXCategoryRouteForSelection(window.location.pathname, category),
@@ -87,7 +95,7 @@ export default function OperatorXView() {
                 aria-current={active ? 'page' : undefined}
                 data-state={active ? 'active' : 'inactive'}
                 className={tabsTriggerClassName}
-                onClick={(event) => selectCategory(event, c.slug)}
+                onClick={(event) => selectCategory(event, c.slug, active)}
               >
                 {c.label[locale]}
               </IntentPrefetchLink>

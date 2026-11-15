@@ -82,7 +82,6 @@ export function replaceClientPathname(
 }
 
 let clientPathnameOverride: string | null = null;
-
 export function getClientPathnameOverride(): string | null {
   return clientPathnameOverride;
 }

@@ -88,9 +88,28 @@ it('shows measured and missing GPU coverage, then links to MoE and back', () => 
     'page',
   );
 
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', moe).as('attention');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Attention').click();
+  cy.location('pathname').should('eq', '/opx/attention');
+  cy.go('back');
+  cy.location('pathname').should('eq', '/opx/moe');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+
   cy.go('back');
   cy.location('pathname').should('eq', '/opx/gemm');
   cy.get('[data-testid="operatorx-coverage"]').should('contain.text', 'Coverage of 2 cases');
+});
+
+it('keeps the view filters when the current category is clicked again', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
+  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro&parallel=tp8');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'GEMM').click();
+  cy.location('pathname').should('eq', '/opx/gemm');
+  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro&parallel=tp8');
 });
 
 it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
