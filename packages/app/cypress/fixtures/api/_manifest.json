@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-17T05:15:55.279Z",
+  "generatedAt": "2026-11-15T08:27:28.651Z",
   "fixtures": {
     "agentic-catalog": {
       "bytes": 10027,
@@ -105,6 +105,20 @@
       "capturedAt": "2026-10-17T05:15:55.279Z",
       "sha256": "79593e777e5935e6f5807a5f0a78291f8860434f056601a0eaa8f1f93a3f2d77",
       "source": "Retained public H3 metadata replay; fixture-only synthetic approval flags exercise chart layout and do not record an actual publication. No new benchmark or production publication.",
+      "topLevel": "object"
+    },
+    "sla-targets": {
+      "bytes": 21495,
+      "capturedAt": "2026-11-15T08:27:28.651Z",
+      "sha256": "bba136505855ca69fb5e6f98b501e3369b1da0fd46d0307150eff24d587790e4",
+      "source": "GitHub Actions artifacts of SemiAnalysisAI/InferenceX, runs 36463674051, 40421997301, 43561310271, 43587669179, 34857875250: bmk_agentic_* results, and profile_export.jsonl, aiperf.log and profile_export_aiperf.json of agentic_* reduced to per-attempt data by slaAttemptsFromExport",
+      "topLevel": "object"
+    },
+    "sla-attempts": {
+      "bytes": 2651089,
+      "capturedAt": "2026-11-15T08:27:28.651Z",
+      "sha256": "78fdfac994c5085e4701e0ae3bc551c0b117dbc7bf3f244b50d97e41ff048d79",
+      "source": "GitHub Actions artifacts of SemiAnalysisAI/InferenceX, runs 36463674051, 40421997301, 43561310271, 43587669179, 34857875250: bmk_agentic_* results, and profile_export.jsonl, aiperf.log and profile_export_aiperf.json of agentic_* reduced to per-attempt data by slaAttemptsFromExport",
       "topLevel": "object"
     }
   }

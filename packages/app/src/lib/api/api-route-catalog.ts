@@ -972,6 +972,28 @@ export const apiRouteCatalog = [
     sourceSha256: '7ebb42a6f30b0630567dc3474599f8d7d7ef911d2ba4bfd862d66f15ed8a40b6',
   },
   {
+    source: 'src/app/api/v1/sla-evaluations/route.ts',
+    path: '/api/v1/sla-evaluations',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'SLA Targets page backend behind a feature-gated tab; the response follows the page and is not yet a stable public contract.',
+      zh: 'SLA 目标页面的专用后端，对应的标签页受功能开关控制；响应结构跟随页面，尚不是稳定的公开契约。',
+    },
+    sourceSha256: 'd5acf2a69debe9369f3051db03a99217fcdb1e9868cd790dcbddcb382a1c996c',
+  },
+  {
+    source: 'src/app/api/v1/sla-targets/route.ts',
+    path: '/api/v1/sla-targets',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'SLA Targets page backend behind a feature-gated tab; the response follows the page and is not yet a stable public contract.',
+      zh: 'SLA 目标页面的专用后端，对应的标签页受功能开关控制；响应结构跟随页面，尚不是稳定的公开契约。',
+    },
+    sourceSha256: 'a8e4ee11a235afe6814c140021f7126c4c4af8ca2463984e898c8578caafb3ca',
+  },
+  {
     source: 'src/app/api/v1/request-timeline/route.ts',
     path: '/api/v1/request-timeline',
     method: 'GET',
@@ -2091,7 +2113,7 @@ export const apiContractSourceDigests = [
     // Reviewed for gzip request-timeline storage (migration 017): only the
     // module comment changed to name request_timeline_gz. Same version,
     // record fields and timing semantics, so the docs stand.
-    sourceSha256: '01a1cb2448ae599cc5802af9a014468982d70a8d7be53ff57d2fc37eaacc49b7',
+    sourceSha256: '36c57785364166383fe2ac04b6e0157bc5831a234b1bbe676d71aef6e6626af5',
     reviewArea: {
       en: 'Request timeline contract version, replay identity, source provenance, and event timing semantics.',
       zh: '请求时间线契约版本、重放标识、来源溯源和事件计时语义。',
