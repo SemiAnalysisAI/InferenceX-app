@@ -20,9 +20,13 @@
  * eats the revenue; the operator's profit can therefore go negative.
  */
 
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+
 import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-revenue';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { Model } from '@/lib/catalog/data-mappings';
+import { modelRoutesForTab } from '@/lib/routing/model-routes';
+import type { ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
 
 import type { ProfitPowerSource } from './profit-power';
 import type { InterpolatedResult } from './types';
@@ -416,6 +420,25 @@ export function modelsWithAgenticData<M extends string>(
     rows.filter((row) => row.benchmark_type === 'agentic_traces').map((row) => row.model),
   );
   return models.filter((model) => dbKeysFor(model).some((key) => agenticDbModels.has(key)));
+}
+
+/**
+ * Models the estimator on `tab` offers. These are the tab's route models that have agentic data,
+ * or every route model when none do. The page switches away from a selected model outside this list.
+ */
+export function profitAgenticModels(
+  tab: ProfitRouteTab,
+  availableModels: readonly Model[],
+  availabilityRows: readonly { model: string; benchmark_type: string }[] | undefined,
+): Model[] {
+  const allowed = modelRoutesForTab(tab).map((route) => route.model);
+  const withData = modelsWithAgenticData(
+    availableModels,
+    availabilityRows,
+    (m) => DISPLAY_MODEL_TO_DB[m] ?? [m],
+  );
+  const both = allowed.filter((m) => withData.includes(m));
+  return both.length > 0 ? both : allowed;
 }
 
 /**

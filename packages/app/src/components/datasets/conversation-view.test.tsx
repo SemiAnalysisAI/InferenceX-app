@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement, type PropsWithChildren } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -53,7 +54,13 @@ describe('ConversationView request states', () => {
     const root = createRoot(container);
 
     act(() =>
-      root.render(createElement(ConversationView, { slug: 'trace', convId: 'conversation-1' })),
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient() },
+          createElement(ConversationView, { slug: 'trace', convId: 'conversation-1' }),
+        ),
+      ),
     );
 
     expect(
@@ -78,7 +85,15 @@ describe('ConversationView request states', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(ConversationView, { slug: 'trace', convId: 'missing' })));
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient() },
+          createElement(ConversationView, { slug: 'trace', convId: 'missing' }),
+        ),
+      ),
+    );
 
     expect(
       container.querySelector<HTMLElement>('[data-testid="conversation-view-not-found"]')?.dataset

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
@@ -45,10 +46,11 @@ it.each([true, false])(
       (candidate) => candidate.cell === 'c1',
     )!;
     const side = publishedResultsSide(fixture.stored, point);
+    const queryClient = new QueryClient();
     function InitialResults() {
       const { points, namedPoints, loading, replay } = useVideoPoints('123', initial);
       return (
-        <>
+        <QueryClientProvider client={queryClient}>
           <output>
             {JSON.stringify({
               official: points.length,
@@ -67,7 +69,7 @@ it.each([true, false])(
             onShow={() => {}}
             reveal={0}
           />
-        </>
+        </QueryClientProvider>
       );
     }
     const html = renderToString(<InitialResults />);
@@ -133,15 +135,17 @@ it('shows a newly read clip while another selected source is still pending', asy
   await act(async () => {
     root = createRoot(container!);
     root.render(
-      <VideoResultsClips
-        points={points}
-        colorFor={() => 'black'}
-        against="reference"
-        onAgainstChange={() => {}}
-        onSubjectChange={() => {}}
-        onShow={() => {}}
-        reveal={0}
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <VideoResultsClips
+          points={points}
+          colorFor={() => 'black'}
+          against="reference"
+          onAgainstChange={() => {}}
+          onSubjectChange={() => {}}
+          onShow={() => {}}
+          reveal={0}
+        />
+      </QueryClientProvider>,
     );
     await Promise.resolve();
   });
@@ -217,16 +221,19 @@ it('waits for a newly wanted side before a reveal scrolls, even after an earlier
         : pending.promise,
     ),
   );
+  const queryClient = new QueryClient();
   const render = (shown: typeof points, reveal: number) => (
-    <VideoResultsClips
-      points={shown}
-      colorFor={() => 'black'}
-      against="reference"
-      onAgainstChange={() => {}}
-      onSubjectChange={() => {}}
-      onShow={() => {}}
-      reveal={reveal}
-    />
+    <QueryClientProvider client={queryClient}>
+      <VideoResultsClips
+        points={shown}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
+        onShow={() => {}}
+        reveal={reveal}
+      />
+    </QueryClientProvider>
   );
   container = document.createElement('div');
   document.body.append(container);

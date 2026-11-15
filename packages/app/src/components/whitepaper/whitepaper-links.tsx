@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowLeft, ArrowRight, Download } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -59,14 +59,14 @@ export function WhitepaperEstimatorLink({
 }: WhitepaperEstimatorLinkProps) {
   return (
     <Button asChild size="lg" variant="outline" className={className}>
-      <Link
+      <IntentPrefetchLink
         href={href}
         data-testid="whitepaper-estimator-link"
         onClick={() => track('whitepaper_estimator_clicked', { slug })}
       >
         {label}
         <ArrowRight aria-hidden="true" />
-      </Link>
+      </IntentPrefetchLink>
     </Button>
   );
 }
@@ -74,14 +74,14 @@ export function WhitepaperEstimatorLink({
 export function WhitepaperBackLink({ href, label }: { href: string; label: string }) {
   return (
     <nav>
-      <Link
+      <IntentPrefetchLink
         href={href}
         className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => track('whitepaper_back_clicked')}
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         {label}
-      </Link>
+      </IntentPrefetchLink>
     </nav>
   );
 }
@@ -135,13 +135,13 @@ export function WhitepaperCard({
     >
       {thumbnail}
       <div className="min-w-0 flex-1">
-        <Link
+        <IntentPrefetchLink
           href={href}
           className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
           onClick={() => track('whitepaper_card_clicked', { slug, title })}
         >
           <span className="sr-only">{title}</span>
-        </Link>
+        </IntentPrefetchLink>
         {children}
       </div>
     </article>
@@ -158,13 +158,13 @@ export function WhitepaperReadLink({
   label: string;
 }) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={href}
       className="relative inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand hover:underline md:min-h-8"
       onClick={() => track('whitepaper_read_clicked', { slug })}
     >
       {label}
       <ArrowRight aria-hidden="true" className="size-4" />
-    </Link>
+    </IntentPrefetchLink>
   );
 }

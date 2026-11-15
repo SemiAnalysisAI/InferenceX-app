@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -35,7 +36,13 @@ describe('QualityMethod', () => {
       const host = document.createElement('div');
       document.body.append(host);
       const root = createRoot(host);
-      act(() => root.render(<QualityMethod leads={[]} onShowMe={() => {}} />));
+      act(() =>
+        root.render(
+          <QueryClientProvider client={new QueryClient()}>
+            <QualityMethod leads={[]} onShowMe={() => {}} />
+          </QueryClientProvider>,
+        ),
+      );
       const link = [...host.querySelectorAll('a')].find((a) => a.textContent?.includes(label));
       expect([link?.getAttribute('href'), link?.getAttribute('target')]).toEqual([href, null]);
       // jsdom cannot navigate; cancel after React's root listener has run.

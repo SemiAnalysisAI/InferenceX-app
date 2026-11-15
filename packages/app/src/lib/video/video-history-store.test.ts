@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 5,
-      // Frame-count plans (no `duration_seconds`) now project a workload key and duration.
-      sources: '261cb8b7390cbcc50b02048b3e3f471fad2a24b6d551be57b590c0f618f075cd',
+      // Chart query keys and run selection moved into shared helpers; recorded video entries are unchanged.
+      sources: '517c3734c35cdc8356d06cebd9966197b09c629baf2647cafe86b6358c519c31',
     });
   });
 });

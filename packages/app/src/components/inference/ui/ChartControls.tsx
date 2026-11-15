@@ -81,6 +81,9 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
+// A model pick moves the page to the model's path, where the path names the model instead.
+const MODEL_ROUTE_DROPPED_PARAMS = ['g_model'];
+
 const STRINGS = {
   en: {
     measuredPower: 'Measured power',
@@ -249,6 +252,7 @@ export default function ChartControls({
     setSelectedXAxisMetric,
     setScaleType,
     setPowerCompare,
+    warmFilterChange,
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
   const featureGateUnlocked = useFeatureGate();
@@ -396,7 +400,7 @@ export default function ChartControls({
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
     // Re-picking the shown model only canonicalizes a bare /infx/inference path. That is not a new page.
     if (target !== null) {
-      replaceRouterPathname(target, ['g_model'], {
+      replaceRouterPathname(target, MODEL_ROUTE_DROPPED_PARAMS, {
         pageview: value !== selectedModel,
       });
     }
@@ -405,6 +409,20 @@ export default function ChartControls({
       model: value,
     });
     setTimeout(trackCombinedFilters, 0);
+  };
+
+  // The provider re-applies route selections when the pick moves the page to another path.
+  const handleModelIntent = (value: Model) => {
+    const target = inferenceModelRouteForSelection(window.location.pathname, value);
+    const search = new URLSearchParams(window.location.search);
+    for (const param of MODEL_ROUTE_DROPPED_PARAMS) search.delete(param);
+    warmFilterChange({
+      model: value,
+      navigation:
+        target === null || target === window.location.pathname
+          ? undefined
+          : { pathname: target, search: search.toString() },
+    });
   };
 
   const handleSequenceChange = (value: Sequence) => {
@@ -512,6 +530,7 @@ export default function ChartControls({
         onChange={handleSequenceChange}
         open={openDropdown === 'sequence'}
         onOpenChange={handleDropdownOpenChange('sequence')}
+        onOptionIntent={(sequence) => warmFilterChange({ sequence })}
         availableSequences={availableSequences}
         model={selectedModel}
         data-testid="scenario-selector"
@@ -553,6 +572,7 @@ export default function ChartControls({
                 onChange={handleModelChange}
                 open={openDropdown === 'model'}
                 onOpenChange={handleDropdownOpenChange('model')}
+                onOptionIntent={handleModelIntent}
                 availableModels={selectableModels}
                 data-testid="model-selector"
                 trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
@@ -567,6 +587,7 @@ export default function ChartControls({
                 onChange={handlePrecisionChange}
                 open={openDropdown === 'precision'}
                 onOpenChange={handleDropdownOpenChange('precision')}
+                onOptionIntent={(precisions) => warmFilterChange({ precisions })}
                 availablePrecisions={availablePrecisions}
                 data-testid="precision-multiselect"
               />

@@ -146,6 +146,8 @@ interface ModelSelectorProps {
    * the dropdown panel widens beyond the trigger so the details have room.
    */
   modelDetails?: ReadonlyMap<string, ReactNode>;
+  /** Called with a model once the user shows intent toward its option. */
+  onOptionIntent?: (value: Model) => void;
 }
 
 export function ModelSelector({
@@ -159,6 +161,7 @@ export function ModelSelector({
   trailing,
   newModels,
   modelDetails,
+  onOptionIntent,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels.filter(isRegisteredModel), (m) =>
@@ -253,6 +256,7 @@ export function ModelSelector({
             }}
             open={open}
             onOpenChange={onOpenChange}
+            onOptionIntent={onOptionIntent && ((values) => onOptionIntent(values[0] as Model))}
             triggerId={id}
             triggerTestId={testId}
             placeholder={t.model}
@@ -365,6 +369,8 @@ interface ScenarioSelectorProps {
   availableSequences: string[];
   model?: Model | null;
   'data-testid'?: string;
+  /** Called with a scenario once the user shows intent toward its option. */
+  onOptionIntent?: (value: Sequence) => void;
 }
 
 export function ScenarioSelector({
@@ -377,6 +383,7 @@ export function ScenarioSelector({
   availableSequences,
   model,
   'data-testid': testId,
+  onOptionIntent,
 }: ScenarioSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -435,6 +442,7 @@ export function ScenarioSelector({
       }}
       open={open}
       onOpenChange={onOpenChange}
+      onOptionIntent={onOptionIntent && ((v) => onOptionIntent(v as Sequence))}
       groups={[
         { label: '', options: agentic.map(toScenarioOption) },
         {
@@ -531,6 +539,8 @@ interface PrecisionSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availablePrecisions: string[];
   'data-testid'?: string;
+  /** Called with the precisions an option would select once the user shows intent toward it. */
+  onOptionIntent?: (value: string[]) => void;
 }
 
 export function PrecisionSelector({
@@ -541,6 +551,7 @@ export function PrecisionSelector({
   onOpenChange,
   availablePrecisions,
   'data-testid': testId,
+  onOptionIntent,
 }: PrecisionSelectorProps) {
   const t = STRINGS[useLocale()];
 
@@ -565,6 +576,7 @@ export function PrecisionSelector({
           onChange={onChange}
           open={isOnlySelectedPrecision ? false : open}
           onOpenChange={onOpenChange}
+          onOptionIntent={onOptionIntent}
           triggerId={id}
           triggerTestId={testId}
           placeholder=""

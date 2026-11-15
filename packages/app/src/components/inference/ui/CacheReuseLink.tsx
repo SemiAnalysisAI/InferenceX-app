@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
 import { track } from '@/lib/analytics/analytics';
@@ -16,7 +16,7 @@ export function CacheReuseLink({ point, className }: { point?: PointMeta; classN
   const locale = useLocale();
   const t = STRINGS[locale];
   return (
-    <Link
+    <IntentPrefetchLink
       href={cacheReuseHref(locale, point)}
       data-testid="cache-reuse-link"
       className={
@@ -30,6 +30,6 @@ export function CacheReuseLink({ point, className }: { point?: PointMeta; classN
       }
     >
       {point ? t.point : t.chart}
-    </Link>
+    </IntentPrefetchLink>
   );
 }

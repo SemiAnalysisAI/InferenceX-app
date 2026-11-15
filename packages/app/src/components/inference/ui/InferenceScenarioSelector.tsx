@@ -25,7 +25,7 @@ export function InferenceScenarioSelector({
   const { selectedSequence, selectedModel, selectedPrecisions } = useInferenceFilters();
   const { availableSequences } = useInferenceData();
   const { selectedYAxisMetric } = useInferenceDisplay();
-  const { setSelectedSequence } = useInferenceActions();
+  const { setSelectedSequence, warmFilterChange } = useInferenceActions();
   const analyticsContext = useInferenceAnalyticsContext();
   const metricKey = selectedYAxisMetric.replace(/^y_/u, '');
 
@@ -37,6 +37,7 @@ export function InferenceScenarioSelector({
       availableSequences={availableSequences}
       model={selectedModel}
       data-testid="scenario-selector"
+      onOptionIntent={(sequence) => warmFilterChange({ sequence })}
       onChange={(sequence) => {
         setSelectedSequence(sequence);
         track('inference_sequence_selected', { ...analyticsContext, sequence });

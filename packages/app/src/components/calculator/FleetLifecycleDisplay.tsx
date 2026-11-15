@@ -52,7 +52,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type { CostProvider, CostType } from './types';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 
 const COST_PROVIDER_OPTIONS: {
   value: CostProvider;
@@ -164,6 +164,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const warmThroughputChange = useWarmThroughputChange();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
@@ -381,6 +382,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     onChange={handleModelChange}
                     open={openDropdown === 'model'}
                     onOpenChange={handleDropdownOpenChange('model')}
+                    onOptionIntent={(model) => warmThroughputChange({ model })}
                     availableModels={availableModels}
                   />
                 </div>
@@ -391,6 +393,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   onChange={handleSequenceChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
+                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
                   availableSequences={availableSequences}
                   model={selectedModel}
                 />
@@ -409,6 +412,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   onChange={handlePrecisionChange}
                   open={openDropdown === 'precision'}
                   onOpenChange={handleDropdownOpenChange('precision')}
+                  onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
                   availablePrecisions={availablePrecisions}
                 />
               </ControlPanel>

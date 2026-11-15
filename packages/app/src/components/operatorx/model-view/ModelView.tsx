@@ -88,7 +88,9 @@ import {
   SWEEP_PX,
   tokenBin,
 } from './OpBars';
-import { DEFAULT_MODEL, ModelViewLoading } from './shell';
+import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
+
+import { ModelViewLoading } from './shell';
 
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
@@ -1078,7 +1080,7 @@ export function ModelView({
   const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
-  const requested = search.get('model') ?? DEFAULT_MODEL;
+  const requested = search.get('model') ?? DEFAULT_OPERATORX_MODEL;
   const requestedSplit = search.get('parallel');
   const isDark = isDarkTheme(useTheme().resolvedTheme);
   const [picked, setPicked] = useState<string[] | null>(null);
@@ -1115,7 +1117,10 @@ export function ModelView({
   const loaded = !gemm.isLoading && !moe.isLoading && !attention.isLoading;
   useEffect(() => {
     if (loaded && modelOptions.length > 0 && !modelOptions.includes(requested))
-      setParam('model', modelOptions.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : modelOptions[0]);
+      setParam(
+        'model',
+        modelOptions.includes(DEFAULT_OPERATORX_MODEL) ? DEFAULT_OPERATORX_MODEL : modelOptions[0],
+      );
   }, [loaded, modelOptions, requested]);
   // GPUs with measured results at the selected device split
   const available = useMemo(() => measuredHardware(atSplitViews), [atSplitViews]);

@@ -12,6 +12,7 @@ import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power/power-basis';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
+import type { FilterChange } from '@/providers/GlobalFilterContext';
 
 export type { WorkerPower };
 
@@ -500,6 +501,8 @@ export interface InferenceActionsContextType {
   setUserPowers: (userPowers: Record<string, number | undefined> | null) => void;
   setHwFilter: (filter: string[] | null) => void;
   setActivePresetId: (id: string | null) => void;
+  /** Warms the data the chart loads once `change` applies, before the user makes it. */
+  warmFilterChange: (change: FilterChange) => void;
 }
 export interface CalculateUserCostsRequest {
   model: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { ServerLogViewer } from '@/components/inference/agentic-point/server-log-viewer';
@@ -49,13 +49,13 @@ export function BenchmarkLogDetail({ id }: { id: number }) {
         <span className="text-sm text-muted-foreground" aria-hidden="true">
           ·
         </span>
-        <Link
+        <IntentPrefetchLink
           href={inferenceHref}
           className="text-sm text-muted-foreground hover:text-foreground"
           onClick={() => track('inference_fixed_seq_logs_chart_clicked', { id })}
         >
           {t.inferenceChart}
-        </Link>
+        </IntentPrefetchLink>
       </nav>
 
       <header>

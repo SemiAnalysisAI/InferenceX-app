@@ -545,6 +545,6 @@ OperatorX 自身的写入才会使其缓存失效。Vercel 的 CDN 缓存键包�
 
 The first chart mounts eagerly; others mount within 300px of the viewport or on
 focus, then retain their controls. Without IntersectionObserver all charts render.
-Landing-link hover/focus prefetches the localized route and default GEMM query,
-sharing the destination's five-minute cache. These are presentation-only controls;
+Links to `/opx` and its categories, including the category switcher, prefetch the
+route and warm its comparison or model-view queries on intent (`prefetchRouteData`).
 API selectors, results, and click analytics are unaffected.

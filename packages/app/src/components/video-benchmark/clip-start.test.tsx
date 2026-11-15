@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -56,16 +57,20 @@ it('keeps playing when the prime from the play gesture settles after the buffere
   root = createRoot(container);
   act(() =>
     root!.render(
-      <VideoResultsClips
-        points={[point]}
-        initialSides={{ [videoClipSourceKey(point)]: publishedResultsSide(fixture.stored, point) }}
-        colorFor={() => 'black'}
-        against="reference"
-        onAgainstChange={() => {}}
-        onSubjectChange={() => {}}
-        onShow={() => {}}
-        reveal={0}
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <VideoResultsClips
+          points={[point]}
+          initialSides={{
+            [videoClipSourceKey(point)]: publishedResultsSide(fixture.stored, point),
+          }}
+          colorFor={() => 'black'}
+          against="reference"
+          onAgainstChange={() => {}}
+          onSubjectChange={() => {}}
+          onShow={() => {}}
+          reveal={0}
+        />
+      </QueryClientProvider>,
     ),
   );
   const video = container.querySelector<HTMLVideoElement>(

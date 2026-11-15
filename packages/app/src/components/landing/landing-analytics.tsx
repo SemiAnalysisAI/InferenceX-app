@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -16,7 +16,10 @@ export function LandingPageAnalytics() {
   return null;
 }
 
-interface LandingTrackedLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
+interface LandingTrackedLinkProps extends Omit<
+  React.ComponentProps<typeof IntentPrefetchLink>,
+  'href'
+> {
   href: string;
   analyticsEvent: string;
   appNavigation?: boolean;
@@ -32,7 +35,7 @@ export function LandingTrackedLink({
   const router = useRouter();
 
   return (
-    <Link
+    <IntentPrefetchLink
       {...props}
       href={href}
       onClick={(event) => {

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { Activity, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -43,19 +44,24 @@ it('keeps one clip audible, including after the overview is hidden and revealed'
     nextPage: null,
   };
   const point = namedRunPoints([page], '123').find((candidate) => candidate.cell === 'c1')!;
+  const queryClient = new QueryClient();
   const Overview = ({ hidden }: { hidden: boolean }) => (
-    <Activity mode={hidden ? 'hidden' : 'visible'}>
-      <VideoResultsClips
-        points={[point]}
-        initialSides={{ [videoClipSourceKey(point)]: publishedResultsSide(fixture.stored, point) }}
-        colorFor={() => 'black'}
-        against="reference"
-        onAgainstChange={() => {}}
-        onSubjectChange={() => {}}
-        onShow={() => {}}
-        reveal={0}
-      />
-    </Activity>
+    <QueryClientProvider client={queryClient}>
+      <Activity mode={hidden ? 'hidden' : 'visible'}>
+        <VideoResultsClips
+          points={[point]}
+          initialSides={{
+            [videoClipSourceKey(point)]: publishedResultsSide(fixture.stored, point),
+          }}
+          colorFor={() => 'black'}
+          against="reference"
+          onAgainstChange={() => {}}
+          onSubjectChange={() => {}}
+          onShow={() => {}}
+          reveal={0}
+        />
+      </Activity>
+    </QueryClientProvider>
   );
   container = document.createElement('div');
   document.body.append(container);

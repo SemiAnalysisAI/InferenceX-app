@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
@@ -74,13 +74,13 @@ export function BlogPostCard({
           level="card"
           className="line-clamp-3 text-balance text-lg leading-snug group-hover:text-brand"
         >
-          <Link
+          <IntentPrefetchLink
             href={`${basePath}/${slug}`}
             className="focus-visible:outline-none before:absolute before:inset-0 before:z-10 before:content-['']"
             onClick={() => track('blog_post_clicked', { slug, title, placement })}
           >
             {title}
-          </Link>
+          </IntentPrefetchLink>
         </Heading>
         <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{subtitle}</p>
         {shown.length > 0 && (

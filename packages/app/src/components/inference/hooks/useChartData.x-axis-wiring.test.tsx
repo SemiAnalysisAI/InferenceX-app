@@ -18,15 +18,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQueries: () => [],
-  useQuery: () => ({ data: undefined, isLoading: false }),
+  useQuery: () => ({ data: mocks.rows, isLoading: mocks.loading, error: null }),
 }));
 vi.mock('@/hooks/api/use-benchmarks', () => ({
   benchmarkQueryOptions: vi.fn(),
-  useBenchmarks: () => ({
-    data: mocks.rows,
-    isLoading: mocks.loading,
-    error: null,
-  }),
 }));
 
 import { useChartData, type XAxisMode } from './useChartData';

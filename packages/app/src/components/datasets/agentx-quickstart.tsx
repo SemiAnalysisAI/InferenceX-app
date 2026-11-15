@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import {
   ARTICLE_H2_CLASS,
   ARTICLE_H3_CLASS,
@@ -50,13 +51,13 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
   return (
     <article data-testid="agentx-quickstart-article" className="min-w-0">
       <header className="border-b border-border/20 pb-6">
-        <Link
+        <IntentPrefetchLink
           href={localePath(AGENTX_ROUTE.path, locale)}
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           {t.back}
-        </Link>
+        </IntentPrefetchLink>
         <p className="mt-6 font-mono text-xs text-muted-foreground">agentx-harness · 1.0.14</p>
         <h1 className="mt-2 text-3xl font-semibold text-balance md:text-4xl">{t.title}</h1>
         <p className="mt-4 leading-reading text-muted-foreground">{t.description}</p>
@@ -82,13 +83,13 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
         <footer className={cn(READING_SECTION_CLASS, 'space-y-3')}>
           <p className={READING_TEXT_CLASS}>{t.resultsHelp}</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <Link
+            <IntentPrefetchLink
               href={localePath(`${AGENTX_ROUTE.path}/methodology`, locale)}
               className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
             >
               {t.methodology}
               <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
+            </IntentPrefetchLink>
             <Link
               href="https://github.com/SemiAnalysisAI/agentx-harness/tree/agentx-v1.0.14"
               className="inline-flex items-center gap-1 font-medium text-brand hover:underline"

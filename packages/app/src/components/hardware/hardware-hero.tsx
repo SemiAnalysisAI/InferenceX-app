@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { BLOG_COPY } from '@/components/blog/blog-copy';
 import { Heading } from '@/components/ui/heading';
@@ -44,13 +44,13 @@ export function HardwareHero({ meta, locale }: { meta: HardwarePageMeta; locale:
         {locale === 'zh' && (
           <>
             <span aria-hidden="true">&middot;</span>
-            <Link
+            <IntentPrefetchLink
               href={hardwarePagePath(meta.slug)}
               hrefLang="en"
               className="text-brand hover:underline"
             >
               {blog.readOriginal}
-            </Link>
+            </IntentPrefetchLink>
           </>
         )}
       </p>
