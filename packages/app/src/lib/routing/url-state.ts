@@ -93,6 +93,13 @@ const URL_STATE_KEYS = [
   'c_recipe',
   'c_ivtarget',
   'c_chmode',
+  's_model',
+  's_seq',
+  's_ttft',
+  's_tpot',
+  's_e2e',
+  's_att',
+  's_cost',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -186,6 +193,13 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_cache: '10',
   c_mtbi: '24',
   c_rec: '12',
+  s_model: '',
+  s_seq: '',
+  s_ttft: '',
+  s_tpot: '',
+  s_e2e: '',
+  s_att: '',
+  s_cost: '',
 };
 
 const currentState: Record<string, string> = {};

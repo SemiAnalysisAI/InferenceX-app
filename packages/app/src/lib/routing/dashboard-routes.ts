@@ -1,5 +1,5 @@
 export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
-export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
+export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_' | 's_';
 
 export interface DashboardProviderCapabilities {
   readonly globalFilters: boolean;
@@ -231,6 +231,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_'],
   },
 
+  {
+    key: 'sla-targets',
+    path: '/infx/sla-targets',
+    canonicalPath: '/infx/sla-targets',
+    navGroup: 'feature-gated',
+    indexable: false,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['s_'],
+  },
   {
     key: 'collectivex',
     path: '/colx',

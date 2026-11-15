@@ -356,8 +356,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 5,
-      // Frame-count plans (no `duration_seconds`) now project a workload key and duration.
-      sources: '261cb8b7390cbcc50b02048b3e3f471fad2a24b6d551be57b590c0f618f075cd',
+      // Re-pinned without a version bump: the dashboard route registry gained the SLA Targets
+      // route, which does not change any recorded entry.
+      sources: 'fd46986cdfe9e92dffa7dfc309870c48e779938446a84492ed165d43099250e2',
     });
   });
 });

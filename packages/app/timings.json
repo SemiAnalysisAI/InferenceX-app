@@ -5202,6 +5202,99 @@
       ]
     },
     {
+      "spec": "cypress/e2e/sla-targets.cy.ts",
+      "duration": 17376,
+      "tests": [
+        {
+          "title": [
+            "SLA Targets",
+            "shows the explanation, the captured-data notice and the example targets"
+          ],
+          "duration": 2080,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "finds no qualifying configuration at the example targets and says so"
+          ],
+          "duration": 1117,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "evaluates a typed target exactly and ranks the configurations that qualify"
+          ],
+          "duration": 2432,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "reads targets that are not round numbers from a share link and evaluates them as given"
+          ],
+          "duration": 957,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "rejects text that is not a number without changing the evaluation"
+          ],
+          "duration": 1326,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "labels a result without a dispatched count as exploratory and never ranks it"
+          ],
+          "duration": 929,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "lists a failed load point with its recorded reason, and the source run"
+          ],
+          "duration": 2896,
+          "attempts": 1
+        },
+        {
+          "title": ["SLA Targets", "adds the end-to-end target only when it is switched on"],
+          "duration": 1862,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "switches model and shows a point without request-level data as insufficient"
+          ],
+          "duration": 1032,
+          "attempts": 1
+        },
+        {
+          "title": ["SLA Targets", "draws both charts with the required attainment line"],
+          "duration": 932,
+          "attempts": 1
+        },
+        {
+          "title": ["SLA Targets", "renders the Chinese page with the same results"],
+          "duration": 951,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "stacks configurations on a phone without horizontal page scroll"
+          ],
+          "duration": 862,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",
       "duration": 8807,
       "tests": [

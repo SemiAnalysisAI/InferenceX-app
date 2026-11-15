@@ -48,6 +48,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   'gpu-specs': 'Chip specs',
   submissions: 'Submissions',
   operatorx: 'OperatorX',
+  'sla-targets': 'SLA targets',
   collectivex: 'CollectiveX',
   'agentic-workload-explorer': 'Agentic workloads',
   'ai-chart': 'AI chart',
