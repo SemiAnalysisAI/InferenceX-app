@@ -219,18 +219,7 @@ async function warmCalculatorPage(
     initialRunId: seed.runId,
     ...state,
   });
-  const prefetchThroughput = (selection: FilterSelection) =>
-    prefetchEnabled(
-      queryClient,
-      throughputQueryOptions(
-        request.model,
-        // The profit estimator always charts agentic traces.
-        profit ? Sequence.AgenticTraces : selection.effectiveSequence,
-        selection.effectiveRunDate,
-      ),
-    );
-
-  prefetchThroughput(resolveFilterSelection(undefined, request));
+  // Only a mount without cached availability reads the undated key, and warming caches availability.
   const availability = await queryClient.ensureQueryData(availabilityQueryOptions());
   if (profit) {
     const offered = profitAgenticModels(
@@ -242,7 +231,15 @@ async function warmCalculatorPage(
     if (!offered.includes(request.model)) return;
   }
   const selection = selectAndWarmWorkflow(queryClient, availability, request);
-  prefetchThroughput(selection);
+  prefetchEnabled(
+    queryClient,
+    throughputQueryOptions(
+      request.model,
+      // The profit estimator always charts agentic traces.
+      profit ? Sequence.AgenticTraces : selection.effectiveSequence,
+      selection.effectiveRunDate,
+    ),
+  );
 
   if (
     route.page === 'fleet' &&

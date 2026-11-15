@@ -269,8 +269,9 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     );
   });
 
-  it('warms /infx/calculator with the provisional and dated calculator keys the page requests', async () => {
+  it('warms /infx/calculator with the dated calculator keys the page reads once availability is cached', async () => {
     const pageClient = freshClient();
+    await pageClient.ensureQueryData(availabilityQueryOptions());
     const seed = calculatorUrlSeed('/infx/calculator', '', undefined);
     await renderPage(
       pageClient,
@@ -291,7 +292,6 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     expect(cachedHashes(warmed)).toEqual(
       hashes(
         availabilityKey,
-        throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, '').queryKey,
         throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, LATEST_DATE).queryKey,
         workflowInfoQueryOptions(LATEST_DATE).queryKey,
       ),
@@ -346,7 +346,6 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     expect(cachedHashes(warmed)).toEqual(
       hashes(
         availabilityKey,
-        throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, '').queryKey,
         throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, LATEST_DATE).queryKey,
         workflowInfoQueryOptions(LATEST_DATE).queryKey,
         benchmarkHistoryQueryOptions(Model.DeepSeek_V4_Pro, FIXED.isl, FIXED.osl, {
@@ -361,7 +360,6 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     expect(cachedHashes(warmed)).toEqual(
       hashes(
         availabilityKey,
-        throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, '').queryKey,
         throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey,
         workflowInfoQueryOptions(AGENTIC_DATE).queryKey,
       ),
@@ -372,13 +370,16 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     writeUrlParams({ g_model: Model.Kimi_K3 });
     readUrlParams();
     const warmed = await warm('/infx/calculator');
-    expect(cachedHashes(warmed)).toContain(
-      hashKey(throughputQueryOptions(Model.Kimi_K3, Sequence.EightK_OneK, '').queryKey),
-    );
+    expect(
+      warmed
+        .getQueryCache()
+        .getAll()
+        .some((query) => query.queryKey[0] === 'benchmarks' && query.queryKey[1] === Model.Kimi_K3),
+    ).toBe(true);
     // Profit routes drop remembered params, so the estimator keeps its route default.
     const profit = await warm('/infx/profit-estimator');
     expect(cachedHashes(profit)).toContain(
-      hashKey(throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, '').queryKey),
+      hashKey(throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey),
     );
   });
 
