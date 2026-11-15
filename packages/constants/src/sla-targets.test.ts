@@ -590,6 +590,19 @@ describe('qualification', () => {
       reason: 'invalid_measurement',
     });
 
+    const unexplained = evaluateSlaPoint(
+      {
+        load,
+        data: { kind: 'excluded', category: 'undetermined', reason: 'Slurm job ended FAILED' },
+        cost: null,
+      },
+      0.99,
+    );
+    expect(unexplained.qualification).toMatchObject({
+      status: 'insufficient_data',
+      reason: 'failure_undetermined',
+    });
+
     const aggregateOnly = evaluateSlaPoint(
       {
         load: { kind: 'request_concurrency', value: 64 },

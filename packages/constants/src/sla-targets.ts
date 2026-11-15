@@ -99,6 +99,11 @@ export interface SlaAttemptRecord {
 
 /** Column value for a metric the client did not record. */
 export const SLA_NOT_RECORDED = -1;
+/**
+ * `tpotUs` value of a completed attempt with fewer than two output tokens:
+ * TPOT is undefined for it, so the TPOT target does not apply.
+ */
+export const SLA_TPOT_NOT_APPLICABLE = -2;
 
 /**
  * Latencies of completed attempts, one entry per attempt, in whole
@@ -108,7 +113,6 @@ export interface SlaCompletedColumns {
   ttftUs: number[];
   tpotUs: number[];
   e2eUs: number[];
-  outputTokens: number[];
 }
 
 export interface SlaOutcomeCount {
@@ -149,14 +153,17 @@ function addOutcome(
  * produced a first token and then failed is a failed attempt.
  */
 export function slaAttemptSet(records: readonly SlaAttemptRecord[]): SlaAttemptSet {
-  const completed: SlaCompletedColumns = { ttftUs: [], tpotUs: [], e2eUs: [], outputTokens: [] };
+  const completed: SlaCompletedColumns = { ttftUs: [], tpotUs: [], e2eUs: [] };
   const other: SlaOutcomeCount[] = [];
   for (const record of records) {
     if (record.outcome === 'completed') {
       completed.ttftUs.push(toMicros(record.ttftMs, 1e3));
-      completed.tpotUs.push(toMicros(record.tpotMs, 1e3));
+      completed.tpotUs.push(
+        record.outputTokens !== null && record.outputTokens < 2
+          ? SLA_TPOT_NOT_APPLICABLE
+          : toMicros(record.tpotMs, 1e3),
+      );
       completed.e2eUs.push(toMicros(record.e2eS, 1e6));
-      completed.outputTokens.push(toMicros(record.outputTokens, 1));
     } else {
       addOutcome(
         other,
@@ -517,7 +524,7 @@ export function evaluateSlaAttempts(
   accounting: SlaAccounting,
   targets: SlaLatencyTargets,
 ): SlaPointCounts {
-  const { ttftUs, tpotUs, e2eUs, outputTokens } = set.completed;
+  const { ttftUs, tpotUs, e2eUs } = set.completed;
   const ttftLimit = targets.maxTtftMs * 1e3;
   const tpotLimit = targets.maxTpotMs * 1e3;
   const e2eLimit = targets.maxE2eS === null ? null : targets.maxE2eS * 1e6;
@@ -530,9 +537,7 @@ export function evaluateSlaAttempts(
   let missingOnly = 0;
   for (let index = 0; index < ttftUs.length; index += 1) {
     const ttft = compare(ttftUs[index], ttftLimit);
-    const tokens = outputTokens[index];
-    const tpotApplies = tokens === SLA_NOT_RECORDED || tokens >= 2;
-    const tpot = tpotApplies ? compare(tpotUs[index], tpotLimit) : 1;
+    const tpot = tpotUs[index] === SLA_TPOT_NOT_APPLICABLE ? 1 : compare(tpotUs[index], tpotLimit);
     const e2e = e2eLimit === null ? 1 : compare(e2eUs[index], e2eLimit);
     if (ttft === 1) withinTtft += 1;
     if (tpot === 1) withinTpot += 1;
@@ -676,6 +681,8 @@ export type SlaQualificationReason =
   | 'service_failure'
   /** The benchmark measurement itself was invalid; says nothing about the service. */
   | 'invalid_measurement'
+  /** The load point failed and its records do not say whether the service or the benchmark did. */
+  | 'failure_undetermined'
   /** The dispatched attempts cannot be established; observed values are exploratory. */
   | 'attempt_population_not_established'
   /** Fewer attempts than the sample policy asks for. */
@@ -774,8 +781,9 @@ export interface SlaCostBasis {
  * Why a tested load point has no measurement.
  * - `service_failure`: the system under test failed at this load.
  * - `invalid_measurement`: the benchmark run itself was invalid.
+ * - `undetermined`: the job failed and its records do not say which of the two it was.
  */
-export type SlaExclusionCategory = 'service_failure' | 'invalid_measurement';
+export type SlaExclusionCategory = 'service_failure' | 'invalid_measurement' | 'undetermined';
 
 export type SlaPointData =
   | { kind: 'measured'; accounting: SlaAccounting; counts: SlaPointCounts }
@@ -834,7 +842,11 @@ export function evaluateSlaPoint(
       accounting: null,
       qualification: {
         status: excluded && data.category === 'service_failure' ? 'misses' : 'insufficient_data',
-        reason: excluded ? data.category : data.reason,
+        reason: excluded
+          ? data.category === 'undetermined'
+            ? 'failure_undetermined'
+            : data.category
+          : data.reason,
         exploratory: false,
         smallSample: false,
         minimumSample: minimumSampleSize(requiredAttainment, policy),
