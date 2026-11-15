@@ -503,6 +503,18 @@ export interface SlaPointCounts {
   incompleteNotPassing: number;
 }
 
+/**
+ * A target in microseconds, the unit attempts are stored in. Converting a
+ * decimal number of milliseconds or seconds in binary can land a hair under
+ * the value meant (1.001 ms becomes 1000.9999999999999 us), which would
+ * exclude an attempt exactly on the threshold. Taking the product at
+ * nanosecond resolution removes that noise and changes no value a person can
+ * enter.
+ */
+function targetLimitUs(value: number, usPerUnit: number): number {
+  return Math.round(value * usPerUnit * 1e3) / 1e3;
+}
+
 /** -1 exceeded, 0 not recorded, 1 within. The limit is compared as entered, inclusive. */
 function compare(valueUs: number, limitUs: number): -1 | 0 | 1 {
   if (valueUs === SLA_NOT_RECORDED) return 0;
@@ -525,9 +537,9 @@ export function evaluateSlaAttempts(
   targets: SlaLatencyTargets,
 ): SlaPointCounts {
   const { ttftUs, tpotUs, e2eUs } = set.completed;
-  const ttftLimit = targets.maxTtftMs * 1e3;
-  const tpotLimit = targets.maxTpotMs * 1e3;
-  const e2eLimit = targets.maxE2eS === null ? null : targets.maxE2eS * 1e6;
+  const ttftLimit = targetLimitUs(targets.maxTtftMs, 1e3);
+  const tpotLimit = targetLimitUs(targets.maxTpotMs, 1e3);
+  const e2eLimit = targets.maxE2eS === null ? null : targetLimitUs(targets.maxE2eS, 1e6);
   let passing = 0;
   let exceeded = 0;
   let withinTtft = 0;

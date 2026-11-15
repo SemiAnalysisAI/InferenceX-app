@@ -438,6 +438,21 @@ describe('exact target evaluation', () => {
     expect(at(737.6)).toBe(3);
   });
 
+  it('includes an attempt exactly on a decimal threshold despite binary conversion', () => {
+    // 1.001 * 1e3 is 1000.9999999999999 in binary floating point; the attempt is at 1001 us.
+    expect(1.001 * 1e3).toBeLessThan(1001);
+    const set = slaAttemptSet([completed(1.001, 1.003, 0.001_005)]);
+    const accounting = reconcileSlaAccounting(set, accountingInput({ issued: 1 }));
+    const counts = (targets: SlaLatencyTargets) => evaluateSlaAttempts(set, accounting, targets);
+    expect(counts({ maxTtftMs: 1.001, maxTpotMs: 1.003, maxE2eS: 0.001_005 })).toMatchObject({
+      passing: 1,
+      withinTtft: 1,
+      withinTpot: 1,
+      withinE2e: 1,
+    });
+    expect(counts({ maxTtftMs: 1.0009, maxTpotMs: 1.003, maxE2eS: null }).withinTtft).toBe(0);
+  });
+
   it('applies the end-to-end target only when it is set, inclusive at the boundary', () => {
     const set = slaAttemptSet([completed(400, 20, 30), completed(400, 20, 30.000001)]);
     const accounting = reconcileSlaAccounting(set, accountingInput({ issued: 2 }));
