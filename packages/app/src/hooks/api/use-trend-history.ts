@@ -1,7 +1,9 @@
+import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 import { useQuery } from '@tanstack/react-query';
 
 import { expandTrendHistory } from '@/components/inference/hooks/trend-history-rows';
 import { fetchTrendHistory } from '@/lib/api/api';
+import { Sequence } from '@/lib/catalog/data-mappings';
 
 export function trendHistoryQueryOptions(
   model: string,
@@ -17,11 +19,17 @@ export function trendHistoryQueryOptions(
   };
 }
 
-export function useTrendHistory(
-  model: string,
-  isl: number,
-  osl: number,
-  benchmarkType?: 'agentic_traces',
-) {
-  return useQuery(trendHistoryQueryOptions(model, isl, osl, benchmarkType));
+/** The trend history of `model` on `sequence`, as the Historical Trends chart requests it. */
+export function sequenceTrendHistoryQueryOptions(model: string, sequence: Sequence) {
+  const islOsl = sequenceToIslOsl(sequence);
+  return trendHistoryQueryOptions(
+    model,
+    islOsl?.isl ?? 0,
+    islOsl?.osl ?? 0,
+    sequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+  );
+}
+
+export function useTrendHistory(model: string, sequence: Sequence) {
+  return useQuery(sequenceTrendHistoryQueryOptions(model, sequence));
 }

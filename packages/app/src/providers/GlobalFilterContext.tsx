@@ -15,6 +15,7 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -23,11 +24,12 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 }
 
 import { useAvailability } from '@/hooks/api/use-availability';
-import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
+import { useWorkflowInfo, workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import {
   hasExplicitUrlParam,
+  peekNavigationUrlParams,
   refreshUrlParams,
   type UrlStateKey,
   type UrlStateParams,
@@ -101,6 +103,8 @@ export interface GlobalFilterActionsContextType {
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedRunDate: (date: string) => void;
   setSelectedRunId: (id: string) => void;
+  /** The provider's request and selection after `change`, or null when it would ignore it. */
+  previewFilterChange: (change: FilterChange) => FilterPreview | null;
 }
 
 export interface GlobalFilterRunContextType {
@@ -511,6 +515,79 @@ export interface FilterSelection {
   effectiveRunDate: string;
 }
 
+/** A selection change as the provider's setters apply it. */
+export interface FilterChange {
+  model?: Model;
+  sequence?: Sequence;
+  precisions?: string[];
+  /** The URL the page moves to along with the change. The new route's selections apply on top. */
+  navigation?: { pathname: string; search: string };
+}
+
+export interface FilterPreview {
+  request: FilterRequest;
+  selection: FilterSelection;
+}
+
+/**
+ * The request after `change`, as the provider's setters and its navigation pass apply it. Null
+ * when the provider ignores the change, as it does for a model the feature gate hides.
+ */
+export function applyFilterChange(
+  request: FilterRequest,
+  change: FilterChange,
+  {
+    featureGateUnlocked,
+    initialPrecisions,
+  }: {
+    featureGateUnlocked: boolean;
+    /** The provider's `initialPrecisions`, already passed through `validPrecisions`. */
+    initialPrecisions: string[];
+  },
+): FilterRequest | null {
+  if (change.model !== undefined && !isModelVisible(change.model, featureGateUnlocked)) {
+    return null;
+  }
+  const next: FilterRequest = { ...request };
+  if (change.model !== undefined) next.model = change.model;
+  if (change.sequence !== undefined) {
+    next.selectedSequence = change.sequence;
+    next.sequenceExplicit = true;
+  }
+  if (change.precisions !== undefined) {
+    next.selectedPrecisions = change.precisions;
+    next.precisionExplicit = true;
+  }
+  if (!change.navigation) return next;
+
+  const { pathname, search } = change.navigation;
+  const { params, explicit } = peekNavigationUrlParams(pathname, search);
+  const overrides = resolveFilterNavigationOverrides({
+    pathname,
+    getUrlParam: (key) => params[key],
+    hasExplicitUrlParam: (key) => explicit[key] !== undefined,
+    initialPrecisions,
+    initialChipBasis: undefined,
+  });
+  if (overrides.model !== undefined) {
+    next.model = visibleSelectedModel(overrides.model, featureGateUnlocked);
+  }
+  if (overrides.sequence !== undefined) {
+    next.selectedSequence = overrides.sequence;
+    next.sequenceExplicit = true;
+  }
+  if (overrides.precisions) {
+    next.selectedPrecisions = overrides.precisions.selected;
+    next.precisionExplicit = overrides.precisions.explicit;
+  }
+  if (overrides.runDate !== undefined) {
+    next.requestedRunDate = overrides.runDate;
+    next.requestedRunDateExplicit = true;
+  }
+  if (overrides.runId !== undefined) next.requestedRunId = overrides.runId;
+  return next;
+}
+
 /**
  * The selection the provider derives from `request` and `availability`, step for step as its
  * memo chain does. Pass `undefined` availability for the state before it loads.
@@ -881,6 +958,38 @@ export function GlobalFilterProvider({
     ],
   );
 
+  const previewInputs = {
+    request: {
+      model: selectedModel,
+      selectedSequence,
+      sequenceExplicit,
+      selectedPrecisions,
+      precisionExplicit,
+      requestedRunDate,
+      requestedRunId,
+    },
+    availability,
+    unofficialAvailable,
+    featureGateUnlocked,
+    initialPrecisions: initialValidPrecisions,
+  };
+  const previewInputsRef = useRef(previewInputs);
+  previewInputsRef.current = previewInputs;
+  const previewFilterChange = useCallback((change: FilterChange): FilterPreview | null => {
+    const inputs = previewInputsRef.current;
+    const request = applyFilterChange(
+      { ...inputs.request, requestedRunDateExplicit: requestedRunDateExplicitRef.current },
+      change,
+      inputs,
+    );
+    return (
+      request && {
+        request,
+        selection: resolveFilterSelection(inputs.availability, request, inputs.unofficialAvailable),
+      }
+    );
+  }, []);
+
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
       setTcoBasis,
@@ -890,6 +999,7 @@ export function GlobalFilterProvider({
       setSelectedPrecisions,
       setSelectedRunDate: setSelectedRunDateManual,
       setSelectedRunId,
+      previewFilterChange,
     }),
     [
       selectModel,
@@ -897,6 +1007,7 @@ export function GlobalFilterProvider({
       setSelectedPrecisions,
       setSelectedRunDateManual,
       setSelectedRunId,
+      previewFilterChange,
     ],
   );
 
@@ -974,6 +1085,29 @@ export function useGlobalFilterActions() {
     throw new Error('useGlobalFilterActions must be used within a GlobalFilterProvider');
   }
   return context;
+}
+
+/**
+ * Returns a function that warms the queries a filter change leads to, before the user makes it.
+ * It warms the provider's workflow info, and `warmPage` adds the page's own queries.
+ */
+export function useWarmFilterChange(
+  warmPage?: (preview: FilterPreview, queryClient: QueryClient) => void,
+): (change: FilterChange) => void {
+  const queryClient = useQueryClient();
+  const { previewFilterChange } = useGlobalFilterActions();
+  const warmPageRef = useRef(warmPage);
+  warmPageRef.current = warmPage;
+  return useCallback(
+    (change: FilterChange) => {
+      const preview = previewFilterChange(change);
+      if (!preview) return;
+      const workflow = workflowInfoQueryOptions(preview.selection.effectiveRunDate);
+      if (workflow.enabled) void queryClient.prefetchQuery(workflow);
+      warmPageRef.current?.(preview, queryClient);
+    },
+    [queryClient, previewFilterChange],
+  );
 }
 
 export function useGlobalFilterRun() {

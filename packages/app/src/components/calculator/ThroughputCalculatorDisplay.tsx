@@ -97,7 +97,7 @@ import type {
   CostType,
   InterpolatedResult,
 } from './types';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const COST_PROVIDER_OPTIONS: {
@@ -401,6 +401,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
     useGlobalFilterActions();
+  const warmThroughputChange = useWarmThroughputChange();
   const chipBasisControl = useMemo(
     () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator' }),
     [chipBasis, setChipBasis],
@@ -958,6 +959,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         onChange={handleSequenceChange}
         open={openDropdown === 'sequence'}
         onOpenChange={handleDropdownOpenChange('sequence')}
+        onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
         availableSequences={availableSequences}
         model={selectedModel}
       />
@@ -976,6 +978,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         onChange={handlePrecisionChange}
         open={openDropdown === 'precision'}
         onOpenChange={handleDropdownOpenChange('precision')}
+        onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
         availablePrecisions={availablePrecisions}
       />
     </>
@@ -1082,6 +1085,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     onChange={handleModelChange}
                     open={openDropdown === 'model'}
                     onOpenChange={handleDropdownOpenChange('model')}
+                    onOptionIntent={(model) => warmThroughputChange({ model })}
                     availableModels={availableModels}
                   />
                 </div>

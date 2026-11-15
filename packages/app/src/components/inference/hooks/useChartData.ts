@@ -49,7 +49,7 @@ import {
   resolveXAxisField,
   type FixedSequenceStatistic,
 } from '@/components/inference/utils/resolveXAxisField';
-import { benchmarkQueryOptions, useBenchmarks } from '@/hooks/api/use-benchmarks';
+import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api/api';
 import {
   benchmarkCurveDate,
@@ -108,6 +108,58 @@ export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): strin
   return en.replace(/\bToken/u, 'Uncached Suffix + Output Token');
 }
 
+/**
+ * The benchmarks queries `useChartData` runs. `base` reads the chart rows, `latest` starts the
+ * latest rows while the sequence resolves and `run` reads a contested run's own rows.
+ */
+export function chartBenchmarkQueries({
+  model,
+  queryDate,
+  asOfRunId,
+  runId,
+  enabled,
+  prefetchLatestRows,
+  scope,
+  initialRows,
+}: {
+  model: Model;
+  /** From `chartBenchmarkQueryDate`. */
+  queryDate: string | undefined;
+  asOfRunId: string | undefined;
+  runId: string | undefined;
+  enabled: boolean;
+  prefetchLatestRows: boolean;
+  scope: string | undefined;
+  initialRows: BenchmarkRow[] | undefined;
+}) {
+  return {
+    base: benchmarkQueryOptions(
+      model,
+      queryDate ?? '',
+      enabled,
+      undefined,
+      asOfRunId,
+      undefined,
+      undefined,
+      !asOfRunId && queryDate === '' ? initialRows : undefined,
+      scope,
+      true,
+    ),
+    latest: benchmarkQueryOptions(
+      model,
+      '',
+      prefetchLatestRows,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      scope,
+    ),
+    run: benchmarkQueryOptions(model, '', enabled && Boolean(runId), undefined, runId, true),
+  };
+}
+
 export function useChartData(
   selectedModel: Model,
   selectedSequence: Sequence,
@@ -146,6 +198,16 @@ export function useChartData(
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
   const queryDate = chartBenchmarkQueryDate(selectedRunDate, latestAvailableDate, asOfRunId);
+  const queries = chartBenchmarkQueries({
+    model: selectedModel,
+    queryDate,
+    asOfRunId,
+    runId: selectedRunId,
+    enabled,
+    prefetchLatestRows,
+    scope: benchmarkQueryScope,
+    initialRows: initialBenchmarkRows,
+  });
 
   const {
     data: queriedBaseRows,
@@ -153,40 +215,14 @@ export function useChartData(
     isFetching: baseFetching,
     isPlaceholderData: basePlaceholder,
     error: baseError,
-  } = useBenchmarks(
-    selectedModel,
-    queryDate,
-    enabled,
-    asOfRunId,
-    undefined,
-    undefined,
-    !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
-    benchmarkQueryScope,
-    true,
-  );
+  } = useQuery(queries.base);
   // Latest rows depend only on the model, so start them while availability resolves the sequence.
   // The prefetch fills the key the disabled observer above reads, and a disabled observer still
   // returns cached data. Until the sequence resolves those rows would be filtered by the
   // provisional default sequence, so the chart keeps loading instead of painting them.
-  useQuery(
-    benchmarkQueryOptions(
-      selectedModel,
-      '',
-      prefetchLatestRows,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      benchmarkQueryScope,
-    ),
-  );
+  useQuery(queries.latest);
   const baseRows = prefetchLatestRows ? undefined : queriedBaseRows;
-  const {
-    data: runRows,
-    isLoading: runLoading,
-    error: runError,
-  } = useBenchmarks(selectedModel, '', enabled && Boolean(selectedRunId), selectedRunId, true);
+  const { data: runRows, isLoading: runLoading, error: runError } = useQuery(queries.run);
 
   const preferVr =
     allowDefaultRunPreference &&

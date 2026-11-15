@@ -124,7 +124,7 @@ import {
 } from './profit-history';
 import type { CostProvider } from './types';
 import { useProfitHistory } from './useProfitHistory';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 
 type PriceSource = 'openrouter' | 'list' | 'custom';
 
@@ -633,6 +633,11 @@ function ProfitEstimatorInner({
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
   const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
+  const includePower = basis === 'gw-year' && powerBasis !== 'provisioned';
+  const warmThroughputChange = useWarmThroughputChange({
+    sequence: selectedSequence,
+    includePower,
+  });
 
   const {
     hardwareConfig,
@@ -653,7 +658,7 @@ function ProfitEstimatorInner({
     true,
     'total',
     tcoBasis,
-    basis === 'gw-year' && powerBasis !== 'provisioned',
+    includePower,
   );
 
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
@@ -788,7 +793,7 @@ function ProfitEstimatorInner({
     currentRunDate: selectedRunDate,
     currentRunIds: historyCurrentRunIds,
     enabled: hasData,
-    includePower: basis === 'gw-year' && powerBasis !== 'provisioned',
+    includePower,
   });
   const historyActive = history.comparisonDates.length > 0;
   const historyRunNumbering = useMemo(() => {
@@ -1622,6 +1627,7 @@ function ProfitEstimatorInner({
                       onChange={handleModelChange}
                       open={openDropdown === 'model'}
                       onOpenChange={handleDropdownOpenChange('model')}
+                      onOptionIntent={(model) => warmThroughputChange({ model })}
                       availableModels={agenticModels}
                     />
                   </div>

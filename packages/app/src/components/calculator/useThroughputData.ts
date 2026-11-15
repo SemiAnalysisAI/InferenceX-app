@@ -13,6 +13,7 @@ import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catal
 import { type Sequence, Percentile, type Model } from '@/lib/catalog/data-mappings';
 
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { type FilterChange, useWarmFilterChange } from '@/providers/GlobalFilterContext';
 
 import {
   getCostField,
@@ -84,6 +85,25 @@ export function throughputQueryOptions(
         },
     includePower ? undefined : initialRows,
   );
+}
+
+/**
+ * Returns a function that warms the throughput query a calculator runs after a filter change. The
+ * profit estimator passes its fixed `sequence`, and its power views pass `includePower`.
+ */
+export function useWarmThroughputChange({
+  sequence,
+  includePower = false,
+}: { sequence?: Sequence; includePower?: boolean } = {}): (change: FilterChange) => void {
+  return useWarmFilterChange(({ request, selection }, queryClient) => {
+    const options = throughputQueryOptions(
+      request.model,
+      sequence ?? selection.effectiveSequence,
+      selection.effectiveRunDate,
+      { includePower },
+    );
+    if (options.enabled) void queryClient.prefetchQuery(options);
+  });
 }
 
 export function useThroughputData(

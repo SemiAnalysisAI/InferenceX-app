@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 5,
-      // The chart query date moved into a shared helper; recorded video entries are unchanged.
-      sources: 'b719b867fd1ff846b89de806c66992906c32c03d954c31f542d3a6dcb819c251',
+      // Chart query keys and run selection moved into shared helpers; recorded video entries are unchanged.
+      sources: '517c3734c35cdc8356d06cebd9966197b09c629baf2647cafe86b6358c519c31',
     });
   });
 });

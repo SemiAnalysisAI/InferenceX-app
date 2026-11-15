@@ -284,6 +284,7 @@ export function createMockInferenceContextValues(
     setHwFilter: namedStub('setHwFilter'),
     activePresetId: null,
     setActivePresetId: namedStub('setActivePresetId'),
+    warmFilterChange: namedStub('warmFilterChange'),
     presetGuardRef: { current: false } as React.RefObject<boolean>,
     compareGpuPair: null,
     lockedFrameworks: null,
@@ -374,6 +375,7 @@ export function createMockEvaluationContext(
     selectedPrecisions: ['fp4'],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_eval'),
     availablePrecisions: ['fp4', 'fp8', 'bf16'],
+    warmFilterChange: namedStub('warmFilterChange_eval'),
     ...overrides,
   };
 }
@@ -416,6 +418,7 @@ export function createMockGlobalFilterContexts(
     selectedRunDateRev: 0,
     selectedRunId: '12345678',
     setSelectedRunId: namedStub('setSelectedRunId_global'),
+    previewFilterChange: namedStub('previewFilterChange_global'),
     availableModels: [Model.DeepSeek_R1],
     availableSequences: [Sequence.EightK_OneK, Sequence.OneK_OneK],
     availablePrecisions: [Precision.FP4, Precision.FP8],
@@ -451,6 +454,7 @@ export function createMockGlobalFilterContexts(
       setSelectedPrecisions: values.setSelectedPrecisions,
       setSelectedRunDate: values.setSelectedRunDate,
       setSelectedRunId: values.setSelectedRunId,
+      previewFilterChange: values.previewFilterChange,
     },
     run: {
       selectedRunDate: values.selectedRunDate,
