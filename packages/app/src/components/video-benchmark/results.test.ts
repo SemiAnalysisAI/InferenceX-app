@@ -354,6 +354,9 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
     for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
+    // PR visualizer links spell the overlay `unofficialRun`, as the other dashboards accept.
+    expect(parseResultsState('unofficialRun=43653414377').unofficialRun).toBe('43653414377');
+    expect(parseResultsState('UnofficialRuns=7').unofficialRun).toBe('7');
     // Retired engine comparison: an old link still plots the best engine per GPU.
     expect(parseResultsState('r_compare=1&r_lossy=1')).toEqual({ ...state(), lossy: true });
     expect(

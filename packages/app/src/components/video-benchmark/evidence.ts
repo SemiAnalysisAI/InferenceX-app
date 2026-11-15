@@ -160,6 +160,7 @@ const SPEC_NAME: Readonly<Record<string, string>> = {
   h100: 'H100 SXM',
   h200: 'H200 SXM',
   b200: 'B200 SXM',
+  b300: 'B300 SXM',
   mi355x: 'MI355X',
 };
 

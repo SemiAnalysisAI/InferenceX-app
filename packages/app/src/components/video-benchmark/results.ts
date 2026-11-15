@@ -1,4 +1,4 @@
-import { at, number, rows, text, type Json } from './bundle';
+import { at, generationDuration, number, rows, text, type Json } from './bundle';
 import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
 import { chipConfigKey, compareDeployments } from './deployment';
@@ -14,7 +14,7 @@ import {
   type ResultsYMetric,
 } from './results-chart';
 
-export const RESULTS_HARDWARE = ['gb200', 'b200', 'mi355x', 'h200', 'h100'] as const;
+export const RESULTS_HARDWARE = ['gb200', 'b300', 'b200', 'mi355x', 'h200', 'h100'] as const;
 
 /** Listed before its first matched run so readers see it is coming; other hardware appears with data. */
 const PLANNED_HARDWARE: readonly string[] = ['mi355x'];
@@ -125,9 +125,16 @@ export const RESULTS_QUERY_PARAMS = [
   'unofficialruns',
 ] as const;
 
+/** Matches the overlay param in any case, as the other dashboards do (`?unofficialRun=` in PR links). */
+export const isUnofficialRunParam = (key: string) => /^unofficialruns?$/iu.test(key);
+
 export function parseResultsState(search: string | URLSearchParams): ResultsState {
   const s = typeof search === 'string' ? new URLSearchParams(search) : search;
-  const overlay = s.get('unofficialruns') ?? s.get('unofficialrun');
+  const overlay =
+    s.get('unofficialruns') ??
+    s.get('unofficialrun') ??
+    [...s].find(([key, value]) => isUnofficialRunParam(key) && value)?.[1] ??
+    null;
   const x = s.get('r_x'),
     y = s.get('r_y');
   const numeric = (key: string, fallback: number | null, allowZero = false) => {
@@ -224,7 +231,7 @@ export function resultMetadata(point: VideoPoint) {
       text(at(plan, 'model_revision')) &&
       positive(width) &&
       positive(height) &&
-      positive(number(at(generation, 'duration_seconds'))) &&
+      positive(generationDuration(generation)) &&
       positive(number(at(generation, 'fps'))) &&
       positive(number(at(generation, 'num_inference_steps'))) &&
       rows(at(plan, 'cases')).length > 0 &&
@@ -234,7 +241,7 @@ export function resultMetadata(point: VideoPoint) {
     ),
     model: text(at(plan, 'model_id')) || point.model,
     resolution: positive(width) && positive(height) ? `${width}×${height}` : null,
-    duration: number(at(generation, 'duration_seconds')) ?? point.durationSeconds,
+    duration: generationDuration(generation) ?? point.durationSeconds,
     steps: number(at(generation, 'num_inference_steps')),
     fps: number(at(generation, 'fps')),
     measurementBoundary: text(at(identity, 'semantics', 'boundary')) || null,

@@ -1,4 +1,4 @@
-import { at, type Json, number, text } from './bundle';
+import { at, generationDuration, type Json, number, text } from './bundle';
 import type { CIArtifact } from './archive';
 import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
@@ -168,7 +168,7 @@ export function videoHistoryEntry(
             replicas: point.replicas,
             wallSeconds: point.wall,
             videoSecondsPerHour: point.secondsRate,
-            durationSeconds: number(at(point.workload, 'generation', 'duration_seconds')),
+            durationSeconds: generationDuration(at(point.workload, 'generation')),
             frameCount: number(at(point.workload, 'generation', 'frame_count')),
             avgPowerW: point.power,
             enforcedLimitW: point.powerLimit?.watts ?? null,
