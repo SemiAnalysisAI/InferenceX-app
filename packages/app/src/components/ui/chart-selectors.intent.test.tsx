@@ -20,6 +20,7 @@ import {
   PrecisionSelector,
   ScenarioSelector,
 } from '@/components/ui/chart-selectors';
+import { OPTION_HOVER_DWELL_MS } from '@/components/ui/option-intent';
 import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import { sequenceTrendHistoryQueryOptions } from '@/hooks/api/use-trend-history';
 import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
@@ -163,10 +164,12 @@ async function render(pathname: string, page: ReactNode): Promise<void> {
 }
 
 /** The keys `act` adds to the cache, with the requests it makes. */
-async function newKeys(action: () => void): Promise<{ keys: string[]; requests: number }> {
+async function newKeys(action: () => unknown): Promise<{ keys: string[]; requests: number }> {
   const before = new Set(ranHashes(client));
   const calls = fetchMock.mock.calls.length;
-  act(action);
+  await act(async () => {
+    await action();
+  });
   await settle();
   return {
     keys: ranHashes(client).filter((hash) => !before.has(hash)),
@@ -181,16 +184,15 @@ const option = (label: string) =>
   )!;
 const hover = (element: HTMLElement) =>
   element.dispatchEvent(new Event('pointerover', { bubbles: true }));
+const leave = (element: HTMLElement) =>
+  element.dispatchEvent(new Event('pointerout', { bubbles: true }));
+/** Hovers `element` long enough to count as resting on it. */
+const rest = async (element: HTMLElement) => {
+  hover(element);
+  await sleep(OPTION_HOVER_DWELL_MS + 20);
+};
 const keyDown = (element: HTMLElement, key: string) =>
   element.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-const moveMouse = (x: number, t: number) => {
-  const event = new MouseEvent('pointermove', { clientX: x, clientY: 12 });
-  Object.defineProperties(event, {
-    pointerType: { value: 'mouse' },
-    timeStamp: { value: t },
-  });
-  window.dispatchEvent(event);
-};
 /** Stands in for Next.js, whose history patch updates `usePathname` on a router rewrite. */
 const followPathname = (event: Event) => {
   mocks.pathname = (event as CustomEvent<ClientPathnameChangeDetail>).detail.pathname;
@@ -294,7 +296,7 @@ describe('selector option intent on a calculator page', () => {
     await render('/infx/calculator', calculatorPage);
     act(() => byTestId('model-selector').click());
 
-    const warmed = await newKeys(() => hover(option('Kimi K3')));
+    const warmed = await newKeys(() => rest(option('Kimi K3')));
     expect(warmed.keys).toEqual(
       hashes(
         throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey,
@@ -310,7 +312,7 @@ describe('selector option intent on a calculator page', () => {
     await render('/infx/calculator', calculatorPage);
     act(() => byTestId('precision-selector').click());
 
-    const warmed = await newKeys(() => hover(option('FP8')));
+    const warmed = await newKeys(() => rest(option('FP8')));
     expect(warmed.keys).toEqual(
       hashes(
         throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, FP8_DATE).queryKey,
@@ -353,7 +355,7 @@ describe('selector option intent on a calculator page', () => {
     await render('/infx/calculator', calculatorPage);
     act(() => byTestId('model-selector').click());
 
-    expect(await newKeys(() => hover(option('Kimi K3')))).toEqual({ keys: [], requests: 0 });
+    expect(await newKeys(() => rest(option('Kimi K3')))).toEqual({ keys: [], requests: 0 });
 
     const search = document.querySelector<HTMLInputElement>('[data-slot="select-content"] input')!;
     const warmed = await newKeys(() => keyDown(search, 'ArrowDown'));
@@ -366,33 +368,18 @@ describe('selector option intent on a calculator page', () => {
     );
   });
 
-  it('warms an option the mouse heads toward and stops watching once the menu closes', async () => {
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      callback(0);
-      return 0;
-    });
-    const removeListener = vi.spyOn(window, 'removeEventListener');
+  it('warms nothing when the pointer passes over options without resting', async () => {
     await render('/infx/calculator', calculatorPage);
     act(() => byTestId('model-selector').click());
-    expect(removeListener).not.toHaveBeenCalledWith('pointermove', expect.any(Function));
-    act(() => byTestId('model-selector').click());
-    expect(removeListener).toHaveBeenCalledWith('pointermove', expect.any(Function));
-    removeListener.mockRestore();
-
-    act(() => byTestId('model-selector').click());
-    option('Kimi K3').getBoundingClientRect = () =>
-      ({ left: 300, top: 0, right: 380, bottom: 24, width: 80, height: 24 }) as DOMRect;
-    const warmed = await newKeys(() => {
-      moveMouse(0, 0);
-      moveMouse(40, 16);
-      moveMouse(80, 32);
+    const passed = await newKeys(async () => {
+      for (const label of ['Kimi K3', 'DeepSeek']) {
+        hover(option(label));
+        await sleep(OPTION_HOVER_DWELL_MS / 3);
+        leave(option(label));
+      }
+      await sleep(OPTION_HOVER_DWELL_MS + 20);
     });
-    expect(warmed.keys).toEqual(
-      hashes(
-        throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey,
-        workflowInfoQueryOptions(AGENTIC_DATE).queryKey,
-      ),
-    );
+    expect(passed).toEqual({ keys: [], requests: 0 });
   });
 });
 
@@ -426,7 +413,7 @@ describe('selector option intent on the inference page', () => {
       requests: 0,
     });
 
-    const warmed = await newKeys(() => hover(option('Kimi K3')));
+    const warmed = await newKeys(() => rest(option('Kimi K3')));
     expect(warmed.keys).toEqual(
       hashes(inferenceChartKey(Model.Kimi_K3), workflowInfoQueryOptions(AGENTIC_DATE).queryKey),
     );
@@ -441,7 +428,7 @@ describe('selector option intent on the inference page', () => {
     // The route's default precisions include FP8, whose latest run is the newest.
     expect(option('FP8').getAttribute('aria-selected')).toBe('true');
 
-    const warmed = await newKeys(() => hover(option('FP8')));
+    const warmed = await newKeys(() => rest(option('FP8')));
     expect(warmed.keys).toEqual(hashes(workflowInfoQueryOptions(LATEST_DATE).queryKey));
     expect(await newKeys(() => option('FP8').click())).toEqual({ keys: [], requests: 0 });
   });
