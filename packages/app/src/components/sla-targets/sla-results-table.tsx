@@ -511,7 +511,7 @@ export function SlaResultsTable({
   };
   const head = `${TABLE_HEAD_CELL_STYLE} px-3 py-2`;
   const config = (row: SlaConfigView) => (
-    <span className="flex min-w-0 items-start gap-2">
+    <span className="flex min-w-0 items-start gap-2" data-testid="sla-config-name">
       <span
         aria-hidden="true"
         className="mt-1.5 size-2.5 shrink-0 rounded-full"
@@ -596,10 +596,10 @@ export function SlaResultsTable({
           const expanded = open.has(row.config.key);
           return (
             <li key={row.config.key} className="py-3" data-status={row.status}>
-              <div className="flex items-start justify-between gap-3">
-                {config(row)}
-                <div className="shrink-0 text-right text-sm">{cells.status}</div>
-              </div>
+              {/* Stacked, not side by side: the status carries a reason sentence on rows
+                  without a verdict, and beside the name it squeezes both into slivers. */}
+              {config(row)}
+              <div className="mt-1.5 pl-4.5 text-sm">{cells.status}</div>
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {(
                   [

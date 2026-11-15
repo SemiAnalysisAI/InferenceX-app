@@ -160,5 +160,37 @@ describe('SLA Targets', () => {
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
+
+    // The row without a verdict carries the longest status: a label, "Exploratory" and a
+    // reason sentence. It goes under the configuration name, never beside it.
+    for (const width of [360, 390, 430]) {
+      cy.viewport(width, 844);
+      cy.get('[data-testid="sla-results-list"] li[data-status="insufficient_data"]')
+        .first()
+        .within(() => {
+          cy.get('[data-testid="sla-config-name"]').then(([name]) => {
+            const box = name.getBoundingClientRect();
+            const card = name.closest('li')!.getBoundingClientRect();
+            expect(box.width, `name width at ${width}`).to.be.at.least(card.width * 0.8);
+            cy.get('[data-testid="sla-row-status"]').then(([status]) => {
+              expect(status.getBoundingClientRect().top).to.be.at.least(box.bottom);
+            });
+          });
+        });
+    }
+    cy.get('[data-testid="sla-results-list"] li[data-status="insufficient_data"]')
+      .first()
+      .find('button[aria-expanded]')
+      .click();
+    cy.get('[data-testid="sla-row-details"]:visible').should('contain.text', 'agentic_');
+    for (const width of [360, 430]) {
+      cy.viewport(width, 844);
+      // Retried: the charts redraw to the new width a moment after the viewport changes.
+      cy.document()
+        .its('documentElement')
+        .should((root) => {
+          expect(root.scrollWidth, `page width at ${width}`).to.be.at.most(root.clientWidth);
+        });
+    }
   });
 });
