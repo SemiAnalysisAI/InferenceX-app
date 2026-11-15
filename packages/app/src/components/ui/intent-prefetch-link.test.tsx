@@ -53,6 +53,17 @@ const renderAt = (left: number, top: number, width: number, height: number) => {
   const rect = { left, top, width, height, right: left + width, bottom: top + height };
   link().getBoundingClientRect = () => rect as DOMRect;
 };
+const setConnection = (connection: { saveData?: boolean; effectiveType?: string }) =>
+  Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
+const approach = () => {
+  move(0, 12, 0);
+  move(40, 12, 16);
+  move(80, 12, 32);
+};
+const hover = () =>
+  act(() => {
+    link().dispatchEvent(new Event('mouseover', { bubbles: true }));
+  });
 
 describe('IntentPrefetchLink', () => {
   it('does not prefetch while the link is merely on screen', () => {
@@ -180,6 +191,41 @@ describe('IntentPrefetchLink', () => {
       move(0, 12, 0, 'touch');
       move(80, 12, 32, 'touch');
       expect(link().dataset.prefetch).toBe('false');
+    });
+
+    describe('network and visibility', () => {
+      afterEach(() => {
+        Reflect.deleteProperty(navigator, 'connection');
+        Reflect.deleteProperty(document, 'visibilityState');
+      });
+
+      it('neither predicts nor counts hover as intent with Save-Data on, but keeps focus', () => {
+        setConnection({ saveData: true, effectiveType: '4g' });
+        renderAt(300, 0, 80, 24);
+        approach();
+        hover();
+        expect(link().dataset.prefetch).toBe('false');
+        act(() => {
+          link().dispatchEvent(new Event('focusin', { bubbles: true }));
+        });
+        expect(link().dataset.prefetch).toBe('null');
+      });
+
+      it.each(['2g', 'slow-2g'])('skips prediction but still prefetches on hover on %s', (type) => {
+        setConnection({ effectiveType: type });
+        renderAt(300, 0, 80, 24);
+        approach();
+        expect(link().dataset.prefetch).toBe('false');
+        hover();
+        expect(link().dataset.prefetch).toBe('null');
+      });
+
+      it('skips prediction while the tab is hidden', () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        renderAt(300, 0, 80, 24);
+        approach();
+        expect(link().dataset.prefetch).toBe('false');
+      });
     });
   });
 });

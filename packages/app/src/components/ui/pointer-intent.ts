@@ -74,8 +74,34 @@ export function segmentHitsRect(
   return true;
 }
 
+interface ConnectionHints {
+  saveData?: boolean;
+  effectiveType?: string;
+}
+
+function connectionHints(): ConnectionHints | undefined {
+  return (navigator as Navigator & { connection?: ConnectionHints }).connection;
+}
+
+/** The user asked the browser to save data, so pointer-driven speculation stays off entirely. */
+export function saveDataRequested(): boolean {
+  return connectionHints()?.saveData === true;
+}
+
+/** Prediction speculates further ahead than hover, so it also stands down on slow links. */
+function predictionAllowed(): boolean {
+  const hints = connectionHints();
+  return (
+    document.visibilityState === 'visible' &&
+    hints?.saveData !== true &&
+    hints?.effectiveType !== 'slow-2g' &&
+    hints?.effectiveType !== '2g'
+  );
+}
+
 function predict() {
   frame = 0;
+  if (!predictionAllowed()) return;
   const last = samples.at(-1);
   const end = projectPointer(samples);
   if (!last || !end) return;
@@ -85,7 +111,6 @@ function predict() {
     if (rect.width === 0 && rect.height === 0) continue;
     if (segmentHitsRect(last.x, last.y, px, py, rect, HIT_SLOP_PX)) {
       targets.delete(element);
-      debugHit?.(element);
       onPredicted();
     }
   }
@@ -119,16 +144,3 @@ export function watchPointerIntent(element: Element, onPredicted: () => void): (
     if (targets.delete(element) && targets.size === 0) stop();
   };
 }
-
-export const POINTER_INTENT_TUNING = {
-  SAMPLE_WINDOW_MS,
-  LOOKAHEAD_MS,
-  MAX_PROJECTION_PX,
-  MIN_SPEED_PX_PER_MS,
-  HIT_SLOP_PX,
-};
-let debugHit: ((element: Element) => void) | undefined;
-export function setPointerIntentDebug(onHit: (element: Element) => void) {
-  debugHit = onHit;
-}
-export const watchedElements = () => [...targets.keys()];

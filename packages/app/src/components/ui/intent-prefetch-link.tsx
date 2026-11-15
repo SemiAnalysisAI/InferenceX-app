@@ -4,17 +4,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 
-import { watchPointerIntent } from '@/components/ui/pointer-intent';
-import { mountPointerIntentDebug } from '@/components/ui/pointer-intent-debug';
+import { saveDataRequested, watchPointerIntent } from '@/components/ui/pointer-intent';
 import { prefetchRouteData } from '@/lib/prefetch/route-data';
-
-mountPointerIntentDebug();
 
 /**
  * `<Link>` that prefetches once the user shows intent (mouse heading toward it, hover, focus or
  * touch) instead of when it scrolls into view. Site-wide nav links point at dynamic dashboards, so
  * viewport prefetch would download their JS and RSC payloads on every page view. Intent also warms
- * the React Query data the target page loads on mount. `prefetch={false}` disables both.
+ * the React Query data the target page loads on mount. `prefetch={false}` disables both. With
+ * Save-Data on, neither prediction nor hover counts as intent.
  */
 export function IntentPrefetchLink({
   prefetch,
@@ -42,7 +40,7 @@ export function IntentPrefetchLink({
       ref={ref}
       prefetch={prefetch !== false && intent ? (prefetch ?? null) : false}
       onMouseEnter={(event) => {
-        setIntent(true);
+        if (!saveDataRequested()) setIntent(true);
         onMouseEnter?.(event);
       }}
       onFocus={(event) => {
