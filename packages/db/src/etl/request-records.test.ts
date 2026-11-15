@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   evaluateSlaAttempts,
@@ -15,7 +15,7 @@ import {
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { bulkIngestBenchmarkRows, type BenchmarkPersistenceInput } from './benchmark-ingest';
 import { mapBenchmarkRow } from './benchmark-mapper';
-import { ingestRequestRecords } from './request-records-ingest';
+import { ingestAndLogRequestRecords, ingestRequestRecords } from './request-records-ingest';
 import { createSkipTracker } from './skip-tracker';
 import {
   decodeSlaAttempts,
@@ -438,6 +438,22 @@ describe('ingestRequestRecords', () => {
     const after = await stored();
     expect(after).toHaveLength(1);
     expect(after[0].sha).not.toBe(first.sha);
+  });
+
+  it('reports a storage failure without failing the benchmark ingest', async () => {
+    const failing = (() => {
+      throw new Error('connection lost');
+    }) as unknown as PgliteSql;
+    const warnings: unknown[] = [];
+    const warn = vi.spyOn(console, 'warn').mockImplementation((line) => warnings.push(line));
+    try {
+      await expect(
+        ingestAndLogRequestRecords(failing, [point(2, block())], 1, ''),
+      ).resolves.toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+    expect(warnings).toEqual(['[WARN] request records not stored: connection lost']);
   });
 
   it('writes nothing and reports it when migration 031 is not applied', async () => {

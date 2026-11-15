@@ -356,8 +356,9 @@ Rules:
 - A point with more than 5% failed requests fails its job, and the job uploads no result row,
   so ingest never sees it. The row and its block still exist in the job's `power_audit_*`
   artifact; nothing reads them from there yet.
-- The comparison page lists AgentX configurations only. Reading `benchmark_sla_attempts` into
-  the view is left until an approved run has produced real blocks to check it against.
+- The page and the view list fixed-sequence configurations, always as "Insufficient data":
+  they do not read `benchmark_sla_attempts` yet. That read is left until an approved run has
+  produced real blocks to check it against.
 - `benchmark_sla_attempts` is not in the public-database sync's table list.
 - The adapter is tested against one synthetic sample (the client run against a local fake
   server, no model and no GPU), stored as a test fixture and never shown as a result.

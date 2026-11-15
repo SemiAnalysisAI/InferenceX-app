@@ -131,8 +131,28 @@ export async function ingestRequestRecords(
   return result;
 }
 
+/**
+ * Store the request records of a batch of benchmark points and log the
+ * outcome. The attempt data is an addition to rows that are already inserted,
+ * so a failure here is reported and never fails their ingest.
+ */
+export async function ingestAndLogRequestRecords(
+  sql: Sql,
+  rows: readonly RequestRecordsPoint[],
+  workflowRunId: number,
+  prefix: string,
+): Promise<void> {
+  try {
+    logRequestRecordsIngest(prefix, await ingestRequestRecords(sql, rows, workflowRunId));
+  } catch (error) {
+    console.warn(
+      `${prefix}[WARN] request records not stored: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 /** One line per outcome worth an operator's attention; silent when no point carried a block. */
-export function logRequestRecordsIngest(prefix: string, result: RequestRecordsIngestResult): void {
+function logRequestRecordsIngest(prefix: string, result: RequestRecordsIngestResult): void {
   if (result.tableAbsent) {
     console.warn(
       `${prefix}[WARN] request_records not stored: migration 031 (benchmark_sla_attempts) is not applied`,

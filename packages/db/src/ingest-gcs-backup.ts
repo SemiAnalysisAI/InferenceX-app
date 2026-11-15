@@ -22,7 +22,7 @@ import {
   bulkUpsertAvailability,
   insertServerLogFiles,
 } from './etl/benchmark-ingest';
-import { ingestRequestRecords, logRequestRecordsIngest } from './etl/request-records-ingest';
+import { ingestAndLogRequestRecords } from './etl/request-records-ingest';
 import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 import { mapEvalSamples } from './etl/eval-samples-mapper';
@@ -605,10 +605,7 @@ async function main(): Promise<void> {
           );
           wr.newBmk += newCount;
           wr.dupBmk += dupCount;
-          logRequestRecordsIngest(
-            `  [${result.dateDir}] `,
-            await ingestRequestRecords(sql, toInsert, workflowRunId),
-          );
+          await ingestAndLogRequestRecords(sql, toInsert, workflowRunId, `  [${result.dateDir}] `);
 
           allInserted.push(...toInsert);
 
