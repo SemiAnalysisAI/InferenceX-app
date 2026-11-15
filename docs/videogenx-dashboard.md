@@ -47,7 +47,8 @@ are fixed. New share/export URLs omit these keys. Both GPU cost bases
 remain available as evidence, not selectable chart settings.
 `r_workload` uses a compact source point identifier;
 canonical workload JSON stays inside the projection. Share includes the `r_`
-registry scope. `?unofficialrun=<id>` reads only that run through
+registry scope. `?unofficialrun=<id>` (the key matches in any case, so the PR visualizer's
+`?unofficialRun=` link works) reads only that run through
 `namedRunPoints`. A stored run keeps its actual approval status. A run absent from
 the History pages is read live from its GitHub artifacts through
 `/api/video-runs?run=<id>&format=live`: the newest attempt of each native
@@ -581,7 +582,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。
-指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。两者均保留所有匹配的 GPU 数，不再按 GPU 数量筛选。
+`?unofficialrun=` 参数名不区分大小写，PR 可视化评论中的 `?unofficialRun=` 链接同样有效。指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。两者均保留所有匹配的 GPU 数，不再按 GPU 数量筛选。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。

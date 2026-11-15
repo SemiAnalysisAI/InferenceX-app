@@ -488,8 +488,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '封印计划中的完整宽×高，例如 1344×768。',
   ],
   r_duration: [
-    'Positive requested clip duration from the plan, in seconds; not decoded output duration.',
-    '计划中的请求视频时长，单位秒，必须为正数；不是解码输出时长。',
+    'Positive requested clip duration from the plan, in seconds: duration_seconds, or frame_count ÷ fps for plans that request frames; not decoded output duration.',
+    '计划中的请求视频时长，单位秒，必须为正数：取 duration_seconds，按帧数请求的计划取 frame_count ÷ fps；不是解码输出时长。',
   ],
   r_mode: [
     'Explicit generation mode; unknown modes are never inferred from model names.',
