@@ -10,6 +10,7 @@ import {
   resultsSearch,
   type ResultCell,
   type ResultsState,
+  workloadSummary,
 } from './results';
 import type { ResultsEvidence } from './results-evidence';
 
@@ -271,6 +272,29 @@ describe('VideoGenX results contract', () => {
       { workloadKey: null },
     ])
       expect(resultProjection([], selection, [{ ...named, ...change }]).overlayCells).toEqual([]);
+  });
+
+  it('offers a second approved model as a selectable workload and names it by its derived duration', () => {
+    const identity = JSON.parse(eligible.workloadKey!);
+    identity.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+    Object.assign(identity.plan.generation, { width: 832, height: 480, frame_count: 81, fps: 16 });
+    delete identity.plan.generation.duration_seconds;
+    const wan = {
+      ...eligible,
+      id: 'wan:c1',
+      runId: '300',
+      hardwareKey: 'b200',
+      workloadKey: JSON.stringify(identity),
+    };
+    const offered = resultProjection([eligible, wan], state());
+    expect(offered.options.workloads.map((workload) => workload.key).sort()).toEqual(
+      [eligible.id, wan.id].sort(),
+    );
+    const selected = resultProjection([eligible, wan], { ...state(), workload: wan.id });
+    expect(selected.cells.map((cell) => cell.point.id)).toEqual([wan.id]);
+    expect(workloadSummary(wan, 'steps')).toContain(
+      'Wan-AI/Wan2.2-T2V-A14B-Diffusers · 832×480 · 5.06 s · 16 fps',
+    );
   });
 
   it('shows each deployment as of the selected run date and run', () => {

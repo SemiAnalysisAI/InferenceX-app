@@ -425,6 +425,33 @@ describe('VideoGenX results', () => {
     cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
   });
 
+  it('switches between approved models from the benchmark config', () => {
+    mount({
+      // A filter left over from the previous workload must not hide the next one.
+      search: '?r_y=videosPerGpuHour&r_steps=50',
+      editPage: (page) => {
+        const entry = page.entries.find((item) => item.runId === B200_RUN)!;
+        for (const source of entry.sources)
+          for (const observation of source.observations) {
+            const workload = JSON.parse(observation.workloadKey!);
+            workload.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+            workload.plan.generation.num_inference_steps = 40;
+            observation.workloadKey = JSON.stringify(workload);
+          }
+      },
+    });
+    hardwarePoints('h200').should('exist');
+    hardwarePoints('b200').should('not.exist');
+    cy.get('[data-testid="results-benchmark-config"]').should('be.visible');
+    cy.get('#results-workload').should('contain', 'MiniMaxAI/MiniMax-H3').click();
+    cy.contains('[role="option"]', 'Wan-AI/Wan2.2-T2V-A14B-Diffusers').click();
+    hardwarePoints('b200').should('exist');
+    hardwarePoints('h200').should('not.exist');
+    cy.get('#video-results-chart-title').should('contain', 'Wan-AI/Wan2.2-T2V-A14B-Diffusers');
+    searchParam('r_workload').should('not.be.null');
+    searchParam('r_steps').should('be.null');
+  });
+
   it('opens the named re-export, not the official cell, when both share an observation ID', () => {
     const namedRun = '90000000001';
     mount({
