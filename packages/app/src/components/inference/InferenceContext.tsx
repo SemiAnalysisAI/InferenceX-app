@@ -605,7 +605,7 @@ export function InferenceProvider({
   );
   const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
   const [showOffloadingLabel, setShowOffloadingLabel] = useState(
-    () => getUrlParam('i_offloadlabel') !== '0',
+    () => getUrlParam('i_offloadlabel') === '1',
   );
   const [showFrameworkLabel, setShowFrameworkLabel] = useState(
     () => getUrlParam('i_frameworklabel') !== '0',
