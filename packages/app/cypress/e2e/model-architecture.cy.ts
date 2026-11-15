@@ -89,6 +89,23 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('expanded transformer block contains expandable attention and FFN', () => {
+      cy.document().then((doc) => {
+        const inline = doc.querySelector('[data-testid="model-architecture-inline"]');
+        cy.writeFile(
+          `cypress/screenshots/diag-${Date.now()}.txt`,
+          [
+            doc.location.href,
+            [
+              ...doc.querySelectorAll<HTMLElement>(
+                '[data-testid^="expand-"],[data-testid^="collapse-"]',
+              ),
+            ]
+              .map((el) => el.dataset.testid)
+              .join(','),
+            inline?.outerHTML.slice(0, 4000) ?? 'no inline',
+          ].join('\n\n'),
+        );
+      });
       cy.get('[data-testid="expand-transformer"]').should('exist');
       cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
 
