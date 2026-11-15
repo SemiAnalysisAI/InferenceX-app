@@ -179,15 +179,42 @@ const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
   latencies: Array.from({ length: 20 }, (_, index) => 70 + index * 0.5),
   clientP50: 75,
   powerValid: true,
-  powerSeries: [
-    { seconds: 0, watts: 3800 },
-    { seconds: 1, watts: 3900 },
-  ],
+  powerSamples: 2,
   peakPowerW: 3900,
   gpuMemoryMiB: null,
   warmupSeconds: 38.2,
   failures: { timeout: 0, oom: 0, engine: 0, transport: 0, other: 0 },
 });
+
+/** Publishes the B200 run with the two-sample power trace the detail view reads when it opens. */
+const b200PowerTrace = (page: VideoHistoryPage) => {
+  const entry = page.entries.find((item) => item.runId === B200_RUN)!;
+  const saved = servingArtifact(Number(B200_RUN), entry.artifact.id, 'NVIDIA B200');
+  const [source] = saved.sources;
+  const manifestSha = entry.sources[0].observations[0].id.split(':')[0];
+  source.checksums = source.checksums.map(([path, sha]) => [
+    path,
+    path === 'manifest.json' ? manifestSha : sha,
+  ]);
+  source.documents = source.documents.map(([path, document]) => [
+    path,
+    /^gpu\/c\d+\/power\.json$/u.test(path)
+      ? {
+          ...(document as Record<string, unknown>),
+          window: { start_unix: 100, end_unix: 101 },
+          sample_series: [
+            { unix_seconds: 100, aggregate_watts: 3800, valid: true },
+            { unix_seconds: 101, aggregate_watts: 3900, valid: true },
+          ],
+        }
+      : document,
+  ]) as typeof source.documents;
+  cy.intercept(
+    'GET',
+    `/api/video-runs?run=${B200_RUN}&artifact=${entry.artifact.id}&format=published`,
+    saved,
+  );
+};
 
 /** The streamed dashboard replaces the pending shell, so an edit made in it would be lost. */
 const focusFirstControl = (focusable: boolean) =>
@@ -728,6 +755,7 @@ describe('VideoGenX results', () => {
       edit: (observation) => {
         observation.results = evidence(observation);
       },
+      editPage: b200PowerTrace,
     });
     points('[data-hardware="b200"]').trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip="video-results-chart"]')

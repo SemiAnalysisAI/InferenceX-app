@@ -1584,7 +1584,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-csv.ts',
-    sourceSha256: '25d35cb98a304d628bd932129d1b0c36ba1cd1bc9064bba23add1c76f2d1e77a',
+    sourceSha256: 'a055811ee460f9a7f9edbbd5da241ae5f9d7378ce27a43f7dc647192513d5944',
     reviewArea: {
       en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
       zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
@@ -1600,7 +1600,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: '3f96b5214df42659c388e475429f0d0e9eb1ccc7701edc225f82ab4919cac556',
+    sourceSha256: '484f9d4a8d62b522c8132685bd4dd33786d7bc7a77b3ee31488e09c87dbfba19',
     reviewArea: {
       en: 'VideoGenX published History, media with its stored quality, and the derived-media (rendition and poster) listing cache shared across instances under the video tag; the listing key is versioned by its value shape.',
       zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及派生媒体（转码版本与封面）回执列表以 video 标签跨实例共享的缓存；列表缓存键随值结构变化而升级版本。',
@@ -1632,7 +1632,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-evidence.ts',
-    sourceSha256: 'c052acf13c5151344e9ce00e8966733fe79a137d3509ccfad88a6e83da9f265c',
+    sourceSha256: '613a2f8d913ddbb3c463986a8193d1d0761c1dc594db96a95716208eaf4c69f4',
     reviewArea: {
       en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
       zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',

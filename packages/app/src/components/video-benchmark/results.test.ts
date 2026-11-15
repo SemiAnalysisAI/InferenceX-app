@@ -30,7 +30,7 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
   latencies: Array.from({ length: 20 }, (_, i) => i + 1),
   clientP50: 10.5,
   powerValid: true,
-  powerSeries: [],
+  powerSamples: 0,
   peakPowerW: 1500,
   gpuMemoryMiB: null,
   warmupSeconds: null,

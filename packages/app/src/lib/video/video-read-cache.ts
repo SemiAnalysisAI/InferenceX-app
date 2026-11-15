@@ -60,7 +60,7 @@ function retained<T, Args extends unknown[]>(
  * it whenever the cached value's shape changes.
  */
 export const cachedVideoHistory = retained(
-  'video:history:v2',
+  'video:history:v3',
   async (page: number, pages: number) => {
     const value = await publishedVideoHistory(page, pages);
     // A page past the end is empty for any number; keeping it would let requests grow the cache.

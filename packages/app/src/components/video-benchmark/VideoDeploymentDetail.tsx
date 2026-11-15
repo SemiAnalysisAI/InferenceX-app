@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { ShareButton } from '@/components/ui/share-button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
@@ -19,6 +20,7 @@ import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
+import { usePowerTrace } from './use-power-trace';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
 import styles from './results.module.css';
 
@@ -54,6 +56,8 @@ const STRINGS = {
         ? `Deadline ${seconds} s · attainment needs every valid request time`
         : `Deadline ${seconds} s · ${share} of valid clips met it`,
     trace: 'GPU board power over time',
+    traceLoading: 'Loading power trace…',
+    traceFailed: 'Power trace could not be loaded',
     time: 'Time (s)',
     powerSummary: (avg: string, peak: string) => `Average ${avg} · observed peak ${peak}`,
     energy: 'Energy',
@@ -137,6 +141,8 @@ const STRINGS = {
         ? `截止时间 ${seconds} s · 需要全部有效请求的时间记录才能计算达成率`
         : `截止时间 ${seconds} s · ${share} 的有效视频按时完成`,
     trace: 'GPU 板卡功率时间序列',
+    traceLoading: '正在加载功率时间序列…',
+    traceFailed: '无法加载功率时间序列',
     time: '时间（s）',
     powerSummary: (avg: string, peak: string) => `平均 ${avg} · 观测峰值 ${peak}`,
     energy: '能耗',
@@ -268,6 +274,12 @@ export default function VideoDeploymentDetail({
         : s.notRecorded;
   const measuredCounts = new Set(siblings.map((sibling) => sibling.point.participating));
   const failures = evidence?.failures ?? null;
+  // Older History has no sample count, so only a recorded zero skips the artifact read.
+  const trace = usePowerTrace(
+    point,
+    state.unofficialRun,
+    evidence?.powerValid === true && evidence.powerSamples !== 0,
+  );
   const actionLabel = {
     run: s.actionRun,
     artifact: s.actionArtifact,
@@ -448,14 +460,14 @@ export default function VideoDeploymentDetail({
               </Panel>
               <Panel title={s.trace}>
                 <div data-testid="results-power-trace">
-                  {evidence?.powerSeries.length ? (
+                  {trace.status === 'ready' && trace.samples.length > 0 ? (
                     <ResultsLines
                       series={[
                         {
                           key: point.hardwareKey ?? '',
                           label: hardware,
                           color,
-                          points: evidence.powerSeries.map((sample) => ({
+                          points: trace.samples.map((sample) => ({
                             x: sample.seconds,
                             y: sample.watts,
                           })),
@@ -466,8 +478,17 @@ export default function VideoDeploymentDetail({
                       yLabel="W"
                       width={phone ? 380 : 630}
                     />
+                  ) : trace.status === 'loading' ? (
+                    // Holds the chart's canvas, so the panel does not grow when the trace arrives.
+                    <Skeleton
+                      className={phone ? 'aspect-[380/262] w-full' : 'aspect-[630/262] w-full'}
+                      role="status"
+                      aria-label={s.traceLoading}
+                    />
                   ) : (
-                    <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {trace.status === 'failed' ? s.traceFailed : s.notRecorded}
+                    </p>
                   )}
                 </div>
                 <p className="text-xs">

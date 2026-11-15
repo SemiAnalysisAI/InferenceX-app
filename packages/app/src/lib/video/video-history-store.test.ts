@@ -355,9 +355,9 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 5,
-      // Frame-count plans (no `duration_seconds`) now project a workload key and duration.
-      sources: '261cb8b7390cbcc50b02048b3e3f471fad2a24b6d551be57b590c0f618f075cd',
+      projection: 6,
+      // The power trace left the entries; they keep its valid sample count.
+      sources: '49e9607a016acfe7bbc3fdc5ece25697f74485afff7bbb96412973dd9f2b05d4',
     });
   });
 });

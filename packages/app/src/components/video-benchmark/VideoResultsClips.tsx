@@ -33,6 +33,7 @@ import { engineLabel } from './engines';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
 import { isLossy, lossyLabel, optimizationsOf } from './optimizations';
+import { readPointArtifact } from './point-artifact';
 import {
   publishedResultsSide,
   resultsClipGroups,
@@ -42,7 +43,6 @@ import {
   type ResultsClipSide,
 } from './results-clips';
 import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
-import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
 import VideoClipReadout from './VideoClipReadout';
@@ -222,17 +222,8 @@ async function readSide(
   unofficialRun: string | undefined,
   signal: AbortSignal,
 ): Promise<ResultsClipSide | null> {
-  const read = (format: 'published' | 'live') =>
-    fetch(
-      `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=${format}`,
-      { signal },
-    );
-  let response = await read('published');
-  // An unstored named run carries PSNR without media.
-  if (response.status === 204 && point.runId === unofficialRun) response = await read('live');
-  if (response.status === 204) return null;
-  if (!response.ok) throw new Error('Published media read failed');
-  return publishedResultsSide((await response.json()) as StoredArtifact, point);
+  const saved = await readPointArtifact(point, unofficialRun, signal);
+  return saved && publishedResultsSide(saved, point);
 }
 
 export default function VideoResultsClips({
