@@ -58,7 +58,7 @@ const gemm = comparisonView(
 );
 const moe = comparisonView(buildComparison('moe', []), null);
 
-it('shows measured and missing GPU coverage, then switches the path to MoE', () => {
+it('shows measured and missing GPU coverage, then links to MoE and back', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
@@ -74,11 +74,23 @@ it('shows measured and missing GPU coverage, then switches the path to MoE', () 
     .and('contain.text', '1/2');
   cy.get('[data-testid="operatorx-viz-metric-vs-size"]').should('contain.text', 'M');
 
-  cy.get('[data-testid="operatorx-page"]').contains('button', 'MoE').click();
+  cy.get('[data-testid="operatorx-page"] nav')
+    .contains('a', 'MoE')
+    .should('have.attr', 'href', '/opx/moe?model=DeepSeek-V4-Pro')
+    .click();
   cy.wait('@moe');
   cy.location('pathname').should('eq', '/opx/moe');
   cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
   cy.contains('No results yet').should('be.visible');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+
+  cy.go('back');
+  cy.location('pathname').should('eq', '/opx/gemm');
+  cy.get('[data-testid="operatorx-coverage"]').should('contain.text', 'Coverage of 2 cases');
 });
 
 it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
@@ -98,10 +110,10 @@ it('redirects a legacy ?op= link to the category path', () => {
   cy.visit('/opx?op=model');
   cy.location('pathname').should('eq', '/opx/model');
   cy.location('search').should('eq', '');
-  cy.contains('[data-testid="operatorx-page"] [role="tab"]', 'Model view').should(
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Model view').should(
     'have.attr',
-    'aria-selected',
-    'true',
+    'aria-current',
+    'page',
   );
 });
 

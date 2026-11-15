@@ -25,36 +25,38 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   );
 }
 
+/** Tab look, keyed off `data-state="active"`; also used by link-based tab strips. */
+export const tabsTriggerClassName = cn(
+  'relative',
+  'inline-flex',
+  'items-center',
+  'justify-center',
+  'gap-1.5',
+  'border-b-2',
+  'border-transparent',
+  'px-4',
+  'py-2',
+  'text-sm',
+  'font-medium',
+  'whitespace-nowrap',
+  'text-muted-foreground',
+  'hover:text-foreground',
+  'data-[state=active]:text-foreground',
+  'data-[state=active]:border-brand',
+  'transition-colors duration-200',
+  'focus-visible:outline-none',
+  'disabled:pointer-events-none',
+  'disabled:opacity-60',
+  '[&_svg]:pointer-events-none',
+  '[&_svg]:shrink-0',
+  "[&_svg:not([class*='size-'])]:size-4",
+);
+
 function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
-      className={cn(
-        'relative',
-        'inline-flex',
-        'items-center',
-        'justify-center',
-        'gap-1.5',
-        'border-b-2',
-        'border-transparent',
-        'px-4',
-        'py-2',
-        'text-sm',
-        'font-medium',
-        'whitespace-nowrap',
-        'text-muted-foreground',
-        'hover:text-foreground',
-        'data-[state=active]:text-foreground',
-        'data-[state=active]:border-brand',
-        'transition-colors duration-200',
-        'focus-visible:outline-none',
-        'disabled:pointer-events-none',
-        'disabled:opacity-60',
-        '[&_svg]:pointer-events-none',
-        '[&_svg]:shrink-0',
-        "[&_svg:not([class*='size-'])]:size-4",
-        className,
-      )}
+      className={cn(tabsTriggerClassName, className)}
       {...props}
     />
   );
