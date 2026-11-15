@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { headingVariants } from '@/components/ui/heading';
@@ -22,7 +22,7 @@ export function PagerCard({
 }) {
   const Icon = direction === 'prev' ? ArrowLeft : ArrowRight;
   return (
-    <Link
+    <IntentPrefetchLink
       href={href}
       className={cn(
         'group flex min-w-0 flex-col gap-2 rounded-xl border border-border/30 bg-card p-5 transition-colors hover:border-border',
@@ -55,6 +55,6 @@ export function PagerCard({
       >
         {title}
       </span>
-    </Link>
+    </IntentPrefetchLink>
   );
 }

@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -216,9 +216,9 @@ export function DatasetDetail({
         >
           {t.retry}
         </button>
-        <Link href={`${prefix}${AGENTX_ROUTE.path}`} className="text-brand underline">
+        <IntentPrefetchLink href={`${prefix}${AGENTX_ROUTE.path}`} className="text-brand underline">
           {t.backToDatasets}
-        </Link>
+        </IntentPrefetchLink>
       </div>
     );
   }
@@ -230,9 +230,9 @@ export function DatasetDetail({
         data-locale={locale}
       >
         {t.notFound}{' '}
-        <Link href={`${prefix}${AGENTX_ROUTE.path}`} className="text-brand underline">
+        <IntentPrefetchLink href={`${prefix}${AGENTX_ROUTE.path}`} className="text-brand underline">
           {t.backToDatasets}
-        </Link>
+        </IntentPrefetchLink>
       </div>
     );
   }
@@ -246,13 +246,13 @@ export function DatasetDetail({
   return (
     <div className="min-h-svh flex flex-col gap-6">
       <div>
-        <Link
+        <IntentPrefetchLink
           href={`${prefix}${AGENTX_ROUTE.path}`}
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           {t.breadcrumbDatasets}
-        </Link>
+        </IntentPrefetchLink>
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-2xl font-semibold text-foreground">{dataset.label}</h1>
           <div className="flex items-center gap-2 text-sm">
@@ -457,13 +457,13 @@ export function DatasetDetail({
                       className="border-b border-border/20 last:border-0 hover:bg-accent/40"
                     >
                       <td className="px-3 py-2">
-                        <Link
+                        <IntentPrefetchLink
                           href={`${prefix}${AGENTX_ROUTE.path}/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
                           onClick={() => track('datasets_conversation_clicked', { slug })}
                           className="font-mono text-xs text-brand hover:underline"
                         >
                           {c.conv_id.slice(0, 20)}…
-                        </Link>
+                        </IntentPrefetchLink>
                         {c.models.length > 0 && (
                           <span className="ml-2 text-2xs text-muted-foreground">
                             {t.modelSuffix(c.models.length)}

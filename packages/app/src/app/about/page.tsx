@@ -9,6 +9,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import {
   ARTICLE_H2_CLASS,
   ARTICLE_PAGE_CLASS,
@@ -66,19 +67,19 @@ export default function AboutPage() {
               Our open data and insights are widely adopted by the ML community, capacity planning
               strategy teams at trillion dollar token factories and AI labs, and at multiple billion
               dollar NeoClouds. Learn more in our articles:{' '}
-              <Link
+              <IntentPrefetchLink
                 href="/blog/inferencemax-open-source-inference-benchmarking"
                 className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v1
-              </Link>
+              </IntentPrefetchLink>
               ,{' '}
-              <Link
+              <IntentPrefetchLink
                 href="/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
                 className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v2
-              </Link>
+              </IntentPrefetchLink>
               .
             </p>
           </div>

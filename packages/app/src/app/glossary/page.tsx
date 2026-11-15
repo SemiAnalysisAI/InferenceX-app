@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { GlossaryBrowser, type GlossaryBrowserEntry } from '@/components/glossary/glossary-browser';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -123,18 +123,18 @@ export default function GlossaryPage() {
               operating points. One maximum-throughput point cannot rank the complete system.
             </p>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium">
-              <Link href="/glossary/interactivity" className={MORE_LINK}>
+              <IntentPrefetchLink href="/glossary/interactivity" className={MORE_LINK}>
                 Interactivity
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href="/glossary/pareto-frontier" className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href="/glossary/pareto-frontier" className={MORE_LINK}>
                 Pareto frontier
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href="/glossary/iso-interactivity" className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href="/glossary/iso-interactivity" className={MORE_LINK}>
                 Iso-interactivity
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+              </IntentPrefetchLink>
             </div>
           </div>
 
@@ -146,18 +146,18 @@ export default function GlossaryPage() {
               speedups on unchanged chips.
             </p>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium">
-              <Link href={`${AGENTX_ROUTE.path}/methodology`} className={MORE_LINK}>
+              <IntentPrefetchLink href={`${AGENTX_ROUTE.path}/methodology`} className={MORE_LINK}>
                 AgentX methodology
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href="/blog" className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href="/blog" className={MORE_LINK}>
                 Browse technical articles
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href={getDashboardRoute('inference').path} className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href={getDashboardRoute('inference').path} className={MORE_LINK}>
                 Explore live benchmark data
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+              </IntentPrefetchLink>
             </div>
           </div>
         </section>

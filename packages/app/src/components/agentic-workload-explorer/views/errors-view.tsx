@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -468,12 +468,12 @@ function ErrorsPageContent() {
                           {err.durationMs === null ? '--' : formatDuration(err.durationMs)}
                         </td>
                         <td className="px-3 py-2">
-                          <Link
+                          <IntentPrefetchLink
                             href={explorerHref(`/sessions/${err.sessionId}/conversation`)}
                             className="font-mono text-brand hover:underline"
                           >
                             {err.sessionId.split('-')[0]}...
-                          </Link>
+                          </IntentPrefetchLink>
                         </td>
                         <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">
                           {formatSnapshotTime(err.timestamp, locale)}

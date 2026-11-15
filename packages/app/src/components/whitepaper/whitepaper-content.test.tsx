@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +14,10 @@ import { WhitepaperIndexContent } from './whitepaper-index-content';
 
 const MI355X_SLUG = 'amd-mi355x-32b-revenue-per-gigawatt-kimi-k3';
 const HAN = /\p{Script=Han}/u;
+
+const withQueryClient = (ui: ReactNode) => (
+  <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+);
 
 function paper() {
   const found = getWhitepaper(MI355X_SLUG);
@@ -29,7 +35,9 @@ function countOccurrences(haystack: string, needle: string) {
 
 describe('WhitepaperDetailContent', () => {
   it('renders the hero, registry KPIs, comparison bar, both figures, and the sidebar PDF card', () => {
-    const html = renderToStaticMarkup(<WhitepaperDetailContent paper={paper()} locale="en" />);
+    const html = renderToStaticMarkup(
+      withQueryClient(<WhitepaperDetailContent paper={paper()} locale="en" />),
+    );
     const { en, chart, figures } = paper();
 
     expect(html).toContain('data-testid="whitepaper-detail-page"');
@@ -62,7 +70,9 @@ describe('WhitepaperDetailContent', () => {
   });
 
   it('renders the Chinese page with translated chrome and no English fallbacks', () => {
-    const html = renderToStaticMarkup(<WhitepaperDetailContent paper={paper()} locale="zh" />);
+    const html = renderToStaticMarkup(
+      withQueryClient(<WhitepaperDetailContent paper={paper()} locale="zh" />),
+    );
     const { zh } = paper();
 
     expect(html).toContain(WHITEPAPER_COPY.zh.keyNumbers);
@@ -82,7 +92,7 @@ describe('WhitepaperDetailContent', () => {
 
 describe('WhitepaperIndexContent', () => {
   it('renders one card per paper with cover, KPIs, tags, and links', () => {
-    const html = renderToStaticMarkup(<WhitepaperIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<WhitepaperIndexContent locale="en" />));
     const { en, coverImagePath, tags } = paper();
 
     expect(html).toContain('data-testid="whitepaper-index-page"');
@@ -105,7 +115,7 @@ describe('WhitepaperIndexContent', () => {
   });
 
   it('renders the Chinese index with translated strings', () => {
-    const html = renderToStaticMarkup(<WhitepaperIndexContent locale="zh" />);
+    const html = renderToStaticMarkup(withQueryClient(<WhitepaperIndexContent locale="zh" />));
     const { zh } = paper();
 
     expect(html).toContain(WHITEPAPER_COPY.zh.indexTitle);

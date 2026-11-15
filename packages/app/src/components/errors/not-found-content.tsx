@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -41,9 +41,9 @@ export function NotFoundContent({ locale }: { locale: Locale }) {
       <h1 className="mb-2 text-2xl font-semibold">{t.title}</h1>
       <p className="mb-8 text-sm text-muted-foreground">{t.description}</p>
       <Button asChild variant="outline">
-        <Link href={href} onClick={() => track('not_found_home_clicked', { locale })}>
+        <IntentPrefetchLink href={href} onClick={() => track('not_found_home_clicked', { locale })}>
           {t.home}
-        </Link>
+        </IntentPrefetchLink>
       </Button>
     </div>
   );

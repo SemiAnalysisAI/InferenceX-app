@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -44,16 +46,19 @@ import { BlogIndexContent, blogIndexData } from './blog-index-content';
 import { BlogIndexPosts } from './blog-index-posts';
 
 const HAN = /\p{Script=Han}/u;
+const withQueryClient = (ui: ReactNode) => (
+  <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+);
 
 function renderTagged(locale: 'en' | 'zh', tag: string): string {
   return renderToStaticMarkup(
-    <BlogIndexPosts locale={locale} {...blogIndexData(locale)} activeTag={tag} />,
+    withQueryClient(<BlogIndexPosts locale={locale} {...blogIndexData(locale)} activeTag={tag} />),
   );
 }
 
 describe('BlogIndexContent', () => {
   it('features the newest post once and lists the rest in the grid', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<BlogIndexContent locale="en" />));
 
     expect(html).toContain('data-testid="blog-featured-post"');
     expect(html).toContain('href="/blog/newest"');
@@ -64,7 +69,7 @@ describe('BlogIndexContent', () => {
   });
 
   it('uses post figures as thumbnails and a text-free tile when a post has none', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<BlogIndexContent locale="en" />));
 
     expect(html).toContain(
       'data-src-light="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-light.png&amp;w=1200&amp;q=75"',
@@ -88,17 +93,19 @@ describe('BlogIndexContent', () => {
 
   it('lays the featured card out as a single text column when the post has no figure', () => {
     const html = renderToStaticMarkup(
-      <BlogFeaturedPost
-        slug="newest"
-        title="Title newest"
-        subtitle="Subtitle newest"
-        dateLabel="May 1, 2026"
-        date="2026-05-01"
-        readingLabel="4 min read"
-        tags={['nvidia']}
-        thumbnail={null}
-        labels={{ eyebrow: 'Latest', read: 'Read article', tags: 'Tags' }}
-      />,
+      withQueryClient(
+        <BlogFeaturedPost
+          slug="newest"
+          title="Title newest"
+          subtitle="Subtitle newest"
+          dateLabel="May 1, 2026"
+          date="2026-05-01"
+          readingLabel="4 min read"
+          tags={['nvidia']}
+          thumbnail={null}
+          labels={{ eyebrow: 'Latest', read: 'Read article', tags: 'Tags' }}
+        />,
+      ),
     );
     expect(html).toContain('data-layout="text"');
     expect(html).not.toContain('<img');
@@ -143,7 +150,8 @@ describe('BlogIndexContent', () => {
 
   it('renders Chinese chrome and zh routes for the zh locale', () => {
     const html =
-      renderToStaticMarkup(<BlogIndexContent locale="zh" />) + renderTagged('zh', 'agentx');
+      renderToStaticMarkup(withQueryClient(<BlogIndexContent locale="zh" />)) +
+      renderTagged('zh', 'agentx');
 
     expect(html).toContain('href="/zh/blog?tag=nvidia"');
     expect(html).toContain('href="/zh/blog/newest"');

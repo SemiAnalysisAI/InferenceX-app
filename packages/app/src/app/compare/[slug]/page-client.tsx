@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
@@ -128,9 +128,9 @@ export default function ComparePageClient({
                 {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI
                 推理基准测试结果，涵盖不同 LLM
                 工作负载下的延迟、吞吐量和成本。可通过下方图表控件切换序列长度、精度和指标，操作方式与
-                <Link href="/zh" className="underline hover:text-primary">
+                <IntentPrefetchLink href="/zh" className="underline hover:text-primary">
                   {t.mainChartLinkText}
-                </Link>
+                </IntentPrefetchLink>
                 相同。
               </p>
             ) : (
@@ -140,9 +140,9 @@ export default function ComparePageClient({
                 <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
                 Use the chart controls below to switch sequences, precisions, and metrics — same
                 interactions as{' '}
-                <Link href="/" className="underline hover:text-primary">
+                <IntentPrefetchLink href="/" className="underline hover:text-primary">
                   {t.mainChartLinkText}
-                </Link>
+                </IntentPrefetchLink>
                 .
               </p>
             )}
@@ -152,13 +152,13 @@ export default function ComparePageClient({
                 data-testid="compare-agentic-intro"
               >
                 {agenticIntro.paragraph}{' '}
-                <Link
+                <IntentPrefetchLink
                   href={agenticIntro.href}
                   data-testid="compare-agentic-intro-link"
                   className="font-medium text-brand underline underline-offset-4 hover:no-underline"
                 >
                   {agenticIntro.linkLabel} →
-                </Link>
+                </IntentPrefetchLink>
               </p>
             )}
             {narrative.length > 0 && (
@@ -181,17 +181,17 @@ export default function ComparePageClient({
               </div>
             )}
             <p className="mt-2 text-sm">
-              <Link
+              <IntentPrefetchLink
                 href={isZh ? `/zh/compare-per-dollar/${slug}` : `/compare-per-dollar/${slug}`}
                 className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_cross_link_to_per_dollar', { slug })}
               >
                 {t.perDollarLinkText}
-              </Link>
+              </IntentPrefetchLink>
             </p>
             {chipPageLink && (
               <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
-                <Link
+                <IntentPrefetchLink
                   href={chipPageLink.href}
                   className="underline hover:text-primary text-muted-foreground"
                   onClick={() =>
@@ -202,7 +202,7 @@ export default function ComparePageClient({
                   }
                 >
                   {chipPageLink.label} →
-                </Link>
+                </IntentPrefetchLink>
               </p>
             )}
           </header>

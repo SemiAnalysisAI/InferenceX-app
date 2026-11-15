@@ -409,9 +409,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
       cy.visit(prefix || '/');
       const link = '[data-testid="landing-huawei-results-link"]';
-      cy.get(link)
-        .should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
-        .and('not.have.attr', 'data-prefetch-ready');
+      cy.get(link).should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`);
       cy.get('@operatorxIntent.all').should('have.length', 0);
       cy.get(link).focus();
       cy.location('pathname').should('eq', prefix || '/');

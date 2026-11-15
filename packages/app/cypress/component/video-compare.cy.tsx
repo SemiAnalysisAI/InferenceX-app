@@ -9,6 +9,7 @@ import type { ResultsEvidence } from '@/components/video-benchmark/results-evide
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
+import { mountWithProviders } from '../support/test-utils';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -322,7 +323,7 @@ function mountResultsClips(
       </PathnameContext.Provider>
     );
   }
-  cy.mount(<Clips />);
+  mountWithProviders(<Clips />);
   cy.wait(keys.map((key) => `@results-${key}` as const));
 }
 

@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
@@ -50,12 +50,12 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
         <Card>
           <header>
             <p className="mb-2 text-sm text-muted-foreground">
-              <Link
+              <IntentPrefetchLink
                 href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}
-              </Link>{' '}
+              </IntentPrefetchLink>{' '}
               / {t.modelBreadcrumb}
             </p>
             <Heading as="h1" level="page" className="text-balance">

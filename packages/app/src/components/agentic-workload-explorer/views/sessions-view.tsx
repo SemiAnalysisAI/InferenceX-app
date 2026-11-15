@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -533,7 +533,7 @@ function SessionRow({ session }: { session: Session }) {
 
   return (
     <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center max-sm:grid-cols-1 max-sm:gap-1 sm:grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px]">
-      <Link
+      <IntentPrefetchLink
         href={explorerHref(`/sessions/${session.id}`)}
         aria-label={t.openSession(session.id)}
         className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -273,12 +273,12 @@ function WebSearchTopSessionsTable({
                 <tr key={s.sessionId} className="border-b border-border/20 hover:bg-surface-hover">
                   <td className="py-1.5 px-2 text-muted-foreground">{i + 1}</td>
                   <td className="py-1.5 px-2">
-                    <Link
+                    <IntentPrefetchLink
                       href={explorerHref(`/sessions/${s.sessionId}/conversation`)}
                       className="font-mono text-brand underline underline-offset-2"
                     >
                       {s.sessionId.split('-')[0]}…
-                    </Link>
+                    </IntentPrefetchLink>
                   </td>
                   <td className="py-1.5 px-2 text-right font-medium">
                     {formatNumber(s.searchCount)}

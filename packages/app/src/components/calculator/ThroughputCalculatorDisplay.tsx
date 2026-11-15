@@ -3,6 +3,7 @@
 import { chipBasisCsvNote, withTotalChipQualifier } from '@/lib/benchmarks/chip-basis';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import Link from 'next/link';
@@ -1463,13 +1464,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         <section data-testid="calculator-fleet-pointer">
           <p className="text-sm text-muted-foreground">
             {t.fleetMoved}{' '}
-            <Link
+            <IntentPrefetchLink
               href={localePath(getDashboardRoute('fleet').path, locale)}
               className="underline hover:text-foreground"
               data-testid="calculator-fleet-pointer-link"
             >
               {t.fleetMovedLink}
-            </Link>
+            </IntentPrefetchLink>
           </p>
         </section>
       )}

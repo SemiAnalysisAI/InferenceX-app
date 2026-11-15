@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { notFound } from 'next/navigation';
 
 import { GlossaryFigure } from '@/components/glossary/glossary-figure';
@@ -132,13 +132,13 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
       <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS)}>
         <article className="flex flex-col gap-10">
           <header className="border-b border-border/30 pb-8">
-            <Link
+            <IntentPrefetchLink
               href="/zh/glossary"
               className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft aria-hidden="true" className="size-4" />
               AI 推理术语表
-            </Link>
+            </IntentPrefetchLink>
             <p className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted-foreground">
               <span>{GLOSSARY_CATEGORY_LABELS_ZH[entry.category]}</span>
               {entry.abbreviation && <span className="font-mono">{entry.abbreviation}</span>}
@@ -216,7 +216,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
               <p className="text-xs font-medium text-muted-foreground">相关术语</p>
               <nav aria-label="相关术语" className="mt-3 flex flex-col">
                 {relatedTerms.map((related) => (
-                  <Link
+                  <IntentPrefetchLink
                     key={related.slug}
                     href={`/zh/glossary/${related.slug}`}
                     className="group flex items-center justify-between gap-3 border-b border-border/20 py-2.5 text-sm transition-colors last:border-b-0 hover:text-brand focus-visible:outline-none"
@@ -226,7 +226,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                       aria-hidden="true"
                       className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand"
                     />
-                  </Link>
+                  </IntentPrefetchLink>
                 ))}
               </nav>
             </aside>
@@ -238,17 +238,17 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 <h2 id="further-reading" className={ARTICLE_H2_CLASS}>
                   在真实基准中理解这一概念
                 </h2>
-                <Link
+                <IntentPrefetchLink
                   href="/zh/blog"
                   className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
                 >
                   全部文章
                   <ArrowRight aria-hidden="true" className="size-4" />
-                </Link>
+                </IntentPrefetchLink>
               </div>
               <div className="mt-4 max-w-measure divide-y divide-border/20">
                 {relatedArticles.map((article) => (
-                  <Link
+                  <IntentPrefetchLink
                     key={article.slug}
                     href={`/zh/blog/${article.slug}`}
                     className="group grid gap-2 py-4 focus-visible:outline-none md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
@@ -265,7 +265,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                       aria-hidden="true"
                       className="hidden size-4 text-muted-foreground transition-colors group-hover:text-foreground md:block"
                     />
-                  </Link>
+                  </IntentPrefetchLink>
                 ))}
               </div>
             </section>

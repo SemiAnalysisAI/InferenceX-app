@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { track } from '@/lib/analytics/analytics';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,7 @@ export function ModelArchitectureInfoLink({
   return (
     <TooltipRoot>
       <TooltipTrigger asChild>
-        <Link
+        <IntentPrefetchLink
           href={localePath(`/model/${entry.slug}`, locale)}
           aria-label={text}
           data-testid="model-architecture-link"
@@ -45,7 +45,7 @@ export function ModelArchitectureInfoLink({
             <line x1="3" y1="9" x2="21" y2="9" />
             <line x1="9" y1="9" x2="9" y2="21" />
           </svg>
-        </Link>
+        </IntentPrefetchLink>
       </TooltipTrigger>
       <TooltipContent
         side="top"

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -266,12 +266,12 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
     <div className="space-y-5">
       <div className="space-y-1">
         <div className="flex items-center gap-1.5 text-xs">
-          <Link
+          <IntentPrefetchLink
             href={explorerHref('/sessions')}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             {t.sessions}
-          </Link>
+          </IntentPrefetchLink>
           <span className="text-muted-foreground">/</span>
           <span className="min-w-0 truncate font-mono font-medium">{session.id}</span>
         </div>
@@ -392,7 +392,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
             {navLinks.map((link) => {
               const isActive = link.active;
               return (
-                <Link
+                <IntentPrefetchLink
                   key={link.href}
                   href={link.href}
                   className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap ${SEGMENT_RADIUS_STYLE} px-1.5 text-sm font-medium transition-colors md:min-h-6 ${
@@ -402,7 +402,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
                   }`}
                 >
                   {link.label}
-                </Link>
+                </IntentPrefetchLink>
               );
             })}
           </nav>

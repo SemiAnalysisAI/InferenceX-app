@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import {
   GlossaryBrowser,
@@ -152,18 +152,18 @@ export default function ZhGlossaryPage() {
               曲线和等交互性比较，展示不同运行点上的真实权衡。单一最大吞吐点无法代表完整系统。
             </p>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium">
-              <Link href="/zh/glossary/interactivity" className={MORE_LINK}>
+              <IntentPrefetchLink href="/zh/glossary/interactivity" className={MORE_LINK}>
                 交互性
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href="/zh/glossary/pareto-frontier" className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href="/zh/glossary/pareto-frontier" className={MORE_LINK}>
                 Pareto 前沿
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href="/zh/glossary/iso-interactivity" className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href="/zh/glossary/iso-interactivity" className={MORE_LINK}>
                 等交互性
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+              </IntentPrefetchLink>
             </div>
           </div>
 
@@ -174,18 +174,24 @@ export default function ZhGlossaryPage() {
               Wide EP 扩展，以及硬件不变时的软件性能提升。
             </p>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium">
-              <Link href={`/zh${AGENTX_ROUTE.path}/methodology`} className={MORE_LINK}>
+              <IntentPrefetchLink
+                href={`/zh${AGENTX_ROUTE.path}/methodology`}
+                className={MORE_LINK}
+              >
                 AgentX 方法说明
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href="/zh/blog" className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink href="/zh/blog" className={MORE_LINK}>
                 浏览技术文章
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-              <Link href={`/zh${getDashboardRoute('inference').path}`} className={MORE_LINK}>
+              </IntentPrefetchLink>
+              <IntentPrefetchLink
+                href={`/zh${getDashboardRoute('inference').path}`}
+                className={MORE_LINK}
+              >
                 查看实时基准数据
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+              </IntentPrefetchLink>
             </div>
           </div>
         </section>
