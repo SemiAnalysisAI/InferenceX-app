@@ -200,6 +200,14 @@ export const apiRouteCatalog = [
     sourceSha256: '49ef61c55d9a90d33cda2bedda7dffe2c1ede9d890bebb3b7c07223cd3c8852e',
   },
   {
+    source: 'src/app/api/v1/views/sla-targets/route.ts',
+    path: '/api/v1/views/sla-targets',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-sla-targets-view',
+    sourceSha256: '4cdc71a92f95ea2cf64e6a48a47eb44c84eebdc35a5f2ba7f2ad2b80c6c692e7',
+  },
+  {
     source: 'src/app/api/v1/views/submissions/route.ts',
     path: '/api/v1/views/submissions',
     method: 'GET',
@@ -977,8 +985,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'SLA Targets page backend behind a feature-gated tab; the response follows the page and is not yet a stable public contract.',
-      zh: 'SLA 目标页面的专用后端，对应的标签页受功能开关控制；响应结构跟随页面，尚不是稳定的公开契约。',
+      en: 'SLA Targets page backend; its response follows the page. The public read-only projection of the same evaluation is /api/v1/views/sla-targets.',
+      zh: 'SLA 目标页面的专用后端，响应结构跟随页面。同一评估的公开只读投影为 /api/v1/views/sla-targets。',
     },
     sourceSha256: 'd5acf2a69debe9369f3051db03a99217fcdb1e9868cd790dcbddcb382a1c996c',
   },
@@ -988,8 +996,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'SLA Targets page backend behind a feature-gated tab; the response follows the page and is not yet a stable public contract.',
-      zh: 'SLA 目标页面的专用后端，对应的标签页受功能开关控制；响应结构跟随页面，尚不是稳定的公开契约。',
+      en: 'SLA Targets page backend; its response follows the page. The public read-only projection of the same evaluation is /api/v1/views/sla-targets.',
+      zh: 'SLA 目标页面的专用后端，响应结构跟随页面。同一评估的公开只读投影为 /api/v1/views/sla-targets。',
     },
     sourceSha256: 'a8e4ee11a235afe6814c140021f7126c4c4af8ca2463984e898c8578caafb3ca',
   },
@@ -1909,7 +1917,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'a38642b2f2d791d78ce0ac7f3ec06477808a103279c2535e08be7eadcc876f7b',
+    sourceSha256: '17d781b025dc6ccca860eedd309a15ea39f355d449e6babee9a987c9669fca8e',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

@@ -239,6 +239,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   rankings: ['format', 'kind', 'model', 'scenario'],
   reliability: ['asOf', 'format', 'gpus', 'range'],
+  'sla-targets': ['attainment', 'cost', 'e2e', 'model', 'sequence', 'tpot', 'ttft'],
   submissions: ['direction', 'limit', 'lines', 'mode', 'offset', 'onChangeOnly', 'search', 'sort'],
   video: [
     ...RESULTS_QUERY_PARAMS,
@@ -294,10 +295,7 @@ export const DASHBOARD_API_COVERAGE = {
     exclusion:
       'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
-  'sla-targets': {
-    exclusion:
-      'Feature-gated SLA Targets preview. Its measurement contract is still under review, so the page reads the page-owned /api/v1/sla-targets and /api/v1/sla-evaluations routes and no stable public read-only view is published yet. Publish /api/v1/views/sla-targets with its skills reference before the tab leaves the feature gate.',
-  },
+  'sla-targets': { view: 'sla-targets' },
   powerx: { view: 'inference' },
   operatorx: { view: 'operatorx' },
   collectivex: { view: 'collectivex' },

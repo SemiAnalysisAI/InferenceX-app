@@ -14,17 +14,18 @@ interactivity limits used elsewhere on the dashboard.
 
 ## Where the code lives
 
-| Piece                                                                       | Location                                                                                                                                        |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Evaluation library: accounting, exact evaluation, qualification, selections | `packages/constants/src/sla-targets.ts`                                                                                                         |
-| Adapter from the original AgentX export, harness log and aggregate          | `packages/db/src/etl/sla-attempts.ts`                                                                                                           |
-| Storage, ingest wiring, backfill                                            | `packages/db/migrations/030_sla_attempts.sql`, `packages/db/src/etl/trace-replay-ingest.ts`, `packages/db/src/backfill-sla-attempts.ts`         |
-| Fixed-sequence request records: adapter, storage, ingest                    | `packages/db/src/etl/sla-attempts.ts`, `packages/db/migrations/031_benchmark_sla_attempts.sql`, `packages/db/src/etl/request-records-ingest.ts` |
-| Reads                                                                       | `packages/db/src/queries/sla-targets.ts`                                                                                                        |
-| Dataset, server evaluation, view                                            | `packages/app/src/lib/sla-targets/`                                                                                                             |
-| Routes                                                                      | `GET /api/v1/sla-targets`, `GET /api/v1/sla-evaluations`                                                                                        |
-| Page                                                                        | `packages/app/src/components/sla-targets/`                                                                                                      |
-| Captured fixture                                                            | `packages/app/scripts/capture-sla-targets-fixtures.ts`                                                                                          |
+| Piece                                                                       | Location                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evaluation library: accounting, exact evaluation, qualification, selections | `packages/constants/src/sla-targets.ts`                                                                                                                                                                         |
+| Adapter from the original AgentX export, harness log and aggregate          | `packages/db/src/etl/sla-attempts.ts`                                                                                                                                                                           |
+| Storage, ingest wiring, backfill                                            | `packages/db/migrations/030_sla_attempts.sql`, `packages/db/src/etl/trace-replay-ingest.ts`, `packages/db/src/backfill-sla-attempts.ts`                                                                         |
+| Fixed-sequence request records: adapter, storage, ingest                    | `packages/db/src/etl/sla-attempts.ts`, `packages/db/migrations/031_benchmark_sla_attempts.sql`, `packages/db/src/etl/request-records-ingest.ts`                                                                 |
+| Reads                                                                       | `packages/db/src/queries/sla-targets.ts`                                                                                                                                                                        |
+| Dataset, server evaluation, view                                            | `packages/app/src/lib/sla-targets/`                                                                                                                                                                             |
+| Routes                                                                      | Page routes `GET /api/v1/sla-targets`, `GET /api/v1/sla-evaluations`                                                                                                                                            |
+| Public read-only view, its OpenAPI entry and skills reference               | `GET /api/v1/views/sla-targets`, `packages/app/src/lib/sla-targets/public-view.ts`, `packages/app/src/lib/views-api/docs/sla-targets.ts`, `packages/skills/skills/inferencex-api/references/dashboard-views.md` |
+| Page                                                                        | `packages/app/src/components/sla-targets/`                                                                                                                                                                      |
+| Captured fixture                                                            | `packages/app/scripts/capture-sla-targets-fixtures.ts`                                                                                                                                                          |
 
 ## Measurement contract
 
@@ -109,7 +110,11 @@ a source is never swapped silently.
 Targets are evaluated on the server, per attempt, against the stored latencies:
 
 - A target is used exactly as entered. It is never rounded or snapped to a step, and a value that
-  cannot be evaluated is rejected with a message (`400`).
+  cannot be evaluated is rejected with a message (`400`). Attempts are stored in whole
+  microseconds and compared inclusively, so an attempt exactly on the threshold is within it. The
+  unit conversion of a target is taken at nanosecond resolution, which only removes binary
+  floating-point noise (1.001 ms would otherwise become 1000.9999999999999 us and exclude an
+  attempt measured at exactly 1.001 ms).
 - The verdict is joint: one attempt must meet every enabled target itself. Joint attainment is
   never derived from separate percentiles. The page shows the per-target shares only as context.
 - Latencies are stored in whole microseconds. A value equal to the target passes.
@@ -250,6 +255,27 @@ Post-processing in the benchmark repository cannot fill these gaps either: its p
 per-point JSON counts errors of both phases together (in one export 1,734 of 1,798 "errors" were
 warmup artefacts) and carries neither the issued count nor the cutoff count.
 
+## Public read-only view
+
+`GET /api/v1/views/sla-targets` returns the comparison as data. It calls the page's own
+`evaluateSlaTargetsView` with the same inputs and only reshapes the result, so the page and the
+API cannot compute different numbers; a test compares them on the captured fixture.
+
+| Selector     | Page control        | Default                    | Notes                                                   |
+| ------------ | ------------------- | -------------------------- | ------------------------------------------------------- |
+| `model`      | Model               | First model of the dataset | Unknown value is a 400 that lists the models.           |
+| `sequence`   | Workload            | First workload             | Unknown value is a 400 that lists the workloads.        |
+| `ttft`       | Max TTFT (ms)       | 1000                       | Exact; a value that cannot be evaluated is a 400.       |
+| `tpot`       | Max TPOT (ms)       | 50                         | Exact.                                                  |
+| `e2e`        | Max end-to-end (s)  | Off                        | `off` or left out for no constraint.                    |
+| `attainment` | Required attainment | 99                         | Percent, 50 to 99.99. The page clamps; the API rejects. |
+| `cost`       | Price table         | `hyperscaler`              | `hyperscaler` or `rental`.                              |
+
+Presentation-only page controls with no selector: row expansion, the chart hover card, and the
+language. The response states the accounting policy and the sample policy once, returns each
+point's accounting, per-target counts and observed metrics apart from its qualification, and
+gives `selections` as indexes into the configuration's points.
+
 ## Storage and rollout
 
 1. **Migration 030** adds `sla_attempts_gz`, `sla_attempts_version` and `sla_attempts_sha256` to
@@ -341,9 +367,8 @@ Rules:
 - Session-level success for AgentX. The harness replays recorded conversations and never judges
   an answer, so a session has no outcome. Results are per request.
 - Open-loop capacity. The benchmarks are closed-loop.
-- A public read-only view (`/api/v1/views/sla-targets`) and its skills reference. The page reads
-  two page-owned routes while the contract is under review; `DASHBOARD_API_COVERAGE` records the
-  exclusion and what has to ship before the tab leaves the feature gate.
+- A CSV form of the public view, and unofficial-run overlays: the page and the view read
+  ingested official runs only.
 
 ## Open items
 

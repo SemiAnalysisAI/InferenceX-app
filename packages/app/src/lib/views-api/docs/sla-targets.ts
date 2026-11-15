@@ -1,0 +1,402 @@
+import type {
+  ApiOperation,
+  ApiParameter,
+  ApiResponse,
+  ApiSchema,
+} from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import {
+  arraySchema,
+  booleanSchema,
+  errorSchema,
+  integerSchema,
+  nullableNumberSchema,
+  nullableStringSchema,
+  numberSchema,
+  objectSchema,
+  parameterErrorSchema,
+  queryParameter,
+  stringSchema,
+  text,
+} from '@/lib/api/api-documentation-helpers';
+
+const nullableIntegerSchema: ApiSchema = { type: ['integer', 'null'] };
+const STATUS_ENUM = ['meets', 'misses', 'insufficient_data'] as const;
+
+/** A nullable object whose fields are described in prose; its keys follow the evaluation library. */
+const nullableRecord = (description: string): ApiSchema => ({
+  type: ['object', 'null'],
+  description,
+  additionalProperties: true,
+});
+
+const parameters: readonly ApiParameter[] = [
+  queryParameter(
+    'model',
+    false,
+    'string',
+    'Display model name. Defaults to the first model in the response `models` list.',
+    '模型显示名称。默认取响应中 `models` 列表的第一个模型。',
+    stringSchema,
+    'DeepSeek-V4-Pro',
+  ),
+  queryParameter(
+    'sequence',
+    false,
+    'string',
+    'Workload. Defaults to the first entry of the response `sequences` list; AgentX is `agentic-traces`.',
+    '工作负载。默认取响应中 `sequences` 列表的第一项；AgentX 为 `agentic-traces`。',
+    stringSchema,
+    'agentic-traces',
+  ),
+  queryParameter(
+    'ttft',
+    false,
+    'number',
+    'Maximum time to first token, in milliseconds. Evaluated exactly as given, never rounded.',
+    '首 token 时间（TTFT）上限，单位毫秒。按给定值精确评估，不做取整。',
+    { type: 'number', default: 1000, maximum: 3_600_000 },
+    1000,
+  ),
+  queryParameter(
+    'tpot',
+    false,
+    'number',
+    'Maximum time per output token, in milliseconds: the average decode time per output token within a request, not a bound on every token gap.',
+    '每输出 token 时间（TPOT）上限，单位毫秒：单个请求内每个输出 token 的平均解码时间，不是对每个 token 间隔的限制。',
+    { type: 'number', default: 50, maximum: 3_600_000 },
+    50,
+  ),
+  queryParameter(
+    'e2e',
+    false,
+    'number',
+    'Maximum end-to-end latency, in seconds. Omit it or pass `off` for no end-to-end constraint.',
+    '端到端延迟上限，单位秒。省略或传入 `off` 表示不限制端到端延迟。',
+    { type: 'string', description: 'A positive number of seconds, at most 3600, or `off`.' },
+    60,
+  ),
+  queryParameter(
+    'attainment',
+    false,
+    'number',
+    'Required share of eligible attempts that meet every enabled target, in percent.',
+    '同时满足所有已启用目标的符合条件的请求占比要求，单位为百分比。',
+    { type: 'number', default: 99, minimum: 50, maximum: 99.99 },
+    99,
+  ),
+  queryParameter(
+    'cost',
+    false,
+    'enum',
+    'Price table behind the cost estimate: hyperscaler or rental $ per GPU-hour.',
+    '成本估算所用的价格表：hyperscaler 或 rental 的每 GPU 小时价格（美元）。',
+    { type: 'string', enum: ['hyperscaler', 'rental'], default: 'hyperscaler' },
+    'hyperscaler',
+  ),
+];
+
+const pointSchema = objectSchema({
+  load: {
+    ...numberSchema,
+    description:
+      'The load setting. Its meaning is the configuration `loadKind`: replay lanes (simulated users) for AgentX, a limit on requests in flight for fixed sequences. Never an offered request rate.',
+  },
+  pointId: nullableIntegerSchema,
+  runAttempt: nullableIntegerSchema,
+  artifact: nullableStringSchema,
+  source: nullableRecord(
+    'Where the attempt data came from (`kind`) and what the harness log said about the run. Null without request-level data.',
+  ),
+  accounting: nullableRecord(
+    'Attempt accounting: issued, dispatched, attempted (the denominator), completed, failed with `failureClasses`, cancelled, incomplete, unknown, skippedBeforeDispatch, contextOverflowRejected, warmupExcluded, the measurement `window` with `durationS` and `durationSource`, and `completeness` with its `reason`.',
+  ),
+  counts: nullableRecord(
+    'Attempts passing, not passing and indeterminate against the targets, plus the attempts within each target alone. Separate per-target counts must not be multiplied into a joint attainment.',
+  ),
+  observed: nullableRecord(
+    'Observed attainment (`passing / attempted`), its upper bounds, goodput and achieved request rate per second of the accounting window. Reported whether or not the point qualifies.',
+  ),
+  qualification: objectSchema({
+    status: { type: 'string', enum: STATUS_ENUM },
+    reason: stringSchema,
+    exploratory: booleanSchema,
+    smallSample: booleanSchema,
+    minimumSample: integerSchema,
+  }),
+  windowCostUsd: nullableNumberSchema,
+  costPer1kCompliantUsd: nullableNumberSchema,
+  exclusion: nullableRecord(
+    'Set for a tested load that produced no measurement: `category` (service_failure, invalid_measurement or undetermined), the recorded `reason`, `jobUrl` and `observedFailures`.',
+  ),
+});
+
+const configSchema: ApiSchema = {
+  type: 'object',
+  properties: {
+    key: stringSchema,
+    workload: stringSchema,
+    loadKind: { type: 'string', enum: ['agentx_users', 'request_concurrency'] },
+    hardware: stringSchema,
+    hardwareLabel: stringSchema,
+    servingLabel: stringSchema,
+    framework: stringSchema,
+    precision: stringSchema,
+    specMethod: stringSchema,
+    offloadMode: stringSchema,
+    gpuCount: integerSchema,
+    poolSplit: nullableStringSchema,
+    date: { type: 'string', format: 'date' },
+    runId: nullableStringSchema,
+    runUrl: nullableStringSchema,
+    benchmarkCommit: nullableStringSchema,
+    datasetSlug: nullableStringSchema,
+    status: { type: 'string', enum: STATUS_ENUM },
+    exploratory: {
+      ...booleanSchema,
+      description: 'Observed values exist but cannot support a verdict; never ranked.',
+    },
+    gpuHourUsd: numberSchema,
+    lowerLoadMissed: booleanSchema,
+    selections: objectSchema({
+      highestPassingLoad: nullableIntegerSchema,
+      highestGoodput: nullableIntegerSchema,
+      lowestCost: nullableIntegerSchema,
+    }),
+    bestObserved: nullableIntegerSchema,
+    points: arraySchema(pointSchema),
+  },
+  required: [
+    'key',
+    'workload',
+    'loadKind',
+    'hardware',
+    'status',
+    'exploratory',
+    'selections',
+    'points',
+  ],
+  additionalProperties: true,
+};
+
+const responseSchema = objectSchema({
+  view: { type: 'string', enum: ['sla-targets'] },
+  apiVersion: { type: 'string', enum: ['v1'] },
+  params: objectSchema({
+    model: stringSchema,
+    sequence: stringSchema,
+    ttft: numberSchema,
+    tpot: numberSchema,
+    e2e: nullableNumberSchema,
+    attainment: numberSchema,
+    cost: { type: 'string', enum: ['hyperscaler', 'rental'] },
+  }),
+  disclaimer: stringSchema,
+  contract: objectSchema({
+    evaluatorVersion: integerSchema,
+    accountingPolicy: { type: 'object', additionalProperties: true },
+    samplePolicy: { type: 'object', additionalProperties: true },
+  }),
+  source: {
+    type: 'object',
+    description:
+      '`kind: live` for the database, or `kind: captured` with the capture time and the benchmark runs of a captured snapshot.',
+    additionalProperties: true,
+  },
+  models: arraySchema(stringSchema),
+  sequences: arraySchema(stringSchema),
+  qualifying: arraySchema(stringSchema),
+  configs: arraySchema(configSchema),
+});
+
+const responseExample = {
+  view: 'sla-targets',
+  apiVersion: 'v1',
+  params: {
+    model: 'DeepSeek-V4-Pro',
+    sequence: 'agentic-traces',
+    ttft: 10000,
+    tpot: 50,
+    e2e: null,
+    attainment: 99,
+    cost: 'hyperscaler',
+  },
+  disclaimer:
+    'Evaluates benchmark results against your service targets. Results apply to the tested workload and conditions; they do not guarantee production SLA compliance.',
+  contract: {
+    evaluatorVersion: 1,
+    accountingPolicy: {
+      version: 1,
+      incompleteAtCutoff: 'not_passing',
+      contextOverflow: 'excluded',
+      contextOverflowLimit: 0.01,
+      missingTelemetry: 'not_passing',
+      timeBase: 'configured_window',
+    },
+    samplePolicy: { absoluteMinimum: 100, minimumAllowedMisses: 1, smallSampleAllowedMisses: 10 },
+  },
+  source: { kind: 'live' },
+  models: ['DeepSeek-V4-Pro'],
+  sequences: ['agentic-traces'],
+  qualifying: [
+    'agentic-traces|b200|dynamo-sglang|fp4|mtp|disagg|multi|p8x8dpaw1g8|d8x8dpaw1g8|offload-on',
+  ],
+  configs: [
+    {
+      key: 'agentic-traces|b200|dynamo-sglang|fp4|mtp|disagg|multi|p8x8dpaw1g8|d8x8dpaw1g8|offload-on',
+      workload: 'agentic-traces',
+      loadKind: 'agentx_users',
+      hardware: 'b200',
+      hardwareLabel: 'B200',
+      servingLabel: 'Dynamo SGLang · FP4 · MTP · 8P+8D · KV offload',
+      framework: 'dynamo-sglang',
+      precision: 'fp4',
+      specMethod: 'mtp',
+      offloadMode: 'on',
+      gpuCount: 16,
+      poolSplit: '8P+8D',
+      date: '2026-10-26',
+      runId: '40421997301',
+      runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40421997301',
+      benchmarkCommit: 'ba157eb69e4d4321b9e013f5007e730fb9c2a3be',
+      datasetSlug: 'semianalysisai/cc-traces-weka-062126',
+      status: 'meets',
+      exploratory: false,
+      gpuHourUsd: 1.73,
+      lowerLoadMissed: false,
+      selections: { highestPassingLoad: 0, highestGoodput: 0, lowestCost: 0 },
+      bestObserved: 0,
+      points: [
+        {
+          load: 32,
+          pointId: 482113,
+          runAttempt: 1,
+          artifact: null,
+          source: {
+            kind: 'original_export',
+            harnessLog: 'complete',
+            abortReason: null,
+            sequenceGaps: 0,
+            unparsedLines: 0,
+          },
+          accounting: {
+            issued: 4537,
+            dispatched: 4537,
+            attempted: 4537,
+            completed: 4537,
+            failed: 0,
+            cancelled: 0,
+            incomplete: 0,
+            unknown: 0,
+            failureClasses: {},
+            skippedBeforeDispatch: 0,
+            contextOverflowRejected: null,
+            warmupExcluded: 354,
+            retryAccounting: 'no_client_retries',
+            outcomeSource: 'explicit',
+            window: {
+              configuredWindowS: 3600,
+              graceS: 30,
+              phaseElapsedS: 3614.44,
+              cutoffReached: false,
+              durationS: 3600,
+              durationSource: 'configured_window',
+            },
+            completeness: 'complete',
+            reason: 'reconciled',
+            populationEstablished: true,
+          },
+          counts: {
+            passing: 4497,
+            notPassing: 40,
+            indeterminate: 0,
+            withinTtft: 4500,
+            withinTpot: 4534,
+            withinE2e: null,
+            missingTelemetry: 0,
+            incompleteNotPassing: 0,
+          },
+          observed: {
+            attempted: 4537,
+            passing: 4497,
+            notPassing: 40,
+            indeterminate: 0,
+            attainment: 0.9911836014987877,
+            attainmentUpper: 0.9911836014987877,
+            attainmentExcludingIncomplete: 0.9911836014987877,
+            ttftAttainment: 0.9918448313863787,
+            tpotAttainment: 0.9993387701124091,
+            e2eAttainment: null,
+            goodputRps: 1.2491666666666668,
+            completedRps: 1.2602777777777778,
+            durationS: 3600,
+            durationSource: 'configured_window',
+          },
+          qualification: {
+            status: 'meets',
+            reason: 'attainment_met',
+            exploratory: false,
+            smallSample: false,
+            minimumSample: 100,
+          },
+          windowCostUsd: 27.68,
+          costPer1kCompliantUsd: 6.15521458750278,
+          exclusion: null,
+        },
+      ],
+    },
+  ],
+};
+
+const responses: readonly ApiResponse[] = [
+  {
+    status: '200',
+    description: text(
+      'Every serving configuration of the model and workload, evaluated against the targets.',
+      '该模型与工作负载下的全部服务配置，以及按目标评估的结果。',
+    ),
+    schema: responseSchema,
+    example: responseExample,
+    mediaType: 'application/json',
+  },
+  {
+    status: '400',
+    description: text(
+      'A selector is unknown, repeated, or a target cannot be evaluated. Targets are never rounded to a supported value.',
+      '参数未知、重复，或目标值无法评估。目标值不会被取整为受支持的数值。',
+    ),
+    schema: parameterErrorSchema,
+    example: { error: 'Invalid ttft: 0 (a positive number, at most 3600000)', param: 'ttft' },
+    mediaType: 'application/json',
+  },
+  {
+    status: '500',
+    description: text('The evaluation failed.', '评估失败。'),
+    schema: errorSchema,
+    example: { error: 'Internal server error' },
+    mediaType: 'application/json',
+  },
+];
+
+export const operations: ApiOperation[] = [
+  {
+    id: 'get-sla-targets-view',
+    group: 'views',
+    method: 'GET',
+    path: '/api/v1/views/sla-targets',
+    summary: text(
+      'Evaluate benchmark results against latency targets',
+      '按延迟目标评估基准测试结果',
+    ),
+    description: text(
+      'Evaluates the tested load points of every serving configuration of one model and workload against a maximum TTFT, a maximum TPOT, an optional maximum end-to-end latency and a required attainment. Attainment is passing attempts over all eligible attempted requests: failed, cancelled and cut-off attempts stay in the denominator. Each point returns its attempt accounting and observed metrics apart from its qualification, with the reason when it cannot qualify; a point whose attempt population cannot be established is exploratory and never ranked. `selections` names the point behind the highest tested passing load, the highest observed goodput and the lowest cost per 1,000 compliant requests. Results apply to the tested workload and conditions and do not guarantee production SLA compliance. The benchmarks are closed-loop, so a load is not an offered request rate.',
+      '针对一个模型和工作负载下的每个服务配置，按 TTFT 上限、TPOT 上限、可选的端到端延迟上限和达标率要求评估其已测试的负载点。达标率为达标请求数除以全部符合条件的已发出请求数：失败、被取消和在截止时未完成的请求都计入分母。每个负载点分别返回请求核算与观测指标，以及是否达标的结论和无法判定时的原因；无法确定请求总体的负载点仅作探索性展示，不参与排名。`selections` 指明达标的最高负载、最高观测 goodput 和每千次达标请求的最低估算成本各自对应的负载点。结果仅适用于所测试的工作负载和条件，不保证生产环境的 SLA 合规。这些基准测试均为闭环测试，负载值不代表请求到达率。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters,
+    responses,
+    responseShapeName: 'SlaTargetsView',
+    curlUrl: `${API_BASE_URL}/api/v1/views/sla-targets?model=DeepSeek-V4-Pro&ttft=10000&tpot=50&attainment=99`,
+  },
+];

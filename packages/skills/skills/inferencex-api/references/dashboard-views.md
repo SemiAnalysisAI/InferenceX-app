@@ -1017,6 +1017,80 @@ window in `historicalWindow`.
 引擎、模型和行范围控件保持不变。分享链接省略默认档位和对比模式；
 API 在 `params` 中返回实际采用的参数，并在 `historicalWindow` 中返回基线窗口。
 
+### SLA Targets view
+
+`GET /api/v1/views/sla-targets` is the read-only form of the feature-gated
+`/infx/sla-targets` and `/zh/infx/sla-targets` page. It evaluates the tested load
+points of every serving configuration of one model and workload against the
+reader's targets. Results apply to the tested workload and conditions; they do
+not guarantee production SLA compliance. Do not call these targets SLOs, and do
+not mix them with the dashboard's fixed interactivity limits.
+
+Selectors, all optional, each echoed resolved in `params`:
+
+- `model` (first of `models`), `sequence` (first of `sequences`; AgentX is
+  `agentic-traces`).
+- `ttft` and `tpot` in milliseconds (defaults `1000` and `50`), `e2e` in seconds
+  (omit or `off` for none). A target is evaluated exactly as given; a value that
+  cannot be evaluated is a 400, never rounded. TPOT is the average decode time
+  per output token within a request, not a bound on every token gap.
+- `attainment` in percent, `50` to `99.99` (default `99`).
+- `cost`: `hyperscaler` (default) or `rental` $ per GPU-hour.
+
+Reading the response:
+
+- Attainment is passing attempts over all eligible attempted requests. Failed
+  and cancelled attempts and attempts cut off at the end of the window stay in
+  the denominator. `contract.accountingPolicy` states the rules in force.
+- Each point reports `accounting`, `counts` and `observed` apart from
+  `qualification`. Quote `observed` values only together with
+  `qualification.status` and `qualification.reason`.
+- `qualification.exploratory` or a configuration with `exploratory: true` means
+  the attempt population could not be established (see
+  `accounting.completeness` and `accounting.reason`). Report such values as
+  exploratory, never as "meets target", and never rank them. `qualifying` lists
+  the only configurations that may be ranked.
+- `selections` holds indexes into `points`: the highest tested passing load, the
+  highest observed goodput among qualifying points, and the lowest cost per
+  1,000 compliant requests among qualifying points. They can be three different
+  points. Name the point when citing one. `lowerLoadMissed` means a lower tested
+  load missed, so the highest passing load is literal, not the edge of a range.
+- `loadKind` says what `load` means: `agentx_users` is replay lanes (simulated
+  users), `request_concurrency` is a limit on requests in flight. Do not call
+  both "concurrent users". `observed.completedRps` is the achieved request rate.
+  The tests are closed-loop: never present a load or a rate as open-loop
+  request-rate capacity.
+- A point with `exclusion` is a tested load that produced no measurement;
+  `exclusion.category` separates a service failure from an invalid benchmark
+  measurement and from an undetermined cause. Report it with its reason.
+- `withinTtft`, `withinTpot` and `withinE2e` are separate counts. Do not
+  multiply separate attainments or percentiles into a joint attainment; use
+  `passing`.
+- Goodput and cost use `observed.durationS`, whose origin is
+  `observed.durationSource`. `windowCostUsd` covers that whole window, idle time
+  included; warmup and grace time are not billed. Cost is an estimate from the
+  dashboard's price table, not a measured bill.
+- `source.kind` is `live` or `captured`; a captured snapshot lists its benchmark
+  runs and capture time. Cite `runUrl` and `benchmarkCommit` of the
+  configuration.
+
+中文：`GET /api/v1/views/sla-targets` 是受功能开关控制的 `/infx/sla-targets`
+与 `/zh/infx/sla-targets` 页面的只读接口，按用户给定的目标评估一个模型和工作负载下
+各服务配置的已测负载点。结果仅适用于所测试的工作负载和条件，不保证生产环境的 SLA
+合规。参数均可省略，解析后的取值在 `params` 中返回：`model`、`sequence`、`ttft` 与
+`tpot`（毫秒，默认 `1000` 和 `50`）、`e2e`（秒，省略或 `off` 表示不限制）、
+`attainment`（百分比，`50` 至 `99.99`，默认 `99`）、`cost`（`hyperscaler` 或
+`rental`）。目标值按给定数值精确评估，无法评估时返回 400，不做取整。达标率为达标请求数
+除以全部符合条件的已发出请求数，失败、被取消和在窗口结束时未完成的请求都计入分母。每个
+负载点的 `accounting`、`counts`、`observed` 与 `qualification` 分开返回；
+`exploratory` 为 true 时表示无法确定请求总体，只能作为探索性结果引用，不得写成
+“达标”，也不得参与排名，可排名的配置仅限 `qualifying`。`selections` 是 `points` 的
+下标，分别对应达标的最高负载、最高观测 goodput 和每千次达标请求的最低估算成本，三者
+可以是不同的负载点。`loadKind` 说明 `load` 的含义：`agentx_users` 是回放通道数（模拟
+用户），`request_concurrency` 是请求并发上限；测试均为闭环，不能据此给出开环的请求
+速率容量。带 `exclusion` 的负载点表示该负载已测试但没有得到测量结果，引用时须同时给出
+其类别和原因。
+
 ### VideoGenX results overview
 
 `GET /api/v1/views/video?view=overview` returns the same nine-group projection as

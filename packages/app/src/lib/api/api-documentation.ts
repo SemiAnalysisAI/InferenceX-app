@@ -35,6 +35,7 @@ import { operations as optionsViews } from '../views-api/docs/options';
 import { operations as overviewViews } from '../views-api/docs/overview';
 import { operations as rankingsViews } from '../views-api/docs/rankings';
 import { operations as reliabilityViews } from '../views-api/docs/reliability';
+import { operations as slaTargetsViews } from '../views-api/docs/sla-targets';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
 export type ApiGroupId = 'views' | 'core' | 'external' | 'datasets' | 'collectivex' | 'diagnostics';
@@ -833,6 +834,7 @@ export const apiOperations: readonly ApiOperation[] = [
     ...fleetViews,
     ...evaluationViews,
     ...reliabilityViews,
+    ...slaTargetsViews,
     ...gpuSpecsViews,
     ...overviewViews,
     ...rankingsViews,
