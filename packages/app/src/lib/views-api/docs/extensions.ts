@@ -565,8 +565,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '估算利用率，范围 0–1，默认 1。收入随利用率变化，预留 GPU 每小时成本不变。',
   ],
   r_x: [
-    'Chart x metric: p50 (default) or p90 per-clip latency, or gpus (participating GPUs per deployment). Presentation only; echoed in params without changing returned cells, and invalid values use the default.',
-    '图表 X 轴指标：单条视频 p50（默认）或 p90 延迟，或 gpus（每个部署参与计算的 GPU 数）。仅影响展示，在 params 中返回，不改变返回的 cells；无效值使用默认值。',
+    'Chart x metric: p50 per-clip latency (default) or gpus (participating GPUs per deployment). Presentation only; echoed in params without changing returned cells. Invalid values, including the retired p90, use the default.',
+    '图表 X 轴指标：单条视频 p50 延迟（默认）或 gpus（每个部署参与计算的 GPU 数）。仅影响展示，在 params 中返回，不改变返回的 cells；无效值（包括已停用的 p90）使用默认值。',
   ],
   r_y: [
     'Chart y metric: videoSecondsPerDollar (default), videosPerGpuHour or kjPerClip. Presentation only; invalid values use the default.',

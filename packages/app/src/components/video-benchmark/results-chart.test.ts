@@ -111,8 +111,6 @@ describe('resultsChartSeries', () => {
     const [energy] = resultsChartSeries(deployments, selection({ y: 'kjPerClip' }));
     expect(ids(energy.frontier)).toEqual(['fast:c1', 'mid:c1', 'slow:c1']);
     expect(energy.frontier.map((p) => p.y)).toEqual([200, 100, 50]);
-    const [p90] = resultsChartSeries(deployments, selection({ x: 'p90' }));
-    expect(p90.frontier.map((p) => p.x)).toEqual([31, 61]);
   });
 
   it('keeps dominated deployments faded unless Optimal Only removes them', () => {

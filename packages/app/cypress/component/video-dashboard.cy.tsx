@@ -312,7 +312,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-table"]').should('not.exist');
     cy.get('[data-testid="results-gpus"]').should('not.exist');
     cy.get('[data-testid="results-cost-basis"]').should('not.exist');
-    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'P90');
+    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'Median latency');
     points(overlay).should('have.length', 2);
     // Same latency on half the boards doubles videos per GPU-hour, so the 4-GPU cell is dominated.
     points(`${overlay}[data-optimal="false"]`).should('have.length', 1);
@@ -827,7 +827,11 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-power-trace"] svg').should('exist');
     cy.get('[data-testid="results-detail-latency"]')
       .invoke('text')
-      .should('match', /P95 \d/u);
+      .should('match', /^Recorded median \d/u);
+    // Twenty clips have no meaningful tail, so neither the readout nor the histogram names one.
+    cy.get('[data-testid="video-results-detail"]')
+      .invoke('text')
+      .should('not.match', /p9[05]/iu);
     cy.get('[data-testid="video-results-detail"]').should('contain', 'of valid clips met it');
     cy.get('[data-testid="video-results-detail"]').should('contain', '38.2 s');
     cy.get('[data-testid="results-detail-tab-validity"]').click();
