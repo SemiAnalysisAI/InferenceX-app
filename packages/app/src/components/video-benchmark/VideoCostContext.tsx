@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
@@ -10,7 +11,10 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { COST_TIERS, TIER_LABELS } from './metrics';
 import type { ResultsState } from './results';
+import { useScrollFade } from './use-scroll-fade';
 import styles from './results.module.css';
+
+const TCO_TABLE = 'results-tco-table';
 
 const STRINGS = {
   en: {
@@ -64,8 +68,11 @@ export default function VideoCostContext({
           },
         ];
   });
+  // The shared price table scrolls sideways once its GPU columns outgrow a phone.
+  const context = useRef<HTMLDivElement>(null);
+  useScrollFade(context, `[data-testid="${TCO_TABLE}"]`, rates.length);
   return (
-    <div data-testid="results-cost-context">
+    <div ref={context} data-testid="results-cost-context">
       <ResultContext
         locale={locale}
         layout="footer"
@@ -131,7 +138,7 @@ export default function VideoCostContext({
           rates.length > 0 ? (
             <TcoPriceTable
               items={rates}
-              testId="results-tco-table"
+              testId={TCO_TABLE}
               cellTestId="results-tco-rate"
               inputIdPrefix="results-tco"
             />

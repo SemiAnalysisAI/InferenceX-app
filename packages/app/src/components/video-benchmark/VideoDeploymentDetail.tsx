@@ -21,6 +21,7 @@ import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
 import { usePowerTrace } from './use-power-trace';
+import { ScrollFade } from './use-scroll-fade';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
 import styles from './results.module.css';
 
@@ -517,7 +518,7 @@ export default function VideoDeploymentDetail({
                 </div>
               </Panel>
               <Panel title={s.cost} note={TIER_LABELS[state.costTier][locale]}>
-                <div className={styles.scroll}>
+                <ScrollFade className={styles.scroll}>
                   <table className={`${styles.table} text-xs`} data-testid="results-detail-cost">
                     <thead>
                       <tr>
@@ -540,7 +541,7 @@ export default function VideoDeploymentDetail({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollFade>
               </Panel>
               <Panel title={s.startup}>
                 <Stat
@@ -592,7 +593,7 @@ export default function VideoDeploymentDetail({
               />
             </Panel>
             <Panel title={s.completion}>
-              <div className={styles.scroll}>
+              <ScrollFade className={styles.scroll}>
                 <table className={`${styles.table} text-xs`} data-testid="results-detail-counts">
                   <thead>
                     <tr>
@@ -618,7 +619,7 @@ export default function VideoDeploymentDetail({
                     </tr>
                   </tbody>
                 </table>
-              </div>
+              </ScrollFade>
             </Panel>
             <Panel title={s.integrity}>
               <Facts

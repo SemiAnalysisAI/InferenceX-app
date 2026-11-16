@@ -46,6 +46,7 @@ import {
 import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
+import { ScrollFade } from './use-scroll-fade';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
 
@@ -781,7 +782,7 @@ export default function VideoResultsClips({
             {(a.previewUrl || b.previewUrl) && (
               <p className="mt-3 text-muted-foreground">{s.webEncode}</p>
             )}
-            <div className="mt-3 overflow-x-auto">
+            <ScrollFade className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[44rem] text-left">
                 <thead className="whitespace-nowrap text-muted-foreground">
                   <tr>
@@ -842,7 +843,7 @@ export default function VideoResultsClips({
                   )}
                 </tbody>
               </table>
-            </div>
+            </ScrollFade>
           </details>
         </>
       ) : (

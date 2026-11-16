@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import VideoSelect from './VideoSelect';
+import { ScrollFade } from './use-scroll-fade';
 import type { VideoHistoryEntry, VideoHistoryPage } from './history';
 
 const STRINGS = {
@@ -329,7 +330,7 @@ export default function VideoHistory() {
                 </p>
               )}
               {source.observations.length > 0 && (
-                <div className="max-w-full overflow-x-auto">
+                <ScrollFade className="max-w-full overflow-x-auto">
                   <table className="w-full text-left text-sm [&_td:not(:first-child)]:text-right [&_th:not(:first-child)]:text-right">
                     <thead className="text-xs text-muted-foreground">
                       <tr>
@@ -377,7 +378,7 @@ export default function VideoHistory() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollFade>
               )}
               <details className="group text-xs text-muted-foreground">
                 <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 hover:text-foreground [&::-webkit-details-marker]:hidden">

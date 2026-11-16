@@ -74,6 +74,26 @@
   }
 }
 
+/* A cut-off edge of a sideways-scrolling table fades, so the hidden columns read as scrollable.
+   `useScrollFade` names the edges that have more content. */
+.page [data-scroll-more] {
+  --fade-start: 0px;
+  --fade-end: 0px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-start),
+    black calc(100% - var(--fade-end)),
+    transparent
+  );
+}
+.page [data-scroll-more~='start'] {
+  --fade-start: 24px;
+}
+.page [data-scroll-more~='end'] {
+  --fade-end: 24px;
+}
+
 /* Touch screens: the same query as `useIsCoarsePointer`. A control keeps its size and gets a
    44 px hit area around it; `--hit-x` and `--hit-y` slide that area off a neighbouring control. */
 @media (hover: none) and (pointer: coarse) {
