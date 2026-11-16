@@ -491,9 +491,10 @@ export function resultProjection(
   const matches = qualified.filter(matchesFilters);
   const namedMatches = named.filter(matchesFilters);
   const preferred = byCoverage(matches.length > 0 ? matches : namedMatches)[0] ?? null;
-  // A model slug is the readable selector of that model's best-covered workload. It ignores
-  // the filters, so a link keeps its workload when they change; other workloads share a point ID.
-  const ranked = byCoverage(qualified.length > 0 ? qualified : named);
+  // A model slug is the readable selector of that model's best-covered official workload. It
+  // ignores the filters, so a link keeps its workload when they change. Every other workload,
+  // including one only a named run publishes, shares a point ID.
+  const ranked = byCoverage(qualified);
   const slugged = (slug: string) => ranked.find((key) => workloads.get(key)!.slug === slug) ?? null;
   const workloadKey =
     state.workload === null

@@ -273,6 +273,8 @@ describe('VideoGenX results contract', () => {
     expect(fallback.workloadMix).toEqual([]);
     expect(fallback.overlayCells[0].point.id).toBe(named.id);
     expect(fallback.state.workload).toBe(named.id);
+    // Official data arriving later would take the slug, so a named-only workload never gets one.
+    expect(fallback.options.workloads[0].slug).toBeUndefined();
     expect(resultProjection([], state(), [named]).options.workloads).toEqual([]);
     for (const change of [
       { samples: 9 },
