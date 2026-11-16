@@ -5203,14 +5203,14 @@
     },
     {
       "spec": "cypress/e2e/sla-targets.cy.ts",
-      "duration": 17376,
+      "duration": 21898,
       "tests": [
         {
           "title": [
             "SLA Targets",
             "shows the explanation, the captured-data notice and the example targets"
           ],
-          "duration": 2080,
+          "duration": 1992,
           "attempts": 1
         },
         {
@@ -5218,7 +5218,7 @@
             "SLA Targets",
             "finds no qualifying configuration at the example targets and says so"
           ],
-          "duration": 1117,
+          "duration": 1087,
           "attempts": 1
         },
         {
@@ -5226,7 +5226,7 @@
             "SLA Targets",
             "evaluates a typed target exactly and ranks the configurations that qualify"
           ],
-          "duration": 2432,
+          "duration": 2509,
           "attempts": 1
         },
         {
@@ -5234,7 +5234,7 @@
             "SLA Targets",
             "reads targets that are not round numbers from a share link and evaluates them as given"
           ],
-          "duration": 957,
+          "duration": 1048,
           "attempts": 1
         },
         {
@@ -5242,7 +5242,7 @@
             "SLA Targets",
             "rejects text that is not a number without changing the evaluation"
           ],
-          "duration": 1326,
+          "duration": 1221,
           "attempts": 1
         },
         {
@@ -5250,7 +5250,7 @@
             "SLA Targets",
             "labels a result without a dispatched count as exploratory and never ranks it"
           ],
-          "duration": 929,
+          "duration": 967,
           "attempts": 1
         },
         {
@@ -5258,12 +5258,12 @@
             "SLA Targets",
             "lists a failed load point with its recorded reason, and the source run"
           ],
-          "duration": 2896,
+          "duration": 2540,
           "attempts": 1
         },
         {
           "title": ["SLA Targets", "adds the end-to-end target only when it is switched on"],
-          "duration": 1862,
+          "duration": 1801,
           "attempts": 1
         },
         {
@@ -5271,17 +5271,30 @@
             "SLA Targets",
             "switches model and shows a point without request-level data as insufficient"
           ],
-          "duration": 1032,
+          "duration": 860,
           "attempts": 1
         },
         {
           "title": ["SLA Targets", "draws both charts with the required attainment line"],
-          "duration": 932,
+          "duration": 1010,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "marks a failed load in the charts without drawing it as a value"
+          ],
+          "duration": 1033,
+          "attempts": 1
+        },
+        {
+          "title": ["SLA Targets", "names the point behind each headline value when they differ"],
+          "duration": 2660,
           "attempts": 1
         },
         {
           "title": ["SLA Targets", "renders the Chinese page with the same results"],
-          "duration": 951,
+          "duration": 997,
           "attempts": 1
         },
         {
@@ -5289,7 +5302,7 @@
             "SLA Targets",
             "stacks configurations on a phone without horizontal page scroll"
           ],
-          "duration": 862,
+          "duration": 1532,
           "attempts": 1
         }
       ]

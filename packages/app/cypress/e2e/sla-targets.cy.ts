@@ -139,6 +139,51 @@ describe('SLA Targets', () => {
     cy.get('[data-testid="sla-goodput-chart"] g.sla-marks circle').should('have.length', 29);
   });
 
+  it('marks a failed load in the charts without drawing it as a value', () => {
+    cy.visit('/infx/sla-targets?s_ttft=10000');
+    waitForVerdicts();
+    for (const chart of ['sla-attainment-chart', 'sla-goodput-chart']) {
+      // One load point failed in the captured runs: 256 users on B200 16P+8D, first attempt.
+      cy.get(`[data-testid="${chart}"] [data-testid="sla-chart-gap"]`)
+        .should('have.length', 1)
+        .then(([cross]) => {
+          const chartSvg = cross.closest('svg')!;
+          const circles = [...chartSvg.querySelectorAll('g.sla-marks circle')];
+          const top = Math.min(...circles.map((circle) => circle.getBoundingClientRect().top));
+          // Above every measured point, in the margin: it has no place on the value scale.
+          expect(cross.getBoundingClientRect().top).to.be.lessThan(top);
+        });
+      // The failed attempt adds no circle: the 29 measured points are all there is.
+      cy.get(`[data-testid="${chart}"] g.sla-marks circle`).should('have.length', 29);
+      cy.get(`[data-testid="${chart}"]`).should(
+        'contain.text',
+        'it has no measurement and is not zero',
+      );
+    }
+  });
+
+  it('names the point behind each headline value when they differ', () => {
+    // On B300 with KV offload, 512 users is the highest passing load at 90%, while
+    // 384 users has both the highest goodput and the lowest cost.
+    cy.visit('/infx/sla-targets?s_ttft=30000&s_att=90');
+    waitForVerdicts();
+    cy.contains('[data-testid="sla-config-row"]', '8 GPUs · KV offload').as('row');
+    cy.get('@row').should('have.attr', 'data-status', 'meets');
+    cy.get('@row').find('td').eq(2).should('contain.text', '512 users');
+    cy.get('@row').find('td').eq(4).should('contain.text', 'at 384 users');
+    cy.get('@row').find('td').eq(5).should('contain.text', 'at 384 users');
+    cy.get('@row').find('[data-testid="sla-row-toggle"]').click();
+    cy.get('[data-testid="sla-row-details"]:visible').within(() => {
+      cy.contains('[data-testid="sla-point-row"]', '512 users')
+        .should('contain.text', 'highest passing load')
+        .and('not.contain.text', 'highest goodput');
+      cy.contains('[data-testid="sla-point-row"]', '384 users')
+        .should('contain.text', 'highest goodput')
+        .and('contain.text', 'lowest cost')
+        .and('not.contain.text', 'highest passing load');
+    });
+  });
+
   it('renders the Chinese page with the same results', () => {
     cy.visit('/zh/infx/sla-targets?s_ttft=10000');
     cy.contains('根据你设定的服务目标评估基准测试结果').should('be.visible');

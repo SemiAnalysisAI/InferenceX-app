@@ -63,6 +63,20 @@ function chartSeries(
       label,
       color,
       exploratory: row.points.some((view) => view.result?.qualification.exploratory),
+      // Failed and excluded loads: marked as tested without a measurement, never as zero.
+      gaps: row.points.flatMap((view) =>
+        view.excluded
+          ? [
+              {
+                x: view.concurrency,
+                seriesLabel: label,
+                color,
+                loadLabel: t.load(row.config.loadKind, view.concurrency),
+                statusLabel: `${t.exclusion[view.excluded.category]} · ${view.excluded.reason}`,
+              },
+            ]
+          : [],
+      ),
       points: row.points
         .flatMap((view) => {
           const observed = view.result?.observed;
