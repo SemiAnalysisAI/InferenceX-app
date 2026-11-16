@@ -174,9 +174,11 @@ const WIPE_SLOP = 6;
 // The Compare row, stage, transport and readout fit under the sticky header together: a picture is at
 // most the window's height less 18rem, and the block narrows to match, one 16:9 frame wide or two
 // side by side.
+// A phone on its side lowers the reserve (`--stage-reserve` in results.module.css) to the header and
+// the transport, so the picture fills the height it has.
 export const STAGE_FIT_WIDTH = {
-  overlay: 'max(20rem, calc((100dvh - 18rem) * 16 / 9))',
-  side: 'max(20rem, calc((100dvh - 18rem) * 32 / 9 + 0.75rem))',
+  overlay: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 16 / 9))',
+  side: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 32 / 9 + 0.75rem))',
 };
 const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;

@@ -129,3 +129,11 @@
     --hit-x: 2px;
   }
 }
+
+/* A phone on its side has no room for the Compare row and readout beside the picture, so the
+   stage keeps only the sticky header and its transport in view with it. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  .page {
+    --stage-reserve: 8rem;
+  }
+}
