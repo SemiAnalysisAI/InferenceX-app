@@ -10,7 +10,7 @@ import { Heading } from '@/components/ui/heading';
 import { ShareButton } from '@/components/ui/share-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
@@ -296,7 +296,7 @@ export default function VideoDeploymentDetail({
     () => evidence?.latencies?.map((seconds) => seconds * 1000) ?? null,
     [evidence?.latencies],
   );
-  const phone = useMediaQuery('(max-width: 640px)');
+  const phone = useIsMobileViewport();
   const code = (value: string | null | undefined) => (
     <span className="break-all font-mono text-xs">{value || s.notRecorded}</span>
   );
