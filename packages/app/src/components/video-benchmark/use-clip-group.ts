@@ -81,6 +81,8 @@ export function useClipGroup(
     for (const [key, video] of videos.current) video.muted = key !== audible;
   }, [audible, keyList]);
 
+  /** When the group last started playing, on the `performance.now()` clock. */
+  const startedAt = useRef(-Infinity);
   // The frame loop reads group inputs through this ref so it never re-subscribes mid-playback.
   const live = useRef({ keyList, audible, duration, onRejected, playback });
   live.current = { keyList, audible, duration, onRejected, playback };
@@ -98,6 +100,7 @@ export function useClipGroup(
         audible: current.audible,
         duration: current.duration,
         ...current.playback,
+        sinceStart: (performance.now() - startedAt.current) / 1000,
       },
       event,
     );
@@ -127,6 +130,7 @@ export function useClipGroup(
     for (const action of step.actions) {
       switch (action.type) {
         case 'play-all': {
+          startedAt.current = performance.now();
           void playAll();
           break;
         }
@@ -135,13 +139,16 @@ export function useClipGroup(
           break;
         }
         case 'play': {
-          // The promise settles when the clip has data, or rejects with AbortError when the group holds or pauses it.
+          // The promise settles when the clip has data. It rejects with AbortError when the group
+          // holds or pauses the clip, and with NotSupportedError when the source cannot be read,
+          // which the element's error event reports with the rendition fallback it has.
           const { key } = action;
           videos.current
             .get(key)
             ?.play()
             .catch((error: { name?: string } | null) => {
-              if (error?.name !== 'AbortError') live.current.onRejected([key]);
+              if (error?.name !== 'AbortError' && error?.name !== 'NotSupportedError')
+                live.current.onRejected([key]);
             });
           break;
         }

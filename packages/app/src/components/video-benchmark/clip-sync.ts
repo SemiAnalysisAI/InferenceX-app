@@ -6,9 +6,9 @@
 
 /**
  * `loading` waits for every clip to be able to play before the group starts; `buffering` is a wait
- * mid-play for a clip that ran out of data. Both end the same way: every clip can play and they
- * are at one time. A clip that waits for data is never paused, because some browsers (iOS) load
- * nothing for a paused clip.
+ * mid-play, for a clip that ran out of data or one that fell behind. Both end the same way: every
+ * clip can play and they are at one time. A clip that waits for data is never paused, because some
+ * browsers (iOS) load nothing for a paused clip.
  */
 export type ClipPhase = 'paused' | 'loading' | 'buffering' | 'playing' | 'ended';
 
@@ -41,6 +41,8 @@ export interface ClipGroup {
   speed: number;
   /** At the shared end, rewind every clip together and play on instead of ending. */
   loop: boolean;
+  /** Seconds since the group last started playing. */
+  sinceStart: number;
 }
 
 export type ClipAction =
@@ -71,10 +73,12 @@ const HAVE_FUTURE_DATA = 3;
 export const NUDGE_SECONDS = 0.04;
 /** Drift at which a nudged follower returns to the base speed. */
 const SETTLE_SECONDS = 0.01;
-/** Drift beyond which a follower is seeked once instead of nudged. */
-export const SEEK_SECONDS = 0.25;
-/** A gap the clip behind plays through to catch up in a wait; a wider one is closed by a seek. */
+/** Drift beyond which the clips ahead wait for the one behind instead of a nudge. */
+export const HOLD_SECONDS = 0.25;
+/** A gap the clip behind plays through to catch up; a wider one is closed by a seek. */
 export const CATCH_UP_SECONDS = 1;
+/** Seconds after a start in which drift only nudges, so a slow start cannot hold the clips again and again. */
+export const REST_SECONDS = 2;
 export const NUDGE_RATE = 0.1;
 const END_EPSILON = 0.02;
 
@@ -232,10 +236,24 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
         }
         return result('ended', duration > 0 ? duration : leader.currentTime);
       }
-      if (clips.some((clip) => starved(clip, duration))) {
-        // The others wait; the clip without data is left playing, which is how it loads.
+      // Nothing moves, so there is nothing to hold: the wait is only named.
+      if (clips.every((clip) => starved(clip, duration))) {
+        resetRates(group, actions);
+        return result('buffering');
+      }
+      // No clip is seeked while it plays: a seek takes longer than the drift it would close, and the
+      // clip is behind again when it lands. The clips ahead wait instead. A clip short of data is
+      // waited for at once; two that both play are, only when the start has had time to settle.
+      const times = clips.map((clip) => clip.currentTime);
+      const front = Math.max(...times);
+      const behind = clips.filter((clip) => front - clip.currentTime > HOLD_SECONDS);
+      if (
+        behind.length > 0 &&
+        (group.sinceStart >= REST_SECONDS || behind.some((clip) => starved(clip, duration)))
+      ) {
         for (const clip of clips)
-          if (!starved(clip, duration)) actions.push({ type: 'pause', key: clip.key });
+          if (!behind.includes(clip) && !starved(clip, duration))
+            actions.push({ type: 'pause', key: clip.key });
         resetRates(group, actions);
         return result('buffering');
       }
@@ -245,13 +263,10 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
         if (clip === leader) continue;
         const drift = clip.currentTime - leader.currentTime;
         const size = Math.abs(drift);
-        let rate = speed;
-        if (size > SEEK_SECONDS) {
-          if (!clip.seeking)
-            actions.push({ type: 'seek', key: clip.key, time: leader.currentTime });
-        } else if (size > NUDGE_SECONDS || (clip.playbackRate !== speed && size > SETTLE_SECONDS)) {
-          rate = speed * (drift > 0 ? 1 - NUDGE_RATE : 1 + NUDGE_RATE);
-        }
+        const rate =
+          size > NUDGE_SECONDS || (clip.playbackRate !== speed && size > SETTLE_SECONDS)
+            ? speed * (drift > 0 ? 1 - NUDGE_RATE : 1 + NUDGE_RATE)
+            : speed;
         if (clip.playbackRate !== rate) actions.push({ type: 'rate', key: clip.key, rate });
       }
       return result('playing');

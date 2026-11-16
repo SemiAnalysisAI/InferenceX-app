@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   CATCH_UP_SECONDS,
+  HOLD_SECONDS,
   NUDGE_SECONDS,
+  REST_SECONDS,
   stepClipGroup,
   type ClipAction,
   type ClipEvent,
@@ -30,6 +32,7 @@ const group = (clips: ClipSnapshot[], changes: Partial<ClipGroup> = {}): ClipGro
   duration: 5,
   speed: 1,
   loop: false,
+  sinceStart: 10,
   ...changes,
 });
 const ofType = (step: ClipGroupStep, type: ClipAction['type']) =>
@@ -61,6 +64,7 @@ function phone(
   };
   let phase: ClipPhase = options.phase ?? 'paused';
   let clock = 0;
+  let startedAt = phase === 'playing' ? -10 : -Infinity;
   const find = (key: string) => clips.find((each) => each.key === key)!;
   const pause = (each: (typeof clips)[number]) => {
     if (!each.paused && each.need > 0) seen.pausedWithoutData += 1;
@@ -74,6 +78,7 @@ function phone(
         duration: 5,
         speed: 1,
         loop: options.loop ?? false,
+        sinceStart: clock - startedAt,
         clips: clips.map((each) =>
           clip(each.key, {
             currentTime: each.time,
@@ -89,6 +94,7 @@ function phone(
     );
     for (const action of step.actions) {
       if (action.type === 'play-all') {
+        startedAt = clock;
         seen.starts += 1;
         for (const each of clips) each.paused = false;
       } else if (action.type === 'pause-all') clips.forEach(pause);
@@ -211,47 +217,48 @@ describe('stepClipGroup', () => {
     expect(landing).toMatchObject({ phase: 'buffering', actions: [] });
   });
 
-  it('holds the clips that can play when one runs out of data, and leaves that one playing', () => {
-    const step = stepClipGroup(
-      group([
-        clip('b200', { readyState: 2, bufferedEnd: 1.1 }),
-        clip('h100', { currentTime: 1.1 }),
-      ]),
+  it('waits for a clip that falls a quarter second behind, at once when it lacks data', () => {
+    const short = { readyState: 2, bufferedEnd: 1.1 };
+    // A stall shorter than that pauses nothing.
+    const brief = stepClipGroup(
+      group([clip('b200', short), clip('h100', { currentTime: 1.1 })]),
       'tick',
     );
-    expect(step).toMatchObject({
+    expect(brief.phase).toBe('playing');
+    expect(ofType(brief, 'pause')).toEqual([]);
+    expect(ofType(brief, 'pause-all')).toEqual([]);
+    const stalled = stepClipGroup(
+      group([clip('b200', short), clip('h100', { currentTime: 1.3 })], { sinceStart: 0.1 }),
+      'tick',
+    );
+    expect(stalled).toMatchObject({
       phase: 'buffering',
       actions: [{ type: 'pause', key: 'h100' }],
-      ready: false,
     });
+    // Two clips that both play are left to the nudge while the start settles.
+    const apart = [clip('b200'), clip('h100', { currentTime: 1.3 })];
+    expect(stepClipGroup(group(apart, { sinceStart: REST_SECONDS - 0.1 }), 'tick')).toMatchObject({
+      phase: 'playing',
+      actions: [{ type: 'rate', key: 'h100', rate: 0.9 }],
+    });
+    expect(stepClipGroup(group(apart, { sinceStart: REST_SECONDS }), 'tick')).toMatchObject({
+      phase: 'buffering',
+      actions: [{ type: 'pause', key: 'h100' }],
+    });
+    const dry = stepClipGroup(group([clip('b200', short), clip('h100', short)]), 'tick');
+    expect(dry).toMatchObject({ phase: 'buffering', actions: [], ready: false });
   });
 
-  it('never seeks the audible clip and corrects the other clip toward it', () => {
-    const step = stepClipGroup(
-      group([clip('b200', { currentTime: 1 }), clip('h100', { currentTime: 1.5 })], {
-        audible: 'h100',
-      }),
-      'tick',
+  it('closes drift without a seek where a seek takes longer than the drift', () => {
+    const drifted = phone(
+      { b200: { time: 1, paused: false }, h100: { time: 1 + HOLD_SECONDS + 0.15, paused: false } },
+      { phase: 'playing', seekSeconds: 0.4 },
     );
-    expect(step.actions).toEqual([{ type: 'seek', key: 'b200', time: 1.5 }]);
-    expect(step.time).toBe(1.5);
-  });
-
-  it('seeks a follower exactly once for large drift and never while it is already seeking', () => {
-    const drifted = stepClipGroup(
-      group([clip('b200'), clip('h100', { currentTime: 1.5, playbackRate: 1.1 })]),
-      'tick',
-    );
-    expect(drifted.actions).toEqual([
-      { type: 'seek', key: 'h100', time: 1 },
-      { type: 'rate', key: 'h100', rate: 1 },
-    ]);
-    const seeking = stepClipGroup(
-      group([clip('b200'), clip('h100', { currentTime: 1.5, seeking: true, readyState: 1 })]),
-      'tick',
-    );
-    expect(seeking.phase).toBe('playing');
-    expect(seeking.actions).toEqual([]);
+    drifted.run(3);
+    expect(drifted.seen.seeks).toBe(0);
+    expect(drifted.seen.phases).toEqual(['playing', 'buffering', 'playing']);
+    expect(drifted.seen.starts).toBe(1);
+    expect(drifted.gap()).toBeLessThanOrEqual(NUDGE_SECONDS);
   });
 
   it('seeks followers to the leader, never the audible clip, when they are too far apart to catch up', () => {
