@@ -59,6 +59,7 @@ import QualityMethod from './QualityMethod';
 import { stageSentence } from './stage-sentence';
 import styles from './results.module.css';
 import { ScrollFade } from './use-scroll-fade';
+import { phoneViewport } from './use-phone';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
 
@@ -375,13 +376,21 @@ export default function VideoResultsClips({
   );
   const nextReady = ready(next);
   // A phone's opening pair is not the link's default, so the address names it and a shared link
-  // reopens the same two clips on any screen.
+  // reopens the same two clips on any screen. It is named once its clips are read, so a side
+  // that turns out to have none is never written.
   const openedPair =
-    against === null && next.option?.value === next.opened && next.opened !== next.fallback
+    against === null &&
+    nextReady &&
+    next.option?.value === next.opened &&
+    next.opened !== next.fallback
       ? next.opened
       : null;
   useEffect(() => {
-    if (openedPair) writeStage({ ...parseStage(location.search), vs: openedPair });
+    if (!openedPair) return;
+    // Hydration renders with the server's guess of a phone and without the link's own keys, so
+    // the address and the screen are read here: a pair the link names, or a wider screen, wins.
+    const live = parseStage(location.search);
+    if (live.vs === null && phoneViewport()) writeStage({ ...live, vs: openedPair });
   }, [openedPair]);
   /** The first frames a pair shows for a prompt. */
   const framesOf = (

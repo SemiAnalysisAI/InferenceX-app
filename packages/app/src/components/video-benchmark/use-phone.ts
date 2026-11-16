@@ -14,7 +14,8 @@ function subscribe(onChange: () => void) {
   return () => query.removeEventListener('change', onChange);
 }
 
-const matches = () => canMatch() && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+/** Whether the viewport is a phone's right now; false where it cannot be measured. */
+export const phoneViewport = () => canMatch() && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
 
 /**
  * `useIsMobileViewport` with the server's guess in place of false. The clip stage's opening pair
@@ -22,5 +23,5 @@ const matches = () => canMatch() && window.matchMedia(MOBILE_VIEWPORT_QUERY).mat
  * document already shows the pair it will keep, so hydration swaps no picture.
  */
 export function usePhone(serverGuess = false): boolean {
-  return useSyncExternalStore(subscribe, matches, () => serverGuess);
+  return useSyncExternalStore(subscribe, phoneViewport, () => serverGuess);
 }
