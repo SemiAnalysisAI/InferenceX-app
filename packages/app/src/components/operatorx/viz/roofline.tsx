@@ -184,11 +184,13 @@ export function Roofline({
     ...Object.values(rooflines).flatMap((r) => r.map((p) => p.y)),
   ];
   const yHi = Math.max(...ys) * 1.1;
-  // Log y: put the lowest measured point a quarter of the way up instead of letting the
-  // roofline's bandwidth slope drag the floor down, then clip each slope at that floor.
-  const pointYs = points.map((p) => p.y).filter((y) => y > 0);
-  const yMin = pointYs.length > 0 ? Math.min(...pointYs) : Math.min(...ys.filter((y) => y > 0));
-  const yLo = Math.exp((Math.log(yMin) - 0.25 * Math.log(yHi)) / 0.75);
+  // Log y: the original full-range axis (all values, /1.5 below, *1.5 above) spent half its
+  // height on near-zero values. Raise the floor so that old midpoint sits a quarter of the
+  // way up, then clip roofline slopes and drop points below the floor.
+  const yPos = ys.filter((y) => y > 0);
+  const yMid = Math.sqrt((Math.min(...yPos) / 1.5) * (Math.max(...yPos) * 1.5));
+  const yLo = Math.exp((Math.log(yMid) - 0.25 * Math.log(yHi)) / 0.75);
+  const shown = logY ? points.filter((p) => p.y >= yLo) : points;
   if (logY)
     for (const [hw, line] of Object.entries(rooflines)) {
       const cut = line.findIndex((p) => p.y >= yLo);
@@ -265,7 +267,7 @@ export function Roofline({
           <OpxChart<Point>
             inspect={{ model, caseOf: (p) => p.i }}
             chartId="operatorx-roofline"
-            data={points}
+            data={shown}
             height={400}
             margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
             xScale={{ type: 'log', domain: [a0, a1], nice: false }}
@@ -320,7 +322,7 @@ export function Roofline({
               {
                 type: 'point',
                 key: 'points',
-                data: points,
+                data: shown,
                 config: {
                   getCx: () => 0,
                   getCy: () => 0,
