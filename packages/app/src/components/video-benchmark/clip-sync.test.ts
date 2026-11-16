@@ -167,6 +167,20 @@ describe('stepClipGroup', () => {
       'play',
     );
     expect(warm).toMatchObject({ phase: 'playing', actions: [{ type: 'play-all' }] });
+    // A tap while one clip still seeks, as after a prompt switch that kept one side.
+    const landing = stepClipGroup(
+      group([clip('b200', cold), clip('h100', { paused: true, seeking: true, readyState: 1 })], {
+        phase: 'paused',
+      }),
+      'play',
+    );
+    expect(landing).toMatchObject({
+      phase: 'loading',
+      actions: [
+        { type: 'play', key: 'b200' },
+        { type: 'prime', key: 'h100' },
+      ],
+    });
   });
 
   it('starts as soon as both clips can play, not when both are downloaded, with no paused clip left to load', () => {

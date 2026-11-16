@@ -131,7 +131,15 @@ function resume(
 ): ClipPhase {
   const { clips, duration } = group;
   // A seeking clip reports its target, not where its picture is; nothing moves until it lands.
-  if (clips.some((clip) => clip.seeking)) return waiting;
+  if (clips.some((clip) => clip.seeking)) {
+    // The tap still reaches every clip: the one without data starts to load, and the others
+    // may be started later without a gesture.
+    if (gesture)
+      for (const clip of clips)
+        if (clip.paused)
+          actions.push({ type: starved(clip, duration) ? 'play' : 'prime', key: clip.key });
+    return waiting;
+  }
   const times = clips.map((clip) => clip.currentTime);
   const front = Math.max(...times);
   if (front - Math.min(...times) > CATCH_UP_SECONDS) {
