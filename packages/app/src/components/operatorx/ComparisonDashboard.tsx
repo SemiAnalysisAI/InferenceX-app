@@ -16,7 +16,6 @@ import { Label } from '@/components/ui/label';
 import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Switch } from '@/components/ui/switch';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
@@ -48,7 +47,6 @@ const STRINGS = {
     devices: 'Devices',
     metric: 'Metric',
     baseline: 'Baseline',
-    logScale: 'Log scale',
     none: 'None',
     oneDevice: '1 GPU',
     loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
@@ -61,7 +59,6 @@ const STRINGS = {
     devices: '设备',
     metric: '指标',
     baseline: '基线',
-    logScale: '对数刻度',
     none: '无',
     oneDevice: '单 GPU',
     loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
@@ -248,10 +245,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const locale = useLocale();
   const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
-  const baseMetric = metricById(search.get('metric'));
-  const logParam = search.get('log');
-  const log = logParam === null ? baseMetric.log : logParam === '1';
-  const metric = useMemo(() => ({ ...baseMetric, log }), [baseMetric, log]);
+  const metric = metricById(search.get('metric'));
   const {
     data: view,
     error,
@@ -407,18 +401,6 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                 },
               ]}
             />
-          </ControlGroup>
-          <ControlGroup label={strings.logScale} htmlFor="operatorx-log">
-            <div className={`flex items-center ${CONTROL_HEIGHT.default}`}>
-              <Switch
-                id="operatorx-log"
-                checked={log}
-                onCheckedChange={(on) => {
-                  track('operatorx_log_scale_toggled', { op, log: on });
-                  setParam('log', on ? '1' : '0');
-                }}
-              />
-            </div>
           </ControlGroup>
         </ControlPanel>
         <div className="mt-4 border-t border-border/30 pt-3">

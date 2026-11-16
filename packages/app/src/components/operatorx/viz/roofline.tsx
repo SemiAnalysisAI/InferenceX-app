@@ -34,6 +34,7 @@ const STRINGS = {
     empty: 'No case has FLOP and byte counts',
     precision: 'Compute precision',
     normalized: 'Normalized',
+    logScale: 'Log scale',
     intensityAxis: 'Arithmetic intensity',
     shareAxis: 'Share of peak compute (%)',
     tflopsAxis: 'Achieved TFLOPS',
@@ -50,6 +51,7 @@ const STRINGS = {
     empty: '没有同时带 FLOP 和字节数的用例',
     precision: '计算精度',
     normalized: '归一化',
+    logScale: '对数刻度',
     intensityAxis: '算术强度',
     shareAxis: '计算峰值占比（%）',
     tflopsAxis: '实测 TFLOPS',
@@ -113,6 +115,7 @@ export function Roofline({
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
   const [sharedOnly, setSharedOnly] = useState(true);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const [logY, setLogY] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
@@ -208,6 +211,21 @@ export function Roofline({
             {strings.normalized}
           </Label>
         </div>
+        {!summaryOnly && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="opx-roofline-log"
+              checked={logY}
+              onCheckedChange={(enabled) => {
+                track('operatorx_roofline_log_toggled', { enabled });
+                setLogY(enabled);
+              }}
+            />
+            <Label htmlFor="opx-roofline-log" className="text-sm font-normal text-muted-foreground">
+              {strings.logScale}
+            </Label>
+          </div>
+        )}
         {summaryOnly && (
           <div className="flex items-center gap-2">
             <Switch
@@ -238,7 +256,15 @@ export function Roofline({
             height={400}
             margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
             xScale={{ type: 'log', domain: [a0, a1], nice: false }}
-            yScale={{ type: 'sqrt', domain: [0, Math.max(...ys) * 1.1], nice: false }}
+            yScale={
+              logY
+                ? {
+                    type: 'log',
+                    domain: [Math.min(...ys.filter((y) => y > 0)) / 1.5, Math.max(...ys) * 1.5],
+                    nice: false,
+                  }
+                : { type: 'sqrt', domain: [0, Math.max(...ys) * 1.1], nice: false }
+            }
             xAxis={
               normalized
                 ? {
