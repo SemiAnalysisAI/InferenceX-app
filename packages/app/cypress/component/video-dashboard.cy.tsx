@@ -15,7 +15,7 @@ import { referenceQualityFixture } from '@/components/video-benchmark/reference-
 import { APP_THEMES } from '@/lib/themes/themes';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
-import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
+import { coarsePointer, readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
 function assertResultsFit() {
   cy.document().should((document) => {
@@ -1074,6 +1074,51 @@ describe('VideoGenX results', () => {
     });
     against().should('have.value', 'reference');
     searchParam('r_vs').should('equal', 'b300');
+  });
+
+  it('pins the point nearest a tap that misses it on a touch screen', () => {
+    coarsePointer();
+    mount({});
+    points().should('have.length.at.least', 2);
+    points().then(($groups) => {
+      const centres = [...$groups].map((group) => {
+        const box = group.querySelector('.visible-shape')!.getBoundingClientRect();
+        return {
+          hardware: (group as HTMLElement).dataset.hardware!,
+          x: box.left + box.width / 2,
+          y: box.top + box.height / 2,
+        };
+      });
+      // 16 px from a point's centre is outside its 12 px hit circle and inside a finger's reach;
+      // the tap must be nearer to that point than to any other by more than the 8 px tie.
+      const taps = centres.flatMap((centre) =>
+        [
+          [16, 0],
+          [-16, 0],
+          [0, 16],
+          [0, -16],
+        ].map(([dx, dy]) => ({ centre, x: centre.x + dx, y: centre.y + dy })),
+      );
+      const tap = taps.find((candidate) =>
+        centres.every(
+          (other) =>
+            other === candidate.centre ||
+            Math.hypot(other.x - candidate.x, other.y - candidate.y) > 16 + 8 + 1,
+        ),
+      )!;
+      expect(tap, 'a point with room beside it').to.not.equal(undefined);
+      const svg = ($groups[0] as unknown as SVGGElement).ownerSVGElement!;
+      const box = svg.getBoundingClientRect();
+      cy.wrap(svg).trigger('click', tap.x - box.left, tap.y - box.top, {
+        clientX: tap.x,
+        clientY: tap.y,
+        force: true,
+      });
+      cy.get('[data-testid="point-details-panel"]').should(
+        'contain',
+        tap.centre.hardware.toUpperCase(),
+      );
+    });
   });
 
   it('pairs an unofficial run with the official cell of the same deployment', () => {

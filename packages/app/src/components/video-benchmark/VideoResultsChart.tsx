@@ -26,6 +26,7 @@ import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { axisLabelUnit, chartHoverCard, chartHoverCardImage } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -37,6 +38,7 @@ import {
   labelShift,
   pillBox,
   spreadPills,
+  tapTarget,
 } from './chart-marks';
 import { mayHaveClips } from './clip-stage';
 import { serverSplit } from './deployment';
@@ -702,6 +704,53 @@ export default function VideoResultsChart({
   );
   const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills });
   marks.current = { link: clipLink, hover: hover.current, pills };
+  // A finger covers several points on a narrow plot, and two can plot a pixel apart. On a touch
+  // screen a tap goes to the point `tapTarget` picks, before the plot's own handlers see it.
+  const touch = useIsCoarsePointer();
+  useEffect(() => {
+    const svg = chart.current?.getSvgElement();
+    if (!touch || !svg) return undefined;
+    let forwarding = false;
+    const onClick = (event: MouseEvent) => {
+      if (forwarding) return;
+      const xAxis = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
+      const yAxis = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
+      const nodes = new Map<string, SVGGElement>();
+      const points = [...svg.querySelectorAll<SVGGElement>('.dot-group')].flatMap((node) => {
+        const shape = node.querySelector('.visible-shape')?.getBoundingClientRect();
+        if (!shape) return [];
+        const left = shape.left + shape.width / 2;
+        const top = shape.top + shape.height / 2;
+        // A zoomed plot clips the points outside it; a tap near its edge must not pick one.
+        if (
+          xAxis &&
+          yAxis &&
+          (left < yAxis.left || left > xAxis.right || top < yAxis.top || top > xAxis.top)
+        )
+          return [];
+        const { key } = select<SVGGElement, PlotPoint>(node).datum();
+        nodes.set(key, node);
+        return [{ key, x: left, y: top }];
+      });
+      const pinned = chart.current?.getPinnedPoint() as PlotPoint | null | undefined;
+      const key = tapTarget({ x: event.clientX, y: event.clientY }, points, pinned?.key ?? null);
+      const target = key === null ? undefined : nodes.get(key);
+      if (!target || target.contains(event.target as Node)) return;
+      event.stopPropagation();
+      forwarding = true;
+      target.dispatchEvent(
+        new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          clientX: event.clientX,
+          clientY: event.clientY,
+        }),
+      );
+      forwarding = false;
+    };
+    svg.addEventListener('click', onClick, true);
+    return () => svg.removeEventListener('click', onClick, true);
+  }, [touch]);
   const lines = useMemo(
     () =>
       Object.fromEntries(

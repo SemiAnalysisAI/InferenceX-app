@@ -7,6 +7,7 @@ import {
   labelShift,
   pillBox,
   spreadPills,
+  tapTarget,
 } from './chart-marks';
 
 describe('pillBox', () => {
@@ -149,5 +150,39 @@ describe('clearOfLabels', () => {
   it('leaves a pill clear of every label alone', () => {
     const pill = { key: 'a', x: 200, y: 100, width: 80 };
     expect(clearOfLabels({ ...pill }, { x: 188 }, [label], 400)).toEqual(pill);
+  });
+});
+
+describe('tapTarget', () => {
+  // H200 and H100 at 8 GPUs plot 1 px apart; B200 sits well clear of both.
+  const points = [
+    { key: 'h200', x: 100, y: 200 },
+    { key: 'h100', x: 101, y: 200 },
+    { key: 'b200', x: 60, y: 120 },
+  ];
+
+  it('picks the nearest point within a finger of the tap and nothing beyond it', () => {
+    expect(tapTarget({ x: 70, y: 135 }, points, null)).toBe('b200');
+    expect(tapTarget({ x: 60, y: 143 }, points, null)).toBeNull();
+    expect(tapTarget({ x: 300, y: 40 }, points, 'b200')).toBeNull();
+  });
+
+  it('gives overlapping points turns, so a second tap reaches the one underneath', () => {
+    const tap = { x: 99, y: 201 };
+    expect(tapTarget(tap, points, null)).toBe('h200');
+    expect(tapTarget(tap, points, 'h200')).toBe('h100');
+    expect(tapTarget(tap, points, 'h100')).toBe('h200');
+    // A point picked elsewhere on the chart does not change whose turn it is here.
+    expect(tapTarget(tap, points, 'b200')).toBe('h200');
+  });
+
+  it('keeps a tap on a point that a finger can tell from its neighbour', () => {
+    const apart = [
+      { key: 'near', x: 100, y: 100 },
+      { key: 'far', x: 115, y: 100 },
+    ];
+    // Both are within reach, but the tap is plainly on `near`: tapping it again unpins it.
+    expect(tapTarget({ x: 100, y: 100 }, apart, 'near')).toBe('near');
+    expect(tapTarget({ x: 107, y: 100 }, apart, 'near')).toBe('far');
   });
 });

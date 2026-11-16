@@ -122,3 +122,34 @@ export function clearOfLabels(
 
 export const boxesOverlap = (a: Box, b: Box): boolean =>
   a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+/** How far from a point's centre a finger still picks it, in px: half a 44 px touch target. */
+export const TAP_RADIUS = 22;
+/** Points whose distances from a tap differ by no more than this, in px, a finger cannot tell apart. */
+const TAP_TIE = 8;
+
+export interface TapPoint {
+  key: string;
+  x: number;
+  y: number;
+}
+
+/**
+ * The point a tap picks: the nearest within `TAP_RADIUS`, or null when none is that close. Points a
+ * finger cannot tell apart take turns, nearest first: a tap that would pick the point picked
+ * `last` picks the next of them instead, so two overlapping points are both reachable.
+ */
+export function tapTarget(
+  tap: { x: number; y: number },
+  points: readonly TapPoint[],
+  last: string | null,
+): string | null {
+  const near = points
+    .map((point) => ({ key: point.key, distance: Math.hypot(point.x - tap.x, point.y - tap.y) }))
+    .filter((point) => point.distance <= TAP_RADIUS)
+    .toSorted((a, b) => a.distance - b.distance);
+  if (near.length === 0) return null;
+  const tied = near.filter((point) => point.distance - near[0].distance <= TAP_TIE);
+  const picked = tied.findIndex((point) => point.key === last);
+  return tied[(picked + 1) % tied.length].key;
+}
