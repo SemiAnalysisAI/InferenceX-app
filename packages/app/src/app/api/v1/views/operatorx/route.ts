@@ -98,12 +98,13 @@ function csvRow(row: Row): Record<string, unknown> {
   };
 }
 
-/** The dashboard page showing this selection. */
-function pageUrl(op: ComparisonOp, view: ComparisonView): string {
+/** The dashboard page showing this selection, GPU picks included when narrowed. */
+function pageUrl(op: ComparisonOp, view: ComparisonView, picked: readonly string[]): string {
   const q = new URLSearchParams(
     view.model ? { model: view.model } : { workload: view.workload ?? '' },
   );
   if (view.parallel) q.set('parallel', view.parallel);
+  if (picked.length > 0) q.set('hardware', picked.join(','));
   return `${operatorXCategoryPath(view.model ? 'model' : op)}?${q}`;
 }
 
@@ -206,7 +207,7 @@ export function GET(request: NextRequest) {
           })),
           hardware: view.hardware.map((h) => ({ id: h.id, runner: h.runner, runs: h.runs })),
         },
-        url: pageUrl(op, view),
+        url: pageUrl(op, view, picked),
         total,
         pageSize: PAGE_SIZE,
         rows,

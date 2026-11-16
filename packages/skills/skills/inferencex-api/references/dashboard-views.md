@@ -665,6 +665,10 @@ flagged.
 OperatorX is available in primary navigation without an unlock. Its read-only view
 is `/api/v1/views/operatorx`; OperatorX `flops` and `bytes` are useful work per GPU,
 so `tflops` compares across device splits; pick one `parallel` split per comparison.
+Page share links keep the selection in plain query params: `workload` or `model`,
+`parallel`, `metric`, `hardware` (comma-separated GPU keys, same as the view API's
+`hardware`), and `baseline` (presentation-only; it picks the speedup reference and
+does not change returned rows). The view response's `url` carries `hardware` when narrowed.
 Its other `/api/v1/operatorx/*` routes belong to the page and are not part of this
 skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes

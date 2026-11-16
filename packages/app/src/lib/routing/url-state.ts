@@ -1,5 +1,9 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
-import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
+import {
+  dashboardRouteForPathname,
+  getDashboardRoute,
+  shareLiveParamsFor,
+} from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
 import { getInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
@@ -371,6 +375,12 @@ function collectTabParams(): URLSearchParams {
     for (const [key, value] of liveParams) {
       if (prefixes.some((prefix) => key.startsWith(prefix))) filtered.set(key, value);
     }
+  }
+
+  // Pages such as OperatorX keep their selections in plain address-bar params.
+  for (const key of shareLiveParamsFor(route)) {
+    const value = liveParams.get(key);
+    if (value) filtered.set(key, value);
   }
 
   // Carry over any unofficial-run IDs currently reflected in the address bar.
