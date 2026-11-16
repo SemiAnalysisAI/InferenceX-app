@@ -181,11 +181,13 @@ export interface VideoResultsClipsProps {
   /** The chart points the two sides play, for the chart's Playing and Baseline badges. */
   onPairChange?: (pair: StagePair) => void;
   /**
-   * `StageOption.value` the reader picked, or null for the subject's `defaultPairing`; one the
-   * subject lacks shows the reference. Page state, so the chart can reset it with a new subject.
+   * `StageOption.value` the reader picked (`r_vs`), or null for the subject's `defaultPairing`;
+   * one the subject lacks pairs it by default too. The caller owns it, so the chart can reset it
+   * with a new subject.
    */
   against: string | null;
-  onAgainstChange: (value: string) => void;
+  /** The reader's pick; null when it is the subject's default pairing, which stays out of the URL. */
+  onAgainstChange: (value: string | null) => void;
   /** Plays the chart point with this key, as a chart click does. */
   onSubjectChange: (clipKey: string) => void;
   /** Plays a point against a `StageOption.value` in Wipe and asks for a reveal. */
@@ -277,9 +279,12 @@ export default function VideoResultsClips({
     // A candidate run is read against production on its own GPU.
     const own = subject ? ownLead(subject.point) : null;
     const options = subject ? stageOptions(subject.point, opening, deployments, own) : [];
-    const pairing = value ?? (subject ? defaultPairing(subject.point, own) : 'reference');
-    const option = options.find((item) => item.value === pairing) ?? options[0];
-    return { picked, subject, options, option, other: option?.point ?? null };
+    const fallback = subject ? defaultPairing(subject.point, own) : 'reference';
+    const option =
+      options.find((item) => item.value === value) ??
+      options.find((item) => item.value === fallback) ??
+      options[0];
+    return { picked, subject, options, option, fallback, other: option?.point ?? null };
   };
   type Pair = ReturnType<typeof pairFor>;
   const ready = ({ subject, other }: Pair) =>
@@ -688,7 +693,7 @@ export default function VideoResultsClips({
                     against: choice?.kind,
                     gpu: choice?.point?.hardwareKey ?? null,
                   });
-                  onAgainstChange(value);
+                  onAgainstChange(value === next.fallback ? null : value);
                 }}
               />
             )}
@@ -710,6 +715,8 @@ export default function VideoResultsClips({
               frames={point.frameCount}
               onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
               loadedFrames={loadedFrames}
+              swapped={stage.swap}
+              onSwappedChange={(swap) => writeStage({ ...stage, swap })}
             />
             <VideoClipReadout
               kind={option?.kind ?? 'reference'}

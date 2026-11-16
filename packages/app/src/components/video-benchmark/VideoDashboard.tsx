@@ -13,6 +13,7 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
+import { useClientSearch } from '@/hooks/useClientSearch';
 import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { isDarkTheme } from '@/lib/themes/themes';
@@ -78,7 +79,15 @@ import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
-import { isStageParam, parseStage, stagePointKey, writeStage, type StagePair } from './clip-stage';
+import {
+  defaultPairing,
+  isStageParam,
+  officialCounterpart,
+  parseStage,
+  stagePointKey,
+  writeStage,
+  type StagePair,
+} from './clip-stage';
 import { seeChangesPair } from './quality-method';
 import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
@@ -301,15 +310,15 @@ export default function VideoDashboard({
     baseline: null,
     posters: {},
   });
-  /** What the stage compares its subject with, by `StageOption.value`; null pairs it by default. */
-  const [against, setAgainst] = useState<string | null>(null);
+  /** What the stage compares its subject with, by `StageOption.value` (`r_vs`); null pairs it by default. */
+  const against = parseStage(useClientSearch()).vs;
   /** Whether the reader has picked a clip yet; until then playable chart points pulse. */
   const [picked, setPicked] = useState(false);
   /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
   const [peek, setPeek] = useState<string | null>(null);
-  const pickAgainst = useCallback((value: string) => {
+  const pickAgainst = useCallback((value: string | null) => {
     setPicked(true);
-    setAgainst(value);
+    writeStage({ ...parseStage(location.search), vs: value });
   }, []);
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
@@ -318,20 +327,10 @@ export default function VideoDashboard({
   const pickClip = useCallback(
     (key: string) => {
       setPicked(true);
-      if (key !== stagePair.playing) setAgainst(null);
-      writeStage({ ...parseStage(location.search), clip: key });
+      const stage = parseStage(location.search);
+      writeStage({ ...stage, clip: key, vs: key === stagePair.playing ? stage.vs : null });
     },
     [stagePair.playing],
-  );
-  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
-  const showOnStage = useCallback(
-    (point: VideoPoint, compare: string) => {
-      setPicked(true);
-      setAgainst(compare);
-      writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
-      requestReveal();
-    },
-    [requestReveal],
   );
   const onStagePair = useCallback(
     (pair: StagePair) =>
@@ -600,6 +599,24 @@ export default function VideoDashboard({
     () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
     [deploymentCells, projection.history],
   );
+  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
+  const showOnStage = (point: VideoPoint, compare: string) => {
+    setPicked(true);
+    const own = officialCounterpart(
+      point,
+      deploymentPoints,
+      officialOpenings,
+      state.unofficialRun ?? undefined,
+    );
+    writeStage({
+      ...parseStage(location.search),
+      clip: stagePointKey(point),
+      view: 'wipe',
+      // The subject's default pairing stays out of the URL, as every default does.
+      vs: compare === defaultPairing(point, own) ? null : compare,
+    });
+    requestReveal();
+  };
   const lossyPair = useMemo(
     () =>
       seeChangesPair(drawnPoints, deploymentPoints, { tier: state.costTier }, state.unofficialRun),

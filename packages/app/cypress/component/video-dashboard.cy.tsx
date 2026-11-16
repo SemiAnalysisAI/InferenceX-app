@@ -113,6 +113,19 @@ const stageInView = () =>
       $stage[0].ownerDocument.defaultView!.innerHeight + 1,
     );
   });
+/** Stored runs may have clips, so every hardware is offered as a pair. */
+const publishEveryRun = (page: VideoHistoryPage) => {
+  for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+};
+/** Whether the subject's pill sits left of its pair's, which Swap exchanges. */
+const subjectOnLeft = (left: boolean) =>
+  cy.get<HTMLElement>('[data-testid="video-results-pill"]').should(($pills) => {
+    const side = (role: string) =>
+      [...$pills]
+        .find((pill) => pill.closest<HTMLElement>('[data-side]')?.dataset.side === role)!
+        .getBoundingClientRect().left;
+    expect(side('a') < side('b'), 'subject pill on the left').to.equal(left);
+  });
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const chooseEngine = (label: string) =>
   cy.get('[data-testid="results-engine"]').contains('button', label).click();
@@ -1022,10 +1035,12 @@ describe('VideoGenX results', () => {
     playing().should('have.attr', 'data-hardware', 'h200');
     searchParam('r_clip').should('match', /^34342452354:[^-]+$/u);
     against().should('have.value', 'reference');
+    searchParam('r_vs').should('equal', null);
     stagePill('b').should('contain', 'Diffusers reference');
     cy.get('[data-testid="video-results-compare"]').should('contain', 'compare');
-    // A click on the playing point keeps the reader's pairing.
+    // A click on the playing point keeps the reader's pairing, which the URL carries.
     against().select('h100');
+    searchParam('r_vs').should('equal', 'h100');
     playing().find('.visible-shape').click({ force: true });
     against().should('have.value', 'h100');
     // A lossy config pairs with its lossless twin.
@@ -1034,7 +1049,31 @@ describe('VideoGenX results', () => {
       .then(($option) => config().select(String($option.val())));
     searchParam('r_clip').should('match', /^34342452354:.+-fbc$/u);
     against().should('have.value', 'twin');
+    searchParam('r_vs').should('equal', null);
     stagePill('b').should('contain', 'H200').and('contain', 'lossless');
+  });
+
+  it('reopens a shared comparison with its pair and swap, and the default for a pair it lacks', () => {
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    mount({ search: '?r_y=videosPerGpuHour&r_vs=h200&r_swap=1', editPage: publishEveryRun });
+    against().should('have.value', 'h200');
+    stagePill('a').should('contain', 'B200');
+    stagePill('b').should('contain', 'H200');
+    subjectOnLeft(true);
+    // Each choice leaves the URL once it is the default again.
+    cy.get('[data-testid="video-results-swap"]').click();
+    subjectOnLeft(false);
+    searchParam('r_swap').should('equal', null);
+    searchParam('r_vs').should('equal', 'h200');
+    against().select('reference');
+    searchParam('r_vs').should('equal', null);
+    // A pair the subject does not offer plays its default and stays in the URL.
+    cy.window().then((win) => {
+      win.history.replaceState(null, '', `${win.location.pathname}?r_y=videosPerGpuHour&r_vs=b300`);
+      win.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    against().should('have.value', 'reference');
+    searchParam('r_vs').should('equal', 'b300');
   });
 
   it('pairs an unofficial run with the official cell of the same deployment', () => {

@@ -156,6 +156,9 @@ export interface VideoClipStageProps {
   onPreviewError: (previewUrl: string) => void;
   /** First frames the caller already loaded, so a swap to them never paints the idle frame. */
   loadedFrames?: ReadonlySet<string>;
+  /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
+  swapped: boolean;
+  onSwappedChange: (swapped: boolean) => void;
 }
 
 type Role = 'a' | 'b';
@@ -185,6 +188,8 @@ export default function VideoClipStage({
   frames,
   onPreviewError,
   loadedFrames,
+  swapped,
+  onSwappedChange,
 }: VideoClipStageProps) {
   const s = STRINGS[useLocale()];
   const clips = { a, b };
@@ -201,8 +206,6 @@ export default function VideoClipStage({
   const [peek, setPeek] = useState(false);
   const [differenceFailed, setDifferenceFailed] = useState(false);
   const [playback, setPlayback] = useState({ speed: 1, loop: true });
-  /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
-  const [swapped, setSwapped] = useState(false);
   const [inspect, setInspect] = useState(false);
   /** One zoom and pan, in percent of a side, applied to both sides and the Difference canvas. */
   const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
@@ -816,7 +819,7 @@ export default function VideoClipStage({
           aria-label={s.swap}
           title={s.swap}
           onClick={() => {
-            setSwapped(!swapped);
+            onSwappedChange(!swapped);
             track('video_results_clips_swap', { enabled: !swapped });
           }}
         >

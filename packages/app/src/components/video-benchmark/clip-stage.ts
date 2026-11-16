@@ -16,10 +16,17 @@ export interface StageState {
   view: StageView;
   /** `resultsPointKey` of the chart point the stage plays; null or an undrawn point plays the default. */
   clip: string | null;
+  /**
+   * `StageOption.value` the subject is compared with; null, or a value the subject does not
+   * offer, pairs it by `defaultPairing`.
+   */
+  vs: string | null;
+  /** The two sides have exchanged places on the stage. */
+  swap: boolean;
 }
 
 /** The stage's own URL keys. VideoDashboard's `commit` rewrites every other `r_` key and keeps these. */
-const STAGE_PARAMS: readonly string[] = ['r_prompt', 'r_view', 'r_clip'];
+const STAGE_PARAMS: readonly string[] = ['r_prompt', 'r_view', 'r_clip', 'r_vs', 'r_swap'];
 export const isStageParam = (key: string) => STAGE_PARAMS.includes(key);
 
 export function parseStage(search: string): StageState {
@@ -29,6 +36,8 @@ export function parseStage(search: string): StageState {
     prompt: params.get('r_prompt') || null,
     view: STAGE_VIEWS.find((item) => item === view) ?? 'wipe',
     clip: params.get('r_clip') || null,
+    vs: params.get('r_vs') || null,
+    swap: params.get('r_swap') === '1',
   };
 }
 
@@ -41,6 +50,10 @@ export function stageSearch(state: StageState, search: string): URLSearchParams 
   else params.set('r_view', state.view);
   if (state.clip) params.set('r_clip', state.clip);
   else params.delete('r_clip');
+  if (state.vs) params.set('r_vs', state.vs);
+  else params.delete('r_vs');
+  if (state.swap) params.set('r_swap', '1');
+  else params.delete('r_swap');
   return params;
 }
 
