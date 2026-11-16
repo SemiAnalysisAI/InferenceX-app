@@ -240,6 +240,13 @@ export default function VideoPointSheet({
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest('button')) return;
     press.current = { id: event.pointerId, y: event.clientY, pull: 0 };
+    // A finger's moves and its lift come here wherever it goes; a mouse's or a pen's go to what is
+    // under it, and a quick drag is off the header before the sheet has followed it.
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // A pointer that is already up has no drag to keep.
+    }
   };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (press.current?.id !== event.pointerId) return;

@@ -17,6 +17,7 @@ import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
 import {
   coarsePointer,
+  mouseDragDown,
   readOnlyVideoRequests,
   resultHistory,
   tapArea,
@@ -1388,6 +1389,26 @@ describe('VideoGenX results', () => {
       'contain',
       'No qualifying run for this workload on this hardware.',
     );
+  });
+
+  it('closes the sheet on a mouse drag that is off its header before the sheet follows', function () {
+    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
+    coarsePointer();
+    cy.viewport(390, 844);
+    mount({});
+    hardwarePoints('b200').first().then(tapPoint);
+    // The sheet has slid in when its foot is the screen's.
+    sheet().should(($sheet) =>
+      expect($sheet[0].getBoundingClientRect().bottom, 'sheet at rest').to.be.closeTo(844, 1),
+    );
+    cy.get('[data-testid="video-point-sheet-header"]').then(($header) => {
+      const box = $header[0].getBoundingClientRect();
+      // One move of 200 px, past the header's own height.
+      expect(box.height, 'header height').to.be.lessThan(200);
+      mouseDragDown(box.left + 60, box.top + box.height / 2, 200);
+    });
+    sheet().should('not.exist');
+    searchParam('r_sheet').should('equal', null);
   });
 
   it('puts the page back where a tap found it, also when closed while it still scrolls', () => {

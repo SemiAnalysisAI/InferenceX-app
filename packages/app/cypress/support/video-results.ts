@@ -61,6 +61,40 @@ export function touchScreen(enabled: boolean) {
 }
 
 /**
+ * A drag by the browser's own mouse, straight down from a point of the mounted page: a press, one
+ * move and a release, each reaching whatever is under the mouse as a person's does, where
+ * `trigger` hands its event to the element named. The mouse ends outside the mounted page.
+ * Chromium only.
+ */
+export function mouseDragDown(x: number, y: number, distance: number) {
+  cy.then(async () => {
+    const frame = window.top!.document.querySelector<HTMLElement>('iframe.aut-iframe')!;
+    const box = frame.getBoundingClientRect();
+    // The runner draws the mounted page scaled to fit its own window.
+    const scale = box.width / frame.offsetWidth;
+    const mouse = (type: string, pageY: number, buttons: number) =>
+      Cypress.automation('remote:debugger:protocol', {
+        command: 'Input.dispatchMouseEvent',
+        params: {
+          type,
+          x: box.left + x * scale,
+          y: box.top + pageY * scale,
+          button: 'left',
+          buttons,
+          clickCount: 1,
+        },
+      });
+    await mouse('mousePressed', y, 1);
+    await mouse('mouseMoved', y + distance, 1);
+    await mouse('mouseReleased', y + distance, 0);
+    await Cypress.automation('remote:debugger:protocol', {
+      command: 'Input.dispatchMouseEvent',
+      params: { type: 'mouseMoved', x: 0, y: 0 },
+    });
+  });
+}
+
+/**
  * The width and height of the area around an element's centre whose taps reach it, up to 30 px
  * each way. It counts a hit area drawn by a pseudo-element and stops where a neighbour is on top.
  */
