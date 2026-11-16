@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +8,10 @@ import type { HardwarePageMeta } from '@/lib/hardware/hardware';
 
 import { HardwareIndexContent } from './hardware-index-content';
 import { HardwarePageContent } from './hardware-page-content';
+
+const withQueryClient = (ui: ReactNode) => (
+  <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+);
 
 const { VR, TPU, META, PAGES } = vi.hoisted(() => {
   const vr = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
@@ -52,12 +58,14 @@ function count(html: string, needle: string) {
 
 function renderPage(locale: 'en' | 'zh', headings: TocHeading[] = HEADINGS) {
   return renderToStaticMarkup(
-    <HardwarePageContent
-      locale={locale}
-      meta={META}
-      headings={headings}
-      content={<p>Article body</p>}
-    />,
+    withQueryClient(
+      <HardwarePageContent
+        locale={locale}
+        meta={META}
+        headings={headings}
+        content={<p>Article body</p>}
+      />,
+    ),
   );
 }
 
@@ -143,7 +151,7 @@ describe('HardwarePageContent', () => {
 
 describe('HardwareIndexContent', () => {
   it('renders one card per page with its date, title, lede, and a link to the page', () => {
-    const html = renderToStaticMarkup(<HardwareIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<HardwareIndexContent locale="en" />));
 
     expect(html).toContain('data-testid="hardware-index-page"');
     expect(html).toContain('<h1');
@@ -159,7 +167,7 @@ describe('HardwareIndexContent', () => {
   });
 
   it('links Chinese cards to the /zh pages', () => {
-    const html = renderToStaticMarkup(<HardwareIndexContent locale="zh" />);
+    const html = renderToStaticMarkup(withQueryClient(<HardwareIndexContent locale="zh" />));
 
     expect(html).toContain(`href="/zh/hardware/${VR}"`);
     expect(html).toContain(`href="/zh/hardware/${TPU}"`);

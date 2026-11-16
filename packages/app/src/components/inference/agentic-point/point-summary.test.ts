@@ -1,4 +1,5 @@
-import { createElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,9 @@ vi.mock('next/navigation', () => ({
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
 
 import { PointSummary } from './point-summary';
+
+const withQueryClient = (ui: ReactNode) =>
+  createElement(QueryClientProvider, { client: new QueryClient() }, ui);
 
 function meta(overrides: Partial<PointMeta> = {}): PointMeta {
   return {
@@ -54,9 +58,11 @@ function meta(overrides: Partial<PointMeta> = {}): PointMeta {
 describe('PointSummary', () => {
   it('identifies multinode aggregate without calling it disaggregated', () => {
     const html = renderToStaticMarkup(
-      createElement(PointSummary, {
-        meta: meta({ disagg: false, is_multinode: true }),
-      }),
+      withQueryClient(
+        createElement(PointSummary, {
+          meta: meta({ disagg: false, is_multinode: true }),
+        }),
+      ),
     );
 
     expect(html).toContain('multi-node aggregate');
@@ -64,7 +70,9 @@ describe('PointSummary', () => {
   });
 
   it('hides a stale CPU cache hit rate when offload is disabled', () => {
-    const html = renderToStaticMarkup(createElement(PointSummary, { meta: meta() }));
+    const html = renderToStaticMarkup(
+      withQueryClient(createElement(PointSummary, { meta: meta() })),
+    );
 
     expect(html).toContain('Chip cache hit');
     expect(html).not.toContain('CPU cache hit');
@@ -72,7 +80,7 @@ describe('PointSummary', () => {
 
   it('shows the CPU cache hit rate when offload is enabled', () => {
     const html = renderToStaticMarkup(
-      createElement(PointSummary, { meta: meta({ offload_mode: 'on' }) }),
+      withQueryClient(createElement(PointSummary, { meta: meta({ offload_mode: 'on' }) })),
     );
 
     expect(html).toContain('CPU cache hit');
@@ -81,14 +89,16 @@ describe('PointSummary', () => {
 
   it('labels TRTLLM offload cache hits as combined instead of showing an empty CPU rate', () => {
     const html = renderToStaticMarkup(
-      createElement(PointSummary, {
-        meta: meta({
-          framework: 'dynamo-trt',
-          kv_offloading: 'dram',
-          server_gpu_cache_hit_rate: 0.978,
-          server_cpu_cache_hit_rate: null,
+      withQueryClient(
+        createElement(PointSummary, {
+          meta: meta({
+            framework: 'dynamo-trt',
+            kv_offloading: 'dram',
+            server_gpu_cache_hit_rate: 0.978,
+            server_cpu_cache_hit_rate: null,
+          }),
         }),
-      }),
+      ),
     );
 
     expect(html).toContain('Combined chip + CPU cache hit');
@@ -98,17 +108,19 @@ describe('PointSummary', () => {
 
   it('shows runtime component names and independently reported versions', () => {
     const html = renderToStaticMarkup(
-      createElement(PointSummary, {
-        meta: meta({
-          offload_mode: 'on',
-          kv_offloading: 'dram',
-          kv_offload_backend: 'lmcache',
-          kv_offload_backend_version: '0.5.1',
-          kv_p2p_transfer: 'mooncake',
-          router_name: 'vllm-router',
-          router_version: '0.1.14',
+      withQueryClient(
+        createElement(PointSummary, {
+          meta: meta({
+            offload_mode: 'on',
+            kv_offloading: 'dram',
+            kv_offload_backend: 'lmcache',
+            kv_offload_backend_version: '0.5.1',
+            kv_p2p_transfer: 'mooncake',
+            router_name: 'vllm-router',
+            router_version: '0.1.14',
+          }),
         }),
-      }),
+      ),
     );
 
     expect(html).toContain('Offload type');
@@ -123,7 +135,9 @@ describe('PointSummary', () => {
 
   it('links an agentic point to its configuration on the Prefix Cache Reuse tab', () => {
     const html = renderToStaticMarkup(
-      createElement(PointSummary, { meta: meta({ model: 'dsr1', disagg: false }) }),
+      withQueryClient(
+        createElement(PointSummary, { meta: meta({ model: 'dsr1', disagg: false }) }),
+      ),
     );
 
     expect(html).toContain('Prefix cache reuse for this config');
@@ -134,7 +148,9 @@ describe('PointSummary', () => {
 
   it('offers no cache-reuse link for a fixed-sequence point', () => {
     const html = renderToStaticMarkup(
-      createElement(PointSummary, { meta: meta({ benchmark_type: 'single_turn' }) }),
+      withQueryClient(
+        createElement(PointSummary, { meta: meta({ benchmark_type: 'single_turn' }) }),
+      ),
     );
 
     expect(html).not.toContain('cache-reuse-link');
@@ -143,14 +159,16 @@ describe('PointSummary', () => {
   it('renders runtime metadata labels in Simplified Chinese on /zh', () => {
     localeState.pathname = '/zh/infx/inference/agentic/206885';
     const html = renderToStaticMarkup(
-      createElement(PointSummary, {
-        meta: meta({
-          kv_offloading: 'dram',
-          kv_offload_backend: 'hicache',
-          router_name: 'sglang-router',
-          router_version: '0.3.2',
+      withQueryClient(
+        createElement(PointSummary, {
+          meta: meta({
+            kv_offloading: 'dram',
+            kv_offload_backend: 'hicache',
+            router_name: 'sglang-router',
+            router_version: '0.3.2',
+          }),
         }),
-      }),
+      ),
     );
     localeState.pathname = '/infx/inference/agentic/206885';
 

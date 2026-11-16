@@ -14,6 +14,7 @@ import { verifiedQuality } from '@/components/video-benchmark/reference-quality'
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { servingArtifact } from '../support/video-artifacts';
+import { mountWithProviders } from '../support/test-utils';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
 function assertResultsFit() {
@@ -58,7 +59,7 @@ function mount({
       <VideoDashboard />
     </PathnameContext.Provider>
   );
-  cy.mount(
+  mountWithProviders(
     theme ? (
       <ThemeProvider
         attribute="class"
@@ -240,7 +241,7 @@ describe('VideoGenX results', () => {
       nextPage: null,
     }).as('history');
     const initialData = { state: parseResultsState('?r_tier=r'), history: null, sides: {} };
-    cy.mount(
+    mountWithProviders(
       <PathnameContext.Provider value="/vgx">
         <VideoDashboard initialData={initialData} pending />
       </PathnameContext.Provider>,
@@ -252,7 +253,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results"]').should('be.visible');
     cy.get('@history.all').should('have.length', 0);
     focusFirstControl(false);
-    cy.mount(
+    mountWithProviders(
       <PathnameContext.Provider value="/vgx">
         <VideoDashboard initialData={initialData} />
       </PathnameContext.Provider>,

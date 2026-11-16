@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -288,13 +288,13 @@ export function AgenticPointDetail({ id }: Props) {
           <ArrowLeft className="size-4" /> {t.back}
         </button>
         <span className="text-sm text-muted-foreground">·</span>
-        <Link
+        <IntentPrefetchLink
           href={inferenceHref}
           onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
           {t.inferenceChart}
-        </Link>
+        </IntentPrefetchLink>
       </div>
 
       {siblingsQuery.isError ? (

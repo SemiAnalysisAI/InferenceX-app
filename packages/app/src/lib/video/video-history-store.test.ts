@@ -357,7 +357,7 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // The power trace left the entries; they keep its valid sample count.
-      sources: '49e9607a016acfe7bbc3fdc5ece25697f74485afff7bbb96412973dd9f2b05d4',
+      sources: 'f0e8fff70b2dc077964ac624744c2ac08b37062bf5bf9a94fd0a7b65f8bbb3f7',
     });
   });
 });

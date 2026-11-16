@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { ArrowRight, Search, X } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 
@@ -264,7 +264,7 @@ export function GlossaryBrowser({
                 </div>
                 <div className="divide-y divide-border/20">
                   {group.map((entry) => (
-                    <Link
+                    <IntentPrefetchLink
                       key={entry.slug}
                       href={`${basePath}/${entry.slug}`}
                       className="group grid gap-2 px-4 py-5 transition-colors hover:bg-muted/40 focus-visible:outline-none md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)_auto] md:items-start md:gap-8 md:px-6"
@@ -293,7 +293,7 @@ export function GlossaryBrowser({
                         aria-hidden="true"
                         className="mt-1 hidden size-4 text-muted-foreground transition-colors group-hover:text-foreground md:block"
                       />
-                    </Link>
+                    </IntentPrefetchLink>
                   ))}
                 </div>
               </section>

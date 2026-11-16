@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics/analytics';
@@ -95,9 +96,9 @@ function LanguageToggle({
   const search = useClientSearch();
   const isOverview = isActive(pathname, '/overview');
   return (
-    <IntentPrefetchLink
+    <Link
       href={target + search}
-      prefetch={isOverview ? false : undefined}
+      prefetch={false}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className={cn(HEADER_ACTION_STYLE, 'min-h-11 px-2 text-sm font-medium whitespace-nowrap')}
@@ -110,7 +111,7 @@ function LanguageToggle({
       }}
     >
       {isZh ? 'EN' : '中文'}
-    </IntentPrefetchLink>
+    </Link>
   );
 }
 
@@ -171,8 +172,9 @@ export const Header = () => {
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-2 sm:gap-6">
-          <IntentPrefetchLink
+          <Link
             href={isZh ? '/zh' : '/'}
+            prefetch={false}
             data-testid="header-brand"
             className="flex items-center min-h-11 gap-2 shrink-0"
           >
@@ -187,7 +189,7 @@ export const Header = () => {
                 className="inline h-auto lg:w-20"
               />
             </span>
-          </IntentPrefetchLink>
+          </Link>
 
           <nav
             className="hidden min-w-0 items-center gap-1 overflow-hidden min-[1120px]:flex"

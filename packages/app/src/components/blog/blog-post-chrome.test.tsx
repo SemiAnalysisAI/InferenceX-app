@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
@@ -5,6 +7,10 @@ import type { BlogPostMeta, TocHeading } from '@/lib/blog/blog';
 
 import { BlogPostContent } from './blog-post-content';
 import { BlogPostNav } from './blog-post-nav';
+
+const withQueryClient = (ui: ReactNode) => (
+  <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+);
 
 const mk = (slug: string, date: string, tags: string[]): BlogPostMeta => ({
   slug,
@@ -27,14 +33,16 @@ const RELATED = [mk('a', '2026-08-01', ['benchmark']), mk('b', '2026-07-01', ['a
 
 function render(locale: 'en' | 'zh') {
   return renderToStaticMarkup(
-    <BlogPostContent
-      locale={locale}
-      meta={META}
-      headings={HEADINGS}
-      content={<p>Body copy</p>}
-      adjacent={{ prev: mk('older', '2026-07-01', []), next: mk('newer', '2026-09-01', []) }}
-      related={RELATED}
-    />,
+    withQueryClient(
+      <BlogPostContent
+        locale={locale}
+        meta={META}
+        headings={HEADINGS}
+        content={<p>Body copy</p>}
+        adjacent={{ prev: mk('older', '2026-07-01', []), next: mk('newer', '2026-09-01', []) }}
+        related={RELATED}
+      />,
+    ),
   );
 }
 
@@ -88,17 +96,19 @@ describe('BlogPostContent', () => {
 
 describe('BlogPostNav', () => {
   it('renders nothing when the post has no neighbours', () => {
-    expect(renderToStaticMarkup(<BlogPostNav prev={null} next={null} />)).toBe('');
+    expect(renderToStaticMarkup(withQueryClient(<BlogPostNav prev={null} next={null} />))).toBe('');
   });
 
   it('renders only the available direction with localized labels', () => {
     const html = renderToStaticMarkup(
-      <BlogPostNav
-        prev={null}
-        next={{ slug: 'n', title: 'Next one' }}
-        basePath="/zh/blog"
-        labels={{ prev: '上一篇', next: '下一篇' }}
-      />,
+      withQueryClient(
+        <BlogPostNav
+          prev={null}
+          next={{ slug: 'n', title: 'Next one' }}
+          basePath="/zh/blog"
+          labels={{ prev: '上一篇', next: '下一篇' }}
+        />,
+      ),
     );
     expect(html).toContain('href="/zh/blog/n"');
     expect(html).toContain('下一篇');

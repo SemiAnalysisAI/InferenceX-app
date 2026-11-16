@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -55,7 +55,7 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
   const cachedPct = formatPct(s.cachedPct);
   const prefix = locale === 'zh' ? '/zh' : '';
   return (
-    <Link
+    <IntentPrefetchLink
       href={`${prefix}${AGENTX_ROUTE.path}/${d.slug}`}
       onClick={() => track('datasets_card_clicked', { slug: d.slug })}
       className="group block"
@@ -120,7 +120,7 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
           <ArrowRight aria-hidden="true" className="size-4" />
         </div>
       </Card>
-    </Link>
+    </IntentPrefetchLink>
   );
 }
 

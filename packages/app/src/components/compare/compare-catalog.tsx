@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import type { ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
@@ -16,14 +16,14 @@ export function CompareCatalogLink({
   children: ReactNode;
 }) {
   return (
-    <Link
+    <IntentPrefetchLink
       data-testid={testId}
       href={href}
       className="inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-md border border-border px-4 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted sm:w-auto sm:justify-start md:min-h-10"
     >
       <span className="text-balance">{children}</span>
       <ArrowRight aria-hidden="true" className="size-4 shrink-0" />
-    </Link>
+    </IntentPrefetchLink>
   );
 }
 

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { Heading } from '@/components/ui/heading';
 import {
@@ -64,9 +64,9 @@ export function BlogIndexContent({ locale }: { locale: Locale }) {
         <p className="max-w-measure text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
         <p className="text-sm text-muted-foreground">
           {t.glossaryLead}{' '}
-          <Link href={localePath('/glossary', locale)} className={READING_LINK_CLASS}>
+          <IntentPrefetchLink href={localePath('/glossary', locale)} className={READING_LINK_CLASS}>
             {t.glossaryLink}
-          </Link>
+          </IntentPrefetchLink>
           {locale === 'zh' ? '。' : '.'}
         </p>
       </header>

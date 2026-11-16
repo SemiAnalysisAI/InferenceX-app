@@ -28,15 +28,18 @@ export function relockFeatureGate(): void {
   window.dispatchEvent(new Event(FEATURE_GATE_LOCKED_EVENT));
 }
 
+/** Whether this browser has unlocked the gate. `useFeatureGate` adopts this after mount. */
+export function readFeatureGateUnlocked(): boolean {
+  return typeof window !== 'undefined' && localStorage.getItem(FEATURE_GATE_KEY) === '1';
+}
+
 export function useFeatureGate(): boolean {
   const [unlocked, setUnlocked] = useState(false);
   const sequenceRef = useRef<string[]>([]);
 
   useEffect(() => {
     localStorage.removeItem('inferencex-feature-gate');
-    if (typeof window !== 'undefined' && localStorage.getItem(FEATURE_GATE_KEY) === '1') {
-      setUnlocked(true);
-    }
+    if (readFeatureGateUnlocked()) setUnlocked(true);
   }, []);
 
   useEffect(() => {

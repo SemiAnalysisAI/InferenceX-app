@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { fmtCostPerMtok, fmtGpuHour, fmtMs, fmtThroughput } from '@/components/live-seo/format';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -52,13 +52,13 @@ export function RunDetailContent({
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <Link
+            <IntentPrefetchLink
               href={t.backHref}
               className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft aria-hidden="true" className="size-4" />
               {t.backLabel}
-            </Link>
+            </IntentPrefetchLink>
             <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-muted-foreground">
               <span>{entry.model.label}</span>
               <span aria-hidden="true">&middot;</span>
@@ -239,9 +239,12 @@ export function RunDetailContent({
             <ul className="mt-3 space-y-2">
               {t.exploreLinks.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-sm font-medium text-brand hover:underline">
+                  <IntentPrefetchLink
+                    href={link.href}
+                    className="text-sm font-medium text-brand hover:underline"
+                  >
                     {link.label}
-                  </Link>
+                  </IntentPrefetchLink>
                 </li>
               ))}
             </ul>

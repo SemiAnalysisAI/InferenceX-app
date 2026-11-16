@@ -63,6 +63,7 @@ export default function EvaluationChartControls() {
     selectedPrecisions,
     setSelectedPrecisions,
     availablePrecisions,
+    warmFilterChange,
   } = useEvaluation();
   const secondaryCount = selectedRunDate === availableDates.at(-1) ? 0 : 1;
 
@@ -82,6 +83,7 @@ export default function EvaluationChartControls() {
                 }}
                 open={openDropdown === 'model'}
                 onOpenChange={handleDropdownOpenChange('model')}
+                onOptionIntent={(model) => warmFilterChange({ model })}
                 availableModels={availableModels}
               />
             </div>
@@ -125,6 +127,7 @@ export default function EvaluationChartControls() {
               }}
               open={openDropdown === 'precision'}
               onOpenChange={handleDropdownOpenChange('precision')}
+              onOptionIntent={(precisions) => warmFilterChange({ precisions })}
               availablePrecisions={availablePrecisions}
               data-testid="evaluation-precision-selector"
             />

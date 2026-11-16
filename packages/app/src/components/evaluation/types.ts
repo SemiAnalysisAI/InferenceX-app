@@ -1,4 +1,5 @@
 import type { Model } from '@/lib/catalog/data-mappings';
+import type { FilterChange } from '@/providers/GlobalFilterContext';
 
 export interface EvaluationChartData {
   evalResultId: number;
@@ -81,4 +82,6 @@ export interface EvaluationChartContextType {
   selectedPrecisions: string[];
   setSelectedPrecisions: (precisions: string[]) => void;
   availablePrecisions: string[];
+  /** Warms the data the page loads once `change` applies, before the user makes it. */
+  warmFilterChange: (change: FilterChange) => void;
 }

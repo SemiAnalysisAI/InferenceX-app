@@ -19,6 +19,7 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
+  useWarmFilterChange,
 } from '@/providers/GlobalFilterContext';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
@@ -358,6 +359,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       eActiveStr,
     ],
   );
+  const warmFilterChange = useWarmFilterChange();
 
   const value: EvaluationChartContextType = useMemo(
     () => ({
@@ -397,6 +399,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       selectedPrecisions: effectivePrecisions,
       setSelectedPrecisions,
       availablePrecisions,
+      warmFilterChange,
     }),
     [
       loading,
@@ -430,6 +433,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       effectivePrecisions,
       setSelectedPrecisions,
       availablePrecisions,
+      warmFilterChange,
     ],
   );
 

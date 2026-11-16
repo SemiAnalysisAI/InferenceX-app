@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Fragment, useId, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
@@ -171,13 +171,13 @@ export default function QualityMethod({
               </span>
             </span>
           )}
-          <Link
+          <IntentPrefetchLink
             href={videoQualityGuidePath(locale)}
             className="text-brand-fill underline underline-offset-2"
             onClick={() => track('video_results_quality_methodology_clicked')}
           >
             {s.methodology}
-          </Link>
+          </IntentPrefetchLink>
         </div>
       </div>
     </details>

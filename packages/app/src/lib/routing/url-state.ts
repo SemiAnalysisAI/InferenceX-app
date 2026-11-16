@@ -209,26 +209,59 @@ export function readUrlParams(): UrlStateParams {
   return _initialParams;
 }
 
+interface NavigationUrlParams {
+  /** Values present in the URL. The page reports these through `hasExplicitUrlParam`. */
+  explicit: UrlStateParams;
+  /** Keys a profit route drops when its URL omits them. Other routes keep remembered values. */
+  cleared: UrlStateKey[];
+}
+
+function navigationUrlParams(pathname: string, search: string): NavigationUrlParams {
+  const searchParams = profitRouteSearch(pathname, search);
+  const onProfitRoute = profitRouteParams(pathname) !== null;
+  const explicit: UrlStateParams = {};
+  const cleared: UrlStateKey[] = [];
+  for (const key of URL_STATE_KEYS) {
+    const value = searchParams.get(key);
+    if (value !== null) explicit[key] = value;
+    else if (onProfitRoute) cleared.push(key);
+  }
+  return { explicit, cleared };
+}
+
 export function refreshUrlParams(): UrlStateParams {
   if (typeof window === 'undefined') return _initialParams;
   flushPendingParams();
-  const searchParams = profitRouteSearch(window.location.pathname, window.location.search);
-  const onProfitRoute = profitRouteParams(window.location.pathname) !== null;
-  for (const key of URL_STATE_KEYS) {
-    delete explicitUrlParams[key];
-    const value = searchParams.get(key);
-    if (value === null) {
-      if (onProfitRoute) {
-        delete _initialParams[key];
-        delete currentState[key];
-      }
-      continue;
-    }
+  const { explicit, cleared } = navigationUrlParams(
+    window.location.pathname,
+    window.location.search,
+  );
+  for (const key of URL_STATE_KEYS) delete explicitUrlParams[key];
+  for (const key of cleared) {
+    delete _initialParams[key];
+    delete currentState[key];
+  }
+  for (const [key, value] of Object.entries(explicit) as [UrlStateKey, string][]) {
     explicitUrlParams[key] = value;
     _initialParams[key] = value;
     currentState[key] = value;
   }
   return _initialParams;
+}
+
+/**
+ * The URL state a client navigation to `pathname` and `search` would hand the page, without
+ * applying it. `params` is what `getUrlParam` returns there, remembered values included.
+ * `explicit` is what `hasExplicitUrlParam` reports.
+ */
+export function peekNavigationUrlParams(
+  pathname: string,
+  search: string,
+): { params: UrlStateParams; explicit: UrlStateParams } {
+  const { explicit, cleared } = navigationUrlParams(pathname, search);
+  const params: UrlStateParams = { ...readUrlParams() };
+  for (const key of cleared) delete params[key];
+  return { params: { ...params, ...explicit }, explicit };
 }
 
 let lastRefreshedPathname: string | null = null;
