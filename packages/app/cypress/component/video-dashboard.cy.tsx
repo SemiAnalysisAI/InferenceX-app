@@ -123,6 +123,31 @@ const stageInView = () =>
 const publishEveryRun = (page: VideoHistoryPage) => {
   for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
 };
+/** Publishes every run and serves the clips of each `hardware`'s C1 artifact, so it can be a pair. */
+const publishClipsOf =
+  (...hardware: string[]) =>
+  (page: VideoHistoryPage) => {
+    publishEveryRun(page);
+    for (const key of hardware) {
+      const point = videoPoints([page]).find(
+        (item) => item.hardwareKey === key && item.concurrency === 1,
+      )!;
+      const saved = servingArtifact(
+        Number(point.runId),
+        point.artifactId,
+        `NVIDIA ${key.toUpperCase()}`,
+      );
+      saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+        path,
+        path === 'manifest.json' ? point.id.split(':')[0] : sha,
+      ]);
+      cy.intercept(
+        'GET',
+        `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`,
+        saved,
+      );
+    }
+  };
 /** Whether the subject's pill sits left of its pair's, which Swap exchanges. */
 const subjectOnLeft = (left: boolean) =>
   cy.get<HTMLElement>('[data-testid="video-results-pill"]').should(($pills) => {
@@ -1155,7 +1180,8 @@ describe('VideoGenX results', () => {
   it('puts the clip stage first on a phone and leaves the desktop order alone', () => {
     cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
     cy.viewport(390, 844);
-    mount({ editPage: publishEveryRun });
+    // A phone pairs the subject with another GPU only when that GPU has clips to play.
+    mount({ editPage: publishClipsOf('b200', 'h200', 'h100') });
     cy.get('[data-testid="results-phone-title"]').should('be.visible').and('contain', 'VideoGenX');
     cy.get('[data-testid="video-results"] h1:visible').should('have.length', 1);
     expectStacked([
