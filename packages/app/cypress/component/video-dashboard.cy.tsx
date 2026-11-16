@@ -1189,7 +1189,19 @@ describe('VideoGenX results', () => {
     });
     // The sheet stands in for the panel a mouse pins, rings its point and takes the focus.
     cy.get('[data-testid="point-details-panel"]').should('not.exist');
-    cy.get('[data-testid="video-results-chart"] .point-sheet-ring').should('have.length', 1);
+    cy.get('[data-testid="video-results-chart"] .point-sheet-ring')
+      .should('have.length', 1)
+      .and(($ring) => {
+        // The page scrolls a point the sheet would cover clear of where the sheet rests.
+        const view = $ring[0].ownerDocument.defaultView!;
+        const resting =
+          view.innerHeight -
+          view.document.querySelector<HTMLElement>('[data-testid="video-point-sheet"]')!
+            .offsetHeight;
+        expect($ring[0].getBoundingClientRect().bottom, 'ring above the sheet').to.be.at.most(
+          resting,
+        );
+      });
     cy.focused().should('have.attr', 'data-testid', 'video-point-sheet');
     searchParam('r_sheet').should('be.a', 'string');
     sheet().find('[data-testid="video-point-sheet-metrics"] dt').should('have.length', 4);

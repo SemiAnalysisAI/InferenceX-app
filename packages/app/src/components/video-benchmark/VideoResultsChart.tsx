@@ -673,7 +673,7 @@ function PointSheet({
       facts={[d.subtitle, labels.gpus, d.date, d.warning].filter((fact) => fact !== undefined)}
       clip={clip}
       noClips={plot.clips ? undefined : labels.noClips}
-      prompt={clip ? (link?.prompt ?? null) : null}
+      prompt={clip === null ? null : (link?.prompt ?? null)}
       metrics={[
         {
           label: labels.latency,

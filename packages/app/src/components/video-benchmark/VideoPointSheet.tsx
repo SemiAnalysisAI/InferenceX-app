@@ -133,12 +133,11 @@ export default function VideoPointSheet({
     if (more.current) setFold(more.current.offsetTop + PEEK);
   });
   // The sheet covers the bottom of the screen; a point under it scrolls up into view.
-  const measured = fold !== null;
   useEffect(() => {
     const element = sheet.current;
     const mark = anchor?.()?.getBoundingClientRect();
-    // Not before the sheet has its opening height.
-    if (!element || !mark || !measured) return;
+    // Not before the sheet has its opening height, and again if its first screen grows.
+    if (!element || !mark || fold === null) return;
     // The slide-in moves the sheet by a transform, so its resting top comes from its height.
     const over = mark.bottom + ANCHOR_GAP - (window.innerHeight - element.offsetHeight);
     if (over <= 0) return;
@@ -148,7 +147,7 @@ export default function VideoPointSheet({
       top: over,
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
-  }, [measured, pointKey, anchor]);
+  }, [fold, pointKey, anchor]);
   // Focus moves into the sheet and returns to where it was; Escape closes.
   useEffect(() => {
     if (!mounted) return undefined;
