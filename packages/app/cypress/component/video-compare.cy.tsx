@@ -573,7 +573,7 @@ describe('Video results clip stage', () => {
     // The pair is paused: once its frames have stood still for half a second its picture stands
     // too, and is not blended again ten times a second.
     cy.wait(700);
-    const blends: number[] = [];
+    const draws = { stage: 0, self: 0 };
     cy.window().then((win) => {
       const context = (win as unknown as typeof globalThis).CanvasRenderingContext2D.prototype;
       const draw = context.drawImage as (...args: unknown[]) => void;
@@ -581,15 +581,20 @@ describe('Video results clip stage', () => {
         this: CanvasRenderingContext2D,
         ...args: unknown[]
       ) {
-        if (
-          this.canvas.dataset.testid === 'video-results-difference' &&
-          (args[0] as Element).localName === 'video'
-        )
-          blends.push(win.performance.now());
+        if (this.canvas.dataset.testid === 'video-results-difference') draws.stage += 1;
+        // No canvas is its own source, which browsers have not always agreed on.
+        if (args[0] === this.canvas) draws.self += 1;
         return draw.apply(this, args);
       });
     });
-    cy.wait(1500).then(() => expect(blends.length, 'video frames blended').to.be.at.most(4));
+    cy.wait(1500).then(() => {
+      // One picture is four draws onto the stage's canvas; ten a second would be sixty.
+      expect(draws.stage, 'draws onto the stage canvas').to.be.at.most(8);
+    });
+    // A new frame is blended at once, and still without a canvas drawn onto itself.
+    scrub(0.4);
+    cy.wrap(draws).should((seen) => expect(seen.stage).to.be.greaterThan(8));
+    cy.wrap(draws).its('self').should('equal', 0);
     // H200's clip equals the reference, so the next subject draws a black difference.
     cy.contains('button', 'Toggle B200').click();
     cy.get('[data-side="a"]').should('contain', 'H200');

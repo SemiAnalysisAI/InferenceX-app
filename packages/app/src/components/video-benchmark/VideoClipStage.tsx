@@ -178,6 +178,8 @@ const ROLES = ['a', 'b'] as const;
 const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
+/** How many times the Difference picture adds the frames' difference up, as `absoluteFrameDifference` multiplies it. */
+const DIFFERENCE_GAIN = 4;
 /** How long after its frames last moved a Difference picture is still drawn at the full rate, in ms. */
 const DIFFERENCE_SETTLE_MS = 500;
 /** How long a Difference picture of two frames that stand still is kept before it is drawn again. */
@@ -367,9 +369,8 @@ export default function VideoClipStage({
     let painted = -Infinity;
     /** Whether this pair's pixels have been read once, which a cross-origin frame refuses. */
     let readable = false;
-    const probe = document.createElement('canvas');
-    probe.width = 1;
-    probe.height = 1;
+    /** Holds |pair − subject| off screen; the stage's canvas is only ever drawn from it. */
+    const scratch = document.createElement('canvas');
     const draw = (now: number) => {
       frame = requestAnimationFrame(draw);
       if (now - lastDraw < 100) return;
@@ -396,30 +397,30 @@ export default function VideoClipStage({
         seen = { subject: subject.currentTime, pair: pair.currentTime, on: target, moved: now };
       if (now - seen.moved > DIFFERENCE_SETTLE_MS && now - painted < DIFFERENCE_STILL_MS) return;
       const output = target.getContext('2d');
-      if (!output) return;
-      if (target.width !== pair.videoWidth || target.height !== pair.videoHeight) {
-        target.width = pair.videoWidth;
-        target.height = pair.videoHeight;
-      }
+      const work = scratch.getContext('2d');
+      if (!output || !work) return;
+      for (const surface of [scratch, target])
+        if (surface.width !== pair.videoWidth || surface.height !== pair.videoHeight) {
+          surface.width = pair.videoWidth;
+          surface.height = pair.videoHeight;
+        }
       try {
+        // The canvases blend the frames themselves, which is `absoluteFrameDifference` without
+        // reading two full frames into script every draw. Off screen: |pair − subject| per
+        // channel. On the stage: that picture four times over, added up, which stops at white.
+        work.globalCompositeOperation = 'copy';
+        work.drawImage(pair, 0, 0);
+        work.globalCompositeOperation = 'difference';
+        work.drawImage(subject, 0, 0);
         if (!readable) {
           // Read off screen, so frames the page may not read never reach the stage.
-          const context = probe.getContext('2d');
-          context?.drawImage(pair, 0, 0, 1, 1);
-          context?.drawImage(subject, 0, 0, 1, 1);
-          context?.getImageData(0, 0, 1, 1);
+          work.getImageData(0, 0, 1, 1);
           readable = true;
         }
-        // The canvas blends the frames itself, which is `absoluteFrameDifference` without reading
-        // two full frames into script every draw: |pair − subject| per channel, then that picture
-        // added to itself twice, which is ×4 and stops at white.
         output.globalCompositeOperation = 'copy';
-        output.drawImage(pair, 0, 0);
-        output.globalCompositeOperation = 'difference';
-        output.drawImage(subject, 0, 0);
+        output.drawImage(scratch, 0, 0);
         output.globalCompositeOperation = 'lighter';
-        output.drawImage(target, 0, 0);
-        output.drawImage(target, 0, 0);
+        for (let layer = 1; layer < DIFFERENCE_GAIN; layer += 1) output.drawImage(scratch, 0, 0);
         painted = now;
       } catch {
         setDifferenceFailed(true);
