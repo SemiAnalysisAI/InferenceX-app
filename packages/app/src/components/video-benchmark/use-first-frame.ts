@@ -57,8 +57,30 @@ export function useFirstFrame(
     const current = waiting.current;
     if (current?.video === video && current?.src === src && current?.round === round) return;
     current?.cancel();
-    waiting.current =
-      video && src ? { video, src, round, cancel: onNextFrame(video, () => setShown(src)) } : null;
+    // Another source, or another element for the same one, has drawn nothing yet: a clip that
+    // comes back after another was shown is loaded anew.
+    setShown(null);
+    if (!video || !src) {
+      waiting.current = null;
+      return;
+    }
+    let stop = onNextFrame(video, () => setShown(src));
+    // The element dropped what it had loaded, as load() and a purge by the browser do.
+    const emptied = () => {
+      setShown(null);
+      stop();
+      stop = onNextFrame(video, () => setShown(src));
+    };
+    video.addEventListener('emptied', emptied);
+    waiting.current = {
+      video,
+      src,
+      round,
+      cancel: () => {
+        stop();
+        video.removeEventListener('emptied', emptied);
+      },
+    };
   });
   useLayoutEffect(
     () => () => {
