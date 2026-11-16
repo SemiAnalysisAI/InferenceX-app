@@ -1794,6 +1794,19 @@ describe('VideoGenX results', () => {
     );
     points('[data-clip-role] .video-clip-pulse').should('not.exist');
     points('[data-clips="false"] .video-clip-pulse').should('not.exist');
+    // The rings run while the chart is on screen and rest once it is scrolled off it.
+    const ringState = () =>
+      points(' .video-clip-pulse')
+        .first()
+        .then(($ring) => getComputedStyle($ring[0]).animationPlayState);
+    cy.get('[data-testid="video-results-chart"]').scrollIntoView();
+    cy.get('[data-testid="video-results-chart"]').should('not.have.attr', 'data-off-screen');
+    ringState().should('equal', 'running');
+    cy.scrollTo('bottom');
+    cy.get('[data-testid="video-results-chart"]').should('have.attr', 'data-off-screen');
+    ringState().should('equal', 'paused');
+    cy.get('[data-testid="video-results-chart"]').scrollIntoView();
+    cy.get('[data-testid="video-results-chart"]').should('not.have.attr', 'data-off-screen');
     points('[data-hardware="h200"] .visible-shape').click({ force: true });
     cy.get('[data-testid="video-results-chart"] .video-clip-pulse').should('not.exist');
   });

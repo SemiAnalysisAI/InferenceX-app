@@ -861,6 +861,19 @@ export default function VideoResultsChart({
   const sheetKey = useStageValue('sheet');
   const sheetPoint =
     touch && sheetKey ? plotted.find((point) => point.key === sheetKey) : undefined;
+  // SVG shapes do not animate on the compositor: each ring costs a style pass and a layout every
+  // frame for as long as it runs. The chart is marked while it is off screen, and the rings rest.
+  useEffect(() => {
+    const root = chart.current
+      ?.getSvgElement()
+      ?.closest<HTMLElement>(`[data-testid="${VIDEO_RESULTS_CHART_ID}"]`);
+    if (!root || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(([entry]) =>
+      root.toggleAttribute('data-off-screen', !entry.isIntersecting),
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
   /** The last point a tap opened, which a tap on the same spot steps past. */
   const lastTapped = useRef<string | null>(null);
   const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills, sheet: null });
