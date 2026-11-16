@@ -181,7 +181,7 @@ const STRINGS = {
     tipClick: '点击即可在下方对比',
     tipHollow: '只有实心点有视频',
     compareBelow: '在下方对比 ↓',
-    perClip: '每条视频成本 ($)',
+    perClip: '每条视频成本',
   },
 };
 

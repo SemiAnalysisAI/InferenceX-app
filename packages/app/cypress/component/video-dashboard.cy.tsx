@@ -1567,6 +1567,11 @@ describe('VideoGenX results', () => {
             );
         });
     });
+    // The figure carries its own "$", so the label names only the metric, as the readout does.
+    sheet()
+      .find('[data-testid="video-point-sheet-metrics"] dt')
+      .eq(1)
+      .should('have.text', '每条视频成本');
     sheet().find('[data-action="compare"]').should('have.text', '对比');
     sheet().find('[data-action="share"]').should('contain', '分享');
     sheet().find('[data-action="view-telemetry"]').should('contain', '查看遥测');
