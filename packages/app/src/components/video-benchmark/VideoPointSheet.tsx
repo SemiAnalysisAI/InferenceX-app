@@ -45,6 +45,8 @@ const SWIPE_CLOSE = 72;
 const PEEK = 24;
 /** Clear space kept between the point's mark and the sheet, in px. */
 const ANCHOR_GAP = 20;
+/** Frames after a dismissal on which the page is put back again if it has moved. */
+const RETURN_FRAMES = 5;
 
 export interface VideoPointSheetProps {
   /** Hardware name, after its color dot. */
@@ -124,7 +126,19 @@ export default function VideoPointSheet({
   const scrolledFor = useRef<string | null>(null);
   /** Closes at the reader's word, which also puts the page back; an action that leaves does not. */
   const dismiss = () => {
-    if (origin.current !== null) window.scrollTo({ top: origin.current });
+    const top = origin.current;
+    if (top !== null) {
+      window.scrollTo({ top });
+      // The scroll that cleared the point may still be running, and it can carry on past this
+      // return or, when it has only just begun, through it; so the next frames check.
+      let frames = RETURN_FRAMES;
+      const hold = () => {
+        if (window.scrollY !== top) window.scrollTo({ top });
+        frames -= 1;
+        if (frames > 0) requestAnimationFrame(hold);
+      };
+      requestAnimationFrame(hold);
+    }
     onClose();
   };
   const close = useRef(dismiss);

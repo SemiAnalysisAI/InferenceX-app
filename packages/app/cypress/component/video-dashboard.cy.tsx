@@ -277,6 +277,28 @@ const tapPoint = ($group: JQuery<HTMLElement>) => {
   tapChart(x, y);
 };
 
+/** The plotted point lowest on the screen. */
+const lowestPoint = () =>
+  points().then(($groups) =>
+    Cypress.$([...$groups].toSorted((a, b) => centreOf(b).y - centreOf(a).y)[0]),
+  );
+/** The page's scroll offset once a smooth scroll has come to rest. */
+const restingScroll = () =>
+  cy.window().then(
+    (win) =>
+      new Cypress.Promise<number>((resolve) => {
+        let last = -1;
+        let still = 0;
+        const frame = () => {
+          still = win.scrollY === last ? still + 1 : 0;
+          last = win.scrollY;
+          if (still >= 10) resolve(last);
+          else win.requestAnimationFrame(frame);
+        };
+        frame();
+      }),
+  );
+
 /** The viewport y of an element's top edge. */
 const topOf = (selector: string) =>
   cy.get(selector).then(($element) => $element[0].getBoundingClientRect().top);
@@ -1316,6 +1338,30 @@ describe('VideoGenX results', () => {
       'contain',
       'No qualifying run for this workload on this hardware.',
     );
+  });
+
+  it('puts the page back where a tap found it, also when closed while it still scrolls', () => {
+    coarsePointer();
+    cy.viewport(390, 844);
+    mount({});
+    points().should('have.length.at.least', 2);
+    // With the chart at the foot of the screen, its lowest point is where the sheet rests.
+    cy.get('[data-testid="d3-chart-svg"]').then(($svg) =>
+      $svg[0].scrollIntoView({ block: 'end', behavior: 'instant' }),
+    );
+    restingScroll().then((found) => {
+      lowestPoint().then(tapPoint);
+      sheet().should('exist');
+      restingScroll().should('be.greaterThan', found);
+      cy.get('[data-testid="video-point-sheet-close"]').click();
+      restingScroll().should('equal', found);
+      // Closed again at once, while the scroll that clears the point has only just begun.
+      lowestPoint().then(tapPoint);
+      sheet().should('exist');
+      cy.get('body').type('{esc}');
+      sheet().should('not.exist');
+      restingScroll().should('equal', found);
+    });
   });
 
   it('plays a point’s clip inside its sheet, and compares, shares and opens telemetry from it', () => {
