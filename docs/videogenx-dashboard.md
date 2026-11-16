@@ -79,21 +79,23 @@ only; query IDs and API projection values remain unchanged.
 
 ## X-axis metric
 
-Chart config's X-axis metric (`r_x`) is median latency per clip (`p50`, default), P90
-latency per clip (`p90`) or GPUs per deployment (`gpus`). The GPU axis plots participating
+Chart config's X-axis metric (`r_x`) is median latency per clip (`p50`, default) or GPUs
+per deployment (`gpus`). A deployment records 20 clips at concurrency 1, too few for a
+tail percentile, so the dashboard shows the median and the per-clip range instead of P90 or
+P95. An old `r_x=p90` link opens on the median. The GPU axis plots participating
 GPUs on a log scale, ticked at the measured counts. A GPU count describes a deployment
 rather than measuring it, so its registry entry sets `rankOn: 'p50'`: each series keeps
 its median-latency frontier, and Optimal only and the Best engine match the median-latency
 view. A deployment without a recorded GPU count cannot be placed on that axis, so it does
 not rank there either. Point labels name GPU counts, so that axis hides them. Its hover
 card shows median latency in place of the GPU count already in the summary, and the
-details panel lists each latency not on the axis. Chip config history fixes every
-deployment's GPU count, so it offers only the latencies and plots median latency while
+details panel lists the median latency. Chip config history fixes every deployment's
+GPU count, so it offers only the latency axis and plots median latency while
 `r_x=gpus` stays in the URL. Quality loss against lossless output (LPIPS) and peak GPU
 memory appear under "Not measured yet" and cannot be selected until that data exists.
 Named-run overlays use the same series and axes.
 
-中文：图表配置中的 X 轴指标（`r_x`）可选单条视频中位延迟（`p50`，默认）、P90 延迟（`p90`）或每个部署的 GPU 数（`gpus`）。GPU 坐标轴按对数刻度绘制参与计算的 GPU 数，刻度只标在实测的数量上。GPU 数是部署的属性而不是测量值，因此注册表为它设置 `rankOn: 'p50'`：每组曲线沿用中位延迟下的 Pareto 前沿，「仅最优」和「最优」引擎与中位延迟视图一致。未记录 GPU 数的部署无法放到该坐标轴上，因此也不参与该坐标轴上的排名。数据点标签本来就写着 GPU 数，所以该坐标轴不显示标签；悬停卡片改为显示中位延迟，详情面板列出不在坐标轴上的各项延迟。芯片配置历史中每个部署的 GPU 数固定不变，因此只提供延迟选项并绘制中位延迟，URL 中仍保留 `r_x=gpus`。相对无损输出的质量损失（LPIPS）和 GPU 峰值显存列在“尚未测量”下，有数据之前不能选择。叠加运行使用同一套曲线和坐标轴。
+中文：图表配置中的 X 轴指标（`r_x`）可选单条视频中位延迟（`p50`，默认）或每个部署的 GPU 数（`gpus`）。每个部署只在并发 1 下记录 20 条视频，样本太少，无法估计尾部分位数，因此仪表板显示中位延迟和单条视频的延迟范围，不显示 P90 或 P95。旧的 `r_x=p90` 链接会打开中位延迟视图。GPU 坐标轴按对数刻度绘制参与计算的 GPU 数，刻度只标在实测的数量上。GPU 数是部署的属性而不是测量值，因此注册表为它设置 `rankOn: 'p50'`：每组曲线沿用中位延迟下的 Pareto 前沿，「仅最优」和「最优」引擎与中位延迟视图一致。未记录 GPU 数的部署无法放到该坐标轴上，因此也不参与该坐标轴上的排名。数据点标签本来就写着 GPU 数，所以该坐标轴不显示标签；悬停卡片改为显示中位延迟，详情面板列出中位延迟。芯片配置历史中每个部署的 GPU 数固定不变，因此只提供延迟坐标轴并绘制中位延迟，URL 中仍保留 `r_x=gpus`。相对无损输出的质量损失（LPIPS）和 GPU 峰值显存列在“尚未测量”下，有数据之前不能选择。叠加运行使用同一套曲线和坐标轴。
 
 ## Layout
 
@@ -219,16 +221,16 @@ hardware; dashed boxes mark GPU counts without a measurement. A spec grid lists 
 runtime, workload, valid clips, power evidence and the hourly GPU rate. Three tabs
 hold the evidence:
 
-| Tab       | Contents                                                                                                                                                                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Telemetry | Per-clip latency distribution, recorded P50/P90/P95, deadline attainment, GPU board power trace, energy per clip and frame, throughput, both cost bases, warmup and failure categories, GPU memory when recorded |
-| Validity  | Workload and manifest hashes, sealed validation, completion counts, power validity and the link to per-clip PSNR                                                                                                 |
-| Sources   | Model, workload, runtime, run, artifact, observation and approval identities                                                                                                                                     |
+| Tab       | Contents                                                                                                                                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Telemetry | Per-clip latency histogram with its range and median, deadline attainment, GPU board power trace, energy per clip and frame, throughput, both cost bases, warmup and failure categories, GPU memory when recorded |
+| Validity  | Workload and manifest hashes, sealed validation, completion counts, power validity and the link to per-clip PSNR                                                                                                  |
+| Sources   | Model, workload, runtime, run, artifact, observation and approval identities                                                                                                                                      |
 
-P95 requires at least 20 aligned valid timings. A technical validity check does not
-imply quality acceptance or release qualification. A median from a native harness is
-not relabeled client latency. Power invalidation is propagated; power and energy stay
-null when it fails. GPU-board energy excludes host, chassis and facility energy.
+A technical validity check does not imply quality acceptance or release qualification.
+A median from a native harness is not relabeled client latency. Power invalidation is
+propagated; power and energy stay null when it fails. GPU-board energy excludes host,
+chassis and facility energy.
 
 The power trace is not part of History (see [Video History](./video-history.md)): the detail
 view reads it from the deployment's artifact when it opens (`use-power-trace.ts`; `format=published`,

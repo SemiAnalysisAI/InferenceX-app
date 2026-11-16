@@ -163,7 +163,7 @@ unchanged.
 ## Evidence boundaries
 
 - Only descriptive observations are shown: this version has no selected matched baseline and computes no before/after delta.
-- Valid/completed/scheduled/failed counts stay separate. Missing or invalid metrics stay null. P90 retains the existing per-cell ten-sample display floor.
+- Valid/completed/scheduled/failed counts stay separate. Missing or invalid metrics stay null. The table shows median latency only; the projected P90 keeps its per-cell ten-sample floor.
 - Latency and throughput use the submission-to-downloaded-media window. Energy uses the recorded generation window and participating GPU boards. Board energy is not facility energy.
 - Fidelity, calibration and release qualification are displayed independently. Stored/published does not mean qualified.
 - Filters apply to loaded pages. The user can load older pages without losing already loaded entries. Global execution-time sorting and an editorial change/PR catalog require a later materialized catalog; the current implementation scans index metadata only, never all full indexes.
