@@ -295,7 +295,11 @@ export const DASHBOARD_API_COVERAGE = {
     exclusion:
       'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
-  'sla-targets': { view: 'sla-targets' },
+  'sla-targets': {
+    view: 'sla-targets',
+    exclusion:
+      'The "More" disclosure, each setup\'s "How this was measured" disclosure and the "Compare setups at every tested load" disclosure are presentation settings with no API parameters: they show or hide values the view already returns (selections, per-load points, accounting, provenance) and never change what is evaluated. The end-to-end limit inside "More" is the e2e parameter.',
+  },
   powerx: { view: 'inference' },
   operatorx: { view: 'operatorx' },
   collectivex: { view: 'collectivex' },

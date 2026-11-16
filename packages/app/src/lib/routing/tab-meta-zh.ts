@@ -147,7 +147,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   'agentic-workload-explorer':
     '本页面基于 ProxyTrace 采集的匿名 coding agent trace 冻结快照，展示真实智能体负载的会话结构、输入/输出 token、前缀缓存命中、首 token 延迟（TTFT）与工具调用分布。快照数据不再更新，所有时间窗口均以快照截止时间为准。',
   'sla-targets':
-    '本页面按你设定的服务目标逐请求评估基准测试结果：请求只有成功完成并同时满足所有已启用的延迟目标才计为达标。页面给出实测达标率、goodput、达标的最高已测负载，以及每千次达标请求的估算成本。结果仅适用于所测工作负载与测试条件，不构成生产环境 SLA 合规保证。',
+    '本页面按你需要的延迟逐请求检查基准测试结果：请求只有成功完成并同时满足你设定的所有限制才计为达标。页面给出每个配置是否达标、达标的最高已测负载，以及每千次达标请求的估算成本。结果仅适用于所测工作负载与测试条件，不构成生产环境 SLA 合规保证。',
   collectivex:
     '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。',
   submissions:

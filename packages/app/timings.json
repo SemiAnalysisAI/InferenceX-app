@@ -5203,30 +5203,27 @@
     },
     {
       "spec": "cypress/e2e/sla-targets.cy.ts",
-      "duration": 21898,
+      "duration": 22605,
       "tests": [
         {
           "title": [
             "SLA Targets",
-            "shows the explanation, the captured-data notice and the example targets"
+            "says what the page does in one sentence, with the explanation and the example targets"
           ],
-          "duration": 1992,
+          "duration": 1854,
+          "attempts": 1
+        },
+        {
+          "title": ["SLA Targets", "answers in one line when no setup meets the example targets"],
+          "duration": 919,
           "attempts": 1
         },
         {
           "title": [
             "SLA Targets",
-            "finds no qualifying configuration at the example targets and says so"
+            "shows three answers per setup for a typed target, cheapest first, in plain words"
           ],
-          "duration": 1087,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "SLA Targets",
-            "evaluates a typed target exactly and ranks the configurations that qualify"
-          ],
-          "duration": 2509,
+          "duration": 2069,
           "attempts": 1
         },
         {
@@ -5234,7 +5231,7 @@
             "SLA Targets",
             "reads targets that are not round numbers from a share link and evaluates them as given"
           ],
-          "duration": 1048,
+          "duration": 896,
           "attempts": 1
         },
         {
@@ -5242,28 +5239,39 @@
             "SLA Targets",
             "rejects text that is not a number without changing the evaluation"
           ],
-          "duration": 1221,
+          "duration": 1360,
           "attempts": 1
         },
         {
           "title": [
             "SLA Targets",
-            "labels a result without a dispatched count as exploratory and never ranks it"
+            "shows a result without a dispatched count as insufficient data, with the reason in the details"
           ],
-          "duration": 967,
+          "duration": 1101,
           "attempts": 1
         },
         {
           "title": [
             "SLA Targets",
-            "lists a failed load point with its recorded reason, and the source run"
+            "keeps the measurement behind \"How this was measured\", closed until asked for"
           ],
-          "duration": 2540,
+          "duration": 2434,
           "attempts": 1
         },
         {
-          "title": ["SLA Targets", "adds the end-to-end target only when it is switched on"],
-          "duration": 1801,
+          "title": [
+            "SLA Targets",
+            "keeps the end-to-end limit under More and shows it as active when collapsed"
+          ],
+          "duration": 2679,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "SLA Targets",
+            "shows a limit from a share link as active without opening More"
+          ],
+          "duration": 587,
           "attempts": 1
         },
         {
@@ -5271,12 +5279,15 @@
             "SLA Targets",
             "switches model and shows a point without request-level data as insufficient"
           ],
-          "duration": 860,
+          "duration": 793,
           "attempts": 1
         },
         {
-          "title": ["SLA Targets", "draws both charts with the required attainment line"],
-          "duration": 1010,
+          "title": [
+            "SLA Targets",
+            "draws both charts with the required share line once the comparison is opened"
+          ],
+          "duration": 1022,
           "attempts": 1
         },
         {
@@ -5284,25 +5295,25 @@
             "SLA Targets",
             "marks a failed load in the charts without drawing it as a value"
           ],
-          "duration": 1033,
+          "duration": 926,
           "attempts": 1
         },
         {
           "title": ["SLA Targets", "names the point behind each headline value when they differ"],
-          "duration": 2660,
+          "duration": 2720,
           "attempts": 1
         },
         {
           "title": ["SLA Targets", "renders the Chinese page with the same results"],
-          "duration": 997,
+          "duration": 1287,
           "attempts": 1
         },
         {
           "title": [
             "SLA Targets",
-            "stacks configurations on a phone without horizontal page scroll"
+            "turns setups into cards on a phone, with the same three answers and no sideways scroll"
           ],
-          "duration": 1532,
+          "duration": 1288,
           "attempts": 1
         }
       ]

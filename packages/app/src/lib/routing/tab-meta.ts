@@ -179,7 +179,7 @@ export const TAB_INTRO: Record<DashboardRouteKey, string> = {
   'agentic-workload-explorer':
     'The agentic workload explorer is a frozen snapshot of anonymized coding-agent traces captured by ProxyTrace. It shows session structure, input and output tokens, prefix cache hits, time to first token (TTFT) and tool call distribution. The snapshot no longer updates, so every time window ends at the snapshot cutoff.',
   'sla-targets':
-    'SLA Targets evaluates benchmark results against your service targets request by request: a request counts only when it completed and met every enabled latency target. It reports observed attainment, goodput, the highest tested load that meets the target and an estimated cost per 1,000 compliant requests. Results apply to the tested workload and conditions; they do not guarantee production SLA compliance.',
+    'SLA Targets checks benchmark results against the latency you need, request by request: a request counts as good only when it completed and met every limit you set. For each setup it shows whether it meets the target, the highest tested load that does, and an estimated cost per 1,000 good requests. Results apply to the tested workload and conditions; they do not guarantee production SLA compliance.',
   collectivex:
     'CollectiveX compares expert-parallel (EP) communication dispatch, combine and round-trip latency across DeepEP, MoRI, UCCL and NCCL/RCCL reference implementations under a shared workload, correctness checks and sampling protocol.',
   submissions:

@@ -11,6 +11,10 @@ import type { SlaRowStatus } from '@/lib/sla-targets/view';
 
 const en = {
   heading: 'SLA targets',
+  lead: (kind: SlaLoadKind) =>
+    `Type the latency you need. See which setups deliver it, how many ${
+      kind === 'agentx_users' ? 'users' : 'concurrent requests'
+    } each carries, and what it costs.`,
   explanation:
     'Evaluates benchmark results against your service targets. Results apply to the tested workload and conditions; they do not guarantee production SLA compliance.',
   capturedSnapshot: (runs: number, date: string) =>
@@ -19,29 +23,34 @@ const en = {
   loading: 'Loading benchmark results…',
   noConfigs: 'No benchmark results are available for this model and workload',
 
-  controlsLegend: 'Targets',
+  targetsLegend: 'Your targets',
+  ttftClause: { before: 'First token within', unit: 'ms' },
+  tpotClause: { before: 'each token within', unit: 'ms' },
+  shareClause: { before: 'for at least', unit: '%', after: 'of requests' },
+  e2eClause: { before: 'Whole response within', unit: 's', placeholder: 'no limit' },
+  more: 'More',
+  moreActive: (seconds: string) => `· whole response within ${seconds} s`,
   exampleNote: 'The starting values are an example, not a recommendation.',
   model: 'Model',
   workload: 'Workload',
   workloadAgentic: 'AgentX agentic traces',
   workloadFixed: (sequence: string) => `Fixed sequence ${sequence}`,
-  maxTtft: 'Max TTFT (ms)',
-  maxTtftHelp:
-    'Longest acceptable time to first token for one request. Any positive number; it is used exactly as entered.',
-  maxTpot: 'Max TPOT (ms)',
-  maxTpotHelp:
-    'Average decode time per output token within a request, not a bound on every token gap. A request with a single output token has no TPOT, so this target does not apply to it.',
-  maxE2e: 'Max end-to-end latency (s)',
-  maxE2eHelp:
-    'Longest acceptable time from sending a request to its last byte. Off by default: agentic requests vary widely in length.',
-  e2eToggle: 'Limit end-to-end latency',
-  requiredAttainment: 'Required attainment (%)',
-  requiredAttainmentHelp:
-    'Share of attempts that must meet every enabled target. Between 50 and 99.99.',
   costBasis: 'GPU price',
   costHyperscaler: 'Owning at hyperscaler volume',
   costRental: 'Renting, 3-year commitment',
   invalidTarget: 'Enter a number greater than 0',
+  invalidShare: 'Enter a number from 50 to 99.99',
+
+  summaryLoading: (total: number) => `Checking ${total} ${total === 1 ? 'setup' : 'setups'}…`,
+  summaryMeets: (meeting: number, total: number) =>
+    `${meeting} of ${total} ${total === 1 ? 'setup' : 'setups'} ${
+      meeting === 1 ? 'meets' : 'meet'
+    } your targets`,
+  summaryNone: 'No setup meets your targets',
+  summaryCheapest: (setup: string, cost: string) =>
+    `Cheapest: ${setup}, ${cost} per 1,000 good requests.`,
+  summaryClosest: (setup: string, percent: string, load: string, required: string) =>
+    `Closest: ${setup}, ${percent} of requests within target at ${load} (need ${required}).`,
 
   definitions: 'How results are computed',
   defAttainmentTerm: 'Attainment',
@@ -52,23 +61,41 @@ const en = {
     'Passing attempts per second of the configured profiling window. The achieved request rate, shown per load point, counts every completed attempt.',
   defLoadTerm: 'Load',
   defLoadAgentic:
-    'AgentX load is the number of replay lanes, each one simulated user replaying a session. The tests are closed-loop, so a result does not show capacity at a given request arrival rate.',
+    'AgentX load is the number of replay lanes, each one simulated user replaying a session. Targets are checked per request, not per session. The tests are closed-loop, so a result does not show capacity at a given request arrival rate.',
   defLoadFixed:
     'Fixed-sequence load is the limit on requests in flight at once. The tests are closed-loop, so a result does not show capacity at a given request arrival rate.',
   defVerdictTerm: 'Verdict',
   defVerdict: (minimum: number) =>
     `A load point needs at least ${minimum.toLocaleString('en-US')} attempts at this required attainment, a rule of thumb rather than a confidence bound. Without a full count of dispatched attempts a result is exploratory and never ranked.`,
 
-  tableHeading: 'Configurations',
-  tableHint:
-    'One row per serving configuration and benchmark run. Expand a row for each tested load, the attempt accounting and the source run.',
-  colConfig: 'Configuration',
+  defTtftTerm: 'First-token time (TTFT)',
+  defTtft:
+    'Longest acceptable time to first token for one request. Any positive number; it is used exactly as entered.',
+  defTpotTerm: 'Per-token time (TPOT)',
+  defTpot:
+    'Average decode time per output token within a request, not a bound on every token gap. A request with a single output token has no TPOT, so this target does not apply to it.',
+  defE2eTerm: 'Whole-response time (end-to-end latency)',
+  defE2e:
+    'Longest acceptable time from sending a request to its last byte. No limit by default: agentic requests vary widely in length.',
+  defCostTerm: 'Estimated cost',
+  defCost: (price: string) =>
+    `GPU cost per 1,000 compliant requests, called good requests on the page, at the ${price} price. Every GPU is billed for the whole configured window; warmup and grace time are not billed.`,
+
+  colSetup: 'Setup',
   colStatus: 'Status',
-  colLoad: 'Highest passing load',
+  colMaxLoad: {
+    agentx_users: 'Max users at target',
+    request_concurrency: 'Max concurrent requests at target',
+  } satisfies Record<SlaLoadKind, string>,
+  colGoodCost: 'Est. cost per 1,000 good requests',
   colAttainment: 'Attainment',
   colGoodput: 'Goodput',
-  colCost: 'Est. cost per 1,000 compliant requests',
-  colAttempts: 'Attempts',
+  shareMeets: (percent: string, load: string, required: string) =>
+    `${percent} of requests within target at ${load} (need ${required})`,
+  shareBest: (percent: string, load: string, required: string) =>
+    `Best: ${percent} of requests within target at ${load} (need ${required})`,
+  howMeasured: 'How this was measured',
+  compare: 'Compare setups at every tested load',
   statusLabel: {
     meets: 'Meets target',
     misses: 'Misses target',
@@ -81,14 +108,17 @@ const en = {
   labelled: (label: string, value: string) => `${label}: ${value}`,
   lowerLoadMissed: 'A lower tested load missed',
   smallSample: 'Small sample',
-  bestObservedAt: (load: string) => `best observed, at ${load}`,
   at: (load: string) => `at ${load}`,
-  none: 'None',
-  details: 'Details',
   load: (kind: SlaLoadKind, value: number) =>
     kind === 'agentx_users'
       ? `${value.toLocaleString('en-US')} ${value === 1 ? 'user' : 'users'}`
       : `${value.toLocaleString('en-US')} concurrent ${value === 1 ? 'request' : 'requests'}`,
+  loadUnit: (kind: SlaLoadKind, value: number) =>
+    kind === 'agentx_users'
+      ? value === 1
+        ? 'user'
+        : 'users'
+      : `concurrent ${value === 1 ? 'request' : 'requests'}`,
   loadAxis: {
     agentx_users: 'Replay lanes (simulated users)',
     request_concurrency: 'Request concurrency limit',
@@ -108,7 +138,30 @@ const en = {
     request_records_unreadable: 'The per-request records could not be read',
     no_eligible_attempts: 'No eligible attempts',
   } satisfies Record<SlaQualificationReason, string>,
+  /** The same reasons in plain words, for the line under a status. */
+  plainReason: {
+    attainment_met: '',
+    attainment_below_required: '',
+    service_failure: 'The service failed at this load',
+    invalid_measurement: 'The measurement was invalid',
+    failure_undetermined: 'The run failed and did not record why',
+    attempt_population_not_established: 'The run did not record how many requests it sent',
+    measurement_incomplete: 'The run did not finish',
+    below_minimum_sample: 'Too few requests to judge',
+    outcomes_unresolved: 'Too many requests have no recorded outcome',
+    no_request_level_data: 'No per-request data for this run',
+    request_columns_omitted: 'Per-request data was not stored for this run',
+    request_records_unreadable: 'The per-request data could not be read',
+    no_eligible_attempts: 'No requests to judge',
+  } satisfies Record<SlaQualificationReason, string>,
 
+  selectionsHeading: 'Headline values',
+  selHighestLoad: 'Highest tested passing load',
+  selHighestGoodput: 'Highest goodput among qualifying loads',
+  selLowestCost: 'Lowest est. cost per 1,000 compliant requests among qualifying loads',
+  selNone: 'No tested load qualifies.',
+  bestObserved: (percent: string, load: string) =>
+    `Best observed attainment: ${percent} at ${load}`,
   pointsHeading: 'Tested loads',
   colPointLoad: 'Load',
   colPointAttempts: 'Attempts',
@@ -196,17 +249,18 @@ const en = {
   tipGoodput: 'goodput',
   tipAttempts: 'attempts',
 
-  costHeading: 'Cost among qualifying configurations',
-  costSub: (price: string) =>
-    `Estimated GPU cost per 1,000 compliant requests at each configuration's cheapest qualifying load, using the ${price} price. Every GPU is billed for the whole configured window; warmup and grace time are not billed.`,
-  costEmpty: 'No configuration meets the targets, so there is no cost to compare.',
   costNoPrice: 'no price on file',
-  perGpuHour: (usd: string) => `${usd} per GPU-hour`,
+  gpuPrice: (usd: string, gpus: number) =>
+    `${usd} per GPU-hour × ${gpus} ${gpus === 1 ? 'GPU' : 'GPUs'}`,
   reqPerSecond: 'req/s',
 };
 
 const zh: typeof en = {
   heading: 'SLA 目标',
+  lead: (kind) =>
+    `填入你需要的延迟，即可看到哪些配置能够达标、各自最多能承载多少${
+      kind === 'agentx_users' ? '用户' : '并发请求'
+    }，以及成本是多少。`,
   explanation:
     '根据你设定的服务目标评估基准测试结果。结果仅适用于所测试的工作负载和条件，不保证生产环境的 SLA 合规。',
   capturedSnapshot: (runs, date) =>
@@ -215,26 +269,30 @@ const zh: typeof en = {
   loading: '正在加载基准测试结果……',
   noConfigs: '该模型和工作负载暂无基准测试结果',
 
-  controlsLegend: '目标',
+  targetsLegend: '你的目标',
+  ttftClause: { before: '首 token 不超过', unit: 'ms' },
+  tpotClause: { before: '每个 token 不超过', unit: 'ms' },
+  shareClause: { before: '至少', unit: '%', after: '的请求达标' },
+  e2eClause: { before: '整个响应不超过', unit: 's', placeholder: '不限' },
+  more: '更多',
+  moreActive: (seconds) => `· 整个响应不超过 ${seconds} s`,
   exampleNote: '初始值只是示例，并非推荐值。',
   model: '模型',
   workload: '工作负载',
   workloadAgentic: 'AgentX 智能体轨迹',
   workloadFixed: (sequence) => `固定序列 ${sequence}`,
-  maxTtft: '最大 TTFT（ms）',
-  maxTtftHelp: '单个请求可接受的最长首 token 时间。可填任意正数，按输入值原样使用。',
-  maxTpot: '最大 TPOT（ms）',
-  maxTpotHelp:
-    '单个请求内每个输出 token 的平均解码时间，并不约束每两个 token 之间的间隔。只有一个输出 token 的请求没有 TPOT，该目标对它不适用。',
-  maxE2e: '最大端到端延迟（s）',
-  maxE2eHelp: '从发出请求到收到最后一个字节可接受的最长时间。默认关闭：智能体请求的长度差异很大。',
-  e2eToggle: '限制端到端延迟',
-  requiredAttainment: '要求的达标率（%）',
-  requiredAttainmentHelp: '必须满足全部已启用目标的请求尝试占比，取值 50 到 99.99。',
   costBasis: 'GPU 价格',
   costHyperscaler: '自有设备 · 超大规模云厂商批量采购',
   costRental: '租赁设备 · 3 年承诺',
   invalidTarget: '请输入大于 0 的数字',
+  invalidShare: '请输入 50 到 99.99 之间的数字',
+
+  summaryLoading: (total) => `正在评估 ${total} 个配置……`,
+  summaryMeets: (meeting, total) => `${total} 个配置中有 ${meeting} 个达标`,
+  summaryNone: '没有配置达标',
+  summaryCheapest: (setup, cost) => `成本最低：${setup}，每千次达标请求 ${cost}。`,
+  summaryClosest: (setup, percent, load, required) =>
+    `最接近：${setup}，${load}时 ${percent} 的请求达标（要求 ${required}）。`,
 
   definitions: '结果的计算方式',
   defAttainmentTerm: '达标率',
@@ -245,23 +303,38 @@ const zh: typeof en = {
     '配置的 profiling 窗口内每秒达标的请求尝试数。各负载点另行给出的实际请求速率则统计所有已完成的尝试。',
   defLoadTerm: '负载',
   defLoadAgentic:
-    'AgentX 的负载是回放通道数，每个通道模拟一个回放会话的用户。测试为闭环负载，结果不能说明在给定请求到达速率下的容量。',
+    'AgentX 的负载是回放通道数，每个通道模拟一个回放会话的用户。目标按请求逐个判定，而不是按会话判定。测试为闭环负载，结果不能说明在给定请求到达速率下的容量。',
   defLoadFixed:
     '固定序列的负载是同时在途请求数的上限。测试为闭环负载，结果不能说明在给定请求到达速率下的容量。',
   defVerdictTerm: '判定',
   defVerdict: (minimum) =>
     `在当前要求的达标率下，一个负载点至少需要 ${minimum.toLocaleString('en-US')} 次请求尝试才能判定；这是经验规则，不是置信区间。无法确定已发出的尝试总数时，结果只作探索性展示，不参与排名。`,
 
-  tableHeading: '配置',
-  tableHint:
-    '每行对应一个推理配置的一次基准测试运行。展开可查看各已测负载、请求尝试核算和来源运行。',
-  colConfig: '配置',
+  defTtftTerm: '首 token 时间（TTFT）',
+  defTtft: '单个请求可接受的最长首 token 时间。可填任意正数，按输入值原样使用。',
+  defTpotTerm: '每 token 时间（TPOT）',
+  defTpot:
+    '单个请求内每个输出 token 的平均解码时间，并不约束每两个 token 之间的间隔。只有一个输出 token 的请求没有 TPOT，该目标对它不适用。',
+  defE2eTerm: '整个响应时间（端到端延迟）',
+  defE2e: '从发出请求到收到最后一个字节可接受的最长时间。默认不限：智能体请求的长度差异很大。',
+  defCostTerm: '估算成本',
+  defCost: (price) =>
+    `每千次达标请求的 GPU 成本，按“${price}”价格计算。所有 GPU 按整个配置窗口计费；warmup 和宽限期不计费。`,
+
+  colSetup: '配置',
   colStatus: '状态',
-  colLoad: '达标的最高负载',
+  colMaxLoad: {
+    agentx_users: '达标时的最大用户数',
+    request_concurrency: '达标时的最大并发请求数',
+  },
+  colGoodCost: '每千次达标请求的估算成本',
   colAttainment: '达标率',
   colGoodput: 'Goodput',
-  colCost: '每千次达标请求的估算成本',
-  colAttempts: '请求尝试数',
+  shareMeets: (percent, load, required) => `${load}时 ${percent} 的请求达标（要求 ${required}）`,
+  shareBest: (percent, load, required) =>
+    `最佳：${load}时 ${percent} 的请求达标（要求 ${required}）`,
+  howMeasured: '测量方式',
+  compare: '对比各配置在每个已测负载下的表现',
   statusLabel: {
     meets: '达标',
     misses: '未达标',
@@ -274,14 +347,12 @@ const zh: typeof en = {
   labelled: (label, value) => `${label}：${value}`,
   lowerLoadMissed: '有更低的已测负载未达标',
   smallSample: '样本量小',
-  bestObservedAt: (load) => `观测到的最高值，${load}时`,
   at: (load) => `${load}时`,
-  none: '无',
-  details: '详情',
   load: (kind, value) =>
     kind === 'agentx_users'
       ? `${value.toLocaleString('en-US')} 个用户`
       : `${value.toLocaleString('en-US')} 个并发请求`,
+  loadUnit: (kind) => (kind === 'agentx_users' ? '个用户' : '个并发请求'),
   loadAxis: {
     agentx_users: '回放通道数（模拟用户）',
     request_concurrency: '请求并发上限',
@@ -301,7 +372,28 @@ const zh: typeof en = {
     request_records_unreadable: '逐请求记录无法读取',
     no_eligible_attempts: '没有符合条件的请求尝试',
   },
+  plainReason: {
+    attainment_met: '',
+    attainment_below_required: '',
+    service_failure: '服务在该负载下发生故障',
+    invalid_measurement: '测量无效',
+    failure_undetermined: '运行失败，且没有记录原因',
+    attempt_population_not_established: '运行没有记录发出了多少请求',
+    measurement_incomplete: '运行未完成',
+    below_minimum_sample: '请求太少，无法判定',
+    outcomes_unresolved: '太多请求没有记录结果',
+    no_request_level_data: '这次运行没有逐请求数据',
+    request_columns_omitted: '这次运行的逐请求数据没有保存',
+    request_records_unreadable: '逐请求数据无法读取',
+    no_eligible_attempts: '没有可供判定的请求',
+  },
 
+  selectionsHeading: '关键数值',
+  selHighestLoad: '达标的最高已测负载',
+  selHighestGoodput: '达标负载中的最高 goodput',
+  selLowestCost: '达标负载中每千次达标请求的最低估算成本',
+  selNone: '没有已测负载达标。',
+  bestObserved: (percent, load) => `观测到的最高达标率：${load}时 ${percent}`,
   pointsHeading: '已测负载',
   colPointLoad: '负载',
   colPointAttempts: '请求尝试数',
@@ -388,12 +480,8 @@ const zh: typeof en = {
   tipGoodput: 'goodput',
   tipAttempts: '请求尝试数',
 
-  costHeading: '达标配置的成本',
-  costSub: (price) =>
-    `各配置在其成本最低的达标负载下，每千次达标请求的 GPU 估算成本，按“${price}”价格计算。所有 GPU 按整个配置窗口计费；warmup 和宽限期不计费。`,
-  costEmpty: '没有配置达标，因此没有可比较的成本。',
   costNoPrice: '暂无价格',
-  perGpuHour: (usd) => `${usd}/GPU 小时`,
+  gpuPrice: (usd, gpus) => `${usd}/GPU 小时 × ${gpus} 张 GPU`,
   reqPerSecond: 'req/s',
 };
 

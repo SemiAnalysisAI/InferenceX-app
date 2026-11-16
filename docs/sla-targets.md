@@ -12,6 +12,46 @@ historical data can and cannot support.
 The thresholds on this page are the reader's targets. They are unrelated to the fixed
 interactivity limits used elsewhere on the dashboard.
 
+## The page
+
+The page answers one question in plain words: type the latency you need; see which setups
+deliver it, how many users each carries, and what it costs. What a reader sees before opening
+anything:
+
+- **Targets as one sentence**: first token within N ms, each token within N ms, for at least N %
+  of requests. The fields are free-typed and used exactly as entered. The optional
+  whole-response (end-to-end) limit is under "More"; an empty field means no limit, and when a
+  limit is set the collapsed control still names it.
+- **One line with the answer**: how many setups meet the targets and the cheapest of them, or
+  that none does and which came closest. While any setup is still being evaluated the line says
+  so and gives no count.
+- **One row per setup with three answers**: the status (exactly "Meets target", "Misses target"
+  or "Insufficient data"), the highest tested load that meets the target, and the estimated
+  cost per 1,000 good requests. One line under the status makes it self-explanatory: the measured
+  share of requests within target against the required share, at the highest passing load for a
+  setup that meets and at its best load for one that misses, or the reason for a setup without a
+  verdict. Rows are ordered meets first (cheapest first), then misses, then insufficient data.
+  The cost names its load only when that is not the highest passing load.
+- The model, workload and GPU price selectors sit beside the answer line; they choose the data,
+  not the targets.
+
+The default view uses plain words ("good requests", "within target"). The precise terms
+(attainment, goodput, compliant, exploratory, accounting) appear only inside the disclosures:
+
+- **"How this was measured"**, per setup, closed by default: the three selections each with its
+  load point, the per-load table (observed values, qualification with its reason, attempt
+  accounting, the bound without cut-off attempts, failed and excluded loads), the source run with
+  the GPU price used, and the definitions, including the sample rule, the cost rule and the note
+  that AgentX targets are checked per request, not per session. A setup the library marks
+  exploratory reads "Insufficient data" in its row; the word and the accounting reason are here.
+- **"Compare setups at every tested load"**, closed by default: the attainment and goodput
+  charts with a legend of the setups.
+
+"More", "How this was measured" and "Compare setups at every tested load" are presentation-only
+controls: they change what is shown, never what is evaluated or returned by the view API. The
+code that turns the shared view into the row answers and the answer line is
+`packages/app/src/lib/sla-targets/summary.ts`; it reads values and evaluates nothing.
+
 ## Where the code lives
 
 | Piece                                                                       | Location                                                                                                                                                                                                        |
@@ -155,8 +195,9 @@ Each is chosen among qualifying points only, and each names the load point that 
 - the highest goodput;
 - the lowest estimated cost per 1,000 compliant requests.
 
-The row gives each value with its load ("at 384 users"), and the expanded view labels the load
-point that supports each one.
+The row shows the highest passing load and the lowest cost, and names the cost's load when it is
+a different one ("at 384 users"). "How this was measured" lists all three selections with their
+loads and labels the load point that supports each one.
 
 The highest passing load can be a different point from the other two, and in the captured data
 it is: on B300 with KV offload at TTFT 30 s, TPOT 50 ms and 90%, the highest passing load is 512
@@ -300,18 +341,19 @@ warmup artefacts) and carries neither the issued count nor the cutoff count.
 `evaluateSlaTargetsView` with the same inputs and only reshapes the result, so the page and the
 API cannot compute different numbers; a test compares them on the captured fixture.
 
-| Selector     | Page control        | Default                    | Notes                                                   |
-| ------------ | ------------------- | -------------------------- | ------------------------------------------------------- |
-| `model`      | Model               | First model of the dataset | Unknown value is a 400 that lists the models.           |
-| `sequence`   | Workload            | First workload             | Unknown value is a 400 that lists the workloads.        |
-| `ttft`       | Max TTFT (ms)       | 1000                       | Exact; a value that cannot be evaluated is a 400.       |
-| `tpot`       | Max TPOT (ms)       | 50                         | Exact.                                                  |
-| `e2e`        | Max end-to-end (s)  | Off                        | `off` or left out for no constraint.                    |
-| `attainment` | Required attainment | 99                         | Percent, 50 to 99.99. The page clamps; the API rejects. |
-| `cost`       | Price table         | `hyperscaler`              | `hyperscaler` or `rental`.                              |
+| Selector     | Page control                        | Default                    | Notes                                                   |
+| ------------ | ----------------------------------- | -------------------------- | ------------------------------------------------------- |
+| `model`      | Model                               | First model of the dataset | Unknown value is a 400 that lists the models.           |
+| `sequence`   | Workload                            | First workload             | Unknown value is a 400 that lists the workloads.        |
+| `ttft`       | First token within                  | 1000                       | Exact; a value that cannot be evaluated is a 400.       |
+| `tpot`       | Each token within                   | 50                         | Exact.                                                  |
+| `e2e`        | Whole response within, under "More" | Off                        | `off` or left out for no constraint.                    |
+| `attainment` | For at least N % of requests        | 99                         | Percent, 50 to 99.99. The page clamps; the API rejects. |
+| `cost`       | Price table                         | `hyperscaler`              | `hyperscaler` or `rental`.                              |
 
-Presentation-only page controls with no selector: row expansion, the chart hover card, and the
-language. The response states the accounting policy and the sample policy once, returns each
+Presentation-only page controls with no selector: the "More" disclosure, each row's "How this was
+measured" disclosure, the "Compare setups at every tested load" disclosure, the chart hover
+card, and the language. The response states the accounting policy and the sample policy once, returns each
 point's accounting, per-target counts and observed metrics apart from its qualification, and
 gives `selections` as indexes into the configuration's points.
 
