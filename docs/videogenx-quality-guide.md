@@ -65,7 +65,8 @@ Widgets never move the page. Both charts place x in percentages inside full-widt
 server render already has its final geometry and no width measurement runs after hydration. Text
 that changes with a control (the x-axis title, the readout name) stacks every variant in one grid
 cell, so its box keeps the tallest variant's height. Readout values start at a fixed column. The
-hover tooltip remounts per clip, so it is placed before its first paint.
+hover tooltip remounts per clip, so it is placed before its first paint. On a touch screen a
+tapped clip's tooltip closes on a tap elsewhere, a scroll or `Esc`.
 `cypress/component/video-quality-guide.cy.tsx` fails on any layout shift outside the floating
 tooltip.
 
