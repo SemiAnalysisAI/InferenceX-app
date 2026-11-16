@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
@@ -22,7 +23,7 @@ import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { Button } from '@/components/ui/button';
 import { ShareButton } from '@/components/ui/share-button';
 import { Card } from '@/components/ui/card';
-import { ChartSection } from '@/components/ui/chart-section';
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { InfoHelp } from '@/components/ui/option-info';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
@@ -90,10 +91,12 @@ import {
   type StagePair,
 } from './clip-stage';
 import { seeChangesPair } from './quality-method';
+import { READOUT_ID } from './VideoClipReadout';
 import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
+import { usePhone } from './use-phone';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -288,14 +291,18 @@ const onDetailEntry = () =>
 export default function VideoDashboard({
   initialData,
   pending = false,
+  phoneGuess = false,
 }: {
   initialData?: VideoInitialData;
+  /** The server's guess that a phone asked for the page, which holds until the viewport is known. */
+  phoneGuess?: boolean;
   /** The server is still streaming `initialData`; show the loading state and do not read in the browser. */
   pending?: boolean;
 }) {
   const locale = useLocale(),
     s = STRINGS[locale];
   const touch = useIsCoarsePointer();
+  const phone = usePhone(phoneGuess);
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
   const latest = useRef(state);
   const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
@@ -653,6 +660,8 @@ export default function VideoDashboard({
     </div>
   );
 
+  const workloadLine = workloadLabel && [workloadLabel, ...engines.map(engineLabel)].join(' · ');
+
   return (
     <div
       className={`${styles.page} flex w-full min-w-0 flex-col gap-4`}
@@ -676,7 +685,8 @@ export default function VideoDashboard({
               gpus: cell.point.participating ?? 0,
             });
           }}
-          onPsnr={() => closeDetail('comparison-clips')}
+          // A phone's clips section has no box of its own, so the link lands on its readout.
+          onPsnr={() => closeDetail(phone ? READOUT_ID : 'comparison-clips')}
         />
       )}
       {/* Hidden, not unmounted: clip media, the selected clip group and chart state survive a detail visit. */}
@@ -686,15 +696,16 @@ export default function VideoDashboard({
             <div className="flex flex-col gap-4">
               <DashboardSectionHeader
                 title={s.title}
+                className={styles.intro}
                 description={
                   <>
                     {s.description(touch)}
-                    {workloadLabel && (
+                    {workloadLine && (
                       <span
-                        className="mt-1 block text-xs font-medium"
+                        className="mt-1 block text-xs font-medium max-md:hidden"
                         data-testid="results-workload-summary"
                       >
-                        {[workloadLabel, ...engines.map(engineLabel)].join(' · ')}
+                        {workloadLine}
                       </span>
                     )}
                   </>
@@ -712,7 +723,7 @@ export default function VideoDashboard({
                       {s.cohortHelp}
                     </InfoHelp>
                     {replay && <span data-testid="results-replay">{s.replay}</span>}
-                    <ShareButton />
+                    <ShareButton className="max-md:hidden" />
                   </div>
                 }
                 headingAs="h1"
@@ -1012,78 +1023,107 @@ export default function VideoDashboard({
               </Button>
             </div>
           )}
-          <ChartSection
-            chartId={VIDEO_RESULTS_CHART_ID}
-            analyticsPrefix="video_results"
-            setIsLegendExpanded={setLegendExpanded}
-            exportFileName="videogenx-results"
-            onExportCsv={() => {
-              const link = document.createElement('a');
-              link.href = csvUrl;
-              link.download = 'videogenx-results.csv';
-              link.click();
-            }}
-          >
-            <div
-              className="motion-stale flex min-w-0 flex-col gap-6"
-              data-testid="video-results-chart-card"
-              data-stale={(loading && deploymentCells.length > 0) || undefined}
-            >
-              <VideoResultsChart
-                cells={deploymentCells}
-                history={chipHistory ? projection.history : null}
-                roster={roster}
-                state={state}
-                colorFor={colorFor}
-                labels={labels}
-                onLabelsChange={setLabels}
-                legendExpanded={legendExpanded}
-                onLegendExpandedChange={setLegendExpanded}
-                onUpdate={updateSeries}
-                onOpen={openPoint}
-                clipLink={clipLink}
-                loading={loading}
-                heading={heading}
-                lossyNote={
-                  <LossyQualityHint
-                    pair={lossyPair}
-                    onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
+          {/* `ChartSection`'s markup, written out so a phone can lift the clip stage out of this
+              card: under 768 px the three wrappers leave no box (results.module.css) and the
+              chart and the clip blocks join the page column, each drawing its own card. */}
+          <section className={styles.lifted}>
+            <figure className={cn('relative min-w-0', styles.lifted)}>
+              <Card className={cn('relative', styles.lifted)}>
+                <div className="max-md:flex max-md:min-w-0 max-md:flex-col max-md:rounded-xl max-md:border max-md:border-border/30 max-md:bg-card max-md:p-4 md:contents">
+                  <ChartButtons
+                    chartId={VIDEO_RESULTS_CHART_ID}
+                    analyticsPrefix="video_results"
+                    setIsLegendExpanded={setLegendExpanded}
+                    exportFileName="videogenx-results"
+                    onExportCsv={() => {
+                      const link = document.createElement('a');
+                      link.href = csvUrl;
+                      link.download = 'videogenx-results.csv';
+                      link.click();
+                    }}
+                    className="md:absolute md:top-6 md:right-6 md:z-10 md:mb-0"
                   />
-                }
-                footer={
-                  <VideoCostContext
-                    state={state}
-                    onUpdate={update}
-                    hardwareKeys={roster.filter(
-                      (key) =>
-                        !hidden.has(key) &&
-                        deploymentCells.some((cell) => cell.point.hardwareKey === key),
-                    )}
-                    date={projection.run?.date ?? null}
-                  />
-                }
-              />
-            </div>
-            <hr className="my-6 border-border-alt" />
-            <VideoResultsClips
-              initialSides={initialData?.sides}
-              points={clipPoints}
-              openings={stageClipPoints}
-              drawn={drawnPoints}
-              deployments={deploymentPoints}
-              officialOpenings={officialOpenings}
-              onPairChange={onStagePair}
-              against={against}
-              onAgainstChange={pickAgainst}
-              onSubjectChange={pickClip}
-              onShow={showOnStage}
-              peek={peek}
-              reveal={reveal}
-              colorFor={colorFor}
-              costs={clipCosts}
-              unofficialRun={state.unofficialRun ?? undefined}
-            />
-          </ChartSection>
+                  <div
+                    className="motion-stale flex min-w-0 flex-col gap-6"
+                    data-testid="video-results-chart-card"
+                    data-stale={(loading && deploymentCells.length > 0) || undefined}
+                  >
+                    <VideoResultsChart
+                      cells={deploymentCells}
+                      history={chipHistory ? projection.history : null}
+                      roster={roster}
+                      state={state}
+                      colorFor={colorFor}
+                      labels={labels}
+                      onLabelsChange={setLabels}
+                      legendExpanded={legendExpanded}
+                      onLegendExpandedChange={setLegendExpanded}
+                      onUpdate={updateSeries}
+                      onOpen={openPoint}
+                      clipLink={clipLink}
+                      loading={loading}
+                      heading={heading}
+                      lossyNote={
+                        <LossyQualityHint
+                          pair={lossyPair}
+                          onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
+                        />
+                      }
+                      footer={
+                        <VideoCostContext
+                          state={state}
+                          onUpdate={update}
+                          hardwareKeys={roster.filter(
+                            (key) =>
+                              !hidden.has(key) &&
+                              deploymentCells.some((cell) => cell.point.hardwareKey === key),
+                          )}
+                          date={projection.run?.date ?? null}
+                        />
+                      }
+                    />
+                  </div>
+                </div>
+                <hr className="my-6 border-border-alt max-md:hidden" />
+                <VideoResultsClips
+                  cohortLoading={pending || loading}
+                  titleRow={
+                    <div
+                      className="flex items-start justify-between gap-3 md:hidden"
+                      data-testid="results-phone-title"
+                    >
+                      <div className="min-w-0">
+                        <Heading as="h1" level="title">
+                          {s.title}
+                        </Heading>
+                        {/* Two lines are held before the workload is known, so nothing shifts when it lands. */}
+                        <p className="mt-0.5 min-h-8 text-xs font-medium text-muted-foreground">
+                          {workloadLine}
+                        </p>
+                      </div>
+                      <ShareButton />
+                    </div>
+                  }
+                  initialSides={initialData?.sides}
+                  points={clipPoints}
+                  openings={stageClipPoints}
+                  drawn={drawnPoints}
+                  deployments={deploymentPoints}
+                  officialOpenings={officialOpenings}
+                  onPairChange={onStagePair}
+                  against={against}
+                  onAgainstChange={pickAgainst}
+                  onSubjectChange={pickClip}
+                  onShow={showOnStage}
+                  peek={peek}
+                  reveal={reveal}
+                  colorFor={colorFor}
+                  costs={clipCosts}
+                  unofficialRun={state.unofficialRun ?? undefined}
+                />
+              </Card>
+            </figure>
+          </section>
           <Card>
             <section
               className="flex min-w-0 flex-col gap-3"

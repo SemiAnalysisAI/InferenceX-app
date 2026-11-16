@@ -302,25 +302,29 @@ function mountResultsClips(
           Toggle B200
         </button>
         <input aria-label="Notes" />
-        <VideoResultsClips
-          points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
-          colorFor={colorFor}
-          deployments={deployments}
-          costs={{
-            [c1('b200').id]: { participating: cost(0.1, 0.02), allocated: null },
-            [c1('h100').id]: { participating: cost(0.3, 0.06), allocated: cost(0.6, 0.12) },
-            ...costs,
-          }}
-          unofficialRun={unofficialRun}
-          against={against}
-          onAgainstChange={setAgainst}
-          onSubjectChange={(clip) => {
-            setAgainst(null);
-            writeStage({ ...parseStage(window.location.search), clip });
-          }}
-          onShow={() => {}}
-          reveal={0}
-        />
+        {/* The page's column, which a phone's blocks join once the section leaves its box. */}
+        <div className="flex flex-col gap-4">
+          <VideoResultsClips
+            points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
+            colorFor={colorFor}
+            deployments={deployments}
+            costs={{
+              [c1('b200').id]: { participating: cost(0.1, 0.02), allocated: null },
+              [c1('h100').id]: { participating: cost(0.3, 0.06), allocated: cost(0.6, 0.12) },
+              ...costs,
+            }}
+            unofficialRun={unofficialRun}
+            titleRow={<h1 className="md:hidden">VideoGenX</h1>}
+            against={against}
+            onAgainstChange={setAgainst}
+            onSubjectChange={(clip) => {
+              setAgainst(null);
+              writeStage({ ...parseStage(window.location.search), clip });
+            }}
+            onShow={() => {}}
+            reveal={0}
+          />
+        </div>
       </PathnameContext.Provider>
     );
   }
@@ -343,6 +347,20 @@ function mountLossyPair(twinP50: number | null) {
     costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
   });
 }
+
+/** The viewport y of an element's top edge. */
+const topOf = (selector: string) =>
+  cy.get(selector).then(($element) => $element[0].getBoundingClientRect().top);
+/** Each selector's element starts below the one before it. */
+const expectStacked = (order: string[]) =>
+  cy.wrap(order).each((selector: string, index) => {
+    if (index === 0) return;
+    topOf(order[index - 1]).then((above) =>
+      topOf(selector).should((below) =>
+        expect(below, `${selector} below ${order[index - 1]}`).to.be.greaterThan(above),
+      ),
+    );
+  });
 
 describe('Video results clip stage', () => {
   beforeEach(() => {
@@ -579,6 +597,37 @@ describe('Video results clip stage', () => {
     cy.get('body').type('{esc}');
     cy.get(`${readout} [data-metric="psnr"] [data-slot="info-help"]`).click();
     cy.get('[data-testid="option-help-content-readout-psnr"]').should('contain', 'Decoded RGB24');
+  });
+
+  it('leads a phone with the stage and the Compare row', () => {
+    cy.viewport(390, 844);
+    mountResultsClips(['b200', 'h200', 'h100']);
+    // Title, picture, transport, Compare row on one line; then the rest.
+    const order = [
+      'h1',
+      '[data-testid="video-results-stage"]',
+      '[data-testid="video-results-play"]',
+      '[data-testid="video-results-compare"]',
+      '[data-testid="video-results-prompt"]',
+      '[data-testid="video-results-view-wipe"]',
+      '[data-testid="video-results-inspect-toggle-phone"]',
+      '[data-testid="video-results-readout"]',
+    ];
+    expectStacked(order);
+    cy.get('[data-testid="video-results-compare"]').should(($row) =>
+      expect($row[0].getBoundingClientRect().height, 'one line').to.be.at.most(44),
+    );
+    cy.document().should((document) =>
+      expect(document.documentElement.scrollWidth).to.be.at.most(
+        document.documentElement.clientWidth,
+      ),
+    );
+    // Inspect leaves the transport row for the view modes, and its drawer opens beside it.
+    cy.get('[data-testid="video-results-inspect-toggle"]').should('not.be.visible');
+    cy.get('[data-testid="video-results-inspect-toggle-phone"]').click();
+    cy.get('[data-testid="video-results-inspect-slot"] [data-testid="video-results-inspect"]')
+      .should('be.visible')
+      .and('contain', 'Speed');
   });
 
   it('names a take only when another take shares the prompt and seed', () => {

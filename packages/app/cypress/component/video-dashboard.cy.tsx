@@ -245,6 +245,20 @@ const engines = () =>
     ...new Set([...$groups].map((group) => group.dataset.engine)),
   ]);
 
+/** The viewport y of an element's top edge. */
+const topOf = (selector: string) =>
+  cy.get(selector).then(($element) => $element[0].getBoundingClientRect().top);
+/** Each selector's element starts below the one before it. */
+const expectStacked = (order: string[]) =>
+  cy.wrap(order).each((selector: string, index) => {
+    if (index === 0) return;
+    topOf(order[index - 1]).then((above) =>
+      topOf(selector).should((below) =>
+        expect(below, `${selector} below ${order[index - 1]}`).to.be.greaterThan(above),
+      ),
+    );
+  });
+
 describe('VideoGenX results', () => {
   it('shows the loading state without reading History while the server streams the cohort', () => {
     readOnlyVideoRequests();
@@ -1074,6 +1088,41 @@ describe('VideoGenX results', () => {
     });
     against().should('have.value', 'reference');
     searchParam('r_vs').should('equal', 'b300');
+  });
+
+  it('puts the clip stage first on a phone and leaves the desktop order alone', () => {
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    cy.viewport(390, 844);
+    mount({ editPage: publishEveryRun });
+    cy.get('[data-testid="results-phone-title"]').should('be.visible').and('contain', 'VideoGenX');
+    cy.get('[data-testid="video-results"] h1:visible').should('have.length', 1);
+    expectStacked([
+      '[data-testid="results-phone-title"]',
+      '[data-testid="video-results-stage"]',
+      '[data-testid="video-results-compare"]',
+      '[data-testid="results-benchmark-config"]',
+      '[data-testid="d3-chart-svg"]',
+      '[data-testid="video-results-view-wipe"]',
+      '[data-testid="video-results-readout"]',
+      '[data-testid="results-how-to-read"]',
+    ]);
+    // The first select still changes what plays, and the model picker is still on the page.
+    config().select('h200');
+    stagePill('a').should('contain', 'H200');
+    cy.get('#results-workload').should('be.visible');
+    assertResultsFit();
+
+    cy.viewport(1280, 900);
+    cy.get('[data-testid="results-phone-title"]').should('not.be.visible');
+    cy.get('[data-testid="video-results"] h1:visible').should('have.length', 1);
+    expectStacked([
+      '[data-testid="results-benchmark-config"]',
+      '[data-testid="d3-chart-svg"]',
+      '[data-testid="video-results-compare"]',
+      '[data-testid="video-results-stage"]',
+      '[data-testid="video-results-readout"]',
+      '[data-testid="results-how-to-read"]',
+    ]);
   });
 
   it('pins the point nearest a tap that misses it on a touch screen', () => {

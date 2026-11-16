@@ -348,6 +348,9 @@ function PairSide({
   );
 }
 
+/** The readout's element id, which the detail page's PSNR link lands on in the phone layout. */
+export const READOUT_ID = 'comparison-readout';
+
 export interface VideoClipReadoutProps {
   kind: StageOption['kind'];
   a: ReadoutSide;
@@ -369,11 +372,12 @@ export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: Video
   const cells = ROWS[kind].map((metric) => cell(metric, kind, a, b, diagnostic, s));
   return (
     <section
+      id={READOUT_ID}
       data-testid="video-results-readout"
       data-pair={kind}
       aria-label={s.pair(a.name, b.name)}
       aria-live="polite"
-      className="space-y-2 text-xs"
+      className="scroll-mt-24 space-y-2 text-xs"
     >
       <p
         data-testid="video-results-readout-pair"

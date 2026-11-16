@@ -157,3 +157,16 @@
     --stage-reserve: 8rem;
   }
 }
+
+/* The phone layout, clip first. The chart card's wrappers leave no box, so the chart and the clip
+   blocks join the page column; the stage block then leads it by `order` alone (LEAD_BLOCK in
+   VideoResultsClips.tsx), with no layout waiting for hydration. The page's title row moves into
+   that block, so the header card keeps its introduction and controls. */
+@media (max-width: 767px) {
+  .lifted {
+    display: contents;
+  }
+  .intro h1 {
+    display: none;
+  }
+}
