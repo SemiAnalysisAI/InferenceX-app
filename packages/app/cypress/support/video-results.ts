@@ -59,3 +59,29 @@ export function touchScreen(enabled: boolean) {
     }),
   );
 }
+
+/**
+ * The width and height of the area around an element's centre whose taps reach it, up to 30 px
+ * each way. It counts a hit area drawn by a pseudo-element and stops where a neighbour is on top.
+ */
+export function tapArea(selector: string) {
+  return cy.get(selector).then(($element) => {
+    const element = $element[0];
+    element.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const box = element.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const reach = (dx: number, dy: number) => {
+      let steps = 0;
+      while (
+        steps < 30 &&
+        element.contains(
+          element.ownerDocument.elementFromPoint(x + dx * (steps + 1), y + dy * (steps + 1)),
+        )
+      )
+        steps += 1;
+      return steps;
+    };
+    return { width: reach(-1, 0) + reach(1, 0) + 1, height: reach(0, -1) + reach(0, 1) + 1 };
+  });
+}

@@ -15,7 +15,13 @@ import { referenceQualityFixture } from '@/components/video-benchmark/reference-
 import { APP_THEMES } from '@/lib/themes/themes';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
-import { coarsePointer, readOnlyVideoRequests, resultHistory } from '../support/video-results';
+import {
+  coarsePointer,
+  readOnlyVideoRequests,
+  resultHistory,
+  tapArea,
+  touchScreen,
+} from '../support/video-results';
 
 function assertResultsFit() {
   cy.document().should((document) => {
@@ -286,6 +292,10 @@ const expectStacked = (order: string[]) =>
   });
 
 describe('VideoGenX results', () => {
+  afterEach(() => {
+    if (Cypress.isBrowser({ family: 'chromium' })) touchScreen(false);
+  });
+
   it('shows the loading state without reading History while the server streams the cohort', () => {
     readOnlyVideoRequests();
     cy.intercept('GET', '/api/video-runs?format=history&page=*', {
@@ -1155,6 +1165,48 @@ describe('VideoGenX results', () => {
       '[data-testid="video-results-readout"]',
       '[data-testid="results-how-to-read"]',
     ]);
+  });
+
+  it('takes taps 44 px tall on the legend toolbar and each disclosure row, at their mouse size', function () {
+    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    cy.viewport(390, 844);
+    mount({ editPage: publishEveryRun });
+    const close = '[data-testid="legend-close-button"]';
+    const rows = [
+      '[data-testid="video-results-legend-reset"]',
+      '[data-testid="video-results-quality-method"] > summary',
+      '[data-testid="video-results-sources"] > summary',
+      '[data-testid="results-advanced"] > summary',
+      '[data-testid="results-history"] > summary',
+    ];
+    // A mouse gets each control's own box and nothing more.
+    tapArea(close).should('deep.equal', { width: 32, height: 32 });
+    tapArea(rows[2]).its('height').should('be.lessThan', 24);
+    const sizes: Record<string, number> = {};
+    cy.wrap([close, ...rows]).each((selector: string) =>
+      cy.get(selector).then(($control) => {
+        sizes[selector] = $control[0].getBoundingClientRect().height;
+      }),
+    );
+    touchScreen(true);
+    tapArea(close).should('deep.equal', { width: 44, height: 44 });
+    cy.wrap(rows).each((selector: string) =>
+      tapArea(selector).should((area) => {
+        expect(area.height, `${selector} height`).to.be.at.least(44);
+        expect(area.width, `${selector} width`).to.be.at.least(44);
+      }),
+    );
+    // The first legend row under the toolbar keeps its own 44 px.
+    tapArea('[data-testid="chart-legend"] li label').its('height').should('be.at.least', 44);
+    // Only the hit area grew: no control changed its height.
+    cy.wrap([close, ...rows]).each((selector: string) =>
+      cy
+        .get(selector)
+        .should(($control) =>
+          expect($control[0].getBoundingClientRect().height, selector).to.equal(sizes[selector]),
+        ),
+    );
   });
 
   it('opens the point nearest a tap in a sheet on a touch screen, and closes it four ways', () => {

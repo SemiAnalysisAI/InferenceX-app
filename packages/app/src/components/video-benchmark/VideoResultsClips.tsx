@@ -1184,7 +1184,10 @@ function PromptRow({
               aria-expanded={expanded}
               aria-label={expanded ? s.fewerPrompts : s.morePrompts(rest)}
               title={expanded ? s.fewerPrompts : s.morePrompts(rest)}
-              className="h-13 w-10 shrink-0 rounded-md border border-dashed border-border bg-muted/20 text-2xs font-medium text-muted-foreground hover:border-foreground hover:text-foreground"
+              className={cn(
+                styles.hit,
+                'relative h-13 w-10 shrink-0 rounded-md border border-dashed border-border bg-muted/20 text-2xs font-medium text-muted-foreground hover:border-foreground hover:text-foreground',
+              )}
               onClick={() => {
                 track('video_results_prompts_expanded', { enabled: !expanded });
                 setExpanded(!expanded);

@@ -112,6 +112,26 @@
   .page [data-slot='switch'] {
     position: relative;
   }
+  /* A disclosure row and the legend's toolbar buttons keep their size and take taps 44 px tall
+     across their width, and at least 44 px wide. */
+  .page summary,
+  .page [data-testid='legend-toolbar'] button {
+    position: relative;
+  }
+  .page summary::after,
+  .page [data-testid='legend-toolbar'] button::after {
+    content: '';
+    position: absolute;
+    top: calc(50% + var(--hit-y, 0px));
+    left: 50%;
+    width: max(100%, 44px);
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  /* The first legend row starts 4 px under the toolbar. */
+  .page [data-testid='legend-toolbar'] button {
+    --hit-y: -2px;
+  }
   /* Where controls sit closer than a finger above and below, the row itself makes the room. */
   .roomy {
     margin-block: 10px;

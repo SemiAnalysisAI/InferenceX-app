@@ -11,7 +11,7 @@ import styles from '@/components/video-benchmark/results.module.css';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
-import { coarsePointer, touchScreen } from '../support/video-results';
+import { coarsePointer, tapArea, touchScreen } from '../support/video-results';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -699,6 +699,21 @@ describe('Video results clip stage', () => {
       // The sentence is kept; it follows the transport instead of pushing it off the screen.
       topOf('[data-testid="video-results-sentence"]').should('be.at.least', play);
     });
+  });
+
+  it('takes taps 44 px wide on the +N prompt tile of a touch tablet, at its 40 px width', function () {
+    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
+    cy.viewport(820, 1000);
+    mountResultsClips(['b200', 'h200']);
+    const more = '[data-testid="video-results-prompts-more"]';
+    cy.get(more).should('have.text', '+1');
+    tapArea(more).its('width').should('equal', 40);
+    touchScreen(true);
+    tapArea(more).should((area) => {
+      expect(area.width).to.equal(44);
+      expect(area.height).to.be.at.least(44);
+    });
+    cy.get(more).should(($tile) => expect($tile[0].getBoundingClientRect().width).to.equal(40));
   });
 
   it('names a take only when another take shares the prompt and seed', () => {
