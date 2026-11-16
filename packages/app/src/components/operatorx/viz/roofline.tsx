@@ -192,7 +192,7 @@ export function Roofline({
   const ptPos = points.map((p) => p.y).filter((y) => y > 0);
   const yLo = Math.min(
     Math.exp((Math.log(yMid) - 0.25 * Math.log(yHi)) / 0.75),
-    ...(ptPos.length ? [Math.min(...ptPos) / 1.2] : []),
+    ...(ptPos.length > 0 ? [Math.min(...ptPos) / 1.2] : []),
   );
   const shown = logY ? points.filter((p) => p.y > 0) : points;
   if (logY)
