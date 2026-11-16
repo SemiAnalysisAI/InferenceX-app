@@ -34,6 +34,7 @@ import { clipGroupActive, frameAt, frameClock } from './clip-sync';
 import { STAGE_ID, type StageView } from './clip-stage';
 import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
+import { useFirstFrame } from './use-first-frame';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -178,6 +179,8 @@ const ROLES = ['a', 'b'] as const;
 const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
+/** How far into the clips, in seconds, their first frames still stand for them. */
+const FIRST_FRAME_SECONDS = 0.25;
 const SPLIT_STEP = 5;
 /** How far a finger travels sideways, in px, before its press is a wipe drag and not a tap. */
 const WIPE_SLOP = 6;
@@ -286,22 +289,30 @@ export default function VideoClipStage({
   const both = playable.length === 2;
   const shown: Role = peek ? OTHER[toggled] : toggled;
   const overlay = view !== 'side';
+  const original = view === 'diff';
+  const srcOf = (clip: StageClip) => (original || !clip.previewUrl ? clip.url : clip.previewUrl);
+  const firstFrame = {
+    a: useFirstFrame(() => videos.current.get('a'), a.url ? srcOf(a) : undefined),
+    b: useFirstFrame(() => videos.current.get('b'), b.url ? srcOf(b) : undefined),
+  };
+  const posterLoaded = (url = '') => loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
+  /**
+   * At the start of the clips, each side's first frame covers its video until every side has put a
+   * frame of its own on screen, so the sides appear together and the stage is never empty while a
+   * clip loads. Elsewhere in the clips the first frame would be the wrong picture.
+   */
+  const covered =
+    time <= FIRST_FRAME_SECONDS && playable.some((role) => !firstFrame[role].presented);
   /**
    * Before the first Play, the idle frame replaces the split until there is a picture to split:
    * both sides' loaded posters in a view that shows them (Difference hides them behind its
    * canvas), or else the clips themselves.
    */
   const postersShown =
-    both &&
-    view !== 'diff' &&
-    playable.every((role) => {
-      const url = clips[role].posterUrl ?? '';
-      return loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
-    });
+    both && view !== 'diff' && playable.every((role) => posterLoaded(clips[role].posterUrl));
   const idle = !armed && playable.length > 0 && !postersShown;
   /** While idle the split stays hidden, so it neither follows the pointer nor locks. */
   const wiping = view === 'wipe' && !idle;
-  const original = view === 'diff';
   /** The baseline sits on the left and the subject on the right until Swap. */
   const onLeft = (role: Role) => (role === 'b') !== swapped;
   const clock = frameClock(duration, fps, frames);
@@ -520,7 +531,6 @@ export default function VideoClipStage({
     }
   };
 
-  const srcOf = (clip: StageClip) => (original || !clip.previewUrl ? clip.url : clip.previewUrl);
   /** Middle of the part of the stage a side shows, for its empty-state text. */
   const centerOf = (role: Role) =>
     view === 'wipe' ? (onLeft(role) ? split / 2 : split + (100 - split) / 2) : 50;
@@ -758,6 +768,16 @@ export default function VideoClipStage({
                     }}
                   />
                 )}
+                {clip.url && !failed && covered && posterLoaded(clip.posterUrl) && (
+                  <img
+                    data-testid="video-results-first-frame"
+                    src={clip.posterUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 size-full object-contain"
+                    style={lensStyle}
+                  />
+                )}
                 {(!clip.url || failed) && (
                   <div
                     data-testid="video-results-media-empty"
@@ -777,6 +797,7 @@ export default function VideoClipStage({
                             next.delete(clip.url);
                             return next;
                           });
+                          firstFrame[role].reset();
                           videos.current.get(role)?.load();
                         }}
                       >

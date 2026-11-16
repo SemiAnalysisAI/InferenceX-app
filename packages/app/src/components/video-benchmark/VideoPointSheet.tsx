@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { buildShareUrl } from '@/lib/routing/url-state';
+import { useFirstFrame } from './use-first-frame';
 
 const STRINGS = {
   en: {
@@ -204,6 +205,7 @@ export default function VideoPointSheet({
   // Another prompt or point is another clip, which starts paused.
   const src = clip?.src ?? null;
   useEffect(() => setPlaying(false), [src]);
+  const firstFrame = useFirstFrame(() => video.current, src ?? undefined);
 
   if (!mounted) return null;
 
@@ -353,6 +355,15 @@ export default function VideoPointSheet({
                         onPause={() => setPlaying(false)}
                         onPlay={() => setPlaying(true)}
                       />
+                      {/* play() ends the poster; until a frame is drawn the first frame stays. */}
+                      {clip.poster && !firstFrame.presented && (
+                        <img
+                          src={clip.poster}
+                          alt=""
+                          data-testid="video-point-sheet-first-frame"
+                          className="absolute inset-0 size-full object-contain"
+                        />
+                      )}
                       <button
                         type="button"
                         aria-label={playing ? s.pause : s.play}

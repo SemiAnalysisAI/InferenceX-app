@@ -1462,12 +1462,20 @@ describe('VideoGenX results', () => {
       .and('have.prop', 'muted', true)
       .and('have.prop', 'playsInline', true)
       .and('have.prop', 'paused', true)
-      .and('have.prop', 'readyState', 0);
+      .and('have.prop', 'readyState', 0)
+      // Its picture also lies over the unread clip, since play() ends the poster before a frame is drawn.
+      .and(($video) =>
+        expect(
+          $video.parent().find('[data-testid="video-point-sheet-first-frame"]').attr('src'),
+          'first frame over the clip',
+        ).to.equal(FRAME),
+      );
     cy.get('[data-testid="video-point-sheet-play"]').click();
     cy.get('[data-testid="video-point-sheet-play"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="video-point-sheet-video"]')
       .should('have.prop', 'paused', false)
       .and(($video) => expect($video.prop('readyState'), 'clip read').to.be.greaterThan(0));
+    cy.get('[data-testid="video-point-sheet-first-frame"]').should('not.exist');
     cy.get('[data-testid="video-point-sheet-play"]').click();
     cy.get('[data-testid="video-point-sheet-video"]').should('have.prop', 'paused', true);
 
