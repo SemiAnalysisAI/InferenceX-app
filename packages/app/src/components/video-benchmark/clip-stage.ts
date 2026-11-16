@@ -23,10 +23,19 @@ export interface StageState {
   vs: string | null;
   /** The two sides have exchanged places on the stage. */
   swap: boolean;
+  /** `resultsPointKey` of the chart point whose sheet a touch screen has open; null with none. */
+  sheet: string | null;
 }
 
 /** The stage's own URL keys. VideoDashboard's `commit` rewrites every other `r_` key and keeps these. */
-const STAGE_PARAMS: readonly string[] = ['r_prompt', 'r_view', 'r_clip', 'r_vs', 'r_swap'];
+const STAGE_PARAMS: readonly string[] = [
+  'r_prompt',
+  'r_view',
+  'r_clip',
+  'r_vs',
+  'r_swap',
+  'r_sheet',
+];
 export const isStageParam = (key: string) => STAGE_PARAMS.includes(key);
 
 export function parseStage(search: string): StageState {
@@ -38,6 +47,7 @@ export function parseStage(search: string): StageState {
     clip: params.get('r_clip') || null,
     vs: params.get('r_vs') || null,
     swap: params.get('r_swap') === '1',
+    sheet: params.get('r_sheet') || null,
   };
 }
 
@@ -54,6 +64,8 @@ export function stageSearch(state: StageState, search: string): URLSearchParams 
   else params.delete('r_vs');
   if (state.swap) params.set('r_swap', '1');
   else params.delete('r_swap');
+  if (state.sheet) params.set('r_sheet', state.sheet);
+  else params.delete('r_sheet');
   return params;
 }
 
@@ -299,4 +311,8 @@ export interface StagePair {
   baseline: string | null;
   /** First frames of the shown prompt by chart point key for read points; null when one has none. */
   posters: Readonly<Record<string, string | null>>;
+  /** What plays for the shown prompt by chart point key, a web rendition where one exists. */
+  media?: Readonly<Record<string, string | null>>;
+  /** The shown prompt's case id and seed. */
+  prompt?: { id: string; seed: number } | null;
 }

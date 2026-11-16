@@ -45,7 +45,7 @@ const point = (hardwareKey: string, runId = 'official') =>
 describe('clip stage', () => {
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
     const search = stageSearch(
-      { prompt: 'crane', view: 'wipe', clip: null, vs: null, swap: false },
+      { prompt: 'crane', view: 'wipe', clip: null, vs: null, swap: false, sheet: null },
       '?r_y=videosPerGpuHour&r_view=side&r_clip=1:old&r_vs=h200&r_swap=1',
     );
     expect(Object.fromEntries(search)).toEqual({ r_y: 'videosPerGpuHour', r_prompt: 'crane' });
@@ -55,9 +55,17 @@ describe('clip stage', () => {
       clip: null,
       vs: null,
       swap: false,
+      sheet: null,
     });
     const clip = stageSearch(
-      { prompt: null, view: 'side', clip: '34341996789:abc:c1', vs: null, swap: false },
+      {
+        prompt: null,
+        view: 'side',
+        clip: '34341996789:abc:c1',
+        vs: null,
+        swap: false,
+        sheet: null,
+      },
       '',
     );
     expect(parseStage(`?${clip}`)).toEqual({
@@ -66,18 +74,34 @@ describe('clip stage', () => {
       clip: '34341996789:abc:c1',
       vs: null,
       swap: false,
+      sheet: null,
     });
   });
 
   it('keeps the compared side and a swap in the URL and leaves their defaults out', () => {
     const pair = stageSearch(
-      { prompt: null, view: 'wipe', clip: '1:b200:c1', vs: 'h200', swap: true },
+      { prompt: null, view: 'wipe', clip: '1:b200:c1', vs: 'h200', swap: true, sheet: null },
       '?r_y=videosPerGpuHour',
     );
     expect(pair.toString()).toBe('r_y=videosPerGpuHour&r_clip=1%3Ab200%3Ac1&r_vs=h200&r_swap=1');
-    expect(parseStage(`?${pair}`)).toMatchObject({ clip: '1:b200:c1', vs: 'h200', swap: true });
+    expect(parseStage(`?${pair}`)).toMatchObject({
+      clip: '1:b200:c1',
+      vs: 'h200',
+      swap: true,
+      sheet: null,
+    });
     // Only `1` swaps, so a hand-edited value cannot leave the sides in an unknown order.
-    expect(parseStage('?r_swap=true&r_vs=')).toMatchObject({ vs: null, swap: false });
+    expect(parseStage('?r_swap=true&r_vs=')).toMatchObject({ vs: null, swap: false, sheet: null });
+  });
+
+  it('keeps the point whose sheet is open in the URL', () => {
+    const opened = stageSearch(
+      { prompt: null, view: 'wipe', clip: null, vs: null, swap: false, sheet: '1:b200:c1' },
+      '?r_y=videosPerGpuHour',
+    );
+    expect(opened.toString()).toBe('r_y=videosPerGpuHour&r_sheet=1%3Ab200%3Ac1');
+    expect(parseStage(`?${opened}`).sheet).toBe('1:b200:c1');
+    expect(stageSearch(parseStage(''), `?${opened}`).has('r_sheet')).toBe(false);
   });
 
   it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {

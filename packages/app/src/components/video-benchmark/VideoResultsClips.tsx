@@ -552,21 +552,30 @@ export default function VideoResultsClips({
         [...new Set([...wanted, ...drawn])].flatMap((p) => {
           const side = sideOf(p);
           if (side === undefined)
-            return failedPeeks.has(sourceKey(p)) ? [[stagePointKey(p), null]] : [];
-          const url = side
-            ? pairedGroup(resultsClipGroups([side]), group)?.clips.get(side.hardwareKey)?.posterUrl
+            return failedPeeks.has(sourceKey(p)) ? [[stagePointKey(p), null, null]] : [];
+          const found = side
+            ? pairedGroup(resultsClipGroups([side]), group)?.clips.get(side.hardwareKey)
             : undefined;
-          return [[stagePointKey(p), url ?? null]];
+          return [
+            [stagePointKey(p), found?.posterUrl ?? null, found?.previewUrl || found?.url || null],
+          ];
         }),
       ),
     [wanted, drawn, revision, failedKeys, failedPeeks, group],
   );
   // Before paint, so the chart's badges and hover card never lag the stage they describe.
-  useLayoutEffect(
-    () =>
-      onPairChange?.({ playing, baseline, posters: Object.fromEntries(JSON.parse(postersJson)) }),
-    [playing, baseline, postersJson, onPairChange],
-  );
+  const promptId = group ? caseOf(group) : null;
+  const promptSeed = group?.seed ?? null;
+  useLayoutEffect(() => {
+    const read: [string, string | null, string | null][] = JSON.parse(postersJson);
+    onPairChange?.({
+      playing,
+      baseline,
+      posters: Object.fromEntries(read.map(([key, poster]) => [key, poster])),
+      media: Object.fromEntries(read.map(([key, , media]) => [key, media])),
+      prompt: promptId === null || promptSeed === null ? null : { id: promptId, seed: promptSeed },
+    });
+  }, [playing, baseline, postersJson, promptId, promptSeed, onPairChange]);
   const clip = group && subject?.side ? (group.clips.get(subject.side.hardwareKey) ?? null) : null;
   const reference = resultsClipReference(group, new Set());
   const point = subject?.point;

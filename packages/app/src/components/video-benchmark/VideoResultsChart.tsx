@@ -26,6 +26,7 @@ import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { axisLabelUnit, chartHoverCard, chartHoverCardImage } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
+import { useClientSearch } from '@/hooks/useClientSearch';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
@@ -40,7 +41,9 @@ import {
   spreadPills,
   tapTarget,
 } from './chart-marks';
-import { mayHaveClips } from './clip-stage';
+import { mayHaveClips, parseStage, writeStage } from './clip-stage';
+import type { VideoPoint } from './metrics';
+import VideoPointSheet from './VideoPointSheet';
 import { serverSplit } from './deployment';
 import { engineLabel, engineShape, engineSort } from './engines';
 import { isLossy, lossyLabel, runtimeLabel } from './optimizations';
@@ -122,6 +125,7 @@ const STRINGS = {
     tipClick: 'Click to compare below',
     tipHollow: 'Only filled points have clips',
     compareBelow: 'Compare below ↓',
+    perClip: '$ per clip',
   },
   zh: {
     gpus: (count: number | null) => (count === null ? '未记录 GPU 数量' : `${count} 张 GPU`),
@@ -178,6 +182,7 @@ const STRINGS = {
     tipClick: '点击即可在下方对比',
     tipHollow: '只有实心点有视频',
     compareBelow: '在下方对比 ↓',
+    perClip: '每条视频成本 ($)',
   },
 };
 
@@ -211,6 +216,8 @@ interface MarkInputs {
   /** The hovered point's series. */
   hover: string | null;
   pills: readonly SeriesPill[];
+  /** The point whose sheet a touch screen has open. */
+  sheet: string | null;
 }
 
 interface PlotSize {
@@ -226,6 +233,9 @@ export interface ClipLink {
   baseline: string | null;
   /** First frames of the stage's prompt by point key, for the hover card; null once read without one. */
   posters: Readonly<Record<string, string | null>>;
+  /** What plays for the stage's prompt by point key, and that prompt, for a touch screen's sheet. */
+  media?: Readonly<Record<string, string | null>>;
+  prompt?: { id: string; seed: number } | null;
   /** Playable points pulse until the reader first picks a clip. */
   pulse: boolean;
   onSelect: (pointKey: string) => void;
@@ -237,6 +247,7 @@ export interface ClipLink {
 
 const LOSSY_DASH = '6 4';
 const BADGES = 'clip-badges';
+const SHEET_RING = 'point-sheet-ring';
 const PULSE = 'video-clip-pulse';
 /** How long the pointer rests on a point before its clips are read for the hover card, in ms. */
 const PEEK_DELAY = 250;
@@ -285,9 +296,24 @@ function textWidth(node: SVGTextElement, size: number): number {
 function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings) {
   root.querySelector(`.${BADGES}`)?.remove();
   root.querySelector(`.${PILLS}`)?.remove();
+  root.querySelector(`.${SHEET_RING}`)?.remove();
   const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
   const host = points[0]?.parentNode;
   if (!host) return;
+  // The point a sheet describes keeps a ring in the ink color, which reads over every series.
+  const chosen = points.find(
+    (node) => select<SVGGElement, PlotPoint>(node).datum().key === inputs.sheet,
+  );
+  if (chosen)
+    select(host as SVGGElement)
+      .append('circle')
+      .attr('class', SHEET_RING)
+      .attr('transform', chosen.getAttribute('transform'))
+      .attr('r', 11)
+      .attr('fill', 'none')
+      .attr('stroke', 'var(--foreground)')
+      .attr('stroke-width', 2)
+      .attr('pointer-events', 'none');
   const { link, hover } = inputs;
   const nodes = new Map<string, SVGGElement>();
   const focus = new Set<string>(hover === null ? [] : [hover]);
@@ -585,6 +611,134 @@ function PanelRuntime({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** The pinned panel's parts, which a touch screen's sheet shows too. */
+interface PanelParts {
+  describe: (plot: PlotPoint) => {
+    title: string;
+    subtitle?: string;
+    date: string;
+    warning?: string;
+  };
+  links: (point: VideoPoint) => { action: string; label: string; href: string }[];
+  sections: (plot: PlotPoint) => ReactNode;
+  selection: Parameters<(typeof RESULTS_X_METRICS)['p50']['value']>[1];
+}
+
+/**
+ * A touch screen's sheet for one plotted point: its clip of the stage's prompt, four figures and
+ * three actions, then everything the pinned panel lists.
+ */
+function PointSheet({
+  plot,
+  panel,
+  link,
+  labels,
+  anchor,
+  onOutside,
+  onOpen,
+  onClose,
+}: {
+  plot: PlotPoint;
+  panel: PanelParts;
+  link: ClipLink | undefined;
+  labels: Record<
+    'gpus' | 'latency' | 'perClip' | 'perDollar' | 'energy' | 'noClips' | 'telemetry',
+    string
+  >;
+  /** The point's mark on the chart. */
+  anchor: () => Element | null;
+  /** Opens the point a tap beside the sheet lands on; false when it lands on none. */
+  onOutside: (x: number, y: number) => boolean;
+  onOpen: (pointKey: string, source: 'popover') => void;
+  onClose: () => void;
+}) {
+  const { cell } = plot;
+  const d = panel.describe(plot);
+  const cost = cell.cost[panel.selection.basis];
+  const perDollar = RESULTS_Y_METRICS.videoSecondsPerDollar;
+  const poster = link?.posters[plot.key];
+  const media = link?.media?.[plot.key] ?? null;
+  // Unread clips show a placeholder; a point read without a first frame or media has none.
+  const clip =
+    !plot.clips || !link
+      ? null
+      : poster === undefined
+        ? undefined
+        : poster === null && media === null
+          ? null
+          : { poster, src: media };
+  return (
+    <VideoPointSheet
+      title={d.title}
+      color={plot.color}
+      facts={[d.subtitle, labels.gpus, d.date, d.warning].filter((fact) => fact !== undefined)}
+      clip={clip}
+      noClips={plot.clips ? undefined : labels.noClips}
+      prompt={clip ? (link?.prompt ?? null) : null}
+      metrics={[
+        {
+          label: labels.latency,
+          value: unit(n(RESULTS_X_METRICS.p50.value(cell, panel.selection), 1), 's'),
+        },
+        { label: labels.perClip, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
+        {
+          label: labels.perDollar,
+          value: n(perDollar.value(cell, panel.selection), perDollar.digits),
+        },
+        {
+          label: labels.energy,
+          value: unit(cell.joulesPerClip === null ? '—' : n(cell.joulesPerClip / 1000, 1), 'kJ'),
+        },
+      ]}
+      onCompare={
+        plot.clips && link
+          ? () => {
+              track('video_results_clip_selected', {
+                source: 'sheet',
+                gpu: plot.hardwareKey,
+                overlay: plot.overlay,
+                lossy: isLossy(cell.point),
+                engine: plot.engine,
+              });
+              link.onSelect(plot.key);
+              onClose();
+              link.onReveal();
+            }
+          : undefined
+      }
+      telemetry={{
+        label: labels.telemetry,
+        onOpen: () => {
+          onClose();
+          onOpen(plot.key, 'popover');
+        },
+      }}
+      context={{ gpu: plot.hardwareKey, overlay: plot.overlay }}
+      pointKey={plot.key}
+      anchor={anchor}
+      onOutside={onOutside}
+      onClose={onClose}
+    >
+      {panel.sections(plot)}
+      <div className="mt-2 flex flex-wrap gap-x-5">
+        {panel.links(cell.point).map((entry) => (
+          <a
+            key={entry.action}
+            data-action={entry.action}
+            href={entry.href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 min-w-11 items-center text-brand-fill hover:underline"
+            onClick={() => track('video_results_sheet_link_opened', { action: entry.action })}
+          >
+            {entry.label}
+          </a>
+        ))}
+      </div>
+    </VideoPointSheet>
+  );
+}
+
 export default function VideoResultsChart({
   cells,
   history,
@@ -702,55 +856,79 @@ export default function VideoResultsChart({
       }),
     [series, s, history, colorFor, better],
   );
-  const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills });
-  marks.current = { link: clipLink, hover: hover.current, pills };
-  // A finger covers several points on a narrow plot, and two can plot a pixel apart. On a touch
-  // screen a tap goes to the point `tapTarget` picks, before the plot's own handlers see it.
+  // A touch screen opens a point in a sheet. The open point is `r_sheet`, so a shared link
+  // reopens it; a mouse keeps the pinned panel and ignores the key.
   const touch = useIsCoarsePointer();
+  const sheetKey = parseStage(useClientSearch()).sheet;
+  const sheetPoint =
+    touch && sheetKey ? plotted.find((point) => point.key === sheetKey) : undefined;
+  /** The last point a tap opened, which a tap on the same spot steps past. */
+  const lastTapped = useRef<string | null>(null);
+  const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills, sheet: null });
+  marks.current = { link: clipLink, hover: hover.current, pills, sheet: sheetPoint?.key ?? null };
+  // A finger covers several points on a narrow plot, and two can plot a pixel apart. On a touch
+  // screen a tap goes to the point `tapTarget` picks and opens its sheet; the plot's own handlers,
+  // which pin the panel a mouse uses, never see it.
+  const openAt = useCallback((clientX: number, clientY: number) => {
+    const svg = chart.current?.getSvgElement();
+    if (!svg) return false;
+    const xAxis = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
+    const yAxis = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
+    const found = new Map<string, PlotPoint>();
+    const points = [...svg.querySelectorAll<SVGGElement>('.dot-group')].flatMap((node) => {
+      const shape = node.querySelector('.visible-shape')?.getBoundingClientRect();
+      if (!shape) return [];
+      const left = shape.left + shape.width / 2;
+      const top = shape.top + shape.height / 2;
+      // A zoomed plot clips the points outside it; a tap near its edge must not pick one.
+      if (
+        xAxis &&
+        yAxis &&
+        (left < yAxis.left || left > xAxis.right || top < yAxis.top || top > xAxis.top)
+      )
+        return [];
+      const point = select<SVGGElement, PlotPoint>(node).datum();
+      found.set(point.key, point);
+      return [{ key: point.key, x: left, y: top }];
+    });
+    const key = tapTarget({ x: clientX, y: clientY }, points, lastTapped.current);
+    const point = key === null ? undefined : found.get(key);
+    if (!point) return false;
+    lastTapped.current = point.key;
+    track('video_results_point_sheet_opened', {
+      gpu: point.hardwareKey,
+      overlay: point.overlay,
+      optimal: point.optimal,
+      playable: point.clips,
+    });
+    // Its clips are read as a rest of the mouse reads them, for the sheet's first frame.
+    if (point.clips) link.current?.onPeek(point.key);
+    writeStage({ ...parseStage(location.search), sheet: point.key });
+    return true;
+  }, []);
   useEffect(() => {
     const svg = chart.current?.getSvgElement();
     if (!touch || !svg) return undefined;
-    let forwarding = false;
     const onClick = (event: MouseEvent) => {
-      if (forwarding) return;
-      const xAxis = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
-      const yAxis = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
-      const nodes = new Map<string, SVGGElement>();
-      const points = [...svg.querySelectorAll<SVGGElement>('.dot-group')].flatMap((node) => {
-        const shape = node.querySelector('.visible-shape')?.getBoundingClientRect();
-        if (!shape) return [];
-        const left = shape.left + shape.width / 2;
-        const top = shape.top + shape.height / 2;
-        // A zoomed plot clips the points outside it; a tap near its edge must not pick one.
-        if (
-          xAxis &&
-          yAxis &&
-          (left < yAxis.left || left > xAxis.right || top < yAxis.top || top > xAxis.top)
-        )
-          return [];
-        const { key } = select<SVGGElement, PlotPoint>(node).datum();
-        nodes.set(key, node);
-        return [{ key, x: left, y: top }];
-      });
-      const pinned = chart.current?.getPinnedPoint() as PlotPoint | null | undefined;
-      const key = tapTarget({ x: event.clientX, y: event.clientY }, points, pinned?.key ?? null);
-      const target = key === null ? undefined : nodes.get(key);
-      if (!target || target.contains(event.target as Node)) return;
-      event.stopPropagation();
-      forwarding = true;
-      target.dispatchEvent(
-        new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          clientX: event.clientX,
-          clientY: event.clientY,
-        }),
-      );
-      forwarding = false;
+      if (openAt(event.clientX, event.clientY)) event.stopPropagation();
     };
     svg.addEventListener('click', onClick, true);
     return () => svg.removeEventListener('click', onClick, true);
-  }, [touch]);
+  }, [touch, openAt]);
+  /** The ring on the point the sheet describes, which the sheet keeps in view above itself. */
+  const sheetAnchor = useCallback(
+    () => chart.current?.getSvgElement()?.querySelector(`.${SHEET_RING}`) ?? null,
+    [],
+  );
+  const closeSheet = useCallback(
+    () => writeStage({ ...parseStage(location.search), sheet: null }),
+    [],
+  );
+  // A link that opens on a sheet reads its point's clips too.
+  const sheetClips = sheetPoint?.clips ? sheetPoint.key : null;
+  useEffect(() => {
+    if (sheetClips) link.current?.onPeek(sheetClips);
+  }, [sheetClips]);
   const lines = useMemo(
     () =>
       Object.fromEntries(
@@ -833,7 +1011,7 @@ export default function VideoResultsChart({
     const svg = chart.current?.getSvgElement();
     if (svg) drawMarks(svg, size.current, marks.current, s);
   }, [s]);
-  useLayoutEffect(redraw, [playing, baseline, pulse, pills, redraw]);
+  useLayoutEffect(redraw, [playing, baseline, pulse, pills, sheetPoint?.key, redraw]);
   // A first frame read after its card opened fills the box the card reserved for it.
   useEffect(() => {
     const key = hovered.current;
@@ -874,7 +1052,7 @@ export default function VideoResultsChart({
     },
     [s],
   );
-  const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
+  const { tooltip, panel } = useMemo(() => {
     const latencyKeys = RESULTS_X_METRIC_KEYS.filter((key) => !RESULTS_X_METRICS[key].rankOn);
     const hoverLatency = RESULTS_X_METRICS[x.rankOn ?? xKey];
     const selection = { basis: state.costBasis, tier: state.costTier };
@@ -891,7 +1069,106 @@ export default function VideoResultsChart({
         xValue: n(xValue, x.digits),
       };
     };
-    return {
+    /** The run, artifact and reproduce links of a point. */
+    const links = (point: VideoPoint) => [
+      {
+        action: 'run',
+        label: s.runLink,
+        href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
+        external: true,
+      },
+      ...detailLinks(point)
+        .filter((entry) => entry.action !== 'run')
+        .map((entry) => ({
+          action: entry.action,
+          label: entry.action === 'artifact' ? s.artifactLink : s.reproduceLink,
+          href: entry.href,
+          external: true,
+        })),
+    ];
+    /** What the pinned panel lists under its headline: setup, latency, power, throughput and cost. */
+    const sections = (plot: PlotPoint) => {
+      const { cell } = plot;
+      const { point } = cell;
+      const d = describe(plot);
+      const cost = cell.cost[state.costBasis];
+      return (
+        <>
+          <PanelSetup
+            facts={[
+              {
+                label: s.concurrency,
+                value: point.concurrency === null ? '—' : String(point.concurrency),
+              },
+              { label: s.gpusShort, value: s.gpuOf(point.participating, point.allocated) },
+              {
+                label: s.valid,
+                value: s.validOf(point.valid, point.scheduled, point.failed),
+              },
+            ]}
+            deployment={{ label: s.deployment, value: deploymentText(point, d.replicas, s) }}
+          />
+          <PanelSection
+            title={clip ? s.latencyClip(clip.seconds, clip.fps) : s.latency}
+            rows={[
+              ...latencyKeys.map((key) => ({
+                label: key === 'p50' ? s.median : 'P90',
+                value: unit(n(RESULTS_X_METRICS[key].value(cell, selection), 1), 's'),
+              })),
+              {
+                label: s.meets(n(state.deadlineSeconds)),
+                value:
+                  cell.deadlineAttainment === null
+                    ? '—'
+                    : `${n(cell.deadlineAttainment * 100, 0)}%`,
+              },
+            ]}
+          />
+          <PanelSection
+            title={s.powerSection}
+            rows={[
+              ...(state.yMetric === 'kjPerClip'
+                ? []
+                : [
+                    {
+                      label: s.energy,
+                      value: unit(
+                        cell.joulesPerClip === null ? '—' : n(cell.joulesPerClip / 1000, 1),
+                        'kJ',
+                      ),
+                    },
+                  ]),
+              {
+                label: s.power,
+                value: unit(point.avgPowerW === null ? '—' : n(point.avgPowerW, 0), 'W'),
+              },
+              {
+                label: s.powerLimit,
+                value: unit(point.enforcedLimitW === null ? '—' : n(point.enforcedLimitW, 0), 'W'),
+              },
+            ]}
+          />
+          <PanelSection
+            title={s.throughputCost}
+            rows={[
+              ...RESULTS_Y_METRIC_KEYS.filter(
+                (key) => key !== state.yMetric && key !== 'kjPerClip',
+              ).map((key) => ({
+                label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
+                value: n(
+                  RESULTS_Y_METRICS[key].value(cell, selection),
+                  RESULTS_Y_METRICS[key].digits,
+                ),
+              })),
+              { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
+              { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
+            ]}
+          />
+          {point.runtime && <PanelRuntime label={s.runtime} value={point.runtime} />}
+        </>
+      );
+    };
+    const config: TooltipConfig<PlotPoint> = {
       rulerType: 'none',
       attachToLayer: 1,
       content: (plot) => {
@@ -937,10 +1214,8 @@ export default function VideoResultsChart({
         });
       },
       details: (plot, _isOverlay, close) => {
-        const { cell } = plot;
-        const { point } = cell;
+        const { point } = plot.cell;
         const d = describe(plot);
-        const cost = cell.cost[state.costBasis];
         return (
           <ChartPointDetails
             title={d.title}
@@ -955,23 +1230,7 @@ export default function VideoResultsChart({
               { value: unit(d.xValue, x.unit), label: x.label[locale] },
             ]}
             // View telemetry sits in the panel's fixed action row, so it never scrolls away.
-            links={[
-              {
-                action: 'run',
-                label: s.runLink,
-                href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
-                external: true,
-              },
-              ...detailLinks(point)
-                .filter((entry) => entry.action !== 'run')
-                .map((entry) => ({
-                  action: entry.action,
-                  label: entry.action === 'artifact' ? s.artifactLink : s.reproduceLink,
-                  href: entry.href,
-                  external: true,
-                })),
-              { action: 'view-telemetry', label: `${s.viewTelemetry} →` },
-            ]}
+            links={[...links(point), { action: 'view-telemetry', label: `${s.viewTelemetry} →` }]}
             onClose={close}
             onAction={(action, event) => {
               event.stopPropagation();
@@ -980,80 +1239,7 @@ export default function VideoResultsChart({
               onOpen(plot.key, 'popover');
             }}
           >
-            <PanelSetup
-              facts={[
-                {
-                  label: s.concurrency,
-                  value: point.concurrency === null ? '—' : String(point.concurrency),
-                },
-                { label: s.gpusShort, value: s.gpuOf(point.participating, point.allocated) },
-                {
-                  label: s.valid,
-                  value: s.validOf(point.valid, point.scheduled, point.failed),
-                },
-              ]}
-              deployment={{ label: s.deployment, value: deploymentText(point, d.replicas, s) }}
-            />
-            <PanelSection
-              title={clip ? s.latencyClip(clip.seconds, clip.fps) : s.latency}
-              rows={[
-                ...latencyKeys.map((key) => ({
-                  label: key === 'p50' ? s.median : 'P90',
-                  value: unit(n(RESULTS_X_METRICS[key].value(cell, selection), 1), 's'),
-                })),
-                {
-                  label: s.meets(n(state.deadlineSeconds)),
-                  value:
-                    cell.deadlineAttainment === null
-                      ? '—'
-                      : `${n(cell.deadlineAttainment * 100, 0)}%`,
-                },
-              ]}
-            />
-            <PanelSection
-              title={s.powerSection}
-              rows={[
-                ...(state.yMetric === 'kjPerClip'
-                  ? []
-                  : [
-                      {
-                        label: s.energy,
-                        value: unit(
-                          cell.joulesPerClip === null ? '—' : n(cell.joulesPerClip / 1000, 1),
-                          'kJ',
-                        ),
-                      },
-                    ]),
-                {
-                  label: s.power,
-                  value: unit(point.avgPowerW === null ? '—' : n(point.avgPowerW, 0), 'W'),
-                },
-                {
-                  label: s.powerLimit,
-                  value: unit(
-                    point.enforcedLimitW === null ? '—' : n(point.enforcedLimitW, 0),
-                    'W',
-                  ),
-                },
-              ]}
-            />
-            <PanelSection
-              title={s.throughputCost}
-              rows={[
-                ...RESULTS_Y_METRIC_KEYS.filter(
-                  (key) => key !== state.yMetric && key !== 'kjPerClip',
-                ).map((key) => ({
-                  label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
-                  value: n(
-                    RESULTS_Y_METRICS[key].value(cell, selection),
-                    RESULTS_Y_METRICS[key].digits,
-                  ),
-                })),
-                { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
-                { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
-              ]}
-            />
-            {point.runtime && <PanelRuntime label={s.runtime} value={point.runtime} />}
+            {sections(plot)}
             {link.current && plot.clips && (
               <Button
                 type="button"
@@ -1112,6 +1298,7 @@ export default function VideoResultsChart({
         pair.onSelect(point.key);
       },
     };
+    return { tooltip: config, panel: { describe, links, sections, selection } };
   }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen, redraw]);
 
   const hidden = new Set(state.hidden);
@@ -1203,206 +1390,230 @@ export default function VideoResultsChart({
       )
     : [];
 
-  return (
-    <D3Chart<PlotPoint>
-      ref={chart}
-      chartId={VIDEO_RESULTS_CHART_ID}
-      testId="video-results-chart"
-      data={plotted}
-      height={440}
-      // The x title centres on the plot, so a wide left margin pushes the zh title past the
-      // right edge at 320 px in DM Sans.
-      margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
-      watermark="logo"
-      transitionDuration={transition}
-      xScale={xScale}
-      yScale={yScale}
-      xAxis={
-        x.scale === 'log'
-          ? {
-              label: xLabel,
-              tickValues: (scale) => {
-                const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
-                return [...new Set(plotted.map((point) => point.x))]
-                  .filter((value) => value >= lo && value <= hi)
-                  .toSorted((a, b) => a - b);
-              },
-              tickFormat: (value) => n(Number(value), x.digits),
-            }
-          : { label: xLabel, tickCount: 6 }
-      }
-      yAxis={{ label: yLabel, tickCount: 6 }}
-      layers={layers}
-      tooltip={tooltip}
-      onRender={onRender}
-      onExportRender={onExportRender}
-      zoom={{
-        enabled: true,
-        axes: 'both',
-        scaleExtent: [1, 20],
-        resetEventName: `video_results_zoom_reset_${VIDEO_RESULTS_CHART_ID}`,
+  const sheet = sheetPoint && (
+    <PointSheet
+      plot={sheetPoint}
+      panel={panel}
+      link={clipLink}
+      labels={{
+        gpus: s.gpus(sheetPoint.cell.point.participating),
+        latency: RESULTS_X_METRICS.p50.label[locale],
+        perClip: s.perClip,
+        perDollar: RESULTS_Y_METRICS.videoSecondsPerDollar.label[locale],
+        energy: s.energy,
+        noClips: s.tipHollow,
+        telemetry: `${s.viewTelemetry} →`,
       }}
-      instructions={s.controls}
-      noDataOverlay={
-        plotted.length === 0 ? (
-          loading ? (
-            <Skeleton
-              data-testid="video-results-chart-skeleton"
-              className="pointer-events-none absolute inset-0"
-            />
-          ) : (
-            <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
-              {s.noData}
-            </EmptyState>
-          )
-        ) : undefined
-      }
-      caption={heading}
-      footer={
-        single || footer ? (
-          <>
-            {single && (
-              <p
-                className="mb-3 text-xs text-muted-foreground"
-                data-testid="video-results-single-note"
-              >
-                {s.singleDeployment}
-              </p>
-            )}
-            {footer}
-          </>
-        ) : undefined
-      }
-      // An 18rem sidebar keeps a pinned point's details readable; it is sized before
-      // the pin so pinning never reflows the plot.
-      legendElement={
-        <div className="flex min-h-0 flex-1 flex-col lg:min-w-72">
-          <ChartLegend
-            variant="sidebar"
-            legendItems={legendItems}
-            onItemRemove={toggle}
-            isLegendExpanded={legendExpanded}
-            onExpandedChange={(expanded) => {
-              onLegendExpandedChange(expanded);
-              track('video_results_legend_expanded', { enabled: expanded });
-            }}
-            reset={{
-              id: 'video-results-legend-reset',
-              disabled: state.hidden.length === 0,
-              onClick: () => {
-                onUpdate({ hidden: [] });
-                track('video_results_legend_reset');
-              },
-            }}
-            switches={[
-              {
-                id: 'video-results-optimal',
-                label: s.optimal,
-                checked: state.optimal,
-                infoTooltip: s.optimalHelp,
-                onCheckedChange: (optimal) => {
-                  onUpdate({ optimal });
-                  track('video_results_optimal_toggled', { enabled: optimal });
-                },
-              },
-              {
-                id: 'video-results-labels',
-                label: s.labels,
-                checked: labels,
-                onCheckedChange: (enabled) => {
-                  onLabelsChange(enabled);
-                  track('video_results_labels_toggled', { enabled });
-                },
-              },
-              ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
-                ? [
-                    {
-                      id: 'video-results-lossy',
-                      label: s.lossy,
-                      checked: state.lossy,
-                      infoTooltip: s.lossyHelp,
-                      onCheckedChange: (lossy: boolean) => {
-                        onUpdate({ lossy });
-                        track('video_results_lossy_toggled', { enabled: lossy });
-                      },
-                    },
-                  ]
-                : []),
-            ]}
-            keyIndicators={
-              engines.length > 1 ||
-              lossySeries.length > 0 ||
-              state.unofficialRun ||
-              unmatched.length > 0 ? (
-                <>
-                  {unmatched.length > 0 && (
-                    <p
-                      className="mt-3 text-xs text-muted-foreground"
-                      data-testid="results-no-matched-run-note"
-                    >
-                      {`${unmatched.map(hardwareLabel).join(', ')} · ${s.noMatchedRunHelp}`}
-                    </p>
-                  )}
-                  {engines.length > 1 && (
-                    <ul
-                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                      aria-label={s.engines}
-                      data-testid="results-engine-key"
-                    >
-                      {engines.map((engine) => (
-                        <li
-                          key={engine ?? 'na'}
-                          className="flex items-center gap-2"
-                          data-engine={engine ?? 'na'}
-                        >
-                          <SeriesSwatch shape={engineShape(engine)} dashed={false} />
-                          {engine === null ? s.engineNotRecorded : engineLabel(engine)}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {lossySeries.length > 0 && (
-                    <ul
-                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                      aria-label={s.lossySeries}
-                      data-testid="results-lossy-key"
-                    >
-                      {lossySeries.map((item) => (
-                        <li
-                          key={item.key}
-                          className="flex items-center gap-2"
-                          data-series={item.key}
-                          style={{
-                            color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
-                          }}
-                        >
-                          <SeriesSwatch
-                            shape={byEngine ? engineShape(item.engine) : 'circle'}
-                            dashed
-                          />
-                          <span className="text-muted-foreground">
-                            {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {lossySeries.length > 0 && lossyNote}
-                  {state.unofficialRun && (
-                    <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span
-                        className="inline-block size-3 shrink-0 rounded-full"
-                        style={{ background: overlayRunColor(0) }}
-                      />
-                      {s.unofficial} #{state.unofficialRun}
-                    </p>
-                  )}
-                </>
-              ) : undefined
-            }
-          />
-        </div>
-      }
+      anchor={sheetAnchor}
+      onOutside={openAt}
+      onOpen={onOpen}
+      onClose={closeSheet}
     />
+  );
+
+  return (
+    <>
+      {sheet}
+      <D3Chart<PlotPoint>
+        ref={chart}
+        chartId={VIDEO_RESULTS_CHART_ID}
+        testId="video-results-chart"
+        data={plotted}
+        height={440}
+        // The x title centres on the plot, so a wide left margin pushes the zh title past the
+        // right edge at 320 px in DM Sans.
+        margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
+        watermark="logo"
+        transitionDuration={transition}
+        xScale={xScale}
+        yScale={yScale}
+        xAxis={
+          x.scale === 'log'
+            ? {
+                label: xLabel,
+                tickValues: (scale) => {
+                  const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
+                  return [...new Set(plotted.map((point) => point.x))]
+                    .filter((value) => value >= lo && value <= hi)
+                    .toSorted((a, b) => a - b);
+                },
+                tickFormat: (value) => n(Number(value), x.digits),
+              }
+            : { label: xLabel, tickCount: 6 }
+        }
+        yAxis={{ label: yLabel, tickCount: 6 }}
+        layers={layers}
+        tooltip={tooltip}
+        onRender={onRender}
+        onExportRender={onExportRender}
+        zoom={{
+          enabled: true,
+          axes: 'both',
+          scaleExtent: [1, 20],
+          resetEventName: `video_results_zoom_reset_${VIDEO_RESULTS_CHART_ID}`,
+        }}
+        instructions={s.controls}
+        noDataOverlay={
+          plotted.length === 0 ? (
+            loading ? (
+              <Skeleton
+                data-testid="video-results-chart-skeleton"
+                className="pointer-events-none absolute inset-0"
+              />
+            ) : (
+              <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
+                {s.noData}
+              </EmptyState>
+            )
+          ) : undefined
+        }
+        caption={heading}
+        footer={
+          single || footer ? (
+            <>
+              {single && (
+                <p
+                  className="mb-3 text-xs text-muted-foreground"
+                  data-testid="video-results-single-note"
+                >
+                  {s.singleDeployment}
+                </p>
+              )}
+              {footer}
+            </>
+          ) : undefined
+        }
+        // An 18rem sidebar keeps a pinned point's details readable; it is sized before
+        // the pin so pinning never reflows the plot.
+        legendElement={
+          <div className="flex min-h-0 flex-1 flex-col lg:min-w-72">
+            <ChartLegend
+              variant="sidebar"
+              legendItems={legendItems}
+              onItemRemove={toggle}
+              isLegendExpanded={legendExpanded}
+              onExpandedChange={(expanded) => {
+                onLegendExpandedChange(expanded);
+                track('video_results_legend_expanded', { enabled: expanded });
+              }}
+              reset={{
+                id: 'video-results-legend-reset',
+                disabled: state.hidden.length === 0,
+                onClick: () => {
+                  onUpdate({ hidden: [] });
+                  track('video_results_legend_reset');
+                },
+              }}
+              switches={[
+                {
+                  id: 'video-results-optimal',
+                  label: s.optimal,
+                  checked: state.optimal,
+                  infoTooltip: s.optimalHelp,
+                  onCheckedChange: (optimal) => {
+                    onUpdate({ optimal });
+                    track('video_results_optimal_toggled', { enabled: optimal });
+                  },
+                },
+                {
+                  id: 'video-results-labels',
+                  label: s.labels,
+                  checked: labels,
+                  onCheckedChange: (enabled) => {
+                    onLabelsChange(enabled);
+                    track('video_results_labels_toggled', { enabled });
+                  },
+                },
+                ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
+                  ? [
+                      {
+                        id: 'video-results-lossy',
+                        label: s.lossy,
+                        checked: state.lossy,
+                        infoTooltip: s.lossyHelp,
+                        onCheckedChange: (lossy: boolean) => {
+                          onUpdate({ lossy });
+                          track('video_results_lossy_toggled', { enabled: lossy });
+                        },
+                      },
+                    ]
+                  : []),
+              ]}
+              keyIndicators={
+                engines.length > 1 ||
+                lossySeries.length > 0 ||
+                state.unofficialRun ||
+                unmatched.length > 0 ? (
+                  <>
+                    {unmatched.length > 0 && (
+                      <p
+                        className="mt-3 text-xs text-muted-foreground"
+                        data-testid="results-no-matched-run-note"
+                      >
+                        {`${unmatched.map(hardwareLabel).join(', ')} · ${s.noMatchedRunHelp}`}
+                      </p>
+                    )}
+                    {engines.length > 1 && (
+                      <ul
+                        className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                        aria-label={s.engines}
+                        data-testid="results-engine-key"
+                      >
+                        {engines.map((engine) => (
+                          <li
+                            key={engine ?? 'na'}
+                            className="flex items-center gap-2"
+                            data-engine={engine ?? 'na'}
+                          >
+                            <SeriesSwatch shape={engineShape(engine)} dashed={false} />
+                            {engine === null ? s.engineNotRecorded : engineLabel(engine)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {lossySeries.length > 0 && (
+                      <ul
+                        className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                        aria-label={s.lossySeries}
+                        data-testid="results-lossy-key"
+                      >
+                        {lossySeries.map((item) => (
+                          <li
+                            key={item.key}
+                            className="flex items-center gap-2"
+                            data-series={item.key}
+                            style={{
+                              color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
+                            }}
+                          >
+                            <SeriesSwatch
+                              shape={byEngine ? engineShape(item.engine) : 'circle'}
+                              dashed
+                            />
+                            <span className="text-muted-foreground">
+                              {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {lossySeries.length > 0 && lossyNote}
+                    {state.unofficialRun && (
+                      <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                          className="inline-block size-3 shrink-0 rounded-full"
+                          style={{ background: overlayRunColor(0) }}
+                        />
+                        {s.unofficial} #{state.unofficialRun}
+                      </p>
+                    )}
+                  </>
+                ) : undefined
+              }
+            />
+          </div>
+        }
+      />
+    </>
   );
 }

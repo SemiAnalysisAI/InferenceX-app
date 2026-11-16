@@ -104,7 +104,7 @@ const STRINGS = {
     advanced: 'Advanced',
     title: 'VideoGenX',
     description: (touch: boolean) =>
-      `Serving latency, cost and energy for one matched 20-clip video workload across hardware. ${touch ? 'Tap' : 'Click'} a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.`,
+      `Serving latency, cost and energy for one matched 20-clip video workload across hardware. ${touch ? 'Tap a point to see its clip and measurements' : 'Click a point to pin its measurements and play its clips below'}; hollow points have no clips. View telemetry opens that deployment.`,
     benchmarkConfig: 'Benchmark config',
     model: 'Model',
     chartConfig: 'Chart config',
@@ -181,7 +181,7 @@ const STRINGS = {
     advanced: '高级选项',
     title: 'VideoGenX',
     description: (touch: boolean) =>
-      `在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。${touch ? '轻点' : '点击'}数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。${touch ? '轻点' : '点击'}“查看遥测”可打开对应部署。`,
+      `在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。${touch ? '轻点数据点可查看其视频和测量值' : '点击数据点可固定显示其测量值，并在下方播放其视频'}；空心点没有视频。${touch ? '轻点' : '点击'}“查看遥测”可打开对应部署。`,
     benchmarkConfig: '基准测试配置',
     model: '模型',
     chartConfig: '图表配置',
@@ -344,11 +344,7 @@ export default function VideoDashboard({
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
-        previous.playing === pair.playing &&
-        previous.baseline === pair.baseline &&
-        JSON.stringify(previous.posters) === JSON.stringify(pair.posters)
-          ? previous
-          : pair,
+        JSON.stringify(previous) === JSON.stringify(pair) ? previous : pair,
       ),
     [],
   );

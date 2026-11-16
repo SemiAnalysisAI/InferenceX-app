@@ -141,10 +141,10 @@ const FRAME = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w
 /**
  * Adds 1-, 2- and 8-GPU points to the B200 run, drawn and playable but neither its lead nor where
  * the stage opens: 1 and 2 GPUs are slower but more efficient, 8 GPUs is the fastest, costliest
- * end. Serves the run's published clips with first frames as `@b200`. Returns the
- * read's URL.
+ * end. Serves the run's published clips with first frames as `@b200`, and with `media` as every
+ * clip's file when a test plays one. Returns the read's URL.
  */
-const b200Frontier = (page: VideoHistoryPage, delay = 0, frame = FRAME) => {
+const b200Frontier = (page: VideoHistoryPage, delay = 0, frame = FRAME, media?: string) => {
   for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
   const source = page.entries.find((entry) => entry.runId === B200_RUN)!.sources[0];
   const lead = source.observations.find((observation) => observation.concurrency === 1)!;
@@ -162,7 +162,7 @@ const b200Frontier = (page: VideoHistoryPage, delay = 0, frame = FRAME) => {
   ]);
   saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
     path,
-    { ...asset, posterUrl: frame },
+    { ...asset, posterUrl: frame, ...(media ? { url: media } : {}) },
   ]);
   const read = `/api/video-runs?run=${B200_RUN}&artifact=${point.artifactId}&format=published`;
   cy.intercept('GET', read, (request) => request.reply({ body: saved, delay })).as('b200');
@@ -244,6 +244,32 @@ const engines = () =>
   hardwarePoints('b200').then(($groups) => [
     ...new Set([...$groups].map((group) => group.dataset.engine)),
   ]);
+
+const sheet = () => cy.get('[data-testid="video-point-sheet"]');
+/** Where a chart point's mark is drawn, in viewport coordinates. */
+const centreOf = (group: Element) => {
+  const box = group.querySelector('.visible-shape')!.getBoundingClientRect();
+  return {
+    hardware: (group as HTMLElement).dataset.hardware!,
+    x: box.left + box.width / 2,
+    y: box.top + box.height / 2,
+  };
+};
+const centres = () => points().then(($groups) => [...$groups].map(centreOf));
+/** A finger's tap on the chart at viewport coordinates, which a touch screen reports as a click. */
+const tapChart = (x: number, y: number) =>
+  cy.get('[data-testid="d3-chart-svg"]').then(($svg) => {
+    const box = $svg[0].getBoundingClientRect();
+    cy.wrap($svg).trigger('click', x - box.left, y - box.top, {
+      clientX: x,
+      clientY: y,
+      force: true,
+    });
+  });
+const tapPoint = ($group: JQuery<HTMLElement>) => {
+  const { x, y } = centreOf($group[0]);
+  tapChart(x, y);
+};
 
 /** The viewport y of an element's top edge. */
 const topOf = (selector: string) =>
@@ -1127,22 +1153,15 @@ describe('VideoGenX results', () => {
     ]);
   });
 
-  it('pins the point nearest a tap that misses it on a touch screen', () => {
+  it('opens the point nearest a tap in a sheet on a touch screen, and closes it four ways', () => {
     coarsePointer();
+    cy.viewport(390, 844);
     mount({});
     points().should('have.length.at.least', 2);
-    points().then(($groups) => {
-      const centres = [...$groups].map((group) => {
-        const box = group.querySelector('.visible-shape')!.getBoundingClientRect();
-        return {
-          hardware: (group as HTMLElement).dataset.hardware!,
-          x: box.left + box.width / 2,
-          y: box.top + box.height / 2,
-        };
-      });
+    centres().then((all) => {
       // 16 px from a point's centre is outside its 12 px hit circle and inside a finger's reach;
       // the tap must be nearer to that point than to any other by more than the 8 px tie.
-      const taps = centres.flatMap((centre) =>
+      const taps = all.flatMap((centre) =>
         [
           [16, 0],
           [-16, 0],
@@ -1151,30 +1170,275 @@ describe('VideoGenX results', () => {
         ].map(([dx, dy]) => ({ centre, x: centre.x + dx, y: centre.y + dy })),
       );
       const tap = taps.find((candidate) =>
-        centres.every(
+        all.every(
           (other) =>
             other === candidate.centre ||
             Math.hypot(other.x - candidate.x, other.y - candidate.y) > 16 + 8 + 1,
         ),
       )!;
       expect(tap, 'a point with room beside it').to.not.equal(undefined);
-      const svg = ($groups[0] as unknown as SVGGElement).ownerSVGElement!;
-      const box = svg.getBoundingClientRect();
-      cy.wrap(svg).trigger('click', tap.x - box.left, tap.y - box.top, {
-        clientX: tap.x,
-        clientY: tap.y,
+      tapChart(tap.x, tap.y);
+      sheet()
+        .should('have.attr', 'role', 'dialog')
+        .and('have.attr', 'aria-modal', 'true')
+        .and('contain', tap.centre.hardware.toUpperCase());
+    });
+    // The sheet stands in for the panel a mouse pins, rings its point and takes the focus.
+    cy.get('[data-testid="point-details-panel"]').should('not.exist');
+    cy.get('[data-testid="video-results-chart"] .point-sheet-ring').should('have.length', 1);
+    cy.focused().should('have.attr', 'data-testid', 'video-point-sheet');
+    searchParam('r_sheet').should('be.a', 'string');
+    sheet().find('[data-testid="video-point-sheet-metrics"] dt').should('have.length', 4);
+    sheet()
+      .find('[data-testid="video-point-sheet-close"], [data-action]')
+      .should('have.length.at.least', 6)
+      .each(($control) => expect($control[0].getBoundingClientRect().height).to.be.at.least(44));
+    // Setup, latency, power, cost and the three source links follow the first screen.
+    sheet()
+      .find('[data-testid="video-point-sheet-more"]')
+      .should('contain', 'Concurrency')
+      .and('contain', 'Power')
+      .find('a[data-action]')
+      .should('have.length', 3);
+    assertResultsFit();
+
+    const closedBy = (way: string) => {
+      cy.get('body').should(($body) =>
+        expect($body.find('[data-testid="video-point-sheet"]').length, `closed by ${way}`).to.equal(
+          0,
+        ),
+      );
+      searchParam('r_sheet').should('equal', null);
+      cy.get('[data-testid="video-results-chart"] .point-sheet-ring').should('not.exist');
+    };
+    const reopen = () => {
+      hardwarePoints('b200').first().then(tapPoint);
+      sheet().should('contain', 'B200');
+    };
+    cy.get('[data-testid="video-point-sheet-close"]').click();
+    closedBy('the close button');
+    reopen();
+    cy.get('body').type('{esc}');
+    closedBy('Escape');
+    reopen();
+    // A tap beside the sheet that lands on no point closes it.
+    cy.get('[data-testid="video-point-sheet-backdrop"]').click(4, 4);
+    closedBy('a tap outside');
+    reopen();
+    // The release follows the last move at once, as a flick does.
+    cy.get('[data-testid="video-point-sheet-header"]')
+      .trigger('pointerdown', 60, 20, {
+        pointerId: 1,
+        eventConstructor: 'PointerEvent',
+        force: true,
+      })
+      .trigger('pointermove', 60, 120, {
+        pointerId: 1,
+        eventConstructor: 'PointerEvent',
+        force: true,
+      })
+      .trigger('pointerup', 60, 120, {
+        pointerId: 1,
+        eventConstructor: 'PointerEvent',
         force: true,
       });
-      cy.get('[data-testid="point-details-panel"]').should(
-        'contain',
-        tap.centre.hardware.toUpperCase(),
-      );
-    });
+    closedBy('a swipe down');
     // The blocked legend row's tooltip never shows on touch, so the legend spells it out.
     cy.get('[data-testid="results-no-matched-run-note"]').should(
       'contain',
       'No qualifying run for this workload on this hardware.',
     );
+  });
+
+  it('plays a point’s clip inside its sheet, and compares, shares and opens telemetry from it', () => {
+    coarsePointer();
+    cy.viewport(390, 844);
+    cy.fixture('video-results/candidate.mp4', 'base64').then((encoded: string) => {
+      cy.window().then((win) => {
+        const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+        const media = win.URL.createObjectURL(new win.Blob([bytes], { type: 'video/mp4' }));
+        mount({
+          edit: (observation) => {
+            observation.results = evidence(observation);
+          },
+          editPage: (page) => {
+            b200Frontier(page, 0, FRAME, media);
+          },
+        });
+      });
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    offStage('b200').first().then(tapPoint);
+    sheet().should('contain', 'B200').and('contain', 'seed');
+    // The first frame shows without a byte of video; the play button reads the clip.
+    cy.get('[data-testid="video-point-sheet-video"]')
+      .should('have.attr', 'poster', FRAME)
+      .and('have.attr', 'preload', 'none')
+      .and('have.prop', 'muted', true)
+      .and('have.prop', 'playsInline', true)
+      .and('have.prop', 'paused', true)
+      .and('have.prop', 'readyState', 0);
+    cy.get('[data-testid="video-point-sheet-play"]').click();
+    cy.get('[data-testid="video-point-sheet-play"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="video-point-sheet-video"]')
+      .should('have.prop', 'paused', false)
+      .and(($video) => expect($video.prop('readyState'), 'clip read').to.be.greaterThan(0));
+    cy.get('[data-testid="video-point-sheet-play"]').click();
+    cy.get('[data-testid="video-point-sheet-video"]').should('have.prop', 'paused', true);
+
+    // A tap on another point beside the open sheet moves the sheet there.
+    hardwarePoints('h200')
+      .first()
+      .then(($group) => {
+        const { x, y } = centreOf($group[0]);
+        cy.get('[data-testid="video-point-sheet-backdrop"]').trigger('click', {
+          clientX: x,
+          clientY: y,
+          force: true,
+        });
+      });
+    sheet().should('contain', 'H200');
+    cy.focused().should('have.attr', 'data-testid', 'video-point-sheet');
+
+    // Share hands the link to the system sheet where the browser has one.
+    cy.window().then((win) => {
+      Object.defineProperty(win.navigator, 'share', {
+        configurable: true,
+        value: cy.stub().as('share').resolves(),
+      });
+    });
+    sheet().find('[data-action="share"]').click();
+    cy.get('@share').should('have.been.calledOnce');
+    cy.get('@share').its('firstCall.args.0.url').should('be.a', 'string');
+    // The open point is in the address, which is what a shared link carries.
+    searchParam('r_sheet').then((key) => {
+      expect(key, 'open point').to.be.a('string');
+      cy.get('[data-testid="video-point-sheet-close"]').click();
+      sheet().should('not.exist');
+      cy.window().then((win) => {
+        const params = new URLSearchParams(win.location.search);
+        params.set('r_sheet', key!);
+        win.history.replaceState(null, '', `${win.location.pathname}?${params}`);
+        win.dispatchEvent(new PopStateEvent('popstate'));
+      });
+    });
+    sheet().should('contain', 'H200');
+
+    // Compare plays the point as the first clip, closes the sheet and brings the stage into view.
+    sheet().find('[data-action="compare"]').click();
+    sheet().should('not.exist');
+    searchParam('r_sheet').should('equal', null);
+    playing().should('have.attr', 'data-hardware', 'h200');
+    stagePill('a').should('contain', 'H200');
+    stageInView();
+
+    hardwarePoints('h200').first().then(tapPoint);
+    sheet().find('[data-action="view-telemetry"]').click();
+    sheet().should('not.exist');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+  });
+
+  it('gives a point without clips and a named run’s point the same sheet, one tap apart', () => {
+    const namedRun = '90000000004';
+    coarsePointer();
+    cy.viewport(390, 844);
+    mount({
+      search: `?unofficialrun=${namedRun}&r_y=videosPerGpuHour`,
+      editPage: (page) => {
+        const named = structuredClone(page.entries.find((entry) => entry.runId === B200_RUN)!);
+        named.runId = namedRun;
+        named.artifact.id = 99994;
+        named.approved = false;
+        page.entries.unshift(named);
+        // Stored runs may have clips; H100's runs stand in for a live run without media.
+        for (const entry of page.entries)
+          if (!['34336635063', '34344378350'].includes(entry.runId))
+            entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
+    hardwarePoints('h100').should('have.attr', 'data-clips', 'false');
+    hardwarePoints('h100').first().then(tapPoint);
+    sheet().should('contain', 'H100');
+    cy.get('[data-testid="video-point-sheet-empty"]').should(
+      'contain',
+      'Only filled points have clips',
+    );
+    sheet().find('video, [data-action="compare"]').should('not.exist');
+    sheet().find('[data-testid="video-point-sheet-metrics"] dt').should('have.length', 4);
+    sheet().find('[data-action="share"], [data-action="view-telemetry"]').should('have.length', 2);
+    cy.get('body').type('{esc}');
+
+    // The named run re-exports the official B200 cell, so the two plot on one spot: a tap opens
+    // one of them and the next tap on that spot steps to the other.
+    const marker = `#${namedRun}`;
+    const tapNamed = () =>
+      points('[data-hardware="b200"][data-overlay="true"]').first().then(tapPoint);
+    tapNamed();
+    sheet()
+      .should('contain', 'B200')
+      .invoke('text')
+      .then((first) => {
+        tapNamed();
+        sheet().should(($sheet) =>
+          expect($sheet.text().includes(marker), 'the other point').to.equal(
+            !first.includes(marker),
+          ),
+        );
+        if (first.includes(marker)) tapNamed();
+      });
+    sheet().should('contain', marker);
+    sheet().find('[data-action="compare"]').click();
+    playing().should('have.attr', 'data-overlay', 'true');
+    stagePill('a').should('contain', 'Unofficial run');
+  });
+
+  it('steps between two GPUs one tap covers, with the sheet in Chinese', () => {
+    coarsePointer();
+    cy.viewport(390, 844);
+    mount({ pathname: '/zh/vgx', editPage: publishEveryRun });
+    // On screen, as a finger finds it: closing the sheet then leaves the chart where it was.
+    cy.get('[data-testid="d3-chart-svg"]').scrollIntoView();
+    centres().then((all) => {
+      // The two points of different hardware that plot closest together.
+      const pairs = all.flatMap((first, index) =>
+        all
+          .slice(index + 1)
+          .filter((second) => second.hardware !== first.hardware)
+          .map((second) => ({
+            first,
+            second,
+            gap: Math.hypot(first.x - second.x, first.y - second.y),
+          })),
+      );
+      const pair = pairs.reduce((closest, item) => (item.gap < closest.gap ? item : closest));
+      // Both are within a finger of the midpoint and neither is nearer by more than the tie.
+      expect(pair.gap, 'two points within one finger').to.be.lessThan(40);
+      const x = (pair.first.x + pair.second.x) / 2;
+      const y = (pair.first.y + pair.second.y) / 2;
+      const names = [pair.first.hardware.toUpperCase(), pair.second.hardware.toUpperCase()];
+      tapChart(x, y);
+      sheet()
+        .find('[id]')
+        .first()
+        .invoke('text')
+        .then((opened) => {
+          expect(names).to.include(opened);
+          cy.get('[data-testid="video-point-sheet-close"]')
+            .should('have.attr', 'aria-label', '关闭数据点详情')
+            .click();
+          tapChart(x, y);
+          sheet()
+            .find('[id]')
+            .first()
+            .should(
+              'have.text',
+              names.find((name) => name !== opened),
+            );
+        });
+    });
+    sheet().find('[data-action="compare"]').should('have.text', '对比');
+    sheet().find('[data-action="share"]').should('contain', '分享');
+    sheet().find('[data-action="view-telemetry"]').should('contain', '查看遥测');
   });
 
   it('pairs an unofficial run with the official cell of the same deployment', () => {
