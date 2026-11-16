@@ -937,11 +937,16 @@ export default function VideoClipStage({
         )}
       </div>
       {caption}
-      <div className="flex flex-wrap items-center gap-3">
+      {/*
+        Under 768 px the row keeps one shape whatever plays: the button is as wide as its longer
+        label, and the time and the buffering note share one slot as wide as the longer of them.
+      */}
+      <div className="flex flex-wrap items-center gap-3 max-md:gap-2">
         <Button
           data-testid="video-results-play"
           variant="outline"
           size="sm"
+          className="max-md:min-w-16"
           disabled={playable.length === 0}
           aria-pressed={active}
           onClick={togglePlay}
@@ -957,7 +962,7 @@ export default function VideoClipStage({
           value={Math.min(time, duration || 1)}
           disabled={duration === 0}
           aria-label={s.scrub}
-          className="h-11 min-w-0 flex-1 basis-28 accent-primary md:h-8"
+          className="h-11 min-w-0 flex-1 basis-28 accent-primary max-md:basis-12 md:h-8"
           onInput={(event) => {
             const next = Number(event.currentTarget.value);
             setDifferenceFailed(false);
@@ -965,13 +970,18 @@ export default function VideoClipStage({
             track('video_results_clips_scrub', { seconds: next });
           }}
         />
-        <span className="font-mono text-xs text-muted-foreground">
+        <span
+          className={cn(
+            'font-mono text-xs text-muted-foreground max-md:min-w-[14ch]',
+            progress && 'max-md:hidden',
+          )}
+        >
           {time.toFixed(2)} / {duration > 0 ? duration.toFixed(2) : '—'} {s.seconds}
         </span>
         {progress && (
           <span
             data-testid="video-results-buffering"
-            className="font-mono text-xs text-muted-foreground"
+            className="font-mono text-xs text-muted-foreground max-md:min-w-[14ch]"
           >
             {progress(Math.round(buffered * 100))}
           </span>
