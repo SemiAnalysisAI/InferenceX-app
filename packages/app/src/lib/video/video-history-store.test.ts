@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // The power trace left the entries; they keep its valid sample count.
-      sources: 'f0e8fff70b2dc077964ac624744c2ac08b37062bf5bf9a94fd0a7b65f8bbb3f7',
+      // Re-pinned after the dashboard route registry gained share params; entries are unchanged.
+      sources: '90ee3a3f5f81b979ab9cfcf223fa06d552ba815c06c9292c04b8974635a457fe',
     });
   });
 });

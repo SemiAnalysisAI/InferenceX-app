@@ -221,7 +221,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: '38f35ad252e31f25db44060c2792384be6dbcb1dac69d217d857486a7ca3732a',
+    sourceSha256: 'f66f930fdbe5df99b73463f7875eaa6a6c405f9750d45e1e0377c9c67d4fe526',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -1887,7 +1887,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'fc182b89629b0b0dce6df319ab8ddcfad3325dd0d0ee98c1f68913712910133a',
+    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

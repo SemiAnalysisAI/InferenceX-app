@@ -58,6 +58,8 @@ import {
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
 import { slices } from '../compare/slices';
+import { shareBin, shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
+import { HARDWARE_PARAM, parsePickedHardware, setPickedHardware } from '../compare/url-selection';
 import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
@@ -174,6 +176,9 @@ function setParam(key: string, value: string) {
   params.set(key, value);
   replaceClientSearch(params);
 }
+
+const setPrecision = (value: ComputePrecision) => setParam('modelPrecision', value);
+const setBin = (value: number) => setParam('modelBin', String(value));
 
 /** A module name with line breaks allowed after `_`, `.` and `+`, never mid-word. */
 function breakable(label: string): ReactNode[] {
@@ -1083,11 +1088,13 @@ export function ModelView({
   const requested = search.get('model') ?? DEFAULT_OPERATORX_MODEL;
   const requestedSplit = search.get('parallel');
   const isDark = isDarkTheme(useTheme().resolvedTheme);
-  const [picked, setPicked] = useState<string[] | null>(null);
-  const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
+  // GPU picks live in the address bar so share links reproduce them.
+  const pickedParam = search.get(HARDWARE_PARAM);
+  const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
+  const pickedPrecision = sharePrecision(search.get('modelPrecision'));
   const [open, setOpen] = useState<SlotData | null>(null);
-  const [pickedBin, setBin] = useState<number | null>(null);
-  const [sweep, setSweep] = useState(false);
+  const pickedBin = shareBin(search.get('modelBin'));
+  const sweep = shareBoolean(search.get('modelSweep'), false);
 
   // Device splits any of the model's ops has cases at; one device by default.
   const splits = useMemo(() => {
@@ -1167,14 +1174,15 @@ export function ModelView({
   const toggle = useCallback(
     (hw: string, placement: 'diagram' | 'chart') => {
       track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement });
-      setPicked(toggleHardwareSelection(hardware, hw));
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPickedHardware(next);
     },
     [hardware],
   );
   const models = useMemo(() => {
     const reset = () => {
       track('operatorx_legend_filter_reset', { op: 'model' });
-      setPicked(null);
+      setPickedHardware(null);
     };
     const build = (view: ComparisonView | undefined) =>
       view
@@ -1254,7 +1262,7 @@ export function ModelView({
   const toggleSweep = useCallback(
     (enabled: boolean) => {
       track('operatorx_model_sweep_toggled', { model: requested, enabled });
-      setSweep(enabled);
+      setParam('modelSweep', String(enabled));
     },
     [requested],
   );

@@ -350,6 +350,44 @@ describe('writeUrlParams + buildShareUrl', () => {
     },
   );
 
+  it.each(['/opx', '/zh/opx/moe', '/opx/model'])(
+    'carries the OperatorX selections in the address bar into share links from %s',
+    async (pathname) => {
+      setupWindow(
+        '?workload=dsv4&parallel=tp8&metric=time&model=DeepSeek-V4-Pro&hardware=b300,mi355x&baseline=b300&modelPrecision=fp8&modelBin=12&modelSweep=true&scatterPrecision=bf16&scatterNormalized=false&scatterLog=true&summaryPrecision=fp4&summaryNormalized=true&summarySharedOnly=false&unrelated=1',
+        pathname,
+      );
+      const { buildShareUrl } = await import('@/lib/routing/url-state');
+      const url = new URL(buildShareUrl());
+      expect(url.pathname).toBe(pathname);
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        workload: 'dsv4',
+        parallel: 'tp8',
+        metric: 'time',
+        model: 'DeepSeek-V4-Pro',
+        hardware: 'b300,mi355x',
+        baseline: 'b300',
+        modelPrecision: 'fp8',
+        modelBin: '12',
+        modelSweep: 'true',
+        scatterPrecision: 'bf16',
+        scatterNormalized: 'false',
+        scatterLog: 'true',
+        summaryPrecision: 'fp4',
+        summaryNormalized: 'true',
+        summarySharedOnly: 'false',
+      });
+    },
+  );
+
+  it('does not copy OperatorX params into share links on other tabs', async () => {
+    setupWindow('?workload=dsv4&hardware=b300', '/infx/inference');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    const params = new URL(buildShareUrl()).searchParams;
+    expect(params.has('workload')).toBe(false);
+    expect(params.has('hardware')).toBe(false);
+  });
+
   it('does not add the inference navigation default to other tabs', async () => {
     setupWindow('', '/infx/historical');
     const { buildShareUrl } = await import('@/lib/routing/url-state');

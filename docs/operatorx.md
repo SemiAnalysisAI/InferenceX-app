@@ -548,3 +548,37 @@ focus, then retain their controls. Without IntersectionObserver all charts rende
 Links to `/opx` and its categories, including the category switcher, prefetch the
 route and warm its comparison or model-view queries on intent (`prefetchRouteData`).
 API selectors, results, and click analytics are unaffected.
+
+### Share-link control coverage
+
+OperatorX share links keep the category path (including `/zh`) and `workload`,
+`parallel`, `metric`, `model`, `hardware`, and `baseline`. Changing the workload drops
+`hardware` and `baseline`. Chart controls use separate URL keys, so the summary and
+scatter charts never overwrite each other. Scatter keys use the `scatter` prefix so they
+never collide with the compare API's `roofline*` summary selectors.
+
+| Control                           | URL key                                                      | Read-only API coverage                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| GPU picks                         | `hardware=a,b`                                               | `/api/v1/views/operatorx?hardware=`                                                                                     |
+| Model precision                   | `modelPrecision=fp4\|fp8\|bf16`                              | `/api/v1/views/operatorx?precision=` (filters `compute_precision`)                                                      |
+| Model token size                  | `modelBin=<integer>`                                         | `/api/v1/views/operatorx?bin=`, the same `sizeBin` half-octave function (`round(log2(x) * 2)`)                          |
+| Model all sizes                   | `modelSweep=true\|false`                                     | Omit `bin`                                                                                                              |
+| Summary precision / norm / cohort | `summaryPrecision`, `summaryNormalized`, `summarySharedOnly` | Compare API `rooflinePrecision`, `rooflineNormalized`, `rooflineSharedOnly`, with the GPU picks as `rooflineHardware`   |
+| Scatter precision / norm          | `scatterPrecision`, `scatterNormalized`                      | View API `precision=` returns the plotted cases; normalization divides by the hardware peaks in the comparison response |
+| Scatter log scale, baseline       | `scatterLog`, `baseline`                                     | Presentation only; returned rows do not change                                                                          |
+
+Unknown or malformed URL values fall back to the existing defaults in the UI; the APIs
+reject them with 400. Legend expansion, open dialogs and diagram folds are
+presentation-only and are not persisted.
+
+中文：OperatorX 分享链接保留类别路径（包括 `/zh`）以及 `workload`、`parallel`、`metric`、
+`model`、`hardware` 和 `baseline`；切换工作负载时会清除 `hardware` 和 `baseline`。
+图表控件使用各自独立的 URL 参数，汇总柱状图与散点图互不覆盖；散点图参数统一以
+`scatter` 为前缀，避免与对比 API 的 `roofline*` 汇总参数重名。模型视图的
+`modelPrecision` 和 `modelBin` 分别对应只读 API `/api/v1/views/operatorx` 的 `precision`
+和 `bin`（与 UI 共用 `sizeBin`，即 `round(log2(x) * 2)`）；`modelSweep=true` 对应不传 `bin`。
+汇总图的 `summaryPrecision`、`summaryNormalized`、`summarySharedOnly` 对应对比 API 的
+`rooflinePrecision`、`rooflineNormalized`、`rooflineSharedOnly`，GPU 选择对应
+`rooflineHardware`。`scatterLog` 和 `baseline` 仅影响展示，不改变返回的数据行。
+UI 遇到无效值时沿用默认设置，API 则返回 400。图例展开、详情弹窗和模型结构折叠仅影响展示，
+不写入分享链接。

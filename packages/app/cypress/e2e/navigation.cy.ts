@@ -397,7 +397,10 @@ describe('H3 video performance history', () => {
     cy.get('[data-testid="video-history-observation"]')
       .should('have.length', 1)
       .and('contain', 'C2')
-      .and('contain', '240 / —');
+      .find('td')
+      .eq(2)
+      .should('contain', '240')
+      .and('not.contain', ' / ');
     cy.location('search').should((search) => {
       const params = new URLSearchParams(search);
       expect(params.get('history-concurrency')).to.equal('2');

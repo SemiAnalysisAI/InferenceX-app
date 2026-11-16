@@ -22,7 +22,25 @@ interface DashboardRouteDefinition {
   readonly localeMirrored: boolean;
   readonly providers: DashboardProviderCapabilities;
   readonly shareParamScopes: readonly DashboardShareParamScope[];
+  /** Unprefixed params the page keeps in the address bar itself; share links copy them as-is. */
+  readonly shareLiveParams?: readonly string[];
 }
+
+/**
+ * OperatorX controls kept in the address bar. The scatter and summary charts use
+ * separate prefixes, distinct from the compare API's `roofline*` projection selectors.
+ */
+export const OPERATORX_SHARE_CONTROLS = [
+  'modelPrecision',
+  'modelBin',
+  'modelSweep',
+  'scatterPrecision',
+  'scatterNormalized',
+  'scatterLog',
+  'summaryPrecision',
+  'summaryNormalized',
+  'summarySharedOnly',
+] as const;
 
 const FILTERED_DASHBOARD_PROVIDERS = {
   globalFilters: true,
@@ -229,6 +247,15 @@ export const DASHBOARD_ROUTES = [
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
+    shareLiveParams: [
+      'workload',
+      'parallel',
+      'metric',
+      'model',
+      'hardware',
+      'baseline',
+      ...OPERATORX_SHARE_CONTROLS,
+    ],
   },
 
   {
@@ -307,6 +334,11 @@ export function getDashboardRoute<K extends DashboardRouteKey>(
   return DASHBOARD_ROUTES.find(
     (route): route is Extract<DashboardRoute, { key: K }> => route.key === key,
   )!;
+}
+
+/** Plain address-bar params a route's share links carry, beyond its prefixed URL state. */
+export function shareLiveParamsFor(route: DashboardRoute | undefined): readonly string[] {
+  return route && 'shareLiveParams' in route ? route.shareLiveParams : [];
 }
 
 export function dashboardRouteForPathname(pathname: string): DashboardRoute | undefined {
