@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../cypress/fixtures/api/video-history.json';
 import type { VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
@@ -6,6 +6,7 @@ import { videoPoints } from './points';
 import {
   DEFAULT_RESULTS_STATE,
   parseResultsState,
+  resultMetadata,
   resultProjection,
   resultsSearch,
   type ResultCell,
@@ -308,6 +309,23 @@ describe('VideoGenX results contract', () => {
     );
   });
 
+  it('parses a workload key once, however many points and renders read its metadata', () => {
+    const workload = JSON.parse(eligible.workloadKey!) as Record<string, unknown>;
+    const key = JSON.stringify({ ...workload, parsedOnce: true });
+    const parse = vi.spyOn(JSON, 'parse');
+    const read = [eligible, { ...eligible, id: 'another-point' }, eligible].map((point) =>
+      resultMetadata({ ...point, workloadKey: key }),
+    );
+    expect(parse.mock.calls.filter(([text]) => text === key)).toHaveLength(1);
+    parse.mockRestore();
+    expect(read[0].canonicalWorkload).toBe(true);
+    expect(read[1]).toEqual(read[0]);
+    expect(read[0]).toEqual(resultMetadata(eligible));
+    // A key that is not JSON keeps the point's own fields, on every read.
+    const old = { ...eligible, workloadKey: 'not json' };
+    expect(resultMetadata(old).canonicalWorkload).toBe(false);
+    expect(resultMetadata(old).model).toBe(eligible.model);
+  });
   it('shows each deployment as of the selected run date and run', () => {
     // Newest publication first, as the history pages deliver them.
     const rerun = run('h200:new', '300', '2026-11-03T05:00:00Z');

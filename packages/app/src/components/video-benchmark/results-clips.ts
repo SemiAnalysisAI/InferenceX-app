@@ -155,7 +155,22 @@ export interface ResultsClipGroup {
   clips: Map<string, ResultsClip>;
 }
 
+/**
+ * One side's own groups, kept for as long as the side is. A render asks for them once per chart
+ * point and once per pairing, and a read side is never changed, so they are built once per side.
+ */
+const ownGroups = new WeakMap<ResultsClipSide, ResultsClipGroup[]>();
+
 export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] {
+  if (sides.length !== 1) return buildClipGroups(sides);
+  const kept = ownGroups.get(sides[0]);
+  if (kept) return kept;
+  const built = buildClipGroups(sides);
+  ownGroups.set(sides[0], built);
+  return built;
+}
+
+function buildClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] {
   const groups = new Map<string, ResultsClipGroup>();
   for (const side of sides) {
     if (!side.generationKey) continue;

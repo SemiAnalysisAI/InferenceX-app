@@ -71,6 +71,27 @@ describe('results clip matching', () => {
     quality[0].candidate.artifact_id = 8;
     expect(publishedResultsSide(f.stored, point).quality.size).toBe(0);
   });
+  it('builds the groups of one side once, and builds a comparison of sides for each call', () => {
+    const fox = record({
+      slotId: 'measurement-r001-c002',
+      caseId: 'fox',
+      prompt: 'A fox crosses a road.',
+      mediaPath: 'artifacts/fox.mp4',
+    });
+    const b200 = side('b200', [record(), fox]);
+    const own = resultsClipGroups([b200]);
+    expect(own.map((group) => group.prompt)).toEqual([record().prompt, fox.prompt]);
+    // A render asks once per chart point and per pairing; each ask gets the groups already built.
+    expect(resultsClipGroups([b200])).toBe(own);
+    // The same clips read again are another side, with groups of its own.
+    const again = side('b200', b200.records);
+    expect(resultsClipGroups([again])).not.toBe(own);
+    expect(resultsClipGroups([again])[0].clips.get('b200')?.side).toBe(again);
+    // Two sides share groups, which the kept ones of either side never become.
+    const both = resultsClipGroups([b200, side('h200', [record()])]);
+    expect([...both[0].clips.keys()]).toEqual(['b200', 'h200']);
+    expect([...resultsClipGroups([b200])[0].clips.keys()]).toEqual(['b200']);
+  });
   it('keeps an unpublished run clip with its PSNR or unscored reason but no media or reference', () => {
     const f = referenceQualityFixture();
     const page: VideoHistoryPage = {

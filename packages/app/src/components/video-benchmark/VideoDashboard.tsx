@@ -481,7 +481,12 @@ export default function VideoDashboard({
   );
   // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
   const allCharted = useMemo(() => chartedCells(projection, state), [projection, state]);
-  const charted = allCharted.filter(shown);
+  // Held between renders: the stage below reads its points from these, and a render that changes
+  // none of them (a rest on a chart point, an opened sheet) must not make it work its pairs out again.
+  const charted = useMemo(
+    () => allCharted.filter((cell) => !hidden.has(cell.point.hardwareKey ?? '')),
+    [allCharted, hidden],
+  );
   const engines = [
     ...new Set(
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
@@ -569,13 +574,26 @@ export default function VideoDashboard({
     }),
   );
   // A lossy named run owns its clip without leading a card.
-  const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
-  const officialClipPoints = resultsClipPoints(
-    charted.filter((c) => !c.overlay),
-    { tier: state.costTier },
+  const clipPoints = useMemo(
+    () => resultsClipPoints(charted, { tier: state.costTier }),
+    [charted, state.costTier],
   );
-  const stageClipPoints = stageOpenings(projection, state, clipPoints);
-  const officialOpenings = stageOpenings(projection, state, officialClipPoints);
+  const stageClipPoints = useMemo(
+    () => stageOpenings(projection, state, clipPoints),
+    [projection, state, clipPoints],
+  );
+  const officialOpenings = useMemo(
+    () =>
+      stageOpenings(
+        projection,
+        state,
+        resultsClipPoints(
+          charted.filter((c) => !c.overlay),
+          { tier: state.costTier },
+        ),
+      ),
+    [projection, state, charted],
+  );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {

@@ -225,13 +225,30 @@ const modelSlug = (model: string) =>
     .replaceAll(/[^a-z0-9.]+/gu, '-')
     .replaceAll(/^-+|-+$/gu, '');
 
-export function resultMetadata(point: VideoPoint) {
+/**
+ * Workload keys already parsed. A key carries its whole plan, every point of a workload shares
+ * it, and a render reads the metadata of every point, so each key is parsed once.
+ */
+const parsedWorkloads = new Map<string, Json>();
+
+function workloadIdentity(key: string | null | undefined): Json {
+  if (!key) return null;
+  const kept = parsedWorkloads.get(key);
+  if (kept !== undefined) return kept;
   let identity: Json = null;
   try {
-    identity = JSON.parse(point.workloadKey ?? 'null') as Json;
+    identity = JSON.parse(key) as Json;
   } catch {
     /* Old sources have no canonical metadata. */
   }
+  // History can page through many workloads; the handful on screen is parsed again after a reset.
+  if (parsedWorkloads.size >= 256) parsedWorkloads.clear();
+  parsedWorkloads.set(key, identity);
+  return identity;
+}
+
+export function resultMetadata(point: VideoPoint) {
+  const identity = workloadIdentity(point.workloadKey);
   const plan = at(identity, 'plan');
   const generation = at(plan, 'generation');
   const width = number(at(generation, 'width')),
