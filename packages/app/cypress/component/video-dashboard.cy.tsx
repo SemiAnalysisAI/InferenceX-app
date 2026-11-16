@@ -1119,6 +1119,11 @@ describe('VideoGenX results', () => {
         tap.centre.hardware.toUpperCase(),
       );
     });
+    // The blocked legend row's tooltip never shows on touch, so the legend spells it out.
+    cy.get('[data-testid="results-no-matched-run-note"]').should(
+      'contain',
+      'No qualifying run for this workload on this hardware.',
+    );
   });
 
   it('pairs an unofficial run with the official cell of the same deployment', () => {

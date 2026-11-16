@@ -1137,6 +1137,8 @@ export default function VideoResultsChart({
       : hardwareLabel(key);
   };
   const lossySeries = series.filter((item) => item.lossy);
+  // A blocked legend row explains itself in a tooltip, which a touch screen never shows.
+  const unmatched = touch ? roster.filter((key) => !measured.has(key)) : [];
   const legendItems: CommonLegendItemProps[] = roster
     .toSorted((a, b) => hardwareSort(a) - hardwareSort(b))
     .map((key) =>
@@ -1328,8 +1330,19 @@ export default function VideoResultsChart({
                 : []),
             ]}
             keyIndicators={
-              engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
+              engines.length > 1 ||
+              lossySeries.length > 0 ||
+              state.unofficialRun ||
+              unmatched.length > 0 ? (
                 <>
+                  {unmatched.length > 0 && (
+                    <p
+                      className="mt-3 text-xs text-muted-foreground"
+                      data-testid="results-no-matched-run-note"
+                    >
+                      {`${unmatched.map(hardwareLabel).join(', ')} · ${s.noMatchedRunHelp}`}
+                    </p>
+                  )}
                   {engines.length > 1 && (
                     <ul
                       className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"

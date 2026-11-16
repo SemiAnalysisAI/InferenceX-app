@@ -1,5 +1,7 @@
 'use client';
 
+import { InfoHelp } from '@/components/ui/option-info';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { speedVs, type StageOption } from './clip-stage';
@@ -358,6 +360,7 @@ export interface VideoClipReadoutProps {
 export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: VideoClipReadoutProps) {
   const locale = useLocale();
   const s = STRINGS[locale];
+  const touch = useIsCoarsePointer();
   // An unofficial run against its own GPU's official lead would otherwise read "B200 against B200".
   const b =
     a.pill.unofficial && !pair.pill.unofficial && pair.name === a.name
@@ -393,7 +396,21 @@ export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: Video
               item.lead && 'bg-success/10',
             )}
           >
-            <dt className="text-2xs text-muted-foreground">{item.label}</dt>
+            <dt className="text-2xs text-muted-foreground">
+              {item.label}
+              {/* A touch screen never shows the cell's hover title. */}
+              {touch && item.help && (
+                <InfoHelp
+                  label={item.label}
+                  value={`readout-${item.metric}`}
+                  align="start"
+                  // The panel clips at its top edge, so the hit area sits a little lower.
+                  triggerClassName="-my-1.5 ml-0.5 align-middle [--hit-y:4px]"
+                >
+                  {item.help}
+                </InfoHelp>
+              )}
+            </dt>
             <dd
               className={cn(
                 'm-0 font-mono text-base font-medium break-words',

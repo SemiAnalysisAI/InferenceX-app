@@ -7,6 +7,7 @@ import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -85,6 +86,12 @@ const STRINGS = {
       toggle: 'Click the clips or press T to flip; hold Space to peek at the other clip.',
       diff: 'RGB difference ×4 between the two clips.',
     },
+    viewHelpTouch: {
+      wipe: 'Drag across the clips to slide the split; tap to play or pause. Tap the handle to lock the split.',
+      side: 'Both clips at once; tap to play or pause.',
+      toggle: 'Tap the clips to flip between them.',
+      diff: 'RGB difference ×4 between the two clips; tap to play or pause.',
+    },
     noReference: 'No sealed reference pair for this clip.',
     unpublishedMedia: 'Media is not shown for an unpublished run.',
     reference: 'Official Diffusers reference',
@@ -92,8 +99,8 @@ const STRINGS = {
     schedule: (updates: number, sigmas: number) => `${updates} updates · ${sigmas} sigma points`,
     referenceNote:
       'Encoded reference MP4. PSNR compares every decoded RGB pixel and frame; it does not measure semantic quality.',
-    metricsHelp:
-      'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; hover it for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.',
+    metricsHelp: (touch: boolean) =>
+      `PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; ${touch ? 'tap its info button' : 'hover it'} for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.`,
     gpu: (n: number) => (n === 1 ? '1 GPU' : `${n} GPUs`),
     official: 'official',
     unofficial: 'unofficial run',
@@ -140,14 +147,20 @@ const STRINGS = {
       toggle: '点击画面或按 T 切换，按住空格键可临时查看另一段视频。',
       diff: '两段视频的 RGB 差异 ×4。',
     },
+    viewHelpTouch: {
+      wipe: '在画面上左右拖动可移动分界线，轻点画面可播放或暂停；轻点分界线按钮可锁定。',
+      side: '同时显示两段视频；轻点画面可播放或暂停。',
+      toggle: '轻点画面可在两段视频之间切换。',
+      diff: '两段视频的 RGB 差异 ×4；轻点画面可播放或暂停。',
+    },
     noReference: '此视频暂无已封存的参考配对。',
     unpublishedMedia: '未发布的运行不显示视频。',
     reference: '官方 Diffusers 参考',
     referenceShort: 'Diffusers 参考',
     schedule: (updates: number, sigmas: number) => `${updates} 次更新 · ${sigmas} 个 sigma 点`,
     referenceNote: '已编码的参考 MP4。PSNR 对比全部解码 RGB 像素和帧，不衡量语义质量。',
-    metricsHelp:
-      'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。速度是两个测量单元 p50 之比，出片时间只是当前 prompt 这一次请求的时长。每条视频成本按所选成本档位和记录的 GPU 数量估算参与 GPU 的 TCO，每视频秒成本按有效输出的实际解码时长分摊；悬停该格可查看按分配 GPU 估算的口径。每条视频能耗是所选测量单元的平均值。以无损对照为基准的配对评分仍在计划中，目前还没有评分器计算。',
+    metricsHelp: (touch: boolean) =>
+      `PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。速度是两个测量单元 p50 之比，出片时间只是当前 prompt 这一次请求的时长。每条视频成本按所选成本档位和记录的 GPU 数量估算参与 GPU 的 TCO，每视频秒成本按有效输出的实际解码时长分摊；${touch ? '轻点该格的说明按钮' : '悬停该格'}可查看按分配 GPU 估算的口径。每条视频能耗是所选测量单元的平均值。以无损对照为基准的配对评分仍在计划中，目前还没有评分器计算。`,
     gpu: (n: number) => `${n} 张 GPU`,
     official: '官方',
     unofficial: '非官方运行',
@@ -247,6 +260,8 @@ export default function VideoResultsClips({
   peek = null,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
+  const touch = useIsCoarsePointer();
+  const viewHelp = touch ? s.viewHelpTouch : s.viewHelp;
   const stage = parseStage(useClientSearch());
   // Callers pick one clip per hardware, which may be a lossy named run's.
   const selected = useMemo(() => points.filter(onRoster), [points]);
@@ -637,7 +652,7 @@ export default function VideoResultsClips({
                 options={STAGE_VIEWS.map((mode) => ({
                   value: mode,
                   label: s.views[mode],
-                  title: s.viewHelp[mode],
+                  title: viewHelp[mode],
                   testId: `video-results-view-${mode}`,
                 }))}
                 onValueChange={(view) => {
@@ -652,7 +667,9 @@ export default function VideoResultsClips({
                 // Clear of the view switcher beside it.
                 triggerClassName="[--hit-x:4px]"
               >
-                {diagnostic ? s.diagnosticNote : s.metricsHelp}
+                {/* Hover titles never show on touch, so the shown view's gestures lead the help. */}
+                {touch && <p>{viewHelp[stage.view]}</p>}
+                <p>{diagnostic ? s.diagnosticNote : s.metricsHelp(touch)}</p>
               </InfoHelp>
             </div>
           </PromptRow>

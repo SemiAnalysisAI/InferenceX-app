@@ -469,6 +469,8 @@ describe('Video results clip stage', () => {
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
     readoutValue('cost').should('have.text', '$0.1');
+    // A mouse reads each readout cell's explanation from its title; only touch adds a button.
+    cy.get(`${readout} [data-slot="info-help"]`).should('not.exist');
 
     cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
@@ -525,7 +527,7 @@ describe('Video results clip stage', () => {
     expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
   });
 
-  it('wipes by a sideways drag and plays on a tap on a touch screen', () => {
+  it('wipes by a sideways drag, plays on a tap and explains itself by tap on a touch screen', () => {
     coarsePointer();
     mountResultsClips(['b200', 'h200']);
     load('[data-testid="video-results-start"]');
@@ -569,6 +571,14 @@ describe('Video results clip stage', () => {
       nextFrames();
       cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(70, 0.5));
     });
+    // Hover titles never show on touch: the view's gestures and each readout cell open by tap.
+    cy.get('[data-testid="video-results-metrics-help"]').click();
+    cy.get('[data-testid="option-help-content-clip-metrics"]')
+      .should('contain', 'Drag across the clips to slide the split')
+      .and('contain', 'tap its info button');
+    cy.get('body').type('{esc}');
+    cy.get(`${readout} [data-metric="psnr"] [data-slot="info-help"]`).click();
+    cy.get('[data-testid="option-help-content-readout-psnr"]').should('contain', 'Decoded RGB24');
   });
 
   it('names a take only when another take shares the prompt and seed', () => {

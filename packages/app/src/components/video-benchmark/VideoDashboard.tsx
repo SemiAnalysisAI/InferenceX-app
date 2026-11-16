@@ -14,6 +14,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { isDarkTheme } from '@/lib/themes/themes';
@@ -99,8 +100,8 @@ const STRINGS = {
   en: {
     advanced: 'Advanced',
     title: 'VideoGenX',
-    description:
-      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.',
+    description: (touch: boolean) =>
+      `Serving latency, cost and energy for one matched 20-clip video workload across hardware. ${touch ? 'Tap' : 'Click'} a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.`,
     benchmarkConfig: 'Benchmark config',
     model: 'Model',
     chartConfig: 'Chart config',
@@ -176,8 +177,8 @@ const STRINGS = {
   zh: {
     advanced: '高级选项',
     title: 'VideoGenX',
-    description:
-      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。点击“查看遥测”可打开对应部署。',
+    description: (touch: boolean) =>
+      `在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。${touch ? '轻点' : '点击'}数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。${touch ? '轻点' : '点击'}“查看遥测”可打开对应部署。`,
     benchmarkConfig: '基准测试配置',
     model: '模型',
     chartConfig: '图表配置',
@@ -294,6 +295,7 @@ export default function VideoDashboard({
 }) {
   const locale = useLocale(),
     s = STRINGS[locale];
+  const touch = useIsCoarsePointer();
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
   const latest = useRef(state);
   const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
@@ -686,7 +688,7 @@ export default function VideoDashboard({
                 title={s.title}
                 description={
                   <>
-                    {s.description}
+                    {s.description(touch)}
                     {workloadLabel && (
                       <span
                         className="mt-1 block text-xs font-medium"

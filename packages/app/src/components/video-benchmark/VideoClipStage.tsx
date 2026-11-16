@@ -67,7 +67,7 @@ const STRINGS = {
     speed: 'Speed',
     zoom: 'Zoom',
     loop: 'Loop',
-    panHint: 'Drag to pan · Esc resets',
+    panHint: (touch: boolean) => `Drag to pan · ${touch ? '1×' : 'Esc'} resets`,
   },
   zh: {
     stage: (a: string, b: string) => `${a} 对比 ${b}`,
@@ -100,7 +100,7 @@ const STRINGS = {
     speed: '播放速度',
     zoom: '缩放',
     loop: '循环播放',
-    panHint: '拖动画面平移 · 按 Esc 复位',
+    panHint: (touch: boolean) => `拖动画面平移 · ${touch ? '选 1×' : '按 Esc'} 复位`,
   },
 };
 
@@ -966,7 +966,7 @@ export default function VideoClipStage({
             <Repeat aria-hidden="true" />
             {s.loop}
           </Button>
-          {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint}</span>}
+          {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint(touch)}</span>}
         </div>
       )}
     </div>
