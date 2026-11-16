@@ -348,7 +348,7 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.params.view).toBe('overview');
     expect(body.params).toMatchObject({
       gpuCount: null,
-      xMetric: 'p90',
+      xMetric: 'p50',
       costBasis: 'participating',
     });
     const defaults = resultProjection(

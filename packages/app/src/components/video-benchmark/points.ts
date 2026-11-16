@@ -140,7 +140,7 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
   });
 }
 
-/** Valid clips a cell needs before the dashboard counts it: the same floor as the P90 display. */
+/** Valid clips a cell needs before the dashboard counts it, so a smoke run of a few clips stays in History only. */
 export const DASHBOARD_SAMPLE_FLOOR = 10;
 
 /** Positive when `a` was published after `b`: the published history order (time, then artifact id). */

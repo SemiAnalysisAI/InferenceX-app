@@ -50,7 +50,6 @@ import { isLossy, lossyLabel, runtimeLabel } from './optimizations';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
 import {
-  RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
@@ -1053,7 +1052,6 @@ export default function VideoResultsChart({
     [s],
   );
   const { tooltip, panel } = useMemo(() => {
-    const latencyKeys = RESULTS_X_METRIC_KEYS.filter((key) => !RESULTS_X_METRICS[key].rankOn);
     const hoverLatency = RESULTS_X_METRICS[x.rankOn ?? xKey];
     const selection = { basis: state.costBasis, tier: state.costTier };
     const describe = ({ cell, overlay, x: xValue, y: yValue }: PlotPoint) => {
@@ -1111,10 +1109,7 @@ export default function VideoResultsChart({
           <PanelSection
             title={clip ? s.latencyClip(clip.seconds, clip.fps) : s.latency}
             rows={[
-              ...latencyKeys.map((key) => ({
-                label: key === 'p50' ? s.median : 'P90',
-                value: unit(n(RESULTS_X_METRICS[key].value(cell, selection), 1), 's'),
-              })),
+              { label: s.median, value: unit(n(point.p50, 1), 's') },
               {
                 label: s.meets(n(state.deadlineSeconds)),
                 value:

@@ -36,7 +36,7 @@ export interface ResultsChartMetric {
   value: (cell: ResultCell, context: ResultsMetricContext) => number | null;
 }
 
-export const RESULTS_X_METRIC_KEYS = ['p50', 'p90', 'gpus'] as const;
+export const RESULTS_X_METRIC_KEYS = ['p50', 'gpus'] as const;
 export const RESULTS_Y_METRIC_KEYS = [
   'videoSecondsPerDollar',
   'videosPerGpuHour',
@@ -57,18 +57,6 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
     better: 'lower',
     digits: 1,
     value: (cell) => cell.point.p50,
-  },
-  p90: {
-    label: { en: 'P90 latency per clip', zh: '单条视频 P90 延迟' },
-    clipLabel: ({ seconds, fps }) => ({
-      en: `P90 latency per ${seconds} s clip at ${fps} fps`,
-      zh: `生成一段 ${seconds} 秒、${fps} fps 视频的 P90 延迟`,
-    }),
-    hoverLabel: { en: 'P90 s', zh: 'P90 延迟 (s)' },
-    unit: 's',
-    better: 'lower',
-    digits: 1,
-    value: (cell) => cell.point.p90,
   },
   gpus: {
     label: { en: 'GPUs per deployment', zh: '每个部署的 GPU 数' },

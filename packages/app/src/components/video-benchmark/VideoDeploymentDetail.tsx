@@ -50,8 +50,7 @@ const STRINGS = {
     sources: 'Sources',
     latency: 'Per-clip latency',
     latencyBoundary: 'Submit to downloaded media',
-    recorded: (p50: string, p90: string, p95: string) =>
-      `Recorded P50 ${p50} · P90 ${p90} · P95 ${p95}`,
+    recorded: (p50: string) => `Recorded median ${p50}`,
     deadline: (seconds: string, share: string | null) =>
       share === null
         ? `Deadline ${seconds} s · attainment needs every valid request time`
@@ -135,8 +134,7 @@ const STRINGS = {
     sources: '来源',
     latency: '单条视频延迟',
     latencyBoundary: '从提交请求到下载完媒体',
-    recorded: (p50: string, p90: string, p95: string) =>
-      `记录值 P50 ${p50} · P90 ${p90} · P95 ${p95}`,
+    recorded: (p50: string) => `记录的中位延迟 ${p50}`,
     deadline: (seconds: string, share: string | null) =>
       share === null
         ? `截止时间 ${seconds} s · 需要全部有效请求的时间记录才能计算达成率`
@@ -437,6 +435,7 @@ export default function VideoDeploymentDetail({
                   <Distribution
                     values={latenciesMs}
                     unit="ms"
+                    percentiles={['p50']}
                     width={phone ? 380 : 720}
                     height={phone ? 240 : 260}
                   />
@@ -444,11 +443,7 @@ export default function VideoDeploymentDetail({
                   <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
                 )}
                 <p className="text-xs" data-testid="results-detail-latency">
-                  {s.recorded(
-                    withUnit(point.p50, 's', 1),
-                    withUnit(point.p90, 's', 1),
-                    withUnit(cell.p95, 's', 1),
-                  )}
+                  {s.recorded(withUnit(point.p50, 's', 1))}
                 </p>
                 <p className="text-xs">
                   {s.deadline(
