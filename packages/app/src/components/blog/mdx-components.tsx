@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import Image, { getImageProps } from 'next/image';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { slugify } from '@/lib/blog/blog';
 import figureDimensions from '@/lib/blog/figure-dimensions.json';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -46,9 +46,9 @@ function CustomLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   const { href, children, ...rest } = props;
   if (href?.startsWith('/')) {
     return (
-      <Link href={href} {...rest}>
+      <IntentPrefetchLink href={href} {...rest}>
         {children}
-      </Link>
+      </IntentPrefetchLink>
     );
   }
   return (

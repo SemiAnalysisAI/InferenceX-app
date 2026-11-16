@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useEffect, useMemo } from 'react';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
@@ -160,9 +160,9 @@ export default function ComparePerDollarPageClient({
                 成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token 数归一化，用于比较不同
                 LLM 工作负载下的每美元性能。可在任一目标交互性下找出成本更低的
                 SKU，并通过下方图表控件切换序列长度、精度和指标；操作方式与
-                <Link href="/zh" className="underline hover:text-primary">
+                <IntentPrefetchLink href="/zh" className="underline hover:text-primary">
                   {t.mainChartLinkText}
-                </Link>
+                </IntentPrefetchLink>
                 相同。
               </p>
             ) : (
@@ -173,9 +173,9 @@ export default function ComparePerDollarPageClient({
                 dollar across LLM workloads. Pick the more cost-efficient SKU at every target
                 interactivity level. Use the chart controls below to switch sequences, precisions,
                 and metrics — same interactions as{' '}
-                <Link href="/" className="underline hover:text-primary">
+                <IntentPrefetchLink href="/" className="underline hover:text-primary">
                   {t.mainChartLinkText}
-                </Link>
+                </IntentPrefetchLink>
                 .
               </p>
             )}
@@ -185,13 +185,13 @@ export default function ComparePerDollarPageClient({
                 data-testid="compare-agentic-intro"
               >
                 {agenticIntro.paragraph}{' '}
-                <Link
+                <IntentPrefetchLink
                   href={agenticIntro.href}
                   data-testid="compare-agentic-intro-link"
                   className="font-medium text-brand underline underline-offset-4 hover:no-underline"
                 >
                   {agenticIntro.linkLabel} →
-                </Link>
+                </IntentPrefetchLink>
               </p>
             )}
             {narrative.length > 0 && (
@@ -239,17 +239,17 @@ export default function ComparePerDollarPageClient({
               </p>
             )}
             <p className="mt-2 text-sm">
-              <Link
+              <IntentPrefetchLink
                 href={isZh ? `/zh/compare/${slug}` : `/compare/${slug}`}
                 className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_per_dollar_cross_link_to_full', { slug })}
               >
                 {t.fullComparisonLinkText}
-              </Link>
+              </IntentPrefetchLink>
             </p>
             {chipPageLink && (
               <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
-                <Link
+                <IntentPrefetchLink
                   href={chipPageLink.href}
                   className="underline hover:text-primary text-muted-foreground"
                   onClick={() =>
@@ -260,7 +260,7 @@ export default function ComparePerDollarPageClient({
                   }
                 >
                   {chipPageLink.label} →
-                </Link>
+                </IntentPrefetchLink>
               </p>
             )}
           </header>

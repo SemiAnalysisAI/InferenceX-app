@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
@@ -130,13 +130,13 @@ export function HuaweiSkuConfigurations() {
           </div>
           <div className="mt-3 space-y-2 rounded-lg bg-muted/30 px-4 py-3">
             <p className="text-sm max-w-4xl">{t.measured}</p>
-            <Link
+            <IntentPrefetchLink
               href={`${locale === 'zh' ? '/zh' : ''}/ubx/core-memory-profiles`}
               className="text-sm underline underline-offset-4"
               onClick={() => track('ubenchx_sku_profiles_opened', { gpu: 'PR_9579' })}
             >
               {t.profiles}
-            </Link>
+            </IntentPrefetchLink>
           </div>
           <div className="mt-3">
             <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />

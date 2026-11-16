@@ -87,7 +87,6 @@ import {
   Sequence,
   Model,
 } from '@/lib/catalog/data-mappings';
-import { modelRoutesForTab } from '@/lib/routing/model-routes';
 import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
@@ -100,8 +99,8 @@ import {
   DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
-  modelsWithAgenticData,
   parseTokenPriceInput,
+  profitAgenticModels,
   profitModelDefaults,
   type CacheHitMode,
   type ProfitBasis,
@@ -125,7 +124,7 @@ import {
 } from './profit-history';
 import type { CostProvider } from './types';
 import { useProfitHistory } from './useProfitHistory';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 
 type PriceSource = 'openrouter' | 'list' | 'custom';
 
@@ -566,16 +565,10 @@ function ProfitEstimatorInner({
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availability } = useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
-  const agenticModels = useMemo(() => {
-    const allowed = modelRoutesForTab(PROFIT_BASIS_TAB[basis]).map((route) => route.model);
-    const withData = modelsWithAgenticData(
-      availableModels,
-      availability?.lines,
-      (m) => DISPLAY_MODEL_TO_DB[m] ?? [m],
-    );
-    const both = allowed.filter((m) => withData.includes(m));
-    return both.length > 0 ? both : allowed;
-  }, [availableModels, availability, basis]);
+  const agenticModels = useMemo(
+    () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
+    [availableModels, availability, basis],
+  );
   const modelAllowed = agenticModels.includes(selectedModel);
   useEffect(() => {
     if (!modelAllowed && agenticModels[0]) {
@@ -640,6 +633,11 @@ function ProfitEstimatorInner({
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
   const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
+  const includePower = basis === 'gw-year' && powerBasis !== 'provisioned';
+  const warmThroughputChange = useWarmThroughputChange({
+    sequence: selectedSequence,
+    includePower,
+  });
 
   const {
     hardwareConfig,
@@ -660,7 +658,7 @@ function ProfitEstimatorInner({
     true,
     'total',
     tcoBasis,
-    basis === 'gw-year' && powerBasis !== 'provisioned',
+    includePower,
   );
 
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
@@ -795,7 +793,7 @@ function ProfitEstimatorInner({
     currentRunDate: selectedRunDate,
     currentRunIds: historyCurrentRunIds,
     enabled: hasData,
-    includePower: basis === 'gw-year' && powerBasis !== 'provisioned',
+    includePower,
   });
   const historyActive = history.comparisonDates.length > 0;
   const historyRunNumbering = useMemo(() => {
@@ -1629,6 +1627,7 @@ function ProfitEstimatorInner({
                       onChange={handleModelChange}
                       open={openDropdown === 'model'}
                       onOpenChange={handleDropdownOpenChange('model')}
+                      onOptionIntent={(model) => warmThroughputChange({ model })}
                       availableModels={agenticModels}
                     />
                   </div>

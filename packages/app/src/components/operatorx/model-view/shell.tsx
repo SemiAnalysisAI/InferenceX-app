@@ -3,8 +3,6 @@ import { Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-export const DEFAULT_MODEL = 'DeepSeek-R1-0528';
-
 export function ModelViewLoading() {
   const locale = useLocale();
   return (

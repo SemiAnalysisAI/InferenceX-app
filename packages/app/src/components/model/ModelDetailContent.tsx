@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -79,19 +79,19 @@ export default async function ModelDetailContent({
         <Card>
           <header>
             <p className="mb-2 text-sm text-muted-foreground">
-              <Link
+              <IntentPrefetchLink
                 href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}
-              </Link>{' '}
+              </IntentPrefetchLink>{' '}
               /{' '}
-              <Link
+              <IntentPrefetchLink
                 href={modelIndexHref(locale)}
                 className="hover:text-foreground transition-colors"
               >
                 {t.modelBreadcrumb}
-              </Link>
+              </IntentPrefetchLink>
             </p>
             <div className="flex items-center gap-3">
               <ModelDeveloperLogo
@@ -110,10 +110,10 @@ export default async function ModelDetailContent({
                 variant="outline"
                 className="mt-4 h-auto min-h-11 whitespace-normal py-2 text-left md:min-h-9"
               >
-                <Link href={inferenceHref} data-testid="model-inference-link">
+                <IntentPrefetchLink href={inferenceHref} data-testid="model-inference-link">
                   {t.inferenceBenchmarksLink(meta.title)}
                   <ArrowRight aria-hidden="true" />
-                </Link>
+                </IntentPrefetchLink>
               </Button>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -135,12 +135,12 @@ export default async function ModelDetailContent({
                 className="mb-6 rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
               >
                 <p>{t.englishArticleNotice}</p>
-                <Link
+                <IntentPrefetchLink
                   href={modelEnglishArticleHref(slug)}
                   className="mt-2 inline-flex font-medium text-foreground underline-offset-4 hover:underline"
                 >
                   {t.englishArticleLink}
-                </Link>
+                </IntentPrefetchLink>
               </aside>
             )}
             {hasMath && <KatexStyles />}
@@ -163,13 +163,13 @@ export default async function ModelDetailContent({
                 {t.dashboardDescription(entry.label, scenario.label)}
               </p>
             </div>
-            <Link
+            <IntentPrefetchLink
               href={modelDashboardHref(dashboardQuery.toString(), locale)}
               className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-foreground underline-offset-4 hover:underline"
             >
               {t.openDashboard}
               <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
+            </IntentPrefetchLink>
           </div>
           <EmbeddedModelDashboard displayName={entry.displayName} sequence={scenario.sequence} />
         </Card>

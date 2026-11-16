@@ -4,6 +4,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@ta
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { reportDataQueryFailure } from '@/lib/analytics/query-error-analytics';
+import { auditWarmedQueries } from '@/lib/prefetch/warm-audit';
 
 export function createAppQueryClient(): QueryClient {
   return new QueryClient({
@@ -52,6 +53,8 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       indexedDB.deleteDatabase('tanstack-query-cache');
     } catch {}
   }, []);
+
+  useEffect(() => auditWarmedQueries(client), [client]);
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

@@ -356,9 +356,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 5,
-      // Re-pinned without a version bump: the dashboard route registry gained the SLA Targets
-      // route, which does not change any recorded entry.
-      sources: 'fd46986cdfe9e92dffa7dfc309870c48e779938446a84492ed165d43099250e2',
+      // Chart query keys and run selection moved into shared helpers, and the dashboard route
+      // registry gained the SLA Targets route; recorded video entries are unchanged.
+      sources: '28c9e63c7d83c1b97c2d75d3df33cbcdd0bec2d56fc32db0fc051683fdf61145',
     });
   });
 });

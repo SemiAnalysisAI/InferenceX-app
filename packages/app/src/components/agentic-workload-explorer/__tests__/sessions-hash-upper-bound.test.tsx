@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useCallback, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -201,7 +202,13 @@ function buttonNamed(name: string): HTMLButtonElement {
 
 describe('sessions hash upper bound', () => {
   it('waits for an explicit Compute click before requesting and rendering hash stats', async () => {
-    await settle(() => root.render(<SessionsPage />));
+    await settle(() =>
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <SessionsPage />
+        </QueryClientProvider>,
+      ),
+    );
 
     const loadButton = buttonNamed('Compute');
     expect(hashStatsRequests()).toEqual([]);

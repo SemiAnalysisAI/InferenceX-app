@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { BlogGridTexture, BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
@@ -80,13 +80,13 @@ export function BlogFeaturedPost({
           level="title"
           className="text-2xl leading-tight text-balance group-hover:text-brand md:text-title"
         >
-          <Link
+          <IntentPrefetchLink
             href={href}
             className="focus-visible:outline-none before:absolute before:inset-0 before:z-10 before:content-['']"
             onClick={onClick}
           >
             {title}
-          </Link>
+          </IntentPrefetchLink>
         </Heading>
         <p
           className={cn(

@@ -459,6 +459,7 @@ const measured = (r: ComparisonRow) =>
 
 /** Workload shown when the request names none (or an unknown one), if the data has it. */
 export const DEFAULT_WORKLOADS: Partial<Record<ComparisonOp, string>> = {
+  gemm: 'gemm:DeepSeek-V4.1-Flash',
   moe: 'moe:DeepSeek-V4.1-Flash',
 };
 

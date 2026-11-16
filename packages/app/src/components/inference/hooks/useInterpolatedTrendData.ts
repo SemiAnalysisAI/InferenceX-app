@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
@@ -12,7 +11,7 @@ import type {
 } from '@/components/inference/types';
 import { useTrendHistory } from '@/hooks/api/use-trend-history';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
-import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import type { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   buildTrendCurves,
@@ -61,19 +60,12 @@ export function useInterpolatedTrendData({
   tcoBasis = DEFAULT_TCO_BASIS,
   chipBasis = DEFAULT_CHIP_BASIS,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
-  const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
-
   const {
     data: allRows,
     isLoading,
     error,
     refetch,
-  } = useTrendHistory(
-    enabled ? selectedModel : '',
-    seqIslOsl?.isl ?? 0,
-    seqIslOsl?.osl ?? 0,
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
-  );
+  } = useTrendHistory(enabled ? selectedModel : '', selectedSequence);
   const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
   const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 

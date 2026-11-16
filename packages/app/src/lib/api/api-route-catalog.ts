@@ -1373,7 +1373,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '20c70bc20a005cc24013ebc7b8d6782c9adef46030ca4b3104c35447e4e11e51',
+    sourceSha256: 'ac495d055a72e392c4ac15e6bd2b7d3291c08ded0fac2162ff6d4a112ba674dc',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
@@ -1582,7 +1582,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: '6ebd9cf0172a205df642e7b683012afbe657998a8280b652940e128333514519',
+    sourceSha256: 'ff9cf222674166bcd893f041bb135b9f5816ef3518c8a9e3b260fbdc15871b82',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1845,7 +1845,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '6be86db9c2dd179a6c9a83480d2ce6725cbe6a9fb16b90a20215501f9cb6f2bb',
+    sourceSha256: '6e64e03ecea5ab51e020ce29277698a01d9a8068072faf2d6c3a629ae1fccd6b',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

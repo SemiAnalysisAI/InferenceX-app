@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query';
 
 import { ApiRequestError } from '@/lib/api/api-request-error';
 
@@ -79,8 +79,8 @@ async function fetchJsonOr404<T>(
   return (await res.json()) as T;
 }
 
-export function useDatasets() {
-  return useQuery({
+export function datasetsQueryOptions() {
+  return queryOptions({
     queryKey: ['datasets'] as const,
     queryFn: async ({ signal }) => {
       const url = '/api/v1/datasets';
@@ -90,6 +90,10 @@ export function useDatasets() {
     },
     staleTime: DAY,
   });
+}
+
+export function useDatasets() {
+  return useQuery(datasetsQueryOptions());
 }
 
 export function useDataset(slug: string | null, initialData?: DatasetDetail) {

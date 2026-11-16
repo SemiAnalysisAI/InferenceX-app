@@ -60,8 +60,10 @@ import {
   breakEvenPricePerMTok,
   computeLifecycle,
   effectiveTokPerSec,
+  fleetMegawatts,
   LIFECYCLE_DEFAULTS,
   MS_PER_MONTH,
+  parseNonNegative,
   type LifecycleAssumptions,
   type LifecycleSeries,
 } from './lifecycle';
@@ -384,11 +386,6 @@ function formatCaptionPrice(value: number): string {
   return fixed.includes('.') ? fixed.replace(/\.?0+$/u, '') : fixed;
 }
 
-function parseNonNegative(raw: string): number | null {
-  const parsed = parseFloat(raw);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
 function initialPriceInputs(params: ReturnType<typeof readUrlParams>): {
   input: string;
   output: string;
@@ -481,10 +478,7 @@ export default function FleetLifecycle({
   const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
-  const mw = useMemo(() => {
-    const parsed = parseNonNegative(mwInput);
-    return parsed !== null && parsed > 0 ? parsed : null;
-  }, [mwInput]);
+  const mw = useMemo(() => fleetMegawatts(mwInput), [mwInput]);
 
   const historical = useHistoricalBest({
     tcoBasis,

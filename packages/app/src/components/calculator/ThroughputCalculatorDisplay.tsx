@@ -3,6 +3,7 @@
 import { chipBasisCsvNote, withTotalChipQualifier } from '@/lib/benchmarks/chip-basis';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import Link from 'next/link';
@@ -97,7 +98,7 @@ import type {
   CostType,
   InterpolatedResult,
 } from './types';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const COST_PROVIDER_OPTIONS: {
@@ -401,6 +402,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
     useGlobalFilterActions();
+  const warmThroughputChange = useWarmThroughputChange();
   const chipBasisControl = useMemo(
     () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator' }),
     [chipBasis, setChipBasis],
@@ -958,6 +960,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         onChange={handleSequenceChange}
         open={openDropdown === 'sequence'}
         onOpenChange={handleDropdownOpenChange('sequence')}
+        onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
         availableSequences={availableSequences}
         model={selectedModel}
       />
@@ -976,6 +979,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         onChange={handlePrecisionChange}
         open={openDropdown === 'precision'}
         onOpenChange={handleDropdownOpenChange('precision')}
+        onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
         availablePrecisions={availablePrecisions}
       />
     </>
@@ -1082,6 +1086,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     onChange={handleModelChange}
                     open={openDropdown === 'model'}
                     onOpenChange={handleDropdownOpenChange('model')}
+                    onOptionIntent={(model) => warmThroughputChange({ model })}
                     availableModels={availableModels}
                   />
                 </div>
@@ -1459,13 +1464,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         <section data-testid="calculator-fleet-pointer">
           <p className="text-sm text-muted-foreground">
             {t.fleetMoved}{' '}
-            <Link
+            <IntentPrefetchLink
               href={localePath(getDashboardRoute('fleet').path, locale)}
               className="underline hover:text-foreground"
               data-testid="calculator-fleet-pointer-link"
             >
               {t.fleetMovedLink}
-            </Link>
+            </IntentPrefetchLink>
           </p>
         </section>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { track } from '@/lib/analytics/analytics';
 
@@ -24,7 +24,7 @@ export function BlogTagLink({
   children,
 }: BlogTagLinkProps) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={clear ? basePath : `${basePath}?tag=${encodeURIComponent(tag)}`}
       className={tagChipClass(active)}
       aria-current={active ? 'page' : undefined}
@@ -39,6 +39,6 @@ export function BlogTagLink({
           {count}
         </span>
       )}
-    </Link>
+    </IntentPrefetchLink>
   );
 }

@@ -15,6 +15,7 @@ import {
   CONTROL_SEARCH_CLEAR_STYLE,
 } from './control-styles';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { useOptionIntent } from './option-intent';
 
 const STRINGS = {
   en: {
@@ -88,6 +89,8 @@ interface MultiSelectProps {
   minimumPrefix?: string;
   /** Display a retained selection without adding it to the available options. */
   missingSelectedOption?: (value: string) => MultiSelectOption;
+  /** Called with the value an option would select once the user shows intent toward it. */
+  onOptionIntent?: (value: string[]) => void;
 }
 
 function MultiSelect({
@@ -119,6 +122,7 @@ function MultiSelect({
   selectedSuffix,
   minimumPrefix,
   missingSelectedOption,
+  onOptionIntent,
 }: MultiSelectProps) {
   const t = STRINGS[useLocale()];
   const resolvedPlaceholder = placeholder ?? t.placeholder;
@@ -209,7 +213,7 @@ function MultiSelect({
       const firstOption = contentRef.current?.querySelector<HTMLButtonElement>(
         '[role="option"]:not(:disabled)',
       );
-      (firstOption ?? contentRef.current)?.focus();
+      optionIntent.focusQuietly(firstOption ?? contentRef.current);
     }
   }, [isOpen]);
 
@@ -240,39 +244,37 @@ function MultiSelect({
     return opts.filter((opt) => matchesSearch(opt.label, search));
   }, [filteredSections, flatOptions, search]);
 
-  const handleToggle = (optionValue: string) => {
+  /** The value choosing `optionValue` produces, or null when it changes nothing. */
+  const toggledValue = (optionValue: string): string[] | null => {
     if (disabled || flatOptions.find((option) => option.value === optionValue)?.disabled) {
-      return;
+      return null;
     }
-
-    const isSelected = value.includes(optionValue);
-
-    if (isSelected) {
-      if (minSelections !== undefined && value.length <= minSelections) {
-        return;
-      }
-      const newValue = value.filter((v) => v !== optionValue);
-      track('multi_select_deselected', { value: optionValue });
-      onChange?.(newValue);
-      setIsOpen(false);
-      triggerRef.current?.focus();
-      return;
+    if (value.includes(optionValue)) {
+      return minSelections !== undefined && value.length <= minSelections
+        ? null
+        : value.filter((v) => v !== optionValue);
     }
-
     if (maxSelections !== undefined && value.length >= maxSelections) {
-      if (maxSelections === 1) {
-        const newValue = [optionValue];
-        track('multi_select_selected', { value: optionValue });
-        onChange?.(newValue);
-        setIsOpen(false);
-        triggerRef.current?.focus();
-        return;
-      }
-      return;
+      return maxSelections === 1 ? [optionValue] : null;
     }
+    return [...value, optionValue];
+  };
 
-    const newValue = [...value, optionValue];
-    track('multi_select_selected', { value: optionValue });
+  const optionIntent = useOptionIntent(
+    isOpen,
+    onOptionIntent &&
+      ((optionValue) => {
+        const next = toggledValue(optionValue);
+        if (next) onOptionIntent(next);
+      }),
+  );
+
+  const handleToggle = (optionValue: string) => {
+    const newValue = toggledValue(optionValue);
+    if (!newValue) return;
+    track(value.includes(optionValue) ? 'multi_select_deselected' : 'multi_select_selected', {
+      value: optionValue,
+    });
     onChange?.(newValue);
     setIsOpen(false);
     triggerRef.current?.focus();
@@ -348,6 +350,7 @@ function MultiSelect({
         title={option.title}
         data-testid={option.testId}
         data-slot="select-item"
+        {...optionIntent.optionProps(option.value, toggledValue(option.value) !== null)}
         onClick={() => handleToggle(option.value)}
         onKeyDown={(event) => {
           const direction =
