@@ -107,6 +107,15 @@ function setParam(key: string, value: string) {
   replaceClientSearch(params);
 }
 
+/** A new workload drops the GPU picks and baseline, which belong to the old one. */
+function setWorkload(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.set('workload', value);
+  params.delete(HARDWARE_PARAM);
+  params.delete(BASELINE_PARAM);
+  replaceClientSearch(params);
+}
+
 /** The one-device option's select value (its split key is empty). */
 const ONE_DEVICE = '1';
 
@@ -336,7 +345,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               value={pending?.id ?? view.workload ?? ''}
               onValueChange={(v) => {
                 track('operatorx_workload_selected', { op, workload: v });
-                setParam('workload', v);
+                setWorkload(v);
               }}
               groups={[
                 {

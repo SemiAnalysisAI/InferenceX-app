@@ -1,12 +1,11 @@
 'use client';
 
-import { useClientSearch } from '@/hooks/useClientSearch';
-import { shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
-import { setSearchParam } from '../compare/url-selection';
-
 import { curveLinear } from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useId, useMemo, useState } from 'react';
+
+import { useClientSearch } from '@/hooks/useClientSearch';
+import { shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -25,6 +24,7 @@ import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
 import { originText } from '../compare/slices';
+import { setSearchParam } from '../compare/url-selection';
 import type { VizDefinition } from './types';
 import { RooflineBars } from './roofline-bars';
 
@@ -117,11 +117,11 @@ export function Roofline({
   const precisions = ORDER.filter((p) => counts.has(p));
   const defaults = view.defaults ?? comparisonDefaults(view);
   const search = new URLSearchParams(useClientSearch());
-  const prefix = summaryOnly ? 'summary' : 'roofline';
+  const prefix = summaryOnly ? 'summary' : 'scatter';
   const picked = sharePrecision(search.get(`${prefix}Precision`));
   const sharedOnly = shareBoolean(search.get('summarySharedOnly'), true);
   const normalized = shareBoolean(search.get(`${prefix}Normalized`), defaults.rooflineNormalized);
-  const logY = shareBoolean(search.get('rooflineLog'), false);
+  const logY = shareBoolean(search.get('scatterLog'), false);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
@@ -243,7 +243,7 @@ export function Roofline({
               checked={logY}
               onCheckedChange={(enabled) => {
                 track('operatorx_roofline_log_toggled', { enabled });
-                setSearchParam('rooflineLog', String(enabled));
+                setSearchParam('scatterLog', String(enabled));
               }}
             />
             <Label htmlFor="opx-roofline-log" className="text-sm font-normal text-muted-foreground">

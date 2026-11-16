@@ -1,7 +1,5 @@
 'use client';
 
-import { sharePrecision, shareBoolean, shareBin } from '@/lib/operatorx/share-state';
-
 import { ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
@@ -60,6 +58,7 @@ import {
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
 import { slices } from '../compare/slices';
+import { shareBin, shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
 import { HARDWARE_PARAM, parsePickedHardware, setPickedHardware } from '../compare/url-selection';
 import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';

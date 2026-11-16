@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after OperatorX share controls changed; recorded video entries are unchanged.
-      sources: '2ddcecf89f806d427a78890d2db90011dc764599f8f6dd809bbbf76866a5872e',
+      // Re-pinned after the dashboard route registry gained share params; entries are unchanged.
+      sources: '90ee3a3f5f81b979ab9cfcf223fa06d552ba815c06c9292c04b8974635a457fe',
     });
   });
 });

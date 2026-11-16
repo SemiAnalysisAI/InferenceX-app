@@ -1355,15 +1355,12 @@ Vendor-series colors are presentation-only. Huawei/Ascend series use a shared, t
 
 `test=mem-bw&gpu=Huawei%20950PR` covers 51 sizes, 8 B through 16 GiB. The nine 8 B–2 KiB points have 360 observations each from a separate CANN 9.2.1 run. `metadata.smallMessageExtension` preserves its date, versions, board, size range, 4096-byte slot stride, archive digest and cache qualification. The original metadata and all 42 measurements from 4 KiB upward are unchanged. These graph-amortized rates include possible cache residency and are not isolated-copy latency or cold-HBM bandwidth.
 
-OperatorX share links also retain `modelPrecision=fp4|fp8|bf16`, `modelBin`
-(nonnegative half-octave bin, `round(log2(case.x) * 2)`), `modelSweep=true|false`,
-`rooflinePrecision`, `rooflineNormalized`, `rooflineLog`, `summaryPrecision`,
-`summaryNormalized`, and `summarySharedOnly`. Summary and scatter controls are
-independent. The page-owned `/api/v1/operatorx/compare?op=gemm` accepts these
-selectors and returns optional `shareState` containing valid explicit overrides;
-it does not replace raw measurements or claim to resolve model-wide defaults.
-To calculate summary bars, map the `summary*` values to the existing
-`rooflinePrecision`, `rooflineNormalized`, `rooflineSharedOnly` API parameters
-and pass the selected GPUs as `rooflineHardware`. Log scale is presentation only.
-Missing or malformed share overrides fall back to the UI defaults; the existing
-roofline projection parameters continue to reject invalid values with 400.
+OperatorX share links also keep `modelPrecision=fp4|fp8|bf16`, `modelBin`
+(half-octave bin, `round(log2(x) * 2)`), `modelSweep=true|false`, `scatterPrecision`,
+`scatterNormalized`, `scatterLog`, `summaryPrecision`, `summaryNormalized`, and
+`summarySharedOnly`. To fetch the model view's rows, pass `modelPrecision` and
+`modelBin` to `/api/v1/views/operatorx` as `precision` and `bin` (omit `bin` for
+`modelSweep=true`). The view response's `url` carries them back for a model selection.
+Summary bars are the page-owned compare API's `rooflinePrecision`,
+`rooflineNormalized`, `rooflineSharedOnly` and `rooflineHardware` (the GPU picks).
+`scatterLog` and `baseline` are presentation only.

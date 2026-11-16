@@ -816,9 +816,7 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // hardware/case, with measurements[].backend provenance), and workload-resolved
 // chart defaults, optional distribution quantiles and per-hardware/shared-cohort roofline
 // median/best summaries with precision/hardware/normalization/cohort selectors are
-// documented in docs/operatorx.md. Explicit chart/model URL overrides are also returned
-// as optional shareState metadata; raw comparison rows and source identities stay intact.
-// Ingest-time compact run
+// documented in docs/operatorx.md. Ingest-time compact run
 // projections are fetched in one revision-aware bulk query, preserving response
 // and source identities; legacy fallback and
 // partial-read cache behavior are documented there as well. Timeline references

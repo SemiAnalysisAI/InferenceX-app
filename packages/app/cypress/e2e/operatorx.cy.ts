@@ -532,7 +532,7 @@ it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switc
 
 it('reopens shared roofline and summary controls independently', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
-  cy.visit('/opx/gemm?rooflinePrecision=bf16&summaryPrecision=bf16');
+  cy.visit('/opx/gemm?scatterPrecision=bf16&summaryPrecision=bf16');
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
   cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
   cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
@@ -544,8 +544,8 @@ it('reopens shared roofline and summary controls independently', () => {
     .then((value) => {
       const url = new URL(String(value));
       expect(url.searchParams.get('summarySharedOnly')).to.eq('false');
-      expect(url.searchParams.get('rooflineNormalized')).to.eq('false');
-      expect(url.searchParams.get('rooflineLog')).to.eq('true');
+      expect(url.searchParams.get('scatterNormalized')).to.eq('false');
+      expect(url.searchParams.get('scatterLog')).to.eq('true');
       cy.visit(url.pathname + url.search);
     });
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();

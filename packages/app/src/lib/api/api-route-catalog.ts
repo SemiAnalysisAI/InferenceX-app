@@ -221,7 +221,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: '9ebfcf35ffdfa9d0e754e6cd679f4934e7fead8ef1d6afaaea73f41141b487f1',
+    sourceSha256: 'f66f930fdbe5df99b73463f7875eaa6a6c405f9750d45e1e0377c9c67d4fe526',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -572,7 +572,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; comparisons include hardware references, defaults, optional distribution quantiles and per-hardware or shared-cohort roofline median/best summaries with resolved controls.',
       zh: 'OperatorX 页面后端；对比结果包含硬件参考值和默认设置，并可按需返回分布分位数及基于各硬件自身用例或共同用例的 roofline 中位数与最佳值汇总，同时附带实际生效的参数。',
     },
-    sourceSha256: '3fd75ac612f3282429ab45a4b48372dc3467ca610b02a1f976a59a9ccf2e7c07',
+    sourceSha256: '733e41ed3e2ba2cc0ef394439b09f850e06c310c6b611c7a2507dfb221cb6dad',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -1887,7 +1887,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'fc182b89629b0b0dce6df319ab8ddcfad3325dd0d0ee98c1f68913712910133a',
+    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

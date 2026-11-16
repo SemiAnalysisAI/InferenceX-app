@@ -1,4 +1,3 @@
-import { OPERATORX_SHARE_CONTROLS } from '../operatorx/share-state';
 export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
 export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
@@ -26,6 +25,22 @@ interface DashboardRouteDefinition {
   /** Unprefixed params the page keeps in the address bar itself; share links copy them as-is. */
   readonly shareLiveParams?: readonly string[];
 }
+
+/**
+ * OperatorX controls kept in the address bar. The scatter and summary charts use
+ * separate prefixes, distinct from the compare API's `roofline*` projection selectors.
+ */
+export const OPERATORX_SHARE_CONTROLS = [
+  'modelPrecision',
+  'modelBin',
+  'modelSweep',
+  'scatterPrecision',
+  'scatterNormalized',
+  'scatterLog',
+  'summaryPrecision',
+  'summaryNormalized',
+  'summarySharedOnly',
+] as const;
 
 const FILTERED_DASHBOARD_PROVIDERS = {
   globalFilters: true,
