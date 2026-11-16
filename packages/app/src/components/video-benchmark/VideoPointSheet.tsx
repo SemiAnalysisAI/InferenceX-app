@@ -120,6 +120,8 @@ export default function VideoPointSheet({
   const [expanded, setExpanded] = useState(false);
   /** Where the page was before it scrolled the point clear of the sheet. */
   const origin = useRef<number | null>(null);
+  /** The point this sheet last scrolled the page for; a later run for it finds the page moving. */
+  const scrolledFor = useRef<string | null>(null);
   /** Closes at the reader's word, which also puts the page back; an action that leaves does not. */
   const dismiss = () => {
     if (origin.current !== null) window.scrollTo({ top: origin.current });
@@ -141,8 +143,16 @@ export default function VideoPointSheet({
     // The slide-in moves the sheet by a transform, so its resting top comes from its height.
     const over = mark.bottom + ANCHOR_GAP - (window.innerHeight - element.offsetHeight);
     if (over <= 0) return;
-    // A point a link opened was never on screen, so there is nowhere to return to.
-    if (origin.current === null && mark.top < window.innerHeight) origin.current = window.scrollY;
+    // The place to return to is where a tap found the page, so it is read before the first scroll
+    // for that point; a run that follows, once the clip is read, finds the page on its way. A
+    // point a link opened was never on screen, so it has no such place.
+    if (
+      origin.current === null &&
+      scrolledFor.current !== pointKey &&
+      mark.top < window.innerHeight
+    )
+      origin.current = window.scrollY;
+    scrolledFor.current = pointKey;
     window.scrollBy({
       top: over,
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
