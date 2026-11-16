@@ -186,11 +186,15 @@ export function Roofline({
   const yHi = Math.max(...ys) * 1.1;
   // Log y: the original full-range axis (all values, /1.5 below, *1.5 above) spent half its
   // height on near-zero values. Raise the floor so that old midpoint sits a quarter of the
-  // way up, then clip roofline slopes and drop points below the floor.
+  // way up, then clip roofline slopes; never above the lowest measured point, so none is hidden.
   const yPos = ys.filter((y) => y > 0);
   const yMid = Math.sqrt((Math.min(...yPos) / 1.5) * (Math.max(...yPos) * 1.5));
-  const yLo = Math.exp((Math.log(yMid) - 0.25 * Math.log(yHi)) / 0.75);
-  const shown = logY ? points.filter((p) => p.y >= yLo) : points;
+  const ptPos = points.map((p) => p.y).filter((y) => y > 0);
+  const yLo = Math.min(
+    Math.exp((Math.log(yMid) - 0.25 * Math.log(yHi)) / 0.75),
+    ...(ptPos.length ? [Math.min(...ptPos) / 1.2] : []),
+  );
+  const shown = logY ? points.filter((p) => p.y > 0) : points;
   if (logY)
     for (const [hw, line] of Object.entries(rooflines)) {
       const cut = line.findIndex((p) => p.y >= yLo);
