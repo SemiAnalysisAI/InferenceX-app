@@ -357,7 +357,7 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // Re-pinned after OperatorX share controls changed; recorded video entries are unchanged.
-      sources: '023657dd6ad8739d7b157c33913a31b4d0fa868d1081f135c68806ca21cfc4e6',
+      sources: '2ddcecf89f806d427a78890d2db90011dc764599f8f6dd809bbbf76866a5872e',
     });
   });
 });

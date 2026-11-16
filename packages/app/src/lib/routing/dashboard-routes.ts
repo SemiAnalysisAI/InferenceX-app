@@ -1,4 +1,4 @@
-import { OPERATORX_SHARE_CONTROLS } from '@/lib/operatorx/share-state';
+import { OPERATORX_SHARE_CONTROLS } from '../operatorx/share-state';
 export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
 export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
