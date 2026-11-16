@@ -280,9 +280,24 @@ function pointPosition(node: Element): { x: number; y: number } | null {
   return match?.groups ? { x: Number(match.groups.x), y: Number(match.groups.y) } : null;
 }
 
+/**
+ * Widths already measured, by type size, weight and text. Measuring a text forces a layout, and
+ * the marks are redrawn on every frame of a transition, so each text is measured once. A font
+ * that loads later changes every width, so they are measured again after it.
+ */
+const measuredWidths = new Map<string, number>();
+if (typeof document !== 'undefined')
+  document.fonts?.addEventListener('loadingdone', () => measuredWidths.clear());
+
 /** Rendered text width, with a character estimate where layout is unavailable. */
-function textWidth(node: SVGTextElement, size: number): number {
-  return node.getComputedTextLength() || [...(node.textContent ?? '')].length * size * 0.6;
+function textWidth(node: SVGTextElement, size: number, estimate = 0.6): number {
+  const text = node.textContent ?? '';
+  const key = `${size}\n${node.getAttribute('font-weight') ?? ''}\n${text}`;
+  const kept = measuredWidths.get(key);
+  if (kept !== undefined) return kept;
+  const width = node.getComputedTextLength();
+  if (width > 0) measuredWidths.set(key, width);
+  return width || [...text].length * size * estimate;
 }
 
 /**
@@ -458,9 +473,7 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       .attr('font-weight', 600)
       .attr('fill', playing ? readableTextColor(point.color) : 'var(--foreground)')
       .text(playing ? s.playing : s.baseline);
-    const label = text.node()!;
-    const labelWidth =
-      label.getComputedTextLength() || [...label.textContent!].length * CHART_TYPE.annotationSub;
+    const labelWidth = textWidth(text.node()!, CHART_TYPE.annotationSub, 1);
     const icon = playing ? 8 : 0;
     const width = labelWidth + icon + 12;
     text.attr('x', -width / 2 + 6 + icon);

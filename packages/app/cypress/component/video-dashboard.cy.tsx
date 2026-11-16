@@ -1781,6 +1781,32 @@ describe('VideoGenX results', () => {
     });
   });
 
+  it('measures the text of a mark once, not on every frame of the glide', () => {
+    mount();
+    playing().should('exist');
+    seriesPills().should('have.length.at.least', 1);
+    // Every text the marks measure: point labels, series pills and clip badges, not axis ticks.
+    const measured: string[] = [];
+    cy.window().then((win) => {
+      const text = (win as unknown as typeof globalThis).SVGTextContentElement.prototype;
+      const measure = text.getComputedTextLength;
+      cy.stub(text, 'getComputedTextLength').callsFake(function (this: SVGTextContentElement) {
+        if (!this.closest('.x-axis, .y-axis')) measured.push(this.textContent ?? '');
+        return measure.call(this);
+      });
+    });
+    // The marks are redrawn on each frame of both glides, with the same texts.
+    toggleHardware('h100');
+    cy.wait(1600);
+    toggleHardware('h100');
+    cy.wait(1600).then(() => {
+      // A measurement forces a layout, so a frame that measured each text would force dozens.
+      expect(measured.length, `measured ${measured.join(' | ')}`).to.be.at.most(
+        2 * new Set(measured).size,
+      );
+    });
+  });
+
   it('pulses playable points until the first clip is picked', () => {
     mount({
       editPage: (page) => {
