@@ -1107,6 +1107,8 @@ describe('VideoGenX results', () => {
       '[data-testid="results-how-to-read"]',
     ]);
     // The first select still changes what plays, and the model picker is still on the page.
+    against().should('not.have.value', 'reference');
+    searchParam('r_vs').should('match', /^h[12]00$/u);
     config().select('h200');
     stagePill('a').should('contain', 'H200');
     cy.get('#results-workload').should('be.visible');

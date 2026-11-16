@@ -1,7 +1,15 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -16,9 +24,11 @@ import {
   compareConfigs,
   configId,
   defaultPairing,
+  mayHaveClips,
   officialCounterpart,
   pairedGroup,
   parseStage,
+  phonePairing,
   promptKey,
   STAGE_ID,
   STAGE_VIEWS,
@@ -46,6 +56,7 @@ import {
 import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
+import { stageSentence } from './stage-sentence';
 import { ScrollFade } from './use-scroll-fade';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
@@ -210,6 +221,11 @@ export interface VideoResultsClipsProps {
   reveal: number;
   /** The drawn point the reader rests on in the chart; its clips are read ahead for its hover card. */
   peek?: string | null;
+  /**
+   * The phone layout: the stage block leads the page (by CSS, under 768 px), and a link that names
+   * no pair opens on `phonePairing`. The caller passes the server's guess until the viewport is known.
+   */
+  phone?: boolean;
   /** The page's title row, which the phone layout shows at the top of the stage block. */
   titleRow?: ReactNode;
   /** The cohort itself is still being read, so there is no subject yet; a phone holds the stage block's place. */
@@ -227,6 +243,9 @@ const LEAD_BLOCK = `flex min-w-0 flex-col gap-3 max-md:order-first max-md:rounde
 const REST_TOP_BLOCK = `flex min-w-0 flex-col gap-3 max-md:rounded-t-xl max-md:border max-md:border-b-0 max-md:pb-3 ${PHONE_CARD}`;
 /** The readout, the quality method and the sources; the page column's gap is closed above it. */
 const REST_BLOCK = `min-w-0 space-y-3 max-md:-mt-4 max-md:rounded-b-xl max-md:border max-md:border-t-0 max-md:pt-0 ${PHONE_CARD}`;
+/** Whether a read side has a clip the stage can play. */
+const playable = (side: ResultsClipSide) =>
+  resultsClipGroups([side]).some((group) => [...group.clips.values()].some((clip) => clip.url));
 const onRoster = (p: VideoPoint) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key);
 /** Strip geometry in px: a 92 px tile, the 40 px "+N" tile and the 8 px gap between them. */
 const TILE = 92;
@@ -273,10 +292,12 @@ export default function VideoResultsClips({
   onShow,
   reveal,
   peek = null,
+  phone = false,
   titleRow,
   cohortLoading = false,
 }: VideoResultsClipsProps) {
-  const s = STRINGS[useLocale()];
+  const locale = useLocale();
+  const s = STRINGS[locale];
   /** Where the stage shows Inspect on a phone: with the view modes, below the chart. */
   const [inspectSlot, setInspectSlot] = useState<HTMLElement | null>(null);
   const touch = useIsCoarsePointer();
@@ -297,6 +318,11 @@ export default function VideoResultsClips({
     if (cache.current.has(key)) return cache.current.get(key) ?? null;
     return failedKeys.has(key) ? null : undefined;
   };
+  /** Whether a pairing candidate has clips: a read side says so, a stored one still being read may. */
+  const mayPlay = (p: VideoPoint) => {
+    const side = sideOf(p);
+    return side === undefined ? mayHaveClips(p) : side !== null && playable(side);
+  };
   const ownLead = (p: VideoPoint) =>
     officialCounterpart(p, deployments, officialOpenings, unofficialRun);
   /** The subject a selection plays, and the side it is compared with. */
@@ -314,11 +340,17 @@ export default function VideoResultsClips({
     const own = subject ? ownLead(subject.point) : null;
     const options = subject ? stageOptions(subject.point, opening, deployments, own) : [];
     const fallback = subject ? defaultPairing(subject.point, own) : 'reference';
+    /** What plays when the link names no pair: `fallback`, or on a phone another GPU. */
+    const opened =
+      (phone && subject && fallback === 'reference'
+        ? phonePairing(subject.point, options, mayPlay)
+        : null) ?? fallback;
     const option =
       options.find((item) => item.value === value) ??
+      options.find((item) => item.value === opened) ??
       options.find((item) => item.value === fallback) ??
       options[0];
-    return { picked, subject, options, option, fallback, other: option?.point ?? null };
+    return { picked, subject, options, option, fallback, opened, other: option?.point ?? null };
   };
   type Pair = ReturnType<typeof pairFor>;
   const ready = ({ subject, other }: Pair) =>
@@ -337,9 +369,19 @@ export default function VideoResultsClips({
       officialOpenings,
       stage.clip,
       against,
+      phone,
     ],
   );
   const nextReady = ready(next);
+  // A phone's opening pair is not the link's default, so the address names it and a shared link
+  // reopens the same two clips on any screen.
+  const openedPair =
+    against === null && next.option?.value === next.opened && next.opened !== next.fallback
+      ? next.opened
+      : null;
+  useEffect(() => {
+    if (openedPair) writeStage({ ...parseStage(location.search), vs: openedPair });
+  }, [openedPair]);
   /** The first frames a pair shows for a prompt. */
   const framesOf = (
     { subject: shown, option: choice, other: paired }: Pair,
@@ -597,6 +639,15 @@ export default function VideoResultsClips({
             url: '',
             empty: s.noTwin,
           };
+  // Two deployments of different hardware: the phone layout states what each costs per clip.
+  const sentence =
+    a && point && other && option?.kind === 'hardware' && !diagnostic
+      ? stageSentence(
+          locale,
+          { name: a.label, point, cost: costs?.[point.id] },
+          { name: b.label, point: other, cost: costs?.[other.id] },
+        )
+      : null;
   // The Compare row and its pairing follow the reader's pick at once, not the held pair.
   const configs = compareConfigs(opening, drawn, unofficialRun);
   const nextHardware = next.subject?.point.hardwareKey ?? '';
@@ -747,7 +798,10 @@ export default function VideoResultsClips({
                       against: choice?.kind,
                       gpu: choice?.point?.hardwareKey ?? null,
                     });
-                    onAgainstChange(value === next.fallback ? null : value);
+                    // Only the default every screen shares stays out of the URL.
+                    onAgainstChange(
+                      value === next.fallback && next.opened === next.fallback ? null : value,
+                    );
                   }}
                 />
               )}
@@ -773,6 +827,31 @@ export default function VideoResultsClips({
                 loadedFrames={loadedFrames}
                 swapped={stage.swap}
                 onSwappedChange={(swap) => writeStage({ ...stage, swap })}
+                caption={
+                  sentence && (
+                    <p
+                      data-testid="video-results-sentence"
+                      className="text-sm leading-6 text-foreground md:hidden"
+                    >
+                      {sentence.map((part, index) =>
+                        'text' in part ? (
+                          <Fragment key={index}>{part.text}</Fragment>
+                        ) : 'strong' in part ? (
+                          <b key={index} className="font-semibold whitespace-nowrap">
+                            {part.strong}
+                          </b>
+                        ) : (
+                          <span
+                            key={index}
+                            aria-hidden="true"
+                            className="mr-1.5 inline-block size-2 rounded-full align-middle"
+                            style={{ background: (part.dot === 'a' ? a : b).color ?? undefined }}
+                          />
+                        ),
+                      )}
+                    </p>
+                  )
+                }
                 inspectSlot={inspectSlot}
               />
             </div>
@@ -925,7 +1004,8 @@ function ClipsSkeleton({ className }: { className?: string }) {
       </div>
       <div className="mx-auto w-full space-y-3" style={{ maxWidth: STAGE_FIT_WIDTH.overlay }}>
         <Skeleton className="aspect-video w-full rounded-lg" />
-        {/* A phone's block also holds the Compare row. */}
+        {/* A phone's block also holds the sentence and the Compare row. */}
+        <Skeleton className="h-18 w-full md:hidden" />
         <Skeleton className="h-8 w-full max-md:h-11" />
         <Skeleton className="h-11 w-full md:hidden" />
       </div>

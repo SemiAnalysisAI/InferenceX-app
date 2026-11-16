@@ -621,8 +621,9 @@ export default function VideoDashboard({
       ...parseStage(location.search),
       clip: stagePointKey(point),
       view: 'wipe',
-      // The subject's default pairing stays out of the URL, as every default does.
-      vs: compare === defaultPairing(point, own) ? null : compare,
+      // The subject's default pairing stays out of the URL, as every default does. A phone opens
+      // on another pair, so there the URL names this one.
+      vs: compare === defaultPairing(point, own) && !phone ? null : compare,
     });
     requestReveal();
   };
@@ -1086,6 +1087,7 @@ export default function VideoDashboard({
                 </div>
                 <hr className="my-6 border-border-alt max-md:hidden" />
                 <VideoResultsClips
+                  phone={phone}
                   cohortLoading={pending || loading}
                   titleRow={
                     <div

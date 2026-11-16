@@ -157,7 +157,10 @@ function mountResultsClips(
     costs = {},
     takes,
     posters = {},
+    phone = false,
   }: {
+    /** The phone layout and its opening pair, which the dashboard takes from the viewport. */
+    phone?: boolean;
     /** Replace the C1 leads of `keys`, which still serve the media. */
     leads?: VideoPoint[];
     deployments?: VideoPoint[];
@@ -314,6 +317,7 @@ function mountResultsClips(
               ...costs,
             }}
             unofficialRun={unofficialRun}
+            phone={phone}
             titleRow={<h1 className="md:hidden">VideoGenX</h1>}
             against={against}
             onAgainstChange={setAgainst}
@@ -599,13 +603,28 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="option-help-content-readout-psnr"]').should('contain', 'Decoded RGB24');
   });
 
-  it('leads a phone with the stage and the Compare row', () => {
+  it('leads a phone with the stage, one sentence and the Compare row', () => {
     cy.viewport(390, 844);
-    mountResultsClips(['b200', 'h200', 'h100']);
-    // Title, picture, transport, Compare row on one line; then the rest.
+    mountResultsClips(['b200', 'h200', 'h100'], '/vgx', false, undefined, [], false, [], {
+      phone: true,
+    });
+    // With no pair in the link a phone opens the subject against another GPU, and says so in the URL.
+    cy.get('[data-testid="video-results-against"]').should('not.have.value', 'reference');
+    cy.location('search').should('match', /r_vs=h[12]00/u);
+    // H100 has a modelled cost in this harness, so the sentence can state both sides.
+    cy.get('[data-testid="video-results-against"]').select('h100');
+    cy.get('[data-testid="video-results-sentence"]')
+      .should('be.visible')
+      .invoke('text')
+      .should(
+        'match',
+        /^Same prompt, same seed\. B200 ×\d+ takes a median [\d.]+ s per clip for \$0\.1; H100 ×\d+ takes [\d.]+ s for \$0\.3\.$/u,
+      );
+    // Title, picture, sentence, transport, Compare row on one line; then the rest.
     const order = [
       'h1',
       '[data-testid="video-results-stage"]',
+      '[data-testid="video-results-sentence"]',
       '[data-testid="video-results-play"]',
       '[data-testid="video-results-compare"]',
       '[data-testid="video-results-prompt"]',
@@ -628,6 +647,10 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-inspect-slot"] [data-testid="video-results-inspect"]')
       .should('be.visible')
       .and('contain', 'Speed');
+    // An explicit reference is a pick like any other on a phone.
+    cy.get('[data-testid="video-results-against"]').select('reference');
+    cy.get('[data-testid="video-results-sentence"]').should('not.exist');
+    cy.get('[data-side="b"]').should('contain', 'Diffusers reference');
   });
 
   it('names a take only when another take shares the prompt and seed', () => {

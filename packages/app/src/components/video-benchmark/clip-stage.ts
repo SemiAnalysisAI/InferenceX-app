@@ -216,6 +216,33 @@ export function officialCounterpart(
 export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
   isLossy(subject) ? 'twin' : (own?.hardwareKey ?? 'reference');
 
+/**
+ * The pairing a phone opens with when the link names none and `defaultPairing` is the reference:
+ * the subject against another GPU, which shows a difference the eye can read. Of the offered
+ * hardware on the subject's workload, engine and GPU count that may have clips (`hasClips`),
+ * it is the one with the highest median latency. Null when there is none, so a workload with
+ * one hardware, or with no like-for-like deployment, keeps the reference.
+ */
+export function phonePairing(
+  subject: VideoPoint,
+  options: readonly StageOption[],
+  hasClips: (point: VideoPoint) => boolean = mayHaveClips,
+): string | null {
+  const slowest = options
+    .flatMap((option) => (option.kind === 'hardware' && option.point ? [option.point] : []))
+    .filter(
+      (point) =>
+        point.hardwareKey !== subject.hardwareKey &&
+        point.workload === subject.workload &&
+        runtimeKey(point) === runtimeKey(subject) &&
+        point.participating === subject.participating &&
+        point.p50 !== null &&
+        hasClips(point),
+    )
+    .toSorted((a, b) => b.p50! - a.p50!)[0];
+  return slowest?.hardwareKey ?? null;
+}
+
 /** A config's Compare-row id: its hardware, its runtime when lossy, and whether it is `namedRun`'s. */
 export const configId = (p: VideoPoint, namedRun?: string) =>
   `${p.hardwareKey ?? ''}${isLossy(p) ? `+${runtimeKey(p)}` : ''}${p.runId === namedRun ? '-overlay' : ''}`;
