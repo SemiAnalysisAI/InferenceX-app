@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { clipGroupActive, frameAt, frameClock } from './clip-sync';
@@ -167,6 +168,8 @@ const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
 const SPLIT_STEP = 5;
+/** How far a finger travels sideways, in px, before its press is a wipe drag and not a tap. */
+const WIPE_SLOP = 6;
 // The Compare row, stage, transport and readout fit under the sticky header together: a picture is at
 // most the window's height less 18rem, and the block narrows to match, one 16:9 frame wide or two
 // side by side.
@@ -238,6 +241,13 @@ export default function VideoClipStage({
     from: typeof lens | null;
     moved: boolean;
   }>(null);
+  /**
+   * A finger cannot hover, so on a touch screen the split follows a press dragged sideways from the
+   * picture or the handle. `moved` outlives the release, so the click that ends a drag does nothing.
+   */
+  const touch = useIsCoarsePointer();
+  const wipe = useRef<{ id: number; x: number; moved: boolean }>(null);
+  const handle = useRef<HTMLButtonElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const pendingSplit = useRef<number | null>(null);
   const splitFrame = useRef(0);
@@ -405,8 +415,18 @@ export default function VideoClipStage({
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     drag.current = null;
+    wipe.current = null;
+    const onPicture = event.target === event.currentTarget;
+    if (
+      touch &&
+      wiping &&
+      !locked &&
+      lens.zoom === 1 &&
+      (onPicture || handle.current?.contains(event.target as Node))
+    )
+      wipe.current = { id: event.pointerId, x: event.clientX, moved: false };
     // Only the picture pans; a press on a pill or control keeps its own action.
-    if (lens.zoom === 1 || event.target !== event.currentTarget) return;
+    if (lens.zoom === 1 || !onPicture) return;
     // Pan is a share of one side, which is the whole stage except in Side by side.
     const side = event.currentTarget.querySelector('[data-side]')?.getBoundingClientRect();
     if (!side || side.width === 0 || side.height === 0) return;
@@ -438,6 +458,16 @@ export default function VideoClipStage({
       return;
     }
     if (!wiping || locked) return;
+    if (touch) {
+      const press = wipe.current;
+      if (press?.id !== event.pointerId) return;
+      if (!press.moved) {
+        if (Math.abs(event.clientX - press.x) <= WIPE_SLOP) return;
+        press.moved = true;
+        // The drag keeps the split after the finger leaves the picture.
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width === 0) return;
     pendingSplit.current = Math.min(
@@ -534,12 +564,16 @@ export default function VideoClipStage({
           // Picture layers pass the pointer through, so only a click on the picture targets the
           // stage itself; pills and controls keep theirs.
           if (event.target !== event.currentTarget) return;
-          if (drag.current?.moved) {
+          if (drag.current?.moved || wipe.current?.moved) {
             drag.current = null;
+            wipe.current = null;
             return;
           }
-          if (wiping) lock(!locked);
-          else if (view === 'toggle') flip('click');
+          if (view === 'toggle') flip('click');
+          // A tap cannot lock a split it never moved, so it plays or pauses; the handle still locks.
+          else if (touch) {
+            if (playable.length > 0) togglePlay();
+          } else if (wiping) lock(!locked);
         }}
         onKeyDown={onKeyDown}
         onKeyUp={(event) => {
@@ -715,6 +749,7 @@ export default function VideoClipStage({
           >
             <div className="absolute inset-y-0 -left-px w-0.5 bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
             <button
+              ref={handle}
               type="button"
               data-testid="video-results-split"
               aria-pressed={locked}
@@ -724,7 +759,10 @@ export default function VideoClipStage({
                 'pointer-events-auto absolute top-1/2 left-0 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white',
                 locked ? 'bg-white text-black' : 'bg-black/55 text-white',
               )}
-              onClick={() => lock(!locked)}
+              onClick={() => {
+                if (wipe.current?.moved) wipe.current = null;
+                else lock(!locked);
+              }}
               onKeyDown={(event) => {
                 if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 event.preventDefault();

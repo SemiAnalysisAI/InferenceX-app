@@ -10,6 +10,7 @@ import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
+import { coarsePointer } from '../support/video-results';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -522,6 +523,52 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-against"]').select('h100');
     cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
     expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
+  });
+
+  it('wipes by a sideways drag and plays on a tap on a touch screen', () => {
+    coarsePointer();
+    mountResultsClips(['b200', 'h200']);
+    load('[data-testid="video-results-start"]');
+    const play = '[data-testid="video-results-play"]';
+    const handle = '[data-testid="video-results-split"]';
+    cy.get('[data-testid="video-results-stage"]').then(($stage) => {
+      cy.stub($stage[0], 'setPointerCapture').as('capture');
+      const { width, height, left, top } = $stage[0].getBoundingClientRect();
+      // Below the centre, so presses land on the clips rather than the split handle.
+      const at = (share: number) =>
+        [
+          width * share,
+          height * 0.75,
+          { clientX: left + width * share, clientY: top + height * 0.75, pointerId: 7 },
+        ] as const;
+      const press = (from: number, to = from) =>
+        cy
+          .wrap($stage)
+          .trigger('pointerdown', ...at(from))
+          .trigger('pointermove', ...at(to))
+          .trigger('pointerup', ...at(to))
+          .trigger('click', ...at(to));
+      // A finger does not hover: a move without a press leaves the split alone.
+      cy.wrap($stage).trigger('pointermove', ...at(0.2));
+      nextFrames();
+      cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(50, 0.5));
+      // A sideways drag moves the split, and the click that ends it neither plays nor locks.
+      press(0.3, 0.7);
+      cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(70, 0.5));
+      cy.get('@capture').should('have.been.calledOnceWith', 7);
+      cy.get(play).should('have.attr', 'aria-pressed', 'false');
+      cy.get(handle).should('have.attr', 'aria-pressed', 'false');
+      // A tap plays, the next pauses, and only the handle locks.
+      press(0.4);
+      cy.get(play).should('have.attr', 'aria-pressed', 'true');
+      press(0.4);
+      cy.get(play).should('have.attr', 'aria-pressed', 'false');
+      cy.get(handle).should('have.attr', 'aria-pressed', 'false').click();
+      cy.get(handle).should('have.attr', 'aria-pressed', 'true');
+      press(0.3, 0.2);
+      nextFrames();
+      cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(70, 0.5));
+    });
   });
 
   it('names a take only when another take shares the prompt and seed', () => {

@@ -2,6 +2,7 @@ import type {
   VideoHistoryObservation,
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
+import { COARSE_POINTER_QUERY } from '@/hooks/useMediaQuery';
 
 /** Clone retained metadata for isolated browser cases; mutations are test data, not benchmark evidence. */
 export function resultHistory(
@@ -23,4 +24,24 @@ export function readOnlyVideoRequests() {
     expect(format, 'media reads never invoke the publication path').not.to.equal('media');
   });
   cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
+}
+
+/**
+ * A touch screen for the components mounted after it: `useIsCoarsePointer` reads true. Call it
+ * before mounting. CSS media queries still see the test browser's mouse.
+ */
+export function coarsePointer() {
+  cy.window().then((win) => {
+    const real = win.matchMedia.bind(win);
+    cy.stub(win, 'matchMedia').callsFake((query: string) =>
+      query === COARSE_POINTER_QUERY
+        ? ({
+            matches: true,
+            media: query,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          } as unknown as MediaQueryList)
+        : real(query),
+    );
+  });
 }
