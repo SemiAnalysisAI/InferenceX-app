@@ -1343,7 +1343,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '20c70bc20a005cc24013ebc7b8d6782c9adef46030ca4b3104c35447e4e11e51',
+    sourceSha256: 'ac495d055a72e392c4ac15e6bd2b7d3291c08ded0fac2162ff6d4a112ba674dc',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
