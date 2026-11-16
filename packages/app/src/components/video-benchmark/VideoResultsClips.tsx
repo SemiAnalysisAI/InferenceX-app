@@ -644,12 +644,14 @@ export default function VideoResultsClips({
               writeStage({ ...stage, prompt: promptKey(item) });
             }}
           >
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5 max-[343px]:gap-1">
               <SegmentedToggle
                 role="group"
                 ariaLabel={s.view}
                 value={stage.view}
                 size="sm"
+                // Four modes and the help button fit the card from a 320 px screen up.
+                buttonClassName="max-[400px]:px-1 max-[374px]:text-xs max-[343px]:px-0.5 max-[343px]:tracking-tight"
                 options={STAGE_VIEWS.map((mode) => ({
                   value: mode,
                   label: s.views[mode],
