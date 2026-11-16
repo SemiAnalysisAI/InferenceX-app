@@ -32,6 +32,7 @@ import { clipGroupActive, frameAt, frameClock } from './clip-sync';
 import { STAGE_ID, type StageView } from './clip-stage';
 import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
+import styles from './results.module.css';
 
 const STRINGS = {
   en: {
@@ -704,7 +705,8 @@ export default function VideoClipStage({
                     aria-label={s.listen(clip.label)}
                     title={s.listen(clip.label)}
                     className={cn(
-                      'grid size-6 shrink-0 place-items-center rounded hover:bg-white/15',
+                      styles.hit,
+                      'relative grid size-6 shrink-0 place-items-center rounded hover:bg-white/15',
                       audible === role ? 'text-amber-400' : 'text-white/70',
                     )}
                     onClick={() => listen(role)}
@@ -756,6 +758,7 @@ export default function VideoClipStage({
               aria-label={locked ? s.unlock : s.lock}
               title={locked ? s.unlock : s.lock}
               className={cn(
+                styles.hit,
                 'pointer-events-auto absolute top-1/2 left-0 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white',
                 locked ? 'bg-white text-black' : 'bg-black/55 text-white',
               )}

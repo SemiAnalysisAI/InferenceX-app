@@ -649,6 +649,8 @@ export default function VideoResultsClips({
                 label={s.label}
                 value="clip-metrics"
                 triggerTestId="video-results-metrics-help"
+                // Clear of the view switcher beside it.
+                triggerClassName="[--hit-x:4px]"
               >
                 {diagnostic ? s.diagnosticNote : s.metricsHelp}
               </InfoHelp>

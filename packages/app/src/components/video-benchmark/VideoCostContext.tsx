@@ -10,6 +10,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { COST_TIERS, TIER_LABELS } from './metrics';
 import type { ResultsState } from './results';
+import styles from './results.module.css';
 
 const STRINGS = {
   en: {
@@ -93,7 +94,13 @@ export default function VideoCostContext({
                 },
               ]}
             />
-            <InfoHelp label={s.tier} value="video-cost-tier" align="start">
+            <InfoHelp
+              label={s.tier}
+              value="video-cost-tier"
+              align="start"
+              // Clear of the select beside it.
+              triggerClassName="[--hit-x:8px]"
+            >
               {s.tierHelp}
             </InfoHelp>
           </span>
@@ -107,7 +114,13 @@ export default function VideoCostContext({
             control={
               <span className="inline-flex items-center gap-0.5">
                 <span>{s.participating}</span>
-                <InfoHelp label={s.basis} value="video-gpu-basis" align="start">
+                <InfoHelp
+                  label={s.basis}
+                  value="video-gpu-basis"
+                  align="start"
+                  // The caption sits between the legend and the price table, closer than a finger.
+                  triggerClassName={styles.roomy}
+                >
                   {s.basisHelp}
                 </InfoHelp>
               </span>

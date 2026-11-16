@@ -700,7 +700,13 @@ export default function VideoDashboard({
                 actions={
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{s.cohort}</span>
-                    <InfoHelp label={s.cohort} value="cohort" triggerTestId="results-cohort-help">
+                    <InfoHelp
+                      label={s.cohort}
+                      value="cohort"
+                      triggerTestId="results-cohort-help"
+                      // Clear of Share beside it.
+                      triggerClassName="[--hit-x:-2px]"
+                    >
                       {s.cohortHelp}
                     </InfoHelp>
                     {replay && <span data-testid="results-replay">{s.replay}</span>}
