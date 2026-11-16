@@ -14,7 +14,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
-import { useClientSearch } from '@/hooks/useClientSearch';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -90,6 +89,7 @@ import {
   writeStage,
   type StagePair,
 } from './clip-stage';
+import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
 import { LossyQualityHint } from './QualityMethod';
@@ -320,7 +320,7 @@ export default function VideoDashboard({
     posters: {},
   });
   /** What the stage compares its subject with, by `StageOption.value` (`r_vs`); null pairs it by default. */
-  const against = parseStage(useClientSearch()).vs;
+  const against = useStageValue('vs');
   /** Whether the reader has picked a clip yet; until then playable chart points pulse. */
   const [picked, setPicked] = useState(false);
   /** The chart point the reader rests on, whose clips are read ahead for its hover card. */

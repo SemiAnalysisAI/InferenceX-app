@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useClientSearch } from '@/hooks/useClientSearch';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -40,6 +39,7 @@ import {
   type StageOption,
   type StagePair,
 } from './clip-stage';
+import { useStageValue } from './use-stage-value';
 import { engineLabel } from './engines';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
@@ -304,7 +304,13 @@ export default function VideoResultsClips({
   const [inspectSlot, setInspectSlot] = useState<HTMLElement | null>(null);
   const touch = useIsCoarsePointer();
   const viewHelp = touch ? s.viewHelpTouch : s.viewHelp;
-  const stage = parseStage(useClientSearch());
+  // Key by key: the address also holds the open chart point, which is not this component's.
+  const stage = {
+    prompt: useStageValue('prompt'),
+    view: useStageValue('view'),
+    clip: useStageValue('clip'),
+    swap: useStageValue('swap'),
+  };
   // Callers pick one clip per hardware, which may be a lossy named run's.
   const selected = useMemo(() => points.filter(onRoster), [points]);
   const opening = useMemo(() => (openings ?? points).filter(onRoster), [openings, points]);
@@ -733,7 +739,7 @@ export default function VideoResultsClips({
               s={s}
               onPick={(item, index, poster) => {
                 track('video_results_prompt_selected', { index, case: caseOf(item), poster });
-                writeStage({ ...stage, prompt: promptKey(item) });
+                writeStage({ ...parseStage(location.search), prompt: promptKey(item) });
               }}
             >
               <div className="flex shrink-0 items-center gap-1.5 max-[343px]:gap-1">
@@ -752,7 +758,7 @@ export default function VideoResultsClips({
                   }))}
                   onValueChange={(view) => {
                     track('video_results_clips_view', { view });
-                    writeStage({ ...stage, view });
+                    writeStage({ ...parseStage(location.search), view });
                   }}
                 />
                 <InfoHelp
@@ -845,7 +851,7 @@ export default function VideoResultsClips({
                 }
                 loadedFrames={loadedFrames}
                 swapped={stage.swap}
-                onSwappedChange={(swap) => writeStage({ ...stage, swap })}
+                onSwappedChange={(swap) => writeStage({ ...parseStage(location.search), swap })}
                 caption={
                   sentence && (
                     <p
@@ -889,7 +895,7 @@ export default function VideoResultsClips({
                     poster,
                     source: 'strip',
                   });
-                  writeStage({ ...stage, prompt: promptKey(item) });
+                  writeStage({ ...parseStage(location.search), prompt: promptKey(item) });
                 }}
               />
             )}

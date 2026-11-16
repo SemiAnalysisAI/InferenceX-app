@@ -26,7 +26,6 @@ import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { axisLabelUnit, chartHoverCard, chartHoverCardImage } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
-import { useClientSearch } from '@/hooks/useClientSearch';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
@@ -42,6 +41,7 @@ import {
   tapTarget,
 } from './chart-marks';
 import { mayHaveClips, parseStage, writeStage } from './clip-stage';
+import { useStageValue } from './use-stage-value';
 import type { VideoPoint } from './metrics';
 import VideoPointSheet from './VideoPointSheet';
 import { serverSplit } from './deployment';
@@ -858,7 +858,7 @@ export default function VideoResultsChart({
   // A touch screen opens a point in a sheet. The open point is `r_sheet`, so a shared link
   // reopens it; a mouse keeps the pinned panel and ignores the key.
   const touch = useIsCoarsePointer();
-  const sheetKey = parseStage(useClientSearch()).sheet;
+  const sheetKey = useStageValue('sheet');
   const sheetPoint =
     touch && sheetKey ? plotted.find((point) => point.key === sheetKey) : undefined;
   /** The last point a tap opened, which a tap on the same spot steps past. */
