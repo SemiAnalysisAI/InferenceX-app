@@ -671,7 +671,7 @@ export default function VideoClipStage({
                   'pointer-events-auto absolute top-2 z-10 flex items-center gap-1.5 rounded-md bg-black/70 py-1 pr-1 pl-2 text-xs text-white',
                   onLeft(role) ? 'left-2' : 'right-2',
                   overlay ? 'max-w-[46%]' : 'max-w-[calc(100%-1rem)]',
-                  audible === role && 'ring-2 ring-amber-400',
+                  audible === role && 'ring-2 ring-primary',
                   view === 'toggle' && shown !== role && 'opacity-45',
                   !playable.includes(role) && 'pr-2',
                 )}
@@ -709,7 +709,7 @@ export default function VideoClipStage({
                     className={cn(
                       styles.hit,
                       'relative grid size-6 shrink-0 place-items-center rounded hover:bg-white/15',
-                      audible === role ? 'text-amber-400' : 'text-white/70',
+                      audible === role ? 'text-primary' : 'text-white/70',
                     )}
                     onClick={() => listen(role)}
                   >

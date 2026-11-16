@@ -276,7 +276,7 @@ export default function VideoHistory() {
         <Card key={entry.id} className="min-w-0 space-y-4 p-4" data-testid="video-history-entry">
           <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
             <a
-              className="text-brand underline underline-offset-2"
+              className="text-brand-fill underline underline-offset-2"
               href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${entry.runId}`}
               target="_blank"
               rel="noreferrer"

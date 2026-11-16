@@ -248,7 +248,7 @@ function Lane({ name, sub, lossy = false }: { name: string; sub: string; lossy?:
     <div
       className={
         lossy
-          ? 'rounded-md border border-amber-500/50 bg-amber-500/5 px-2 py-1'
+          ? 'rounded-md border border-warning/50 bg-warning/5 px-2 py-1'
           : 'rounded-md border border-border/30 bg-card px-2 py-1'
       }
     >

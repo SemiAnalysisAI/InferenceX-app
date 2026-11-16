@@ -1215,7 +1215,7 @@ export default function VideoDashboard({
           </details>
           <footer className="flex flex-wrap justify-end gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
             <a
-              className="text-brand hover:underline"
+              className="text-brand-fill hover:underline"
               href={csvUrl}
               download="videogenx-results.csv"
               onClick={() => track('video_results_csv_downloaded', { source: 'footer' })}
@@ -1223,7 +1223,7 @@ export default function VideoDashboard({
               {s.csv}
             </a>
             <a
-              className="text-brand hover:underline"
+              className="text-brand-fill hover:underline"
               href={apiUrl}
               onClick={() => track('video_results_api_opened')}
             >
