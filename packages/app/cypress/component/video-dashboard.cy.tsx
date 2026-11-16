@@ -1294,6 +1294,13 @@ describe('VideoGenX results', () => {
         );
       });
     cy.focused().should('have.attr', 'data-testid', 'video-point-sheet');
+    // The sheet is modal: Tab goes round its controls and back to the first, not on to the page.
+    sheet()
+      .find('button, a[href]')
+      .then(($stops) => {
+        for (let press = 0; press <= $stops.length; press += 1) cy.press(Cypress.Keyboard.Keys.TAB);
+      });
+    cy.focused().should('have.attr', 'data-testid', 'video-point-sheet-close');
     searchParam('r_sheet').should('be.a', 'string');
     sheet().find('[data-testid="video-point-sheet-metrics"] dt').should('have.length', 4);
     sheet()

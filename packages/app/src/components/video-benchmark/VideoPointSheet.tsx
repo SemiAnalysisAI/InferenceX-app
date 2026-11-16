@@ -172,15 +172,28 @@ export default function VideoPointSheet({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
   }, [fold, pointKey, anchor]);
-  // Focus moves into the sheet and returns to where it was; Escape closes.
+  // Focus moves into the sheet and returns to where it was; Escape closes. The sheet is modal,
+  // so Tab goes round its own controls and never reaches the page under the backdrop.
   useEffect(() => {
     if (!mounted) return undefined;
     const before = document.activeElement;
     sheet.current?.focus({ preventScroll: true });
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.stopPropagation();
-      close.current();
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        close.current();
+        return;
+      }
+      const element = sheet.current;
+      if (event.key !== 'Tab' || !element) return;
+      const stops = [...element.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')];
+      const edge = event.shiftKey ? stops[0] : stops.at(-1);
+      const active = document.activeElement;
+      // From the sheet itself, Tab already lands on its first control.
+      if (active === edge || !element.contains(active) || (event.shiftKey && active === element)) {
+        event.preventDefault();
+        (event.shiftKey ? stops.at(-1) : stops[0])?.focus();
+      }
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => {
