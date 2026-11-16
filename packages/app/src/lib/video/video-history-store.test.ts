@@ -355,9 +355,9 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 5,
-      // Chart query keys and run selection moved into shared helpers; recorded video entries are unchanged.
-      sources: '517c3734c35cdc8356d06cebd9966197b09c629baf2647cafe86b6358c519c31',
+      projection: 6,
+      // The power trace left the entries; they keep its valid sample count.
+      sources: 'f0e8fff70b2dc077964ac624744c2ac08b37062bf5bf9a94fd0a7b65f8bbb3f7',
     });
   });
 });

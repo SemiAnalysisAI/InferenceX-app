@@ -1,6 +1,11 @@
 import { at, number, rows, text, type Bundle } from './bundle';
 import type { ServingCell } from './serving';
 
+export interface PowerSample {
+  seconds: number;
+  watts: number;
+}
+
 export interface ResultsEvidence {
   workloadHash: string | null;
   manifestHash: string;
@@ -14,11 +19,59 @@ export interface ResultsEvidence {
   latencies: number[] | null;
   clientP50?: number | null;
   powerValid: boolean | null;
-  powerSeries: { seconds: number; watts: number }[];
+  /**
+   * Valid samples in the measurement window. The trace itself stays in the artifact
+   * (`powerTrace`): at 1 Hz it outweighs every other History field together. Absent on
+   * older History.
+   */
+  powerSamples?: number;
   peakPowerW: number | null;
   gpuMemoryMiB: number | null;
   warmupSeconds: number | null;
   failures: Record<'timeout' | 'oom' | 'engine' | 'transport' | 'other', number> | null;
+}
+
+type PowerBundle = Pick<Bundle, 'documents'>;
+
+/** The measurement power phase and whether every record of it agrees the power is valid. */
+function measuredPower(bundle: PowerBundle, cell: ServingCell) {
+  const phase = at(cell.power, 'phases', 'measurement');
+  const sidecars = [
+    bundle.documents.get(`gpu/${cell.id}/aggregate.json`),
+    bundle.documents.get(`gpu/${cell.id}/benchmark_concurrency_${cell.concurrency}.json`),
+  ];
+  const dissent = sidecars.some(
+    (s) => at(s, 'power_valid') === false || at(s, 'power_valid') === 0,
+  );
+  return {
+    phase,
+    valid:
+      at(cell.cell, 'verified') === true &&
+      at(phase, 'valid') === true &&
+      at(cell.power, 'valid') !== false &&
+      at(cell.job, 'power', 'valid') !== false &&
+      !dissent,
+  };
+}
+
+/** A cell's valid GPU power samples inside its measurement window; empty when its power is invalid. */
+export function powerTrace(bundle: PowerBundle, cell: ServingCell): PowerSample[] {
+  const start = number(at(cell.power, 'window', 'start_unix'));
+  const end = number(at(cell.power, 'window', 'end_unix'));
+  if (start === null || end === null) return [];
+  if (!measuredPower(bundle, cell).valid) return [];
+  return rows(at(cell.power, 'sample_series')).flatMap((sample) => {
+    const time = number(at(sample, 'unix_seconds'));
+    const watts = number(at(sample, 'aggregate_watts'));
+    return at(sample, 'valid') === true &&
+      time !== null &&
+      time >= start &&
+      time <= end &&
+      watts !== null &&
+      watts >= 0
+      ? [{ seconds: time - start, watts }]
+      : [];
+  });
 }
 
 export function resultsEvidence(
@@ -36,37 +89,7 @@ export function resultsEvidence(
     valid.length > 0 &&
     valid.length === number(at(cell.run, 'summary', 'valid')) &&
     latencies.every((n): n is number => n !== null && n > 0);
-  const phase = at(cell.power, 'phases', 'measurement');
-  const sidecars = [
-    bundle.documents.get(`gpu/${cell.id}/aggregate.json`),
-    bundle.documents.get(`gpu/${cell.id}/benchmark_concurrency_${cell.concurrency}.json`),
-  ];
-  const dissent = sidecars.some(
-    (s) => at(s, 'power_valid') === false || at(s, 'power_valid') === 0,
-  );
-  const powerValid =
-    verified &&
-    at(phase, 'valid') === true &&
-    at(cell.power, 'valid') !== false &&
-    at(cell.job, 'power', 'valid') !== false &&
-    !dissent;
-  const start = number(at(cell.power, 'window', 'start_unix'));
-  const end = number(at(cell.power, 'window', 'end_unix'));
-  const series =
-    powerValid && start !== null && end !== null
-      ? rows(at(cell.power, 'sample_series')).flatMap((sample) => {
-          const time = number(at(sample, 'unix_seconds'));
-          const watts = number(at(sample, 'aggregate_watts'));
-          return at(sample, 'valid') === true &&
-            time !== null &&
-            time >= start &&
-            time <= end &&
-            watts !== null &&
-            watts >= 0
-            ? [{ seconds: time - start, watts }]
-            : [];
-        })
-      : [];
+  const { phase, valid: powerValid } = measuredPower(bundle, cell);
   const warmups = rows(at(cell.run, 'records')).filter((r) => at(r, 'phase') === 'warmup');
   const warmupTimes = warmups.map((r) => number(at(r, 'submit_to_media_seconds')));
   const failureRecords = measured.filter(
@@ -123,7 +146,7 @@ export function resultsEvidence(
       ? number(at(cell.run, 'serving', 'client_ready_latency_seconds', 'p50'))
       : null,
     powerValid: at(cell.power, 'valid') === null && at(phase, 'valid') === null ? null : powerValid,
-    powerSeries: series,
+    powerSamples: powerTrace(bundle, cell).length,
     peakPowerW: powerValid ? number(at(phase, 'aggregate', 'observed_peak_power_w')) : null,
     gpuMemoryMiB: null,
     warmupSeconds:

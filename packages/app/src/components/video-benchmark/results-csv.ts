@@ -44,7 +44,7 @@ export function resultCsvRows(projection: ReturnType<typeof resultProjection>) {
       gpu_board_energy_j_per_clip: cell.joulesPerClip,
       gpu_board_mean_w: point.avgPowerW,
       power_valid: evidence?.powerValid ?? null,
-      power_samples: evidence?.powerSeries.length ?? null,
+      power_samples: evidence?.powerSamples ?? null,
       cost_tier: projection.state.costTier,
       participating_cost_usd_per_video: cell.cost.participating?.perVideo ?? null,
       participating_cost_usd_per_video_s: cell.cost.participating?.perVideoSecond ?? null,
