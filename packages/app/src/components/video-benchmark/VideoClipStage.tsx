@@ -32,7 +32,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { clipGroupActive, frameAt, frameClock } from './clip-sync';
 import { STAGE_ID, type StageView } from './clip-stage';
-import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
 import { useFirstFrame } from './use-first-frame';
 import styles from './results.module.css';
@@ -179,6 +178,10 @@ const ROLES = ['a', 'b'] as const;
 const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
+/** How long after its frames last moved a Difference picture is still drawn at the full rate, in ms. */
+const DIFFERENCE_SETTLE_MS = 500;
+/** How long a Difference picture of two frames that stand still is kept before it is drawn again. */
+const DIFFERENCE_STILL_MS = 1000;
 /** How far into the clips, in seconds, their first frames still stand for them. */
 const FIRST_FRAME_SECONDS = 0.25;
 const SPLIT_STEP = 5;
@@ -354,11 +357,22 @@ export default function VideoClipStage({
     if (view !== 'diff' || !both) return undefined;
     let frame = 0;
     let lastDraw = -Infinity;
-    const buffer = document.createElement('canvas');
-    const context = buffer.getContext('2d', { willReadFrequently: true });
+    /** The playback times last seen and when they last moved: frames that stand still keep their picture. */
+    let seen: { subject: number; pair: number; on: HTMLCanvasElement | null; moved: number } = {
+      subject: NaN,
+      pair: NaN,
+      on: null,
+      moved: -Infinity,
+    };
+    let painted = -Infinity;
+    /** Whether this pair's pixels have been read once, which a cross-origin frame refuses. */
+    let readable = false;
+    const probe = document.createElement('canvas');
+    probe.width = 1;
+    probe.height = 1;
     const draw = (now: number) => {
       frame = requestAnimationFrame(draw);
-      if (!context || now - lastDraw < 100) return;
+      if (now - lastDraw < 100) return;
       lastDraw = now;
       const subject = videos.current.get('a'),
         pair = videos.current.get('b'),
@@ -370,21 +384,43 @@ export default function VideoClipStage({
         return;
       }
       if (Math.abs(subject.currentTime - pair.currentTime) > DIFFERENCE_SYNC_SECONDS) return;
-      buffer.width = pair.videoWidth;
-      buffer.height = pair.videoHeight;
+      // A seek shows its frame once it lands. A browser can show that frame a little after the
+      // seek ends, so the picture is drawn at the full rate for a moment after the times last
+      // moved; a pair that stands still after that keeps its picture, drawn again once a second.
+      if (subject.seeking || pair.seeking) return;
+      if (
+        target !== seen.on ||
+        subject.currentTime !== seen.subject ||
+        pair.currentTime !== seen.pair
+      )
+        seen = { subject: subject.currentTime, pair: pair.currentTime, on: target, moved: now };
+      if (now - seen.moved > DIFFERENCE_SETTLE_MS && now - painted < DIFFERENCE_STILL_MS) return;
+      const output = target.getContext('2d');
+      if (!output) return;
+      if (target.width !== pair.videoWidth || target.height !== pair.videoHeight) {
+        target.width = pair.videoWidth;
+        target.height = pair.videoHeight;
+      }
       try {
-        context.drawImage(pair, 0, 0);
-        const base = context.getImageData(0, 0, buffer.width, buffer.height);
-        context.drawImage(subject, 0, 0);
-        const candidate = context.getImageData(0, 0, buffer.width, buffer.height);
-        target.width = buffer.width;
-        target.height = buffer.height;
-        const output = target.getContext('2d');
-        if (output) {
-          const difference = output.createImageData(buffer.width, buffer.height);
-          difference.data.set(absoluteFrameDifference(base.data, candidate.data));
-          output.putImageData(difference, 0, 0);
+        if (!readable) {
+          // Read off screen, so frames the page may not read never reach the stage.
+          const context = probe.getContext('2d');
+          context?.drawImage(pair, 0, 0, 1, 1);
+          context?.drawImage(subject, 0, 0, 1, 1);
+          context?.getImageData(0, 0, 1, 1);
+          readable = true;
         }
+        // The canvas blends the frames itself, which is `absoluteFrameDifference` without reading
+        // two full frames into script every draw: |pair − subject| per channel, then that picture
+        // added to itself twice, which is ×4 and stops at white.
+        output.globalCompositeOperation = 'copy';
+        output.drawImage(pair, 0, 0);
+        output.globalCompositeOperation = 'difference';
+        output.drawImage(subject, 0, 0);
+        output.globalCompositeOperation = 'lighter';
+        output.drawImage(target, 0, 0);
+        output.drawImage(target, 0, 0);
+        painted = now;
       } catch {
         setDifferenceFailed(true);
       }

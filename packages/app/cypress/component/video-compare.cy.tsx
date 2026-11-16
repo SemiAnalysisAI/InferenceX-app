@@ -6,6 +6,7 @@ import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import type { ResultCell } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
+import { absoluteFrameDifference } from '@/components/video-benchmark/results-clips';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import styles from '@/components/video-benchmark/results.module.css';
 import history from '../fixtures/api/video-history.json';
@@ -551,6 +552,44 @@ describe('Video results clip stage', () => {
       expect(rgba[0]).to.be.greaterThan(200);
       expect(rgba[2]).to.be.greaterThan(200);
     });
+    // The canvas blends the two frames itself; every pixel equals the arithmetic done in script.
+    cy.get<HTMLCanvasElement>('[data-testid="video-results-difference"]').should(($canvas) => {
+      const page = $canvas[0].ownerDocument;
+      const pixels = (side: 'a' | 'b') => {
+        const video = page.querySelector<HTMLVideoElement>(`[data-side="${side}"] video`)!;
+        const frame = page.createElement('canvas');
+        frame.width = video.videoWidth;
+        frame.height = video.videoHeight;
+        const context = frame.getContext('2d')!;
+        context.drawImage(video, 0, 0);
+        return context.getImageData(0, 0, frame.width, frame.height).data;
+      };
+      const drawn = $canvas[0]
+        .getContext('2d')!
+        .getImageData(0, 0, $canvas[0].width, $canvas[0].height).data;
+      expect($canvas[0].width, 'frame width').to.equal(32);
+      expect([...drawn]).to.deep.equal([...absoluteFrameDifference(pixels('b'), pixels('a'))]);
+    });
+    // The pair is paused: once its frames have stood still for half a second its picture stands
+    // too, and is not blended again ten times a second.
+    cy.wait(700);
+    const blends: number[] = [];
+    cy.window().then((win) => {
+      const context = (win as unknown as typeof globalThis).CanvasRenderingContext2D.prototype;
+      const draw = context.drawImage as (...args: unknown[]) => void;
+      cy.stub(context, 'drawImage').callsFake(function (
+        this: CanvasRenderingContext2D,
+        ...args: unknown[]
+      ) {
+        if (
+          this.canvas.dataset.testid === 'video-results-difference' &&
+          (args[0] as Element).localName === 'video'
+        )
+          blends.push(win.performance.now());
+        return draw.apply(this, args);
+      });
+    });
+    cy.wait(1500).then(() => expect(blends.length, 'video frames blended').to.be.at.most(4));
     // H200's clip equals the reference, so the next subject draws a black difference.
     cy.contains('button', 'Toggle B200').click();
     cy.get('[data-side="a"]').should('contain', 'H200');
