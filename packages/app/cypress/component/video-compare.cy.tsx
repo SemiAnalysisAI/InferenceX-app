@@ -435,7 +435,8 @@ describe('Video results clip stage', () => {
   it('keeps native rerun media and PSNR separate from the original CI performance', () => {
     cy.viewport(390, 900);
     mountResultsClips(['b200', 'h100'], '/vgx', true);
-    cy.get('[data-prompt="diag:drum-taps"]')
+    // At this width the strip under the stage is the prompt picker.
+    cy.get('[data-strip-prompt="diag:drum-taps"]')
       .should('have.attr', 'aria-pressed', 'true')
       .and('contain', 'Matched-noise rerun');
     cy.get('[data-side="a"]').should('contain', '4 GPU');
@@ -455,7 +456,7 @@ describe('Video results clip stage', () => {
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
-    cy.get('[data-prompt="drum-taps"]').click();
+    cy.get('[data-strip-prompt="drum-taps"]').click();
     // The board's reference order: quality first, then latency and one cost, then energy.
     readoutOrder(['psnr', 'wall', 'cost', 'energy']);
     readoutValue('psnr').should('have.text', '25 dB');
@@ -603,7 +604,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="option-help-content-readout-psnr"]').should('contain', 'Decoded RGB24');
   });
 
-  it('leads a phone with the stage, one sentence and the Compare row', () => {
+  it('leads a phone with the stage, one sentence, the Compare row and a strip of every prompt', () => {
     cy.viewport(390, 844);
     mountResultsClips(['b200', 'h200', 'h100'], '/vgx', false, undefined, [], false, [], {
       phone: true,
@@ -620,13 +621,14 @@ describe('Video results clip stage', () => {
         'match',
         /^Same prompt, same seed\. B200 ×\d+ takes a median [\d.]+ s per clip for \$0\.1; H100 ×\d+ takes [\d.]+ s for \$0\.3\.$/u,
       );
-    // Title, picture, sentence, transport, Compare row on one line; then the rest.
+    // Title, picture, sentence, transport, Compare row on one line, prompt strip; then the rest.
     const order = [
       'h1',
       '[data-testid="video-results-stage"]',
       '[data-testid="video-results-sentence"]',
       '[data-testid="video-results-play"]',
       '[data-testid="video-results-compare"]',
+      '[data-testid="video-results-prompt-strip"]',
       '[data-testid="video-results-prompt"]',
       '[data-testid="video-results-view-wipe"]',
       '[data-testid="video-results-inspect-toggle-phone"]',
@@ -641,6 +643,16 @@ describe('Video results clip stage', () => {
         document.documentElement.clientWidth,
       ),
     );
+    // The strip holds every prompt and scrolls sideways; the prompt row's own tiles are away.
+    cy.get('[data-testid="video-results-prompts"]').should('not.be.visible');
+    cy.get('[data-testid="video-results-prompt-strip"]').should(($strip) => {
+      expect($strip.find('[data-strip-prompt]')).to.have.length(4);
+      expect($strip[0].scrollWidth, 'more to swipe to').to.be.greaterThan($strip[0].clientWidth);
+    });
+    cy.get('[data-strip-prompt="drum-taps~4"]').scrollIntoView().click();
+    cy.location('search').should('contain', 'r_prompt=drum-taps%7E4');
+    cy.get('[data-strip-prompt="drum-taps~4"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="video-results-prompt"]').should('contain', 'take 4');
     // Inspect leaves the transport row for the view modes, and its drawer opens beside it.
     cy.get('[data-testid="video-results-inspect-toggle"]').should('not.be.visible');
     cy.get('[data-testid="video-results-inspect-toggle-phone"]').click();

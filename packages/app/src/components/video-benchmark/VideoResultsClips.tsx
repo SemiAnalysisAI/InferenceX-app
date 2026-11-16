@@ -237,7 +237,7 @@ const NO_POINTS: readonly VideoPoint[] = [];
 // where the stage block comes first by CSS order alone, so no layout waits for hydration. Each
 // block then draws the card it left; the two rest blocks draw one card between them.
 const PHONE_CARD = 'max-md:mb-0 max-md:border-border/30 max-md:bg-card max-md:p-4';
-/** The title row, stage, transport and Compare row. */
+/** The title row, stage, transport, Compare row and prompt strip. */
 const LEAD_BLOCK = `flex min-w-0 flex-col gap-3 max-md:order-first max-md:rounded-xl max-md:border ${PHONE_CARD}`;
 /** The prompt, the view modes and Inspect. */
 const REST_TOP_BLOCK = `flex min-w-0 flex-col gap-3 max-md:rounded-t-xl max-md:border max-md:border-b-0 max-md:pb-3 ${PHONE_CARD}`;
@@ -855,6 +855,22 @@ export default function VideoResultsClips({
                 inspectSlot={inspectSlot}
               />
             </div>
+            {groups.length > 1 && (
+              <PromptStrip
+                groups={groups}
+                group={stagePrompt(groups, stage.prompt)}
+                s={s}
+                onPick={(item, index, poster) => {
+                  track('video_results_prompt_selected', {
+                    index,
+                    case: caseOf(item),
+                    poster,
+                    source: 'strip',
+                  });
+                  writeStage({ ...stage, prompt: promptKey(item) });
+                }}
+              />
+            )}
           </div>
           <div className={REST_BLOCK}>
             <div className="motion-stale" data-stale={stale || undefined}>
@@ -1004,10 +1020,11 @@ function ClipsSkeleton({ className }: { className?: string }) {
       </div>
       <div className="mx-auto w-full space-y-3" style={{ maxWidth: STAGE_FIT_WIDTH.overlay }}>
         <Skeleton className="aspect-video w-full rounded-lg" />
-        {/* A phone's block also holds the sentence and the Compare row. */}
+        {/* A phone's block also holds the sentence, the Compare row and the prompt strip. */}
         <Skeleton className="h-18 w-full md:hidden" />
         <Skeleton className="h-8 w-full max-md:h-11" />
         <Skeleton className="h-11 w-full md:hidden" />
+        <Skeleton className="h-19 w-full md:hidden" />
       </div>
     </div>
   );
@@ -1120,11 +1137,6 @@ function PromptRow({
   const head = groups.slice(0, count);
   const shown = !group || head.includes(group) ? head : [...head.slice(0, count - 1), group];
   const rest = groups.length - shown.length;
-  /** The clip whose first frame a tile shows: the reference's, else the first clip's. */
-  const faceOf = (item: ResultsClipGroup) =>
-    [resultsClipReference(item, NO_HIDDEN), [...item.clips.values()][0]].find(
-      (clip) => clip?.posterUrl && !failedPosters.has(clip.posterUrl),
-    );
   return (
     <div
       ref={row}
@@ -1137,35 +1149,21 @@ function PromptRow({
           aria-label={s.prompts}
           data-testid="video-results-prompts"
           className={cn(
-            // The padding keeps the selected tile's ring inside the clip.
-            '-m-0.5 flex min-w-0 items-start gap-2 p-0.5',
+            // The padding keeps the selected tile's ring inside the clip. A phone picks prompts
+            // from the strip under the stage, which shows them all.
+            '-m-0.5 flex min-w-0 items-start gap-2 p-0.5 max-md:hidden',
             expanded ? 'basis-full flex-wrap' : 'overflow-hidden max-[820px]:basis-full',
           )}
         >
-          {shown.map((item) => {
-            const face = faceOf(item);
-            const poster = face?.posterUrl;
-            const take = namesTake(groups, item) ? s.take(item.take) : null;
-            return (
-              <PromptTile
-                key={item.key}
-                prompt={promptKey(item)}
-                caseId={caseOf(item)}
-                label={
-                  item.scope
-                    ? s.diagnostic
-                    : poster
-                      ? take
-                      : [`${s.seed} ${item.seed}`, take].filter(Boolean).join(' · ')
-                }
-                poster={poster}
-                preview={face?.previewUrl}
-                pressed={item === group}
-                onPick={() => onPick(item, groups.indexOf(item), Boolean(poster))}
-                onPosterError={(url) => setFailedPosters((previous) => new Set([...previous, url]))}
-              />
-            );
-          })}
+          <PromptTiles
+            items={shown}
+            groups={groups}
+            group={group}
+            s={s}
+            failedPosters={failedPosters}
+            onPosterError={(url) => setFailedPosters((previous) => new Set([...previous, url]))}
+            onPick={onPick}
+          />
           {(rest > 0 || expanded) && (
             <button
               type="button"
@@ -1194,6 +1192,108 @@ function PromptRow({
   );
 }
 
+/** The tiles of `items`, for the prompt row or the phone strip. */
+function PromptTiles({
+  items,
+  groups,
+  group,
+  s,
+  failedPosters,
+  onPosterError,
+  onPick,
+  strip = false,
+}: {
+  items: readonly ResultsClipGroup[];
+  groups: readonly ResultsClipGroup[];
+  group: ResultsClipGroup | null;
+  s: Strings;
+  /** Posters that failed to load; their tiles fall back to the next poster, then to text. */
+  failedPosters: ReadonlySet<string>;
+  onPosterError: (url: string) => void;
+  onPick: (group: ResultsClipGroup, index: number, poster: boolean) => void;
+  strip?: boolean;
+}) {
+  return items.map((item) => {
+    // The clip whose first frame a tile shows: the reference's, else the first clip's.
+    const face = [resultsClipReference(item, NO_HIDDEN), [...item.clips.values()][0]].find(
+      (clip) => clip?.posterUrl && !failedPosters.has(clip.posterUrl),
+    );
+    const poster = face?.posterUrl;
+    const take = namesTake(groups, item) ? s.take(item.take) : null;
+    return (
+      <PromptTile
+        key={item.key}
+        prompt={promptKey(item)}
+        caseId={caseOf(item)}
+        label={
+          item.scope
+            ? s.diagnostic
+            : poster
+              ? take
+              : [`${s.seed} ${item.seed}`, take].filter(Boolean).join(' · ')
+        }
+        poster={poster}
+        preview={face?.previewUrl}
+        pressed={item === group}
+        strip={strip}
+        onPick={() => onPick(item, groups.indexOf(item), Boolean(poster))}
+        onPosterError={onPosterError}
+      />
+    );
+  });
+}
+
+/**
+ * A phone's prompt picker under the stage: every prompt's tile in one row that scrolls sideways
+ * and snaps, the next tile cut by the card's edge. A sideways swipe scrolls the row and an
+ * upright one the page; a tap picks the prompt as a tile in the prompt row does.
+ */
+function PromptStrip({
+  groups,
+  group,
+  s,
+  onPick,
+}: {
+  groups: readonly ResultsClipGroup[];
+  group: ResultsClipGroup | null;
+  s: Strings;
+  onPick: (group: ResultsClipGroup, index: number, poster: boolean) => void;
+}) {
+  const strip = useRef<HTMLDivElement>(null);
+  const [failedPosters, setFailedPosters] = useState<ReadonlySet<string>>(new Set());
+  const shown = group?.key;
+  // The shown prompt's tile stays in view; only the row scrolls, never the page.
+  useLayoutEffect(() => {
+    const row = strip.current;
+    const tile = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!row || !tile || row.clientWidth === 0) return;
+    const box = row.getBoundingClientRect();
+    const at = tile.getBoundingClientRect();
+    if (at.left < box.left || at.right > box.right) row.scrollLeft += at.left - box.left - 16;
+  }, [shown]);
+  return (
+    <div
+      ref={strip}
+      role="group"
+      aria-label={s.prompts}
+      data-testid="video-results-prompt-strip"
+      // The row bleeds to the card's edges, so a cut tile shows there is more to swipe to.
+      className="-mx-4 flex snap-x scroll-px-4 items-start gap-2 overflow-x-auto overscroll-x-contain px-4 py-0.5 [scrollbar-width:none] max-md:order-2 md:hidden [&::-webkit-scrollbar]:hidden"
+    >
+      <PromptTiles
+        items={groups}
+        groups={groups}
+        group={group}
+        s={s}
+        failedPosters={failedPosters}
+        onPosterError={(url) => setFailedPosters((previous) => new Set([...previous, url]))}
+        onPick={onPick}
+        strip
+      />
+    </div>
+  );
+}
+
 /**
  * A prompt's first frame over its case id, or a text tile while it has no poster. Resting the
  * mouse on it, or focusing it from the keyboard, loops its muted preview over the frame.
@@ -1205,6 +1305,7 @@ function PromptTile({
   poster,
   preview,
   pressed,
+  strip = false,
   onPick,
   onPosterError,
 }: {
@@ -1216,6 +1317,8 @@ function PromptTile({
   /** The poster clip's web rendition; fetched only once the tile is hovered. */
   preview: string | undefined;
   pressed: boolean;
+  /** A tile of the phone strip, which the prompt row's own tiles must not be mistaken for. */
+  strip?: boolean;
   onPick: () => void;
   onPosterError: (url: string) => void;
 }) {
@@ -1238,10 +1341,13 @@ function PromptTile({
   return (
     <button
       type="button"
-      data-prompt={prompt}
+      {...{ [strip ? 'data-strip-prompt' : 'data-prompt']: prompt }}
       aria-pressed={pressed}
       title={caseId}
-      className="group/tile flex w-23 shrink-0 flex-col gap-1 text-left outline-none"
+      className={cn(
+        'group/tile flex w-23 shrink-0 flex-col gap-1 text-left outline-none',
+        strip && 'snap-start',
+      )}
       onClick={onPick}
       // A touch would start a download only to pick the prompt.
       onPointerEnter={(event) => event.pointerType === 'mouse' && start()}
