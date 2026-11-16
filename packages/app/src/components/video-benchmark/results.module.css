@@ -151,10 +151,19 @@
 }
 
 /* A phone on its side has no room for the Compare row and readout beside the picture, so the
-   stage keeps only the sticky header and its transport in view with it. */
+   stage keeps only the sticky header and its transport in view with it. The stage sentence
+   follows the transport there, which keeps Play on the screen under the whole picture. */
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .page {
     --stage-reserve: 8rem;
+  }
+  .stageColumn {
+    display: flex;
+    flex-direction: column;
+  }
+  .stageSentence {
+    order: 1;
+    margin-block: 0.75rem 0;
   }
 }
 

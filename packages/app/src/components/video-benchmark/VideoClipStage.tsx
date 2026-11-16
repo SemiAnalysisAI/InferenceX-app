@@ -661,7 +661,7 @@ export default function VideoClipStage({
   return (
     <div
       id={STAGE_ID}
-      className="mx-auto w-full min-w-0 scroll-mt-24 space-y-3"
+      className={cn(styles.stageColumn, 'mx-auto w-full min-w-0 scroll-mt-24 space-y-3')}
       style={{ maxWidth: overlay ? STAGE_FIT_WIDTH.overlay : STAGE_FIT_WIDTH.side }}
     >
       <div

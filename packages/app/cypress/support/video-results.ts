@@ -45,3 +45,17 @@ export function coarsePointer() {
     );
   });
 }
+
+/**
+ * A touch screen the style sheet sees too: Chromium's touch emulation makes
+ * `(hover: none) and (pointer: coarse)` match in CSS and in `matchMedia`. Chromium only; the
+ * emulation outlives the test, so pair `touchScreen(true)` with `touchScreen(false)` in `afterEach`.
+ */
+export function touchScreen(enabled: boolean) {
+  cy.then(() =>
+    Cypress.automation('remote:debugger:protocol', {
+      command: 'Emulation.setTouchEmulationEnabled',
+      params: { enabled },
+    }),
+  );
+}

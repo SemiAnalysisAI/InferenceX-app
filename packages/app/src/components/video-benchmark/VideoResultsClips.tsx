@@ -57,6 +57,7 @@ import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
 import { stageSentence } from './stage-sentence';
+import styles from './results.module.css';
 import { ScrollFade } from './use-scroll-fade';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
@@ -840,7 +841,10 @@ export default function VideoResultsClips({
                   sentence && (
                     <p
                       data-testid="video-results-sentence"
-                      className="text-sm leading-6 text-foreground md:hidden"
+                      className={cn(
+                        styles.stageSentence,
+                        'text-sm leading-6 text-foreground md:hidden',
+                      )}
                     >
                       {sentence.map((part, index) =>
                         'text' in part ? (

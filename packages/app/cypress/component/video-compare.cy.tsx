@@ -7,10 +7,11 @@ import { dashboardCells, videoPoints } from '@/components/video-benchmark/points
 import type { ResultCell } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
+import styles from '@/components/video-benchmark/results.module.css';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
-import { coarsePointer } from '../support/video-results';
+import { coarsePointer, touchScreen } from '../support/video-results';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -306,7 +307,7 @@ function mountResultsClips(
         </button>
         <input aria-label="Notes" />
         {/* The page's column, which a phone's blocks join once the section leaves its box. */}
-        <div className="flex flex-col gap-4">
+        <div className={`${styles.page} flex flex-col gap-4`}>
           <VideoResultsClips
             points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
             colorFor={colorFor}
@@ -355,6 +356,9 @@ function mountLossyPair(twinP50: number | null) {
 /** The viewport y of an element's top edge. */
 const topOf = (selector: string) =>
   cy.get(selector).then(($element) => $element[0].getBoundingClientRect().top);
+/** The viewport y of an element's bottom edge. */
+const bottomOf = (selector: string) =>
+  cy.get(selector).then(($element) => $element[0].getBoundingClientRect().bottom);
 /** Each selector's element starts below the one before it. */
 const expectStacked = (order: string[]) =>
   cy.wrap(order).each((selector: string, index) => {
@@ -370,6 +374,9 @@ describe('Video results clip stage', () => {
   beforeEach(() => {
     // The stage keeps its view and prompt in the URL, which outlives one test's mount.
     cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
+  });
+  afterEach(() => {
+    if (Cypress.isBrowser({ family: 'chromium' })) touchScreen(false);
   });
 
   it('keeps one audible side, also across a prompt switch', () => {
@@ -663,6 +670,35 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-against"]').select('reference');
     cy.get('[data-testid="video-results-sentence"]').should('not.exist');
     cy.get('[data-side="b"]').should('contain', 'Diffusers reference');
+  });
+
+  it('keeps Play on a sideways phone’s screen under the whole picture, the sentence after it', function () {
+    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
+    touchScreen(true);
+    // An iPhone 15 on its side.
+    cy.viewport(734, 343);
+    mountResultsClips(['b200', 'h200', 'h100'], '/vgx', false, undefined, [], false, [], {
+      phone: true,
+    });
+    cy.get('[data-testid="video-results-against"]').select('h100');
+    cy.get('[data-testid="video-results-sentence"]').should('be.visible');
+    // The site's sticky header is 57 px tall; the picture rests 4 px under it.
+    const HEADER = 57;
+    topOf('[data-testid="video-results-stage"]').then((top) =>
+      cy.window().then((win) => win.scrollBy(0, top - HEADER - 4)),
+    );
+    topOf('[data-testid="video-results-stage"]').should('be.closeTo', HEADER + 4, 1);
+    // The picture takes the height the header and the transport leave, so it is taller than
+    // the 180 px a desktop window this short gets.
+    bottomOf('[data-testid="video-results-stage"]').then((picture) => {
+      expect(picture - HEADER - 4, 'picture height').to.be.closeTo(215, 1);
+      topOf('[data-testid="video-results-play"]').should('be.at.least', picture);
+    });
+    bottomOf('[data-testid="video-results-play"]').then((play) => {
+      expect(play, 'Play inside the 343 px screen').to.be.at.most(343);
+      // The sentence is kept; it follows the transport instead of pushing it off the screen.
+      topOf('[data-testid="video-results-sentence"]').should('be.at.least', play);
+    });
   });
 
   it('names a take only when another take shares the prompt and seed', () => {
