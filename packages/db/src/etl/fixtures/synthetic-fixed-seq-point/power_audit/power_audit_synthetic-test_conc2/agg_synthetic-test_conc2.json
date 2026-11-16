@@ -1,0 +1,137 @@
+{
+  "hw": "h100",
+  "conc": 2,
+  "image": "synthetic-test-image:local",
+  "model": "synthetic-test/not-a-real-model",
+  "infmax_model_prefix": "dsr1",
+  "framework": "vllm",
+  "precision": "fp8",
+  "spec_decoding": "none",
+  "disagg": false,
+  "recipe_fingerprint": "",
+  "isl": 32,
+  "osl": 8,
+  "benchmark_outcome": {
+    "status": "passed",
+    "requested": 20,
+    "completed": 20,
+    "failed": 0,
+    "max_failure_rate": 0.05
+  },
+  "duration": 2.3540351989997816,
+  "completed": 20,
+  "request_throughput": 8.496049680352233,
+  "request_records": {
+    "schema_version": 1,
+    "counts": {
+      "requested": 20,
+      "dispatched": 20,
+      "completed": 20,
+      "failed": 0,
+      "failed_by_class": {
+        "http_status": 0,
+        "timeout": 0,
+        "connection": 0,
+        "stream_error": 0,
+        "empty_response": 0,
+        "other": 0
+      },
+      "http_status": {},
+      "warmup_excluded": 4,
+      "retries": 0
+    },
+    "accounting": {
+      "complete": true,
+      "reasons": []
+    },
+    "window": {
+      "benchmark_start_time_unix": 1794805577.4667795,
+      "benchmark_end_time_unix": 1794805579.8208144,
+      "duration": 2.3540351989997816,
+      "duration_source": "client_perf_counter_first_dispatch_to_last_return"
+    },
+    "load": {
+      "max_concurrency": 2,
+      "max_concurrency_kind": "request_concurrency_limit",
+      "request_rate": "inf"
+    },
+    "tpot_definition": "(e2el_ms - ttft_ms) / (output_len - 1); null when output_len < 2",
+    "ms_decimals": 3,
+    "outcomes": [
+      "completed",
+      "http_status",
+      "timeout",
+      "connection",
+      "stream_error",
+      "empty_response",
+      "other"
+    ],
+    "completion_evidence_bits": {
+      "done": 1,
+      "finish_reason": 2,
+      "usage": 4
+    },
+    "columns": {
+      "start_offset_ms": [
+        0.184, 0.441, 64.704, 64.893, 469.774, 470.01, 534.856, 535.237, 941.406, 941.588, 1005.854,
+        1007.397, 1412.066, 1412.322, 1477.103, 1477.379, 1883.876, 1884.113, 1948.413, 1948.606
+      ],
+      "outcome": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "ttft_ms": [
+        33.371, 33.181, 253.409, 253.31, 33.596, 33.429, 253.715, 253.407, 32.871, 32.761, 254.203,
+        252.748, 33.309, 33.15, 254.587, 254.373, 32.933, 32.766, 253.395, 253.279
+      ],
+      "tpot_ms": [
+        10.22, 10.29, 50.331, 50.391, 10.334, 10.401, 50.667, 50.795, 10.36, 10.429, 50.387, 50.48,
+        10.363, 10.439, 50.439, 50.514, 10.366, 10.439, 50.488, 50.558
+      ],
+      "e2el_ms": [
+        64.031, 64.052, 404.402, 404.484, 64.599, 64.632, 405.716, 405.792, 63.951, 64.047, 405.365,
+        404.187, 64.398, 64.468, 405.904, 405.914, 64.032, 64.083, 404.859, 404.954
+      ],
+      "output_len": [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      "input_len": [32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32],
+      "completion_evidence": [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]
+    }
+  },
+  "is_multinode": false,
+  "tp": 1,
+  "pp": 1,
+  "dcp_size": 1,
+  "pcp_size": 1,
+  "ep": 1,
+  "dp_attention": "false",
+  "tput_per_gpu": 305.8577884926804,
+  "output_tput_per_gpu": 33.98419872140893,
+  "input_tput_per_gpu": 271.8735897712715,
+  "mean_ttft": 0.14338968355002635,
+  "median_ttft": 0.14317183050002313,
+  "std_ttft": 0.11025378439414892,
+  "p90_ttft": 0.2542198315000405,
+  "p99_ttft": 0.2545463532999952,
+  "p99.9_ttft": 0.25458300373000586,
+  "mean_tpot": 0.030434600099996108,
+  "mean_intvty": 32.85733989322659,
+  "median_tpot": 0.030385088666624444,
+  "median_intvty": 32.910879773025606,
+  "std_tpot": 0.020070688830942637,
+  "std_intvty": 49.82390033661013,
+  "p90_tpot": 0.05056907869998971,
+  "p90_intvty": 19.77493016894143,
+  "p99_tpot": 0.05077052123000006,
+  "p99_intvty": 19.696469048836647,
+  "p99.9_tpot": 0.050792406323001464,
+  "p99.9_intvty": 19.687982365725162,
+  "mean_itl": 0.030434679949996733,
+  "median_itl": 0.030415317500001038,
+  "std_itl": 0.02007138546449851,
+  "p90_itl": 0.05053262479996192,
+  "p99_itl": 0.051227261830103996,
+  "p99.9_itl": 0.05144367778307924,
+  "mean_e2el": 0.23469348385001468,
+  "median_e2el": 0.23440953049998825,
+  "std_e2el": 0.17046485991628635,
+  "p90_e2el": 0.4058030947000589,
+  "p99_e2el": 0.4059121787499862,
+  "p99.9_e2el": 0.4059138331749864
+}

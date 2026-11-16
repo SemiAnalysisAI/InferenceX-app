@@ -13,10 +13,11 @@ import {
 import {
   getPayloadDb,
   readEachDb,
+  readFromPayloadDbs,
   readRecordFromPayloadDbs,
 } from '@semianalysisai/inferencex-db/lib/payload-db';
 import {
-  getSlaAttempts,
+  getRequestRecordsPresence,
   getSlaAttemptsSources,
   getSlaRunProvenance,
   type SlaAttemptsSource,
@@ -42,6 +43,7 @@ import {
   type SlaPointEvaluationResult,
   type SlaPointEvaluations,
 } from './evaluation';
+import { evaluateStoredSlaPoint, SLA_NO_REQUEST_DATA } from './stored';
 
 /** Captured benchmark results served when the app runs without a database. */
 export interface SlaTargetsFixture {
@@ -62,7 +64,7 @@ export const SLA_ATTEMPTS_FIXTURE = 'sla-attempts';
 export const SLA_EVALUATION_MAX_IDS = 64;
 const EVALUATION_CONCURRENCY = 4;
 
-const NO_DATA: SlaPointEvaluationResult = { unavailable: 'no_request_level_data' };
+const NO_DATA = SLA_NO_REQUEST_DATA;
 
 function fixtureDataset(requestedModel: string | null): SlaTargetsDataset {
   const fixture = loadFixture<SlaTargetsFixture>(SLA_TARGETS_FIXTURE);
@@ -101,17 +103,23 @@ async function loadRunProvenance(runIds: string[]): Promise<Record<string, SlaRu
 const getCachedLiveConfigs = cachedQuery(async (model: string): Promise<SlaTargetsConfig[]> => {
   const rows = await getCachedBenchmarks(DISPLAY_MODEL_TO_DB[model] ?? []);
   const runIds = [...new Set(rows.flatMap((row) => runIdFromRunUrl(row.run_url) ?? []))].toSorted();
-  const [presence, provenance] = await Promise.all([
+  // Fixed-sequence points keep their per-request data in their own table.
+  const fixedSequenceIds = rows
+    .filter((row) => row.benchmark_type !== 'agentic_traces')
+    .map((row) => Number(row.id));
+  const [presence, provenance, recordParts] = await Promise.all([
     getCachedBenchmarkPresence(),
     loadRunProvenance(runIds),
+    readFromPayloadDbs(fixedSequenceIds, getRequestRecordsPresence),
   ]);
   const traces = new IdBitset(presence.trace);
+  const records = new Set(recordParts.flat());
   return buildSlaConfigs(
     rows,
-    (id) => traces.has(id),
+    (id, agentic) => (agentic ? traces.has(id) : records.has(id)),
     (runId) => (runId === null ? undefined : provenance[runId]),
   );
-}, 'sla-targets-configs-v2');
+}, 'sla-targets-configs-v3');
 
 /**
  * Serving configurations of one model with their tested load points. An
@@ -144,18 +152,21 @@ export async function getSlaTargetsDataset(
 const getCachedPointEvaluation = cachedQuery(
   async (
     id: number,
-    kind: SlaAttemptsSource['kind'],
-    _identity: string,
+    kind: Exclude<SlaAttemptsSource['kind'], 'unavailable'>,
+    identity: string,
     _evaluatorVersion: number,
     _attemptsVersion: number,
     _policyKey: string,
     maxTtftMs: number,
     maxTpotMs: number,
     maxE2eS: number | null,
-  ): Promise<SlaPointEvaluationResult> => {
-    const blob = await getSlaAttempts(await getPayloadDb(id), id, kind);
-    return blob ? evaluateSlaAttemptsBlob(blob, { maxTtftMs, maxTpotMs, maxE2eS }) : NO_DATA;
-  },
+  ): Promise<SlaPointEvaluationResult> =>
+    evaluateStoredSlaPoint(
+      await getPayloadDb(id),
+      id,
+      { kind, identity },
+      { maxTtftMs, maxTpotMs, maxE2eS },
+    ),
   'sla-point-evaluation-v1',
 );
 
@@ -199,17 +210,19 @@ export async function getSlaPointEvaluations(
         evaluations[id] =
           source === undefined || source.kind === 'none'
             ? NO_DATA
-            : await getCachedPointEvaluation(
-                id,
-                source.kind,
-                source.identity,
-                SLA_EVALUATOR_VERSION,
-                SLA_ATTEMPTS_VERSION,
-                policyKey,
-                targets.maxTtftMs,
-                targets.maxTpotMs,
-                targets.maxE2eS,
-              );
+            : source.kind === 'unavailable'
+              ? { unavailable: source.reason, detail: source.detail }
+              : await getCachedPointEvaluation(
+                  id,
+                  source.kind,
+                  source.identity,
+                  SLA_EVALUATOR_VERSION,
+                  SLA_ATTEMPTS_VERSION,
+                  policyKey,
+                  targets.maxTtftMs,
+                  targets.maxTpotMs,
+                  targets.maxE2eS,
+                );
       }
     }),
   );

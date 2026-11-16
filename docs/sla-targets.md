@@ -19,7 +19,7 @@ interactivity limits used elsewhere on the dashboard.
 | Evaluation library: accounting, exact evaluation, qualification, selections | `packages/constants/src/sla-targets.ts`                                                                                                                                                                         |
 | Adapter from the original AgentX export, harness log and aggregate          | `packages/db/src/etl/sla-attempts.ts`                                                                                                                                                                           |
 | Storage, ingest wiring, backfill                                            | `packages/db/migrations/030_sla_attempts.sql`, `packages/db/src/etl/trace-replay-ingest.ts`, `packages/db/src/backfill-sla-attempts.ts`                                                                         |
-| Fixed-sequence request records: adapter, storage, ingest                    | `packages/db/src/etl/sla-attempts.ts`, `packages/db/migrations/031_benchmark_sla_attempts.sql`, `packages/db/src/etl/request-records-ingest.ts`                                                                 |
+| Fixed-sequence request records: adapter, storage, ingest, round-trip test   | `packages/db/src/etl/sla-attempts.ts`, `packages/db/migrations/031_benchmark_sla_attempts.sql`, `packages/db/src/etl/request-records-ingest.ts`                                                                 |
 | Reads                                                                       | `packages/db/src/queries/sla-targets.ts`                                                                                                                                                                        |
 | Dataset, server evaluation, view                                            | `packages/app/src/lib/sla-targets/`                                                                                                                                                                             |
 | Routes                                                                      | Page routes `GET /api/v1/sla-targets`, `GET /api/v1/sla-evaluations`                                                                                                                                            |
@@ -155,7 +155,20 @@ Each is chosen among qualifying points only, and each names the load point that 
 - the highest goodput;
 - the lowest estimated cost per 1,000 compliant requests.
 
-They can be three different points.
+The row gives each value with its load ("at 384 users"), and the expanded view labels the load
+point that supports each one.
+
+The highest passing load can be a different point from the other two, and in the captured data
+it is: on B300 with KV offload at TTFT 30 s, TPOT 50 ms and 90%, the highest passing load is 512
+users, while 384 users has the highest goodput and the lowest cost.
+
+The highest-goodput point and the lowest-cost point are the same point within one
+configuration, by arithmetic and not by coincidence. Cost per passing attempt is price x GPUs x
+window / passing, and goodput is passing / window, so cost per 1,000 = price x GPUs / goodput x
+(1,000 / 3,600): the window cancels. They are still computed and named separately, because the
+identity holds only while every load point of a configuration has the same price and GPU count
+and cost covers exactly the window goodput is measured over. Billing warmup or grace time, or
+a per-point GPU count, would separate them.
 
 ### Goodput and cost
 
@@ -194,17 +207,40 @@ A load the run tested without producing a measurement is a first-class input wit
 
 Attainment is never computed from the partial export of an aborted run.
 
+### Four kinds of load without a verdict
+
+They are different states in the data model, the page, the charts and the view API, and none of
+them is ever shown as zero:
+
+| State                         | In the data                                                             | On the page                                                                                                                               |
+| ----------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Failed or excluded            | `exclusion` with a category and the recorded reason; no observed values | Its own row with "Failed: service failure" or "Excluded: invalid measurement"; a cross above the charts at that load, off the value scale |
+| Measured, nothing to evaluate | `unavailable` with a reason and the recorded detail; no observed values | "Insufficient data" with the reason; not drawn in the charts                                                                              |
+| Measured, incomplete          | Observed values, `accounting.reason: measurement_incomplete`            | "Insufficient data", exploratory, with what the client or its log said; never ranked                                                      |
+| Never run                     | Nothing                                                                 | Not listed. Nothing renders a load that was never tested.                                                                                 |
+
+`unavailable.reason` is one of `no_request_level_data` (the run kept aggregates only),
+`request_columns_omitted` (the stored result left the per-attempt columns out for size; the
+detail gives the attempt count and the limit) and `request_records_unreadable` (an unknown
+schema version or load kind, or a block that contradicts its own counts). A point in any of
+these states has no attainment, no passing count, no goodput and no cost: the percentile
+aggregates of the same row are never used to stand in for them.
+
+The database keeps no record of failed load points, so on live data the first state appears only
+when a captured snapshot records it.
+
 ## Policy decisions
 
-Four judgment calls are fields of `SlaAccountingPolicy`. Each can be changed in one place, and a
+Five judgment calls are fields of `SlaAccountingPolicy`. Each can be changed in one place, and a
 change gives cached evaluations a new key.
 
-| Decision                                                       | Current choice                                                                                                                          | Alternative                                                                              | Why it matters                                                                                                                                                                 |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Attempts in flight at the cutoff (`incompleteAtCutoff`)        | `not_passing`: in the denominator, counted as not passing. The attainment with them removed is reported next to it.                     | `indeterminate`: a miss is declared only when it would hold even had all of them passed. | They are cancelled without a record, so their TTFT and TPOT are unknown. At 512 lanes they were 1.9% of attempts, which alone rules out a 99% target under the current choice. |
-| Context-overflow rejections (`contextOverflow`)                | `excluded`: reported, not eligible, because the trace does not fit the model. A point is flagged above the harness's 1% validity limit. | `failed_attempt`: eligible, failed with class `context_overflow`.                        | The harness removes them from the export. None occurred in the runs examined.                                                                                                  |
-| Completed attempts with missing telemetry (`missingTelemetry`) | `not_passing`, counted under missing telemetry.                                                                                         | `indeterminate`.                                                                         | Rare in completed runs.                                                                                                                                                        |
-| Time base of goodput and cost (`timeBase`)                     | `configured_window`: the one duration that is equal across load points. Warmup and grace time are not billed.                           | `phase_elapsed`: includes grace and drain.                                               | Up to about 1% difference in goodput and cost.                                                                                                                                 |
+| Decision                                                       | Current choice                                                                                                                                                                                                                                                                                                                                                                           | Alternative                                                                                                                                                | Why it matters                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Attempts in flight at the cutoff (`incompleteAtCutoff`)        | `not_passing`: in the denominator, counted as not passing. The attainment with them removed is reported next to it.                                                                                                                                                                                                                                                                      | `indeterminate`: a miss is declared only when it would hold even had all of them passed.                                                                   | They are cancelled without a record, so their TTFT and TPOT are unknown. At 512 lanes they were 1.9% of attempts, which alone rules out a 99% target under the current choice.                                                                                                            |
+| Context-overflow rejections (`contextOverflow`)                | `excluded`: reported, not eligible, because the trace does not fit the model. A point is flagged above the harness's 1% validity limit.                                                                                                                                                                                                                                                  | `failed_attempt`: eligible, failed with class `context_overflow`.                                                                                          | The harness removes them from the export. None occurred in the runs examined.                                                                                                                                                                                                             |
+| Completed attempts with missing telemetry (`missingTelemetry`) | `not_passing`, counted under missing telemetry.                                                                                                                                                                                                                                                                                                                                          | `indeterminate`.                                                                                                                                           | Rare in completed runs.                                                                                                                                                                                                                                                                   |
+| Time base of goodput and cost (`timeBase`)                     | `configured_window`: the one duration that is equal across load points. Warmup and grace time are not billed.                                                                                                                                                                                                                                                                            | `phase_elapsed`: includes grace and drain.                                                                                                                 | Up to about 1% difference in goodput and cost.                                                                                                                                                                                                                                            |
+| Completions without completion evidence (`completionEvidence`) | `required`: an attempt the client called completed whose stream showed no completion evidence at all (no finish reason, no end-of-stream marker, no usage block) stays in the denominator, does not pass, and is reported as its own count, not as a service failure. A finish reason without the end-of-stream marker counts as completed, and the number of such attempts is recorded. | `not_required`: taken as completed, on the client's word. Stricter: require the end-of-stream marker itself, which is what a proposed client fix would do. | Fixed-sequence only; the AgentX export records no such evidence. A first token is not proof that a response finished. No real engine has been observed with this data yet, so whether every frontend sends the marker is unverified, and the strict rule could disqualify a whole engine. |
 
 ## What historical data can and cannot support
 
@@ -246,7 +282,10 @@ its harness log reconciles exactly:
 | Already stored, after `db:backfill-sla-attempts` (export only)                | Explicit                           | Lower bound | Exploratory: observed values, no verdict, not ranked.                                                             |
 | Already stored, before the backfill, or before migration 030 is applied       | Inferred from the derived timeline | Unknown     | Exploratory. A request with a TTFT is taken as completed; one without is `unknown`, neither a failure nor a pass. |
 | Already stored, artifacts still on GitHub (90 days)                           | Explicit                           | Recoverable | A verdict once its harness counters are attached. No tool does this for an existing row yet; see open items.      |
-| Fixed-sequence, run without a `request_records` block (every run so far)      | None per request                   | None        | Insufficient data: no request-level data.                                                                         |
+| Fixed-sequence, run without a `request_records` block (every run so far)      | None per request                   | None        | Insufficient data: no request-level data. Not zero, not passing, not derived from percentiles.                    |
+| Fixed-sequence, future run with a complete `request_records` block            | Explicit                           | Established | A verdict.                                                                                                        |
+| Fixed-sequence, block with the per-attempt columns omitted for size           | Counts only                        | Stated      | Insufficient data, with the omission reason, attempt count and limit.                                             |
+| Fixed-sequence or AgentX, measurement stated or logged as not complete        | Explicit for what ran              | Not stated  | Insufficient data, exploratory, with what the client said. Never a verdict, even when the counts add up.          |
 
 The page never shows an unqualified "Meets target" for a point whose dispatched attempts cannot
 be established.
@@ -315,53 +354,92 @@ GitHub keeps artifacts for 90 days, so the run list has to be refreshed over tim
 
 ## Fixed-sequence workloads
 
-No fixed-sequence run so far kept per-request data, so every fixed-sequence point reads
+No fixed-sequence run so far kept per-request data, so every fixed-sequence point today reads
 "Insufficient data: no request-level data". Historical runs cannot be evaluated and do not need
-to be rerun for the AgentX view to work. What exists is the path that retains the data for future
-runs.
+to be rerun for the AgentX view to work. The path that retains and evaluates the data for future
+runs is complete on the app side.
 
 **Producer.** A change to the fixed-sequence client in the benchmark repository (branch
 `feat/fixed-seq-request-records`, not merged, never run on hardware) adds a `request_records`
-block to each result row: one entry per measured attempt with its outcome, TTFT, TPOT and
-end-to-end latency, the counts the client kept (requested, dispatched, completed, failed by
-class, warmup, retries), its measurement window, and what the load setting means.
+block to each result row: one entry per measured attempt with its outcome, TTFT, TPOT,
+end-to-end latency and the completion evidence its stream showed; the counts the client kept
+(requested, dispatched, completed, failed by class, warmup, retries); a statement of whether
+the block accounts for every requested attempt; its measurement window; and what the load
+setting means.
 
 **Ingest.** `mapBenchmarkRow` carries the block; `slaAttemptsFromRequestRecords` adapts it into
 the same attempt data the AgentX export yields; `ingestRequestRecords` stores it in
 `benchmark_sla_attempts` (migration 031, written and not applied) keyed by the benchmark point.
+
+**Read.** The page and the view API read `benchmark_sla_attempts` through the same functions as
+AgentX points (`getSlaAttemptsSources`, `getSlaAttempts`, `evaluateStoredSlaPoint`) and evaluate
+with the same library. With no stored rows, which is today's state and the preview's, they show
+"Insufficient data".
+
 Rules:
 
 - The outcome column decides. Only `completed` is a completion; a failed attempt that streamed
   tokens first keeps its TTFT in the block and is still a failure. An outcome name this code
   does not know is a failure.
+- A first token is not proof of completion. The client's `completed` means HTTP 200, one choice
+  chunk and no error event; a stream that simply stops is `completed` too. An attempt whose
+  stream showed no completion evidence at all is kept apart as unconfirmed, and the
+  `completionEvidence` policy keeps it in the denominator without letting it pass. It is
+  reported as its own count ("stream ended without completion evidence"), not as a failure
+  class. Attempts with a finish reason and no end-of-stream marker count as completed; how many
+  there were is recorded. The client's own counts are stored beside this, unchanged.
+- The block's completeness statement is binding, and it is not trusted alone: the adapter
+  checks requested against dispatched, the outcome column against the completed and failed
+  counts, and the per-class and per-status totals itself. A block that says it is not complete,
+  says nothing, or fails that check is marked `measurement_incomplete`: its observed values are
+  exploratory and it never qualifies, even when its counts happen to add up. Columns of unequal
+  length are refused outright. The client writes no result at all for a cancelled or
+  interrupted run, so this guards against truncated, edited or version-skewed blocks.
 - A completed attempt with fewer than two output tokens has no TPOT. Policy choice: it is stored
   as "not applicable" and the TPOT target does not apply to it, the same rule as for AgentX and
   the same result as the client's own goodput path, which treats that TPOT as 0. The alternative
   is to count it as not passing. Sweeps force full-length outputs, so the case should not occur.
 - The window is count-bound: it ends when the last requested attempt returns. Nothing is cut
   off, there is no grace period, and the duration is the client's own
-  (`durationSource: client_reported`). The configured-window time base of the AgentX policy has
-  nothing to read here, and the result says which duration it used.
+  (`durationSource: client_reported`; the client's description of how it measured it is kept
+  too). The configured-window time base of the AgentX policy has nothing to read here, and the
+  result says which duration it used.
 - The load is stored as `request_concurrency`: a limit on requests in flight. It is refused when
   the block names any other kind.
 - Above 200,000 attempts the producer omits the per-attempt columns from the aggregate. The
-  point is then stored with `unavailable_reason = 'columns_omitted'`; counts alone cannot
-  evaluate a latency target. An unknown schema version, an unknown load kind, or a block that
-  contradicts its own counts is stored with its reason the same way, never read on a guess.
+  point is then stored with `unavailable_reason = 'columns_omitted'` and shown as "Insufficient
+  data" with the attempt count and the limit. The columns still exist in the raw client JSON of
+  the job's `power_audit_*` artifact; this version has no path that reads them from there.
+- An unknown schema version, an unknown load kind, or a block that contradicts its own counts
+  or columns is stored with its reason the same way, never read on a guess.
 - The three top-level values that repeat the block (`duration`, `completed`,
   `request_throughput`) are not stored as metrics.
+
+**Round-trip test.** `packages/app/src/lib/sla-targets/request-records-path.test.ts` runs the
+whole app side on a local in-process Postgres with the real migrations: the artifact reader and
+the official mapper, the benchmark-row and request-records writers, the stored-data read, the
+adapter and evaluator, the page model and the view. Its input is the output of the benchmark
+repository's `synthetic_point.py`, in which the real client measures a scripted local server and
+the real aggregation writes the rows. Expectations come from the script's manifest, not from
+the measured output.
+
+- The normal unit run uses one committed output
+  (`packages/db/src/etl/fixtures/synthetic-fixed-seq-point`, whose manifest names the commit that
+  produced it).
+- `INFERENCEX_CHECKOUT=<benchmark checkout> bun run --cwd packages/app test:sla-roundtrip` runs
+  the producer afresh (about a minute, no GPU, no model, loopback only), repeats every assertion
+  on the fresh output, and fails when the fresh output and the committed one differ in shape.
+
+All of it is synthetic test data. It is reachable from no page, route or preview fixture, and
+the official mapper rejects the producer's default identity.
 
 **Limits.**
 
 - A point with more than 5% failed requests fails its job, and the job uploads no result row,
   so ingest never sees it. The row and its block still exist in the job's `power_audit_*`
-  artifact; nothing reads them from there yet.
-- The page and the view list fixed-sequence configurations, always as "Insufficient data":
-  they do not read `benchmark_sla_attempts` yet. That read is left until an approved run has
-  produced real blocks to check it against.
+  artifact; nothing reads them from there yet, so such a point is not listed rather than listed
+  as failed.
 - `benchmark_sla_attempts` is not in the public-database sync's table list.
-- The adapter is tested against one synthetic sample (the client run against a local fake
-  server, no model and no GPU), stored as a test fixture and never shown as a result.
 
 ## Not covered
 
@@ -379,4 +457,5 @@ Rules:
   benchmark repository (`job_event_*`) carry the outcome and could be ingested.
 - Emit the issued, cutoff and overflow counts in the published per-point JSON of the benchmark
   repository, so accounting does not depend on parsing a log.
-- Whether the four policy decisions above are the intended ones.
+- Whether the five policy decisions above are the intended ones.
+- Read failed fixed-sequence points and omitted per-attempt columns from `power_audit_*`.

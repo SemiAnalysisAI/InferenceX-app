@@ -109,7 +109,7 @@ const pointSchema = objectSchema({
     'Where the attempt data came from (`kind`) and what the harness log said about the run. Null without request-level data.',
   ),
   accounting: nullableRecord(
-    'Attempt accounting: issued, dispatched, attempted (the denominator), completed, failed with `failureClasses`, cancelled, incomplete, unknown, skippedBeforeDispatch, contextOverflowRejected, warmupExcluded, the measurement `window` with `durationS` and `durationSource`, and `completeness` with its `reason`.',
+    'Attempt accounting: issued, dispatched, attempted (the denominator), completed, failed with `failureClasses`, unconfirmedCompletions (called completed by the client without any completion evidence; in the denominator, never passing), cancelled, incomplete, unknown, skippedBeforeDispatch, contextOverflowRejected, warmupExcluded, the measurement `window` with `durationS` and `durationSource`, and `completeness` with its `reason`.',
   ),
   counts: nullableRecord(
     'Attempts passing, not passing and indeterminate against the targets, plus the attempts within each target alone. Separate per-target counts must not be multiplied into a joint attainment.',
@@ -126,6 +126,9 @@ const pointSchema = objectSchema({
   }),
   windowCostUsd: nullableNumberSchema,
   costPer1kCompliantUsd: nullableNumberSchema,
+  unavailable: nullableRecord(
+    'Set for a measured load with nothing to evaluate: `reason` (no_request_level_data, request_columns_omitted or request_records_unreadable) and the recorded `detail`. Such a point has no attainment; it is not zero and not a pass.',
+  ),
   exclusion: nullableRecord(
     'Set for a tested load that produced no measurement: `category` (service_failure, invalid_measurement or undetermined), the recorded `reason`, `jobUrl` and `observedFailures`.',
   ),
@@ -289,6 +292,7 @@ const responseExample = {
             incomplete: 0,
             unknown: 0,
             failureClasses: {},
+            unconfirmedCompletions: 0,
             skippedBeforeDispatch: 0,
             contextOverflowRejected: null,
             warmupExcluded: 354,
@@ -341,6 +345,7 @@ const responseExample = {
           },
           windowCostUsd: 27.68,
           costPer1kCompliantUsd: 6.15521458750278,
+          unavailable: null,
           exclusion: null,
         },
       ],

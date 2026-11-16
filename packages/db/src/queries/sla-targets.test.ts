@@ -11,7 +11,12 @@ import {
   slaAttemptsSha256,
 } from '../etl/sla-attempts';
 import { REQUEST_CHART_DATA_VERSION } from './request-chart-data';
-import { getSlaAttempts, getSlaAttemptsSources, getSlaRunProvenance } from './sla-targets';
+import {
+  getRequestRecordsPresence,
+  getSlaAttempts,
+  getSlaAttemptsSources,
+  getSlaRunProvenance,
+} from './sla-targets';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -153,6 +158,138 @@ describe('getSlaAttemptsSources and getSlaAttempts', () => {
 
   it('does not query for an empty id list', async () => {
     await expect(getSlaAttemptsSources(sql, [])).resolves.toEqual({});
+  });
+});
+
+describe('fixed-sequence request records', () => {
+  // Three fixed-sequence points of one run: attempt data stored, stored with a
+  // reason, and stored by another extraction version. A fourth has no row.
+  const STORED = 900_001;
+  const OMITTED = 900_002;
+  const OTHER_VERSION = 900_003;
+  const HISTORICAL = 900_004;
+  let recordsSha: string;
+
+  beforeAll(async () => {
+    const gz = encodeSlaAttempts({
+      version: SLA_ATTEMPTS_VERSION,
+      source: {
+        kind: 'request_records',
+        harnessLog: 'not_applicable',
+        abortReason: null,
+        sequenceGaps: null,
+        unparsedLines: 0,
+      },
+      set: {
+        completed: {
+          ttftUs: [30_000, 250_000],
+          tpotUs: [10_000, 50_000],
+          e2eUs: [60_000, 400_000],
+        },
+        other: [{ outcome: 'failed', failureClass: 'http_503', count: 1 }],
+      },
+      accounting: {
+        issued: 3,
+        issuedLowerBound: 3,
+        skippedBeforeDispatch: 0,
+        incompleteAtCutoff: 0,
+        contextOverflowRejected: null,
+        warmupExcluded: 2,
+        retryAccounting: 'no_client_retries',
+        outcomeSource: 'explicit',
+        timings: {
+          configuredWindowS: null,
+          graceS: null,
+          phaseElapsedS: null,
+          clientDurationS: 1.5,
+          attemptSpanS: 1.4,
+          cutoffReached: false,
+        },
+      },
+    });
+    recordsSha = slaAttemptsSha256(gz);
+    await db.exec(`
+      INSERT INTO benchmark_results
+        (id, workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, metrics)
+      VALUES
+        (${STORED}, 2, 1, 'single_turn', '2026-09-29', 8192, 1024, 8, '{}'),
+        (${OMITTED}, 2, 1, 'single_turn', '2026-09-29', 8192, 1024, 16, '{}'),
+        (${OTHER_VERSION}, 2, 1, 'single_turn', '2026-09-29', 8192, 1024, 32, '{}'),
+        (${HISTORICAL}, 2, 1, 'single_turn', '2026-09-29', 8192, 1024, 64, '{"median_ttft": 0.1}');
+    `);
+    await db.query(
+      `INSERT INTO benchmark_sla_attempts
+         (benchmark_result_id, sla_attempts_gz, sla_attempts_version, sla_attempts_sha256,
+          load_kind, concurrency_limit, unavailable_reason, unavailable_detail)
+       VALUES
+         (${STORED}, $1, $2, decode($3, 'hex'), 'request_concurrency', 8, null, null),
+         (${OMITTED}, null, $2, null, null, null, 'columns_omitted',
+          'attempts_exceed_aggregate_limit: 250000 attempts, limit 200000'),
+         (${OTHER_VERSION}, $1, $4, decode($3, 'hex'), 'request_concurrency', 32, null, null)`,
+      [gz, SLA_ATTEMPTS_VERSION, recordsSha, SLA_ATTEMPTS_VERSION + 1],
+    );
+  });
+
+  it('reads stored attempt data with its content identity', async () => {
+    const sources = await getSlaAttemptsSources(sql, [STORED]);
+    expect(sources[STORED]).toEqual({ kind: 'request_records', identity: `records:${recordsSha}` });
+    const blob = await getSlaAttempts(sql, STORED, 'request_records');
+    expect(blob?.source.kind).toBe('request_records');
+    expect(blob?.set.completed.ttftUs).toEqual([30_000, 250_000]);
+    expect(blob?.accounting.timings.clientDurationS).toBe(1.5);
+  });
+
+  it('reports omitted columns with the recorded reason, and never decodes another version', async () => {
+    const sources = await getSlaAttemptsSources(sql, [OMITTED, OTHER_VERSION]);
+    expect(sources[OMITTED]).toEqual({
+      kind: 'unavailable',
+      identity: 'unavailable:columns_omitted',
+      reason: 'request_columns_omitted',
+      detail: 'attempts_exceed_aggregate_limit: 250000 attempts, limit 200000',
+    });
+    expect(sources[OTHER_VERSION]).toMatchObject({
+      kind: 'unavailable',
+      reason: 'request_records_unreadable',
+    });
+    await expect(getSlaAttempts(sql, OMITTED, 'unavailable')).resolves.toBeNull();
+    await expect(getSlaAttempts(sql, OTHER_VERSION, 'request_records')).resolves.toBeNull();
+  });
+
+  it('has nothing for a historical row that carries aggregates only', async () => {
+    const sources = await getSlaAttemptsSources(sql, [HISTORICAL]);
+    expect(sources[HISTORICAL]).toEqual({ kind: 'none', identity: 'none' });
+    await expect(getSlaAttempts(sql, HISTORICAL, 'none')).resolves.toBeNull();
+  });
+
+  it('lists which points carried a request-records block', async () => {
+    await expect(
+      getRequestRecordsPresence(sql, [HISTORICAL, STORED, OMITTED, OTHER_VERSION, 443435]),
+    ).resolves.toEqual([STORED, OMITTED, OTHER_VERSION]);
+    await expect(getRequestRecordsPresence(sql, [])).resolves.toEqual([]);
+  });
+
+  it('reads as no request-level data on a database without migration 031', async () => {
+    const bare = await migratedPglite();
+    try {
+      await bare.exec(`
+        DROP TABLE benchmark_sla_attempts;
+        INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, created_at, date)
+        VALUES (1, 1, 1, 'Run Sweep', '2026-09-29T04:19:00Z', '2026-09-29');
+        INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
+          is_multinode, prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
+        VALUES (1, 'dsv4', 'b300', 'sglang', 'fp4', 'mtp', false, false, 8, 8, 8, 8);
+        INSERT INTO benchmark_results
+          (id, workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, metrics)
+        VALUES (7, 1, 1, 'single_turn', '2026-09-29', 8192, 1024, 8, '{}');
+      `);
+      const bareSql = pgliteSql(bare);
+      await expect(getSlaAttemptsSources(bareSql, [7])).resolves.toEqual({
+        7: { kind: 'none', identity: 'none' },
+      });
+      await expect(getRequestRecordsPresence(bareSql, [7])).resolves.toEqual([]);
+    } finally {
+      await bare.close();
+    }
   });
 });
 

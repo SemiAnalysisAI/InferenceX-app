@@ -33,6 +33,7 @@
     "cache:warmup": "bun --env-file=../../.env scripts/warmup-cache.ts",
     "capture:fixtures": "bun scripts/capture-cypress-fixtures.ts",
     "capture:sla-fixtures": "bun scripts/capture-sla-targets-fixtures.ts",
+    "test:sla-roundtrip": "SLA_ROUNDTRIP=1 vitest run src/lib/sla-targets/request-records-path.test.ts",
     "fixtures:video-history": "bun scripts/build-video-history-fixture.ts",
     "guard:zh-copy:chinese-only": "bun scripts/check-zh-chinese-only.ts --chinese-only"
   },

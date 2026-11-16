@@ -349,6 +349,46 @@ describe('attempt accounting', () => {
     expect(accounting).toMatchObject({ completeness: 'unknown', reason: 'no_attempt_records' });
   });
 
+  it('keeps a completion without completion evidence in the denominator and out of the passes', () => {
+    // Three confirmed completions and one stream that produced a first token and
+    // then simply ended: fast enough to pass, were a first token proof of completion.
+    const set = {
+      ...slaAttemptSet([...repeat(PASS, 3), failed('http_503')]),
+      unconfirmed: { ttftUs: [400_000], tpotUs: [20_000], e2eUs: [10_000_000] },
+    };
+    const input = accountingInput({ issued: 5 });
+    const accounting = reconcileSlaAccounting(set, input);
+    expect(accounting).toMatchObject({
+      attempted: 5,
+      completed: 3,
+      failed: 1,
+      unconfirmedCompletions: 1,
+      unknown: 0,
+      completeness: 'complete',
+      reason: 'reconciled',
+    });
+    // Its own count: missing completion evidence is not a recorded failure.
+    expect(accounting.failureClasses).toEqual({ http_503: 1 });
+    expect(evaluateSlaAttempts(set, accounting, TARGETS)).toMatchObject({
+      passing: 3,
+      notPassing: 2,
+      indeterminate: 0,
+      withinTtft: 3,
+    });
+
+    // The alternative takes the client's word for it.
+    const lenient = reconcileSlaAccounting(set, input, {
+      ...SLA_ACCOUNTING_POLICY,
+      completionEvidence: 'not_required',
+    });
+    expect(lenient).toMatchObject({ attempted: 5, completed: 4, unconfirmedCompletions: 1 });
+    expect(evaluateSlaAttempts(set, lenient, TARGETS)).toMatchObject({
+      passing: 4,
+      notPassing: 1,
+      withinTtft: 4,
+    });
+  });
+
   it('keeps warmup and retry accounting beside the attempt counts', () => {
     const accounting = reconcileSlaAccounting(
       slaAttemptSet(repeat(PASS, 200)),
@@ -401,7 +441,7 @@ describe('accounting window', () => {
 
   it('gives every policy its own cache key', () => {
     expect(slaAccountingPolicyKey(SLA_ACCOUNTING_POLICY)).toBe(
-      'v1;cutoff=not_passing;overflow=excluded@0.01;telemetry=not_passing;time=configured_window',
+      'v1;cutoff=not_passing;overflow=excluded@0.01;telemetry=not_passing;time=configured_window;completion=required',
     );
     expect(
       slaAccountingPolicyKey({ ...SLA_ACCOUNTING_POLICY, timeBase: 'phase_elapsed' }),
@@ -631,6 +671,78 @@ describe('qualification', () => {
       reason: 'no_request_level_data',
     });
     expect(aggregateOnly.exclusion).toBeNull();
+    expect(aggregateOnly.unavailable).toEqual({ reason: 'no_request_level_data', detail: null });
+    expect(crashed.unavailable).toBeNull();
+  });
+
+  it('gives a point without request-level data no number at all', () => {
+    for (const reason of [
+      'no_request_level_data',
+      'request_columns_omitted',
+      'request_records_unreadable',
+    ] as const) {
+      const point = evaluateSlaPoint(
+        {
+          load: { kind: 'request_concurrency', value: 64 },
+          data: { kind: 'unavailable', reason, detail: 'as recorded' },
+          cost: { gpuHourUsd: 2, gpuCount: 8 },
+        },
+        0.5,
+      );
+      // Not zero, not a pass, and nothing an aggregate percentile could stand in for.
+      expect(point.observed).toBeNull();
+      expect(point.accounting).toBeNull();
+      expect(point.windowCostUsd).toBeNull();
+      expect(point.costPer1kCompliantUsd).toBeNull();
+      expect(point.qualification).toMatchObject({ status: 'insufficient_data', reason });
+      expect(point.unavailable).toEqual({ reason, detail: 'as recorded' });
+    }
+    const config = evaluateSlaConfig(
+      [
+        {
+          load: { kind: 'request_concurrency', value: 8 },
+          data: { kind: 'unavailable', reason: 'request_columns_omitted' },
+          cost: null,
+        },
+      ],
+      0.5,
+    );
+    expect(config.status).toBe('insufficient_data');
+    expect(config.exploratory).toBe(false);
+    expect(config.selections).toEqual({
+      highestPassingLoad: null,
+      highestGoodput: null,
+      lowestCost: null,
+    });
+  });
+
+  it('never qualifies an incomplete measurement, even when its counts add up', () => {
+    // Every record passes and the issued count equals the records: without the
+    // client's own statement this would reconcile and meet the targets.
+    const records = repeat(PASS, 2000);
+    const complete = evaluateSlaPoint(measured(8, records), 0.99);
+    expect(complete.accounting).toMatchObject({ completeness: 'complete', reason: 'reconciled' });
+    expect(complete.qualification.status).toBe('meets');
+
+    const interrupted = evaluateSlaPoint(
+      measured(8, records, { measurementIncomplete: true }),
+      0.99,
+    );
+    expect(interrupted.accounting).toMatchObject({
+      completeness: 'partial',
+      reason: 'measurement_incomplete',
+      populationEstablished: false,
+    });
+    expect(interrupted.qualification).toMatchObject({
+      status: 'insufficient_data',
+      reason: 'measurement_incomplete',
+      exploratory: true,
+    });
+    // The observed values stay, labelled exploratory, and the point is never selected.
+    expect(interrupted.observed?.attainment).toBe(1);
+    const config = evaluateSlaConfig([measured(8, records, { measurementIncomplete: true })], 0.99);
+    expect(config).toMatchObject({ status: 'insufficient_data', exploratory: true });
+    expect(config.selections.highestPassingLoad).toBeNull();
   });
 });
 
@@ -667,6 +779,13 @@ describe('cost', () => {
     expect(costPer1kCompliantUsd({ gpuHourUsd: 2, gpuCount: 8 }, 3600, 0)).toBeNull();
   });
 });
+
+/** A count-bound client window: only the client's own duration is known. */
+function clientWindow(seconds: number): Partial<SlaAccountingInput> {
+  return {
+    timings: { ...HOUR, configuredWindowS: null, phaseElapsedS: null, clientDurationS: seconds },
+  };
+}
 
 describe('configuration results', () => {
   it('reports the highest tested passing load literally when passing is not monotonic', () => {
@@ -715,6 +834,41 @@ describe('configuration results', () => {
       result.points[0].observed?.goodputRps ?? 0,
     );
     expect(result.points[2].qualification.status).toBe('misses');
+  });
+
+  it('ties the cheapest point to the highest-goodput point within one cost basis', () => {
+    // Cost per passing attempt is price x GPUs x window / passing, and goodput is
+    // passing / window, so cost per 1,000 = price x GPUs / goodput x (1000 / 3600).
+    // With one price and one GPU count the two selections are the same point,
+    // whatever the windows are. The highest passing load is independent of both.
+    const points = [
+      measured(8, repeat(PASS, 1000), clientWindow(100)),
+      measured(16, repeat(PASS, 3000), clientWindow(250)),
+      measured(32, repeat(PASS, 500), clientWindow(40)),
+      measured(64, repeat(PASS, 400), clientWindow(80)),
+    ];
+    const result = evaluateSlaConfig(points, 0.99);
+    expect(result.points.map((point) => point.observed!.goodputRps)).toEqual([10, 12, 12.5, 5]);
+    for (const point of result.points) {
+      expect(point.costPer1kCompliantUsd).toBeCloseTo(
+        ((2 * 8) / point.observed!.goodputRps!) * (1000 / 3600),
+        9,
+      );
+    }
+    expect(result.selections).toEqual({ highestPassingLoad: 3, highestGoodput: 2, lowestCost: 2 });
+
+    // Only a different cost basis on a point separates the two.
+    const repriced = evaluateSlaConfig(
+      points.map((point, index) =>
+        index === 1 ? { ...point, cost: { gpuHourUsd: 1, gpuCount: 8 } } : point,
+      ),
+      0.99,
+    );
+    expect(repriced.selections).toEqual({
+      highestPassingLoad: 3,
+      highestGoodput: 2,
+      lowestCost: 1,
+    });
   });
 
   it('picks the cheapest qualifying point by its own cost basis', () => {

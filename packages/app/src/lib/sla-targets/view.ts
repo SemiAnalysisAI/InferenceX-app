@@ -165,7 +165,15 @@ function evaluateConfig(
       return { load, data: { kind: 'excluded', category, reason }, cost };
     }
     if (entry.evaluation === null) {
-      return { load, data: { kind: 'unavailable', reason: 'no_request_level_data' }, cost };
+      const stored = entry.point ? evaluations[entry.point.id] : undefined;
+      return {
+        load,
+        data:
+          stored !== undefined && 'unavailable' in stored
+            ? { kind: 'unavailable', reason: stored.unavailable, detail: stored.detail ?? null }
+            : { kind: 'unavailable', reason: 'no_request_level_data' },
+        cost,
+      };
     }
     const { accounting, counts } = entry.evaluation;
     return { load, data: { kind: 'measured', accounting, counts }, cost };

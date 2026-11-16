@@ -143,6 +143,8 @@ function accountingLines(t: SlaStrings, view: SlaPointView): string[] {
     accounting.reason === 'dispatch_count_unavailable' && accounting.issuedLowerBound !== null
       ? `${t.accounting[accounting.reason]} (≥ ${formatCount(accounting.issuedLowerBound)})`
       : t.accounting[accounting.reason],
+    // What the client or its log said about a measurement that did not complete.
+    accounting.reason === 'measurement_incomplete' ? (evaluation.source.abortReason ?? '') : '',
     [
       part(accounting.completed, t.breakdown.completed),
       accounting.failed > 0
@@ -150,6 +152,10 @@ function accountingLines(t: SlaStrings, view: SlaPointView): string[] {
         : null,
       part(accounting.cancelled, t.breakdown.cancelled),
       part(accounting.incomplete, t.breakdown.incomplete),
+      // Counted apart only when the policy does not take them as completed.
+      accounting.policy.completionEvidence === 'required'
+        ? part(accounting.unconfirmedCompletions, t.breakdown.unconfirmed)
+        : null,
       part(accounting.unknown, t.breakdown.unknown),
       part(counts.missingTelemetry, t.breakdown.missingTelemetry),
     ]
@@ -165,6 +171,13 @@ function accountingLines(t: SlaStrings, view: SlaPointView): string[] {
       .filter((entry) => entry !== null)
       .join(' · '),
   ].filter((line) => line.length > 0);
+}
+
+/** The headline values of the configuration that this load point supports. */
+function supportedValues(t: SlaStrings, row: SlaConfigView, view: SlaPointView): string[] {
+  return (Object.keys(row.selections) as (keyof typeof row.selections)[])
+    .filter((key) => row.selections[key] === view)
+    .map((key) => t.supports[key]);
 }
 
 function PointRow({ t, row, view }: { t: SlaStrings; row: SlaConfigView; view: SlaPointView }) {
@@ -214,9 +227,7 @@ function PointRow({ t, row, view }: { t: SlaStrings; row: SlaConfigView; view: S
   const cost = result?.costPer1kCompliantUsd ?? null;
   const qualification = result?.qualification;
   const status: SlaRowStatus = qualification?.status ?? 'loading';
-  const supports = (Object.keys(row.selections) as (keyof typeof row.selections)[])
-    .filter((key) => row.selections[key] === view)
-    .map((key) => t.supports[key]);
+  const supports = supportedValues(t, row, view);
   const bounds = observed
     ? [
         observed.attainmentExcludingIncomplete !== null &&
@@ -294,6 +305,11 @@ function PointRow({ t, row, view }: { t: SlaStrings; row: SlaConfigView; view: S
           </span>
         ))}
         {!view.evaluation && qualification && t.reason[qualification.reason]}
+        {view.result?.unavailable?.detail && (
+          <span className="block break-words" data-testid="sla-unavailable-detail">
+            {view.result.unavailable.detail}
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -324,12 +340,16 @@ function PointBlock({ t, row, view }: { t: SlaStrings; row: SlaConfigView; view:
   const goodput = observed?.goodputRps ?? null;
   const cost = view.result?.costPer1kCompliantUsd ?? null;
   const reason = qualification ? t.reason[qualification.reason] : '';
+  const supports = supportedValues(t, row, view);
   return (
     <li className="py-2">
       <div className="flex items-baseline justify-between gap-3">
         <span className="tabular-nums">{loadOf(t, kind, view)}</span>
         <span className={cn('font-medium', STATUS_TONE[status])}>{t.statusLabel[status]}</span>
       </div>
+      {supports.length > 0 && (
+        <p className="text-xs text-muted-foreground">{supports.join(t.listSeparator)}</p>
+      )}
       {observed && attainment !== null && (
         <p className="mt-1 text-sm tabular-nums">
           {formatPercent(attainment)}
@@ -344,6 +364,7 @@ function PointBlock({ t, row, view }: { t: SlaStrings; row: SlaConfigView; view:
       <p className="mt-1 text-xs text-muted-foreground">
         {[
           reason ? (qualification?.exploratory ? t.exploratoryReason(reason) : reason) : null,
+          view.result?.unavailable?.detail ?? null,
           ...accountingLines(t, view),
         ]
           .filter((line) => line !== null)

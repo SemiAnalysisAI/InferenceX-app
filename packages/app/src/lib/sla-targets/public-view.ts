@@ -13,6 +13,7 @@ import {
   type SlaSelections,
   type SlaStatus,
   type SlaTargets,
+  type SlaUnavailableReason,
 } from '@semianalysisai/inferencex-constants';
 
 import { ViewsApiParamError } from '@/lib/views-api/errors';
@@ -131,6 +132,11 @@ export interface SlaPublicPoint {
   /** GPU cost of the whole accounting window, $. */
   windowCostUsd: number | null;
   costPer1kCompliantUsd: number | null;
+  /**
+   * Set for a measured load with nothing to evaluate: no request-level data,
+   * per-request columns omitted for size, or records this evaluator cannot read.
+   */
+  unavailable: { reason: SlaUnavailableReason; detail: string | null } | null;
   /** Set for a tested load that produced no measurement. */
   exclusion: {
     category: SlaExclusionCategory;
@@ -193,6 +199,7 @@ function publicPoint(view: SlaPointView): SlaPublicPoint {
     qualification: result.qualification,
     windowCostUsd: result.windowCostUsd,
     costPer1kCompliantUsd: result.costPer1kCompliantUsd,
+    unavailable: result.unavailable,
     exclusion: excluded
       ? {
           category: excluded.category,

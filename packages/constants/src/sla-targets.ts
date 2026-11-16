@@ -124,6 +124,13 @@ export interface SlaOutcomeCount {
 /** The attempts of one load point: completed ones with latencies, the rest by outcome. */
 export interface SlaAttemptSet {
   completed: SlaCompletedColumns;
+  /**
+   * Attempts the client called completed whose stream showed no evidence at
+   * all that the response finished: no finish reason, no end-of-stream marker,
+   * no usage block. Whether they count as completions is
+   * `policy.completionEvidence`. Absent when the client records no such evidence.
+   */
+  unconfirmed?: SlaCompletedColumns;
   other: SlaOutcomeCount[];
 }
 
@@ -218,6 +225,14 @@ export interface SlaAccountingPolicy {
    * - `phase_elapsed`: phase start to phase completion, grace and drain included.
    */
   timeBase: 'configured_window' | 'phase_elapsed';
+  /**
+   * Attempts the client called completed without evidence that the response
+   * finished (`SlaAttemptSet.unconfirmed`). A first token is not that evidence.
+   * - `required`: eligible and not passing, reported as their own count. They
+   *   are missing completion evidence, not a recorded service failure.
+   * - `not_required`: taken as completed, on the client's word.
+   */
+  completionEvidence: 'required' | 'not_required';
 }
 
 export const SLA_ACCOUNTING_POLICY: SlaAccountingPolicy = {
@@ -227,6 +242,7 @@ export const SLA_ACCOUNTING_POLICY: SlaAccountingPolicy = {
   contextOverflowLimit: 0.01,
   missingTelemetry: 'not_passing',
   timeBase: 'configured_window',
+  completionEvidence: 'required',
 };
 
 /** Accounting policy version of the default policy; part of every cache key. */
@@ -240,6 +256,7 @@ export function slaAccountingPolicyKey(policy: SlaAccountingPolicy): string {
     `overflow=${policy.contextOverflow}@${policy.contextOverflowLimit}`,
     `telemetry=${policy.missingTelemetry}`,
     `time=${policy.timeBase}`,
+    `completion=${policy.completionEvidence}`,
   ].join(';');
 }
 
@@ -332,6 +349,13 @@ export interface SlaAccountingInput {
   warmupExcluded: number | null;
   retryAccounting: SlaRetryAccounting;
   outcomeSource: SlaOutcomeSource;
+  /**
+   * The client says its records do not account for the whole measurement: the
+   * run was cancelled, interrupted or aborted, or its own counts disagree. The
+   * records it left may be exact, but they are not the full population. Absent
+   * means the client reported a complete run.
+   */
+  measurementIncomplete?: boolean;
   timings: SlaWindowTimings;
 }
 
@@ -348,6 +372,8 @@ export type SlaAccountingReason =
   | 'outcomes_not_explicit'
   /** More attempt records than the client says it issued. */
   | 'records_exceed_dispatched'
+  /** The client did not finish the measurement, or says its counts do not cover it. */
+  | 'measurement_incomplete'
   /** Neither attempt records nor an issued count. */
   | 'no_attempt_records';
 
@@ -369,6 +395,12 @@ export interface SlaAccounting {
   unknown: number;
   /** Failed attempts by the error class the client recorded. */
   failureClasses: Record<string, number>;
+  /**
+   * Attempts the client called completed without any completion evidence,
+   * however the policy counts them. Under `completionEvidence: required` they
+   * are in `attempted`, in neither `completed` nor `failed`, and never pass.
+   */
+  unconfirmedCompletions: number;
   skippedBeforeDispatch: number | null;
   /** Requests rejected for context overflow, however the policy counts them. */
   contextOverflowRejected: number | null;
@@ -418,9 +450,16 @@ export function reconcileSlaAccounting(
   if (policy.contextOverflow === 'failed_attempt') {
     addFailures(SLA_CONTEXT_OVERFLOW_FAILURE, overflow);
   }
-  const completed = set.completed.ttftUs.length;
+  const unconfirmed = set.unconfirmed?.ttftUs.length ?? 0;
+  const evidenceRequired = policy.completionEvidence === 'required';
+  const completed = set.completed.ttftUs.length + (evidenceRequired ? 0 : unconfirmed);
   const classified =
-    completed + totals.failed + totals.cancelled + totals.incomplete + totals.unknown;
+    (evidenceRequired ? unconfirmed : 0) +
+    completed +
+    totals.failed +
+    totals.cancelled +
+    totals.incomplete +
+    totals.unknown;
 
   const { issued } = input;
   const dispatched =
@@ -442,6 +481,11 @@ export function reconcileSlaAccounting(
   } else if (exceeds) {
     completeness = 'unknown';
     reason = 'records_exceed_dispatched';
+  } else if (input.measurementIncomplete === true) {
+    // Stated first among the partial cases: counts that happen to add up do
+    // not make an interrupted measurement a complete one.
+    completeness = 'partial';
+    reason = 'measurement_incomplete';
   } else if (input.outcomeSource !== 'explicit') {
     completeness = 'unknown';
     reason = 'outcomes_not_explicit';
@@ -465,6 +509,7 @@ export function reconcileSlaAccounting(
     incomplete: totals.incomplete,
     unknown,
     failureClasses,
+    unconfirmedCompletions: unconfirmed,
     skippedBeforeDispatch: input.skippedBeforeDispatch,
     contextOverflowRejected: input.contextOverflowRejected,
     contextOverflowOverLimit:
@@ -536,7 +581,6 @@ export function evaluateSlaAttempts(
   accounting: SlaAccounting,
   targets: SlaLatencyTargets,
 ): SlaPointCounts {
-  const { ttftUs, tpotUs, e2eUs } = set.completed;
   const ttftLimit = targetLimitUs(targets.maxTtftMs, 1e3);
   const tpotLimit = targetLimitUs(targets.maxTpotMs, 1e3);
   const e2eLimit = targets.maxE2eS === null ? null : targetLimitUs(targets.maxE2eS, 1e6);
@@ -547,20 +591,29 @@ export function evaluateSlaAttempts(
   let withinE2e = 0;
   let missingTelemetry = 0;
   let missingOnly = 0;
-  for (let index = 0; index < ttftUs.length; index += 1) {
-    const ttft = compare(ttftUs[index], ttftLimit);
-    const tpot = tpotUs[index] === SLA_TPOT_NOT_APPLICABLE ? 1 : compare(tpotUs[index], tpotLimit);
-    const e2e = e2eLimit === null ? 1 : compare(e2eUs[index], e2eLimit);
-    if (ttft === 1) withinTtft += 1;
-    if (tpot === 1) withinTpot += 1;
-    if (e2e === 1) withinE2e += 1;
-    const missing = ttft === 0 || tpot === 0 || e2e === 0;
-    if (missing) missingTelemetry += 1;
-    if (ttft === -1 || tpot === -1 || e2e === -1) exceeded += 1;
-    else if (missing) missingOnly += 1;
-    else passing += 1;
-  }
   const { policy } = accounting;
+  // Completions without completion evidence are evaluated only when the policy
+  // takes them as completed; otherwise they are counted below as not passing.
+  const evaluated =
+    policy.completionEvidence === 'required' || set.unconfirmed === undefined
+      ? [set.completed]
+      : [set.completed, set.unconfirmed];
+  for (const { ttftUs, tpotUs, e2eUs } of evaluated) {
+    for (let index = 0; index < ttftUs.length; index += 1) {
+      const ttft = compare(ttftUs[index], ttftLimit);
+      const tpot =
+        tpotUs[index] === SLA_TPOT_NOT_APPLICABLE ? 1 : compare(tpotUs[index], tpotLimit);
+      const e2e = e2eLimit === null ? 1 : compare(e2eUs[index], e2eLimit);
+      if (ttft === 1) withinTtft += 1;
+      if (tpot === 1) withinTpot += 1;
+      if (e2e === 1) withinE2e += 1;
+      const missing = ttft === 0 || tpot === 0 || e2e === 0;
+      if (missing) missingTelemetry += 1;
+      if (ttft === -1 || tpot === -1 || e2e === -1) exceeded += 1;
+      else if (missing) missingOnly += 1;
+      else passing += 1;
+    }
+  }
   const incompleteNotPassing =
     policy.incompleteAtCutoff === 'not_passing' ? accounting.incomplete : 0;
   const notPassing =
@@ -568,6 +621,7 @@ export function evaluateSlaAttempts(
     accounting.failed +
     accounting.cancelled +
     incompleteNotPassing +
+    (policy.completionEvidence === 'required' ? accounting.unconfirmedCompletions : 0) +
     (policy.missingTelemetry === 'not_passing' ? missingOnly : 0);
   return {
     passing,
@@ -686,6 +740,21 @@ export function smallSampleSize(
 
 export type SlaStatus = 'meets' | 'misses' | 'insufficient_data';
 
+/**
+ * Why a measured load point has nothing to evaluate. None of these is a
+ * failure of the service, and none may be shown as zero or approximated from
+ * aggregate percentiles.
+ * - `no_request_level_data`: the run kept aggregates only.
+ * - `request_columns_omitted`: the run recorded each attempt, but the stored
+ *   result left the per-attempt columns out for size.
+ * - `request_records_unreadable`: per-attempt data exists in a form this
+ *   evaluator does not read, or that contradicts its own counts.
+ */
+export type SlaUnavailableReason =
+  | 'no_request_level_data'
+  | 'request_columns_omitted'
+  | 'request_records_unreadable';
+
 export type SlaQualificationReason =
   | 'attainment_met'
   | 'attainment_below_required'
@@ -697,11 +766,13 @@ export type SlaQualificationReason =
   | 'failure_undetermined'
   /** The dispatched attempts cannot be established; observed values are exploratory. */
   | 'attempt_population_not_established'
+  /** The measurement was cancelled, interrupted or left incomplete; observed values are exploratory. */
+  | 'measurement_incomplete'
   /** Fewer attempts than the sample policy asks for. */
   | 'below_minimum_sample'
   /** Passing or missing depends on attempts whose verdict cannot be known. */
   | 'outcomes_unresolved'
-  | 'no_request_level_data'
+  | SlaUnavailableReason
   | 'no_eligible_attempts';
 
 export interface SlaQualification {
@@ -737,6 +808,9 @@ export function qualifySlaPoint(
     minimumSample,
   });
   if (observed.attempted === 0) return insufficient('no_eligible_attempts', false);
+  if (accounting.reason === 'measurement_incomplete') {
+    return insufficient('measurement_incomplete', true);
+  }
   if (!accounting.populationEstablished) {
     return insufficient('attempt_population_not_established', true);
   }
@@ -800,7 +874,12 @@ export type SlaExclusionCategory = 'service_failure' | 'invalid_measurement' | '
 export type SlaPointData =
   | { kind: 'measured'; accounting: SlaAccounting; counts: SlaPointCounts }
   | { kind: 'excluded'; category: SlaExclusionCategory; reason: string }
-  | { kind: 'unavailable'; reason: 'no_request_level_data' };
+  | {
+      kind: 'unavailable';
+      reason: SlaUnavailableReason;
+      /** What the producer or the ingest recorded about it, in its own words. */
+      detail?: string | null;
+    };
 
 export interface SlaPointInput {
   load: SlaLoad;
@@ -821,6 +900,8 @@ export interface SlaPointResult {
   costPer1kCompliantUsd: number | null;
   /** Set when the point was excluded from measurement. */
   exclusion: { category: SlaExclusionCategory; reason: string } | null;
+  /** Set when the point was measured but has nothing to evaluate. */
+  unavailable: { reason: SlaUnavailableReason; detail: string | null } | null;
 }
 
 /** GPU cost of an accounting window: every GPU for the whole window, idle time included. */
@@ -866,6 +947,7 @@ export function evaluateSlaPoint(
       windowCostUsd: null,
       costPer1kCompliantUsd: null,
       exclusion: excluded ? { category: data.category, reason: data.reason } : null,
+      unavailable: excluded ? null : { reason: data.reason, detail: data.detail ?? null },
     };
   }
   const observed = observeSlaPoint(data.accounting, data.counts);
@@ -877,6 +959,7 @@ export function evaluateSlaPoint(
     windowCostUsd: windowCostUsd(input.cost, observed.durationS),
     costPer1kCompliantUsd: costPer1kCompliantUsd(input.cost, observed.durationS, observed.passing),
     exclusion: null,
+    unavailable: null,
   };
 }
 

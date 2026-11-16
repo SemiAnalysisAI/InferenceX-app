@@ -1063,6 +1063,23 @@ Reading the response:
 - A point with `exclusion` is a tested load that produced no measurement;
   `exclusion.category` separates a service failure from an invalid benchmark
   measurement and from an undetermined cause. Report it with its reason.
+- A point with `unavailable` was measured but has nothing to evaluate:
+  `no_request_level_data` (the run kept aggregates only),
+  `request_columns_omitted` (per-request records left out of the stored result
+  for size; `detail` gives the count and the limit) or
+  `request_records_unreadable`. It has no attainment. Never report it as 0%, as
+  passing, or with a figure derived from the row's percentile aggregates.
+- `accounting.reason: measurement_incomplete` means the client or its log says
+  the measurement did not complete. Its values are exploratory whatever the
+  counts say.
+- A load that appears in no point was never run. Do not describe it as failed.
+- Within one configuration the highest-goodput point and the lowest-cost point
+  coincide by arithmetic (cost per 1,000 = price x GPUs / goodput x 1,000 /
+  3,600); only the highest passing load is independent of them.
+- `accounting.unconfirmedCompletions` counts attempts the client called
+  completed whose stream showed no completion evidence at all. Under the
+  default policy they stay in the denominator and do not pass; they are not a
+  failure class.
 - `withinTtft`, `withinTpot` and `withinE2e` are separate counts. Do not
   multiply separate attainments or percentiles into a joint attainment; use
   `passing`.
@@ -1089,7 +1106,11 @@ Reading the response:
 可以是不同的负载点。`loadKind` 说明 `load` 的含义：`agentx_users` 是回放通道数（模拟
 用户），`request_concurrency` 是请求并发上限；测试均为闭环，不能据此给出开环的请求
 速率容量。带 `exclusion` 的负载点表示该负载已测试但没有得到测量结果，引用时须同时给出
-其类别和原因。
+其类别和原因。带 `unavailable` 的负载点表示已测量但没有可评估的数据（没有逐请求数据、
+逐请求记录因体积过大未写入存储的结果，或记录无法读取），它没有达标率，不得写成 0%、
+写成达标，也不得用该行的百分位汇总值推算。`accounting.reason` 为
+`measurement_incomplete` 时表示测量未完成，其数值只能作为探索性结果。任何负载点里都
+没有出现的负载就是没有测试过，不要说成失败。
 
 ### VideoGenX results overview
 

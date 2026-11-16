@@ -345,7 +345,22 @@ describe('slaAttemptsFromExport', () => {
     });
     expect(blob.source).toMatchObject({ harnessLog: 'aborted' });
     expect(blob.source.abortReason).toContain('failed_request_threshold');
-    expect(blob.accounting).toMatchObject({ issued: null, incompleteAtCutoff: null });
+    expect(blob.accounting).toMatchObject({
+      issued: null,
+      incompleteAtCutoff: null,
+      measurementIncomplete: true,
+    });
+    // The run stopped early: its records can be shown, never judged.
+    expect(reconcileSlaAccounting(blob.set, blob.accounting)).toMatchObject({
+      completeness: 'partial',
+      reason: 'measurement_incomplete',
+      populationEstablished: false,
+    });
+  });
+
+  it('does not mark a run that finished as incomplete', async () => {
+    const blob = await slaAttemptsFromExport([record(0), record(1)], { harnessLog: LOG_COMPLETE });
+    expect(blob.accounting).not.toHaveProperty('measurementIncomplete');
   });
 
   it('counts lines that are not JSON instead of dropping them silently', async () => {

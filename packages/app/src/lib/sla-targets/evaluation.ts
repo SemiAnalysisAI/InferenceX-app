@@ -7,6 +7,7 @@ import {
   type SlaAccountingPolicy,
   type SlaLatencyTargets,
   type SlaPointCounts,
+  type SlaUnavailableReason,
 } from '@semianalysisai/inferencex-constants';
 import type { SlaAttemptsBlob } from '@semianalysisai/inferencex-db/etl/sla-attempts';
 
@@ -22,9 +23,17 @@ export interface SlaPointEvaluation {
   counts: SlaPointCounts;
 }
 
-export type SlaPointEvaluationResult =
-  | SlaPointEvaluation
-  | { unavailable: 'no_request_level_data' };
+/**
+ * A point with nothing to evaluate: why, and what was recorded about it. It
+ * carries no counts and no attainment, so nothing downstream can show it as
+ * zero or as a pass.
+ */
+export interface SlaPointUnavailable {
+  unavailable: SlaUnavailableReason;
+  detail?: string | null;
+}
+
+export type SlaPointEvaluationResult = SlaPointEvaluation | SlaPointUnavailable;
 
 export type SlaPointEvaluations = Record<number, SlaPointEvaluationResult>;
 

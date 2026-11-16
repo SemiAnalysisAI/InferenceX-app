@@ -58,9 +58,43 @@ export interface SlaAttemptsBlob {
     sequenceGaps: number | null;
     /** Records that could not be parsed as JSON. */
     unparsedLines: number;
+    /** What a fixed-sequence `request_records` block itself stated, kept as written. */
+    requestRecords?: RequestRecordsStatement;
   };
   set: SlaAttemptSet;
   accounting: SlaAccountingInput;
+}
+
+/** The parts of a `request_records` block that describe it, as the client wrote them. */
+export interface RequestRecordsStatement {
+  schemaVersion: number;
+  /** How the client measured `window.duration`, in its own words. */
+  durationSource: string | null;
+  /**
+   * The block's statement that it accounts for every requested attempt, with
+   * its reasons when it does not. `stated: false` when the block says nothing.
+   */
+  accounting: { stated: boolean; complete: boolean; reasons: string[] };
+  /** The client's counts, before this adapter reads the columns. */
+  counts: {
+    requested: number;
+    dispatched: number;
+    completed: number | null;
+    failed: number | null;
+    failedByClass: Record<string, number>;
+    httpStatus: Record<string, number>;
+  };
+  /**
+   * Attempts the client called completed whose stream showed no completion
+   * evidence at all. Their latencies are kept apart, in `set.unconfirmed`; the
+   * accounting policy decides how they count.
+   */
+  withoutCompletionEvidence: number;
+  /**
+   * Attempts the client called completed whose stream carried a finish reason
+   * and never the end-of-stream marker. They count as completed.
+   */
+  finishedWithoutEndMarker: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,6 +426,8 @@ export async function slaAttemptsFromExport(
       // The harness issues one credit per request and has no retry path.
       retryAccounting: 'no_client_retries',
       outcomeSource: 'explicit',
+      // The harness stopped the run early, or marked it cancelled.
+      ...(aborted ? { measurementIncomplete: true } : {}),
       timings: {
         configuredWindowS: log?.configuredWindowS ?? null,
         graceS: log?.graceS ?? null,
@@ -501,6 +537,7 @@ export const REQUEST_RECORDS_SCHEMA_VERSION = 1;
 const REQUEST_CONCURRENCY_LIMIT = 'request_concurrency_limit';
 const COMPLETED_OUTCOME = 'completed';
 const HTTP_STATUS_OUTCOME = 'http_status';
+const ACCOUNTING_NOT_STATED = 'accounting_not_stated';
 
 /**
  * Why a `request_records` block yields no attempt data.
@@ -571,6 +608,16 @@ function unavailable(
  *
  * - The outcome column decides: only `completed` is a completion. A failed
  *   attempt keeps the TTFT it observed before failing, and stays a failure.
+ * - A first token is not proof of completion. An attempt the client called
+ *   completed whose stream showed no completion evidence at all (no finish
+ *   reason, no end-of-stream marker, no usage block) is kept apart as
+ *   unconfirmed; the accounting policy decides whether it counts as a
+ *   completion. The client's own counts are kept beside this.
+ * - The block states whether it accounts for every requested attempt, and the
+ *   statement is checked again here against the counts and columns. When the
+ *   block says it does not, says nothing, or the check disagrees, the result
+ *   is marked incomplete and can never qualify, even if its numbers happen to
+ *   add up.
  * - A completed attempt without a TTFT is missing telemetry, not a failure.
  * - A completed attempt with fewer than two output tokens has no TPOT; it is
  *   stored as not applicable, the same rule as for AgentX.
@@ -613,10 +660,11 @@ export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecords
   }
   const outcomes = Array.isArray(root.outcomes) ? root.outcomes : null;
   const { outcome, ttft_ms: ttft, tpot_ms: tpot, e2el_ms: e2el, output_len: outputLen } = columns;
+  const evidence = columns.completion_evidence;
   const startOffset = columns.start_offset_ms;
   if (
     !outcomes ||
-    ![outcome, ttft, tpot, e2el, outputLen].every(
+    ![outcome, ttft, tpot, e2el, outputLen, evidence].every(
       (column) => Array.isArray(column) && column.length === dispatched,
     )
   ) {
@@ -625,13 +673,25 @@ export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecords
       'a column is missing or its length is not counts.dispatched',
     );
   }
+  const bits = plainObject(root.completion_evidence_bits) ?? {};
+  const doneBit = wholeCount(bits.done) ?? 0;
+  const finishBit = wholeCount(bits.finish_reason) ?? 0;
+  if (doneBit === 0 || finishBit === 0) {
+    return unavailable(
+      'malformed_block',
+      'completion_evidence_bits does not name done and finish_reason',
+    );
+  }
   const starts =
     Array.isArray(startOffset) && startOffset.length === dispatched
       ? (startOffset as unknown[])
       : null;
 
   const rows: AttemptRow[] = [];
+  const unconfirmed: AttemptRow[] = [];
   const failures = new Map<string, number>();
+  let clientCompleted = 0;
+  let finishedWithoutEndMarker = 0;
   let firstStartMs = Number.POSITIVE_INFINITY;
   let lastEndMs = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < dispatched; index += 1) {
@@ -648,21 +708,65 @@ export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecords
       failures.set(failureClass, (failures.get(failureClass) ?? 0) + 1);
       continue;
     }
+    clientCompleted += 1;
+    const shown = wholeCount((evidence as unknown[])[index]) ?? 0;
+    const confirmed = shown !== 0;
+    if ((shown & finishBit) !== 0 && (shown & doneBit) === 0) finishedWithoutEndMarker += 1;
     const tpotMs = finite((tpot as unknown[])[index]);
     const tokens = finite((outputLen as unknown[])[index]);
-    rows.push([
+    (confirmed ? rows : unconfirmed).push([
       micros(finite((ttft as unknown[])[index])),
       tpotMs === null && tokens !== null && tokens < 2 ? SLA_TPOT_NOT_APPLICABLE : micros(tpotMs),
       micros(e2elMs),
     ]);
   }
   const statedCompleted = wholeCount(counts.completed);
-  if (statedCompleted !== null && statedCompleted !== rows.length) {
+  if (statedCompleted !== null && statedCompleted !== clientCompleted) {
     return unavailable(
       'malformed_block',
-      `counts.completed ${statedCompleted} but ${rows.length} completed outcomes`,
+      `counts.completed ${statedCompleted} but ${clientCompleted} completed outcomes`,
     );
   }
+  const statedFailed = wholeCount(counts.failed);
+  if (statedFailed !== null && statedFailed !== dispatched - clientCompleted) {
+    return unavailable(
+      'malformed_block',
+      `counts.failed ${statedFailed} but ${dispatched - clientCompleted} failed outcomes`,
+    );
+  }
+
+  const countMap = (value: unknown): Record<string, number> =>
+    Object.fromEntries(
+      Object.entries(plainObject(value) ?? {}).flatMap(([name, amount]) => {
+        const whole = wholeCount(amount);
+        return whole === null ? [] : [[name, whole] as [string, number]];
+      }),
+    );
+  const failedByClass = countMap(counts.failed_by_class);
+  const httpStatus = countMap(counts.http_status);
+
+  // The block's own statement, then the same checks made here: the flag alone is not trusted.
+  const stated = plainObject(root.accounting);
+  const isStated = typeof stated?.complete === 'boolean';
+  const reasons = new Set<string>(
+    isStated && Array.isArray(stated.reasons)
+      ? stated.reasons.filter((reason): reason is string => typeof reason === 'string')
+      : [],
+  );
+  if (!isStated) reasons.add(ACCOUNTING_NOT_STATED);
+  if (stated?.complete === false && reasons.size === 0) reasons.add('no_reason_stated');
+  if (requested !== dispatched) reasons.add('requested_not_dispatched');
+  if (statedCompleted === null || statedFailed === null) reasons.add('outcome_count_mismatch');
+  const classNames = new Set([...Object.keys(failedByClass), ...failures.keys()]);
+  if ([...classNames].some((name) => (failedByClass[name] ?? 0) !== (failures.get(name) ?? 0))) {
+    reasons.add('failure_class_count_mismatch');
+  }
+  const httpTotal = Object.values(httpStatus).reduce((sum, amount) => sum + amount, 0);
+  if (httpTotal !== (failures.get(HTTP_STATUS_OUTCOME) ?? 0)) {
+    reasons.add('http_status_count_mismatch');
+  }
+  const accounting = { stated: isStated, complete: reasons.size === 0, reasons: [...reasons] };
+  const measured = plainObject(root.window) ?? {};
 
   const httpFailures = failures.get(HTTP_STATUS_OUTCOME) ?? 0;
   failures.delete(HTTP_STATUS_OUTCOME);
@@ -673,7 +777,7 @@ export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecords
     .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([failureClass, amount]) => ({ outcome: 'failed', failureClass, count: amount }));
 
-  const duration = finite(plainObject(root.window)?.duration);
+  const duration = finite(measured.duration);
   const retries = wholeCount(counts.retries);
   return {
     kind: 'attempts',
@@ -684,11 +788,33 @@ export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecords
       source: {
         kind: 'request_records',
         harnessLog: 'not_applicable',
-        abortReason: null,
+        abortReason: accounting.complete
+          ? null
+          : `accounting incomplete: ${accounting.reasons.join(', ')}`,
         sequenceGaps: null,
         unparsedLines: 0,
+        requestRecords: {
+          schemaVersion: REQUEST_RECORDS_SCHEMA_VERSION,
+          durationSource:
+            typeof measured.duration_source === 'string' ? measured.duration_source : null,
+          accounting,
+          counts: {
+            requested,
+            dispatched,
+            completed: statedCompleted,
+            failed: statedFailed,
+            failedByClass,
+            httpStatus,
+          },
+          withoutCompletionEvidence: unconfirmed.length,
+          finishedWithoutEndMarker,
+        },
       },
-      set: { completed: completedColumns(rows), other },
+      set: {
+        completed: completedColumns(rows),
+        ...(unconfirmed.length > 0 ? { unconfirmed: completedColumns(unconfirmed) } : {}),
+        other,
+      },
       accounting: {
         issued: requested,
         issuedLowerBound: dispatched,
@@ -700,6 +826,7 @@ export function slaAttemptsFromRequestRecords(block: unknown): SlaRequestRecords
         warmupExcluded: wholeCount(counts.warmup_excluded),
         retryAccounting: retries === 0 ? 'no_client_retries' : 'unknown',
         outcomeSource: 'explicit',
+        ...(accounting.complete ? {} : { measurementIncomplete: true }),
         timings: {
           configuredWindowS: null,
           graceS: null,
@@ -721,6 +848,8 @@ interface SlaAttemptsWire extends Omit<SlaAttemptsBlob, 'set'> {
   set: {
     /** `ttftUs` is sorted, so it is stored as differences between neighbours. */
     completed: { ttftUsDelta: number[]; tpotUs: number[]; e2eUs: number[] };
+    /** Few by nature, so stored as they are. */
+    unconfirmed?: SlaAttemptSet['unconfirmed'];
     other: SlaOutcomeCount[];
   };
 }
@@ -738,6 +867,7 @@ export function encodeSlaAttempts(blob: SlaAttemptsBlob): Buffer {
         tpotUs,
         e2eUs,
       },
+      ...(blob.set.unconfirmed ? { unconfirmed: blob.set.unconfirmed } : {}),
       other: blob.set.other,
     },
   };
@@ -749,7 +879,14 @@ export function decodeSlaAttempts(gz: Uint8Array): SlaAttemptsBlob {
   const { ttftUsDelta, tpotUs, e2eUs } = wire.set.completed;
   let running = 0;
   const ttftUs = ttftUsDelta.map((delta) => (running += delta));
-  return { ...wire, set: { completed: { ttftUs, tpotUs, e2eUs }, other: wire.set.other } };
+  return {
+    ...wire,
+    set: {
+      completed: { ttftUs, tpotUs, e2eUs },
+      ...(wire.set.unconfirmed ? { unconfirmed: wire.set.unconfirmed } : {}),
+      other: wire.set.other,
+    },
+  };
 }
 
 /** Content identity of an encoded blob: the source-data part of an evaluation cache key. */

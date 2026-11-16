@@ -172,7 +172,7 @@ function runOrder(row: SlaConfigRow): string {
  */
 export function buildSlaConfigs(
   rows: readonly SlaConfigRow[],
-  hasRequestData: (id: number) => boolean,
+  hasRequestData: (id: number, agentic: boolean) => boolean,
   provenance: (runId: string | null) => SlaRunProvenance | undefined = () => undefined,
 ): SlaTargetsConfig[] {
   const latestRun = new Map<string, { order: string; rows: SlaConfigRow[] }>();
@@ -220,7 +220,7 @@ export function buildSlaConfigs(
           .map((row) => ({
             id: Number(row.id),
             concurrency: row.conc,
-            hasRequestData: isAgentic && hasRequestData(Number(row.id)),
+            hasRequestData: hasRequestData(Number(row.id), isAgentic),
             artifact: null,
             runAttempt: null,
           }))
