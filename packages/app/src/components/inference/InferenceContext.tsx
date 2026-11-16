@@ -1105,6 +1105,7 @@ export function InferenceProvider({
 
   const selectableHwTypes = useChartDataFilter(
     hwSelectablePoints,
+    activeHwTypes,
     setActiveHwTypesWithFilter,
     extractHwKey,
   );

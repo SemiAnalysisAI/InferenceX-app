@@ -23,6 +23,30 @@ export function reconcileActiveSet<T>(
   return filtered;
 }
 
+export interface HiddenSelection<T> {
+  selection: Set<T>;
+  hidden: Set<T>;
+}
+
+export function reconcileRememberingHidden<T>(
+  prev: Set<T>,
+  last: HiddenSelection<T> | null,
+  itemsWithData: Set<T>,
+  resetOnChange: boolean,
+): HiddenSelection<T> {
+  // Any selection change since the last reconcile was the reader's, so forget older hidden picks.
+  const unchanged =
+    last !== null &&
+    last.selection.size === prev.size &&
+    [...prev].every((item) => last.selection.has(item));
+  const hidden = unchanged ? last.hidden : new Set<T>();
+  const intended = hidden.size > 0 ? new Set([...prev, ...hidden]) : prev;
+  return {
+    selection: reconcileActiveSet(intended, itemsWithData, resetOnChange),
+    hidden: new Set([...intended].filter((item) => !itemsWithData.has(item))),
+  };
+}
+
 export interface AvailableSelectionInput<T> {
   active: Set<T>;
   available: Set<T>;
@@ -149,7 +173,8 @@ export function useUrlStateSync(
 
 export function useChartDataFilter<TData, TKey extends string>(
   data: TData[],
-  setActiveSet: any,
+  activeSet: Set<TKey>,
+  setActiveSet: (set: Set<TKey>) => void,
   extractKey: (item: TData) => TKey,
   options?: {
     resetOnChange?: boolean;
@@ -166,6 +191,9 @@ export function useChartDataFilter<TData, TKey extends string>(
   const itemsWithDataKey = useMemo(() => [...itemsWithData].toSorted().join(','), [itemsWithData]);
 
   const prevItemsKeyRef = useRef<string>('');
+  const activeSetRef = useRef(activeSet);
+  activeSetRef.current = activeSet;
+  const lastReconcileRef = useRef<HiddenSelection<TKey> | null>(null);
 
   useEffect(() => {
     if (skipEmpty && itemsWithData.size === 0) {
@@ -178,7 +206,14 @@ export function useChartDataFilter<TData, TKey extends string>(
 
     prevItemsKeyRef.current = itemsWithDataKey;
 
-    setActiveSet((prev: Set<TKey>) => reconcileActiveSet(prev, itemsWithData, resetOnChange));
+    const result = reconcileRememberingHidden(
+      activeSetRef.current,
+      lastReconcileRef.current,
+      itemsWithData,
+      resetOnChange,
+    );
+    lastReconcileRef.current = result;
+    setActiveSet(result.selection);
   }, [itemsWithDataKey, itemsWithData, setActiveSet, resetOnChange, skipEmpty]);
 
   return itemsWithData;
