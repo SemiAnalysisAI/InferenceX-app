@@ -3,6 +3,7 @@
 import { ChevronDown } from 'lucide-react';
 import {
   Activity,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -325,6 +326,9 @@ export default function VideoDashboard({
   const [picked, setPicked] = useState(false);
   /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
   const [peek, setPeek] = useState<string | null>(null);
+  // Reading a point's clips ahead can wait a frame; the tap or rest that asks for it must not
+  // wait for this whole page to render before its own sheet or card is on screen.
+  const peekAt = useCallback((key: string) => startTransition(() => setPeek(key)), []);
   const pickAgainst = useCallback((value: string | null) => {
     setPicked(true);
     writeStage({ ...parseStage(location.search), vs: value });
@@ -353,10 +357,10 @@ export default function VideoDashboard({
       ...stagePair,
       pulse: !picked,
       onSelect: pickClip,
-      onPeek: setPeek,
+      onPeek: peekAt,
       onReveal: requestReveal,
     }),
-    [stagePair, picked, pickClip, requestReveal],
+    [stagePair, picked, pickClip, peekAt, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
