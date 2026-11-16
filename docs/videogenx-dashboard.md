@@ -39,7 +39,7 @@ cohort separately rather than averaging across resolutions, durations or modes.
 `r_*` URL parameters record filters, hidden hardware, the X and Y metrics (`r_x`, `r_y`),
 Optimal only (`r_optimal`), the open deployment
 (`r_point`), deadline, cost tier, entered mode prices and utilization. The clip stage's
-`r_view`, `r_prompt`, `r_clip`, `r_vs` and `r_swap` stay in the page URL and are not API
+`r_view`, `r_prompt`, `r_clip`, `r_vs`, `r_swap` and `r_sheet` stay in the page URL and are not API
 parameters; the overview API rejects them as unknown.
 The retired `r_gpus` and `r_basis` parameters are accepted but ignored by the
 UI and overview API: all GPU counts and participating GPUs
@@ -302,7 +302,8 @@ rendition over the frame, faded in once it plays; the rendition is requested onl
 touch only picks the prompt, and `prefers-reduced-motion` keeps the still frame. `clip-stage.ts` owns the stage's URL keys:
 `r_prompt` (case id, `~take` after the first take, `diag:` for the matched-noise rerun),
 `r_view` (omitted for Wipe), `r_clip` (the subject's `resultsPointKey`), `r_vs` (the pair,
-omitted for the default pairing) and `r_swap` (`1` while Swap is on). Its writer
+omitted for the default pairing), `r_swap` (`1` while Swap is on) and `r_sheet` (the
+`resultsPointKey` of the chart point whose sheet a touch screen has open). Its writer
 replaces only those keys, and the dashboard's `commit` keeps them while it rewrites the
 results keys. They are page state only: the overview API request is built from the results
 keys and never carries them. An unknown prompt shows the first prompt, and an unknown,
@@ -524,6 +525,41 @@ unchanged.
   `chart-marks.ts`). Points within 8 px of the nearest take turns on repeated taps, so two
   that plot a pixel apart are both reachable. The listener sits on the video chart; the
   shared chart wrapper is untouched.
+- Point sheet: on a coarse pointer the tap opens `VideoPointSheet` in place of the pinned
+  panel, which a mouse keeps. The sheet reuses the chart tooltip's sheet style and opens no
+  taller than its first screen, so the chart stays in view with a ring on the point; a point
+  the sheet would cover scrolls clear of it, and closing puts the page back. The first screen
+  has the hardware, engine, GPU count and run date, the point's clip of the stage's prompt
+  as a first frame with a play button (muted, inline, `preload="none"` until tapped), the
+  prompt id and seed, four figures (median latency, $ per clip, video-seconds per $1 TCO,
+  energy per clip) and three actions: Compare plays the point as the stage's subject and
+  scrolls to the stage, Share passes the page link to `navigator.share` where the browser
+  has it and copies it otherwise, and View telemetry opens the deployment. Everything else
+  the pinned panel lists follows by scrolling the sheet, which then grows to the tooltip
+  sheet's height. A point without clips gets the same sheet with the legend's wording in
+  place of the clip and no Compare; a named run's point carries its run marker. The close
+  button, a tap beside the sheet, a downward drag of its header and `Esc` close it; a tap
+  beside it that lands on another point moves it there. The open point is `r_sheet`, so a
+  shared link reopens it; a mouse ignores the key.
+- Phone order: under 768 px the page leads with the clips. A compact title row (page title,
+  workload line, Share), the stage, one sentence, the transport, the Compare row and a strip
+  of every prompt come first; the intro, Benchmark config, the chart, the legend, the cost
+  caption, the rest of the clips section (prompt text, view switcher, Inspect, readout,
+  quality method, sources) and the remaining sections follow. Nothing is removed. The order
+  is CSS only (`results.module.css` and `max-md:` utilities), so the DOM, the focus order
+  and every wider layout are unchanged.
+- Opening pair: with no `r_vs` in the URL a phone opens the subject against another GPU
+  rather than its reference (`phonePairing` in `clip-stage.ts`): a hardware deployment of the
+  same workload, engine and GPU count that has clips, the one with the highest median
+  latency. The server guesses a phone from the User-Agent (`phoneUserAgent`) so the first
+  paint already shows that pair, and the phone writes it to `r_vs`, so its link reopens the
+  same pair anywhere. Without such a deployment the default pairing stands.
+- Stage sentence: when both sides are hardware deployments with a median latency and a cost
+  per clip, one line under the picture says what each takes and costs (`stageSentence` in
+  `stage-sentence.ts`), with the readout's rounding. It shows under 768 px only.
+- Prompt strip: under 768 px the prompt tiles become one row that scrolls sideways with
+  snap points and lists every prompt; a tap selects the prompt (`r_prompt`). First frames
+  load lazily and nothing plays on its own.
 - Wide tables: `ScrollFade` and `useScrollFade` (`use-scroll-fade.tsx`) name the edges that hide
   columns in `data-scroll-more`, and the CSS fades those edges. The cost context table, the
   detail page's cost and completion tables, Prompt & sources and each History table use it.
@@ -532,7 +568,7 @@ unchanged.
 - The quality guide's PSNR strip closes a tapped clip's tooltip on a tap elsewhere, a scroll
   or `Esc`.
 
-中文：触屏规则沿用应用已有的判断：行为用 `useIsCoarsePointer`（`(hover: none) and (pointer: coarse)`），布局用 `useIsMobileViewport`（767 px）；鼠标和键盘的行为不变。点按区域：在触屏设备上，`results.module.css` 为说明按钮、开关、视频扬声器按钮和分界线按钮加上 44 px 的点按区域（用伪元素实现，控件本身大小不变；`--hit-x`/`--hit-y` 可把这一区域从相邻控件上移开），把详情页标签的点按高度扩大到 44 px，并让图例的每一行和每个开关各占 44 px 高。说明文字：读数区中靠 `title` 说明自己的每一格，另带一个内容相同的 `InfoHelp` 按钮；“对比视频”的说明先列出当前视图的触屏手势，页首简介和“检查”面板的提示改用触屏说法，图例中没有匹配运行的硬件则在图例下方用一行文字说明。数据点：轻点会选中 22 px 内最近的数据点（`chart-marks.ts` 中的 `tapTarget`）；与最近的数据点相距不到 8 px 的几个点在连续轻点时轮流选中，因此只相隔一个像素的两个点都能选到。监听器只加在视频图表上，共享的图表封装没有改动。宽表格：`ScrollFade` 和 `useScrollFade`（`use-scroll-fade.tsx`）把还藏有列的一侧写入 `data-scroll-more`，CSS 让这一侧渐隐；成本表、详情页的成本表和完成情况表、“Prompt 与来源”以及每张 History 表都使用它。宽度：页面从 320 px 起不会横向滚动；视图切换器在 400 px 以下收紧内边距，在 374 px 以下缩小文字。质量指南的 PSNR 分布图中，轻点其他位置、滚动页面或按 `Esc` 都会关闭已点开的提示。
+中文：触屏规则沿用应用已有的判断：行为用 `useIsCoarsePointer`（`(hover: none) and (pointer: coarse)`），布局用 `useIsMobileViewport`（767 px）；鼠标和键盘的行为不变。点按区域：在触屏设备上，`results.module.css` 为说明按钮、开关、视频扬声器按钮和分界线按钮加上 44 px 的点按区域（用伪元素实现，控件本身大小不变；`--hit-x`/`--hit-y` 可把这一区域从相邻控件上移开），把详情页标签的点按高度扩大到 44 px，并让图例的每一行和每个开关各占 44 px 高。说明文字：读数区中靠 `title` 说明自己的每一格，另带一个内容相同的 `InfoHelp` 按钮；“对比视频”的说明先列出当前视图的触屏手势，页首简介和“检查”面板的提示改用触屏说法，图例中没有匹配运行的硬件则在图例下方用一行文字说明。数据点：轻点会选中 22 px 内最近的数据点（`chart-marks.ts` 中的 `tapTarget`）；与最近的数据点相距不到 8 px 的几个点在连续轻点时轮流选中，因此只相隔一个像素的两个点都能选到。监听器只加在视频图表上，共享的图表封装没有改动。数据点面板：在触屏设备上，轻点数据点会打开 `VideoPointSheet`，代替鼠标使用的固定面板。面板沿用图表提示在窄屏上的底部面板样式，打开时高度不超过首屏内容，图表仍留在视野内，所选数据点带有圆环标记；数据点若会被面板挡住，页面会滚动到露出它的位置，关闭后回到原处。首屏依次是硬件、引擎、GPU 数量和运行日期，该数据点在对比区当前 prompt 下的视频（先显示首帧和播放按钮；静音、内联播放，轻点前为 `preload="none"`），prompt ID 和 seed，四个数值（单条视频延迟中位数、每条视频成本、每 1 美元 TCO 生成的视频秒数、每条视频能耗），以及三个操作：“对比”把该数据点设为对比对象并滚动到对比区，“分享”在浏览器支持 `navigator.share` 时调用系统分享，否则复制链接，“查看遥测”打开该部署的详情。固定面板中的其余内容在面板内向下滚动即可看到，此时面板会增高到底部面板样式的上限。没有视频的数据点使用同一面板，视频位置显示图例中的说明文字，且没有“对比”；来自指定运行的数据点带有运行标记。关闭按钮、轻点面板以外的位置、向下拖动面板顶部和 `Esc` 都可以关闭面板；轻点面板以外的另一个数据点则切换到该点。打开的数据点记录在 `r_sheet` 中，分享链接会重新打开它；鼠标设备忽略该参数。手机上的顺序：宽度小于 768 px 时页面先展示视频，依次是精简的标题行（页面标题、工作负载说明和分享）、对比区、一句话说明、播放控件、“对比”一行和列出全部 prompt 的横向滚动条，随后才是简介、基准测试配置、图表、图例、成本说明、视频区的其余部分（prompt 文本、视图切换器、“检查”、读数区、质量方法和来源）以及其余各节，内容没有删减。顺序只由 CSS 调整（`results.module.css` 和 `max-md:` 工具类），DOM、焦点顺序和更宽的布局都不变。默认配对：URL 中没有 `r_vs` 时，手机上对比对象的配对视频是另一种 GPU 而不是参考视频（`clip-stage.ts` 中的 `phonePairing`）：在工作负载、引擎和 GPU 数量相同且有视频的硬件部署中，取延迟中位数最高的一个。服务端根据 User-Agent 判断是否为手机（`phoneUserAgent`），首次渲染就显示这一组；手机还会把它写入 `r_vs`，因此链接在任何设备上都会打开同一组。没有符合条件的部署时仍使用默认配对。一句话说明：两侧都是硬件部署且都有延迟中位数和每条视频成本时，画面下方用一句话写出各自的延迟和成本（`stage-sentence.ts` 中的 `stageSentence`），取整方式与读数区相同，只在宽度小于 768 px 时显示。Prompt 条：宽度小于 768 px 时，prompt 卡片排成可横向滚动并带吸附点的一行，列出全部 prompt；轻点即选中该 prompt（`r_prompt`）。首帧延迟加载，不会自动播放。宽表格：`ScrollFade` 和 `useScrollFade`（`use-scroll-fade.tsx`）把还藏有列的一侧写入 `data-scroll-more`，CSS 让这一侧渐隐；成本表、详情页的成本表和完成情况表、“Prompt 与来源”以及每张 History 表都使用它。宽度：页面从 320 px 起不会横向滚动；视图切换器在 400 px 以下收紧内边距，在 374 px 以下缩小文字。质量指南的 PSNR 分布图中，轻点其他位置、滚动页面或按 `Esc` 都会关闭已点开的提示。
 
 ## Control coverage
 
@@ -579,6 +615,7 @@ official/unofficial source membership remain unchanged.
 | Deployment labels, detail tab, pinned point                                             | Presentation only                                                                                              |
 | Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract                         |
 | Clip subject, its pair and Swap                                                         | Presentation only; `r_clip`, `r_vs` and `r_swap` are page state                                                |
+| Phone order, opening pair, stage sentence, prompt strip, point sheet                    | Presentation only; `r_sheet` is page state and every figure shown is already in the point's cell               |
 | How we score quality, Show me, See what changes                                         | Presentation only; the PSNR range comes from the existing published media reads                                |
 | Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data                               |
 
@@ -587,7 +624,9 @@ Video results controls and the new disclosures/media link record `video_results_
 events. Shared `InfoHelp` retains its `selector_option_help_opened` event. Tests cover projection/API parity, both GPU bases,
 nulls and invalid power, sample floors, overlay filtering, chart series for official
 and overlay runs, legend filtering, deployment detail history, clip alignment, real
-browser playback and difference failure, bilingual layout and 390px overflow.
+browser playback and difference failure, bilingual layout and 390px overflow, the phone
+order, opening pair, sentence and strip, and the touch point sheet for official, clipless and
+named-run points.
 
 ## 中文说明
 
@@ -606,7 +645,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。
 
 视频对比只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。视频区接在图表卡片的分隔线下方，在与卡片同宽的双侧对比区（`VideoClipStage`）中播放：左侧为配对视频（基线），右侧为对比对象。画面高度不超过窗口高度减去 18rem（触屏设备横屏且高度不足 500 px 时为 8rem，此时只让页首和播放控件与画面同屏），窗口较矮时对比区和播放控件一起收窄并居中，使“对比”一行、画面、播放控件和读数区一起留在页首下方的视野内；并排视图按两个画面的宽度计算这一上限。`r_clip` 指向的数据点若在图表中绘制，就以它为对比对象；否则通过 `?unofficialrun=` 指定的运行若有可见数据点，无论是否有视频，都以它为对比对象；否则默认对比对象为 B200 的起始部署（`stageOpenings`）：B200 代表部署所在前沿上延迟处于下中位的数据点。这样对比区从曲线中段开始（在 1、2、4、8 张 GPU 中为 4 张），而不是从卡片和对比所用的最高效一端，或成本最高的最快一端开始。B200 被隐藏或没有已发布视频时，改用名单中第一个有视频且未隐藏的硬件，并按同样规则选择部署。服务端会连同各代表部署一起预取起始部署的视频。优先的硬件仍在加载时会先占住位置，加载完成后画面不会跳到别的硬件。切换到视频尚未读取的一组对比时（点击数据点、“对比”一行或“在下方对比”），对比区和读数区先保留上一组，并像推理页图表重新获取数据时那样以 `motion-stale` 变暗，读取完成后再切换；图表标记和“对比”一行会立即跟随新的选择，prompt 行也保留原有卡片。新一组的首帧加载完成前（最长 800 ms），对比区同样保留上一组但不变暗，因此切换对比或 prompt 时画面不会先变黑。第一组读取完成前，prompt 行和对比区以 `Skeleton` 占位。加载状态只向屏幕阅读器播报。“对比”一行写作“[配置] 对比 [配对]”，由两个与站内样式一致的下拉框组成。第一个选择播放的对象：每种可见硬件的起始部署；开启有损曲线时，再加上每个已绘制的有损配置，取其延迟处于下中位的部署（`compareConfigs`）。选择后与点击图表一样写入 `r_clip`。第二个自动跟随（`defaultPairing`）：有损配置配其无损对照，来自 `?unofficialrun=` 的对象配同一 GPU 上部署相同的官方数据点，没有时配该 GPU 的官方起始部署（`officialCounterpart`），其余对象配各自已封存的 Diffusers 参考；也可以改选其他每种可见硬件的起始部署，即第一个下拉框为该硬件播放的部署。配对一侧播放与对象相同 prompt、seed 和重复次数的视频；找不到无损对照时，画面位置会说明原因。这一选择写入页面 URL 的 `r_vs`（`reference`、`twin` 或硬件键），与对象的默认配对相同时省略，因此分享链接能还原同一组对比，图例中的“查看画面变化”也可以选中无损对照；通过该行或图表换成新对象时，配对回到默认；对象没有所选项时显示默认配对，该参数仍留在 URL 中。每侧左上或右上的标签注明硬件与引擎，随后是 GPU 数量（有损一侧另注优化项，无损对照注明“无损”），或注明参考并标为“官方”，并带有扬声器按钮；`?unofficialrun=` 叠加运行使用 `overlayRunColor`，并标注“非官方运行”。“Prompt 与来源”列出画面中的两侧。
-对比区有四种视图：卷帘（默认）、并排、切换和差异。卷帘视图把两侧叠放，右侧画面从跟随指针移动的分界线处裁切；点击画面或分界线按钮可锁定，焦点在按钮上时可用 `←`/`→` 移动分界线。触屏设备（`useIsCoarsePointer`）没有可跟随的指针：从画面或分界线按钮按下后横向拖动即可移动分界线，手指移出画面后仍然有效；纵向拖动照常滚动页面；轻点画面播放或暂停，只有分界线按钮可以锁定。并排把两段视频左右排列，宽度小于 640px 时改为上下排列。切换一次只显示一侧：点击画面或按 `T` 切换，按住空格键可临时查看另一侧，松开后复原；在其他视图中，焦点位于对比区时按空格键播放或暂停。快捷键只作用于获得焦点的对比区，不监听整个页面；对比区内按钮上的空格键和回车键仍触发按钮本身。宽度不小于 820px 时，prompt 列表、当前 prompt 和视图切换器排在同一行；更窄时，列表和 prompt 各占一整行。prompt 是这一行的主体：14px 正文色文字，最多显示两行，超出时提供“展开”链接，前面是等宽半粗体的 `seed N`。只有另一个已加载的重复与它的 prompt 和 seed 相同时，开头和卡片上才显示“第 N 次”，因此生产数据中只有一次重复的 prompt 只显示 seed。列表显示放得下的卡片，最多三张，另加当前 prompt 的卡片，以及一个展开全部的“+N”卡片。每张卡片是 prompt 的封面加用例 ID：优先使用该 prompt 参考视频的封面，其次使用对比对象视频的封面；两者都没有或图片加载失败时，显示写有用例 ID 和 seed 的文字卡片。封面按固定尺寸延迟加载，加载完成后在闪动的占位上淡入（`motion-media`）。鼠标停留在封面卡片上或用键盘聚焦该卡片时，会在封面上循环播放该视频的静音网页版本，开始播放后淡入；只有这时才请求该版本。触摸只会选择 prompt，开启 `prefers-reduced-motion` 时保持静止封面。`clip-stage.ts` 负责对比区自己的 URL 参数：`r_prompt`（用例 ID，第二次及之后的重复加 `~take`，相同初始噪声重跑加 `diag:` 前缀）、`r_view`（卷帘视图时省略）、`r_clip`（对比对象的 `resultsPointKey`）、`r_vs`（配对视频，为默认配对时省略）和 `r_swap`（互换两侧时为 `1`）。它只改写这几个参数，仪表板的 `commit` 改写结果参数时也会保留它们。这些参数只是页面状态：overview API 请求由结果参数构成，不会携带它们。未知的 prompt 显示第一条；未知、已隐藏或未绘制的 `r_clip` 播放默认对象；两者都仍留在 URL 中。切换 prompt、对比对象或配对视频会暂停并把两侧都回到开头，视图、分界线锁定和音源保持不变。
+对比区有四种视图：卷帘（默认）、并排、切换和差异。卷帘视图把两侧叠放，右侧画面从跟随指针移动的分界线处裁切；点击画面或分界线按钮可锁定，焦点在按钮上时可用 `←`/`→` 移动分界线。触屏设备（`useIsCoarsePointer`）没有可跟随的指针：从画面或分界线按钮按下后横向拖动即可移动分界线，手指移出画面后仍然有效；纵向拖动照常滚动页面；轻点画面播放或暂停，只有分界线按钮可以锁定。并排把两段视频左右排列，宽度小于 640px 时改为上下排列。切换一次只显示一侧：点击画面或按 `T` 切换，按住空格键可临时查看另一侧，松开后复原；在其他视图中，焦点位于对比区时按空格键播放或暂停。快捷键只作用于获得焦点的对比区，不监听整个页面；对比区内按钮上的空格键和回车键仍触发按钮本身。宽度不小于 820px 时，prompt 列表、当前 prompt 和视图切换器排在同一行；更窄时，列表和 prompt 各占一整行。prompt 是这一行的主体：14px 正文色文字，最多显示两行，超出时提供“展开”链接，前面是等宽半粗体的 `seed N`。只有另一个已加载的重复与它的 prompt 和 seed 相同时，开头和卡片上才显示“第 N 次”，因此生产数据中只有一次重复的 prompt 只显示 seed。列表显示放得下的卡片，最多三张，另加当前 prompt 的卡片，以及一个展开全部的“+N”卡片。每张卡片是 prompt 的封面加用例 ID：优先使用该 prompt 参考视频的封面，其次使用对比对象视频的封面；两者都没有或图片加载失败时，显示写有用例 ID 和 seed 的文字卡片。封面按固定尺寸延迟加载，加载完成后在闪动的占位上淡入（`motion-media`）。鼠标停留在封面卡片上或用键盘聚焦该卡片时，会在封面上循环播放该视频的静音网页版本，开始播放后淡入；只有这时才请求该版本。触摸只会选择 prompt，开启 `prefers-reduced-motion` 时保持静止封面。`clip-stage.ts` 负责对比区自己的 URL 参数：`r_prompt`（用例 ID，第二次及之后的重复加 `~take`，相同初始噪声重跑加 `diag:` 前缀）、`r_view`（卷帘视图时省略）、`r_clip`（对比对象的 `resultsPointKey`）、`r_vs`（配对视频，为默认配对时省略）和 `r_swap`（互换两侧时为 `1`），以及 `r_sheet`（触屏设备上已打开底部面板的数据点的 `resultsPointKey`）。它只改写这几个参数，仪表板的 `commit` 改写结果参数时也会保留它们。这些参数只是页面状态：overview API 请求由结果参数构成，不会携带它们。未知的 prompt 显示第一条；未知、已隐藏或未绘制的 `r_clip` 播放默认对象；两者都仍留在 URL 中。切换 prompt、对比对象或配对视频会暂停并把两侧都回到开头，视图、分界线锁定和音源保持不变。
 卷帘、并排和切换视图优先播放 `previewUrl` 指向的网页转码版本，没有转码版本或转码版本加载失败时播放封存的原始视频；“差异”视图两侧都加载原始视频，PSNR 和视频文件链接始终使用原始视频。播放转码版本时，“Prompt 与来源”中会注明。首次点击播放前不请求任何视频媒体：视频以 `preload="none"` 渲染，并显示各自一侧的封面。两侧都有封面时，卷帘分界线在播放前即可使用；否则由待播放画面（prompt、两侧标签和播放按钮）覆盖对比区。首次播放时在点击手势内改为 `preload="auto"` 再预热。浏览器只把 `preload` 视为提示，因此这只是尽力而为。
 同步播放由 `clip-sync.ts` 中的纯函数状态机驱动（暂停、加载、缓冲、播放、结束五个状态），`useClipGroup` 只负责采集每个视频的快照并执行返回的动作，`?unofficialrun=` 叠加视频走同一套逻辑。首次播放后每段视频完整下载；视频只有几秒长，因此先下载完整再播放，播放过程中不会卡顿。只要还有视频没有从当前时间缓冲到共享结尾（允许 50 毫秒误差）或 `readyState` 低于 3，控制条就显示“加载中 N%”（以最慢视频已缓冲的共享时长百分比计）。此时点击播放会进入加载状态，等全部视频加载完成后一起开始；拖动进度条和结束后重播同样经过加载状态。播放过程中若有视频停顿（未在 seek 且 `readyState` 低于 3，例如浏览器回收了缓冲），全部视频一起暂停并显示“缓冲中 N%”，等每个视频都至少缓冲了 1 秒后续数据或缓冲到结尾后，再从主视频的时间点一起恢复。开启音频时以有声视频为主，否则以第一个未停顿的视频为主；有声视频不会被 seek 去追赶其他视频。40 到 250 毫秒的偏差通过微调 playbackRate 纠正，超过 250 毫秒才 seek 一次，且该视频 seek 过程中不会重复触发。时间显示和进度条每秒最多刷新十次。
 对比区下方的控制条包含播放、进度条、时间、“互换两侧”和“检查”。互换两侧只交换两侧在画面中的位置：卷帘视图交换左右，并排视图交换左右（窄屏上下排列时交换上下），切换视图交换按钮顺序。对比对象与配对视频的角色不变：对比区的无障碍标签仍为“对比对象 对比 配对视频”，下方指标仍属于对比对象；`r_swap` 让分享链接保留这一状态。“检查”展开逐帧、播放速度、缩放和循环播放控件，这些状态只保存在对比区本地，切换 prompt 或对比对象时保留。逐帧会暂停两侧视频，并把它们 seek 到上一帧或下一帧的中点，即使浏览器对 seek 时间取整，也会显示目标帧；焦点位于对比区时按 `←`/`→` 效果相同。帧率取自工作负载记录的 `plan.generation.fps`（`resultMetadata`），总帧数取自其 `frame_count`，且不超过可播放时长对应的帧数；缺少帧率时逐帧按钮不可用。播放速度（0.25×、0.5×、1×）是整组视频的基准 `playbackRate`：偏差微调不超过该速度的 10%，恢复播放、拖动进度条和重新加载视频源后都回到该速度，而不是回到 1×。缩放（1×、2×、4×）对两侧视频和差异画布施加同一个 CSS 变换；放大后拖动画面会同时平移两侧，按 `Esc` 恢复原始大小并解除分界线锁定（触屏设备上的提示改为选择 1×）。循环播放默认开启：到达共享结尾时两侧一起 seek 回 0，再经过加载状态同时重新开始，不会出现一侧单独循环；关闭后视频停在共享结尾。每个控件都会记录 `video_results_` 前缀的事件。
@@ -619,7 +658,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 参数会被忽略。分享和导出链接不写入取默认值的参数。`r_workload` 使用模型 slug（如 `minimax-h3`），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载；其他工作负载使用数据点 ID，旧链接中的数据点 ID 仍可解析。利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的场景输入会保留。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
-页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs` 和 `r_swap` 只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
+页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs`、`r_swap` 和 `r_sheet` 只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。
