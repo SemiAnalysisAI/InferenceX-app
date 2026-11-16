@@ -354,7 +354,7 @@ describe('writeUrlParams + buildShareUrl', () => {
     'carries the OperatorX selections in the address bar into share links from %s',
     async (pathname) => {
       setupWindow(
-        '?workload=dsv4&parallel=tp8&metric=time&model=DeepSeek-V4-Pro&hardware=b300,mi355x&baseline=b300&unrelated=1',
+        '?workload=dsv4&parallel=tp8&metric=time&model=DeepSeek-V4-Pro&hardware=b300,mi355x&baseline=b300&modelPrecision=fp8&modelBin=12&modelSweep=true&rooflinePrecision=bf16&rooflineNormalized=false&rooflineLog=true&summaryPrecision=fp4&summaryNormalized=true&summarySharedOnly=false&unrelated=1',
         pathname,
       );
       const { buildShareUrl } = await import('@/lib/routing/url-state');
@@ -367,6 +367,15 @@ describe('writeUrlParams + buildShareUrl', () => {
         model: 'DeepSeek-V4-Pro',
         hardware: 'b300,mi355x',
         baseline: 'b300',
+        modelPrecision: 'fp8',
+        modelBin: '12',
+        modelSweep: 'true',
+        rooflinePrecision: 'bf16',
+        rooflineNormalized: 'false',
+        rooflineLog: 'true',
+        summaryPrecision: 'fp4',
+        summaryNormalized: 'true',
+        summarySharedOnly: 'false',
       });
     },
   );

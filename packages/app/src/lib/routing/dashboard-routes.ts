@@ -1,3 +1,4 @@
+import { OPERATORX_SHARE_CONTROLS } from '@/lib/operatorx/share-state';
 export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
 export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
@@ -231,7 +232,15 @@ export const DASHBOARD_ROUTES = [
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
-    shareLiveParams: ['workload', 'parallel', 'metric', 'model', 'hardware', 'baseline'],
+    shareLiveParams: [
+      'workload',
+      'parallel',
+      'metric',
+      'model',
+      'hardware',
+      'baseline',
+      ...OPERATORX_SHARE_CONTROLS,
+    ],
   },
 
   {

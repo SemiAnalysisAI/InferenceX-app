@@ -529,3 +529,70 @@ it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switc
     .first()
     .should('have.css', 'background-color', 'rgb(235, 192, 74)');
 });
+
+it('reopens shared roofline and summary controls independently', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
+  cy.visit('/opx/gemm?rooflinePrecision=bf16&summaryPrecision=bf16');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-roofline-log').click().should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="share-button"]').first().click();
+  cy.get('input[aria-label="Share link for the current view"]')
+    .invoke('val')
+    .then((value) => {
+      const url = new URL(String(value));
+      expect(url.searchParams.get('summarySharedOnly')).to.eq('false');
+      expect(url.searchParams.get('rooflineNormalized')).to.eq('false');
+      expect(url.searchParams.get('rooflineLog')).to.eq('true');
+      cy.visit(url.pathname + url.search);
+    });
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-roofline-log').should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="operatorx-viz-roofline"] circle.point').should('have.length', 3);
+});
+
+it('reopens the model token selection and sweep mode from a share link', () => {
+  const model = gemm.models[0];
+  const view = { ...gemm, model, modelOptions: [model] };
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', {
+    ...moe,
+    model,
+    modelOptions: [model],
+  });
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', {
+    ...moe,
+    op: 'attention',
+    model,
+    modelOptions: [model],
+  });
+  cy.visit(`/opx/model?model=${encodeURIComponent(model)}&modelPrecision=bf16&modelBin=12`);
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', '64 tokens');
+  cy.get('#operatorx-model-tokens').then(($input) => {
+    const input = $input[0] as HTMLInputElement;
+    const win = input.ownerDocument.defaultView!;
+    Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      input.max,
+    );
+    input.dispatchEvent(new win.Event('input', { bubbles: true }));
+  });
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
+  cy.get('[data-testid="share-button"]').first().click();
+  cy.get('input[aria-label="Share link for the current view"]')
+    .invoke('val')
+    .then((value) => {
+      const url = new URL(String(value));
+      expect(url.searchParams.get('modelBin')).to.eq('12');
+      expect(url.searchParams.get('modelSweep')).to.eq('true');
+      expect(url.searchParams.get('modelPrecision')).to.eq('bf16');
+      cy.visit(url.pathname + url.search);
+    });
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
+});

@@ -170,3 +170,24 @@ it('returns an empty summary when the selected workload has no measured hardware
     caseIndices: [],
   });
 });
+
+it('retains valid share overrides without filtering raw source measurements', async () => {
+  const source = comparison();
+  vi.mocked(getComparison).mockResolvedValue(source);
+  const response = await GET(
+    new NextRequest(
+      'http://localhost/api/v1/operatorx/compare?op=gemm&modelPrecision=fp8&modelBin=12&modelSweep=true&summarySharedOnly=false&summaryNormalized=false&rooflineLog=true',
+    ),
+  );
+  const body = await response.json();
+  expect(body.shareState).toEqual({
+    modelPrecision: 'fp8',
+    modelBin: '12',
+    modelSweep: 'true',
+    summarySharedOnly: 'false',
+    summaryNormalized: 'false',
+    rooflineLog: 'true',
+  });
+  expect(body.measurements).toEqual(comparisonView(source, null).measurements);
+  expect(body.cases).toEqual(comparisonView(source, null).cases);
+});

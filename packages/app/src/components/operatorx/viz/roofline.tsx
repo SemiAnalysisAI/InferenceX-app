@@ -1,5 +1,9 @@
 'use client';
 
+import { useClientSearch } from '@/hooks/useClientSearch';
+import { shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
+import { setSearchParam } from '../compare/url-selection';
+
 import { curveLinear } from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useId, useMemo, useState } from 'react';
@@ -112,10 +116,12 @@ export function Roofline({
   }, [view]);
   const precisions = ORDER.filter((p) => counts.has(p));
   const defaults = view.defaults ?? comparisonDefaults(view);
-  const [picked, setPicked] = useState<ComputePrecision | null>(null);
-  const [sharedOnly, setSharedOnly] = useState(true);
-  const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
-  const [logY, setLogY] = useState(false);
+  const search = new URLSearchParams(useClientSearch());
+  const prefix = summaryOnly ? 'summary' : 'roofline';
+  const picked = sharePrecision(search.get(`${prefix}Precision`));
+  const sharedOnly = shareBoolean(search.get('summarySharedOnly'), true);
+  const normalized = shareBoolean(search.get(`${prefix}Normalized`), defaults.rooflineNormalized);
+  const logY = shareBoolean(search.get('rooflineLog'), false);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
@@ -209,7 +215,7 @@ export function Roofline({
           value={precision}
           onValueChange={(value) => {
             track('operatorx_roofline_precision_selected', { precision: value });
-            setPicked(value);
+            setSearchParam(`${prefix}Precision`, value);
           }}
           ariaLabel={strings.precision}
           options={precisions.map((p) => ({ value: p, label: p }))}
@@ -220,7 +226,7 @@ export function Roofline({
             checked={normalized}
             onCheckedChange={(enabled) => {
               track('operatorx_roofline_normalized_toggled', { enabled });
-              setNormalized(enabled);
+              setSearchParam(`${prefix}Normalized`, String(enabled));
             }}
           />
           <Label
@@ -237,7 +243,7 @@ export function Roofline({
               checked={logY}
               onCheckedChange={(enabled) => {
                 track('operatorx_roofline_log_toggled', { enabled });
-                setLogY(enabled);
+                setSearchParam('rooflineLog', String(enabled));
               }}
             />
             <Label htmlFor="opx-roofline-log" className="text-sm font-normal text-muted-foreground">
@@ -252,7 +258,7 @@ export function Roofline({
               checked={sharedOnly}
               onCheckedChange={(enabled) => {
                 track('operatorx_summary_shared_toggled', { enabled });
-                setSharedOnly(enabled);
+                setSearchParam('summarySharedOnly', String(enabled));
               }}
             />
             <Label

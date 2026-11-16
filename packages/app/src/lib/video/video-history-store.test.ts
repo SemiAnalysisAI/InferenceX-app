@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the sample-floor comment changed; recorded entries are unchanged.
-      sources: 'dd899e22d3f18fbc463933fb5280fc4238772da6a36ed4d682ad1e03d3bd5710',
+      // Re-pinned after OperatorX share controls changed; recorded video entries are unchanged.
+      sources: '023657dd6ad8739d7b157c33913a31b4d0fa868d1081f135c68806ca21cfc4e6',
     });
   });
 });

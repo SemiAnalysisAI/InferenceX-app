@@ -572,7 +572,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; comparisons include hardware references, defaults, optional distribution quantiles and per-hardware or shared-cohort roofline median/best summaries with resolved controls.',
       zh: 'OperatorX 页面后端；对比结果包含硬件参考值和默认设置，并可按需返回分布分位数及基于各硬件自身用例或共同用例的 roofline 中位数与最佳值汇总，同时附带实际生效的参数。',
     },
-    sourceSha256: '733e41ed3e2ba2cc0ef394439b09f850e06c310c6b611c7a2507dfb221cb6dad',
+    sourceSha256: '3fd75ac612f3282429ab45a4b48372dc3467ca610b02a1f976a59a9ccf2e7c07',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',

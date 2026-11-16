@@ -1,5 +1,7 @@
 'use client';
 
+import { sharePrecision, shareBoolean, shareBin } from '@/lib/operatorx/share-state';
+
 import { ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
@@ -175,6 +177,9 @@ function setParam(key: string, value: string) {
   params.set(key, value);
   replaceClientSearch(params);
 }
+
+const setPrecision = (value: ComputePrecision) => setParam('modelPrecision', value);
+const setBin = (value: number) => setParam('modelBin', String(value));
 
 /** A module name with line breaks allowed after `_`, `.` and `+`, never mid-word. */
 function breakable(label: string): ReactNode[] {
@@ -1087,10 +1092,10 @@ export function ModelView({
   // GPU picks live in the address bar so share links reproduce them.
   const pickedParam = search.get(HARDWARE_PARAM);
   const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
-  const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
+  const pickedPrecision = sharePrecision(search.get('modelPrecision'));
   const [open, setOpen] = useState<SlotData | null>(null);
-  const [pickedBin, setBin] = useState<number | null>(null);
-  const [sweep, setSweep] = useState(false);
+  const pickedBin = shareBin(search.get('modelBin'));
+  const sweep = shareBoolean(search.get('modelSweep'), false);
 
   // Device splits any of the model's ops has cases at; one device by default.
   const splits = useMemo(() => {
@@ -1257,7 +1262,7 @@ export function ModelView({
   const toggleSweep = useCallback(
     (enabled: boolean) => {
       track('operatorx_model_sweep_toggled', { model: requested, enabled });
-      setSweep(enabled);
+      setParam('modelSweep', String(enabled));
     },
     [requested],
   );

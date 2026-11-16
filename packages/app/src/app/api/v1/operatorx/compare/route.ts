@@ -1,3 +1,4 @@
+import { operatorXShareState } from '@/lib/operatorx/share-state';
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
@@ -94,8 +95,10 @@ export async function GET(request: NextRequest) {
       summaryHardware.some((hw) => !view.hardware.some((item) => item.id === hw))
     )
       return NextResponse.json({ error: 'Invalid roofline hardware' }, { status: 400 });
+    const shareState = operatorXShareState(params);
     const body = {
       ...view,
+      ...(Object.keys(shareState).length > 0 ? { shareState } : {}),
       ...(distributionRequested
         ? {
             distribution: distributionView(view, {

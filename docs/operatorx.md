@@ -548,3 +548,46 @@ focus, then retain their controls. Without IntersectionObserver all charts rende
 Links to `/opx` and its categories, including the category switcher, prefetch the
 route and warm its comparison or model-view queries on intent (`prefetchRouteData`).
 API selectors, results, and click analytics are unaffected.
+
+### Share-link control coverage
+
+OperatorX share links retain the category path (including `/zh`) and `workload`,
+`parallel`, `metric`, `model`, `hardware`, and `baseline`. Additional controls use
+independent URL overrides so the summary and scatter chart can differ:
+
+| Control                                    | URL override                                                 | API / data coverage                                                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model precision                            | `modelPrecision=fp4\|fp8\|bf16`                              | Filter returned model cases by `computePrecision`; unavailable choices use the model's existing precision default.                                                   |
+| Model token size                           | `modelBin=<integer>`                                         | Half-octave bin: `round(log2(case.x) * 2)`; unavailable bins use the existing nearest-to-128-token default.                                                          |
+| Model all sizes                            | `modelSweep=true\|false`                                     | Show all size bins instead of only `modelBin`.                                                                                                                       |
+| Roofline precision / normalization         | `rooflinePrecision`, `rooflineNormalized`                    | Select precision and absolute / peak-relative units from the comparison rows and hardware references.                                                                |
+| Roofline log scale                         | `rooflineLog=true\|false`                                    | Presentation only; no change to API measurements.                                                                                                                    |
+| Summary precision / normalization / cohort | `summaryPrecision`, `summaryNormalized`, `summarySharedOnly` | Map to the comparison API's existing `rooflinePrecision`, `rooflineNormalized`, `rooflineSharedOnly` projection selectors, with selected GPUs as `rooflineHardware`. |
+
+`GET /api/v1/operatorx/compare` accepts these URL overrides and adds `shareState`
+when any valid override is supplied. This object contains validated **explicit
+requests**, not resolved model-wide defaults: model defaults depend on all three
+op responses. Raw cases, measurements, nulls and source identities remain intact.
+Precision values outside fp4/fp8/bf16, malformed booleans, and non-integer or
+out-of-range bins are ignored in `shareState` and by the UI. Existing API roofline
+projection validation still returns 400 for invalid projection selectors.
+Missing overrides use existing workload defaults; explicit `false` is retained.
+Legend expansion, open dialogs and diagram folds are presentation-only and are
+not persisted. The page-owned API remains outside published OpenAPI.
+
+中文：OperatorX 分享链接保留类别路径（包括 `/zh`）以及 `workload`、`parallel`、
+`metric`、`model`、`hardware` 和 `baseline`。模型视图用 `modelPrecision` 保存计算精度（按 `computePrecision` 筛选用例），
+用 `modelBin` 保存 token 数所在的半 octave 分桶（`round(log2(case.x) * 2)`），
+用 `modelSweep` 保存是否显示所有尺寸分桶。所选精度或分桶不可用时，分别回退到模型原有的
+默认精度和最接近 128 token 的分桶。Roofline 图用 `rooflinePrecision`、
+`rooflineNormalized` 和 `rooflineLog` 保存精度、归一化及对数刻度；汇总柱状图独立使用
+`summaryPrecision`、`summaryNormalized` 和 `summarySharedOnly`，互不覆盖。
+汇总参数对应现有 API 的 `rooflinePrecision`、`rooflineNormalized` 和
+`rooflineSharedOnly`；GPU 选择对应 `rooflineHardware`。
+
+对比 API 在收到有效参数时返回 `shareState`，记录经过校验的显式选择，而非模型视图
+最终生效的默认值（后者取决于三个算子响应）。原始用例、测量值、缺失值和来源身份保持
+不变。UI 和 `shareState` 会忽略 fp4/fp8/bf16 以外的精度、格式错误的布尔值，以及非整数或越界的分桶；现有 roofline 投影
+参数校验仍会对无效参数返回 400。缺省参数沿用工作负载默认值，显式 `false` 会保留。
+图例展开、详情弹窗和模型结构折叠仅影响展示，不写入分享链接。对数刻度不改变 API
+测量值。该页面专属 API 仍不纳入公开 OpenAPI。
