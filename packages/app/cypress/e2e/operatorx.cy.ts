@@ -559,7 +559,13 @@ it('reopens shared roofline and summary controls independently', () => {
 
 it('reopens the model token selection and sweep mode from a share link', () => {
   const model = gemm.models[0];
-  const view = { ...gemm, model, modelOptions: [model] };
+  const view = {
+    ...gemm,
+    model,
+    modelOptions: [model],
+    hardware: gemm.hardware.filter((hw) => hw.id === 'h200'),
+    measurements: { h200: gemm.measurements.h200 },
+  };
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', {
     ...moe,
@@ -573,6 +579,12 @@ it('reopens the model token selection and sweep mode from a share link', () => {
     modelOptions: [model],
   });
   cy.visit(`/opx/model?model=${encodeURIComponent(model)}&modelPrecision=bf16&modelBin=12`);
+  cy.get('[data-testid="operatorx-model-gpu-h200"]')
+    .click()
+    .should('have.attr', 'aria-pressed', 'true');
+  cy.location('search').should((search) =>
+    expect(new URLSearchParams(search).has('hardware')).to.eq(false),
+  );
   cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', '64 tokens');
   cy.get('#operatorx-model-tokens').then(($input) => {
     const input = $input[0] as HTMLInputElement;

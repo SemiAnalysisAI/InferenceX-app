@@ -1175,7 +1175,8 @@ export function ModelView({
   const toggle = useCallback(
     (hw: string, placement: 'diagram' | 'chart') => {
       track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement });
-      setPickedHardware(toggleHardwareSelection(hardware, hw));
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPickedHardware(next);
     },
     [hardware],
   );
