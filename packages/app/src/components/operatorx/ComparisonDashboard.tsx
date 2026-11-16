@@ -33,6 +33,13 @@ import {
 } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
+import {
+  BASELINE_PARAM,
+  HARDWARE_PARAM,
+  parsePickedHardware,
+  setPickedHardware,
+  setSearchParam,
+} from './compare/url-selection';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
@@ -97,6 +104,15 @@ function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
+  replaceClientSearch(params);
+}
+
+/** A new workload drops the GPU picks and baseline, which belong to the old one. */
+function setWorkload(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.set('workload', value);
+  params.delete(HARDWARE_PARAM);
+  params.delete(BASELINE_PARAM);
   replaceClientSearch(params);
 }
 
@@ -254,8 +270,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     refetch,
   } = useOperatorXComparison(op, search.get('workload'), search.get('parallel'));
   const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
-  const [picked, setPicked] = useState<string[] | null>(null);
-  const [pickedBaseline, setBaseline] = useState<string | null>(null);
+  // GPU picks and the baseline live in the address bar so share links reproduce them.
+  const pickedParam = search.get(HARDWARE_PARAM);
+  const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
+  const pickedBaseline = search.get(BASELINE_PARAM);
   const [inspected, setInspected] = useState<number | null>(null);
   const queryClient = useQueryClient();
   useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
@@ -277,11 +295,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     const toggle = (hw: string) => {
       track('operatorx_gpu_toggled', { op, gpu: hw, placement: 'chart' });
       const next = toggleHardwareSelection(hardware, hw);
-      if (next !== hardware) setPicked(next);
+      if (next !== hardware) setPickedHardware(next);
     };
     const reset = () => {
       track('operatorx_legend_filter_reset', { op });
-      setPicked(null);
+      setPickedHardware(null);
     };
     const inspect = (index: number) => {
       track('operatorx_case_opened', { op, metric: metric.id });
@@ -327,7 +345,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               value={pending?.id ?? view.workload ?? ''}
               onValueChange={(v) => {
                 track('operatorx_workload_selected', { op, workload: v });
-                setParam('workload', v);
+                setWorkload(v);
               }}
               groups={[
                 {
@@ -388,7 +406,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               value={baseline ?? NO_BASELINE}
               onValueChange={(v) => {
                 track('operatorx_baseline_selected', { op, gpu: v });
-                setBaseline(v);
+                setSearchParam(BASELINE_PARAM, v === NO_BASELINE ? null : v);
               }}
               searchable={false}
               groups={[

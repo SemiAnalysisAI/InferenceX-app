@@ -665,6 +665,10 @@ flagged.
 OperatorX is available in primary navigation without an unlock. Its read-only view
 is `/api/v1/views/operatorx`; OperatorX `flops` and `bytes` are useful work per GPU,
 so `tflops` compares across device splits; pick one `parallel` split per comparison.
+Page share links keep the selection in plain query params: `workload` or `model`,
+`parallel`, `metric`, `hardware` (comma-separated GPU keys, same as the view API's
+`hardware`), and `baseline` (presentation-only; it picks the speedup reference and
+does not change returned rows). The view response's `url` carries `hardware` when narrowed.
 Its other `/api/v1/operatorx/*` routes belong to the page and are not part of this
 skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
@@ -1350,3 +1354,13 @@ Vendor-series colors are presentation-only. Huawei/Ascend series use a shared, t
 ### Huawei small-message bandwidth extension
 
 `test=mem-bw&gpu=Huawei%20950PR` covers 51 sizes, 8 B through 16 GiB. The nine 8 B–2 KiB points have 360 observations each from a separate CANN 9.2.1 run. `metadata.smallMessageExtension` preserves its date, versions, board, size range, 4096-byte slot stride, archive digest and cache qualification. The original metadata and all 42 measurements from 4 KiB upward are unchanged. These graph-amortized rates include possible cache residency and are not isolated-copy latency or cold-HBM bandwidth.
+
+OperatorX share links also keep `modelPrecision=fp4|fp8|bf16`, `modelBin`
+(half-octave bin, `round(log2(x) * 2)`), `modelSweep=true|false`, `scatterPrecision`,
+`scatterNormalized`, `scatterLog`, `summaryPrecision`, `summaryNormalized`, and
+`summarySharedOnly`. To fetch the model view's rows, pass `modelPrecision` and
+`modelBin` to `/api/v1/views/operatorx` as `precision` and `bin` (omit `bin` for
+`modelSweep=true`). The view response's `url` carries them back for a model selection.
+Summary bars are the page-owned compare API's `rooflinePrecision`,
+`rooflineNormalized`, `rooflineSharedOnly` and `rooflineHardware` (the GPU picks).
+`scatterLog` and `baseline` are presentation only.

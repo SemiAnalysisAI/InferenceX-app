@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { convertRedirects } from '@vercel/routing-utils/dist/superstatic';
 import { describe, expect, it } from 'vitest';
@@ -161,4 +163,30 @@ describe('next.config custom routes', () => {
     const response = await respond(path);
     expect(response.headers.get('content-language')).toBe(language);
   });
+});
+
+it('loads the production config through Next’s transpiler without Vitest alias resolution', () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      '-e',
+      `
+    const { transpileConfig } = require('next/dist/build/next-config-ts/transpile-config');
+    transpileConfig({ nextConfigPath: require('node:path').resolve('next.config.ts'), dir: process.cwd() })
+      .then(async loaded => {
+        const config = loaded.default ?? loaded;
+        const redirects = await config.redirects();
+        if (!redirects.some(route => route.source === '/datasets' && route.destination === '/infx/agentx')) throw new Error('Dashboard redirects missing');
+        process.stdout.write('config-loaded');
+      })
+      .catch(error => { console.error(error); process.exitCode = 1; });
+  `,
+    ],
+    {
+      cwd: resolve(import.meta.dirname, '../../..'),
+      encoding: 'utf8',
+      env: { ...process.env, __NEXT_NODE_NATIVE_TS_LOADER_ENABLED: 'false' },
+    },
+  );
+  expect(output).toContain('config-loaded');
 });

@@ -1,4 +1,5 @@
 import { rooflineBound } from '@/components/operatorx/compare/roofline-bound';
+import { sizeBin } from '@/components/operatorx/model-view/OpBars';
 import type { NextRequest } from 'next/server';
 
 import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
@@ -27,6 +28,14 @@ export const maxDuration = 300;
 
 const OPS = ['gemm', 'moe', 'attention'] as const satisfies readonly ComparisonOp[];
 const STATUSES = ['ok', 'unsupported', 'error', 'missing', 'all'] as const;
+const PRECISIONS = ['bf16', 'fp8', 'fp4'] as const;
+
+/** Model-view case filters: compute precision and the half-octave token bin it shows. */
+interface CaseFilter {
+  precision: (typeof PRECISIONS)[number] | null;
+  bin: number | null;
+}
+const NO_FILTER: CaseFilter = { precision: null, bin: null };
 const PAGE_SIZE = 100;
 /** The `parallel` value for one device, which has the empty split key. */
 const ONE_DEVICE = '1';
@@ -36,6 +45,7 @@ function flatten(
   view: ComparisonView,
   hardware: readonly string[],
   status: (typeof STATUSES)[number],
+  filter: CaseFilter = NO_FILTER,
   from = 0,
   to = Infinity,
 ) {
@@ -43,6 +53,8 @@ function flatten(
   let total = 0;
   for (let i = 0; i < view.cases.length; i++) {
     const c = view.cases[i];
+    if (filter.precision !== null && c.computePrecision !== filter.precision) continue;
+    if (filter.bin !== null && !(c.x !== null && c.x > 0 && sizeBin(c.x) === filter.bin)) continue;
     for (const hw of hardware) {
       const col = view.measurements[hw];
       const result = col?.status[i];
@@ -98,12 +110,20 @@ function csvRow(row: Row): Record<string, unknown> {
   };
 }
 
-/** The dashboard page showing this selection. */
-function pageUrl(op: ComparisonOp, view: ComparisonView): string {
+/** The dashboard page showing this selection, GPU picks included when narrowed. */
+function pageUrl(
+  op: ComparisonOp,
+  view: ComparisonView,
+  picked: readonly string[],
+  filter: CaseFilter,
+): string {
   const q = new URLSearchParams(
     view.model ? { model: view.model } : { workload: view.workload ?? '' },
   );
   if (view.parallel) q.set('parallel', view.parallel);
+  if (picked.length > 0) q.set('hardware', picked.join(','));
+  if (view.model && filter.precision) q.set('modelPrecision', filter.precision);
+  if (view.model && filter.bin !== null) q.set('modelBin', String(filter.bin));
   return `${operatorXCategoryPath(view.model ? 'model' : op)}?${q}`;
 }
 
@@ -160,12 +180,20 @@ export function GET(request: NextRequest) {
     if (unknown)
       throw new ViewsApiParamError('hardware', `Unknown hardware: ${unknown}`, available);
     const hardware = picked.length > 0 ? picked : available;
+    const filter: CaseFilter = {
+      precision: s.has('precision')
+        ? parseEnumParam(s.get('precision'), 'precision', PRECISIONS, 'bf16')
+        : null,
+      bin: s.has('bin')
+        ? parseNumberParam(s.get('bin'), 'bin', 0, { min: 0, max: 1023, integer: true })
+        : null,
+    };
 
     const page = parseNumberParam(s.get('page'), 'page', 0, { min: 0, integer: true });
     const { rows, total } =
       format === 'csv'
-        ? flatten(view, hardware, status)
-        : flatten(view, hardware, status, page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+        ? flatten(view, hardware, status, filter)
+        : flatten(view, hardware, status, filter, page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page >= pages)
       throw new ViewsApiParamError('page', `page must be below ${pages}`, [String(pages - 1)]);
@@ -187,6 +215,8 @@ export function GET(request: NextRequest) {
           parallel: view.parallel || ONE_DEVICE,
           hardware,
           status,
+          precision: filter.precision,
+          bin: filter.bin,
           page,
           format,
         },
@@ -206,7 +236,7 @@ export function GET(request: NextRequest) {
           })),
           hardware: view.hardware.map((h) => ({ id: h.id, runner: h.runner, runs: h.runs })),
         },
-        url: pageUrl(op, view),
+        url: pageUrl(op, view, picked, filter),
         total,
         pageSize: PAGE_SIZE,
         rows,
