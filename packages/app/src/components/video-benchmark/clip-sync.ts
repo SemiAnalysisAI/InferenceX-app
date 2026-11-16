@@ -5,8 +5,10 @@
  */
 
 /**
- * `loading` waits for every clip to hold data through the shared end before the group starts;
- * `buffering` is a stall mid-play, released once each clip has a little data ahead again.
+ * `loading` waits for every clip to be able to play before the group starts; `buffering` is a wait
+ * mid-play for a clip that ran out of data. Both end the same way: every clip can play and they
+ * are at one time. A clip that waits for data is never paused, because some browsers (iOS) load
+ * nothing for a paused clip.
  */
 export type ClipPhase = 'paused' | 'loading' | 'buffering' | 'playing' | 'ended';
 
@@ -21,6 +23,7 @@ export interface ClipSnapshot {
   /** End of the buffered range that contains currentTime; 0 when none does. */
   bufferedEnd: number;
   readyState: number;
+  paused: boolean;
   seeking: boolean;
   ended: boolean;
   playbackRate: number;
@@ -43,8 +46,12 @@ export interface ClipGroup {
 export type ClipAction =
   | { type: 'play-all' }
   | { type: 'pause-all' }
-  /** play() then pause() inside the user gesture, so browsers that fetch media only after a gesture load while the group waits. */
-  | { type: 'prime' }
+  /** play() and no pause: the clip lacks data or is behind, and plays on its own until it has caught up. */
+  | { type: 'play'; key: string }
+  /** Holds a clip that is ready and ahead while another catches up. */
+  | { type: 'pause'; key: string }
+  /** play() then pause() inside the user gesture, so a browser that wants a gesture lets the held clip start later. */
+  | { type: 'prime'; key: string }
   | { type: 'seek'; key: string; time: number }
   | { type: 'rate'; key: string; rate: number };
 
@@ -55,50 +62,40 @@ export interface ClipGroupStep {
   time: number;
   /** Share of the shared duration buffered by the slowest clip, 0..1. */
   buffered: number;
-  /** Every clip holds data from its time through the shared end, so the group can start without a stall. */
+  /** No clip is waiting for data. */
   ready: boolean;
 }
 
 const HAVE_FUTURE_DATA = 3;
-/** Seconds buffered past the group time before clips stalled mid-play resume together. */
-export const BUFFER_MARGIN_SECONDS = 1;
-/** Slack before the shared end within which a buffered range counts as reaching it. */
-export const LOADED_SLACK_SECONDS = 0.05;
-/** Drift that starts a playbackRate nudge on a follower. */
+/** Drift that starts a playbackRate nudge on a follower; clips this close count as at one time. */
 export const NUDGE_SECONDS = 0.04;
 /** Drift at which a nudged follower returns to the base speed. */
 const SETTLE_SECONDS = 0.01;
 /** Drift beyond which a follower is seeked once instead of nudged. */
 export const SEEK_SECONDS = 0.25;
+/** A gap the clip behind plays through to catch up in a wait; a wider one is closed by a seek. */
+export const CATCH_UP_SECONDS = 1;
 export const NUDGE_RATE = 0.1;
 const END_EPSILON = 0.02;
 
 export const clipGroupActive = (phase: ClipPhase) =>
   phase === 'loading' || phase === 'buffering' || phase === 'playing';
 
-const stalled = (clip: ClipSnapshot) => !clip.seeking && clip.readyState < HAVE_FUTURE_DATA;
-
-const endOf = (clip: ClipSnapshot, duration: number) => (duration > 0 ? duration : clip.duration);
-
-/** Decodable and buffered from its time through the shared end. */
-function loaded(clip: ClipSnapshot, duration: number) {
-  const end = endOf(clip, duration);
-  return (
-    clip.readyState >= HAVE_FUTURE_DATA && end > 0 && clip.bufferedEnd >= end - LOADED_SLACK_SECONDS
-  );
+/** At the end of the media a clip has no data ahead and never will. */
+function atEnd(clip: ClipSnapshot, duration: number) {
+  const end = duration > 0 ? duration : clip.duration;
+  return clip.ended || (end > 0 && clip.currentTime >= end - END_EPSILON);
 }
 
-/** Mid-play fallback for a buffer the browser evicted. */
-function hasDataAhead(clip: ClipSnapshot, duration: number) {
-  return (
-    clip.readyState >= HAVE_FUTURE_DATA &&
-    (clip.bufferedEnd - clip.currentTime >= BUFFER_MARGIN_SECONDS || loaded(clip, duration))
-  );
-}
+/** Waiting for data: not seeking, and nothing to play from its time. */
+const starved = (clip: ClipSnapshot, duration: number) =>
+  !clip.seeking && clip.readyState < HAVE_FUTURE_DATA && !atEnd(clip, duration);
 
-function leaderOf({ clips, audible }: ClipGroup) {
+function leaderOf({ clips, audible, duration }: ClipGroup) {
   return (
-    clips.find((clip) => clip.key === audible) ?? clips.find((clip) => !stalled(clip)) ?? clips[0]
+    clips.find((clip) => clip.key === audible) ??
+    clips.find((clip) => !starved(clip, duration)) ??
+    clips[0]
   );
 }
 
@@ -115,25 +112,49 @@ function resetRates({ clips, speed }: ClipGroup, actions: ClipAction[]) {
     if (clip.playbackRate !== speed) actions.push({ type: 'rate', key: clip.key, rate: speed });
 }
 
-/** Seeks followers that drifted while paused, then starts all clips once each passes the waiting phase's rule. */
+/**
+ * One step of a wait. Every clip that lacks data or is behind plays; a clip that is ready and
+ * ahead is held. Once all are ready and at one time they start together. Clips further apart than
+ * a clip can play through are seeked to the leader first. `gesture` marks the step taken inside
+ * the user's tap.
+ */
 function resume(
   group: ClipGroup,
   leader: ClipSnapshot,
   actions: ClipAction[],
   waiting: 'loading' | 'buffering',
+  gesture = false,
 ): ClipPhase {
-  let aligning = false;
-  for (const clip of group.clips) {
-    if (clip === leader || Math.abs(clip.currentTime - leader.currentTime) <= SEEK_SECONDS)
-      continue;
-    aligning = true;
-    if (!clip.seeking) actions.push({ type: 'seek', key: clip.key, time: leader.currentTime });
+  const { clips, duration } = group;
+  // A seeking clip reports its target, not where its picture is; nothing moves until it lands.
+  if (clips.some((clip) => clip.seeking)) return waiting;
+  const times = clips.map((clip) => clip.currentTime);
+  const front = Math.max(...times);
+  if (front - Math.min(...times) > CATCH_UP_SECONDS) {
+    for (const clip of clips) {
+      if (!clip.paused && !starved(clip, duration)) actions.push({ type: 'pause', key: clip.key });
+      if (clip !== leader && Math.abs(clip.currentTime - leader.currentTime) > NUDGE_SECONDS)
+        actions.push({ type: 'seek', key: clip.key, time: leader.currentTime });
+    }
+    return waiting;
   }
-  const ready = waiting === 'loading' ? loaded : hasDataAhead;
-  if (aligning || !group.clips.every((clip) => ready(clip, group.duration))) return waiting;
-  resetRates(group, actions);
-  actions.push({ type: 'play-all' });
-  return 'playing';
+  const moving = clips.filter(
+    (clip) => starved(clip, duration) || front - clip.currentTime > NUDGE_SECONDS,
+  );
+  // Some held and some playing would start apart by however long a start takes.
+  const together = clips.every((clip) => clip.paused) || clips.every((clip) => !clip.paused);
+  if (moving.length === 0 && together) {
+    resetRates(group, actions);
+    actions.push({ type: 'play-all' });
+    return 'playing';
+  }
+  for (const clip of clips) {
+    if (moving.includes(clip)) {
+      if (clip.paused) actions.push({ type: 'play', key: clip.key });
+    } else if (!clip.paused) actions.push({ type: 'pause', key: clip.key });
+    else if (gesture) actions.push({ type: 'prime', key: clip.key });
+  }
+  return waiting;
 }
 
 /**
@@ -165,7 +186,7 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
     actions,
     time,
     buffered: bufferedShare(group),
-    ready: clips.every((clip) => loaded(clip, duration)),
+    ready: !clips.some((clip) => starved(clip, duration)),
   });
   if (!leader) return result('paused');
   const active = clipGroupActive(phase);
@@ -180,8 +201,10 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
   switch (event) {
     case 'hide':
     case 'pause': {
-      if (event === 'hide' ? phase !== 'playing' : !active) return result(phase);
+      if (!active) return result(phase);
       actions.push({ type: 'pause-all' });
+      // A hidden page keeps a start the user is waiting for; the wait goes on when it is back.
+      if (event === 'hide' && phase !== 'playing') return result(phase);
       resetRates(group, actions);
       return result('paused');
     }
@@ -191,9 +214,7 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
         for (const clip of clips) actions.push({ type: 'seek', key: clip.key, time: 0 });
         return result('loading', 0);
       }
-      const next = resume(group, leader, actions, 'loading');
-      if (next === 'loading') actions.push({ type: 'prime' });
-      return result(next);
+      return result(resume(group, leader, actions, 'loading', true));
     }
     case 'tick': {
       if (phase === 'loading' || phase === 'buffering')
@@ -211,8 +232,10 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
         }
         return result('ended', duration > 0 ? duration : leader.currentTime);
       }
-      if (clips.some(stalled)) {
-        actions.push({ type: 'pause-all' });
+      if (clips.some((clip) => starved(clip, duration))) {
+        // The others wait; the clip without data is left playing, which is how it loads.
+        for (const clip of clips)
+          if (!starved(clip, duration)) actions.push({ type: 'pause', key: clip.key });
         resetRates(group, actions);
         return result('buffering');
       }

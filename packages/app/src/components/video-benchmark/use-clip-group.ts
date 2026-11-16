@@ -29,6 +29,7 @@ function clipSnapshot(key: string, video: HTMLVideoElement): ClipSnapshot {
     duration: Number.isFinite(video.duration) ? video.duration : 0,
     bufferedEnd,
     readyState: video.readyState,
+    paused: video.paused,
     seeking: video.seeking,
     ended: video.ended,
     playbackRate: video.playbackRate,
@@ -133,14 +134,27 @@ export function useClipGroup(
           for (const clip of clips) videos.current.get(clip.key)?.pause();
           break;
         }
+        case 'play': {
+          // The promise settles when the clip has data, or rejects with AbortError when the group holds or pauses it.
+          const { key } = action;
+          videos.current
+            .get(key)
+            ?.play()
+            .catch((error: { name?: string } | null) => {
+              if (error?.name !== 'AbortError') live.current.onRejected([key]);
+            });
+          break;
+        }
+        case 'pause': {
+          videos.current.get(action.key)?.pause();
+          break;
+        }
         case 'prime': {
-          // A prime is not a start. Its own pause() rejects every play() with AbortError, so there is no outcome to read.
-          for (const clip of clips) {
-            const video = videos.current.get(clip.key);
-            if (!video) continue;
-            void video.play().catch(() => {});
-            video.pause();
-          }
+          // A prime is not a start. Its own pause() rejects the play() with AbortError, so there is no outcome to read.
+          const video = videos.current.get(action.key);
+          if (!video) break;
+          void video.play().catch(() => {});
+          video.pause();
           break;
         }
         case 'seek': {

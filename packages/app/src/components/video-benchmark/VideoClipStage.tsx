@@ -534,10 +534,13 @@ export default function VideoClipStage({
   /** Middle of the part of the stage a side shows, for its empty-state text. */
   const centerOf = (role: Role) =>
     view === 'wipe' ? (onLeft(role) ? split / 2 : split + (100 - split) / 2) : 50;
-  const progress =
-    phase === 'buffering'
+  // Named only while the group waits for data: a paused clip may load nothing, and a clip that
+  // only catches up with the other is not loading.
+  const progress = ready
+    ? null
+    : phase === 'buffering'
       ? s.buffering
-      : armed && !ready && playable.length > 0 && (phase === 'paused' || phase === 'loading')
+      : phase === 'loading'
         ? s.downloading
         : null;
 

@@ -11,7 +11,7 @@ import styles from '@/components/video-benchmark/results.module.css';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
-import { coarsePointer, tapArea, touchScreen } from '../support/video-results';
+import { coarsePointer, phoneMedia, tapArea, touchScreen } from '../support/video-results';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -375,8 +375,12 @@ describe('Video results clip stage', () => {
     // The stage keeps its view and prompt in the URL, which outlives one test's mount.
     cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
   });
+  /** Puts the browser's own media back after a test that stood in for it. */
+  let undoMedia: (() => void) | null = null;
   afterEach(() => {
     if (Cypress.isBrowser({ family: 'chromium' })) touchScreen(false);
+    undoMedia?.();
+    undoMedia = null;
   });
 
   it('keeps one audible side, also across a prompt switch', () => {
@@ -555,6 +559,60 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-against"]').select('h100');
     cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
     expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
+  });
+
+  it('starts both clips from the tap where a clip loads only while it plays, behind their first frames', () => {
+    const reference = poster('red');
+    const subject = poster('blue');
+    const seen = { calls: [] as ReturnType<typeof phoneMedia>['calls'], referenceSrc: '' };
+    cy.window().then((win) => {
+      // The reference takes twice as long to have data as the subject does.
+      const media = phoneMedia(win, (src) => (src === seen.referenceSrc ? 600 : 300));
+      seen.calls = media.calls;
+      undoMedia = media.undo;
+    });
+    mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
+      posters: { reference, 'measurement-r001': subject },
+    });
+    const videos = '[data-testid="video-results-stage"] video';
+    const frames = '[data-testid="video-results-first-frame"]';
+    sideVideo('b').then(($video) => {
+      seen.referenceSrc = $video.attr('src')!;
+    });
+    cy.get(frames).should('have.length', 2);
+    cy.get('[data-testid="video-results-play"]')
+      .click()
+      .then(() => {
+        // Both starts are asked for inside the tap, and neither is taken back.
+        expect(seen.calls.filter((entry) => entry.call === 'play' && entry.inClick)).to.have.length(
+          2,
+        );
+        expect(seen.calls.filter((entry) => entry.call === 'pause')).to.deep.equal([]);
+      });
+    // While the clips load, each side keeps its first frame and the transport says why it waits.
+    cy.get(frames)
+      .should('have.length', 2)
+      .each(($frame) => cy.wrap($frame).should('be.visible'));
+    sideVideo('a').parent().find('img').should('have.attr', 'src', subject);
+    cy.get('[data-testid="video-results-buffering"]').should('contain', 'Loading');
+    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
+    // Both move once the slower clip has data: well inside a second, and from one time.
+    cy.get<HTMLVideoElement>(videos, { timeout: 1500 }).should(($videos) => {
+      const times = [...$videos].map((video) => {
+        expect(video.paused, 'playing').to.equal(false);
+        expect(video.currentTime, 'moving').to.be.greaterThan(0.05);
+        return video.currentTime;
+      });
+      expect(Math.abs(times[0] - times[1]), 'together').to.be.lessThan(0.04);
+    });
+    cy.get(frames).should('not.exist');
+    cy.get('[data-testid="video-results-buffering"]').should('not.exist');
+    cy.then(() =>
+      // A clip that waits for data is never paused; only the one that had its data is held.
+      expect(seen.calls.filter((entry) => entry.call === 'pause' && !entry.loaded)).to.deep.equal(
+        [],
+      ),
+    );
   });
 
   it('wipes by a sideways drag, plays on a tap and explains itself by tap on a touch screen', () => {
