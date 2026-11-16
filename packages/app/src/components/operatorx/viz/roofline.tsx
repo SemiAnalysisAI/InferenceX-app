@@ -183,6 +183,19 @@ export function Roofline({
     ...points.map((p) => p.y),
     ...Object.values(rooflines).flatMap((r) => r.map((p) => p.y)),
   ];
+  const yHi = Math.max(...ys) * 1.1;
+  // Log y: put the lowest measured point a quarter of the way up instead of letting the
+  // roofline's bandwidth slope drag the floor down, then clip each slope at that floor.
+  const pointYs = points.map((p) => p.y).filter((y) => y > 0);
+  const yMin = pointYs.length > 0 ? Math.min(...pointYs) : Math.min(...ys.filter((y) => y > 0));
+  const yLo = Math.exp((Math.log(yMin) - 0.25 * Math.log(yHi)) / 0.75);
+  if (logY)
+    for (const [hw, line] of Object.entries(rooflines)) {
+      const cut = line.findIndex((p) => p.y >= yLo);
+      if (cut <= 0) continue;
+      const below = line[cut - 1];
+      rooflines[hw] = [{ x: (below.x * yLo) / below.y, y: yLo }, ...line.slice(cut)];
+    }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -260,10 +273,10 @@ export function Roofline({
               logY
                 ? {
                     type: 'log',
-                    domain: [Math.min(...ys.filter((y) => y > 0)) / 1.5, Math.max(...ys) * 1.5],
+                    domain: [yLo, yHi],
                     nice: false,
                   }
-                : { type: 'sqrt', domain: [0, Math.max(...ys) * 1.1], nice: false }
+                : { type: 'sqrt', domain: [0, yHi], nice: false }
             }
             xAxis={
               normalized
