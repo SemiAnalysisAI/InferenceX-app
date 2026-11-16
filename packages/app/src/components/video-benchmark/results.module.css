@@ -75,8 +75,9 @@
 }
 
 /* A cut-off edge of a sideways-scrolling table fades, so the hidden columns read as scrollable.
-   `useScrollFade` names the edges that have more content. */
-.page [data-scroll-more] {
+   `useScrollFade` names the edges that have more content; a table that hides none gets no mask,
+   which would redraw its rounded corners. */
+.page [data-scroll-more]:not([data-scroll-more='']) {
   --fade-start: 0px;
   --fade-end: 0px;
   mask-image: linear-gradient(

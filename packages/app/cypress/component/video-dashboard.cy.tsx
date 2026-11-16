@@ -1231,6 +1231,23 @@ describe('VideoGenX results', () => {
     );
   });
 
+  it('fades the cut-off edge of a wide table on a phone and masks nothing where no column is hidden', () => {
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    cy.viewport(1440, 900);
+    mount({ editPage: publishEveryRun });
+    cy.get('[data-testid="video-results-sources"] > summary').click();
+    const scroller = '[data-testid="video-results-sources"] [data-scroll-more]';
+    cy.get(scroller)
+      .should('have.attr', 'data-scroll-more', '')
+      .and('have.css', 'mask-image', 'none');
+    cy.viewport(390, 844);
+    cy.get(scroller)
+      .should('have.attr', 'data-scroll-more', 'end')
+      .and(($table) => expect(getComputedStyle($table[0]).maskImage).to.contain('linear-gradient'));
+    cy.get(scroller).scrollTo('right');
+    cy.get(scroller).should('have.attr', 'data-scroll-more', 'start');
+  });
+
   it('opens the point nearest a tap in a sheet on a touch screen, and closes it four ways', () => {
     coarsePointer();
     cy.viewport(390, 844);
