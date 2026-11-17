@@ -153,132 +153,73 @@
 }
 
 /* AgentX session replay (`agentx-session-replay.tsx`). The finished chart is the resting state.
-   While a replay draws, every bar segment runs one animation whose delay and length come from
-   the replay timeline as `--replay-at` and `--replay-ms`, so the bars move on transform and
-   opacity only and no script runs per frame. */
-.agentx-replay {
-  --replay-cached: 0.4;
-  --replay-carried: 0.65;
-}
-
-.agentx-replay-rows {
-  --replay-row: 0.875rem;
-}
-
-.agentx-replay-row {
-  height: var(--replay-row);
-}
-
-.agentx-replay-label {
-  line-height: var(--replay-row);
-}
-
-.agentx-replay-track {
-  height: calc(var(--replay-row) - 0.25rem);
-}
-
-.agentx-replay-cached {
-  opacity: var(--replay-cached);
-}
-
-/* On a short viewport (a phone held sideways) the caption, the axis and all 20 rows have to fit
-   under the sticky header, so the rows and the gaps above them tighten. This file is not in a
-   cascade layer, so these win over the Tailwind spacing classes on the same elements. */
-@media (max-height: 480px) {
-  .agentx-replay-rows {
-    --replay-row: 0.625rem;
-  }
-
-  .agentx-replay-label {
-    font-size: var(--text-2xs);
-  }
-
-  .agentx-replay-caption {
-    margin-top: 0.25rem;
-  }
-
-  .agentx-replay-axis {
-    margin-top: 0.375rem;
-  }
-}
-
-/* Empty track of a request that has not been sent yet; hidden once the chart is finished. */
-.agentx-replay-slot {
-  opacity: 0;
-}
-
+   While a replay draws, each bar segment runs one animation whose delay and length come from
+   the replay timeline, on transform and opacity only. */
 @media (prefers-reduced-motion: no-preference) {
-  [data-replay='out'] .agentx-replay-rows {
-    animation: agentx-replay-out 250ms var(--motion-ease-exit) forwards;
+  [data-replay='out'] .replay-rows {
+    animation: replay-out 250ms var(--motion-ease-exit) forwards;
   }
 
-  [data-replay='play'] .agentx-replay-rows {
-    animation: agentx-replay-in 200ms var(--motion-ease-enter) both;
+  [data-replay='play'] .replay-rows {
+    animation: replay-in 200ms var(--motion-ease-enter) both;
   }
 
-  [data-replay='play'] :is(.agentx-replay-slot, .agentx-replay-carry, .agentx-replay-grow) {
-    animation-duration: var(--replay-ms);
-    animation-delay: var(--replay-at);
-    animation-fill-mode: both;
+  [data-replay='play'] :is(.replay-slot, .replay-carry, .replay-grow) {
+    transform-origin: left center;
+    animation: var(--ms) var(--motion-ease-enter) var(--at) both;
   }
 
-  [data-replay='play'] .agentx-replay-slot {
-    animation-name: agentx-replay-slot;
-    animation-timing-function: linear;
+  /* The empty track of a request that has not been sent yet. */
+  [data-replay='play'] .replay-slot {
+    animation-name: replay-slot;
   }
 
-  /* The previous request's whole bar turns into cache where it is, then drops into this row
-     as its cached prefix. It travels at a stronger tint so the move reads at speed. */
-  [data-replay='play'] .agentx-replay-carry {
-    animation-name: agentx-replay-carry;
+  /* The previous request's whole bar turns into cache where it is, then drops into this row. */
+  [data-replay='play'] .replay-carry {
+    animation-name: replay-carry;
     animation-timing-function: ease-in-out;
   }
 
-  [data-replay='play'] .agentx-replay-grow {
-    transform-origin: left center;
-    animation-name: agentx-replay-grow;
-    animation-timing-function: var(--motion-ease-enter);
+  [data-replay='play'] .replay-grow {
+    animation-name: replay-grow;
   }
 
-  [data-replay-paused] .agentx-replay-rows,
-  [data-replay-paused] .agentx-replay-rows * {
+  [data-replay-paused] .replay-rows,
+  [data-replay-paused] .replay-rows * {
     animation-play-state: paused;
   }
 }
 
-@keyframes agentx-replay-out {
+@keyframes replay-out {
   to {
     opacity: 0;
   }
 }
 
-@keyframes agentx-replay-in {
+@keyframes replay-in {
   from {
     opacity: 0;
   }
 }
 
-@keyframes agentx-replay-slot {
+@keyframes replay-slot {
   from {
     opacity: 1;
   }
-  to {
-    opacity: 0;
-  }
 }
 
-@keyframes agentx-replay-carry {
+@keyframes replay-carry {
   from {
     opacity: 0;
-    transform: translateY(calc(var(--replay-carry) * var(--replay-row) * -1));
+    transform: translateY(calc(var(--carry) * var(--row) * -1));
   }
   20% {
-    opacity: var(--replay-carried);
-    transform: translateY(calc(var(--replay-carry) * var(--replay-row) * -1));
+    opacity: 0.65;
+    transform: translateY(calc(var(--carry) * var(--row) * -1));
   }
 }
 
-@keyframes agentx-replay-grow {
+@keyframes replay-grow {
   from {
     transform: scaleX(0);
   }

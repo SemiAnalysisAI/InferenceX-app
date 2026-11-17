@@ -1,7 +1,7 @@
 'use client';
 
 import { RotateCcw } from 'lucide-react';
-import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import { useReducedMotion } from '@/components/inference/replay/useReducedMotion';
 import { Button } from '@/components/ui/button';
@@ -11,18 +11,17 @@ import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 
 import {
-  type Caption,
-  carryDistance,
   CONTEXT_CAP,
   DISPLAY_ROWS,
   type Frame,
   frameAt,
   LEAD_OUT_MS,
   nextChange,
+  NOTES,
   REPLAY,
   REPLAY_ROWS,
-  type ReplayRow,
   REST_FRAME,
+  type StepNote,
   TIMELINE,
   WARM_PREFIX,
 } from './agentx-session-replay-model';
@@ -32,15 +31,9 @@ type Locale = 'en' | 'zh';
 
 const TICKS = [64_000, 128_000, 192_000, 256_000];
 
-/** The replay first plays once this share of the rows is on screen. */
-const START_RATIO = 0.5;
-
 function tokens(n: number): string {
   return n >= 1000 ? `${Number((n / 1000).toFixed(1))}k` : String(n);
 }
-
-/** Shown in place of a number whose bar segment has not started yet. */
-const PENDING = '–';
 
 function requestNumber(n: number): string {
   return String(n).padStart(2, '0');
@@ -53,12 +46,12 @@ const STRINGS = {
     request: (range: string, total: number) => `Request ${range} / ${total}`,
     main: 'main',
     sub: (n: number) => `sub ${n}`,
-    captions: {
+    notes: {
       warmStart: `Replay joins mid-session. Warmup already holds the ${tokens(WARM_PREFIX)}-token prefix in KV cache.`,
       fanOut: 'Three subagents start in parallel with empty KV caches and prefill from scratch.',
       subagentsReturn: 'Subagent reports return to the main agent as new input.',
       mainTurns: 'Later turns reuse earlier context from KV cache and prefill only the new input.',
-    } satisfies Record<Caption, string>,
+    } satisfies Record<StepNote, string>,
     stats: {
       cached: 'From KV cache',
       fresh: 'Prefilled',
@@ -76,12 +69,12 @@ const STRINGS = {
     request: (range: string, total: number) => `请求 ${range} / ${total}`,
     main: '主',
     sub: (n: number) => `子 ${n}`,
-    captions: {
+    notes: {
       warmStart: `回放从会话中途开始。warmup 已将 ${tokens(WARM_PREFIX)} token 的 prefix 写入 KV cache。`,
       fanOut: '三个 subagent 并行启动。它们的 KV cache 为空，prompt 需要从头 prefill。',
       subagentsReturn: 'subagent 的结果作为新 input 返回 main agent。',
       mainTurns: '后续轮次从 KV cache 复用此前的上下文，只 prefill 新增的 input。',
-    } satisfies Record<Caption, string>,
+    } satisfies Record<StepNote, string>,
     stats: {
       cached: '来自 KV cache',
       fresh: '已 prefill',
@@ -99,83 +92,84 @@ function pct(n: number): string {
   return `${(n / CONTEXT_CAP) * 100}%`;
 }
 
-/** The delay and length of one segment's animation, read by the rules in `motion.css`. */
-function motion(at: number, until: number, carry?: number): CSSProperties {
-  return {
-    '--replay-at': `${at - LEAD_OUT_MS}ms`,
-    '--replay-ms': `${until - at}ms`,
-    ...(carry === undefined ? null : { '--replay-carry': carry }),
-  } as CSSProperties;
+/** When a segment's animation starts and how long it runs, read by the rules in `motion.css`. */
+function timing(at: number, ms: number, carry = 0): CSSProperties {
+  return { '--at': `${at - LEAD_OUT_MS}ms`, '--ms': `${ms}ms`, '--carry': carry } as CSSProperties;
 }
 
-/** Each drawn row with how far above it the bar it inherits sits (see `carryDistance`). */
-const ROWS = DISPLAY_ROWS.map((row, index) => ({
-  row,
-  carry: carryDistance(DISPLAY_ROWS, index),
-  /** A subagent's later request: drawn under its first without repeating the label. */
-  continues: row.lane !== null && DISPLAY_ROWS[index - 1]?.lane === row.lane,
-}));
+function Segment({
+  value,
+  color,
+  className,
+  minPx = 0,
+  motion,
+}: {
+  value: number;
+  color: string;
+  className?: string;
+  minPx?: number;
+  motion: CSSProperties;
+}) {
+  return (
+    <span
+      className={cn('relative h-full shrink-0', className)}
+      style={{
+        ...motion,
+        width: pct(value),
+        minWidth: value > 0 ? minPx : 0,
+        backgroundColor: color,
+      }}
+    />
+  );
+}
 
 function Row({
   row,
-  carry,
-  label,
   frame,
+  label,
 }: {
-  row: ReplayRow;
-  carry: number;
-  label: string;
+  row: (typeof DISPLAY_ROWS)[number];
   frame: Frame;
+  label: string;
 }) {
+  const { start, prefill, decode, drawn } = TIMELINE[row.step];
   const playing = frame.phase === 'play';
-  const timing = TIMELINE[row.step];
-  const { pace } = REPLAY[row.step];
+  const active = playing && row.step === frame.step;
   return (
-    <li
-      className="agentx-replay-row flex items-center gap-2"
-      data-testid="agentx-session-replay-row"
-    >
+    <li className="flex h-(--row) items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'agentx-replay-label min-w-12 shrink-0 whitespace-nowrap text-right text-xs tabular-nums',
-          playing && row.step === frame.step
-            ? 'font-semibold text-foreground'
-            : 'text-muted-foreground',
-          playing && row.step > frame.step && 'opacity-60',
+          'min-w-12 shrink-0 whitespace-nowrap text-right text-xs leading-(--row) tabular-nums short:text-2xs',
+          active ? 'font-semibold text-foreground' : 'text-muted-foreground',
+          playing && row.step > frame.step ? 'opacity-60' : 'opacity-100',
         )}
       >
         {label}
       </span>
-      <div className="agentx-replay-track relative flex flex-1">
+      <div className="relative flex h-[calc(var(--row)-0.25rem)] flex-1">
         <span
-          className="agentx-replay-slot absolute inset-0 bg-foreground/5"
-          style={motion(timing.start, timing.start + 150)}
+          className="replay-slot absolute inset-0 bg-foreground/5 opacity-0"
+          style={timing(start, 150)}
         />
-        <span
-          className="agentx-replay-cached agentx-replay-carry relative h-full shrink-0"
-          style={{
-            width: pct(row.cached),
-            backgroundColor: SEG.cached,
-            ...motion(timing.start, timing.prefill, carry),
-          }}
+        <Segment
+          value={row.cached}
+          color={SEG.cached}
+          className="replay-carry opacity-40"
+          motion={timing(start, prefill - start, row.carry)}
         />
-        <span
-          className="agentx-replay-grow relative h-full shrink-0"
-          style={{
-            width: pct(row.fresh),
-            minWidth: 2,
-            backgroundColor: SEG.uncached,
-            ...motion(timing.prefill, timing.prefill + pace.prefill),
-          }}
+        <Segment
+          value={row.fresh}
+          color={SEG.uncached}
+          minPx={2}
+          className="replay-grow"
+          motion={timing(prefill, decode - prefill)}
         />
-        <span
-          className="agentx-replay-grow relative h-full shrink-0"
-          style={{
-            width: pct(row.output),
-            minWidth: 2,
-            backgroundColor: SEG.output,
-            ...motion(timing.decode, timing.decode + pace.decode),
-          }}
+        <Segment
+          value={row.output}
+          color={SEG.output}
+          minPx={3}
+          className="replay-grow"
+          motion={timing(decode, drawn - decode)}
         />
       </div>
     </li>
@@ -185,24 +179,22 @@ function Row({
 export function AgentXSessionReplay({ locale }: { locale: Locale }) {
   const t = STRINGS[locale];
   const reducedMotion = useReducedMotion();
-  const rowsRef = useRef<HTMLOListElement>(null);
+  const ref = useRef<HTMLOListElement>(null);
+  const start = useRef<() => void>(undefined);
   const [frame, setFrame] = useState<Frame>(REST_FRAME);
   const [paused, setPaused] = useState(false);
-  const control = useRef<{ start: () => void; seek: () => void } | null>(null);
 
   useEffect(() => {
-    const rows = rowsRef.current;
-    if (reducedMotion || !rows) return undefined;
-
-    // One clock: `elapsed` is how much of the replay has been shown, and `since` is when it
-    // last started running (null while it is stopped).
+    const node = ref.current;
+    if (reducedMotion || !node || typeof IntersectionObserver === 'undefined') return undefined;
+    // One clock: `elapsed` is how much of the replay has been shown and `since` is when it last
+    // started running (null while it is stopped).
     let elapsed = 0;
     let since: number | null = null;
     let active = false;
     let played = false;
     let offscreen = false;
     let timer: number | undefined;
-
     const now = () => (since === null ? elapsed : elapsed + performance.now() - since);
     const tick = () => {
       const time = now();
@@ -211,10 +203,9 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
       if (next === null) {
         active = false;
         since = null;
-        elapsed = 0;
-        return;
+      } else {
+        timer = window.setTimeout(tick, next - time);
       }
-      timer = window.setTimeout(tick, next - time);
     };
     // Runs the clock only while a replay is under way and the reader can see it.
     const update = () => {
@@ -225,60 +216,39 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
       } else if (!run && since !== null) {
         elapsed = now();
         since = null;
-        window.clearTimeout(timer);
+        clearTimeout(timer);
       }
       setPaused(active && !run);
     };
-
-    control.current = {
-      start: () => {
-        window.clearTimeout(timer);
-        played = true;
-        active = true;
-        elapsed = 0;
-        since = null;
-        update();
-      },
-      // The bars are CSS animations that all began when drawing began, so setting their
-      // time to the clock's keeps them on it across a pause.
-      seek: () => {
-        const time = now() - LEAD_OUT_MS;
-        if (time < 0 || typeof rows.getAnimations !== 'function') return;
-        for (const animation of rows.getAnimations({ subtree: true })) {
-          animation.currentTime = time;
-        }
-      },
+    start.current = () => {
+      clearTimeout(timer);
+      played = true;
+      active = true;
+      elapsed = 0;
+      since = null;
+      update();
     };
-
-    const observer =
-      typeof IntersectionObserver === 'undefined'
-        ? null
-        : new IntersectionObserver(
-            (entries) => {
-              // Several threshold crossings can arrive at once; the last is the current state.
-              const entry = entries.at(-1);
-              if (!entry) return;
-              offscreen = !entry.isIntersecting;
-              if (!played && entry.intersectionRatio >= START_RATIO) control.current?.start();
-              else update();
-            },
-            { threshold: [0, START_RATIO] },
-          );
-    observer?.observe(rows);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries.at(-1);
+        if (!entry) return;
+        offscreen = !entry.isIntersecting;
+        // First plays once half of the rows are on screen.
+        if (!played && entry.intersectionRatio >= 0.5) start.current?.();
+        else update();
+      },
+      { threshold: [0, 0.5] },
+    );
+    observer.observe(node);
     document.addEventListener('visibilitychange', update);
     return () => {
-      observer?.disconnect();
+      observer.disconnect();
       document.removeEventListener('visibilitychange', update);
-      window.clearTimeout(timer);
-      control.current = null;
+      clearTimeout(timer);
       setFrame(REST_FRAME);
       setPaused(false);
     };
   }, [reducedMotion]);
-
-  useLayoutEffect(() => {
-    control.current?.seek();
-  }, [frame.phase, paused]);
 
   const step = REPLAY[frame.step];
   const firstIndex = REPLAY_ROWS.indexOf(step.rows[0]) + 1;
@@ -287,69 +257,55 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
     firstIndex === lastIndex
       ? requestNumber(firstIndex)
       : `${requestNumber(firstIndex)}–${requestNumber(lastIndex)}`;
+  const shown = (n: number | null) => (n === null ? '–' : tokens(n));
 
   const stats = [
     { key: 'cached', label: t.stats.cached, value: tokens(frame.cached), color: SEG.cached },
-    {
-      key: 'fresh',
-      label: t.stats.fresh,
-      value: frame.fresh === null ? PENDING : tokens(frame.fresh),
-      color: SEG.uncached,
-    },
-    {
-      key: 'output',
-      label: t.stats.output,
-      value: frame.output === null ? PENDING : tokens(frame.output),
-      color: SEG.output,
-    },
+    { key: 'fresh', label: t.stats.fresh, value: shown(frame.fresh), color: SEG.uncached },
+    { key: 'output', label: t.stats.output, value: shown(frame.output), color: SEG.output },
     {
       key: 'hit',
       label: t.stats.hit,
-      value: frame.hit === null ? PENDING : `${(frame.hit * 100).toFixed(1)}%`,
+      value: frame.hit === null ? '–' : `${(frame.hit * 100).toFixed(1)}%`,
       color: null,
     },
   ];
 
   return (
     <figure
-      className="agentx-replay border-b border-border/20 px-5 py-5 sm:px-6"
+      className="border-b border-border/20 px-5 py-5 sm:px-6"
       data-testid="agentx-session-replay"
       data-replay={frame.phase}
       data-replay-paused={paused ? '' : undefined}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <div className="flex items-center gap-1">
-          <p className="text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
+        <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+          {t.eyebrow}
           {reducedMotion ? null : (
             <Button
-              type="button"
               variant="ghost"
               size="icon-xs"
               aria-label={t.replay}
-              title={t.replay}
               data-testid="agentx-session-replay-restart"
-              className={cn(
-                '-my-3.5 text-muted-foreground md:-my-2',
-                frame.phase !== 'rest' && 'invisible',
-              )}
+              className={cn('-my-3.5 md:-my-2', frame.phase !== 'rest' && 'invisible')}
               onClick={() => {
                 track('agentx_replay_restarted');
-                control.current?.start();
+                start.current?.();
               }}
             >
               <RotateCcw aria-hidden="true" />
             </Button>
           )}
-        </div>
+        </p>
         <p className="text-xs text-muted-foreground tabular-nums font-medium">
           {t.request(range, REPLAY_ROWS.length)}
         </p>
       </div>
-      <p className="agentx-replay-caption mt-2 min-h-10 text-sm leading-5 text-foreground sm:min-h-5">
-        {t.captions[frame.caption]}
+      <p className="mt-2 min-h-10 text-sm leading-5 text-foreground short:mt-1 sm:min-h-5">
+        {t.notes[NOTES[frame.step]]}
       </p>
 
-      <p className="agentx-replay-axis mt-3 ml-14 text-xs text-muted-foreground" aria-hidden="true">
+      <p className="mt-3 ml-14 text-xs text-muted-foreground short:mt-1.5" aria-hidden="true">
         {t.axis}
       </p>
       <div className="relative mt-0.5" aria-hidden="true">
@@ -373,14 +329,14 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             </span>
           ))}
         </div>
-        <ol ref={rowsRef} className="agentx-replay-rows relative">
-          {ROWS.map(({ row, carry, continues }, index) => (
+        <ol ref={ref} className="replay-rows relative [--row:0.875rem] short:[--row:0.625rem]">
+          {DISPLAY_ROWS.map((row, index) => (
             <Row
               key={index}
               row={row}
-              carry={carry}
               frame={frame}
-              label={row.lane === null ? t.main : continues ? '' : t.sub(row.lane + 1)}
+              // A subagent's second request sits under its first, without repeating the label.
+              label={row.lane === null ? t.main : row.carry ? '' : t.sub(row.lane + 1)}
             />
           ))}
         </ol>
@@ -397,7 +353,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
               <span className="inline-flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className={cn('size-2 shrink-0', stat.key === 'cached' && 'agentx-replay-cached')}
+                  className={cn('size-2 shrink-0', stat.key === 'cached' && 'opacity-40')}
                   style={stat.color ? { backgroundColor: stat.color } : undefined}
                 />
                 {stat.label}
