@@ -36,7 +36,6 @@ import {
   PILL_HEIGHT,
   badgeBox,
   boxesOverlap,
-  clearOfLabels,
   labelShift,
   placePill,
   spreadPills,
@@ -487,13 +486,15 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       .text(narrow ? pill.short : pill.text);
     const width = textWidth(text.node()!, CHART_TYPE.annotation) + 12;
     rect.attr('width', width);
-    // A shown label is stepped past below, as before; the place itself avoids the rest.
-    const box = placePill(pill.key, at, width, size, {
-      boxes: [...badges, ...taken],
-      points: spots,
-      lines,
-    });
-    clearOfLabels(box, at, covered, size.width);
+    // Each place is judged where the pill ends up once it is off the shown labels.
+    const box = placePill(
+      pill.key,
+      at,
+      width,
+      size,
+      { boxes: [...badges, ...taken], points: spots, lines },
+      covered,
+    );
     taken.push({ x0: box.x, x1: box.x + width, y0: box.y, y1: box.y + PILL_HEIGHT });
     return [{ box, group }];
   });

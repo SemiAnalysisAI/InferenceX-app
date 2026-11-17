@@ -220,9 +220,11 @@ export function badgeBox(
 
 /**
  * Where a series pill goes: right of its last point, else above it, below it, or left of it, the
- * first of those that stays inside the plot and covers none of `obstacles`. When every place
- * covers something, the one that covers least wins. `spreadPills` still runs afterwards for pills
- * left on each other.
+ * first of those that stays inside the plot and covers none of `obstacles`. A place over one of
+ * the shown `labels` is also judged where `clearOfLabels` moves the pill to, so stepping off a
+ * label never lands the pill on a point, a line or another mark. When every place covers
+ * something, the one that covers least wins. `spreadPills` still runs afterwards for pills left on
+ * each other.
  */
 export function placePill(
   key: string,
@@ -230,6 +232,7 @@ export function placePill(
   width: number,
   plot: { width: number; height: number },
   obstacles: MarkObstacles,
+  labels: readonly Box[] = [],
 ): PillBox {
   const inside = (x: number) =>
     Math.max(EDGE, Math.min(x, Math.max(EDGE, plot.width - EDGE - width)));
@@ -244,21 +247,26 @@ export function placePill(
     { key, x: inside(end.x - PILL_OFFSET - width), y: middle, width },
   ].filter((pill) => pill.y >= EDGE && pill.y + PILL_HEIGHT <= plot.height - EDGE);
   // Off the plot at every place: the right or left of the point, which `spreadPills` clamps.
-  if (candidates.length === 0) return pillBox(key, end, width, plot.width);
-  const cost = (pill: PillBox) =>
-    covered(
-      { x0: pill.x, x1: pill.x + pill.width, y0: pill.y, y1: pill.y + PILL_HEIGHT },
-      obstacles,
-    );
+  if (candidates.length === 0)
+    return clearOfLabels(pillBox(key, end, width, plot.width), end, labels, plot.width);
+  const edges = (pill: PillBox) => ({
+    x0: pill.x,
+    x1: pill.x + pill.width,
+    y0: pill.y,
+    y1: pill.y + PILL_HEIGHT,
+  });
+  const all = { ...obstacles, boxes: [...obstacles.boxes, ...labels] };
   let best = candidates[0];
-  let least = cost(best);
-  for (const candidate of candidates.slice(1)) {
-    if (least === 0) break;
-    const next = cost(candidate);
-    if (next < least) {
-      best = candidate;
-      least = next;
+  let least = Infinity;
+  for (const candidate of candidates) {
+    const moved = clearOfLabels({ ...candidate }, end, labels, plot.width);
+    const stayed = moved.x === candidate.x && moved.y === candidate.y;
+    const cost = covered(edges(candidate), obstacles) + (stayed ? 0 : covered(edges(moved), all));
+    if (cost < least) {
+      best = moved;
+      least = cost;
     }
+    if (least === 0) break;
   }
   return best;
 }

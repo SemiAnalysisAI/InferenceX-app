@@ -291,6 +291,36 @@ describe('placePill', () => {
       placePill('a', end, 60, plot, { boxes: [badge], points: [point], lines: [line] }),
     ).toEqual({ key: 'a', x: 128, y: 91, width: 60 });
   });
+
+  it('goes below a labelled last point near the right edge, never onto the point', () => {
+    const end = { x: 200, y: 100 };
+    // The point's GPU-count label, reaching down over the point as the chart passes it.
+    const label = { x0: 185, x1: 215, y0: 82, y1: 105 };
+    const pill = placePill('a', end, 60, plot, { ...clear, points: [end] }, [label]);
+    // Above would cover the label, and stepping off it there would land on the point.
+    expect(pill).toEqual({ key: 'a', x: 168, y: 112, width: 60 });
+    expect(boxesOverlap(label, edges(pill))).toBe(false);
+  });
+
+  it('goes left of a labelled point rather than drop off the label onto its neighbour', () => {
+    const end = { x: 170, y: 100 };
+    const neighbour = { x: 192, y: 122 };
+    const label = { x0: 155, x1: 185, y0: 82, y1: 105 };
+    // Right is free until the label pushes the pill down, since the plot has no room to step past.
+    const pill = placePill('a', end, 44, plot, { ...clear, points: [end, neighbour] }, [label]);
+    expect(pill).toEqual({ key: 'a', x: 114, y: 107, width: 44 });
+  });
+
+  it('still steps a right-hand pill past its point’s label when the plot has room', () => {
+    const end = { x: 100, y: 100 };
+    const label = { x0: 85, x1: 125, y0: 82, y1: 105 };
+    expect(placePill('a', end, 60, plot, { ...clear, points: [end] }, [label])).toEqual({
+      key: 'a',
+      x: 129,
+      y: 91,
+      width: 60,
+    });
+  });
 });
 
 describe('tapTarget', () => {

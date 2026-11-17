@@ -192,7 +192,9 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    the legend's wording ("B200 (SGLang)"; lossy series as a dashed outline, the named overlay
    run in `overlayRunColor`). A pill goes right of its last point, else above it, below it or
    left of it: the first place inside the plot that covers no badge, shown label, earlier pill,
-   point or line, and otherwise the place that covers least (`placePill`, `chart-marks.ts`).
+   point or line, and otherwise the place that covers least (`placePill`, `chart-marks.ts`). A
+   pill over a shown label steps past it or drops below it, and a place also counts what the
+   pill would cover once moved, so it never leaves a label for a point.
    Pills left on each other are pushed down 21 px at a time, and all stay inside the plot, follow
    zoom and pan, and appear in the PNG export. A plot narrower than 480 px names only the focus
    overlay lines, so a phone is not covered in unofficial pills, and names a GPU's one lossless
