@@ -79,7 +79,8 @@ const STRINGS = {
     diagnosticNote:
       'Single-clip rerun with fixed noise and parallelism. Charts below use the original 20-clip run.',
     media: 'Media',
-    webEncode: 'Playback uses a web encode; Difference, PSNR and the media link use the original.',
+    webEncode:
+      'Playback and Difference use a web encode; PSNR and the media link use the original.',
     seed: 'seed',
     take: (n: number) => `take ${n}`,
     more: 'More',
@@ -142,7 +143,7 @@ const STRINGS = {
     diagnosticNote:
       '单条视频重跑，使用固定的初始噪声和并行配置。下方图表仍展示原始 20 条视频的测试结果。',
     media: '视频文件',
-    webEncode: '播放使用网页转码版本；“差异”视图、PSNR 和视频文件链接仍使用原始视频。',
+    webEncode: '播放和“差异”视图使用网页转码版本；PSNR 和视频文件链接仍使用原始视频。',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
     more: '展开',

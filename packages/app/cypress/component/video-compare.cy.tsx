@@ -634,7 +634,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-difference"]').should('not.exist');
   });
 
-  it('plays web renditions outside Difference and sealed originals in it, also for an overlay', () => {
+  it('plays web renditions in every view, Difference included, also for an overlay', () => {
     mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId, [
       'b200',
       'h200',
@@ -648,7 +648,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-sources"]').should(
       'contain',
-      'Playback uses a web encode; Difference, PSNR and the media link use the original.',
+      'Playback and Difference use a web encode; PSNR and the media link use the original.',
     );
     cy.get('@original-b200').then((url) =>
       cy
@@ -662,14 +662,14 @@ describe('Video results clip stage', () => {
     expectClipsAt(0.8);
 
     cy.get('[data-testid="video-results-view-diff"]').click();
-    cy.get('@original-b200').then((url) => sideVideo('a').should('have.attr', 'src', url));
-    sideVideo('b')
-      .invoke('attr', 'src')
-      .then((src) => cy.get('@preview-url').should('not.equal', src));
-    // Swapping to the original reloads each side; it must resume at the group's time, not 0.
+    cy.get('@preview-url').then((url) => {
+      sideVideo('a').should('have.attr', 'src', url);
+      sideVideo('b').should('have.attr', 'src', url);
+    });
     expectClipsAt(0.8);
-    // Both renditions are the same stand-in, so only the originals differ.
-    expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
+    // Both renditions are the same stand-in while the originals differ, so a black difference
+    // shows Difference read the renditions.
+    expectDifference((rgba) => expect(rgba).to.deep.equal([0, 0, 0, 255]));
 
     cy.get('[data-testid="video-results-view-toggle"]').click();
     cy.get('@preview-url').then((url) => sideVideo('a').should('have.attr', 'src', url));

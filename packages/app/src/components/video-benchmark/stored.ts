@@ -12,7 +12,7 @@ export interface StoredMedia {
   previewUrl?: string;
   /**
    * JPEG of the first decoded frame of `url`, attached at read time like `previewUrl`.
-   * Presentation only; metrics, PSNR and Difference read the sealed original.
+   * Presentation only; metrics and PSNR read the sealed original.
    */
   posterUrl?: string;
 }

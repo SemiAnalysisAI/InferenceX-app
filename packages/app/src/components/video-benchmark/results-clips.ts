@@ -137,9 +137,9 @@ export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): 
 export interface ResultsClip {
   side: ResultsClipSide;
   record: CaseRecord;
-  /** Sealed original: Difference, PSNR pairing and the media link; empty for an unpublished run. */
+  /** Sealed original: PSNR pairing and the media link; empty for an unpublished run. */
   url: string;
-  /** Lighter web rendition of `url` for Clip view playback. */
+  /** Lighter web rendition of `url`, which the stage plays in every view. */
   previewUrl?: string;
   /** JPEG of the first decoded frame of `url`; presentation only. */
   posterUrl?: string;

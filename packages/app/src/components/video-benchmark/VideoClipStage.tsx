@@ -51,7 +51,7 @@ const STRINGS = {
       'Difference unavailable: frames must have matching geometry and permit cross-origin pixel reads.',
     differenceLabel: 'RGB difference ×4 · preview',
     differenceNote:
-      'Absolute RGB difference ×4 between the two clips at the same playback time. This browser preview is separate from the all-frame PSNR measurement.',
+      'Absolute RGB difference ×4 between the two clips at the same playback time, from their web encodes where they exist. This browser preview is separate from the all-frame PSNR measurement, which uses the originals.',
     play: 'Play',
     pause: 'Pause',
     playBoth: 'Play both clips',
@@ -84,7 +84,7 @@ const STRINGS = {
     differenceUnavailable: '无法显示差异：帧尺寸必须一致，且视频需允许跨域像素读取。',
     differenceLabel: 'RGB 差异 ×4 · 预览',
     differenceNote:
-      '两段视频在相同播放时刻的 RGB 绝对差异，放大 4 倍。此为浏览器预览，与全帧 PSNR 测量相互独立。',
+      '两段视频在相同播放时刻的 RGB 绝对差异，放大 4 倍；有网页转码版本时基于转码版本计算。此为浏览器预览，与基于原始视频的全帧 PSNR 测量相互独立。',
     play: '播放',
     pause: '暂停',
     playBoth: '同时播放两段视频',
@@ -118,9 +118,9 @@ export interface StageClip {
   meta: string;
   /** Pill dot; null draws the reference's outlined dot. */
   color: string | null;
-  /** Sealed original, which Difference always reads; empty when no media is shown. */
+  /** Sealed original, played when the side has no web rendition; empty when no media is shown. */
   url: string;
-  /** Lighter web rendition of `url` for the other views. */
+  /** Lighter web rendition of `url`, which every view plays, Difference included. */
   previewUrl?: string;
   /** First frame of `url`, shown before Play; loading it requests no clip media. */
   posterUrl?: string;
@@ -303,11 +303,12 @@ export default function VideoClipStage({
   const both = playable.length === 2;
   const shown: Role = peek ? OTHER[toggled] : toggled;
   const overlay = view !== 'side';
-  const original = view === 'diff';
-  const srcOf = (clip: StageClip) => (original || !clip.previewUrl ? clip.url : clip.previewUrl);
+  // Two sealed originals stream at about 15 Mbit/s each, more than a phone link carries, so
+  // Difference plays the renditions too; their difference is within 0.1 dB PSNR of the originals'.
+  const src = { a: a.previewUrl || a.url, b: b.previewUrl || b.url };
   const firstFrame = {
-    a: useFirstFrame(() => videos.current.get('a'), a.url ? srcOf(a) : undefined),
-    b: useFirstFrame(() => videos.current.get('b'), b.url ? srcOf(b) : undefined),
+    a: useFirstFrame(() => videos.current.get('a'), a.url ? src.a : undefined),
+    b: useFirstFrame(() => videos.current.get('b'), b.url ? src.b : undefined),
   };
   const posterLoaded = (url = '') => loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
   // At the start of the clips, each side's first frame covers its video until every side has
@@ -343,7 +344,7 @@ export default function VideoClipStage({
 
   useEffect(() => () => cancelAnimationFrame(splitFrame.current), []);
 
-  // Changing a side's source (Difference, rendition fallback) reloads it at 0. Before metadata,
+  // Changing a side's source (rendition fallback) reloads it at 0. Before metadata,
   // currentTime sets the start position, so it resumes at the time of a side that kept its source,
   // or at the group time when both sources changed. A new selection starts its clips at 0.
   const shownTime = useRef(0);
@@ -358,7 +359,7 @@ export default function VideoClipStage({
     const resumeAt = anchor ? anchor.currentTime : shownTime.current;
     for (const video of videos.current.values())
       if (video.readyState === 0) video.currentTime = resumeAt;
-  }, [selection, original, a.previewUrl, b.previewUrl]);
+  }, [selection, src.a, src.b]);
 
   useEffect(() => {
     if (view !== 'diff' || !both) return undefined;
@@ -431,7 +432,7 @@ export default function VideoClipStage({
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [view, both, a.url, b.url]);
+  }, [view, both, src.a, src.b]);
 
   const active = clipGroupActive(phase);
   const togglePlay = () => {
@@ -681,7 +682,7 @@ export default function VideoClipStage({
                 {clip.url && (
                   <video
                     ref={group.register(role)}
-                    src={srcOf(clip)}
+                    src={src[role]}
                     poster={clip.posterUrl}
                     crossOrigin="anonymous"
                     muted
