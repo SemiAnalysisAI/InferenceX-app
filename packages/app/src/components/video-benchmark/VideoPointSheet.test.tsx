@@ -225,3 +225,19 @@ it('ends the return for a point tapped after the sheet has gone', () => {
   expect(second.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1070 });
   expect(second.scrollBy).not.toHaveBeenCalled();
 });
+
+it('lets the page go back when a point that needed no scroll is drawn again as the sheet leaves', () => {
+  animated();
+  const page = { scrollY: 1000, markBottom: 580, firstScreen: 200 };
+  const sheet = open(page);
+  // The sheet moves to a point already clear of it, so the page does not move for that one.
+  Object.assign(page, { scrollY: 1100, markBottom: 480 });
+  sheet.render('second');
+  expect(sheet.scrollBy).toHaveBeenCalledOnce();
+  sheet.close();
+  expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000, behavior: 'smooth' });
+  // Its clip is read while the sheet slides away, which makes the first screen taller.
+  Object.assign(page, { scrollY: 1080, firstScreen: 230 });
+  sheet.render('second');
+  expect(sheet.scrollTo).toHaveBeenCalledOnce();
+});

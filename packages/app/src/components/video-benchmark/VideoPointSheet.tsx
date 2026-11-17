@@ -154,6 +154,8 @@ export default function VideoPointSheet({
   const origin = useRef<number | null>(null);
   /** The point this sheet last scrolled the page for; a later run for it finds the page moving. */
   const scrolledFor = useRef<string | null>(null);
+  /** The point this sheet last showed, whether or not the page had to move for it. */
+  const shownFor = useRef<string | null>(null);
   /** Closes at the reader's word, which also puts the page back; an action that leaves does not. */
   const dismiss = () => {
     if (exit.current) return;
@@ -238,8 +240,12 @@ export default function VideoPointSheet({
   // The sheet covers the bottom of the screen; a point under it scrolls up into view.
   useEffect(() => {
     // A return still on its way would carry another point back under the sheet. It ends here,
-    // and the point is read where the page stopped.
-    if (scrolledFor.current !== pointKey) endReturn?.();
+    // and the point is read where the page stopped. Only another point ends it: the same point
+    // drawn again, as when its clip is read while the sheet leaves, lets the page go back.
+    if (shownFor.current !== pointKey) {
+      shownFor.current = pointKey;
+      endReturn?.();
+    }
     const element = sheet.current;
     const mark = anchor?.()?.getBoundingClientRect();
     // Not before the sheet has its opening height, and again if its first screen grows.
