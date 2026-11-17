@@ -243,3 +243,49 @@
     display: none;
   }
 }
+
+/* Motion. A change of state eases from the old state to the new one, with the site's durations
+   and curves (`src/app/motion.css`); `motion.ts` names the same values for script. Everything
+   here animates opacity and transform only, and is off under `prefers-reduced-motion: reduce`. */
+@keyframes swap-in {
+  from {
+    opacity: 0;
+  }
+}
+/* The site's page transition (`motion-vt-in`), for the deployment page and the way back. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Values that replace others in the same place: the readout, the stage sentence, a sheet
+     that moves to another point. */
+  .swapIn {
+    animation: swap-in var(--motion-dur-fast) var(--motion-ease-enter);
+  }
+  .pageIn {
+    animation: page-in var(--motion-dur-base) var(--motion-ease-enter);
+  }
+  /* Under 768 px the shared sheet style slides the sheet in; a wider touch screen gets the same. */
+  @media (min-width: 768px) {
+    .sheet {
+      animation: sheet-in var(--motion-dur-base) var(--motion-ease-enter);
+    }
+  }
+  /* A sheet let go short of closing settles back; while a finger drags it, it follows the finger. */
+  .sheet[data-settling] {
+    transition: transform var(--motion-dur-fast) var(--motion-ease-standard);
+  }
+  /* The selected prompt's ring moves over as feedback on the tap. */
+  .tileFrame {
+    transition: box-shadow var(--motion-dur-fast) var(--motion-ease-standard);
+  }
+}
