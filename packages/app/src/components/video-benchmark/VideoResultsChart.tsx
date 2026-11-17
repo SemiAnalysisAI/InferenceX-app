@@ -1096,6 +1096,15 @@ export default function VideoResultsChart({
   const onRender = useCallback(
     ({ layout, width, height }: RenderContext) => {
       size.current = { width, height };
+      // The x title centres on the plot. Where the chart is too narrow for that, as for the zh
+      // title on a 320 px phone, it moves over just far enough to stay inside the chart.
+      const title = layout.svg.select<SVGTextElement>('.x-axis-label').node();
+      if (title) {
+        const centre = layout.margin.left + width / 2;
+        const chartWidth = layout.margin.left + width + layout.margin.right;
+        const shift = labelShift(centre, textWidth(title, CHART_TYPE.axisLabel), chartWidth);
+        title.setAttribute('x', String(centre + shift));
+      }
       const root = layout.zoomGroup.node();
       if (!root) return;
       drawMarks(root, size.current, marks.current, s);

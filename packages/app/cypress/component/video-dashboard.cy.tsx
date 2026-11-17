@@ -2161,6 +2161,8 @@ describe('VideoGenX results', () => {
           expect(legend.left, 'legend beside the chart').to.be.at.least(plot.right);
         else expect(legend.top, 'legend below the chart').to.be.at.least(plot.bottom);
       });
+      // The title names the clip shape once the cohort has loaded, which is its longest form.
+      cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', '24 fps');
       cy.get('[data-testid="video-results-chart"] .x-axis-label').should(($label) => {
         const svg = $label[0].closest('svg')!.getBoundingClientRect();
         const label = $label[0].getBoundingClientRect();

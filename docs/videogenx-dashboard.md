@@ -119,7 +119,8 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    the chart caption so PNG exports carry it. The chart plots every measured deployment
    of the selected workload. X is a latency per clip or GPUs per deployment, described
    in X-axis metric; when every plotted deployment generates clips of one length and
-   frame rate, a latency axis title names both. Y is video-seconds
+   frame rate, a latency axis title names both. The title centres on the plot and, in a
+   chart too narrow for that, moves over to stay inside it. Y is video-seconds
    per $1 TCO (default), videos per GPU-hour or GPU kJ per valid clip.
    `results-chart.ts` registers each metric with its label, unit and better direction.
    Each hardware, runtime and run channel is one series with its own Pareto frontier;
