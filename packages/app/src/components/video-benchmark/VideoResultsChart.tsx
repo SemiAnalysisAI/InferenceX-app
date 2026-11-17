@@ -5,7 +5,6 @@ import {
   easeCubicInOut,
   select,
   timer,
-  zoomIdentity,
   zoomTransform,
   type ScaleContinuousNumeric,
   type Timer,
@@ -55,12 +54,15 @@ import {
   type PlotBefore,
 } from './chart-motion';
 import {
+  EASE,
   MOTION,
+  cssEase,
   markMotion,
   markPassEnd,
   markStep,
   reducedMotion,
   type MarkMotion,
+  type MarkPlace,
 } from './motion';
 import {
   BADGE_HEIGHT,
@@ -304,16 +306,52 @@ function drawHollow(root: Element) {
 }
 
 const PILLS = 'series-pills';
+/** On a mark, the key of the point it is attached to, which it rides while that point glides. */
+const RIDES = 'data-rides';
 /** One display frame, so the marks' last redraw lands after the points' last step. */
 const FRAME_MS = 20;
 /** Plot width, in px, below which only focus overlay lines get a pill. */
 const NARROW_PLOT = 480;
 
 const now = () => performance.now();
-/** A mark's opacity attribute while it fades in; none once it is opaque. */
-const faded = (opacity: number) => (opacity < 1 ? opacity : null);
+/**
+ * How a pass draws marks that are on their way. At `rest` the pass is the only one, so each move
+ * is an animation on the drawn mark. A `frame` is one of a run of passes, a frame apart, so the
+ * mark is drawn where it has got to. Through a `zoom` or pan nothing eases.
+ */
+type MarkPass = 'rest' | 'frame' | 'zoom';
+/**
+ * Fades in a mark that appeared `age` ms ago. Marks are redrawn whole, so a redraw during the fade
+ * picks it up where it was; nothing is redrawn for the fade itself.
+ */
+function fadeIn(node: Element | null, age: number | null) {
+  if (age === null || typeof node?.animate !== 'function') return;
+  node.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: MOTION.fast,
+    easing: cssEase(EASE.enter),
+  }).currentTime = age;
+}
+/**
+ * Carries a mark drawn on `to` there from `from`, `elapsed` ms into the move. The animation is the
+ * drawn mark's own, so the move takes no redraw; a redraw meanwhile picks it up where it was.
+ */
+function moveIn(node: Element | null, from: Spot | null, to: Spot, elapsed: number) {
+  if (!from || typeof node?.animate !== 'function') return;
+  node.animate(
+    [
+      { transform: `translate(${from.x}px, ${from.y}px)` },
+      { transform: `translate(${to.x}px, ${to.y}px)` },
+    ],
+    { duration: MOTION.base, easing: cssEase(EASE.standard) },
+  ).currentTime = elapsed;
+}
 /** Where the points sit among the plot's layers, after the capture layer and the lines; the hover card attaches there. */
 const POINTS_LAYER = 2;
+/** Whether the plot is zoomed or panned away from its resting view. */
+const zoomed = (svg: SVGSVGElement) => {
+  const { k, x, y } = zoomTransform(svg);
+  return k !== 1 || x !== 0 || y !== 0;
+};
 /** Ticks asked of each linear axis. */
 const X_TICKS = 6;
 const Y_TICKS = 6;
@@ -360,12 +398,14 @@ function drawMarks(
   s: Strings,
   motion: MarkMotion | null = null,
   time = 0,
+  mode: MarkPass = 'rest',
 ): boolean {
   let moving = false;
-  /** Where to draw a mark now: on its place, or on its way there from where it last was. */
-  const step = (id: string, anchor: string, anchorAt: Spot, target: Spot) => {
-    if (!motion) return { ...target, opacity: 1, moving: false };
-    const at = markStep(motion, id, anchor, anchorAt, target, time);
+  const framed = mode === 'frame';
+  /** A mark's place, and the move or fade that brings it there. */
+  const step = (id: string, anchor: string, anchorAt: Spot, target: Spot): MarkPlace => {
+    if (!motion) return { ...target, from: null, elapsed: 0, age: null, moving: false };
+    const at = markStep(motion, id, anchor, anchorAt, target, time, mode === 'zoom');
     moving ||= at.moving;
     return at;
   };
@@ -386,22 +426,22 @@ function drawMarks(
   if (chosen && chosenAt) {
     // The ring goes over to another point the sheet moves to.
     const ring = step('sheet', inputs.sheet ?? '', chosenAt, chosenAt);
-    select(host as SVGGElement)
+    const circle = select(host as SVGGElement)
       .append('circle')
       .attr('class', SHEET_RING)
+      .attr(RIDES, inputs.sheet)
       // On its point it copies the point's own transform, as every mark does at rest.
       .attr(
         'transform',
-        ring.x === chosenAt.x && ring.y === chosenAt.y
-          ? chosen.getAttribute('transform')
-          : `translate(${ring.x},${ring.y})`,
+        framed && ring.from ? `translate(${ring.x},${ring.y})` : chosen.getAttribute('transform'),
       )
-      .attr('opacity', faded(ring.opacity))
       .attr('r', 11)
       .attr('fill', 'none')
       .attr('stroke', 'var(--foreground)')
       .attr('stroke-width', 2)
       .attr('pointer-events', 'none');
+    fadeIn(circle.node(), ring.age);
+    if (!framed) moveIn(circle.node(), ring.from, chosenAt, ring.elapsed);
   }
   const { link, hover } = inputs;
   const nodes = new Map<string, SVGGElement>();
@@ -442,6 +482,7 @@ function drawMarks(
       .append('g')
       .attr('data-clip-badge', role)
       .attr('data-point', point.key)
+      .attr(RIDES, point.key)
       .attr('transform', node.getAttribute('transform'));
     badge
       .append('circle')
@@ -485,11 +526,26 @@ function drawMarks(
     // A badge goes over to the point the stage plays next, ring and label together.
     const ring = step(`${role}:ring`, point.key, at, at);
     const label = step(`${role}:tag`, point.key, at, { x: box.x0, y: box.y0 });
+    const offset = { x: box.x0 - at.x, y: box.y0 - at.y };
     // On its way to another point it says so; at rest and while its point glides it is on the point.
-    if (ring.x !== at.x || ring.y !== at.y)
-      badge.attr('transform', `translate(${ring.x},${ring.y})`).attr('data-moving', '');
-    badge.attr('opacity', faded(ring.opacity));
-    tag.attr('transform', `translate(${label.x - ring.x},${label.y - ring.y})`);
+    if (ring.from) badge.attr('data-moving', '');
+    fadeIn(badge.node(), ring.age);
+    if (framed) {
+      if (ring.from) badge.attr('transform', `translate(${ring.x},${ring.y})`);
+      tag.attr('transform', `translate(${label.x - ring.x},${label.y - ring.y})`);
+    } else {
+      tag.attr('transform', `translate(${offset.x},${offset.y})`);
+      moveIn(badge.node(), ring.from, at, ring.elapsed);
+      // The label keeps its own way inside the badge: from the side it was on to the side it is on.
+      const start = ring.from ?? at;
+      if (label.from)
+        moveIn(
+          tag.node(),
+          { x: label.from.x - start.x, y: label.from.y - start.y },
+          offset,
+          label.elapsed,
+        );
+    }
   }
 
   // Point labels: focus series only, kept inside the plot and off the badges and each other.
@@ -581,9 +637,14 @@ function drawMarks(
   boxes.forEach(({ group, pill, at }, index) => {
     // A pill stays on its line's end; it eases only to another end or another side of it.
     const place = step(`pill:${pill.key}`, pill.end, at, spread[index]);
+    const to = framed ? place : spread[index];
     group
-      .attr('transform', `translate(${place.x},${place.y})`)
-      .attr('opacity', faded(place.opacity));
+      .attr('transform', `translate(${to.x},${to.y})`)
+      .attr(RIDES, pill.end)
+      .attr('data-dx', spread[index].x - at.x)
+      .attr('data-dy', spread[index].y - at.y);
+    fadeIn(group.node(), place.age);
+    if (!framed) moveIn(group.node(), place.from, spread[index], place.elapsed);
   });
 
   // Pulses live inside each point, so a redraw on hover or zoom does not restart them.
@@ -611,6 +672,27 @@ function drawMarks(
   badgeLayer?.raise();
   if (motion) markPassEnd(motion);
   return moving;
+}
+
+/**
+ * Moves each mark with the point it is attached to, keeping the place the last full pass gave it
+ * beside that point. This is all a frame of a glide has to do for the marks.
+ */
+function rideMarks(root: Element) {
+  const points = new Map<string, SVGGElement>();
+  for (const node of root.querySelectorAll<SVGGElement>('.dot-group'))
+    if (node.dataset.point) points.set(node.dataset.point, node);
+  for (const mark of root.querySelectorAll<SVGElement>(`[${RIDES}]`)) {
+    const point = points.get(mark.getAttribute(RIDES) ?? '');
+    if (!point) continue;
+    const { dx, dy } = mark.dataset;
+    if (dx === undefined || dy === undefined) {
+      mark.setAttribute('transform', point.getAttribute('transform') ?? '');
+      continue;
+    }
+    const at = pointPosition(point);
+    if (at) mark.setAttribute('transform', `translate(${at.x + Number(dx)},${at.y + Number(dy)})`);
+  }
 }
 
 /**
@@ -1226,8 +1308,14 @@ export default function VideoResultsChart({
             glide.current.from = null;
             glide.current.to = null;
           }
+          // The plot has redrawn its lines for the zoom; a glide in progress no longer ends on its own.
+          glide.current.lines = new Map();
           const root = group.node();
-          if (root && drawMarks(root, { width, height }, marks.current, s, markPlaces, now()))
+          // Marks keep to their points through a zoom or pan.
+          if (
+            root &&
+            drawMarks(root, { width, height }, marks.current, s, markPlaces, now(), 'zoom')
+          )
             run.current();
         },
       },
@@ -1255,11 +1343,13 @@ export default function VideoResultsChart({
     follow.current?.stop();
     follow.current = null;
     const svg = chart.current?.getSvgElement();
-    if (svg) delete svg.dataset.moving;
+    if (!svg) return;
+    delete svg.dataset.moving;
+    delete svg.dataset.gliding;
   };
   /**
    * One frame of whatever is in motion: lines and grid keep step with the gliding points, and
-   * marks ease to their places. It ends itself once the points have arrived and no mark moves.
+   * marks are redrawn on them. It ends itself once the points have arrived and no mark moves.
    */
   const frame = useCallback(() => {
     const move = glide.current;
@@ -1270,6 +1360,8 @@ export default function VideoResultsChart({
     }
     const at = now();
     const gliding = at < move.until;
+    // Marks on their way are carried by their own animations; they are redrawn once they arrive.
+    if (!move.running && !gliding && markPlaces && at < markPlaces.until) return;
     if (move.running) {
       followLines(root, marks.current.pills);
       if (layout && move.from && move.to)
@@ -1280,10 +1372,18 @@ export default function VideoResultsChart({
           easeCubicInOut(Math.min(1, (at - move.start) / MOTION.glide)),
         );
     }
-    const moving = drawMarks(root, size.current, marks.current, s, markPlaces, at);
+    // While the points glide the marks ride them, each where the last pass placed it beside its
+    // point. They are placed afresh once the points arrive, and on every frame only while one of
+    // them is on its way somewhere else.
+    const riding = gliding && !(markPlaces && at < markPlaces.until);
+    if (riding) rideMarks(root);
+    const moving =
+      !riding &&
+      drawMarks(root, size.current, marks.current, s, markPlaces, at, gliding ? 'frame' : 'rest');
     if (move.running && !gliding) {
       // The points have arrived: each line takes the shape the plot gave it, and the axes rest.
       move.running = false;
+      delete chart.current?.getSvgElement()?.dataset.gliding;
       for (const [path, shape] of move.lines) if (path.isConnected) path.setAttribute('d', shape);
       move.lines = new Map();
       if (layout && move.to) {
@@ -1309,7 +1409,11 @@ export default function VideoResultsChart({
   };
   const redraw = useCallback(() => {
     const svg = chart.current?.getSvgElement();
-    if (svg && drawMarks(svg, size.current, marks.current, s, markPlaces, now())) run.current();
+    if (!svg) return;
+    const at = now();
+    // In a glide the next frame redraws the marks again; otherwise this is the only pass.
+    const mode = at < glide.current.until ? 'frame' : 'rest';
+    if (drawMarks(svg, size.current, marks.current, s, markPlaces, at, mode)) run.current();
   }, [s, markPlaces]);
   useLayoutEffect(redraw, [playing, baseline, pulse, pills, sheetPoint?.key, redraw]);
   // A first frame read after its card opened fills the box the card reserved for it.
@@ -1368,7 +1472,7 @@ export default function VideoResultsChart({
         !seen ||
         seen.width !== width ||
         seen.height !== height ||
-        (svg !== null && zoomTransform(svg) !== zoomIdentity) ||
+        (svg !== null && zoomed(svg)) ||
         sameAxes(seen, next);
       move.from = still ? null : seen;
       move.to = still ? null : next;
@@ -1396,7 +1500,17 @@ export default function VideoResultsChart({
           : [],
       );
       if (move.running) followLines(root, marks.current.pills);
-      drawMarks(root, size.current, marks.current, s, markPlaces, at);
+      // The pulse rings hold still for the glide (`[data-gliding]`): the main thread paints them.
+      svg?.toggleAttribute('data-gliding', move.running);
+      drawMarks(
+        root,
+        size.current,
+        marks.current,
+        s,
+        markPlaces,
+        at,
+        move.running ? 'frame' : 'rest',
+      );
       run.current();
     },
     [s, animated, markPlaces],

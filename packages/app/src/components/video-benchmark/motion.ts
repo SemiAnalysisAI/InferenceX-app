@@ -62,8 +62,8 @@ interface Moving {
   anchor: string;
   /** Its offset from that point, which changes only when it is placed on another side. */
   offset: Place;
-  /** Where it was last drawn. */
-  shown: Place;
+  /** Where it belongs, as last drawn. */
+  to: Place;
   /** Where its move began, while it moves. */
   from: Place | null;
   start: number;
@@ -82,16 +82,47 @@ export interface MarkMotion {
   seen: Set<string>;
   /** False until the first pass that drew a mark: what is there at the start does not fade in. */
   seeded: boolean;
+  /** When the last mark on its way arrives. */
+  until: number;
 }
 
-export const markMotion = (): MarkMotion => ({ marks: new Map(), seen: new Set(), seeded: false });
+export const markMotion = (): MarkMotion => ({
+  marks: new Map(),
+  seen: new Set(),
+  seeded: false,
+  until: 0,
+});
+
+/** Where a mark is at `now`: on its place, or part of the way there. */
+function markAt(mark: Moving, now: number): Place {
+  const t = (now - mark.start) / MOTION.base;
+  if (!mark.from || t >= 1) return mark.to;
+  const eased = bezier(EASE.standard, t);
+  return {
+    x: mark.from.x + (mark.to.x - mark.from.x) * eased,
+    y: mark.from.y + (mark.to.y - mark.from.y) * eased,
+  };
+}
 
 /** A mark's offset has to change by more than this, in px, to count as a new placement. */
 const PLACED_ELSEWHERE = 1;
 
+/** A mark as one pass draws it. */
+export interface MarkPlace extends Place {
+  /** Where its move began, and how long ago in ms, while it is on its way; else null. */
+  from: Place | null;
+  elapsed: number;
+  /** How long ago, in ms, a mark still fading in appeared; null once it is opaque. */
+  age: number | null;
+  moving: boolean;
+}
+
 /**
- * Where to draw a mark now, and how opaque. `target` is where it belongs and `anchorAt` the
- * point it is attached to, both in plot pixels. `moving` says whether it is still on its way.
+ * Where a mark is now. `target` is where it belongs and `anchorAt` the point it is attached to,
+ * both in plot pixels. The mark is drawn on `target`; while `moving`, an animation on the drawn
+ * mark carries it there from `from`, picked up `elapsed` ms in, so a move costs no redraw. The
+ * returned place is where that animation has it now. A fade in works the same way, from `age`.
+ * `instant` is for a zoom or pan, where every mark keeps to its point: nothing eases or fades in.
  */
 export function markStep(
   motion: MarkMotion,
@@ -100,40 +131,38 @@ export function markStep(
   anchorAt: Place,
   target: Place,
   now: number,
-): Place & { opacity: number; moving: boolean } {
+  instant = false,
+): MarkPlace {
   motion.seen.add(id);
   const offset = { x: target.x - anchorAt.x, y: target.y - anchorAt.y };
   const mark = motion.marks.get(id);
   if (!mark) {
-    const born = motion.seeded ? now : -Infinity;
-    motion.marks.set(id, { anchor, offset, shown: target, from: null, start: 0, born });
-    return { ...target, opacity: born === now ? 0 : 1, moving: born === now };
+    const born = motion.seeded && !instant ? now : -Infinity;
+    motion.marks.set(id, { anchor, offset, to: target, from: null, start: 0, born });
+    return { ...target, from: null, elapsed: 0, age: born === now ? 0 : null, moving: false };
   }
   const elsewhere =
     mark.anchor !== anchor ||
     Math.hypot(mark.offset.x - offset.x, mark.offset.y - offset.y) > PLACED_ELSEWHERE;
-  if (elsewhere) {
-    mark.from = mark.shown;
+  if (instant) mark.from = null;
+  else if (elsewhere) {
+    // From wherever it is, which is part of the way when this cuts a move short.
+    mark.from = markAt(mark, now);
     mark.start = now;
   }
   mark.anchor = anchor;
   mark.offset = offset;
-  let shown = target;
-  if (mark.from) {
-    const t = (now - mark.start) / MOTION.base;
-    if (t >= 1) mark.from = null;
-    else {
-      const eased = bezier(EASE.standard, t);
-      shown = {
-        x: mark.from.x + (target.x - mark.from.x) * eased,
-        y: mark.from.y + (target.y - mark.from.y) * eased,
-      };
-    }
-  }
-  mark.shown = shown;
-  const age = (now - mark.born) / MOTION.fast;
-  const opacity = age >= 1 ? 1 : bezier(EASE.enter, age);
-  return { ...shown, opacity, moving: mark.from !== null || age < 1 };
+  mark.to = target;
+  if (mark.from && now - mark.start >= MOTION.base) mark.from = null;
+  if (mark.from) motion.until = Math.max(motion.until, mark.start + MOTION.base);
+  const age = now - mark.born;
+  return {
+    ...markAt(mark, now),
+    from: mark.from,
+    elapsed: now - mark.start,
+    age: age < MOTION.fast ? age : null,
+    moving: mark.from !== null,
+  };
 }
 
 /** Ends a drawing pass: marks that were not drawn in it are forgotten. */
