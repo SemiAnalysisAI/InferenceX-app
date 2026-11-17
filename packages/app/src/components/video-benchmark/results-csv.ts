@@ -52,8 +52,6 @@ export function resultCsvRows(projection: ReturnType<typeof resultProjection>) {
       allocated_cost_usd_per_video: cell.cost.allocated?.perVideo ?? null,
       allocated_cost_usd_per_video_s: cell.cost.allocated?.perVideoSecond ?? null,
       allocated_cost_usd_per_hour: cell.cost.allocated?.perHour ?? null,
-      participating_profit_usd_per_hour: cell.profit.participating?.profitPerHour ?? null,
-      allocated_profit_usd_per_hour: cell.profit.allocated?.profitPerHour ?? null,
     };
   };
   return [...projection.cells, ...projection.overlayCells].map(row);
@@ -108,6 +106,4 @@ export const RESULT_CSV_COLUMNS = [
   'allocated_cost_usd_per_video',
   'allocated_cost_usd_per_video_s',
   'allocated_cost_usd_per_hour',
-  'participating_profit_usd_per_hour',
-  'allocated_profit_usd_per_hour',
 ] as const satisfies readonly (keyof ReturnType<typeof resultCsvRows>[number])[];

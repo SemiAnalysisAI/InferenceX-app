@@ -38,12 +38,13 @@ cohort separately rather than averaging across resolutions, durations or modes.
 
 `r_*` URL parameters record filters, hidden hardware, the X and Y metrics (`r_x`, `r_y`),
 Optimal only (`r_optimal`), the open deployment
-(`r_point`), deadline, cost tier, entered mode prices and utilization. The clip stage's
+(`r_point`), deadline and cost tier. The clip stage's
 `r_view`, `r_prompt`, `r_clip`, `r_vs`, `r_swap` and `r_sheet` stay in the page URL and are not API
 parameters; the overview API rejects them as unknown.
 The retired `r_gpus` and `r_basis` parameters are accepted but ignored by the
 UI and overview API: all GPU counts and participating GPUs
-are fixed. New share/export URLs omit these keys and every parameter at its default. Both GPU cost bases
+are fixed. The removed profit estimator's `r_api`, `r_price_t2v`, `r_price_i2v`, `r_price_r2v`
+and `r_utilization` are accepted and ignored the same way. New share/export URLs omit these keys and every parameter at its default. Both GPU cost bases
 remain available as evidence, not selectable chart settings.
 `r_workload` is a model slug such as `minimax-h3`, which selects that model's best-covered
 workload under any filter. Any other workload uses a compact source point identifier, and
@@ -198,12 +199,8 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    retains representative cells and deadline calculations for data consumers.
 3. The clip comparison card described in Synchronized clips.
 4. A How to read these results card, always open from 768 px and one closed disclosure row
-   on a phone, and a closed-by-default Advanced
-   disclosure containing the profit estimator. Expansion is local presentation state;
-   closing it preserves scenario inputs and does not change API calculations. How to
-   read lists the measurements not yet collected. The profit estimator's mode prices
-   and utilization sit in a Scenario `ControlPanel`. No placeholder chart, illustrative
-   value or uncalibrated rating schema is shipped.
+   on a phone. How to read lists the measurements not yet collected. No placeholder chart,
+   illustrative value or uncalibrated rating schema is shipped.
 5. Performance history, collapsed under a chevron heading until opened or deep-linked,
    because opening it reads stored History pages.
 
@@ -482,7 +479,7 @@ same tab; see [VideoGenX quality guide](./videogenx-quality-guide.md). Events:
 
 中文：读数区下方有一个通栏、带边框、默认收起的“质量评分方法”说明（`QualityMethod.tsx`）。它先说明目前的方法：每条视频与官方 Diffusers 参考视频比较 PSNR，使用相同的 prompt 和 seed，逐帧比较全部解码画面。横跨面板的 HTML/CSS 示意图展示标为“计划中”的无损配对方法，因为目前还没有评分器计算配对的 SSIM 或 LPIPS：GPU、引擎、服务器布局、prompt 和 seed 保持不变；分别进行无损运行和有损运行；对全部解码帧计算 PSNR、SSIM 和 LPIPS；报告已评分的 prompt（最多 20 条）中的中位数和最差一条。一个灰底提示框说明，按计划无损配置还会再运行一次，两次运行之间的差距即为本底噪声。左侧带竖线的提示块提出“为什么不以官方参考视频为基准评分？”。可见代表部署的视频加载后，它先给出实时的 PSNR 范围：`referencePsnrRange`（`quality-method.ts`）只取无损 CI 视频的有限 PSNR，跳过有损代表部署、相同初始噪声重跑，以及完全一致、不兼容和未评分的配对；只有一条视频或分数相同时显示单个数值。还没有可计入的视频时，提示块不带数字，范围也从不写死。随后用读数区的同一句话（`VideoClipReadout.tsx` 中的 `PIXELS_DIFFER`）说明原因：不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同。“播放示例”（`showMeTarget`）以卷帘视图播放 B200 代表部署与其参考视频，并像“在下方对比”一样把对比区滚入视野（`VideoDashboard.tsx` 中的 `showOnStage`）；B200 被隐藏、为有损配置或没有可播放的参考视频时，改为播放第一个有参考视频的可见代表部署，都没有时不显示该按钮。使用 `?unofficialrun=` 时，与对比区一致，先尝试指定运行的代表部署，无论其硬件是什么。“完整方法说明”在当前标签页打开质量指南 `/vgx/quality`（`/zh` 页面打开 `/zh/vgx/quality`），详见 [VideoGenX 质量指南](./videogenx-quality-guide.md)。事件为 `video_results_quality_method_opened`、`video_results_quality_show_me`、`video_results_quality_methodology_clicked` 和 `video_results_lossy_see_changes`。
 
-## Cost and profit
+## Cost
 
 Both bases are kept as evidence: participating boards and allocated boards. The chart
 uses participating boards; the clip stage and
@@ -498,16 +495,9 @@ and filter metadata: a 5-second request can produce 124 frames at 24 fps, or
 5.1667 decoded seconds. Owning and rental tiers reuse `hardware.ts` and the shared
 hardware registry. These are modelled costs, not measurements or API bills.
 
-The estimator begins with empty price inputs. Each T2V/I2V/R2V price is a user
-scenario for the selected resolution and duration. Unknown mode yields no assumed
-mode price. Revenue/hour = validated decoded video-seconds/hour × utilization × entered price;
-profit/hour subtracts the entire hourly GPU TCO for that basis. Both are normalized
-by the corresponding GPU count for the plotted profit/GPU-hour. Utilization
-reduces revenue, not the hours billed. Missing output duration for any valid
-measured request, or a legacy History projection without `videoSecondsPerHour`,
-leaves video-second throughput, per-video-second cost, revenue and profit null;
-requested duration is never a fallback. Per-video costs can remain available.
-This does not establish sustained capacity.
+Missing output duration for any valid measured request, or a legacy History projection
+without `videoSecondsPerHour`, leaves video-second throughput and per-video-second cost
+null; requested duration is never a fallback. Per-video costs can remain available.
 
 ## Touch screens and phones
 
@@ -568,11 +558,11 @@ official/unofficial source membership remain unchanged.
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Model, workload, resolution, duration, mode, steps, engine, date                        | `r_*` selection fields                                                                                         |
 | Hardware visibility, named run (stored or read live)                                    | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                                        |
-| Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                                                   |
+| Deadline, cost tier                                                                     | Same pure calculations in `resultProjection`                                                                   |
 | X and Y metrics, Optimal only, open deployment                                          | `r_x`, `r_y`, `r_optimal`, `r_point`; every axis value is in each cell                                         |
 | Engine comparison, Lossy optimizations                                                  | `r_lossy` (`r_compare` is retired and ignored); presentation only, every cell carries `metadata.optimizations` |
 | Fixed GPU basis, all GPU counts                                                         | `r_basis`, `r_gpus` accepted but ignored; resolved params are participating and null                           |
-| Advanced disclosure                                                                     | Presentation only; closed by default, preserves scenario inputs                                                |
+| Profit estimator (removed)                                                              | `r_api`, `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_utilization` accepted but ignored                     |
 | Deployment labels, detail tab, pinned point                                             | Presentation only                                                                                              |
 | Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract                         |
 | Clip subject, its pair and Swap                                                         | Presentation only; `r_clip`, `r_vs` and `r_swap` are page state                                                |
@@ -616,9 +606,8 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 运行、产物、Runtime 和媒体来源一起放在“Prompt 与来源”中。
 触屏和手机：行为以 `useIsCoarsePointer` 为准，布局以 767 px 的手机断点为准，鼠标和键盘的行为不变，这些都只是展示层的变化。宽度小于 768 px 时页面先展示视频：标题行、对比区、一句话写出两侧的延迟中位数和每条视频成本、播放控件、“对比”一行和列出全部 prompt 的横向滚动条，随后才是简介、图表和其余部分；顺序只由 CSS 调整。URL 中没有 `r_vs` 时，手机上的配对视频是工作负载、引擎和 GPU 数量相同的另一种 GPU（`phonePairing`），服务端根据 User-Agent 判断是否为手机，手机会把这一配对写入 `r_vs`。轻点图表会选中 22 px 内最近的数据点（`tapTarget`），并打开 `VideoPointSheet` 代替固定面板：该数据点的视频、四个数值、“对比”“分享”和“查看遥测”，以及固定面板的其余内容；打开的数据点记录在 `r_sheet` 中。在对比区横向拖动可移动卷帘分界线，轻点画面播放或暂停，只有分界线按钮可以锁定。较小的控件有 44 px 的点按区域，图例改为紧凑布局，部署标签默认关闭，“如何解读这些结果”默认折叠，宽表格在被截断的一侧渐隐。`format.ts` 统一延迟、成本和能耗的写法（约三位有效数字），API 和 CSV 仍保留完整精度。
 
-成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 参数会被忽略。分享和导出链接不写入取默认值的参数。`r_workload` 使用模型 slug（如 `minimax-h3`），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载；其他工作负载使用数据点 ID，旧链接中的数据点 ID 仍可解析。利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的场景输入会保留。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
-任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
-场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
+成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 以及已移除的利润估算器参数（`r_api`、`r_price_t2v`、`r_price_i2v`、`r_price_r2v`、`r_utilization`）会被忽略。分享和导出链接不写入取默认值的参数。`r_workload` 使用模型 slug（如 `minimax-h3`），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载；其他工作负载使用数据点 ID，旧链接中的数据点 ID 仍可解析。视频秒吞吐量和每视频秒成本使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
+任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。
 页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs`（配对）、`r_swap`（互换两侧）和 `r_sheet`（触屏设备上打开的数据点面板）只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。

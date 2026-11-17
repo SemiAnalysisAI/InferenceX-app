@@ -45,8 +45,6 @@ describe('VideoGenX overview CSV rows', () => {
       video_seconds_per_s: 240 / 3600,
       participating_cost_usd_per_video_s: cell.cost.participating!.perHour / 240,
       allocated_cost_usd_per_video_s: cell.cost.allocated!.perHour / 240,
-      participating_profit_usd_per_hour: null,
-      allocated_profit_usd_per_hour: null,
     });
   });
 });

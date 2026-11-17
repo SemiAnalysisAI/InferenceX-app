@@ -30,9 +30,7 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { InfoHelp } from '@/components/ui/option-info';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -44,7 +42,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
 import { videoHardwareColor } from './hardware-colors';
-import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
+import { compareDeployments, layoutLabel, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
 import type { VideoPoint } from './metrics';
@@ -60,7 +58,6 @@ import {
   workloadSummary,
   type ResultCell,
   type ResultsState,
-  type VideoMode,
 } from './results';
 import {
   chartedCells,
@@ -98,13 +95,11 @@ import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
 import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
-import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
 import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    advanced: 'Advanced',
     title: 'VideoGenX',
     description: (touch: boolean) =>
       `Serving latency, cost and energy for one matched 20-clip video workload across hardware. ${touch ? 'Tap a point to see its clip and measurements' : 'Click a point to pin its measurements and play its clips below'}; hollow points have no clips. View telemetry opens that deployment.`,
@@ -146,14 +141,11 @@ const STRINGS = {
     loading: 'Loading video results…',
     error: 'Could not load video results',
     retry: 'Retry',
-    empty: 'No measured data for this selection',
     cohort: '20-clip C1 cohort · ≥10 valid per hardware',
     cohortHelp:
       'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
     replay: 'Local replay · unpublished',
     vs: 'vs.',
-    participating: 'Participating GPUs',
-    allocated: 'Allocated GPUs',
     howToRead: 'How to read these results',
     howToReadItems: [
       'One cohort is 20 scheduled clips at concurrency 1 (C1) per hardware. A hardware appears only with at least 10 valid clips of the same workload.',
@@ -163,15 +155,6 @@ const STRINGS = {
     ],
     notMeasured:
       'Not measured yet: server-side stage timing, host memory and GPU memory where not recorded, SSIM, VBench, CLIP and VLM quality, sustained load, model load, first-request latency, LoRA switch time and best topology per GPU count.',
-    estimator: 'Profit estimator',
-    scenario: 'Scenario',
-    utilization: 'Utilisation',
-    price: 'API $ / video-s',
-    priceNote: 'Scenario prices · not current API rates',
-    priceDetail:
-      'Scenario inputs, not measured revenue or current API prices. Enter a price for each mode; an unknown mode has no price.',
-    profitNote:
-      'Revenue = measured video-s/hr × utilisation × entered $/video-s. Profit subtracts all hourly GPU TCO; divide by the stated GPU count. No capacity or sustained-load claim.',
     history: 'Performance history',
     historyNote: 'Stored evidence, including unapproved, low-sample and unmatched runs',
     overlay: 'Unofficial run',
@@ -184,7 +167,6 @@ const STRINGS = {
     csv: 'Download CSV',
   },
   zh: {
-    advanced: '高级选项',
     title: 'VideoGenX',
     description: (touch: boolean) =>
       `在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。${touch ? '轻点数据点可查看其视频和测量值' : '点击数据点可固定显示其测量值，并在下方播放其视频'}；空心点没有视频。${touch ? '轻点' : '点击'}“查看遥测”可打开对应部署。`,
@@ -223,14 +205,11 @@ const STRINGS = {
     loading: '正在加载视频结果…',
     error: '无法加载视频结果',
     retry: '重试',
-    empty: '当前选择没有实测数据',
     cohort: '20 条视频的 C1 工作负载 · 每种硬件至少 10 个有效样本',
     cohortHelp:
       '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
     replay: '本地回放 · 未发布',
     vs: 'vs',
-    participating: '参与计算的 GPU',
-    allocated: '分配的 GPU',
     howToRead: '如何解读这些结果',
     howToReadItems: [
       '每种硬件的一组结果为并发 1（C1）下计划生成的 20 条视频；同一工作负载至少有 10 条有效视频时，该硬件才会显示。',
@@ -240,15 +219,6 @@ const STRINGS = {
     ],
     notMeasured:
       '尚未测量：服务端阶段耗时、主机内存及未记录的 GPU 显存、SSIM、VBench、CLIP 与 VLM 质量评估、持续负载、模型加载、首次请求延迟、LoRA 切换时间，以及各 GPU 数量下的最优拓扑。',
-    estimator: '利润估算器',
-    scenario: '场景',
-    utilization: '利用率',
-    price: 'API $ / video-s',
-    priceNote: '场景价格，非当前 API 报价',
-    priceDetail:
-      '价格输入是场景假设，不是实测收入或当前 API 报价。分别填写各模式的价格；未知模式不套用价格。',
-    profitNote:
-      '收入 = 实测 video-s/hr × 利用率 × 输入单价。利润扣除全部每小时 GPU TCO，再除以相应 GPU 数量。不据此推断容量或持续负载能力。',
     history: '性能历史',
     historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行',
     overlay: '非官方运行',
@@ -429,19 +399,7 @@ export default function VideoDashboard({
   }, []);
   const update = useCallback(
     (patch: Partial<ResultsState>) => {
-      const changesWorkload = ['model', 'workload', 'resolution', 'duration', 'mode', 'steps'].some(
-        (key) => key in patch,
-      );
-      commit(
-        {
-          ...latest.current,
-          ...patch,
-          ...(changesWorkload
-            ? { apiPrice: null, apiPrices: { t2v: null, i2v: null, r2v: null } }
-            : {}),
-        },
-        'replace',
-      );
+      commit({ ...latest.current, ...patch }, 'replace');
       track('video_results_config_changed', { controls: Object.keys(patch).join(',') });
     },
     [commit],
@@ -519,7 +477,7 @@ export default function VideoDashboard({
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
   );
-  // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
+  // Clips pick among the runtimes the chart draws, so they name its engine.
   const allCharted = useMemo(() => chartedCells(projection, state), [projection, state]);
   // Memoized: a render that changes none of these must not make the stage work its pairs out again.
   const charted = useMemo(
@@ -531,15 +489,6 @@ export default function VideoDashboard({
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
     ),
   ].toSorted((a, b) => engineSort(a) - engineSort(b));
-  // With two engines shown, a per-hardware pick (profit bar) names the engine it picked.
-  const cellLabel = (cell: ResultCell) =>
-    [
-      hardwareLabel(cell.point.hardwareKey ?? ''),
-      engines.length > 1 && cell.metadata.engine ? engineLabel(cell.metadata.engine) : null,
-      cell.overlay ? `#${cell.point.runId}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
   const compareConfigs = projection.state.configs;
   // Chip Config plots earlier runs, so their popovers open cells outside the as-of set.
   const detailPool = [...deploymentCells, ...projection.history];
@@ -600,18 +549,6 @@ export default function VideoDashboard({
   );
   const color = (cell: ResultCell) =>
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');
-  const representatives = roster.flatMap((key) =>
-    [false, true].flatMap((overlay) => {
-      const choices = charted.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
-      const lead = leadCell(
-        choices.map((c) => c.point),
-        key,
-        { tier: state.costTier },
-      );
-      const first = choices.find((c) => c.point.id === lead?.id);
-      return first ? [first] : [];
-    }),
-  );
   // A lossy named run owns its clip without leading a card.
   const clipPoints = useMemo(
     () => resultsClipPoints(charted, { tier: state.costTier }),
@@ -633,20 +570,6 @@ export default function VideoDashboard({
       ),
     [projection, state, charted],
   );
-  const profitBars: ResultBar[] = roster
-    .filter((key) => !hidden.has(key))
-    .flatMap((key) => {
-      const rows = representatives.filter((c) => c.point.hardwareKey === key);
-      return rows.length > 0
-        ? rows.map((c) => ({
-            key: c.overlay ? `${key}-overlay` : key,
-            label: cellLabel(c),
-            color: color(c),
-            value: c.profit.participating?.profitPerGpuHour ?? null,
-            secondary: c.profit.allocated?.profitPerGpuHour ?? null,
-          }))
-        : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
-    });
   const chipHistory = compareConfigs.length > 0;
   const xMetric = plottedXMetric(state.xMetric, chipHistory);
   // The stage plays only a point the chart draws; a lossy one finds its twin among every deployment.
@@ -1213,97 +1136,6 @@ export default function VideoDashboard({
               </section>
             </Card>
           )}
-          <details
-            className="group/advanced"
-            data-testid="results-advanced"
-            onToggle={(event) =>
-              track('video_results_advanced_toggled', { enabled: event.currentTarget.open })
-            }
-          >
-            <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-              <ChevronDown
-                aria-hidden="true"
-                className="size-5 text-muted-foreground transition-transform duration-200 group-open/advanced:rotate-180"
-              />
-              <h2 className="text-lg font-medium">{s.advanced}</h2>
-            </summary>
-            <Card>
-              <section
-                className="flex min-w-0 flex-col gap-4"
-                aria-labelledby="results-profit-title"
-                data-testid="results-profit"
-              >
-                <div>
-                  <Heading as="h3" level="card" id="results-profit-title">
-                    {s.estimator}
-                  </Heading>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {s.priceNote}. {s.priceDetail}
-                  </p>
-                </div>
-                <ControlPanel legend={s.scenario} className="grid-cols-2 lg:grid-cols-4">
-                  {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
-                    <div key={mode} className="flex min-w-0 flex-col gap-1.5">
-                      <Label htmlFor={`results-price-${mode}`}>
-                        {s.price} · {mode.toUpperCase()}
-                      </Label>
-                      <Input
-                        id={`results-price-${mode}`}
-                        type="number"
-                        min="0"
-                        step="0.005"
-                        placeholder="—"
-                        value={state.apiPrices[mode] ?? ''}
-                        data-testid={`results-price-${mode}`}
-                        onChange={(e) => {
-                          const value = e.target.value === '' ? null : e.target.valueAsNumber;
-                          if (value === null || (Number.isFinite(value) && value >= 0))
-                            update({ apiPrices: { ...state.apiPrices, [mode]: value } });
-                        }}
-                      />
-                    </div>
-                  ))}
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="results-utilization">
-                      {s.utilization} · {n(state.utilization * 100, 0)}%
-                    </Label>
-                    <input
-                      id="results-utilization"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={state.utilization * 100}
-                      className="h-9 accent-primary"
-                      data-testid="results-utilization"
-                      onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
-                    />
-                  </div>
-                </ControlPanel>
-                {representatives.some(
-                  (c) => c.profit.participating !== null || c.profit.allocated !== null,
-                ) ? (
-                  <ResultsBars
-                    rows={profitBars}
-                    label={s.estimator}
-                    unit="$/GPU-hr"
-                    secondaryLabel={s.allocated}
-                  />
-                ) : (
-                  <EmptyState
-                    bare
-                    className="min-h-15 rounded-lg border border-dashed text-xs"
-                    data-testid="results-empty"
-                  >
-                    {s.empty}
-                  </EmptyState>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {s.participating} · {s.allocated}. {s.profitNote}
-                </p>
-              </section>
-            </Card>
-          </details>
           <details
             className="group/history"
             data-testid="results-history"

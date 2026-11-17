@@ -565,13 +565,8 @@ describe('VideoGenX results', () => {
       'have.text',
       'How to read these results',
     );
-    cy.get('[data-testid="results-profit"] h3').should('have.text', 'Profit estimator');
-    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
     cy.get('details[data-testid^="results-"] > summary h2').should(($titles) => {
-      expect([...$titles].map((title) => title.textContent)).to.deep.equal([
-        'Advanced',
-        'Performance history',
-      ]);
+      expect([...$titles].map((title) => title.textContent)).to.deep.equal(['Performance history']);
     });
     cy.get('[data-testid="results-not-measured"]').should('contain', 'LoRA switch time');
     cy.get('[data-testid="results-empty"][data-state="planned"]').should('not.exist');
@@ -634,36 +629,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
-  });
-
-  it('applies explicit scenario prices and utilisation to profit', () => {
-    // Synthetic additive evidence exercises controls absent from retained public
-    // projections. It is never written to the committed history fixture.
-    mount({
-      edit: (observation) => {
-        observation.videoSecondsPerHour = 400;
-        observation.results = evidence(observation);
-      },
-    });
-    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-    cy.get('[data-testid="results-advanced"] > summary').click();
-    cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('be.visible');
-    cy.get('[data-testid="results-price-t2v"]').type('0.05');
-    cy.location('search').should('contain', 'r_price_t2v=0.05');
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '3.27');
-    cy.get('[data-testid="results-utilization"]').then(($input) => {
-      const input = $input[0] as HTMLInputElement;
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-      setter.call(input, '50');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
-    cy.location('search').should('contain', 'r_utilization=0.5');
-    cy.get('[data-testid="results-advanced"] > summary').click();
-    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-    cy.get('[data-testid="results-advanced"] > summary').click();
-    cy.get('[data-testid="results-price-t2v"]').should('have.value', '0.05');
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
   });
 
   it('plots the selected Y metric with participating GPUs and median latency', () => {
@@ -1439,12 +1404,6 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="results-table"]').should('not.exist');
       cy.get('[data-testid="results-gpus"]').should('not.exist');
       cy.get('[data-testid="results-cost-basis"]').should('not.exist');
-      cy.get('[data-testid="results-advanced"] > summary')
-        .should('contain', pathname.startsWith('/zh') ? '高级选项' : 'Advanced')
-        .click();
-      cy.get('[data-testid="results-price-t2v"]').should('be.visible');
-      cy.get('[data-testid="results-advanced"] > summary').click();
-      cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
       cy.get('[data-testid="video-results-stage"]').should(($stage) => {
         const rect = $stage[0].getBoundingClientRect();
         expect(rect.left, 'stage inside the page').to.be.at.least(0);
