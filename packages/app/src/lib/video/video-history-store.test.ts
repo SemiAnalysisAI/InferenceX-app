@@ -356,9 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the overview disaggregated-throughput fix, which only touches
-      // LLM overview tier reads; video entries are unchanged.
-      sources: 'ff79147adaef68f77f332c03de290d8ff428cd85d791add401af4b38a0039632',
+      // Re-pinned after a comment in stored.ts stopped naming Difference; entries are unchanged.
+      sources: '5e220ee0779fb1d2db11d782e2dbbef1284d6f44b8ccbe9021a043e72c9dade6',
     });
   });
 });

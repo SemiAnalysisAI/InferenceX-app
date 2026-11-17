@@ -29,7 +29,7 @@ const flush = () =>
       }),
   );
 
-it('keeps playing when the prime from the play gesture settles after the buffered start', async () => {
+it('plays a clip without data from the tap, and keeps playing when that play() is rejected as aborted', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const frames: FrameRequestCallback[] = [];
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
@@ -76,12 +76,13 @@ it('keeps playing when the prime from the play gesture settles after the buffere
   const video = container.querySelector<HTMLVideoElement>(
     `[data-hardware="${point.hardwareKey}"] video`,
   )!;
-  let bufferedEnd = 2;
-  Object.defineProperty(video, 'readyState', { value: 4, configurable: true });
+  // Metadata only, as on a phone before play() is asked of the clip.
+  let readyState = 1;
+  Object.defineProperty(video, 'readyState', { get: () => readyState, configurable: true });
   Object.defineProperty(video, 'duration', { value: 5, configurable: true });
   Object.defineProperty(video, 'buffered', {
     configurable: true,
-    value: { length: 1, start: () => 0, end: () => bufferedEnd },
+    value: { length: 1, start: () => 0, end: () => (readyState > 1 ? 5 : 0) },
   });
   act(() => video.dispatchEvent(new Event('loadedmetadata')));
   const button = container.querySelector<HTMLButtonElement>('[data-testid="video-results-play"]')!;
@@ -89,20 +90,24 @@ it('keeps playing when the prime from the play gesture settles after the buffere
 
   act(() => button.click());
   expect(video.preload).toBe('auto');
-  expect(plays, 'the gesture primes the clip').toHaveLength(1);
-  expect(pause).toHaveBeenCalledTimes(1);
+  expect(plays, 'play() is asked for inside the tap').toHaveLength(1);
+  // A phone loads nothing for a clip that is paused before its play() takes effect.
+  expect(pause, 'and is not taken back').not.toHaveBeenCalled();
   expect(button.getAttribute('aria-pressed')).toBe('true');
 
-  bufferedEnd = 5;
+  readyState = 4;
   act(() => frames.shift()!(16));
-  expect(plays, 'the buffered group starts').toHaveLength(2);
+  expect(plays, 'the group starts once the clip can play').toHaveLength(2);
 
   act(() => plays[0].reject(new DOMException('interrupted', 'AbortError')));
   await flush();
-  expect(button.getAttribute('aria-pressed'), 'the settled prime leaves the start alone').toBe(
+  expect(button.getAttribute('aria-pressed'), 'the aborted play() leaves the start alone').toBe(
     'true',
   );
-  expect(pause, 'the clip keeps playing').toHaveBeenCalledTimes(1);
+  expect(container.textContent, 'and is not a media failure').not.toContain(
+    'This clip could not be played.',
+  );
+  expect(pause, 'the clip keeps playing').not.toHaveBeenCalled();
 
   act(() => plays[1].resolve());
   await flush();

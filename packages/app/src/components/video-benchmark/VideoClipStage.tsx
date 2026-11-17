@@ -19,18 +19,22 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
   type Ref,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
+import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { clipGroupActive, frameAt, frameClock } from './clip-sync';
 import { STAGE_ID, type StageView } from './clip-stage';
-import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
+import { useFirstFrame } from './use-first-frame';
+import styles from './results.module.css';
 
 const STRINGS = {
   en: {
@@ -47,7 +51,7 @@ const STRINGS = {
       'Difference unavailable: frames must have matching geometry and permit cross-origin pixel reads.',
     differenceLabel: 'RGB difference ×4 · preview',
     differenceNote:
-      'Absolute RGB difference ×4 between the two clips at the same playback time. This browser preview is separate from the all-frame PSNR measurement.',
+      'Absolute RGB difference ×4 between the two clips at the same playback time, from their web encodes where they exist. This browser preview is separate from the all-frame PSNR measurement, which uses the originals.',
     play: 'Play',
     pause: 'Pause',
     playBoth: 'Play both clips',
@@ -65,7 +69,7 @@ const STRINGS = {
     speed: 'Speed',
     zoom: 'Zoom',
     loop: 'Loop',
-    panHint: 'Drag to pan · Esc resets',
+    panHint: (touch: boolean) => `Drag to pan · ${touch ? '1×' : 'Esc'} resets`,
   },
   zh: {
     stage: (a: string, b: string) => `${a} 对比 ${b}`,
@@ -80,7 +84,7 @@ const STRINGS = {
     differenceUnavailable: '无法显示差异：帧尺寸必须一致，且视频需允许跨域像素读取。',
     differenceLabel: 'RGB 差异 ×4 · 预览',
     differenceNote:
-      '两段视频在相同播放时刻的 RGB 绝对差异，放大 4 倍。此为浏览器预览，与全帧 PSNR 测量相互独立。',
+      '两段视频在相同播放时刻的 RGB 绝对差异，放大 4 倍；有网页转码版本时基于转码版本计算。此为浏览器预览，与基于原始视频的全帧 PSNR 测量相互独立。',
     play: '播放',
     pause: '暂停',
     playBoth: '同时播放两段视频',
@@ -98,7 +102,7 @@ const STRINGS = {
     speed: '播放速度',
     zoom: '缩放',
     loop: '循环播放',
-    panHint: '拖动画面平移 · 按 Esc 复位',
+    panHint: (touch: boolean) => `拖动画面平移 · ${touch ? '选 1×' : '按 Esc'} 复位`,
   },
 };
 
@@ -114,9 +118,9 @@ export interface StageClip {
   meta: string;
   /** Pill dot; null draws the reference's outlined dot. */
   color: string | null;
-  /** Sealed original, which Difference always reads; empty when no media is shown. */
+  /** Sealed original, played when the side has no web rendition; empty when no media is shown. */
   url: string;
-  /** Lighter web rendition of `url` for the other views. */
+  /** Lighter web rendition of `url`, which every view plays, Difference included. */
   previewUrl?: string;
   /** First frame of `url`, shown before Play; loading it requests no clip media. */
   posterUrl?: string;
@@ -156,6 +160,16 @@ export interface VideoClipStageProps {
   onPreviewError: (previewUrl: string) => void;
   /** First frames the caller already loaded, so a swap to them never paints the idle frame. */
   loadedFrames?: ReadonlySet<string>;
+  /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
+  swapped: boolean;
+  onSwappedChange: (swapped: boolean) => void;
+  /** A line between the picture and the transport. */
+  caption?: ReactNode;
+  /**
+   * Where a phone shows Inspect, toggle and drawer, in place of the transport row. Null until
+   * that element mounts; undefined keeps Inspect in the transport row at every width.
+   */
+  inspectSlot?: HTMLElement | null;
 }
 
 type Role = 'a' | 'b';
@@ -163,16 +177,39 @@ const ROLES = ['a', 'b'] as const;
 const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
+/** How many times the Difference picture adds the frames' difference up, as `absoluteFrameDifference` multiplies it. */
+const DIFFERENCE_GAIN = 4;
+/** After its frames last moved, a Difference picture is drawn at the full rate this long, then once per still period, in ms. */
+const DIFFERENCE_SETTLE_MS = 500;
+const DIFFERENCE_STILL_MS = 1000;
+/** How far into the clips, in seconds, their first frames still stand for them. */
+const FIRST_FRAME_SECONDS = 0.25;
 const SPLIT_STEP = 5;
+/** How far a finger travels sideways, in px, before its press is a wipe drag and not a tap. */
+const WIPE_SLOP = 6;
 // The Compare row, stage, transport and readout fit under the sticky header together: a picture is at
 // most the window's height less 18rem, and the block narrows to match, one 16:9 frame wide or two
 // side by side.
+// A phone on its side lowers the reserve (`--stage-reserve` in results.module.css).
 export const STAGE_FIT_WIDTH = {
-  overlay: 'max(20rem, calc((100dvh - 18rem) * 16 / 9))',
-  side: 'max(20rem, calc((100dvh - 18rem) * 32 / 9 + 0.75rem))',
+  overlay: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 16 / 9))',
+  side: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 32 / 9 + 0.75rem))',
 };
 const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;
+
+/** Renders `children` in `slot` when there is one, else in place; nothing while `show` is false. */
+function InSlot({
+  slot,
+  show = true,
+  children,
+}: {
+  slot: HTMLElement | null;
+  show?: boolean;
+  children: ReactNode;
+}) {
+  return show ? (slot ? createPortal(children, slot) : children) : null;
+}
 
 export default function VideoClipStage({
   ref,
@@ -185,6 +222,10 @@ export default function VideoClipStage({
   frames,
   onPreviewError,
   loadedFrames,
+  swapped,
+  onSwappedChange,
+  caption,
+  inspectSlot,
 }: VideoClipStageProps) {
   const s = STRINGS[useLocale()];
   const clips = { a, b };
@@ -201,8 +242,6 @@ export default function VideoClipStage({
   const [peek, setPeek] = useState(false);
   const [differenceFailed, setDifferenceFailed] = useState(false);
   const [playback, setPlayback] = useState({ speed: 1, loop: true });
-  /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
-  const [swapped, setSwapped] = useState(false);
   const [inspect, setInspect] = useState(false);
   /** One zoom and pan, in percent of a side, applied to both sides and the Difference canvas. */
   const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
@@ -235,6 +274,13 @@ export default function VideoClipStage({
     from: typeof lens | null;
     moved: boolean;
   }>(null);
+  // A finger cannot hover, so on a touch screen the split follows a press dragged sideways.
+  // `moved` outlives the release, so the click that ends a drag does nothing.
+  const touch = useIsCoarsePointer();
+  /** A phone shows Inspect, toggle and drawer, in the caller's slot. */
+  const slot = (useIsMobileViewport() && inspectSlot) || null;
+  const wipe = useRef<{ id: number; x: number; moved: boolean }>(null);
+  const handle = useRef<HTMLButtonElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const pendingSplit = useRef<number | null>(null);
   const splitFrame = useRef(0);
@@ -257,22 +303,27 @@ export default function VideoClipStage({
   const both = playable.length === 2;
   const shown: Role = peek ? OTHER[toggled] : toggled;
   const overlay = view !== 'side';
+  // Two sealed originals stream at about 15 Mbit/s each, more than a phone link carries, so
+  // Difference plays the renditions too; their difference is within 0.1 dB PSNR of the originals'.
+  const src = { a: a.previewUrl || a.url, b: b.previewUrl || b.url };
+  const firstFrame = {
+    a: useFirstFrame(() => videos.current.get('a'), a.url ? src.a : undefined),
+    b: useFirstFrame(() => videos.current.get('b'), b.url ? src.b : undefined),
+  };
+  const posterLoaded = (url = '') => loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
+  // At the start of the clips, each side's first frame covers its video until every side has
+  // drawn a frame of its own, so the sides appear together and the stage is never empty.
+  const covered = time <= FIRST_FRAME_SECONDS && playable.some((role) => !firstFrame[role]);
   /**
    * Before the first Play, the idle frame replaces the split until there is a picture to split:
    * both sides' loaded posters in a view that shows them (Difference hides them behind its
    * canvas), or else the clips themselves.
    */
   const postersShown =
-    both &&
-    view !== 'diff' &&
-    playable.every((role) => {
-      const url = clips[role].posterUrl ?? '';
-      return loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
-    });
+    both && view !== 'diff' && playable.every((role) => posterLoaded(clips[role].posterUrl));
   const idle = !armed && playable.length > 0 && !postersShown;
   /** While idle the split stays hidden, so it neither follows the pointer nor locks. */
   const wiping = view === 'wipe' && !idle;
-  const original = view === 'diff';
   /** The baseline sits on the left and the subject on the right until Swap. */
   const onLeft = (role: Role) => (role === 'b') !== swapped;
   const clock = frameClock(duration, fps, frames);
@@ -293,7 +344,7 @@ export default function VideoClipStage({
 
   useEffect(() => () => cancelAnimationFrame(splitFrame.current), []);
 
-  // Changing a side's source (Difference, rendition fallback) reloads it at 0. Before metadata,
+  // Changing a side's source (rendition fallback) reloads it at 0. Before metadata,
   // currentTime sets the start position, so it resumes at the time of a side that kept its source,
   // or at the group time when both sources changed. A new selection starts its clips at 0.
   const shownTime = useRef(0);
@@ -308,17 +359,27 @@ export default function VideoClipStage({
     const resumeAt = anchor ? anchor.currentTime : shownTime.current;
     for (const video of videos.current.values())
       if (video.readyState === 0) video.currentTime = resumeAt;
-  }, [selection, original, a.previewUrl, b.previewUrl]);
+  }, [selection, src.a, src.b]);
 
   useEffect(() => {
     if (view !== 'diff' || !both) return undefined;
     let frame = 0;
     let lastDraw = -Infinity;
-    const buffer = document.createElement('canvas');
-    const context = buffer.getContext('2d', { willReadFrequently: true });
+    /** The playback times last seen and when they last moved. */
+    let seen: { subject: number; pair: number; on: HTMLCanvasElement | null; moved: number } = {
+      subject: NaN,
+      pair: NaN,
+      on: null,
+      moved: -Infinity,
+    };
+    let painted = -Infinity;
+    /** Whether this pair's pixels have been read once, which a cross-origin frame refuses. */
+    let readable = false;
+    /** Holds |pair − subject| off screen; the stage's canvas is only ever drawn from it. */
+    const scratch = document.createElement('canvas');
     const draw = (now: number) => {
       frame = requestAnimationFrame(draw);
-      if (!context || now - lastDraw < 100) return;
+      if (now - lastDraw < 100) return;
       lastDraw = now;
       const subject = videos.current.get('a'),
         pair = videos.current.get('b'),
@@ -330,28 +391,48 @@ export default function VideoClipStage({
         return;
       }
       if (Math.abs(subject.currentTime - pair.currentTime) > DIFFERENCE_SYNC_SECONDS) return;
-      buffer.width = pair.videoWidth;
-      buffer.height = pair.videoHeight;
-      try {
-        context.drawImage(pair, 0, 0);
-        const base = context.getImageData(0, 0, buffer.width, buffer.height);
-        context.drawImage(subject, 0, 0);
-        const candidate = context.getImageData(0, 0, buffer.width, buffer.height);
-        target.width = buffer.width;
-        target.height = buffer.height;
-        const output = target.getContext('2d');
-        if (output) {
-          const difference = output.createImageData(buffer.width, buffer.height);
-          difference.data.set(absoluteFrameDifference(base.data, candidate.data));
-          output.putImageData(difference, 0, 0);
+      // A browser can show a sought frame a little after the seek ends, so the picture is drawn at
+      // the full rate for a moment after the times last moved, then once a second.
+      if (subject.seeking || pair.seeking) return;
+      if (
+        target !== seen.on ||
+        subject.currentTime !== seen.subject ||
+        pair.currentTime !== seen.pair
+      )
+        seen = { subject: subject.currentTime, pair: pair.currentTime, on: target, moved: now };
+      if (now - seen.moved > DIFFERENCE_SETTLE_MS && now - painted < DIFFERENCE_STILL_MS) return;
+      const output = target.getContext('2d');
+      const work = scratch.getContext('2d');
+      if (!output || !work) return;
+      for (const surface of [scratch, target])
+        if (surface.width !== pair.videoWidth || surface.height !== pair.videoHeight) {
+          surface.width = pair.videoWidth;
+          surface.height = pair.videoHeight;
         }
+      try {
+        // The canvases blend the frames, which is `absoluteFrameDifference` without reading two
+        // frames into script: |pair − subject| off screen, then added up four times on the stage.
+        work.globalCompositeOperation = 'copy';
+        work.drawImage(pair, 0, 0);
+        work.globalCompositeOperation = 'difference';
+        work.drawImage(subject, 0, 0);
+        if (!readable) {
+          // Read off screen, so frames the page may not read never reach the stage.
+          work.getImageData(0, 0, 1, 1);
+          readable = true;
+        }
+        output.globalCompositeOperation = 'copy';
+        output.drawImage(scratch, 0, 0);
+        output.globalCompositeOperation = 'lighter';
+        for (let layer = 1; layer < DIFFERENCE_GAIN; layer += 1) output.drawImage(scratch, 0, 0);
+        painted = now;
       } catch {
         setDifferenceFailed(true);
       }
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [view, both, a.url, b.url]);
+  }, [view, both, src.a, src.b]);
 
   const active = clipGroupActive(phase);
   const togglePlay = () => {
@@ -402,8 +483,18 @@ export default function VideoClipStage({
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     drag.current = null;
+    wipe.current = null;
+    const onPicture = event.target === event.currentTarget;
+    if (
+      touch &&
+      wiping &&
+      !locked &&
+      lens.zoom === 1 &&
+      (onPicture || handle.current?.contains(event.target as Node))
+    )
+      wipe.current = { id: event.pointerId, x: event.clientX, moved: false };
     // Only the picture pans; a press on a pill or control keeps its own action.
-    if (lens.zoom === 1 || event.target !== event.currentTarget) return;
+    if (lens.zoom === 1 || !onPicture) return;
     // Pan is a share of one side, which is the whole stage except in Side by side.
     const side = event.currentTarget.querySelector('[data-side]')?.getBoundingClientRect();
     if (!side || side.width === 0 || side.height === 0) return;
@@ -435,6 +526,16 @@ export default function VideoClipStage({
       return;
     }
     if (!wiping || locked) return;
+    if (touch) {
+      const press = wipe.current;
+      if (press?.id !== event.pointerId) return;
+      if (!press.moved) {
+        if (Math.abs(event.clientX - press.x) <= WIPE_SLOP) return;
+        press.moved = true;
+        // The drag keeps the split after the finger leaves the picture.
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width === 0) return;
     pendingSplit.current = Math.min(
@@ -471,14 +572,15 @@ export default function VideoClipStage({
     }
   };
 
-  const srcOf = (clip: StageClip) => (original || !clip.previewUrl ? clip.url : clip.previewUrl);
   /** Middle of the part of the stage a side shows, for its empty-state text. */
   const centerOf = (role: Role) =>
     view === 'wipe' ? (onLeft(role) ? split / 2 : split + (100 - split) / 2) : 50;
-  const progress =
-    phase === 'buffering'
+  // Named only while the group waits for data: a paused clip may load nothing.
+  const progress = ready
+    ? null
+    : phase === 'buffering'
       ? s.buffering
-      : armed && !ready && playable.length > 0 && (phase === 'paused' || phase === 'loading')
+      : phase === 'loading'
         ? s.downloading
         : null;
 
@@ -504,7 +606,7 @@ export default function VideoClipStage({
   return (
     <div
       id={STAGE_ID}
-      className="mx-auto w-full min-w-0 scroll-mt-24 space-y-3"
+      className={cn(styles.stageColumn, 'mx-auto w-full min-w-0 scroll-mt-24 space-y-3')}
       style={{ maxWidth: overlay ? STAGE_FIT_WIDTH.overlay : STAGE_FIT_WIDTH.side }}
     >
       <div
@@ -531,12 +633,16 @@ export default function VideoClipStage({
           // Picture layers pass the pointer through, so only a click on the picture targets the
           // stage itself; pills and controls keep theirs.
           if (event.target !== event.currentTarget) return;
-          if (drag.current?.moved) {
+          if (drag.current?.moved || wipe.current?.moved) {
             drag.current = null;
+            wipe.current = null;
             return;
           }
-          if (wiping) lock(!locked);
-          else if (view === 'toggle') flip('click');
+          if (view === 'toggle') flip('click');
+          // A tap cannot lock a split it never moved, so it plays or pauses; the handle still locks.
+          else if (touch) {
+            if (playable.length > 0) togglePlay();
+          } else if (wiping) lock(!locked);
         }}
         onKeyDown={onKeyDown}
         onKeyUp={(event) => {
@@ -576,7 +682,7 @@ export default function VideoClipStage({
                 {clip.url && (
                   <video
                     ref={group.register(role)}
-                    src={srcOf(clip)}
+                    src={src[role]}
                     poster={clip.posterUrl}
                     crossOrigin="anonymous"
                     muted
@@ -595,6 +701,16 @@ export default function VideoClipStage({
                         onPreviewError(preview);
                       else setErrors((previous) => new Set([...previous, clip.url]));
                     }}
+                  />
+                )}
+                {clip.url && !failed && covered && posterLoaded(clip.posterUrl) && (
+                  <img
+                    data-testid="video-results-first-frame"
+                    src={clip.posterUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 size-full object-contain"
+                    style={lensStyle}
                   />
                 )}
                 {(!clip.url || failed) && (
@@ -631,7 +747,7 @@ export default function VideoClipStage({
                   'pointer-events-auto absolute top-2 z-10 flex items-center gap-1.5 rounded-md bg-black/70 py-1 pr-1 pl-2 text-xs text-white',
                   onLeft(role) ? 'left-2' : 'right-2',
                   overlay ? 'max-w-[46%]' : 'max-w-[calc(100%-1rem)]',
-                  audible === role && 'ring-2 ring-amber-400',
+                  audible === role && 'ring-2 ring-primary',
                   view === 'toggle' && shown !== role && 'opacity-45',
                   !playable.includes(role) && 'pr-2',
                 )}
@@ -667,8 +783,9 @@ export default function VideoClipStage({
                     aria-label={s.listen(clip.label)}
                     title={s.listen(clip.label)}
                     className={cn(
-                      'grid size-6 shrink-0 place-items-center rounded hover:bg-white/15',
-                      audible === role ? 'text-amber-400' : 'text-white/70',
+                      styles.hit,
+                      'relative grid size-6 shrink-0 place-items-center rounded hover:bg-white/15',
+                      audible === role ? 'text-primary' : 'text-white/70',
                     )}
                     onClick={() => listen(role)}
                   >
@@ -712,16 +829,21 @@ export default function VideoClipStage({
           >
             <div className="absolute inset-y-0 -left-px w-0.5 bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
             <button
+              ref={handle}
               type="button"
               data-testid="video-results-split"
               aria-pressed={locked}
               aria-label={locked ? s.unlock : s.lock}
               title={locked ? s.unlock : s.lock}
               className={cn(
+                styles.hit,
                 'pointer-events-auto absolute top-1/2 left-0 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white',
                 locked ? 'bg-white text-black' : 'bg-black/55 text-white',
               )}
-              onClick={() => lock(!locked)}
+              onClick={() => {
+                if (wipe.current?.moved) wipe.current = null;
+                else lock(!locked);
+              }}
               onKeyDown={(event) => {
                 if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 event.preventDefault();
@@ -769,11 +891,14 @@ export default function VideoClipStage({
           </span>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-3">
+      {caption}
+      {/* Under 768 px the row keeps one shape whatever plays: the time and the buffering note share a slot. */}
+      <div className="flex flex-wrap items-center gap-3 max-md:gap-2">
         <Button
           data-testid="video-results-play"
           variant="outline"
           size="sm"
+          className="max-md:min-w-16"
           disabled={playable.length === 0}
           aria-pressed={active}
           onClick={togglePlay}
@@ -789,7 +914,7 @@ export default function VideoClipStage({
           value={Math.min(time, duration || 1)}
           disabled={duration === 0}
           aria-label={s.scrub}
-          className="h-11 min-w-0 flex-1 basis-28 accent-primary md:h-8"
+          className="h-11 min-w-0 flex-1 basis-28 accent-primary max-md:basis-12 md:h-8"
           onInput={(event) => {
             const next = Number(event.currentTarget.value);
             setDifferenceFailed(false);
@@ -797,13 +922,18 @@ export default function VideoClipStage({
             track('video_results_clips_scrub', { seconds: next });
           }}
         />
-        <span className="font-mono text-xs text-muted-foreground">
+        <span
+          className={cn(
+            'font-mono text-xs text-muted-foreground max-md:min-w-[14ch]',
+            progress && 'max-md:hidden',
+          )}
+        >
           {time.toFixed(2)} / {duration > 0 ? duration.toFixed(2) : '—'} {s.seconds}
         </span>
         {progress && (
           <span
             data-testid="video-results-buffering"
-            className="font-mono text-xs text-muted-foreground"
+            className="font-mono text-xs text-muted-foreground max-md:min-w-[14ch]"
           >
             {progress(Math.round(buffered * 100))}
           </span>
@@ -816,28 +946,34 @@ export default function VideoClipStage({
           aria-label={s.swap}
           title={s.swap}
           onClick={() => {
-            setSwapped(!swapped);
+            onSwappedChange(!swapped);
             track('video_results_clips_swap', { enabled: !swapped });
           }}
         >
           <ArrowLeftRight aria-hidden="true" />
         </Button>
-        <Button
-          data-testid="video-results-inspect-toggle"
-          variant="outline"
-          size="sm"
-          aria-expanded={inspect}
-          aria-controls={inspectId}
-          onClick={() => {
-            setInspect(!inspect);
-            track('video_results_inspect_toggled', { enabled: !inspect });
-          }}
-        >
-          <ScanSearch aria-hidden="true" />
-          {s.inspect}
-        </Button>
+        <InSlot slot={slot}>
+          <Button
+            data-testid="video-results-inspect-toggle"
+            variant="outline"
+            size="sm"
+            // Hidden by CSS from a phone's first paint, before the slot it moves to has mounted.
+            className={
+              slot ? 'self-start' : inspectSlot === undefined ? undefined : 'max-md:hidden'
+            }
+            aria-expanded={inspect}
+            aria-controls={inspectId}
+            onClick={() => {
+              setInspect(!inspect);
+              track('video_results_inspect_toggled', { enabled: !inspect });
+            }}
+          >
+            <ScanSearch aria-hidden="true" />
+            {s.inspect}
+          </Button>
+        </InSlot>
       </div>
-      {inspect && (
+      <InSlot slot={slot} show={inspect}>
         <div
           id={inspectId}
           data-testid="video-results-inspect"
@@ -922,9 +1058,9 @@ export default function VideoClipStage({
             <Repeat aria-hidden="true" />
             {s.loop}
           </Button>
-          {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint}</span>}
+          {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint(touch)}</span>}
         </div>
-      )}
+      </InSlot>
     </div>
   );
 }

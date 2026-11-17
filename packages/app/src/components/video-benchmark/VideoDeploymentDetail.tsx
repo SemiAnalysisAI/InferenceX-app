@@ -10,7 +10,7 @@ import { Heading } from '@/components/ui/heading';
 import { ShareButton } from '@/components/ui/share-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
@@ -21,6 +21,8 @@ import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
 import { usePowerTrace } from './use-power-trace';
+import { ScrollFade } from './use-scroll-fade';
+import { cost, reading } from './format';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
 import styles from './results.module.css';
 
@@ -195,6 +197,9 @@ const STRINGS = {
   },
 };
 
+/** A cost under a "$" column heading, or a dash when it could not be modelled. */
+const costFigures = (value: number | null | undefined) => cost(value)?.slice(1) ?? '—';
+
 const withUnit = (value: number | null | undefined, unit: string, digits: number) =>
   value === null || value === undefined ? '—' : `${n(value, digits)} ${unit}`;
 
@@ -293,7 +298,8 @@ export default function VideoDeploymentDetail({
     () => evidence?.latencies?.map((seconds) => seconds * 1000) ?? null,
     [evidence?.latencies],
   );
-  const phone = useMediaQuery('(max-width: 640px)');
+  const phone = useIsMobileViewport();
+  const median = reading(point.p50);
   const code = (value: string | null | undefined) => (
     <span className="break-all font-mono text-xs">{value || s.notRecorded}</span>
   );
@@ -442,7 +448,7 @@ export default function VideoDeploymentDetail({
                   <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
                 )}
                 <p className="text-xs" data-testid="results-detail-latency">
-                  {s.recorded(withUnit(point.p50, 's', 1))}
+                  {s.recorded(median === null ? '—' : `${median} s`)}
                 </p>
                 <p className="text-xs">
                   {s.deadline(
@@ -496,10 +502,12 @@ export default function VideoDeploymentDetail({
               <Panel title={s.energy}>
                 <div className="grid grid-cols-2 gap-4">
                   <Stat
-                    value={n(cell.joulesPerClip === null ? null : cell.joulesPerClip / 1000, 1)}
+                    value={
+                      reading(cell.joulesPerClip === null ? null : cell.joulesPerClip / 1000) ?? '—'
+                    }
                     label={s.perClip}
                   />
-                  <Stat value={n(cell.joulesPerFrame, 1)} label={s.perFrame} />
+                  <Stat value={reading(cell.joulesPerFrame) ?? '—'} label={s.perFrame} />
                 </div>
                 <p className="text-xs text-muted-foreground">{s.energyNote}</p>
               </Panel>
@@ -512,7 +520,7 @@ export default function VideoDeploymentDetail({
                 </div>
               </Panel>
               <Panel title={s.cost} note={TIER_LABELS[state.costTier][locale]}>
-                <div className={styles.scroll}>
+                <ScrollFade className={styles.scroll}>
                   <table className={`${styles.table} text-xs`} data-testid="results-detail-cost">
                     <thead>
                       <tr>
@@ -527,15 +535,15 @@ export default function VideoDeploymentDetail({
                           <td>{s[basis]}</td>
                           <td>{n(point[basis], 0)}</td>
                           <td data-value={cell.cost[basis]?.perVideo}>
-                            {n(cell.cost[basis]?.perVideo, 4)}
+                            {costFigures(cell.cost[basis]?.perVideo)}
                           </td>
-                          <td>{n(cell.cost[basis]?.perVideoSecond, 4)}</td>
+                          <td>{costFigures(cell.cost[basis]?.perVideoSecond)}</td>
                           <td>{n(cell.cost[basis]?.perHour, 2)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollFade>
               </Panel>
               <Panel title={s.startup}>
                 <Stat
@@ -587,7 +595,7 @@ export default function VideoDeploymentDetail({
               />
             </Panel>
             <Panel title={s.completion}>
-              <div className={styles.scroll}>
+              <ScrollFade className={styles.scroll}>
                 <table className={`${styles.table} text-xs`} data-testid="results-detail-counts">
                   <thead>
                     <tr>
@@ -613,7 +621,7 @@ export default function VideoDeploymentDetail({
                     </tr>
                   </tbody>
                 </table>
-              </div>
+              </ScrollFade>
             </Panel>
             <Panel title={s.integrity}>
               <Facts

@@ -545,24 +545,24 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '硬件注册表 TCO 档位 h（自有，默认）或 r（租赁），同时返回两种 GPU 成本口径。',
   ],
   r_api: [
-    'Optional nonnegative USD/video-second scenario price when generation mode is unknown; default null.',
-    '生成模式未记录时可指定的非负视频秒场景价格，单位美元；默认 null。',
+    'Retired profit-estimator input, accepted but ignored.',
+    '已移除的利润估算器参数，仍可传入但会被忽略。',
   ],
   r_price_t2v: [
-    'Optional nonnegative T2V scenario price, USD/video-second; default null.',
-    '可选非负 T2V 视频秒场景价格，单位美元；默认 null。',
+    'Retired profit-estimator input, accepted but ignored.',
+    '已移除的利润估算器参数，仍可传入但会被忽略。',
   ],
   r_price_i2v: [
-    'Optional nonnegative I2V scenario price, USD/video-second; default null.',
-    '可选非负 I2V 视频秒场景价格，单位美元；默认 null。',
+    'Retired profit-estimator input, accepted but ignored.',
+    '已移除的利润估算器参数，仍可传入但会被忽略。',
   ],
   r_price_r2v: [
-    'Optional nonnegative R2V scenario price, USD/video-second; default null.',
-    '可选非负 R2V 视频秒场景价格，单位美元；默认 null。',
+    'Retired profit-estimator input, accepted but ignored.',
+    '已移除的利润估算器参数，仍可传入但会被忽略。',
   ],
   r_utilization: [
-    'Modelled utilization 0–1, default 1. Revenue scales; reserved GPU hourly cost does not.',
-    '估算利用率，范围 0–1，默认 1。收入随利用率变化，预留 GPU 每小时成本不变。',
+    'Retired profit-estimator input, accepted but ignored.',
+    '已移除的利润估算器参数，仍可传入但会被忽略。',
   ],
   r_x: [
     'Chart x metric: p50 per-clip latency (default) or gpus (participating GPUs per deployment). Presentation only; echoed in params without changing returned cells. Invalid values, including the retired p90, use the default.',
@@ -854,8 +854,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the /vgx results UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Deployment cells are keyed by hardware, runtime (serving engine plus the optimizations its run configuration declared), participating GPUs, TP × Ulysses split and concurrency, so cells of two engines, or of one engine with and without an optimization, never replace each other. metadata.optimizations lists the declared optimization keys; runs recorded before the field existed list none. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput, both per-video-second cost bases and modelled revenue use this output rate. Missing valid output durations or older History without this optional field leave these metrics and profit null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts), excluding it from official cells, deployments and workload mix. A stored run keeps its actual approval; a run absent from History is read live from its public h3-results artifact documents, unapproved and without media; its clips still carry PSNR and unscored reasons from a trusted h3-quality artifact of the same run attempt. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与 /vgx 结果页共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。部署数据点按硬件、runtime（引擎加上运行配置声明的优化项）、参与计算的 GPU 数、TP × Ulysses 并行配置和并发数区分，不同引擎、或同一引擎开与不开某项优化的数据点互不覆盖。metadata.optimizations 列出声明的优化项 key；该字段出现之前记录的运行为空列表。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标及利润均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），并将其排除在正式结果、部署和工作负载构成之外。已存储的运行保留实际批准状态；不在 History 中的运行从其公开的 h3-results 产物实时读取文档，视为未批准，且不附带媒体；其视频仍会附上同一运行尝试的可信 h3-quality 产物中的 PSNR 与未评分原因。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the /vgx results UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost. Deployment cells are keyed by hardware, runtime (serving engine plus the optimizations its run configuration declared), participating GPUs, TP × Ulysses split and concurrency, so cells of two engines, or of one engine with and without an optimization, never replace each other. metadata.optimizations lists the declared optimization keys; runs recorded before the field existed list none. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput and both per-video-second cost bases use this output rate. Missing valid output durations or older History without this optional field leave these metrics null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts), excluding it from official cells, deployments and workload mix. A stored run keeps its actual approval; a run absent from History is read live from its public h3-results artifact documents, unapproved and without media; its clips still carry PSNR and unscored reasons from a trusted h3-quality artifact of the same run attempt. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与 /vgx 结果页共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本；分配证据缺失时保留 null。部署数据点按硬件、runtime（引擎加上运行配置声明的优化项）、参与计算的 GPU 数、TP × Ulysses 并行配置和并发数区分，不同引擎、或同一引擎开与不开某项优化的数据点互不覆盖。metadata.optimizations 列出声明的优化项 key；该字段出现之前记录的运行为空列表。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量和两种 GPU 口径的每视频秒成本共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），并将其排除在正式结果、部署和工作负载构成之外。已存储的运行保留实际批准状态；不在 History 中的运行从其公开的 h3-results 产物实时读取文档，视为未批准，且不附带媒体；其视频仍会附上同一运行尝试的可信 h3-quality 产物中的 PSNR 与未评分原因。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(

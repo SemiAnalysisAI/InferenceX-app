@@ -1,10 +1,11 @@
 'use client';
 
 import * as d3 from 'd3';
-import { type CSSProperties, Fragment, useState } from 'react';
+import { type CSSProperties, Fragment, useEffect, useState } from 'react';
 
 import { WidgetFrame, type WidgetProps } from '@/components/tutorial/widget-chrome';
 import { Stat } from '@/components/ui/stat';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
@@ -50,6 +51,7 @@ const STRINGS = {
 
 /** An example of the kind of cut-off this guide argues against, not a rule anyone adopted. */
 const EXAMPLE_BAND = { from: 10, to: 17 } as const;
+const DOT = 'video-quality-guide-psnr-dot';
 const ROW_HEIGHT = 76;
 const BAND_LABEL_HEIGHT = 22;
 const AXIS_HEIGHT = 28;
@@ -121,6 +123,28 @@ export function ReferencePsnrWidget({
 }: WidgetProps & { evidence: ReferencePsnrEvidence }) {
   const t = STRINGS[locale];
   const [active, setActive] = useState<Active | null>(null);
+  const touch = useIsCoarsePointer();
+  const shown = active !== null;
+  // A tapped clip's tooltip has no pointer to leave it: a tap elsewhere, a scroll or Escape closes it.
+  useEffect(() => {
+    if (!touch || !shown) return undefined;
+    const close = () => setActive(null);
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Element && event.target.closest(`[data-testid="${DOT}"]`)))
+        close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('scroll', close, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('scroll', close, { capture: true });
+    };
+  }, [touch, shown]);
   const hardware = evidence.hardware;
   const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${evidence.runId}`;
 
@@ -229,7 +253,7 @@ function Strip({
   return (
     <div
       className="grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[6.5rem_minmax(0,1fr)]"
-      // A touch pointer leaves on lift; its tooltip stays until another dot is tapped.
+      // A touch pointer leaves on lift; its tooltip stays until the reader taps or scrolls elsewhere.
       onPointerLeave={(event) => {
         if (event.pointerType !== 'touch') onActive(null);
       }}
@@ -283,7 +307,7 @@ function Strip({
               return (
                 <g
                   key={dot.prompt}
-                  data-testid="video-quality-guide-psnr-dot"
+                  data-testid={DOT}
                   opacity={active && !on ? 0.35 : 1}
                   className="cursor-pointer"
                   onPointerEnter={(event) => onActive(activeAt(event.currentTarget, dot.prompt))}
@@ -317,7 +341,8 @@ function Strip({
         </Fragment>
       ))}
       <span />
-      <svg aria-hidden="true" width="100%" height={AXIS_HEIGHT} className="block">
+      {/* On a phone the end labels are wider than the axis padding, so they may overhang it. */}
+      <svg aria-hidden="true" width="100%" height={AXIS_HEIGHT} className="block overflow-visible">
         <line x1={pct(lo)} x2={pct(hi)} y1={0.5} y2={0.5} stroke="var(--border)" />
         {ticks.map((tick) => (
           <text

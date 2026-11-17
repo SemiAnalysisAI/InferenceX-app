@@ -1,18 +1,24 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import {
   Activity,
+  Children,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
+  type ComponentProps,
+  type ReactNode,
 } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
+import { MOBILE_VIEWPORT_QUERY, useIsCoarsePointer, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { isDarkTheme } from '@/lib/themes/themes';
@@ -20,13 +26,11 @@ import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { Button } from '@/components/ui/button';
 import { ShareButton } from '@/components/ui/share-button';
 import { Card } from '@/components/ui/card';
-import { ChartSection } from '@/components/ui/chart-section';
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { InfoHelp } from '@/components/ui/option-info';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -38,7 +42,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
 import { videoHardwareColor } from './hardware-colors';
-import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
+import { compareDeployments, layoutLabel, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
 import type { VideoPoint } from './metrics';
@@ -54,7 +58,6 @@ import {
   workloadSummary,
   type ResultCell,
   type ResultsState,
-  type VideoMode,
 } from './results';
 import {
   chartedCells,
@@ -78,20 +81,30 @@ import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
-import { isStageParam, parseStage, stagePointKey, writeStage, type StagePair } from './clip-stage';
+import {
+  defaultPairing,
+  isStageParam,
+  officialCounterpart,
+  parseStage,
+  stagePointKey,
+  writeStage,
+  type StagePair,
+} from './clip-stage';
+import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
+import { READOUT_ID } from './VideoClipReadout';
 import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
-import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
-import VideoHistory from './VideoHistory';
 import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    advanced: 'Advanced',
     title: 'VideoGenX',
-    description:
-      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.',
+    description: (touch: boolean) =>
+      `Serving latency, cost and energy for one matched 20-clip video workload across hardware. ${touch ? 'Tap a point to see its clip and measurements' : 'Click a point to pin its measurements and play its clips below'}; hollow points have no clips. View telemetry opens that deployment.`,
+    // A phone shows the cohort line right above this and names View telemetry on its button.
+    descriptionPhone:
+      'Serving latency, cost and energy across hardware. Tap a point for its clip and measurements; hollow points have no clips.',
     benchmarkConfig: 'Benchmark config',
     model: 'Model',
     chartConfig: 'Chart config',
@@ -127,14 +140,11 @@ const STRINGS = {
     loading: 'Loading video results…',
     error: 'Could not load video results',
     retry: 'Retry',
-    empty: 'No measured data for this selection',
     cohort: '20-clip C1 cohort · ≥10 valid per hardware',
     cohortHelp:
-      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
+      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. A fixture replay reads retained evidence and is not a new measurement.',
     replay: 'Local replay · unpublished',
     vs: 'vs.',
-    participating: 'Participating GPUs',
-    allocated: 'Allocated GPUs',
     howToRead: 'How to read these results',
     howToReadItems: [
       'One cohort is 20 scheduled clips at concurrency 1 (C1) per hardware. A hardware appears only with at least 10 valid clips of the same workload.',
@@ -144,17 +154,6 @@ const STRINGS = {
     ],
     notMeasured:
       'Not measured yet: server-side stage timing, host memory and GPU memory where not recorded, SSIM, VBench, CLIP and VLM quality, sustained load, model load, first-request latency, LoRA switch time and best topology per GPU count.',
-    estimator: 'Profit estimator',
-    scenario: 'Scenario',
-    utilization: 'Utilisation',
-    price: 'API $ / video-s',
-    priceNote: 'Scenario prices · not current API rates',
-    priceDetail:
-      'Scenario inputs, not measured revenue or current API prices. Enter a price for each mode; an unknown mode has no price.',
-    profitNote:
-      'Revenue = measured video-s/hr × utilisation × entered $/video-s. Profit subtracts all hourly GPU TCO; divide by the stated GPU count. No capacity or sustained-load claim.',
-    history: 'Performance history',
-    historyNote: 'Stored evidence, including unapproved, low-sample and unmatched runs',
     overlay: 'Unofficial run',
     overlayMissing:
       'No matching stored observation for this run. Loading it does not publish or generate media.',
@@ -165,10 +164,11 @@ const STRINGS = {
     csv: 'Download CSV',
   },
   zh: {
-    advanced: '高级选项',
     title: 'VideoGenX',
-    description:
-      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。点击“查看遥测”可打开对应部署。',
+    description: (touch: boolean) =>
+      `在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。${touch ? '轻点数据点可查看其视频和测量值' : '点击数据点可固定显示其测量值，并在下方播放其视频'}；空心点没有视频。${touch ? '轻点' : '点击'}“查看遥测”可打开对应部署。`,
+    descriptionPhone:
+      '比较各硬件的服务延迟、成本与能耗。轻点数据点可查看其视频和测量值；空心点没有视频。',
     benchmarkConfig: '基准测试配置',
     model: '模型',
     chartConfig: '图表配置',
@@ -202,14 +202,11 @@ const STRINGS = {
     loading: '正在加载视频结果…',
     error: '无法加载视频结果',
     retry: '重试',
-    empty: '当前选择没有实测数据',
     cohort: '20 条视频的 C1 工作负载 · 每种硬件至少 10 个有效样本',
     cohortHelp:
-      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
+      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。Fixture 回放只读取已保留的证据，不是新测量。',
     replay: '本地回放 · 未发布',
     vs: 'vs',
-    participating: '参与计算的 GPU',
-    allocated: '分配的 GPU',
     howToRead: '如何解读这些结果',
     howToReadItems: [
       '每种硬件的一组结果为并发 1（C1）下计划生成的 20 条视频；同一工作负载至少有 10 条有效视频时，该硬件才会显示。',
@@ -219,17 +216,6 @@ const STRINGS = {
     ],
     notMeasured:
       '尚未测量：服务端阶段耗时、主机内存及未记录的 GPU 显存、SSIM、VBench、CLIP 与 VLM 质量评估、持续负载、模型加载、首次请求延迟、LoRA 切换时间，以及各 GPU 数量下的最优拓扑。',
-    estimator: '利润估算器',
-    scenario: '场景',
-    utilization: '利用率',
-    price: 'API $ / video-s',
-    priceNote: '场景价格，非当前 API 报价',
-    priceDetail:
-      '价格输入是场景假设，不是实测收入或当前 API 报价。分别填写各模式的价格；未知模式不套用价格。',
-    profitNote:
-      '收入 = 实测 video-s/hr × 利用率 × 输入单价。利润扣除全部每小时 GPU TCO，再除以相应 GPU 数量。不据此推断容量或持续负载能力。',
-    history: '性能历史',
-    historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行',
     overlay: '非官方运行',
     overlayMissing: '这个运行没有匹配的已存储观测；加载不会发布或生成媒体。',
     overlayLive: '该运行尚未发布，数据直接从其 GitHub 产物实时读取；不显示媒体。',
@@ -271,6 +257,34 @@ function MetricSelect({
 }
 
 /** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
+/**
+ * `ChartSection`'s markup with wrappers a phone dissolves (results.module.css), so the chart and
+ * the clip blocks join the page column and each draws its own card. The first child, the chart,
+ * shares a phone card with the buttons.
+ */
+function LiftedChartSection({
+  children,
+  ...buttons
+}: ComponentProps<typeof ChartButtons> & { children: ReactNode }) {
+  const [chart, ...rest] = Children.toArray(children);
+  return (
+    <section className={styles.lifted}>
+      <figure className={cn('relative min-w-0', styles.lifted)}>
+        <Card className={cn('relative', styles.lifted)}>
+          <div className="max-md:flex max-md:min-w-0 max-md:flex-col max-md:rounded-xl max-md:border max-md:border-border/30 max-md:bg-card max-md:p-4 md:contents">
+            <ChartButtons
+              {...buttons}
+              className="md:absolute md:top-6 md:right-6 md:z-10 md:mb-0"
+            />
+            {chart}
+          </div>
+          {rest}
+        </Card>
+      </figure>
+    </section>
+  );
+}
+
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
@@ -278,13 +292,18 @@ const onDetailEntry = () =>
 export default function VideoDashboard({
   initialData,
   pending = false,
+  phoneGuess = false,
 }: {
   initialData?: VideoInitialData;
+  /** The server's guess that a phone asked for the page, until the viewport is known. */
+  phoneGuess?: boolean;
   /** The server is still streaming `initialData`; show the loading state and do not read in the browser. */
   pending?: boolean;
 }) {
   const locale = useLocale(),
     s = STRINGS[locale];
+  const touch = useIsCoarsePointer();
+  const phone = useMediaQuery(MOBILE_VIEWPORT_QUERY, phoneGuess);
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
   const latest = useRef(state);
   const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
@@ -292,8 +311,9 @@ export default function VideoDashboard({
     initialData?.history,
     pending,
   );
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [labels, setLabels] = useState(true);
+  // Until the reader sets the switch, a phone's narrow plot leaves the GPU-count labels off.
+  const [labelsPick, setLabels] = useState<boolean | null>(null);
+  const labels = labelsPick ?? !phone;
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
   const [stagePair, setStagePair] = useState<StagePair>({
@@ -301,15 +321,17 @@ export default function VideoDashboard({
     baseline: null,
     posters: {},
   });
-  /** What the stage compares its subject with, by `StageOption.value`; null pairs it by default. */
-  const [against, setAgainst] = useState<string | null>(null);
+  /** What the stage compares its subject with, by `StageOption.value` (`r_vs`); null pairs it by default. */
+  const against = useStageValue('vs');
   /** Whether the reader has picked a clip yet; until then playable chart points pulse. */
   const [picked, setPicked] = useState(false);
   /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
   const [peek, setPeek] = useState<string | null>(null);
-  const pickAgainst = useCallback((value: string) => {
+  // A transition, so the tap or rest that asks for the read does not wait for this page to render.
+  const peekAt = useCallback((key: string) => startTransition(() => setPeek(key)), []);
+  const pickAgainst = useCallback((value: string | null) => {
     setPicked(true);
-    setAgainst(value);
+    writeStage({ ...parseStage(location.search), vs: value });
   }, []);
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
@@ -318,29 +340,15 @@ export default function VideoDashboard({
   const pickClip = useCallback(
     (key: string) => {
       setPicked(true);
-      if (key !== stagePair.playing) setAgainst(null);
-      writeStage({ ...parseStage(location.search), clip: key });
+      const stage = parseStage(location.search);
+      writeStage({ ...stage, clip: key, vs: key === stagePair.playing ? stage.vs : null });
     },
     [stagePair.playing],
-  );
-  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
-  const showOnStage = useCallback(
-    (point: VideoPoint, compare: string) => {
-      setPicked(true);
-      setAgainst(compare);
-      writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
-      requestReveal();
-    },
-    [requestReveal],
   );
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
-        previous.playing === pair.playing &&
-        previous.baseline === pair.baseline &&
-        JSON.stringify(previous.posters) === JSON.stringify(pair.posters)
-          ? previous
-          : pair,
+        JSON.stringify(previous) === JSON.stringify(pair) ? previous : pair,
       ),
     [],
   );
@@ -349,10 +357,10 @@ export default function VideoDashboard({
       ...stagePair,
       pulse: !picked,
       onSelect: pickClip,
-      onPeek: setPeek,
+      onPeek: peekAt,
       onReveal: requestReveal,
     }),
-    [stagePair, picked, pickClip, requestReveal],
+    [stagePair, picked, pickClip, peekAt, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
@@ -361,11 +369,6 @@ export default function VideoDashboard({
       const next = parseResultsState(location.search);
       latest.current = next;
       setState(next);
-      const params = new URLSearchParams(location.search);
-      if (
-        ['history-hardware', 'history-concurrency', 'history-query'].some((key) => params.has(key))
-      )
-        setHistoryOpen(true);
     };
     read();
     window.addEventListener('popstate', read);
@@ -385,19 +388,7 @@ export default function VideoDashboard({
   }, []);
   const update = useCallback(
     (patch: Partial<ResultsState>) => {
-      const changesWorkload = ['model', 'workload', 'resolution', 'duration', 'mode', 'steps'].some(
-        (key) => key in patch,
-      );
-      commit(
-        {
-          ...latest.current,
-          ...patch,
-          ...(changesWorkload
-            ? { apiPrice: null, apiPrices: { t2v: null, i2v: null, r2v: null } }
-            : {}),
-        },
-        'replace',
-      );
+      commit({ ...latest.current, ...patch }, 'replace');
       track('video_results_config_changed', { controls: Object.keys(patch).join(',') });
     },
     [commit],
@@ -475,23 +466,18 @@ export default function VideoDashboard({
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
   );
-  // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
+  // Clips pick among the runtimes the chart draws, so they name its engine.
   const allCharted = useMemo(() => chartedCells(projection, state), [projection, state]);
-  const charted = allCharted.filter(shown);
+  // Memoized: a render that changes none of these must not make the stage work its pairs out again.
+  const charted = useMemo(
+    () => allCharted.filter((cell) => !hidden.has(cell.point.hardwareKey ?? '')),
+    [allCharted, hidden],
+  );
   const engines = [
     ...new Set(
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
     ),
   ].toSorted((a, b) => engineSort(a) - engineSort(b));
-  // With two engines shown, a per-hardware pick (profit bar) names the engine it picked.
-  const cellLabel = (cell: ResultCell) =>
-    [
-      hardwareLabel(cell.point.hardwareKey ?? ''),
-      engines.length > 1 && cell.metadata.engine ? engineLabel(cell.metadata.engine) : null,
-      cell.overlay ? `#${cell.point.runId}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
   const compareConfigs = projection.state.configs;
   // Chip Config plots earlier runs, so their popovers open cells outside the as-of set.
   const detailPool = [...deploymentCells, ...projection.history];
@@ -552,40 +538,27 @@ export default function VideoDashboard({
   );
   const color = (cell: ResultCell) =>
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');
-  const representatives = roster.flatMap((key) =>
-    [false, true].flatMap((overlay) => {
-      const choices = charted.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
-      const lead = leadCell(
-        choices.map((c) => c.point),
-        key,
-        { tier: state.costTier },
-      );
-      const first = choices.find((c) => c.point.id === lead?.id);
-      return first ? [first] : [];
-    }),
-  );
   // A lossy named run owns its clip without leading a card.
-  const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
-  const officialClipPoints = resultsClipPoints(
-    charted.filter((c) => !c.overlay),
-    { tier: state.costTier },
+  const clipPoints = useMemo(
+    () => resultsClipPoints(charted, { tier: state.costTier }),
+    [charted, state.costTier],
   );
-  const stageClipPoints = stageOpenings(projection, state, clipPoints);
-  const officialOpenings = stageOpenings(projection, state, officialClipPoints);
-  const profitBars: ResultBar[] = roster
-    .filter((key) => !hidden.has(key))
-    .flatMap((key) => {
-      const rows = representatives.filter((c) => c.point.hardwareKey === key);
-      return rows.length > 0
-        ? rows.map((c) => ({
-            key: c.overlay ? `${key}-overlay` : key,
-            label: cellLabel(c),
-            color: color(c),
-            value: c.profit.participating?.profitPerGpuHour ?? null,
-            secondary: c.profit.allocated?.profitPerGpuHour ?? null,
-          }))
-        : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
-    });
+  const stageClipPoints = useMemo(
+    () => stageOpenings(projection, state, clipPoints),
+    [projection, state, clipPoints],
+  );
+  const officialOpenings = useMemo(
+    () =>
+      stageOpenings(
+        projection,
+        state,
+        resultsClipPoints(
+          charted.filter((c) => !c.overlay),
+          { tier: state.costTier },
+        ),
+      ),
+    [projection, state, charted],
+  );
   const chipHistory = compareConfigs.length > 0;
   const xMetric = plottedXMetric(state.xMetric, chipHistory);
   // The stage plays only a point the chart draws; a lossy one finds its twin among every deployment.
@@ -600,6 +573,24 @@ export default function VideoDashboard({
     () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
     [deploymentCells, projection.history],
   );
+  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
+  const showOnStage = (point: VideoPoint, compare: string) => {
+    setPicked(true);
+    const own = officialCounterpart(
+      point,
+      deploymentPoints,
+      officialOpenings,
+      state.unofficialRun ?? undefined,
+    );
+    writeStage({
+      ...parseStage(location.search),
+      clip: stagePointKey(point),
+      view: 'wipe',
+      // A default stays out of the URL, except on a phone, which opens on another pair.
+      vs: compare === defaultPairing(point, own) && !phone ? null : compare,
+    });
+    requestReveal();
+  };
   const lossyPair = useMemo(
     () =>
       seeChangesPair(drawnPoints, deploymentPoints, { tier: state.costTier }, state.unofficialRun),
@@ -627,12 +618,17 @@ export default function VideoDashboard({
     <div className="min-w-0 pr-0 md:pr-56">
       <Heading as="h2" level="card" id="video-results-chart-title">
         {model} · {RESULTS_Y_METRICS[state.yMetric].label[locale]}
-        <HeadingQualifier>
-          {s.vs} {RESULTS_X_METRICS[xMetric].label[locale]}
-        </HeadingQualifier>
+        {/* A phone leaves the x metric to the axis title right under the plot. */}
+        <span className="max-md:hidden">
+          <HeadingQualifier>
+            {s.vs} {RESULTS_X_METRICS[xMetric].label[locale]}
+          </HeadingQualifier>
+        </span>
       </Heading>
     </div>
   );
+
+  const workloadLine = workloadLabel && [workloadLabel, ...engines.map(engineLabel)].join(' · ');
 
   return (
     <div
@@ -657,7 +653,8 @@ export default function VideoDashboard({
               gpus: cell.point.participating ?? 0,
             });
           }}
-          onPsnr={() => closeDetail('comparison-clips')}
+          // A phone's clips section has no box of its own, so the link lands on its readout.
+          onPsnr={() => closeDetail(phone ? READOUT_ID : 'comparison-clips')}
         />
       )}
       {/* Hidden, not unmounted: clip media, the selected clip group and chart state survive a detail visit. */}
@@ -667,15 +664,16 @@ export default function VideoDashboard({
             <div className="flex flex-col gap-4">
               <DashboardSectionHeader
                 title={s.title}
+                className={styles.intro}
                 description={
                   <>
-                    {s.description}
-                    {workloadLabel && (
+                    {phone ? s.descriptionPhone : s.description(touch)}
+                    {workloadLine && (
                       <span
-                        className="mt-1 block text-xs font-medium"
+                        className="mt-1 block text-xs font-medium max-md:hidden"
                         data-testid="results-workload-summary"
                       >
-                        {[workloadLabel, ...engines.map(engineLabel)].join(' · ')}
+                        {workloadLine}
                       </span>
                     )}
                   </>
@@ -683,11 +681,17 @@ export default function VideoDashboard({
                 actions={
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{s.cohort}</span>
-                    <InfoHelp label={s.cohort} value="cohort" triggerTestId="results-cohort-help">
+                    <InfoHelp
+                      label={s.cohort}
+                      value="cohort"
+                      triggerTestId="results-cohort-help"
+                      // Clear of Share beside it.
+                      triggerClassName="[--hit-x:-2px]"
+                    >
                       {s.cohortHelp}
                     </InfoHelp>
                     {replay && <span data-testid="results-replay">{s.replay}</span>}
-                    <ShareButton />
+                    <ShareButton className="max-md:hidden" />
                   </div>
                 }
                 headingAs="h1"
@@ -987,7 +991,7 @@ export default function VideoDashboard({
               </Button>
             </div>
           )}
-          <ChartSection
+          <LiftedChartSection
             chartId={VIDEO_RESULTS_CHART_ID}
             analyticsPrefix="video_results"
             setIsLegendExpanded={setLegendExpanded}
@@ -1018,6 +1022,7 @@ export default function VideoDashboard({
                 onOpen={openPoint}
                 clipLink={clipLink}
                 loading={loading}
+                phone={phone}
                 heading={heading}
                 lossyNote={
                   <LossyQualityHint
@@ -1039,8 +1044,27 @@ export default function VideoDashboard({
                 }
               />
             </div>
-            <hr className="my-6 border-border-alt" />
+            <hr className="my-6 border-border-alt max-md:hidden" />
             <VideoResultsClips
+              phone={phone}
+              cohortLoading={pending || loading}
+              titleRow={
+                <div
+                  className="flex items-start justify-between gap-3 md:hidden"
+                  data-testid="results-phone-title"
+                >
+                  <div className="min-w-0">
+                    <Heading as="h1" level="title">
+                      {s.title}
+                    </Heading>
+                    {/* Two lines are held before the workload is known, so nothing shifts when it lands. */}
+                    <p className="mt-0.5 min-h-8 text-xs font-medium text-muted-foreground">
+                      {workloadLine}
+                    </p>
+                  </div>
+                  <ShareButton />
+                </div>
+              }
               initialSides={initialData?.sides}
               points={clipPoints}
               openings={stageClipPoints}
@@ -1058,139 +1082,52 @@ export default function VideoDashboard({
               costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}
             />
-          </ChartSection>
-          <Card>
-            <section
-              className="flex min-w-0 flex-col gap-3"
-              aria-labelledby="results-how-to-read-title"
+          </LiftedChartSection>
+          {phone ? (
+            // A phone folds the notes into one closed row, in the style of "How we score quality".
+            <details
+              className="group/how-to-read text-xs"
               data-testid="results-how-to-read"
+              onToggle={(event) =>
+                track('video_results_how_to_read_toggled', { enabled: event.currentTarget.open })
+              }
             >
-              <Heading as="h2" level="card" id="results-how-to-read-title">
-                {s.howToRead}
-              </Heading>
-              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+              <summary className="flex w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm font-semibold group-open/how-to-read:rounded-b-none hover:bg-muted/10 [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 transition-transform group-open/how-to-read:rotate-90"
+                />
+                <h2>{s.howToRead}</h2>
+              </summary>
+              <ul className="list-disc space-y-1.5 rounded-b-lg border border-t-0 border-border/30 bg-card p-3.5 pl-8 leading-relaxed text-muted-foreground">
                 {s.howToReadItems.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
                 <li data-testid="results-not-measured">{s.notMeasured}</li>
               </ul>
-            </section>
-          </Card>
-          <details
-            className="group/advanced"
-            data-testid="results-advanced"
-            onToggle={(event) =>
-              track('video_results_advanced_toggled', { enabled: event.currentTarget.open })
-            }
-          >
-            <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-              <ChevronDown
-                aria-hidden="true"
-                className="size-5 text-muted-foreground transition-transform duration-200 group-open/advanced:rotate-180"
-              />
-              <h2 className="text-lg font-medium">{s.advanced}</h2>
-            </summary>
+            </details>
+          ) : (
             <Card>
               <section
-                className="flex min-w-0 flex-col gap-4"
-                aria-labelledby="results-profit-title"
-                data-testid="results-profit"
+                className="flex min-w-0 flex-col gap-3"
+                aria-labelledby="results-how-to-read-title"
+                data-testid="results-how-to-read"
               >
-                <div>
-                  <Heading as="h3" level="card" id="results-profit-title">
-                    {s.estimator}
-                  </Heading>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {s.priceNote}. {s.priceDetail}
-                  </p>
-                </div>
-                <ControlPanel legend={s.scenario} className="grid-cols-2 lg:grid-cols-4">
-                  {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
-                    <div key={mode} className="flex min-w-0 flex-col gap-1.5">
-                      <Label htmlFor={`results-price-${mode}`}>
-                        {s.price} · {mode.toUpperCase()}
-                      </Label>
-                      <Input
-                        id={`results-price-${mode}`}
-                        type="number"
-                        min="0"
-                        step="0.005"
-                        placeholder="—"
-                        value={state.apiPrices[mode] ?? ''}
-                        data-testid={`results-price-${mode}`}
-                        onChange={(e) => {
-                          const value = e.target.value === '' ? null : e.target.valueAsNumber;
-                          if (value === null || (Number.isFinite(value) && value >= 0))
-                            update({ apiPrices: { ...state.apiPrices, [mode]: value } });
-                        }}
-                      />
-                    </div>
+                <Heading as="h2" level="card" id="results-how-to-read-title">
+                  {s.howToRead}
+                </Heading>
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                  {s.howToReadItems.map((item) => (
+                    <li key={item}>{item}</li>
                   ))}
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="results-utilization">
-                      {s.utilization} · {n(state.utilization * 100, 0)}%
-                    </Label>
-                    <input
-                      id="results-utilization"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={state.utilization * 100}
-                      className="h-9 accent-primary"
-                      data-testid="results-utilization"
-                      onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
-                    />
-                  </div>
-                </ControlPanel>
-                {representatives.some(
-                  (c) => c.profit.participating !== null || c.profit.allocated !== null,
-                ) ? (
-                  <ResultsBars
-                    rows={profitBars}
-                    label={s.estimator}
-                    unit="$/GPU-hr"
-                    secondaryLabel={s.allocated}
-                  />
-                ) : (
-                  <EmptyState
-                    bare
-                    className="min-h-15 rounded-lg border border-dashed text-xs"
-                    data-testid="results-empty"
-                  >
-                    {s.empty}
-                  </EmptyState>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {s.participating} · {s.allocated}. {s.profitNote}
-                </p>
+                  <li data-testid="results-not-measured">{s.notMeasured}</li>
+                </ul>
               </section>
             </Card>
-          </details>
-          <details
-            className="group/history"
-            data-testid="results-history"
-            open={historyOpen}
-            onToggle={(event) => {
-              const enabled = event.currentTarget.open;
-              if (enabled === historyOpen) return;
-              setHistoryOpen(enabled);
-              track('video_results_history_toggled', { enabled });
-            }}
-          >
-            <summary className="mb-2 flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 [&::-webkit-details-marker]:hidden">
-              <ChevronDown
-                aria-hidden="true"
-                className="size-5 text-muted-foreground transition-transform duration-200 group-open/history:rotate-180"
-              />
-              <h2 className="text-lg font-medium">{s.history}</h2>
-              <span className="text-sm text-muted-foreground">{s.historyNote}</span>
-            </summary>
-            <div>{historyOpen && <VideoHistory />}</div>
-          </details>
+          )}
           <footer className="flex flex-wrap justify-end gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
             <a
-              className="text-brand hover:underline"
+              className="text-brand-fill hover:underline"
               href={csvUrl}
               download="videogenx-results.csv"
               onClick={() => track('video_results_csv_downloaded', { source: 'footer' })}
@@ -1198,7 +1135,7 @@ export default function VideoDashboard({
               {s.csv}
             </a>
             <a
-              className="text-brand hover:underline"
+              className="text-brand-fill hover:underline"
               href={apiUrl}
               onClick={() => track('video_results_api_opened')}
             >

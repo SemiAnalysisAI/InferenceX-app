@@ -29,6 +29,7 @@ function clipSnapshot(key: string, video: HTMLVideoElement): ClipSnapshot {
     duration: Number.isFinite(video.duration) ? video.duration : 0,
     bufferedEnd,
     readyState: video.readyState,
+    paused: video.paused,
     seeking: video.seeking,
     ended: video.ended,
     playbackRate: video.playbackRate,
@@ -80,6 +81,8 @@ export function useClipGroup(
     for (const [key, video] of videos.current) video.muted = key !== audible;
   }, [audible, keyList]);
 
+  /** When the group last started playing, on the `performance.now()` clock. */
+  const startedAt = useRef(-Infinity);
   // The frame loop reads group inputs through this ref so it never re-subscribes mid-playback.
   const live = useRef({ keyList, audible, duration, onRejected, playback });
   live.current = { keyList, audible, duration, onRejected, playback };
@@ -97,6 +100,7 @@ export function useClipGroup(
         audible: current.audible,
         duration: current.duration,
         ...current.playback,
+        sinceStart: (performance.now() - startedAt.current) / 1000,
       },
       event,
     );
@@ -126,6 +130,7 @@ export function useClipGroup(
     for (const action of step.actions) {
       switch (action.type) {
         case 'play-all': {
+          startedAt.current = performance.now();
           void playAll();
           break;
         }
@@ -133,14 +138,30 @@ export function useClipGroup(
           for (const clip of clips) videos.current.get(clip.key)?.pause();
           break;
         }
+        case 'play': {
+          // The promise settles when the clip has data. It rejects with AbortError when the group
+          // holds or pauses the clip, and with NotSupportedError when the source cannot be read,
+          // which the element's error event reports with the rendition fallback it has.
+          const { key } = action;
+          videos.current
+            .get(key)
+            ?.play()
+            .catch((error: { name?: string } | null) => {
+              if (error?.name !== 'AbortError' && error?.name !== 'NotSupportedError')
+                live.current.onRejected([key]);
+            });
+          break;
+        }
+        case 'pause': {
+          videos.current.get(action.key)?.pause();
+          break;
+        }
         case 'prime': {
-          // A prime is not a start. Its own pause() rejects every play() with AbortError, so there is no outcome to read.
-          for (const clip of clips) {
-            const video = videos.current.get(clip.key);
-            if (!video) continue;
-            void video.play().catch(() => {});
-            video.pause();
-          }
+          // A prime is not a start. Its own pause() rejects the play() with AbortError, so there is no outcome to read.
+          const video = videos.current.get(action.key);
+          if (!video) break;
+          void video.play().catch(() => {});
+          video.pause();
           break;
         }
         case 'seek': {

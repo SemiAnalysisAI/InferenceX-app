@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CATCH_UP_SECONDS,
+  REST_SECONDS,
   stepClipGroup,
   type ClipAction,
   type ClipGroup,
@@ -13,6 +15,7 @@ const clip = (key: string, changes: Partial<ClipSnapshot> = {}): ClipSnapshot =>
   duration: 5,
   bufferedEnd: 5,
   readyState: 4,
+  paused: false,
   seeking: false,
   ended: false,
   playbackRate: 1,
@@ -25,63 +28,97 @@ const group = (clips: ClipSnapshot[], changes: Partial<ClipGroup> = {}): ClipGro
   duration: 5,
   speed: 1,
   loop: false,
+  sinceStart: 10,
   ...changes,
 });
 const ofType = (step: ClipGroupStep, type: ClipAction['type']) =>
   step.actions.filter((action) => action.type === type);
 
+/** One frame of a wait mid-play. */
+const wait = (clips: ClipSnapshot[]) => stepClipGroup(group(clips, { phase: 'buffering' }), 'tick');
+
 describe('stepClipGroup', () => {
-  it('pauses every clip together, without seeking, when the leader stalls', () => {
-    const step = stepClipGroup(
-      group([
-        clip('b200', { readyState: 2, bufferedEnd: 1.1 }),
-        clip('h100', { currentTime: 1.3 }),
-      ]),
+  it('waits for a clip that falls a quarter second behind, at once when it lacks data', () => {
+    const short = { readyState: 2, bufferedEnd: 1.1 };
+    // A stall shorter than that pauses nothing.
+    const brief = stepClipGroup(
+      group([clip('b200', short), clip('h100', { currentTime: 1.1 })]),
       'tick',
     );
-    expect(step.phase).toBe('buffering');
-    expect(ofType(step, 'pause-all')).toHaveLength(1);
-    expect(ofType(step, 'seek')).toEqual([]);
-    expect(ofType(step, 'play-all')).toEqual([]);
+    expect(brief.phase).toBe('playing');
+    expect(ofType(brief, 'pause')).toEqual([]);
+    expect(ofType(brief, 'pause-all')).toEqual([]);
+    const stalled = stepClipGroup(
+      group([clip('b200', short), clip('h100', { currentTime: 1.3 })], { sinceStart: 0.1 }),
+      'tick',
+    );
+    expect(stalled).toMatchObject({
+      phase: 'buffering',
+      actions: [{ type: 'pause', key: 'h100' }],
+    });
+    // Two clips that both play are left to the nudge while the start settles.
+    const apart = [clip('b200'), clip('h100', { currentTime: 1.3 })];
+    expect(stepClipGroup(group(apart, { sinceStart: REST_SECONDS - 0.1 }), 'tick')).toMatchObject({
+      phase: 'playing',
+      actions: [{ type: 'rate', key: 'h100', rate: 0.9 }],
+    });
+    expect(stepClipGroup(group(apart, { sinceStart: REST_SECONDS }), 'tick')).toMatchObject({
+      phase: 'buffering',
+      actions: [{ type: 'pause', key: 'h100' }],
+    });
+    const dry = stepClipGroup(group([clip('b200', short), clip('h100', short)]), 'tick');
+    expect(dry).toMatchObject({ phase: 'buffering', actions: [], ready: false });
   });
 
-  it('resumes every clip from the leader time once each has data ahead', () => {
-    const waiting = group(
-      [
-        clip('b200', { currentTime: 1, readyState: 3, bufferedEnd: 1.5 }),
-        clip('h100', { currentTime: 1.4 }),
+  it('in a wait, plays the clip that lacks data or is behind and holds the one ahead until they meet', () => {
+    const starved = wait([
+      clip('b200', { readyState: 2, bufferedEnd: 1, paused: true }),
+      clip('h100', { currentTime: 1.3 }),
+    ]);
+    expect(starved).toMatchObject({
+      phase: 'buffering',
+      actions: [
+        { type: 'play', key: 'b200' },
+        { type: 'pause', key: 'h100' },
       ],
-      { phase: 'buffering' },
-    );
-    const aligning = stepClipGroup(waiting, 'tick');
-    expect(aligning.phase).toBe('buffering');
-    expect(aligning.actions).toEqual([{ type: 'seek', key: 'h100', time: 1 }]);
-    expect(aligning.buffered).toBeCloseTo(0.3);
-
-    const aligned = group([clip('b200', { readyState: 3, bufferedEnd: 1.5 }), clip('h100')], {
-      phase: 'buffering',
+      ready: false,
     });
-    expect(stepClipGroup(aligned, 'tick')).toMatchObject({ phase: 'buffering', actions: [] });
-
-    const loaded = group([clip('b200', { readyState: 3, bufferedEnd: 2.2 }), clip('h100')], {
-      phase: 'buffering',
-    });
-    expect(stepClipGroup(loaded, 'tick')).toMatchObject({
+    // It has data again and plays on its own toward the held clip.
+    const behind = wait([clip('b200'), clip('h100', { currentTime: 1.3, paused: true })]);
+    expect(behind).toMatchObject({ phase: 'buffering', actions: [], ready: true });
+    // Level: it stops as well, so both start from rest.
+    const level = wait([
+      clip('b200', { currentTime: 1.28 }),
+      clip('h100', { currentTime: 1.3, paused: true }),
+    ]);
+    expect(level).toMatchObject({ phase: 'buffering', actions: [{ type: 'pause', key: 'b200' }] });
+    const rested = wait([
+      clip('b200', { currentTime: 1.28, paused: true }),
+      clip('h100', { currentTime: 1.3, paused: true }),
+    ]);
+    expect(rested).toMatchObject({ phase: 'playing', actions: [{ type: 'play-all' }] });
+    // Both got data in the same frame and already run together.
+    expect(wait([clip('b200'), clip('h100')])).toMatchObject({
       phase: 'playing',
       actions: [{ type: 'play-all' }],
-      time: 1,
     });
+    const landing = wait([clip('b200', { seeking: true, readyState: 1 }), clip('h100')]);
+    expect(landing).toMatchObject({ phase: 'buffering', actions: [] });
   });
 
-  it('never seeks the audible clip and corrects the other clip toward it', () => {
-    const step = stepClipGroup(
-      group([clip('b200', { currentTime: 1 }), clip('h100', { currentTime: 1.5 })], {
-        audible: 'h100',
-      }),
-      'tick',
-    );
-    expect(step.actions).toEqual([{ type: 'seek', key: 'b200', time: 1.5 }]);
-    expect(step.time).toBe(1.5);
+  it('seeks followers to the leader, never the audible clip, when they are too far apart to catch up', () => {
+    const apart = [
+      clip('b200', { paused: true }),
+      clip('h100', { currentTime: 1 + CATCH_UP_SECONDS + 0.5 }),
+    ];
+    const step = stepClipGroup(group(apart, { phase: 'loading', audible: 'h100' }), 'tick');
+    expect(step.actions).toEqual([
+      { type: 'seek', key: 'b200', time: 1 + CATCH_UP_SECONDS + 0.5 },
+      { type: 'pause', key: 'h100' },
+    ]);
+    expect(step.time).toBe(1 + CATCH_UP_SECONDS + 0.5);
+    const mute = stepClipGroup(group(apart, { phase: 'loading' }), 'tick');
+    expect(ofType(mute, 'seek')).toEqual([{ type: 'seek', key: 'h100', time: 1 }]);
   });
 
   it('nudges a follower with playbackRate for small drift and resets it once settled', () => {
@@ -99,23 +136,6 @@ describe('stepClipGroup', () => {
       'tick',
     );
     expect(steady.actions).toEqual([]);
-  });
-
-  it('seeks a follower exactly once for large drift and never while it is already seeking', () => {
-    const drifted = stepClipGroup(
-      group([clip('b200'), clip('h100', { currentTime: 1.5, playbackRate: 1.1 })]),
-      'tick',
-    );
-    expect(drifted.actions).toEqual([
-      { type: 'seek', key: 'h100', time: 1 },
-      { type: 'rate', key: 'h100', rate: 1 },
-    ]);
-    const seeking = stepClipGroup(
-      group([clip('b200'), clip('h100', { currentTime: 1.5, seeking: true, readyState: 1 })]),
-      'tick',
-    );
-    expect(seeking.phase).toBe('playing');
-    expect(seeking.actions).toEqual([]);
   });
 
   it('ends at the shared duration and restarts every clip from zero through buffering', () => {
@@ -140,54 +160,24 @@ describe('stepClipGroup', () => {
     });
   });
 
-  it('holds play until every clip is buffered to the shared end, reporting the slowest share', () => {
+  it('reports the slowest clip’s buffered share, and waiting for data only while a clip lacks it', () => {
     const partial = [
-      clip('b200', { currentTime: 0, readyState: 4, bufferedEnd: 2.5 }),
-      clip('h100', { currentTime: 0, readyState: 4, bufferedEnd: 5, duration: 5.17 }),
+      clip('b200', { currentTime: 0, readyState: 4, bufferedEnd: 2.5, paused: true }),
+      clip('h100', { currentTime: 0, readyState: 4, bufferedEnd: 5, duration: 5.17, paused: true }),
     ];
-    const pressed = stepClipGroup(group(partial, { phase: 'paused' }), 'play');
-    expect(pressed.phase).toBe('loading');
-    expect(ofType(pressed, 'play-all')).toEqual([]);
-    expect(ofType(pressed, 'prime')).toHaveLength(1);
-    expect(pressed.buffered).toBeCloseTo(0.5);
-    expect(pressed.ready).toBe(false);
-    expect(stepClipGroup(group(partial, { phase: 'loading' }), 'tick')).toMatchObject({
-      phase: 'loading',
-      actions: [],
-    });
+    const idle = stepClipGroup(group(partial, { phase: 'paused' }), 'tick');
+    expect(idle).toMatchObject({ phase: 'paused', actions: [], ready: true });
+    expect(idle.buffered).toBeCloseTo(0.5);
     const decoding = group(
-      [clip('b200', { currentTime: 0, readyState: 2, bufferedEnd: 5 }), partial[1]],
+      [clip('b200', { currentTime: 0, readyState: 2, bufferedEnd: 0.4, paused: true }), partial[1]],
       { phase: 'loading' },
     );
-    expect(stepClipGroup(decoding, 'tick')).toMatchObject({ phase: 'loading', ready: false });
-    const complete = group(
-      [clip('b200', { currentTime: 0, readyState: 4, bufferedEnd: 4.96 }), partial[1]],
-      { phase: 'loading' },
-    );
-    expect(stepClipGroup(complete, 'tick')).toMatchObject({
-      phase: 'playing',
-      actions: [{ type: 'play-all' }],
-      ready: true,
-    });
-    expect(stepClipGroup(group(partial, { phase: 'paused' }), 'tick')).toMatchObject({
-      phase: 'paused',
-      actions: [],
-      buffered: 0.5,
-      ready: false,
-    });
-    const scrubbed = (end: number) =>
-      group(
-        [
-          clip('b200', { currentTime: 4, readyState: 4, bufferedEnd: end }),
-          clip('h100', { currentTime: 4, readyState: 4, bufferedEnd: 5 }),
-        ],
-        { phase: 'loading' },
-      );
-    expect(stepClipGroup(scrubbed(4.3), 'tick')).toMatchObject({ phase: 'loading', actions: [] });
-    expect(stepClipGroup(scrubbed(4.96), 'tick')).toMatchObject({ phase: 'playing' });
+    const waiting = stepClipGroup(decoding, 'tick');
+    expect(waiting).toMatchObject({ phase: 'loading', ready: false });
+    expect(waiting.buffered).toBeCloseTo(0.08);
   });
 
-  it('hiding the page pauses playing clips but keeps a pending start', () => {
+  it('hiding the page pauses the clips, and keeps a pending start for when it is back', () => {
     const playing = stepClipGroup(
       group([clip('b200', { playbackRate: 1.1 }), clip('h100')]),
       'hide',
@@ -196,12 +186,21 @@ describe('stepClipGroup', () => {
       phase: 'paused',
       actions: [{ type: 'pause-all' }, { type: 'rate', key: 'b200', rate: 1 }],
     });
-    const partial = [clip('b200', { currentTime: 0, bufferedEnd: 2 }), clip('h100')];
-    for (const phase of ['loading', 'buffering'] as const)
-      expect(stepClipGroup(group(partial, { phase }), 'hide')).toMatchObject({
+    const cold = { currentTime: 0, readyState: 1, bufferedEnd: 0 };
+    for (const phase of ['loading', 'buffering'] as const) {
+      expect(stepClipGroup(group([clip('b200', cold), clip('h100')], { phase }), 'hide')).toEqual(
+        expect.objectContaining({ phase, actions: [{ type: 'pause-all' }] }),
+      );
+      // Back on the page, the clip without data plays again so that it loads.
+      const back = [
+        clip('b200', { ...cold, paused: true }),
+        clip('h100', { currentTime: 0, paused: true }),
+      ];
+      expect(stepClipGroup(group(back, { phase }), 'tick')).toMatchObject({
         phase,
-        actions: [],
+        actions: [{ type: 'play', key: 'b200' }],
       });
+    }
   });
 
   it('scrubbing pauses the group, seeks every clip including the audible one, and reloads', () => {

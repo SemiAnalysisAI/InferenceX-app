@@ -262,34 +262,6 @@ describe('VideoGenX results', () => {
     focusFirstControl(true);
   });
 
-  for (const pathname of ['/zh/vgx']) {
-    it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
-      const zh = pathname.startsWith('/zh');
-      mount({
-        pathname,
-        editPage: (page) => {
-          page.entries[0].sources[0].powerVerified = true;
-          page.entries[2].sources[0].powerVerified = false;
-        },
-      });
-      cy.contains('summary', zh ? '性能历史' : 'Performance history').click();
-      cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
-      cy.get('[data-testid="video-history-publication"]')
-        .first()
-        .should('contain', zh ? '已批准用于仪表板' : 'Approved for dashboard');
-      cy.get('[data-testid="video-history-publication"]')
-        .eq(4)
-        .should('contain', zh ? '未找到匹配的发布批准回执' : 'No matching approval receipt');
-      cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
-        expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal(
-          zh
-            ? ['· GPU 功率: 已测得', '· GPU 功率: 未测得', '· GPU 功率: 已测得']
-            : ['· GPU power: Measured', '· GPU power: Not measured', '· GPU power: Measured'],
-        );
-      });
-    });
-  }
-
   it('ignores retired controls and plots every named-run GPU count on either X axis', () => {
     mount({
       search:
@@ -390,11 +362,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-stage"]').should('not.exist');
     // Rewriting the results keys keeps the clip stage's own keys.
     searchParam('r_view').should('equal', 'side');
-    cy.contains('summary', 'Performance history').click();
-    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
-    cy.get('[data-testid="video-history-publication"]').each(($entry) => {
-      expect($entry).to.contain('No matching approval receipt');
-    });
   });
 
   it('shows a lossy named run’s clip, which leads no card, in the overlay color', () => {
@@ -565,14 +532,7 @@ describe('VideoGenX results', () => {
       'have.text',
       'How to read these results',
     );
-    cy.get('[data-testid="results-profit"] h3').should('have.text', 'Profit estimator');
-    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-    cy.get('details[data-testid^="results-"] > summary h2').should(($titles) => {
-      expect([...$titles].map((title) => title.textContent)).to.deep.equal([
-        'Advanced',
-        'Performance history',
-      ]);
-    });
+    cy.get('details[data-testid^="results-"] > summary h2').should('not.exist');
     cy.get('[data-testid="results-not-measured"]').should('contain', 'LoRA switch time');
     cy.get('[data-testid="results-empty"][data-state="planned"]').should('not.exist');
     points().should('have.length', 2);
@@ -634,36 +594,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
-  });
-
-  it('applies explicit scenario prices and utilisation to profit', () => {
-    // Synthetic additive evidence exercises controls absent from retained public
-    // projections. It is never written to the committed history fixture.
-    mount({
-      edit: (observation) => {
-        observation.videoSecondsPerHour = 400;
-        observation.results = evidence(observation);
-      },
-    });
-    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-    cy.get('[data-testid="results-advanced"] > summary').click();
-    cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('be.visible');
-    cy.get('[data-testid="results-price-t2v"]').type('0.05');
-    cy.location('search').should('contain', 'r_price_t2v=0.05');
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '3.27');
-    cy.get('[data-testid="results-utilization"]').then(($input) => {
-      const input = $input[0] as HTMLInputElement;
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-      setter.call(input, '50');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
-    cy.location('search').should('contain', 'r_utilization=0.5');
-    cy.get('[data-testid="results-advanced"] > summary').click();
-    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-    cy.get('[data-testid="results-advanced"] > summary').click();
-    cy.get('[data-testid="results-price-t2v"]').should('have.value', '0.05');
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
   });
 
   it('plots the selected Y metric with participating GPUs and median latency', () => {
@@ -1439,12 +1369,6 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="results-table"]').should('not.exist');
       cy.get('[data-testid="results-gpus"]').should('not.exist');
       cy.get('[data-testid="results-cost-basis"]').should('not.exist');
-      cy.get('[data-testid="results-advanced"] > summary')
-        .should('contain', pathname.startsWith('/zh') ? '高级选项' : 'Advanced')
-        .click();
-      cy.get('[data-testid="results-price-t2v"]').should('be.visible');
-      cy.get('[data-testid="results-advanced"] > summary').click();
-      cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
       cy.get('[data-testid="video-results-stage"]').should(($stage) => {
         const rect = $stage[0].getBoundingClientRect();
         expect(rect.left, 'stage inside the page').to.be.at.least(0);
@@ -1454,7 +1378,10 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="video-results-readout"] dl').should(($grid) => {
         const cells = [...$grid[0].children];
         const rows = new Set(cells.map((cell) => cell.getBoundingClientRect().top)).size;
-        expect(rows, 'readout rows').to.equal(width >= 1024 ? 1 : Math.ceil(cells.length / 2));
+        // One row from 1024 px, two columns from 768 px, and one column on a phone.
+        expect(rows, 'readout rows').to.equal(
+          width >= 1024 ? 1 : width >= 768 ? Math.ceil(cells.length / 2) : cells.length,
+        );
         expect($grid.find('[data-metric="cost"]').attr('title')).to.contain(
           pathname.startsWith('/zh') ? '分配 GPU' : 'allocated',
         );

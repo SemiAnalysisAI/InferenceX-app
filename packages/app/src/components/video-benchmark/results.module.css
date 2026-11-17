@@ -73,3 +73,163 @@
     grid-row: 1;
   }
 }
+
+/* A cut-off edge of a sideways-scrolling table fades; `useScrollFade` names the edges with more
+   content. A table that hides none gets no mask, which would redraw its rounded corners. */
+.page [data-scroll-more]:not([data-scroll-more='']) {
+  --fade-start: 0px;
+  --fade-end: 0px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-start),
+    black calc(100% - var(--fade-end)),
+    transparent
+  );
+}
+.page [data-scroll-more~='start'] {
+  --fade-start: 24px;
+}
+.page [data-scroll-more~='end'] {
+  --fade-end: 24px;
+}
+
+/* Touch screens: the same query as `useIsCoarsePointer`. A control keeps its size and gets a
+   44 px hit area around it; `--hit-x` and `--hit-y` slide that area off a neighbouring control. */
+@media (hover: none) and (pointer: coarse) {
+  .hit::after,
+  .page [data-slot='info-help']::after,
+  .page [data-slot='switch']::after,
+  .page summary::after,
+  .page [data-testid='legend-toolbar'] button::after {
+    content: '';
+    position: absolute;
+    top: calc(50% + var(--hit-y, 0px));
+    left: calc(50% + var(--hit-x, 0px));
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  /* A disclosure row and the legend's toolbar buttons take taps across their width. */
+  .page summary::after,
+  .page [data-testid='legend-toolbar'] button::after {
+    left: 50%;
+    width: max(100%, 44px);
+  }
+  .page [data-slot='info-help'],
+  .page [data-slot='switch'],
+  .page summary,
+  .page [data-testid='legend-toolbar'] button {
+    position: relative;
+  }
+  /* The first legend row starts 4 px under the toolbar. */
+  .page [data-testid='legend-toolbar'] button {
+    --hit-y: -2px;
+  }
+  /* Where controls sit closer than a finger above and below, the row itself makes the room. */
+  .roomy {
+    margin-block: 10px;
+  }
+  /* A 38 px tab reaches 44 px without moving the strip; the bottom inset also spans its 2 px border. */
+  .page [data-slot='tabs-trigger']::after {
+    content: '';
+    position: absolute;
+    inset: -3px 0 -5px;
+  }
+  /* Legend rows and switches stack closer than a finger, so each takes a 44 px row. */
+  .page :global(.sidebar-legend) li label,
+  .page :global(.sidebar-legend) div:has(> [data-slot='switch']) {
+    min-height: 44px;
+  }
+  .page :global(.sidebar-legend) div:has(> [data-slot='switch']) {
+    margin-top: 0;
+  }
+  .page :global(.sidebar-legend) div:has(> [data-slot='switch']) > label {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+  }
+  /* Those taller rows would scroll inside the stacked legend's height cap and hide the last GPUs. */
+  @media (max-width: 1023px) {
+    .page :global(.sidebar-legend) {
+      max-height: none;
+    }
+  }
+  /* The legend clips at its own edge, where the switch starts. */
+  .page :global(.sidebar-legend) [data-slot='switch'] {
+    --hit-x: 6px;
+  }
+  .page :global(.sidebar-legend) [data-slot='info-help'] {
+    --hit-x: 2px;
+  }
+}
+
+/* A phone's legend is compact: the hardware wraps into rows 32 px apart and the switches share a
+   row where they fit. Every entry's hit area is still 44 px tall, reaching 6 px past the entry
+   above and below. A touch screen keeps this while the legend sits under the chart. This follows
+   the touch rules above, so it also undoes their 44 px rows. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) and (max-width: 1023px) {
+  .page :global(.sidebar-legend) > ul {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+  }
+  .page :global(.sidebar-legend) > ul > li {
+    max-width: 100%;
+    margin-block: 0;
+  }
+  .page :global(.sidebar-legend) > ul > li[data-testid='legend-section-heading'] {
+    flex-basis: 100%;
+  }
+  .page :global(.sidebar-legend) li label {
+    position: relative;
+    min-height: 32px;
+  }
+  .page :global(.sidebar-legend) li label::after {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
+  }
+  /* A neighbour's hit area never lies over an entry's own dot and name. */
+  .page :global(.sidebar-legend) li label > span {
+    position: relative;
+    z-index: 1;
+  }
+  .page :global(.sidebar-legend) div:has(> div > [data-slot='switch']) {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+  }
+  .page :global(.sidebar-legend) div:has(> [data-slot='switch']) {
+    min-height: 36px;
+    margin-top: 0;
+  }
+}
+
+/* A phone on its side keeps only the sticky header and the transport in view with the picture;
+   the stage sentence follows the transport, which keeps Play on screen under the whole picture. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  .page {
+    --stage-reserve: 8rem;
+  }
+  .stageColumn {
+    display: flex;
+    flex-direction: column;
+  }
+  .stageSentence {
+    order: 1;
+    margin-block: 0.75rem 0;
+  }
+}
+
+/* The phone layout, clip first. The chart card's wrappers leave no box, so the chart and the clip
+   blocks join the page column, where the stage block leads by `order` (LEAD_BLOCK in
+   VideoResultsClips.tsx). The page's title row moves into that block. */
+@media (max-width: 767px) {
+  .lifted {
+    display: contents;
+  }
+  .intro h1 {
+    display: none;
+  }
+}

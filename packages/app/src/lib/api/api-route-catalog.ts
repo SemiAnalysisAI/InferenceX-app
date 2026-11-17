@@ -1568,15 +1568,15 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '085f6b70578c454aba295d461b341d773589db3857334402339f528f48a32687',
+    sourceSha256: '44a1c9bde8bbb865d7f74bab6172647d5c2c36e0640fe053fe4cbe530eebc3e4',
     reviewArea: {
-      en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
-      zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
+      en: 'Shared VideoGenX results selectors, sample admission and dual GPU cost bases.',
+      zh: 'VideoGenX 结果页共用的筛选、样本准入及两种 GPU 成本口径。',
     },
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: '7d845aa632bc9d00228ec77ba97989cb0708c7cb6bd3fc2a34236f2fb5983c09',
+    sourceSha256: 'fe690c15585b39aa069433c7aa198cd60604418255a912d74f8aea8b81526b8e',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1584,7 +1584,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-csv.ts',
-    sourceSha256: 'a055811ee460f9a7f9edbbd5da241ae5f9d7378ce27a43f7dc647192513d5944',
+    sourceSha256: '7adccb2fa000a26b68be9dcbba411ca2b1ef7dc8c7c5a2dc9dcf8ad965f18263',
     reviewArea: {
       en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
       zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
@@ -1610,8 +1610,8 @@ export const apiContractSourceDigests = [
     source: 'src/lib/video/video-renditions.ts',
     sourceSha256: '90d79fd57bf930bf3f22bfd823dbccf538433a6cc490f0311d2ca538ba63e558',
     reviewArea: {
-      en: 'VideoGenX derived media profiles (web playback rendition and first-frame poster), their receipts keyed by the sealed source SHA256, and the read-time previewUrl and posterUrl on published media and stored reference clips; url, Difference and PSNR keep the sealed original.',
-      zh: 'VideoGenX 派生媒体配置（网页播放转码版本与首帧封面）、按封存原始视频 SHA256 记录的回执，以及读取时附加到已发布媒体和已存参考视频的 previewUrl 与 posterUrl；url、差异预览和 PSNR 仍使用封存的原始视频。',
+      en: 'VideoGenX derived media profiles (web playback rendition and first-frame poster), their receipts keyed by the sealed source SHA256, and the read-time previewUrl and posterUrl on published media and stored reference clips; url and PSNR keep the sealed original.',
+      zh: 'VideoGenX 派生媒体配置（网页播放转码版本与首帧封面）、按封存原始视频 SHA256 记录的回执，以及读取时附加到已发布媒体和已存参考视频的 previewUrl 与 posterUrl；url 和 PSNR 仍使用封存的原始视频。',
     },
   },
   {
@@ -1656,7 +1656,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-clips.ts',
-    sourceSha256: 'b1eb590d36107baba009104c68c1bbbdcddd16db7b633914c659b2e9e6d09186',
+    sourceSha256: '44b73c173855fda20c9b2e95b92776bdc14070dd1d190835f2285effc4db7773',
     reviewArea: {
       en: 'Exact candidate/reference pairing, unscored reasons and per-clip quality projection shared by Results and the overview API, including PSNR without media for an unstored named run.',
       zh: 'Results 与 overview API 共用的精确候选/参考配对、未评分原因及逐条质量投影，包括未存储的指定运行在无媒体时的 PSNR。',
@@ -1664,7 +1664,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/stored.ts',
-    sourceSha256: 'a5119c1c5cea7f5bdfc90150181af73bf92b2ebcd931a11e4f55db569cbdb4b5',
+    sourceSha256: '7a3bdfbeecb6c4cb481d0b8a26515dda8fa386bcc8f69d7808d96e3aae5fb537',
     reviewArea: {
       en: 'Original stored artifact identity, optional read-time playback previewUrl and first-frame posterUrl, and the separately stored, independently verified quality attachment (pairs, unscored clips, unreadable flag) merged at read time without approval promotion.',
       zh: '原始已存储产物身份、读取时附加的可选播放 previewUrl 与首帧封面 posterUrl，以及单独存储、独立校验并在读取时合并的质量附件（配对、未评分视频、无法读取标记），不提升发布批准状态。',
