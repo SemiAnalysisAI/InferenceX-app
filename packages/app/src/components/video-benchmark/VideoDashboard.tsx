@@ -99,6 +99,7 @@ import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
 import { usePhone } from './use-phone';
+import { DISCLOSURE, useDisclosureMotion } from './motion-dom';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -704,8 +705,16 @@ export default function VideoDashboard({
 
   const workloadLine = workloadLabel && [workloadLabel, ...engines.map(engineLabel)].join(' · ');
 
+  // A visit to a deployment page is a navigation, so both ends of it ease in; the first page does not.
+  const disclosures = useDisclosureMotion<HTMLDivElement>();
+  const wentToDetail = useRef(false);
+  const sawOverview = useRef(false);
+  if (detailCell) wentToDetail.current = true;
+  else if (!pending) sawOverview.current = true;
+
   return (
     <div
+      ref={disclosures}
       className={`${styles.page} flex w-full min-w-0 flex-col gap-4`}
       data-testid="video-results"
       // The streamed dashboard remounts in place of this shell, so edits made here would be lost.
@@ -717,6 +726,7 @@ export default function VideoDashboard({
           siblings={detailSiblings}
           gpuCounts={options.gpuCounts}
           workloadLabel={workloadLabel ?? detailCell.point.workload}
+          entering={sawOverview.current}
           state={state}
           color={color(detailCell)}
           notMeasured={s.notMeasured}
@@ -733,7 +743,7 @@ export default function VideoDashboard({
       )}
       {/* Hidden, not unmounted: clip media, the selected clip group and chart state survive a detail visit. */}
       <Activity mode={detailCell ? 'hidden' : 'visible'}>
-        <div className="flex flex-col gap-4">
+        <div className={cn('flex flex-col gap-4', wentToDetail.current && styles.pageIn)}>
           <Card>
             <div className="flex flex-col gap-4">
               <DashboardSectionHeader
@@ -1171,6 +1181,7 @@ export default function VideoDashboard({
           {phone ? (
             // A phone folds the notes into one closed row, in the style of "How we score quality".
             <details
+              {...DISCLOSURE}
               className="group/how-to-read text-xs"
               data-testid="results-how-to-read"
               onToggle={(event) =>
@@ -1180,7 +1191,7 @@ export default function VideoDashboard({
               <summary className="flex w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm font-semibold group-open/how-to-read:rounded-b-none hover:bg-muted/10 [&::-webkit-details-marker]:hidden">
                 <ChevronRight
                   aria-hidden="true"
-                  className="size-3.5 shrink-0 transition-transform group-open/how-to-read:rotate-90"
+                  className="size-3.5 shrink-0 transition-transform group-open/how-to-read:rotate-90 group-data-closing/how-to-read:rotate-0"
                 />
                 <h2>{s.howToRead}</h2>
               </summary>
@@ -1211,6 +1222,7 @@ export default function VideoDashboard({
             </Card>
           )}
           <details
+            {...DISCLOSURE}
             className="group/advanced"
             data-testid="results-advanced"
             onToggle={(event) =>
@@ -1220,7 +1232,7 @@ export default function VideoDashboard({
             <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
               <ChevronDown
                 aria-hidden="true"
-                className="size-5 text-muted-foreground transition-transform duration-200 group-open/advanced:rotate-180"
+                className="size-5 text-muted-foreground transition-transform duration-200 group-open/advanced:rotate-180 group-data-closing/advanced:rotate-0"
               />
               <h2 className="text-lg font-medium">{s.advanced}</h2>
             </summary>
@@ -1302,6 +1314,7 @@ export default function VideoDashboard({
             </Card>
           </details>
           <details
+            {...DISCLOSURE}
             className="group/history"
             data-testid="results-history"
             open={historyOpen}
@@ -1315,7 +1328,7 @@ export default function VideoDashboard({
             <summary className="mb-2 flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 [&::-webkit-details-marker]:hidden">
               <ChevronDown
                 aria-hidden="true"
-                className="size-5 text-muted-foreground transition-transform duration-200 group-open/history:rotate-180"
+                className="size-5 text-muted-foreground transition-transform duration-200 group-open/history:rotate-180 group-data-closing/history:rotate-0"
               />
               <h2 className="text-lg font-medium">{s.history}</h2>
               <span className="text-sm text-muted-foreground">{s.historyNote}</span>

@@ -12,6 +12,7 @@ import type { StageCandidate } from './clip-stage';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
 import { referencePsnrRange, showMeTarget, type LossyPair } from './quality-method';
+import { DISCLOSURE } from './motion-dom';
 import { PIXELS_DIFFER } from './VideoClipReadout';
 
 const STRINGS = {
@@ -110,6 +111,7 @@ export default function QualityMethod({
   const helpId = useId();
   return (
     <details
+      {...DISCLOSURE}
       data-testid="video-results-quality-method"
       className="group/quality text-xs"
       onToggle={(event) => {
@@ -119,7 +121,7 @@ export default function QualityMethod({
       <summary className="flex w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm font-semibold group-open/quality:rounded-b-none hover:bg-muted/10 [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden="true"
-          className="size-3.5 shrink-0 transition-transform group-open/quality:rotate-90"
+          className="size-3.5 shrink-0 transition-transform group-open/quality:rotate-90 group-data-closing/quality:rotate-0"
         />
         {s.title}
       </summary>

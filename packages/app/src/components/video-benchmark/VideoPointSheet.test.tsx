@@ -106,3 +106,69 @@ it('returns to where the reader tapped a second point after a link opened the fi
   sheet.close();
   expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1020 });
 });
+
+/** Lets the sheet animate, as a browser does; returns each animation with a handle that ends it. */
+function animated() {
+  const slides: { frames: Keyframe[]; finish: () => void; cancelled: boolean }[] = [];
+  Element.prototype.animate = function animate(frames: Keyframe[]) {
+    const listeners: Record<string, (() => void)[]> = {};
+    const slide = {
+      frames,
+      cancelled: false,
+      finish: () => listeners.finish?.forEach((listener) => listener()),
+    };
+    slides.push(slide);
+    return {
+      addEventListener: (type: string, listener: () => void) =>
+        (listeners[type] ??= []).push(listener),
+      cancel: () => {
+        slide.cancelled = true;
+      },
+    } as unknown as Animation;
+  } as typeof Element.prototype.animate;
+  return slides;
+}
+afterEach(() => Reflect.deleteProperty(Element.prototype, 'animate'));
+
+it('slides away and scrolls the page back smoothly, and closes once it is gone', () => {
+  const slides = animated();
+  const page = { scrollY: 1000, markBottom: 580, firstScreen: 200 };
+  const sheet = open(page);
+  sheet.close();
+  expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000, behavior: 'smooth' });
+  // Still there while it leaves, with the page behind already taking touches.
+  expect(sheet.onClose).not.toHaveBeenCalled();
+  expect(slides).toHaveLength(1);
+  expect(slides[0].frames.at(-1)).toEqual({ transform: 'translateY(100%)', opacity: 0 });
+  expect(document.querySelector('[data-testid="video-point-sheet-backdrop"]')!.className).toContain(
+    'pointer-events-none',
+  );
+  // A second close while it leaves does nothing more.
+  sheet.close();
+  expect(slides).toHaveLength(1);
+  act(() => slides[0].finish());
+  expect(sheet.onClose).toHaveBeenCalledOnce();
+});
+
+it('stays for another point tapped while it slides away', () => {
+  const slides = animated();
+  const sheet = open({ scrollY: 1000, markBottom: 400, firstScreen: 200 });
+  sheet.close();
+  sheet.render('second');
+  expect(slides[0].cancelled).toBe(true);
+  // The slide that was cut short must not close the sheet the reader just moved.
+  act(() => slides[0].finish());
+  expect(sheet.onClose).not.toHaveBeenCalled();
+  expect(
+    document.querySelector('[data-testid="video-point-sheet-backdrop"]')!.className,
+  ).not.toContain('pointer-events-none');
+});
+
+it('closes at once under reduced motion', () => {
+  animated();
+  const sheet = open({ scrollY: 1000, markBottom: 580, firstScreen: 200 });
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  sheet.close();
+  expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000 });
+  expect(sheet.onClose).toHaveBeenCalledOnce();
+});
