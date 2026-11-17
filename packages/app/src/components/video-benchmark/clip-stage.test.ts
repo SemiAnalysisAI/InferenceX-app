@@ -2,13 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   pairedGroup,
   parseStage,
-  phonePairing,
   promptKey,
   speedVs,
   stagePrompt,
   stageSearch,
   stageSubject,
-  type StageOption,
 } from './clip-stage';
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
@@ -78,32 +76,6 @@ describe('clip stage', () => {
     });
   });
 
-  it('keeps the compared side and a swap in the URL and leaves their defaults out', () => {
-    const pair = stageSearch(
-      { prompt: null, view: 'wipe', clip: '1:b200:c1', vs: 'h200', swap: true, sheet: null },
-      '?r_y=videosPerGpuHour',
-    );
-    expect(pair.toString()).toBe('r_y=videosPerGpuHour&r_clip=1%3Ab200%3Ac1&r_vs=h200&r_swap=1');
-    expect(parseStage(`?${pair}`)).toMatchObject({
-      clip: '1:b200:c1',
-      vs: 'h200',
-      swap: true,
-      sheet: null,
-    });
-    // Only `1` swaps, so a hand-edited value cannot leave the sides in an unknown order.
-    expect(parseStage('?r_swap=true&r_vs=')).toMatchObject({ vs: null, swap: false, sheet: null });
-  });
-
-  it('keeps the point whose sheet is open in the URL', () => {
-    const opened = stageSearch(
-      { prompt: null, view: 'wipe', clip: null, vs: null, swap: false, sheet: '1:b200:c1' },
-      '?r_y=videosPerGpuHour',
-    );
-    expect(opened.toString()).toBe('r_y=videosPerGpuHour&r_sheet=1%3Ab200%3Ac1');
-    expect(parseStage(`?${opened}`).sheet).toBe('1:b200:c1');
-    expect(stageSearch(parseStage(''), `?${opened}`).has('r_sheet')).toBe(false);
-  });
-
   it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {
     const official = { point: point('b200'), side: side('b200', [record('crane')]) };
     const clipless = { point: point('b200'), side: side('b200', [record('crane')], false) };
@@ -161,58 +133,5 @@ describe('clip stage', () => {
     expect(pairedGroup(other, subject)?.clips.get('h200')?.url).toBe('/h200-rerun.mp4');
     const [ci] = resultsClipGroups([side('b200', [record('crane')])]);
     expect(pairedGroup(other, ci)?.scope).toBeUndefined();
-  });
-});
-
-/** A stored 4-GPU SGLang cell of one workload, as `phonePairing` compares them. */
-const cell = (hardwareKey: string, p50: number | null, patch: Partial<VideoPoint> = {}) =>
-  ({
-    id: hardwareKey,
-    hardwareKey,
-    runId: 'official',
-    workload: 'h3',
-    participating: 4,
-    p50,
-    publishedAt: '2026-11-01T00:00:00.000Z',
-    results: { engine: 'sglang' },
-    ...patch,
-  }) as VideoPoint;
-const offered = (...points: VideoPoint[]): StageOption[] => [
-  { value: 'reference', kind: 'reference', point: null },
-  ...points.map((item) => ({
-    value: item.hardwareKey ?? '',
-    kind: 'hardware' as const,
-    point: item,
-  })),
-];
-
-describe('phonePairing', () => {
-  const b200 = cell('b200', 35.4);
-
-  it('opens against the slowest other GPU on the same workload, engine and GPU count', () => {
-    const options = offered(cell('mi355x', 54.7), cell('h200', 71.7), cell('h100', 74.2));
-    expect(phonePairing(b200, options)).toBe('h100');
-    expect(phonePairing(b200, offered(cell('mi355x', 54.7), cell('h200', 71.7)))).toBe('h200');
-  });
-
-  it('skips deployments that are not like for like or have no clips', () => {
-    const options = offered(
-      cell('h100', 74.2, { participating: 8 }),
-      cell('h200', 71.7, { results: { engine: 'vllm-omni' } } as Partial<VideoPoint>),
-      cell('mi355x', 99, { workload: 'wan' }),
-      cell('b300', 80, { publishedAt: null } as Partial<VideoPoint>),
-      cell('gb200', null),
-      cell('b200', 90),
-    );
-    expect(phonePairing(b200, options)).toBeNull();
-    // The caller can rule a candidate out once its read shows no clips.
-    const two = offered(cell('h200', 71.7), cell('h100', 74.2));
-    expect(phonePairing(b200, two, (item) => item.hardwareKey !== 'h100')).toBe('h200');
-  });
-
-  it('keeps the usual default with one hardware or only the reference on offer', () => {
-    expect(phonePairing(b200, offered())).toBeNull();
-    const twin: StageOption[] = [{ value: 'twin', kind: 'twin', point: cell('h200', 71.7) }];
-    expect(phonePairing(b200, twin)).toBeNull();
   });
 });

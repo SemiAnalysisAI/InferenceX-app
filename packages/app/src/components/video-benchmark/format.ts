@@ -21,7 +21,7 @@ export const reading = (value: number | null | undefined): string | null =>
  * A dollar amount without its sign: three decimals below $1 ("0.068"), cents from $1 ("1.23"),
  * and two significant figures below one cent ("0.0046"), so a cost never rounds to 0.
  */
-export function dollarFigures(value: number): string {
+function dollarFigures(value: number): string {
   const abs = Math.abs(value);
   return abs >= 1
     ? value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

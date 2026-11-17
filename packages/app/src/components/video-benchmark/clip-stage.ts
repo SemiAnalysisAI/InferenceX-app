@@ -236,7 +236,7 @@ export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
 export function phonePairing(
   subject: VideoPoint,
   options: readonly StageOption[],
-  hasClips: (point: VideoPoint) => boolean = mayHaveClips,
+  hasClips: (point: VideoPoint) => boolean,
 ): string | null {
   const slowest = options
     .flatMap((option) => (option.kind === 'hardware' && option.point ? [option.point] : []))

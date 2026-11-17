@@ -123,13 +123,13 @@ export function clearOfLabels(
 export const boxesOverlap = (a: Box, b: Box): boolean =>
   a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 
-export interface Spot {
+interface Spot {
   x: number;
   y: number;
 }
 
 /** Whether the straight line from `a` to `b` passes through `box` (Liang–Barsky clipping). */
-export function segmentCrosses(a: Spot, b: Spot, box: Box): boolean {
+function segmentCrosses(a: Spot, b: Spot, box: Box): boolean {
   let enter = 0;
   let leave = 1;
   const dx = b.x - a.x;
@@ -158,7 +158,7 @@ export const BADGE_HEIGHT = 16;
 const BADGE_OFFSET = 12;
 
 /** What a badge or pill should not cover: earlier badges, labels and pills, the points, and the lines. */
-export interface MarkObstacles {
+interface MarkObstacles {
   boxes: readonly Box[];
   points: readonly Spot[];
   lines: readonly (readonly Spot[])[];
@@ -264,11 +264,11 @@ export function placePill(
 }
 
 /** How far from a point's centre a finger still picks it, in px: half a 44 px touch target. */
-export const TAP_RADIUS = 22;
+const TAP_RADIUS = 22;
 /** Points whose distances from a tap differ by no more than this, in px, a finger cannot tell apart. */
 const TAP_TIE = 8;
 
-export interface TapPoint {
+interface TapPoint {
   key: string;
   x: number;
   y: number;

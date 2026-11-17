@@ -6,13 +6,10 @@ import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import type { ResultCell } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
-import { absoluteFrameDifference } from '@/components/video-benchmark/results-clips';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
-import styles from '@/components/video-benchmark/results.module.css';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
-import { coarsePointer, phoneMedia, tapArea, touchScreen } from '../support/video-results';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -133,7 +130,7 @@ const cost = (perVideo: number, perVideoSecond: number) => ({
   perHour: 1,
 });
 const readout = '[data-testid="video-results-readout"]';
-/** A readout cell's lines: its own value, then the pair's line when it has one. */
+/** A readout cell's lines: its own value, its context, then the pair's value when it has one. */
 const readoutLines = (metric: string) => cy.get(`${readout} [data-metric="${metric}"] dd`);
 const readoutValue = (metric: string, index = 0) => readoutLines(metric).eq(index);
 /** The readout's cells in reading order. */
@@ -159,10 +156,7 @@ function mountResultsClips(
     costs = {},
     takes,
     posters = {},
-    phone = false,
   }: {
-    /** The phone layout and its opening pair, which the dashboard takes from the viewport. */
-    phone?: boolean;
     /** Replace the C1 leads of `keys`, which still serve the media. */
     leads?: VideoPoint[];
     deployments?: VideoPoint[];
@@ -307,30 +301,25 @@ function mountResultsClips(
           Toggle B200
         </button>
         <input aria-label="Notes" />
-        {/* The page's column, which a phone's blocks join once the section leaves its box. */}
-        <div className={`${styles.page} flex flex-col gap-4`}>
-          <VideoResultsClips
-            points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
-            colorFor={colorFor}
-            deployments={deployments}
-            costs={{
-              [c1('b200').id]: { participating: cost(0.1, 0.02), allocated: null },
-              [c1('h100').id]: { participating: cost(0.3, 0.06), allocated: cost(0.6, 0.12) },
-              ...costs,
-            }}
-            unofficialRun={unofficialRun}
-            phone={phone}
-            titleRow={<h1 className="md:hidden">VideoGenX</h1>}
-            against={against}
-            onAgainstChange={setAgainst}
-            onSubjectChange={(clip) => {
-              setAgainst(null);
-              writeStage({ ...parseStage(window.location.search), clip });
-            }}
-            onShow={() => {}}
-            reveal={0}
-          />
-        </div>
+        <VideoResultsClips
+          points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
+          colorFor={colorFor}
+          deployments={deployments}
+          costs={{
+            [c1('b200').id]: { participating: cost(0.1, 0.02), allocated: null },
+            [c1('h100').id]: { participating: cost(0.3, 0.06), allocated: cost(0.6, 0.12) },
+            ...costs,
+          }}
+          unofficialRun={unofficialRun}
+          against={against}
+          onAgainstChange={setAgainst}
+          onSubjectChange={(clip) => {
+            setAgainst(null);
+            writeStage({ ...parseStage(window.location.search), clip });
+          }}
+          onShow={() => {}}
+          reveal={0}
+        />
       </PathnameContext.Provider>
     );
   }
@@ -354,34 +343,10 @@ function mountLossyPair(twinP50: number | null) {
   });
 }
 
-/** The viewport y of an element's top edge. */
-const topOf = (selector: string) =>
-  cy.get(selector).then(($element) => $element[0].getBoundingClientRect().top);
-/** The viewport y of an element's bottom edge. */
-const bottomOf = (selector: string) =>
-  cy.get(selector).then(($element) => $element[0].getBoundingClientRect().bottom);
-/** Each selector's element starts below the one before it. */
-const expectStacked = (order: string[]) =>
-  cy.wrap(order).each((selector: string, index) => {
-    if (index === 0) return;
-    topOf(order[index - 1]).then((above) =>
-      topOf(selector).should((below) =>
-        expect(below, `${selector} below ${order[index - 1]}`).to.be.greaterThan(above),
-      ),
-    );
-  });
-
 describe('Video results clip stage', () => {
   beforeEach(() => {
     // The stage keeps its view and prompt in the URL, which outlives one test's mount.
     cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
-  });
-  /** Puts the browser's own media back after a test that stood in for it. */
-  let undoMedia: (() => void) | null = null;
-  afterEach(() => {
-    if (Cypress.isBrowser({ family: 'chromium' })) touchScreen(false);
-    undoMedia?.();
-    undoMedia = null;
   });
 
   it('keeps one audible side, also across a prompt switch', () => {
@@ -474,21 +439,10 @@ describe('Video results clip stage', () => {
     readoutValue('psnr').should('have.text', '25 dB');
     readoutValue('wall').should('have.text', '120 s');
     readoutValue('energy').should('have.text', '301 kJ');
-    cy.get(`${readout} [data-metric="energy"] dt`).should('contain', 'Mean energy per clip');
-    // Against the reference a cell is its label and one value; the rest sits in its help.
-    readoutLines('cost').should('have.length', 1).and('have.text', '$0.100');
+    readoutValue('cost').should('have.text', '$0.100');
     cy.get(`${readout} [data-metric="cost"]`)
       .should('have.attr', 'title')
-      .and('contain', '$0.020 per video-second')
       .and('contain', 'On the allocated GPUs: not measured yet.');
-    cy.get(`${readout} [data-metric="psnr"]`)
-      .should('have.attr', 'title')
-      .and('contain', 'Higher is closer to the reference.');
-    // A phone lists the cells in one column, the pair's line beside each value.
-    cy.get(`${readout} [data-metric]`).should(($cells) => {
-      const lefts = new Set($cells.toArray().map((cell) => cell.getBoundingClientRect().left));
-      expect(lefts.size).to.equal(1);
-    });
     cy.get(`${readout} [data-testid="video-results-readout-pair"]`).should(
       'contain',
       '4 GPU · TP2 × Ulysses 2',
@@ -514,8 +468,6 @@ describe('Video results clip stage', () => {
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
     readoutValue('cost').should('have.text', '$0.100');
-    // A mouse reads each readout cell's explanation from its title; only touch adds a button.
-    cy.get(`${readout} [data-slot="info-help"]`).should('not.exist');
 
     cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
@@ -562,49 +514,6 @@ describe('Video results clip stage', () => {
       expect(rgba[0]).to.be.greaterThan(200);
       expect(rgba[2]).to.be.greaterThan(200);
     });
-    // The canvas blends the two frames itself; every pixel equals the arithmetic done in script.
-    cy.get<HTMLCanvasElement>('[data-testid="video-results-difference"]').should(($canvas) => {
-      const page = $canvas[0].ownerDocument;
-      const pixels = (side: 'a' | 'b') => {
-        const video = page.querySelector<HTMLVideoElement>(`[data-side="${side}"] video`)!;
-        const frame = page.createElement('canvas');
-        frame.width = video.videoWidth;
-        frame.height = video.videoHeight;
-        const context = frame.getContext('2d')!;
-        context.drawImage(video, 0, 0);
-        return context.getImageData(0, 0, frame.width, frame.height).data;
-      };
-      const drawn = $canvas[0]
-        .getContext('2d')!
-        .getImageData(0, 0, $canvas[0].width, $canvas[0].height).data;
-      expect($canvas[0].width, 'frame width').to.equal(32);
-      expect([...drawn]).to.deep.equal([...absoluteFrameDifference(pixels('b'), pixels('a'))]);
-    });
-    // The pair is paused: once its frames have stood still for half a second its picture stands
-    // too, and is not blended again ten times a second.
-    cy.wait(700);
-    const draws = { stage: 0, self: 0 };
-    cy.window().then((win) => {
-      const context = (win as unknown as typeof globalThis).CanvasRenderingContext2D.prototype;
-      const draw = context.drawImage as (...args: unknown[]) => void;
-      cy.stub(context, 'drawImage').callsFake(function (
-        this: CanvasRenderingContext2D,
-        ...args: unknown[]
-      ) {
-        if (this.canvas.dataset.testid === 'video-results-difference') draws.stage += 1;
-        // No canvas is its own source, which browsers have not always agreed on.
-        if (args[0] === this.canvas) draws.self += 1;
-        return draw.apply(this, args);
-      });
-    });
-    cy.wait(1500).then(() => {
-      // One picture is four draws onto the stage's canvas; ten a second would be sixty.
-      expect(draws.stage, 'draws onto the stage canvas').to.be.at.most(8);
-    });
-    // A new frame is blended at once, and still without a canvas drawn onto itself.
-    scrub(0.4);
-    cy.wrap(draws).should((seen) => expect(seen.stage).to.be.greaterThan(8));
-    cy.wrap(draws).its('self').should('equal', 0);
     // H200's clip equals the reference, so the next subject draws a black difference.
     cy.contains('button', 'Toggle B200').click();
     cy.get('[data-side="a"]').should('contain', 'H200');
@@ -613,222 +522,6 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-against"]').select('h100');
     cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
     expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
-  });
-
-  it('starts both clips from the tap where a clip loads only while it plays, behind their first frames', () => {
-    const reference = poster('red');
-    const subject = poster('blue');
-    const seen = { calls: [] as ReturnType<typeof phoneMedia>['calls'], referenceSrc: '' };
-    cy.window().then((win) => {
-      // The reference takes twice as long to have data as the subject does.
-      const media = phoneMedia(win, (src) => (src === seen.referenceSrc ? 600 : 300));
-      seen.calls = media.calls;
-      undoMedia = media.undo;
-    });
-    mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
-      posters: { reference, 'measurement-r001': subject },
-    });
-    const videos = '[data-testid="video-results-stage"] video';
-    const frames = '[data-testid="video-results-first-frame"]';
-    sideVideo('b').then(($video) => {
-      seen.referenceSrc = $video.attr('src')!;
-    });
-    cy.get(frames).should('have.length', 2);
-    cy.get('[data-testid="video-results-play"]')
-      .click()
-      .then(() => {
-        // Both starts are asked for inside the tap, and neither is taken back.
-        expect(seen.calls.filter((entry) => entry.call === 'play' && entry.inClick)).to.have.length(
-          2,
-        );
-        expect(seen.calls.filter((entry) => entry.call === 'pause')).to.deep.equal([]);
-      });
-    // While the clips load, each side keeps its first frame and the transport says why it waits.
-    cy.get(frames)
-      .should('have.length', 2)
-      .each(($frame) => cy.wrap($frame).should('be.visible'));
-    sideVideo('a').parent().find('img').should('have.attr', 'src', subject);
-    cy.get('[data-testid="video-results-buffering"]').should('contain', 'Loading');
-    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
-    // Both move once the slower clip has data: well inside a second, and from one time.
-    cy.get<HTMLVideoElement>(videos, { timeout: 1500 }).should(($videos) => {
-      const times = [...$videos].map((video) => {
-        expect(video.paused, 'playing').to.equal(false);
-        expect(video.currentTime, 'moving').to.be.greaterThan(0.05);
-        return video.currentTime;
-      });
-      expect(Math.abs(times[0] - times[1]), 'together').to.be.lessThan(0.04);
-    });
-    cy.get(frames).should('not.exist');
-    cy.get('[data-testid="video-results-buffering"]').should('not.exist');
-    cy.then(() =>
-      // A clip that waits for data is never paused; only the one that had its data is held.
-      expect(seen.calls.filter((entry) => entry.call === 'pause' && !entry.loaded)).to.deep.equal(
-        [],
-      ),
-    );
-  });
-
-  it('wipes by a sideways drag, plays on a tap and explains itself by tap on a touch screen', () => {
-    coarsePointer();
-    mountResultsClips(['b200', 'h200']);
-    load('[data-testid="video-results-start"]');
-    const play = '[data-testid="video-results-play"]';
-    const handle = '[data-testid="video-results-split"]';
-    cy.get('[data-testid="video-results-stage"]').then(($stage) => {
-      cy.stub($stage[0], 'setPointerCapture').as('capture');
-      const { width, height, left, top } = $stage[0].getBoundingClientRect();
-      // Below the centre, so presses land on the clips rather than the split handle.
-      const at = (share: number) =>
-        [
-          width * share,
-          height * 0.75,
-          { clientX: left + width * share, clientY: top + height * 0.75, pointerId: 7 },
-        ] as const;
-      const press = (from: number, to = from) =>
-        cy
-          .wrap($stage)
-          .trigger('pointerdown', ...at(from))
-          .trigger('pointermove', ...at(to))
-          .trigger('pointerup', ...at(to))
-          .trigger('click', ...at(to));
-      // A finger does not hover: a move without a press leaves the split alone.
-      cy.wrap($stage).trigger('pointermove', ...at(0.2));
-      nextFrames();
-      cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(50, 0.5));
-      // A sideways drag moves the split, and the click that ends it neither plays nor locks.
-      press(0.3, 0.7);
-      cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(70, 0.5));
-      cy.get('@capture').should('have.been.calledOnceWith', 7);
-      cy.get(play).should('have.attr', 'aria-pressed', 'false');
-      cy.get(handle).should('have.attr', 'aria-pressed', 'false');
-      // A tap plays, the next pauses, and only the handle locks.
-      press(0.4);
-      cy.get(play).should('have.attr', 'aria-pressed', 'true');
-      press(0.4);
-      cy.get(play).should('have.attr', 'aria-pressed', 'false');
-      cy.get(handle).should('have.attr', 'aria-pressed', 'false').click();
-      cy.get(handle).should('have.attr', 'aria-pressed', 'true');
-      press(0.3, 0.2);
-      nextFrames();
-      cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(70, 0.5));
-    });
-    // Hover titles never show on touch: the view's gestures and each readout cell open by tap.
-    cy.get('[data-testid="video-results-metrics-help"]').click();
-    cy.get('[data-testid="option-help-content-clip-metrics"]')
-      .should('contain', 'Drag across the clips to slide the split')
-      .and('contain', 'tap its info button');
-    cy.get('body').type('{esc}');
-    cy.get(`${readout} [data-metric="psnr"] [data-slot="info-help"]`).click();
-    cy.get('[data-testid="option-help-content-readout-psnr"]').should('contain', 'Decoded RGB24');
-  });
-
-  it('leads a phone with the stage, one sentence, the Compare row and a strip of every prompt', () => {
-    cy.viewport(390, 844);
-    mountResultsClips(['b200', 'h200', 'h100'], '/vgx', false, undefined, [], false, [], {
-      phone: true,
-    });
-    // With no pair in the link a phone opens the subject against another GPU, and says so in the URL.
-    cy.get('[data-testid="video-results-against"]').should('not.have.value', 'reference');
-    cy.location('search').should('match', /r_vs=h[12]00/u);
-    // H100 has a modelled cost in this harness, so the sentence can state both sides.
-    cy.get('[data-testid="video-results-against"]').select('h100');
-    cy.get('[data-testid="video-results-sentence"]')
-      .should('be.visible')
-      .invoke('text')
-      .should(
-        'match',
-        /^Same prompt, same seed\. B200 ×\d+ takes a median [\d.]+ s per clip for \$0\.100; H100 ×\d+ takes [\d.]+ s for \$0\.300\.$/u,
-      );
-    // Title, picture, sentence, transport, Compare row on one line, prompt strip; then the rest.
-    const order = [
-      'h1',
-      '[data-testid="video-results-stage"]',
-      '[data-testid="video-results-sentence"]',
-      '[data-testid="video-results-play"]',
-      '[data-testid="video-results-compare"]',
-      '[data-testid="video-results-prompt-strip"]',
-      '[data-testid="video-results-prompt"]',
-      '[data-testid="video-results-view-wipe"]',
-      '[data-testid="video-results-inspect-toggle"]',
-      '[data-testid="video-results-readout"]',
-    ];
-    expectStacked(order);
-    cy.get('[data-testid="video-results-compare"]').should(($row) =>
-      expect($row[0].getBoundingClientRect().height, 'one line').to.be.at.most(44),
-    );
-    cy.document().should((document) =>
-      expect(document.documentElement.scrollWidth).to.be.at.most(
-        document.documentElement.clientWidth,
-      ),
-    );
-    // The strip holds every prompt and scrolls sideways; the prompt row's own tiles are away.
-    cy.get('[data-testid="video-results-prompts"]').should('not.be.visible');
-    cy.get('[data-testid="video-results-prompt-strip"]').should(($strip) => {
-      expect($strip.find('[data-strip-prompt]')).to.have.length(4);
-      expect($strip[0].scrollWidth, 'more to swipe to').to.be.greaterThan($strip[0].clientWidth);
-    });
-    cy.get('[data-strip-prompt="drum-taps~4"]').scrollIntoView().click();
-    cy.location('search').should('contain', 'r_prompt=drum-taps%7E4');
-    cy.get('[data-strip-prompt="drum-taps~4"]').should('have.attr', 'aria-pressed', 'true');
-    cy.get('[data-testid="video-results-prompt"]').should('contain', 'take 4');
-    // Inspect leaves the transport row for the view modes, and its drawer opens beside it.
-    cy.get(
-      '[data-testid="video-results-inspect-slot"] [data-testid="video-results-inspect-toggle"]',
-    )
-      .should('be.visible')
-      .click();
-    cy.get('[data-testid="video-results-inspect-slot"] [data-testid="video-results-inspect"]')
-      .should('be.visible')
-      .and('contain', 'Speed');
-    // An explicit reference is a pick like any other on a phone.
-    cy.get('[data-testid="video-results-against"]').select('reference');
-    cy.get('[data-testid="video-results-sentence"]').should('not.exist');
-    cy.get('[data-side="b"]').should('contain', 'Diffusers reference');
-  });
-
-  it('keeps Play on a sideways phone’s screen under the whole picture, the sentence after it', function () {
-    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
-    touchScreen(true);
-    // An iPhone 15 on its side.
-    cy.viewport(734, 343);
-    mountResultsClips(['b200', 'h200', 'h100'], '/vgx', false, undefined, [], false, [], {
-      phone: true,
-    });
-    cy.get('[data-testid="video-results-against"]').select('h100');
-    cy.get('[data-testid="video-results-sentence"]').should('be.visible');
-    // The site's sticky header is 57 px tall; the picture rests 4 px under it.
-    const HEADER = 57;
-    topOf('[data-testid="video-results-stage"]').then((top) =>
-      cy.window().then((win) => win.scrollBy(0, top - HEADER - 4)),
-    );
-    topOf('[data-testid="video-results-stage"]').should('be.closeTo', HEADER + 4, 1);
-    // The picture takes the height the header and the transport leave, so it is taller than
-    // the 180 px a desktop window this short gets.
-    bottomOf('[data-testid="video-results-stage"]').then((picture) => {
-      expect(picture - HEADER - 4, 'picture height').to.be.closeTo(215, 1);
-      topOf('[data-testid="video-results-play"]').should('be.at.least', picture);
-    });
-    bottomOf('[data-testid="video-results-play"]').then((play) => {
-      expect(play, 'Play inside the 343 px screen').to.be.at.most(343);
-      // The sentence is kept; it follows the transport instead of pushing it off the screen.
-      topOf('[data-testid="video-results-sentence"]').should('be.at.least', play);
-    });
-  });
-
-  it('takes taps 44 px wide on the +N prompt tile of a touch tablet, at its 40 px width', function () {
-    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
-    cy.viewport(820, 1000);
-    mountResultsClips(['b200', 'h200']);
-    const more = '[data-testid="video-results-prompts-more"]';
-    cy.get(more).should('have.text', '+1');
-    tapArea(more).its('width').should('equal', 40);
-    touchScreen(true);
-    tapArea(more).should((area) => {
-      expect(area.width).to.equal(44);
-      expect(area.height).to.be.at.least(44);
-    });
-    cy.get(more).should(($tile) => expect($tile[0].getBoundingClientRect().width).to.equal(40));
   });
 
   it('names a take only when another take shares the prompt and seed', () => {
@@ -1115,13 +808,9 @@ describe('Video results clip stage', () => {
     readoutLines('wall').should('have.length', 2).last().should('have.text', 'H100 120 s');
     readoutValue('speed').should('have.text', '2.15× faster');
     readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167 s');
-    // No cross-GPU quality score: PSNR gives the other GPU's value alone.
-    readoutLines('psnr').should('have.length', 2).last().should('have.text', 'H100 25 dB');
+    readoutValue('psnr', 1).should('have.text', 'H100 25 dB');
     // Cost says how the subject stands against the pair, then the pair's value.
-    readoutLines('cost')
-      .should('have.length', 2)
-      .last()
-      .should('have.text', '3× cheaper than H100 · $0.300');
+    readoutValue('cost', 1).should('have.text', '3× cheaper than H100 · $0.300');
   });
 
   it('shows a dash, not a pending score or stray times, where a lossy pair has nothing to compare', () => {

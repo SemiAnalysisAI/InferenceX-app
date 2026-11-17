@@ -89,7 +89,7 @@ export default function VideoPointSheet({
   /** The point's mark on the chart, which the page scrolls clear of the sheet. */
   anchor: () => Element | null;
   /** A tap beside the sheet; true when it opened another point. */
-  onOutside?: (x: number, y: number) => boolean;
+  onOutside: (x: number, y: number) => boolean;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -253,7 +253,7 @@ export default function VideoPointSheet({
         className="fixed inset-0 z-[9998] cursor-default touch-none"
         onClick={(event) => {
           // A tap that moves the sheet to another point leaves the focus in the sheet.
-          if (onOutside?.(event.clientX, event.clientY))
+          if (onOutside(event.clientX, event.clientY))
             sheet.current?.focus({ preventScroll: true });
           else dismiss();
         }}

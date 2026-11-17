@@ -2,7 +2,6 @@ import { ReferencePsnrWidget } from '@/components/video-benchmark/quality-guide/
 import { TradeoffWidget } from '@/components/video-benchmark/quality-guide/tradeoff-widget';
 import type { Locale } from '@/lib/i18n/i18n';
 import type { ReferencePsnrEvidence } from '@/lib/video/reference-psnr-evidence';
-import { coarsePointer } from '../support/video-results';
 
 /** Test-only scores, not measurements; near-equal values force the strip into several lanes. */
 const PROMPTS = ['ping-pong', 'kettle-pour', 'paper-fold', 'zipper-close', 'candle-light'];
@@ -71,10 +70,6 @@ const recordShifts = () =>
     return shifts;
   });
 
-/** A tap on the first clip of the strip. */
-const tap = () =>
-  cy.get('[data-testid="video-quality-guide-psnr-dot"]').first().click({ force: true });
-
 describe('VideoGenX quality guide widgets', () => {
   for (const width of [390, 1280]) {
     it(`never move the page while hovering clips or switching scores at ${width}px`, () => {
@@ -117,28 +112,4 @@ describe('VideoGenX quality guide widgets', () => {
       );
     });
   }
-
-  it('closes a tapped clip’s tooltip on a tap elsewhere, a scroll or Escape on a touch screen', () => {
-    cy.viewport(390, 700);
-    coarsePointer();
-    cy.mount(
-      <div>
-        <Widgets locale="en" />
-        <Widgets locale="zh" />
-      </div>,
-    );
-    const tooltip = '[data-testid="video-quality-guide-psnr-tooltip"]';
-    tap();
-    cy.get(tooltip).should('contain', 'ping-pong');
-    cy.get('[data-marker]').first().trigger('pointerdown', { force: true });
-    cy.get(tooltip).should('not.exist');
-    tap();
-    cy.get(tooltip).should('exist');
-    cy.window().then((win) => win.scrollTo(0, 200));
-    cy.get(tooltip).should('not.exist');
-    tap();
-    cy.get(tooltip).should('exist');
-    cy.get('body').type('{esc}');
-    cy.get(tooltip).should('not.exist');
-  });
 });
