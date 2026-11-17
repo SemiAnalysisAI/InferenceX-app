@@ -54,6 +54,8 @@ const ANCHOR_GAP = 20;
 const RETURN_FRAMES = 5;
 /** Frames a smooth return is given to come to rest before it is left alone. */
 const RETURN_WAIT_FRAMES = 120;
+/** How far from its place, in px, a page at rest is still put back after a smooth return. */
+const RETURN_SLACK = 24;
 /** What a reader does to scroll the page themselves, which ends the return. */
 const HOLDS = ['wheel', 'touchstart', 'keydown'] as const;
 
@@ -175,7 +177,9 @@ export default function VideoPointSheet({
           last = window.scrollY;
           if (held) frames = 0;
           else if (rested >= RETURN_FRAMES) {
-            if (last !== top) window.scrollTo({ top });
+            // A few pixels short is the earlier scroll's doing; anywhere else, something else has
+            // moved the page since, and that stands.
+            if (last !== top && Math.abs(last - top) <= RETURN_SLACK) window.scrollTo({ top });
             frames = 0;
           }
         }
