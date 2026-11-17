@@ -61,6 +61,21 @@ export function touchScreen(enabled: boolean) {
 }
 
 /**
+ * Asks for reduced motion, or stops asking, as the system setting does: stylesheets and
+ * `matchMedia` both see it. Chromium only; set it before the page mounts.
+ */
+export function reducedMotion(enabled: boolean) {
+  cy.then(() =>
+    Cypress.automation('remote:debugger:protocol', {
+      command: 'Emulation.setEmulatedMedia',
+      params: {
+        features: [{ name: 'prefers-reduced-motion', value: enabled ? 'reduce' : '' }],
+      },
+    }),
+  );
+}
+
+/**
  * A drag by the browser's own mouse, straight down from a point of the mounted page: a press, one
  * move and a release, each reaching whatever is under the mouse as a person's does, where
  * `trigger` hands its event to the element named. The mouse ends outside the mounted page.

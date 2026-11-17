@@ -17,6 +17,7 @@ import { servingArtifact } from '../support/video-artifacts';
 import { mountWithProviders } from '../support/test-utils';
 import {
   coarsePointer,
+  reducedMotion,
   mouseDragDown,
   readOnlyVideoRequests,
   resultHistory,
@@ -339,9 +340,84 @@ const expectStacked = (order: string[]) =>
     );
   });
 
+const PLOT = '[data-testid="d3-chart-svg"]';
+/** Every number in a transform or path, to a hundredth of a pixel: at rest, d3 and the plot write the same place two ways. */
+const numbers = (text: string | null) =>
+  (text ?? '')
+    .match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/gu)
+    ?.map((value) => Math.round(Number(value) * 100) / 100) ?? [];
+/** Where the plot has put everything it draws: points, lines, axis ticks and grid lines. */
+const plotPlaces = (svg: Element) => ({
+  points: Object.fromEntries<number[]>(
+    [...svg.querySelectorAll<SVGGElement>('.dot-group')].map((node) => [
+      node.dataset.point ?? '',
+      numbers(node.getAttribute('transform')),
+    ]),
+  ),
+  lines: Object.fromEntries<number[]>(
+    [...svg.querySelectorAll<SVGPathElement>('.line-path')].map((node) => [
+      node.dataset.lineKey ?? '',
+      numbers(node.getAttribute('d')),
+    ]),
+  ),
+  ticks: [...svg.querySelectorAll('.x-axis .tick, .y-axis .tick')].map((node) => [
+    node.textContent,
+    numbers(node.getAttribute('transform')),
+    node.getAttribute('opacity'),
+  ]),
+  grid: [...svg.querySelectorAll('.grid-v line, .grid-h line')].map((node) => [
+    numbers(node.getAttribute('x1')),
+    numbers(node.getAttribute('y1')),
+    (node as SVGLineElement).style.visibility,
+  ]),
+});
+/** Whether anything in the plot is still on its way somewhere. */
+const plotBusy = (svg: Element) =>
+  Object.hasOwn((svg as SVGElement).dataset, 'moving') ||
+  svg.querySelector('.plot-exit') !== null ||
+  [svg, ...svg.querySelectorAll('*')].some((node) => '__transition' in node);
+/** Waits for the plot to come to rest: no glide, no mark on its way, nothing fading out. */
+const plotAtRest = () =>
+  cy.get(PLOT).should(($svg) => expect(plotBusy($svg[0]), 'plot in motion').to.equal(false));
+/** Each frontier line passes through plotted points only, vertex for vertex. */
+const linesOnPoints = () =>
+  cy.get(PLOT).should(($svg) => {
+    const spots = Object.values(plotPlaces($svg[0]).points);
+    const lines = Object.entries(plotPlaces($svg[0]).lines);
+    expect(lines.length, 'lines').to.be.greaterThan(0);
+    for (const [key, path] of lines)
+      for (let index = 0; index < path.length; index += 2)
+        expect(
+          spots.some(
+            ([x, y]) => Math.abs(x - path[index]) < 0.5 && Math.abs(y - path[index + 1]) < 0.5,
+          ),
+          `${key} vertex ${index / 2} on a point`,
+        ).to.equal(true);
+  });
+/** How many of `nodes` are marks fading out of the plot. */
+const exitsIn = (nodes: NodeList) =>
+  [...nodes].filter((node) => (node as Element).classList?.contains('plot-exit')).length;
+/** Counts the marks that fade out of the plot: each is added to it as it leaves, then removed. */
+const watchExits = () => {
+  const seen = { added: 0, removed: 0 };
+  cy.get(PLOT).then(($svg) => {
+    new ($svg[0].ownerDocument.defaultView as Window & typeof globalThis).MutationObserver(
+      (records) => {
+        for (const record of records) {
+          seen.added += exitsIn(record.addedNodes);
+          seen.removed += exitsIn(record.removedNodes);
+        }
+      },
+    ).observe($svg[0], { childList: true, subtree: true });
+  });
+  return seen;
+};
+
 describe('VideoGenX results', () => {
   afterEach(() => {
-    if (Cypress.isBrowser({ family: 'chromium' })) touchScreen(false);
+    if (!Cypress.isBrowser({ family: 'chromium' })) return;
+    touchScreen(false);
+    reducedMotion(false);
   });
 
   it('shows the loading state without reading History while the server streams the cohort', () => {
@@ -1088,6 +1164,11 @@ describe('VideoGenX results', () => {
     });
     against().select('h200');
     cy.get('[data-testid="video-results-quality-method"] summary').click();
+    // The disclosure eases open; the button is in its place once that has ended.
+    cy.get('[data-testid="video-results-quality-method"]').should(($details) => {
+      expect(($details[0] as HTMLDetailsElement).open, 'open').to.equal(true);
+      expect($details[0].dataset.easing, 'still easing').to.equal(undefined);
+    });
     // The button sits below the stage; once it tops the viewport the stage is out of view above.
     cy.get('[data-testid="video-results-quality-show-me"]')
       .scrollIntoView()
@@ -1852,26 +1933,146 @@ describe('VideoGenX results', () => {
   });
 
   it('glides points to new data, with the playing badge on its point every frame', () => {
-    mount();
-    playing().should('exist');
+    // B200's clips are published, so the stage's subject, and with it the badge, stays put.
+    mount({ editPage: (page) => void b200Frontier(page) });
+    playing().should('have.attr', 'data-hardware', 'b200');
+    plotAtRest();
     const frames: [string | null, string | null][] = [];
+    const sampling = { on: true };
     cy.window().then((win) => {
       const chart = win.document.querySelector('[data-testid="video-results-chart"]')!;
-      const start = win.performance.now();
       const tick = () => {
-        frames.push([
-          chart.querySelector('[data-clip-role="playing"]')?.getAttribute('transform') ?? null,
-          chart.querySelector('[data-clip-badge="playing"]')?.getAttribute('transform') ?? null,
-        ]);
-        if (win.performance.now() - start < 1500) win.requestAnimationFrame(tick);
+        // A badge on its way to another point is marked; this is about one that follows its point.
+        const badge = chart.querySelector('[data-clip-badge="playing"]:not([data-moving])');
+        if (badge)
+          frames.push([
+            chart.querySelector('[data-clip-role="playing"]')?.getAttribute('transform') ?? null,
+            badge.getAttribute('transform'),
+          ]);
+        if (sampling.on) win.requestAnimationFrame(tick);
       };
       win.requestAnimationFrame(tick);
     });
-    // Hiding H100 rescales the plot, so the B200 point moves.
-    toggleHardware('h100');
-    cy.wait(1600).then(() => {
+    // Another x metric moves every point, the playing one included.
+    cy.get('[data-testid="results-x-metric"]').click();
+    cy.contains('[data-select-option]', 'GPUs per deployment').click();
+    cy.location('search').should('contain', 'r_x=gpus');
+    plotAtRest();
+    cy.then(() => {
+      sampling.on = false;
       expect(new Set(frames.map(([point]) => point)).size, 'positions').to.be.greaterThan(3);
       for (const [point, badge] of frames) expect(badge).to.equal(point);
+    });
+  });
+
+  it('moves the points that stay, fades out those that leave and keeps each line on its points', () => {
+    mount({ editPage: (page) => void b200Frontier(page) });
+    hardwarePoints('b200').should('have.length', 4);
+    plotAtRest();
+    linesOnPoints();
+    const exits = watchExits();
+    hardwarePoints('h100')
+      .first()
+      .then(($point) => {
+        const [node] = $point;
+        const from = node.getAttribute('transform');
+        // B200 reaches furthest along the x axis, so hiding it rescales the plot.
+        toggleHardware('b200');
+        hardwarePoints('b200').should('not.exist');
+        // Its points and its line fade out where they were and are then gone from the plot.
+        cy.wrap(exits).should((seen) => {
+          expect(seen.added, 'marks that faded out').to.equal(5);
+          expect(seen.removed, 'marks removed after fading').to.equal(seen.added);
+        });
+        plotAtRest();
+        // The point that stayed is the same node in a new place: it moved, it was not redrawn.
+        hardwarePoints('h100')
+          .first()
+          .should(($after) => {
+            expect($after[0], 'same node').to.equal(node);
+            expect(numbers($after[0].getAttribute('transform'))).not.to.deep.equal(numbers(from));
+          });
+        toggleHardware('b200');
+        hardwarePoints('b200').should('have.length', 4);
+        plotAtRest();
+        linesOnPoints();
+      });
+  });
+
+  it('ends where the last of two quick changes leaves it', () => {
+    mount({ editPage: (page) => void b200Frontier(page) });
+    hardwarePoints('b200').should('have.length', 4);
+    plotAtRest();
+    cy.get(PLOT).then(($svg) => {
+      const before = plotPlaces($svg[0]);
+      // Hidden, and shown again 80 ms later, while the points, lines and axes are still on their way.
+      cy.window().then((win) => {
+        const label = win.document.querySelector<HTMLElement>('label[for="checkbox-b200"]')!;
+        label.click();
+        win.setTimeout(() => label.click(), 80);
+      });
+      cy.location('search').should('not.contain', 'r_hidden');
+      hardwarePoints('b200').should('have.length', 4);
+      plotAtRest();
+      cy.get(PLOT).should(($after) => expect(plotPlaces($after[0])).to.deep.equal(before));
+      linesOnPoints();
+    });
+  });
+
+  it('glides a named run’s points and line as it does any other', () => {
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,
+      editPage: (page) => {
+        b200Frontier(page);
+        addNamedRun(page);
+      },
+    });
+    points('[data-overlay="true"]').should('have.length', 4);
+    plotAtRest();
+    points('[data-overlay="true"]')
+      .first()
+      .then(($point) => {
+        const [node] = $point;
+        const from = node.getAttribute('transform');
+        // Another x metric moves every point, onto a log axis ticked at the measured GPU counts.
+        cy.get('[data-testid="results-x-metric"]').click();
+        cy.contains('[data-select-option]', 'GPUs per deployment').click();
+        searchParam('r_x').should('equal', 'gpus');
+        plotAtRest();
+        points('[data-overlay="true"]')
+          .first()
+          .should(($after) => {
+            expect($after[0], 'same node').to.equal(node);
+            expect(numbers($after[0].getAttribute('transform'))).not.to.deep.equal(numbers(from));
+          });
+        linesOnPoints();
+        cy.get(`${PLOT} .x-axis .tick`).should(($ticks) =>
+          expect([...$ticks].map((tick) => tick.textContent)).to.include.members(['1', '2', '8']),
+        );
+      });
+  });
+
+  it('changes at once under reduced motion', () => {
+    reducedMotion(true);
+    mount({ editPage: (page) => void b200Frontier(page) });
+    hardwarePoints('b200').should('have.length', 4);
+    const exits = watchExits();
+    toggleHardware('b200');
+    hardwarePoints('b200').should('not.exist');
+    // Nothing is on its way anywhere, however soon after the change the plot is read.
+    cy.get(PLOT).then(($svg) => {
+      expect(plotBusy($svg[0]), 'plot in motion').to.equal(false);
+      expect(exits.added, 'marks that faded out').to.equal(0);
+      expect(
+        [$svg[0], ...$svg[0].querySelectorAll('*')].flatMap((node) => node.getAnimations()),
+        'animations in the plot',
+      ).to.have.length(0);
+    });
+    // A disclosure row opens to its full height in the same frame.
+    cy.get('[data-testid="results-advanced"] > summary').click();
+    cy.get('[data-testid="results-advanced"]').should(($details) => {
+      expect(($details[0] as HTMLDetailsElement).open, 'open').to.equal(true);
+      expect($details[0].getAnimations(), 'animations').to.have.length(0);
     });
   });
 
