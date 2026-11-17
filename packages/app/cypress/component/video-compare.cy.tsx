@@ -750,7 +750,7 @@ describe('Video results clip stage', () => {
       '[data-testid="video-results-prompt-strip"]',
       '[data-testid="video-results-prompt"]',
       '[data-testid="video-results-view-wipe"]',
-      '[data-testid="video-results-inspect-toggle-phone"]',
+      '[data-testid="video-results-inspect-toggle"]',
       '[data-testid="video-results-readout"]',
     ];
     expectStacked(order);
@@ -773,8 +773,11 @@ describe('Video results clip stage', () => {
     cy.get('[data-strip-prompt="drum-taps~4"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="video-results-prompt"]').should('contain', 'take 4');
     // Inspect leaves the transport row for the view modes, and its drawer opens beside it.
-    cy.get('[data-testid="video-results-inspect-toggle"]').should('not.be.visible');
-    cy.get('[data-testid="video-results-inspect-toggle-phone"]').click();
+    cy.get(
+      '[data-testid="video-results-inspect-slot"] [data-testid="video-results-inspect-toggle"]',
+    )
+      .should('be.visible')
+      .click();
     cy.get('[data-testid="video-results-inspect-slot"] [data-testid="video-results-inspect"]')
       .should('be.visible')
       .and('contain', 'Speed');

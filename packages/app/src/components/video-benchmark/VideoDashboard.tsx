@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Activity,
+  Children,
   startTransition,
   useCallback,
   useEffect,
@@ -10,12 +11,14 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ComponentProps,
+  type ReactNode,
 } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
-import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
+import { MOBILE_VIEWPORT_QUERY, useIsCoarsePointer, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { isDarkTheme } from '@/lib/themes/themes';
@@ -90,7 +93,6 @@ import {
   writeStage,
   type StagePair,
 } from './clip-stage';
-import { deploymentLabels } from './chart-marks';
 import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
@@ -98,7 +100,6 @@ import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
-import { usePhone } from './use-phone';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -159,12 +160,6 @@ const STRINGS = {
       'Latency runs from request submit to downloaded media.',
       'Power is GPU-board power of the participating GPUs only. Host, chassis and facility power are excluded.',
       'TCO is modelled from registry $/GPU-hr and measured output, for both participating and allocated GPUs. It is not a measurement or an API bill.',
-    ],
-    howToReadShort: [
-      '20 scheduled clips of one workload per hardware, at concurrency 1; shown from 10 valid clips.',
-      'Latency: request submit to downloaded media.',
-      'Power: participating GPU boards only; no host, chassis or facility.',
-      'TCO: modelled from $/GPU-hr and measured output; not a measurement or an API bill.',
     ],
     notMeasured:
       'Not measured yet: server-side stage timing, host memory and GPU memory where not recorded, SSIM, VBench, CLIP and VLM quality, sustained load, model load, first-request latency, LoRA switch time and best topology per GPU count.',
@@ -243,12 +238,6 @@ const STRINGS = {
       '功率仅统计参与计算的 GPU 板卡，不含主机、机箱和设施功耗。',
       'TCO 根据硬件注册表中的 $/GPU-hr 和实测产出估算，同时给出参与计算和分配的 GPU 两种口径；它不是实测值，也不是 API 账单。',
     ],
-    howToReadShort: [
-      '同一工作负载下，每种硬件以并发 1 计划生成 20 条视频；有效视频不少于 10 条才显示。',
-      '延迟：从提交请求到下载完媒体。',
-      '功率：仅统计参与计算的 GPU 板卡，不含主机、机箱和设施。',
-      'TCO：按 $/GPU-hr 和实测产出估算，不是实测值，也不是 API 账单。',
-    ],
     notMeasured:
       '尚未测量：服务端阶段耗时、主机内存及未记录的 GPU 显存、SSIM、VBench、CLIP 与 VLM 质量评估、持续负载、模型加载、首次请求延迟、LoRA 切换时间，以及各 GPU 数量下的最优拓扑。',
     estimator: '利润估算器',
@@ -303,6 +292,34 @@ function MetricSelect({
 }
 
 /** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
+/**
+ * `ChartSection`'s markup with wrappers a phone dissolves (results.module.css), so the chart and
+ * the clip blocks join the page column and each draws its own card. The first child, the chart,
+ * shares a phone card with the buttons.
+ */
+function LiftedChartSection({
+  children,
+  ...buttons
+}: ComponentProps<typeof ChartButtons> & { children: ReactNode }) {
+  const [chart, ...rest] = Children.toArray(children);
+  return (
+    <section className={styles.lifted}>
+      <figure className={cn('relative min-w-0', styles.lifted)}>
+        <Card className={cn('relative', styles.lifted)}>
+          <div className="max-md:flex max-md:min-w-0 max-md:flex-col max-md:rounded-xl max-md:border max-md:border-border/30 max-md:bg-card max-md:p-4 md:contents">
+            <ChartButtons
+              {...buttons}
+              className="md:absolute md:top-6 md:right-6 md:z-10 md:mb-0"
+            />
+            {chart}
+          </div>
+          {rest}
+        </Card>
+      </figure>
+    </section>
+  );
+}
+
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
@@ -313,7 +330,7 @@ export default function VideoDashboard({
   phoneGuess = false,
 }: {
   initialData?: VideoInitialData;
-  /** The server's guess that a phone asked for the page, which holds until the viewport is known. */
+  /** The server's guess that a phone asked for the page, until the viewport is known. */
   phoneGuess?: boolean;
   /** The server is still streaming `initialData`; show the loading state and do not read in the browser. */
   pending?: boolean;
@@ -321,7 +338,7 @@ export default function VideoDashboard({
   const locale = useLocale(),
     s = STRINGS[locale];
   const touch = useIsCoarsePointer();
-  const phone = usePhone(phoneGuess);
+  const phone = useMediaQuery(MOBILE_VIEWPORT_QUERY, phoneGuess);
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
   const latest = useRef(state);
   const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
@@ -332,7 +349,7 @@ export default function VideoDashboard({
   const [historyOpen, setHistoryOpen] = useState(false);
   // Until the reader sets the switch, a phone's narrow plot leaves the GPU-count labels off.
   const [labelsPick, setLabels] = useState<boolean | null>(null);
-  const labels = deploymentLabels(labelsPick, phone);
+  const labels = labelsPick ?? !phone;
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
   const [stagePair, setStagePair] = useState<StagePair>({
@@ -346,8 +363,7 @@ export default function VideoDashboard({
   const [picked, setPicked] = useState(false);
   /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
   const [peek, setPeek] = useState<string | null>(null);
-  // Reading a point's clips ahead can wait a frame; the tap or rest that asks for it must not
-  // wait for this whole page to render before its own sheet or card is on screen.
+  // A transition, so the tap or rest that asks for the read does not wait for this page to render.
   const peekAt = useCallback((key: string) => startTransition(() => setPeek(key)), []);
   const pickAgainst = useCallback((value: string | null) => {
     setPicked(true);
@@ -505,8 +521,7 @@ export default function VideoDashboard({
   );
   // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
   const allCharted = useMemo(() => chartedCells(projection, state), [projection, state]);
-  // Held between renders: the stage below reads its points from these, and a render that changes
-  // none of them (a rest on a chart point, an opened sheet) must not make it work its pairs out again.
+  // Memoized: a render that changes none of these must not make the stage work its pairs out again.
   const charted = useMemo(
     () => allCharted.filter((cell) => !hidden.has(cell.point.hardwareKey ?? '')),
     [allCharted, hidden],
@@ -659,8 +674,7 @@ export default function VideoDashboard({
       ...parseStage(location.search),
       clip: stagePointKey(point),
       view: 'wipe',
-      // The subject's default pairing stays out of the URL, as every default does. A phone opens
-      // on another pair, so there the URL names this one.
+      // A default stays out of the URL, except on a phone, which opens on another pair.
       vs: compare === defaultPairing(point, own) && !phone ? null : compare,
     });
     requestReveal();
@@ -1065,109 +1079,98 @@ export default function VideoDashboard({
               </Button>
             </div>
           )}
-          {/* `ChartSection`'s markup, written out so a phone can lift the clip stage out of this
-              card: under 768 px the three wrappers leave no box (results.module.css) and the
-              chart and the clip blocks join the page column, each drawing its own card. */}
-          <section className={styles.lifted}>
-            <figure className={cn('relative min-w-0', styles.lifted)}>
-              <Card className={cn('relative', styles.lifted)}>
-                <div className="max-md:flex max-md:min-w-0 max-md:flex-col max-md:rounded-xl max-md:border max-md:border-border/30 max-md:bg-card max-md:p-4 md:contents">
-                  <ChartButtons
-                    chartId={VIDEO_RESULTS_CHART_ID}
-                    analyticsPrefix="video_results"
-                    setIsLegendExpanded={setLegendExpanded}
-                    exportFileName="videogenx-results"
-                    onExportCsv={() => {
-                      const link = document.createElement('a');
-                      link.href = csvUrl;
-                      link.download = 'videogenx-results.csv';
-                      link.click();
-                    }}
-                    className="md:absolute md:top-6 md:right-6 md:z-10 md:mb-0"
+          <LiftedChartSection
+            chartId={VIDEO_RESULTS_CHART_ID}
+            analyticsPrefix="video_results"
+            setIsLegendExpanded={setLegendExpanded}
+            exportFileName="videogenx-results"
+            onExportCsv={() => {
+              const link = document.createElement('a');
+              link.href = csvUrl;
+              link.download = 'videogenx-results.csv';
+              link.click();
+            }}
+          >
+            <div
+              className="motion-stale flex min-w-0 flex-col gap-6"
+              data-testid="video-results-chart-card"
+              data-stale={(loading && deploymentCells.length > 0) || undefined}
+            >
+              <VideoResultsChart
+                cells={deploymentCells}
+                history={chipHistory ? projection.history : null}
+                roster={roster}
+                state={state}
+                colorFor={colorFor}
+                labels={labels}
+                onLabelsChange={setLabels}
+                legendExpanded={legendExpanded}
+                onLegendExpandedChange={setLegendExpanded}
+                onUpdate={updateSeries}
+                onOpen={openPoint}
+                clipLink={clipLink}
+                loading={loading}
+                phone={phone}
+                heading={heading}
+                lossyNote={
+                  <LossyQualityHint
+                    pair={lossyPair}
+                    onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
                   />
-                  <div
-                    className="motion-stale flex min-w-0 flex-col gap-6"
-                    data-testid="video-results-chart-card"
-                    data-stale={(loading && deploymentCells.length > 0) || undefined}
-                  >
-                    <VideoResultsChart
-                      cells={deploymentCells}
-                      history={chipHistory ? projection.history : null}
-                      roster={roster}
-                      state={state}
-                      colorFor={colorFor}
-                      labels={labels}
-                      onLabelsChange={setLabels}
-                      legendExpanded={legendExpanded}
-                      onLegendExpandedChange={setLegendExpanded}
-                      onUpdate={updateSeries}
-                      onOpen={openPoint}
-                      clipLink={clipLink}
-                      loading={loading}
-                      phone={phone}
-                      heading={heading}
-                      lossyNote={
-                        <LossyQualityHint
-                          pair={lossyPair}
-                          onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
-                        />
-                      }
-                      footer={
-                        <VideoCostContext
-                          state={state}
-                          onUpdate={update}
-                          hardwareKeys={roster.filter(
-                            (key) =>
-                              !hidden.has(key) &&
-                              deploymentCells.some((cell) => cell.point.hardwareKey === key),
-                          )}
-                          date={projection.run?.date ?? null}
-                        />
-                      }
-                    />
+                }
+                footer={
+                  <VideoCostContext
+                    state={state}
+                    onUpdate={update}
+                    hardwareKeys={roster.filter(
+                      (key) =>
+                        !hidden.has(key) &&
+                        deploymentCells.some((cell) => cell.point.hardwareKey === key),
+                    )}
+                    date={projection.run?.date ?? null}
+                  />
+                }
+              />
+            </div>
+            <hr className="my-6 border-border-alt max-md:hidden" />
+            <VideoResultsClips
+              phone={phone}
+              cohortLoading={pending || loading}
+              titleRow={
+                <div
+                  className="flex items-start justify-between gap-3 md:hidden"
+                  data-testid="results-phone-title"
+                >
+                  <div className="min-w-0">
+                    <Heading as="h1" level="title">
+                      {s.title}
+                    </Heading>
+                    {/* Two lines are held before the workload is known, so nothing shifts when it lands. */}
+                    <p className="mt-0.5 min-h-8 text-xs font-medium text-muted-foreground">
+                      {workloadLine}
+                    </p>
                   </div>
+                  <ShareButton />
                 </div>
-                <hr className="my-6 border-border-alt max-md:hidden" />
-                <VideoResultsClips
-                  phone={phone}
-                  cohortLoading={pending || loading}
-                  titleRow={
-                    <div
-                      className="flex items-start justify-between gap-3 md:hidden"
-                      data-testid="results-phone-title"
-                    >
-                      <div className="min-w-0">
-                        <Heading as="h1" level="title">
-                          {s.title}
-                        </Heading>
-                        {/* Two lines are held before the workload is known, so nothing shifts when it lands. */}
-                        <p className="mt-0.5 min-h-8 text-xs font-medium text-muted-foreground">
-                          {workloadLine}
-                        </p>
-                      </div>
-                      <ShareButton />
-                    </div>
-                  }
-                  initialSides={initialData?.sides}
-                  points={clipPoints}
-                  openings={stageClipPoints}
-                  drawn={drawnPoints}
-                  deployments={deploymentPoints}
-                  officialOpenings={officialOpenings}
-                  onPairChange={onStagePair}
-                  against={against}
-                  onAgainstChange={pickAgainst}
-                  onSubjectChange={pickClip}
-                  onShow={showOnStage}
-                  peek={peek}
-                  reveal={reveal}
-                  colorFor={colorFor}
-                  costs={clipCosts}
-                  unofficialRun={state.unofficialRun ?? undefined}
-                />
-              </Card>
-            </figure>
-          </section>
+              }
+              initialSides={initialData?.sides}
+              points={clipPoints}
+              openings={stageClipPoints}
+              drawn={drawnPoints}
+              deployments={deploymentPoints}
+              officialOpenings={officialOpenings}
+              onPairChange={onStagePair}
+              against={against}
+              onAgainstChange={pickAgainst}
+              onSubjectChange={pickClip}
+              onShow={showOnStage}
+              peek={peek}
+              reveal={reveal}
+              colorFor={colorFor}
+              costs={clipCosts}
+              unofficialRun={state.unofficialRun ?? undefined}
+            />
+          </LiftedChartSection>
           {phone ? (
             // A phone folds the notes into one closed row, in the style of "How we score quality".
             <details
@@ -1185,7 +1188,7 @@ export default function VideoDashboard({
                 <h2>{s.howToRead}</h2>
               </summary>
               <ul className="list-disc space-y-1.5 rounded-b-lg border border-t-0 border-border/30 bg-card p-3.5 pl-8 leading-relaxed text-muted-foreground">
-                {s.howToReadShort.map((item) => (
+                {s.howToReadItems.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
                 <li data-testid="results-not-measured">{s.notMeasured}</li>

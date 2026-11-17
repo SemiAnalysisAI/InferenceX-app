@@ -74,9 +74,8 @@
   }
 }
 
-/* A cut-off edge of a sideways-scrolling table fades, so the hidden columns read as scrollable.
-   `useScrollFade` names the edges that have more content; a table that hides none gets no mask,
-   which would redraw its rounded corners. */
+/* A cut-off edge of a sideways-scrolling table fades; `useScrollFade` names the edges with more
+   content. A table that hides none gets no mask, which would redraw its rounded corners. */
 .page [data-scroll-more]:not([data-scroll-more='']) {
   --fade-start: 0px;
   --fade-end: 0px;
@@ -100,7 +99,9 @@
 @media (hover: none) and (pointer: coarse) {
   .hit::after,
   .page [data-slot='info-help']::after,
-  .page [data-slot='switch']::after {
+  .page [data-slot='switch']::after,
+  .page summary::after,
+  .page [data-testid='legend-toolbar'] button::after {
     content: '';
     position: absolute;
     top: calc(50% + var(--hit-y, 0px));
@@ -109,25 +110,17 @@
     height: 44px;
     transform: translate(-50%, -50%);
   }
-  .page [data-slot='info-help'],
-  .page [data-slot='switch'] {
-    position: relative;
+  /* A disclosure row and the legend's toolbar buttons take taps across their width. */
+  .page summary::after,
+  .page [data-testid='legend-toolbar'] button::after {
+    left: 50%;
+    width: max(100%, 44px);
   }
-  /* A disclosure row and the legend's toolbar buttons keep their size and take taps 44 px tall
-     across their width, and at least 44 px wide. */
+  .page [data-slot='info-help'],
+  .page [data-slot='switch'],
   .page summary,
   .page [data-testid='legend-toolbar'] button {
     position: relative;
-  }
-  .page summary::after,
-  .page [data-testid='legend-toolbar'] button::after {
-    content: '';
-    position: absolute;
-    top: calc(50% + var(--hit-y, 0px));
-    left: 50%;
-    width: max(100%, 44px);
-    height: 44px;
-    transform: translate(-50%, -50%);
   }
   /* The first legend row starts 4 px under the toolbar. */
   .page [data-testid='legend-toolbar'] button {
@@ -172,10 +165,9 @@
 }
 
 /* A phone's legend is compact: the hardware wraps into rows 32 px apart and the switches share a
-   row where they fit, in place of one 44 px row each. Every entry's hit area is still 44 px
-   tall: it reaches 6 px past the entry above and below, so neighbouring areas overlap in the
-   bands between two names, which hold no text. A touch screen keeps this while the legend sits
-   under the chart. This follows the touch rules above, so it also undoes their 44 px rows. */
+   row where they fit. Every entry's hit area is still 44 px tall, reaching 6 px past the entry
+   above and below. A touch screen keeps this while the legend sits under the chart. This follows
+   the touch rules above, so it also undoes their 44 px rows. */
 @media (max-width: 767px), (hover: none) and (pointer: coarse) and (max-width: 1023px) {
   .page :global(.sidebar-legend) > ul {
     display: flex;
@@ -214,9 +206,8 @@
   }
 }
 
-/* A phone on its side has no room for the Compare row and readout beside the picture, so the
-   stage keeps only the sticky header and its transport in view with it. The stage sentence
-   follows the transport there, which keeps Play on the screen under the whole picture. */
+/* A phone on its side keeps only the sticky header and the transport in view with the picture;
+   the stage sentence follows the transport, which keeps Play on screen under the whole picture. */
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .page {
     --stage-reserve: 8rem;
@@ -232,9 +223,8 @@
 }
 
 /* The phone layout, clip first. The chart card's wrappers leave no box, so the chart and the clip
-   blocks join the page column; the stage block then leads it by `order` alone (LEAD_BLOCK in
-   VideoResultsClips.tsx), with no layout waiting for hydration. The page's title row moves into
-   that block, so the header card keeps its introduction and controls. */
+   blocks join the page column, where the stage block leads by `order` (LEAD_BLOCK in
+   VideoResultsClips.tsx). The page's title row moves into that block. */
 @media (max-width: 767px) {
   .lifted {
     display: contents;

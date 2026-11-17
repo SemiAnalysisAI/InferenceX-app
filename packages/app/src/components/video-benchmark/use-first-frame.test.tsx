@@ -20,7 +20,7 @@ function Clip({ src }: { src: string }) {
   return (
     <>
       <video ref={video} src={src} />
-      {!frame.presented && <img alt="" data-testid="first-frame" />}
+      {!frame && <img alt="" data-testid="first-frame" />}
     </>
   );
 }

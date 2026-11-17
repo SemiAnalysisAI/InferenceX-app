@@ -19,10 +19,17 @@ export const PIXELS_DIFFER = {
   zh: '不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同',
 } as const;
 
-/**
- * "比 H100 低 29%": a cost or an energy against the pair's, under a label that names the quantity.
- * Chinese gives a saving as a percentage however large, and a multiple only for an excess.
- */
+/** "29% cheaper than H100", "2.09× the energy of H100": a cost or an energy against the pair's. */
+const versusEn = (c: Comparison, name: string, noun: string, less: string, more: string) =>
+  c.direction === 'same'
+    ? `Same ${noun} as ${name}`
+    : c.times
+      ? c.direction === 'better'
+        ? `${c.times}× ${less} than ${name}`
+        : `${c.times}× the ${noun} of ${name}`
+      : `${c.percent}% ${c.direction === 'better' ? less : more} than ${name}`;
+
+/** "比 H100 低 29%": Chinese gives a saving as a percentage however large, a multiple only for an excess. */
 const versusZh = (c: Comparison, name: string) =>
   c.direction === 'same'
     ? `与 ${name} 相同`
@@ -65,22 +72,9 @@ const STRINGS = {
     ) =>
       `Modelled TCO per valid clip on the participating GPUs, from the selected tier and the recorded GPU count${perSecond === null ? '' : `: ${perSecond} per video-second`}. On the allocated GPUs: ${allocated === null ? 'not measured yet' : `${allocated} per clip${allocatedPerSecond === null ? '' : `, ${allocatedPerSecond} per video-second`}`}.`,
     versus: {
-      cost: (c: Comparison, name: string) =>
-        c.direction === 'same'
-          ? `Same cost as ${name}`
-          : c.times
-            ? c.direction === 'better'
-              ? `${c.times}× cheaper than ${name}`
-              : `${c.times}× the cost of ${name}`
-            : `${c.percent}% ${c.direction === 'better' ? 'cheaper' : 'pricier'} than ${name}`,
+      cost: (c: Comparison, name: string) => versusEn(c, name, 'cost', 'cheaper', 'pricier'),
       energy: (c: Comparison, name: string) =>
-        c.direction === 'same'
-          ? `Same energy as ${name}`
-          : c.times
-            ? c.direction === 'better'
-              ? `${c.times}× less energy than ${name}`
-              : `${c.times}× the energy of ${name}`
-            : `${c.percent}% ${c.direction === 'better' ? 'less' : 'more'} energy than ${name}`,
+        versusEn(c, name, 'energy', 'less energy', 'more energy'),
     },
     exactMatch: 'Exact match',
     incompatibleShort: 'Incompatible pair',
@@ -212,9 +206,9 @@ interface SideRead {
 }
 
 /**
- * The number behind a value where lower is better, so its cell can say how the subject stands
- * against its pair. Wall time has none: the speed cell compares the two medians, and one prompt's
- * times are never divided. PSNR has none: the readout forms no cross-GPU quality score.
+ * The number behind a lower-is-better value, so its cell can say how the subject stands against
+ * its pair. Wall time and PSNR have none: one prompt's times are never divided, and the readout
+ * forms no cross-GPU quality score.
  */
 const AMOUNTS = {
   cost: ({ cost }: ReadoutSide) => cost?.participating?.perVideo,
@@ -266,8 +260,7 @@ const SIDE_METRICS: Record<SideMetric, SideRead> = {
       return { value: kj === null ? s.notMeasured : `${kj} kJ`, help: s.energyNote };
     },
   },
-  // The chart's basis is the participating GPUs. The cost per video-second is the same cost over
-  // the output's length, and the allocated basis is the other count; both sit in the help.
+  // The chart's basis is the participating GPUs; per video-second and the allocated basis sit in the help.
   cost: {
     read: ({ cost }, s) => ({
       value: dollars(cost?.participating?.perVideo) ?? s.notMeasured,
@@ -293,10 +286,7 @@ function readSide(metric: SideMetric, side: ReadoutSide, diagnostic: boolean, s:
 interface Cell extends Reading {
   metric: Metric;
   label: string;
-  /**
-   * The pair's line, after its color dot: how the subject stands against it in plain words where
-   * the metric allows ("29% cheaper than H100"), then the pair's own value.
-   */
+  /** The pair's line, after its color dot: how the subject stands against it, then its own value. */
   pair?: { words?: string; value: string };
   /** The lossy pair's headline trade, tinted; its value turns green only when the subject is faster. */
   lead?: { faster: boolean };
@@ -468,10 +458,7 @@ export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: Video
               </dd>
             )}
             {item.pair && (
-              <dd
-                data-readout-pair
-                className="m-0 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground max-md:text-xs"
-              >
+              <dd className="m-0 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground max-md:text-xs">
                 <SideDot color={b.pill.color} />
                 <span className="min-w-0 break-words">
                   {item.pair.words && <span className="text-foreground">{item.pair.words}</span>}

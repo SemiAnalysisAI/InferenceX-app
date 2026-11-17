@@ -22,7 +22,7 @@ import type { ResultCell, ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
 import { usePowerTrace } from './use-power-trace';
 import { ScrollFade } from './use-scroll-fade';
-import { dollarFigures, reading } from './format';
+import { cost, reading } from './format';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
 import styles from './results.module.css';
 
@@ -198,14 +198,7 @@ const STRINGS = {
 };
 
 /** A cost under a "$" column heading, or a dash when it could not be modelled. */
-const costFigures = (value: number | null | undefined) =>
-  typeof value === 'number' && Number.isFinite(value) ? dollarFigures(value) : '—';
-
-/** A measurement in the view's figures with its unit, or a dash when it was not recorded. */
-const inFigures = (value: number | null | undefined, unit: string) => {
-  const text = reading(value);
-  return text === null ? '—' : `${text} ${unit}`;
-};
+const costFigures = (value: number | null | undefined) => cost(value)?.slice(1) ?? '—';
 
 const withUnit = (value: number | null | undefined, unit: string, digits: number) =>
   value === null || value === undefined ? '—' : `${n(value, digits)} ${unit}`;
@@ -306,6 +299,7 @@ export default function VideoDeploymentDetail({
     [evidence?.latencies],
   );
   const phone = useIsMobileViewport();
+  const median = reading(point.p50);
   const code = (value: string | null | undefined) => (
     <span className="break-all font-mono text-xs">{value || s.notRecorded}</span>
   );
@@ -454,7 +448,7 @@ export default function VideoDeploymentDetail({
                   <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
                 )}
                 <p className="text-xs" data-testid="results-detail-latency">
-                  {s.recorded(inFigures(point.p50, 's'))}
+                  {s.recorded(median === null ? '—' : `${median} s`)}
                 </p>
                 <p className="text-xs">
                   {s.deadline(

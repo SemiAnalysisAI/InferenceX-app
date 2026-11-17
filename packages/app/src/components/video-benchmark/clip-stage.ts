@@ -230,10 +230,8 @@ export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
 
 /**
  * The pairing a phone opens with when the link names none and `defaultPairing` is the reference:
- * the subject against another GPU, which shows a difference the eye can read. Of the offered
- * hardware on the subject's workload, engine and GPU count that may have clips (`hasClips`),
- * it is the one with the highest median latency. Null when there is none, so a workload with
- * one hardware, or with no like-for-like deployment, keeps the reference.
+ * of the offered hardware on the subject's workload, engine and GPU count that may have clips,
+ * the one with the highest median latency. Null when there is none, which keeps the reference.
  */
 export function phonePairing(
   subject: VideoPoint,

@@ -51,7 +51,8 @@ function open(page: { scrollY: number; markBottom: number; firstScreen: number }
           clip={null}
           prompt={null}
           metrics={[]}
-          telemetry={{ label: 'View telemetry', onOpen: () => {} }}
+          telemetry="View telemetry"
+          onTelemetry={() => {}}
           context={{ gpu: 'b200', overlay: false }}
           pointKey={pointKey}
           anchor={anchor}

@@ -3,14 +3,6 @@
  * Pure, so the rules the chart draws by can be tested without a browser.
  */
 
-/**
- * Whether the chart labels each focus point with its GPU count. The reader's switch decides once
- * it is set; until then a phone's plot, too narrow for them, starts with the labels off. The
- * point sheet states the GPU count either way.
- */
-export const deploymentLabels = (picked: boolean | null, phone: boolean): boolean =>
-  picked ?? !phone;
-
 export const PILL_HEIGHT = 18;
 /** Vertical pitch between stacked pills: one pill and a 3 px gap. */
 const PILL_PITCH = PILL_HEIGHT + 3;

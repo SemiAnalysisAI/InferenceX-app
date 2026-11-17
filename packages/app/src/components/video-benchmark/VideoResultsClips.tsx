@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
+import { MOBILE_VIEWPORT_QUERY, useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -56,10 +56,9 @@ import {
 import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
-import { stageSentence } from './stage-sentence';
+import { cost as dollarsOf, reading as figuresOf } from './format';
 import styles from './results.module.css';
 import { ScrollFade } from './use-scroll-fade';
-import { phoneViewport } from './use-phone';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
 
@@ -106,6 +105,8 @@ const STRINGS = {
       toggle: 'Tap the clips to flip between them.',
       diff: 'RGB difference ×4 between the two clips; tap to play or pause.',
     },
+    sentence:
+      'Same prompt, same seed. {a} takes a median {as} per clip for {ad}; {b} takes {bs} for {bd}.',
     noReference: 'No sealed reference pair for this clip.',
     unpublishedMedia: 'Media is not shown for an unpublished run.',
     reference: 'Official Diffusers reference',
@@ -167,6 +168,8 @@ const STRINGS = {
       toggle: '轻点画面可在两段视频之间切换。',
       diff: '两段视频的 RGB 差异 ×4；轻点画面可播放或暂停。',
     },
+    sentence:
+      '相同的 prompt 和 seed。{a} 每条视频的延迟中位数为 {as}，成本 {ad}；{b} 为 {bs}，成本 {bd}。',
     noReference: '此视频暂无已封存的参考配对。',
     unpublishedMedia: '未发布的运行不显示视频。',
     reference: '官方 Diffusers 参考',
@@ -209,11 +212,10 @@ export interface VideoResultsClipsProps {
   onPairChange?: (pair: StagePair) => void;
   /**
    * `StageOption.value` the reader picked (`r_vs`), or null for the subject's `defaultPairing`;
-   * one the subject lacks pairs it by default too. The caller owns it, so the chart can reset it
-   * with a new subject.
+   * one the subject lacks pairs it by default too. Page state, so the chart can reset it with a new subject.
    */
   against: string | null;
-  /** The reader's pick; null when it is the subject's default pairing, which stays out of the URL. */
+  /** Null for the subject's default pairing, which stays out of the URL. */
   onAgainstChange: (value: string | null) => void;
   /** Plays the chart point with this key, as a chart click does. */
   onSubjectChange: (clipKey: string) => void;
@@ -223,28 +225,26 @@ export interface VideoResultsClipsProps {
   reveal: number;
   /** The drawn point the reader rests on in the chart; its clips are read ahead for its hover card. */
   peek?: string | null;
-  /**
-   * The phone layout: the stage block leads the page (by CSS, under 768 px), and a link that names
-   * no pair opens on `phonePairing`. The caller passes the server's guess until the viewport is known.
-   */
+  /** The phone layout: a link that names no pair opens on `phonePairing`. */
   phone?: boolean;
   /** The page's title row, which the phone layout shows at the top of the stage block. */
   titleRow?: ReactNode;
-  /** The cohort itself is still being read, so there is no subject yet; a phone holds the stage block's place. */
+  /** The cohort is still being read; a phone holds the stage block's place. */
   cohortLoading?: boolean;
 }
 
 const NO_POINTS: readonly VideoPoint[] = [];
 // Under 768 px the section's blocks leave its box (`max-md:contents`) and join the page column,
-// where the stage block comes first by CSS order alone, so no layout waits for hydration. Each
-// block then draws the card it left; the two rest blocks draw one card between them.
+// where the stage block comes first by CSS order alone. Each block draws the card it left; the
+// rest blocks draw one card between them.
 const PHONE_CARD = 'max-md:mb-0 max-md:border-border/30 max-md:bg-card max-md:p-4';
 /** The title row, stage, transport, Compare row and prompt strip. */
 const LEAD_BLOCK = `flex min-w-0 flex-col gap-3 max-md:order-first max-md:rounded-xl max-md:border ${PHONE_CARD}`;
 /** The prompt, the view modes and Inspect. */
-const REST_TOP_BLOCK = `flex min-w-0 flex-col gap-3 max-md:rounded-t-xl max-md:border max-md:border-b-0 max-md:pb-3 ${PHONE_CARD}`;
-/** The readout, the quality method and the sources; the page column's gap is closed above it. */
-const REST_BLOCK = `min-w-0 space-y-3 max-md:-mt-4 max-md:rounded-b-xl max-md:border max-md:border-t-0 max-md:pt-0 ${PHONE_CARD}`;
+const REST_TOP_BLOCK = `min-w-0 ${PHONE_CARD} max-md:rounded-t-xl max-md:border max-md:border-b-0 max-md:pb-3`;
+/** The readout and the quality method, then the sources; the page column's gap is closed above each. */
+const REST_BLOCK = `min-w-0 space-y-3 ${PHONE_CARD} max-md:-mt-4 max-md:border-x max-md:py-0`;
+const REST_BOTTOM_BLOCK = `min-w-0 ${PHONE_CARD} max-md:-mt-4 max-md:rounded-b-xl max-md:border max-md:border-t-0 max-md:pt-3`;
 /** Whether a read side has a clip the stage can play. */
 const playable = (side: ResultsClipSide) =>
   resultsClipGroups([side]).some((group) => [...group.clips.values()].some((clip) => clip.url));
@@ -300,11 +300,11 @@ export default function VideoResultsClips({
 }: VideoResultsClipsProps) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  /** Where the stage shows Inspect on a phone: with the view modes, below the chart. */
+  /** Where a phone shows Inspect: with the view modes. */
   const [inspectSlot, setInspectSlot] = useState<HTMLElement | null>(null);
   const touch = useIsCoarsePointer();
   const viewHelp = touch ? s.viewHelpTouch : s.viewHelp;
-  // Key by key: the address also holds the open chart point, which is not this component's.
+  // Key by key, so the open chart point (`r_sheet`) does not render the clips again.
   const stage = {
     prompt: useStageValue('prompt'),
     view: useStageValue('view'),
@@ -381,9 +381,8 @@ export default function VideoResultsClips({
     ],
   );
   const nextReady = ready(next);
-  // A phone's opening pair is not the link's default, so the address names it and a shared link
-  // reopens the same two clips on any screen. It is named once its clips are read, so a side
-  // that turns out to have none is never written.
+  // A phone's opening pair is not the link's default, so the URL names it once its clips are
+  // read, and a shared link reopens the same two clips on any screen.
   const openedPair =
     against === null &&
     nextReady &&
@@ -393,10 +392,10 @@ export default function VideoResultsClips({
       : null;
   useEffect(() => {
     if (!openedPair) return;
-    // Hydration renders with the server's guess of a phone and without the link's own keys, so
-    // the address and the screen are read here: a pair the link names, or a wider screen, wins.
+    // Hydration renders with the server's guess, so the URL and the screen are read here.
     const live = parseStage(location.search);
-    if (live.vs === null && phoneViewport()) writeStage({ ...live, vs: openedPair });
+    if (live.vs === null && matchMedia(MOBILE_VIEWPORT_QUERY).matches)
+      writeStage({ ...live, vs: openedPair });
   }, [openedPair]);
   /** The first frames a pair shows for a prompt. */
   const framesOf = (
@@ -664,15 +663,6 @@ export default function VideoResultsClips({
             url: '',
             empty: s.noTwin,
           };
-  // Two deployments of different hardware: the phone layout states what each costs per clip.
-  const sentence =
-    a && point && other && option?.kind === 'hardware' && !diagnostic
-      ? stageSentence(
-          locale,
-          { name: a.label, point, cost: costs?.[point.id] },
-          { name: b.label, point: other, cost: costs?.[other.id] },
-        )
-      : null;
   // The Compare row and its pairing follow the reader's pick at once, not the held pair.
   const configs = compareConfigs(opening, drawn, unofficialRun);
   const nextHardware = next.subject?.point.hardwareKey ?? '';
@@ -732,54 +722,53 @@ export default function VideoResultsClips({
         </div>
       ) : a && point ? (
         <>
-          <div className={REST_TOP_BLOCK}>
-            <PromptRow
-              groups={groups}
-              group={stagePrompt(groups, stage.prompt)}
-              s={s}
-              onPick={(item, index, poster) => {
-                track('video_results_prompt_selected', { index, case: caseOf(item), poster });
-                writeStage({ ...parseStage(location.search), prompt: promptKey(item) });
-              }}
-            >
-              <div className="flex shrink-0 items-center gap-1.5 max-[343px]:gap-1">
-                <SegmentedToggle
-                  role="group"
-                  ariaLabel={s.view}
-                  value={stage.view}
-                  size="sm"
-                  // Four modes and the help button fit the card from a 320 px screen up.
-                  buttonClassName="max-[400px]:px-1 max-[374px]:text-xs max-[343px]:px-0.5 max-[343px]:tracking-tight"
-                  options={STAGE_VIEWS.map((mode) => ({
-                    value: mode,
-                    label: s.views[mode],
-                    title: viewHelp[mode],
-                    testId: `video-results-view-${mode}`,
-                  }))}
-                  onValueChange={(view) => {
-                    track('video_results_clips_view', { view });
-                    writeStage({ ...parseStage(location.search), view });
-                  }}
-                />
-                <InfoHelp
-                  label={s.label}
-                  value="clip-metrics"
-                  triggerTestId="video-results-metrics-help"
-                  // Clear of the view switcher beside it.
-                  triggerClassName="[--hit-x:4px]"
-                >
-                  {/* Hover titles never show on touch, so the shown view's gestures lead the help. */}
-                  {touch && <p>{viewHelp[stage.view]}</p>}
-                  <p>{diagnostic ? s.diagnosticNote : s.metricsHelp(touch)}</p>
-                </InfoHelp>
-              </div>
-            </PromptRow>
+          <PromptRow
+            className={REST_TOP_BLOCK}
+            groups={groups}
+            group={stagePrompt(groups, stage.prompt)}
+            s={s}
+            onPick={(item, index, poster) => {
+              track('video_results_prompt_selected', { index, case: caseOf(item), poster });
+              writeStage({ ...parseStage(location.search), prompt: promptKey(item) });
+            }}
+          >
+            <div className="flex shrink-0 items-center gap-1.5 max-[343px]:gap-1">
+              <SegmentedToggle
+                role="group"
+                ariaLabel={s.view}
+                value={stage.view}
+                size="sm"
+                // Four modes and the help button fit the card from a 320 px screen up.
+                buttonClassName="max-[400px]:px-1 max-[374px]:text-xs max-[343px]:px-0.5 max-[343px]:tracking-tight"
+                options={STAGE_VIEWS.map((mode) => ({
+                  value: mode,
+                  label: s.views[mode],
+                  title: viewHelp[mode],
+                  testId: `video-results-view-${mode}`,
+                }))}
+                onValueChange={(view) => {
+                  track('video_results_clips_view', { view });
+                  writeStage({ ...parseStage(location.search), view });
+                }}
+              />
+              <InfoHelp
+                label={s.label}
+                value="clip-metrics"
+                triggerTestId="video-results-metrics-help"
+                // Clear of the view switcher beside it.
+                triggerClassName="[--hit-x:4px]"
+              >
+                {/* Hover titles never show on touch, so the shown view's gestures lead the help. */}
+                {touch && <p>{viewHelp[stage.view]}</p>}
+                <p>{diagnostic ? s.diagnosticNote : s.metricsHelp(touch)}</p>
+              </InfoHelp>
+            </div>
             <div
               ref={setInspectSlot}
               data-testid="video-results-inspect-slot"
-              className="flex flex-col gap-3 empty:hidden md:hidden"
+              className="flex basis-full flex-col gap-3 empty:hidden md:hidden"
             />
-          </div>
+          </PromptRow>
           <div className={LEAD_BLOCK} data-testid="video-results-lead">
             {titleRow}
             {/* Capped like the stage below, so the row starts at the picture's left edge. */}
@@ -853,31 +842,16 @@ export default function VideoResultsClips({
                 swapped={stage.swap}
                 onSwappedChange={(swap) => writeStage({ ...parseStage(location.search), swap })}
                 caption={
-                  sentence && (
-                    <p
-                      data-testid="video-results-sentence"
-                      className={cn(
-                        styles.stageSentence,
-                        'text-sm leading-6 text-foreground md:hidden',
-                      )}
-                    >
-                      {sentence.map((part, index) =>
-                        'text' in part ? (
-                          <Fragment key={index}>{part.text}</Fragment>
-                        ) : 'strong' in part ? (
-                          <b key={index} className="font-semibold whitespace-nowrap">
-                            {part.strong}
-                          </b>
-                        ) : (
-                          <span
-                            key={index}
-                            aria-hidden="true"
-                            className="mr-1.5 inline-block size-2 rounded-full align-middle"
-                            style={{ background: (part.dot === 'a' ? a : b).color ?? undefined }}
-                          />
-                        ),
-                      )}
-                    </p>
+                  other &&
+                  option?.kind === 'hardware' &&
+                  !diagnostic && (
+                    <StageSentence
+                      template={s.sentence}
+                      sides={[
+                        { ...a, point, cost: costs?.[point.id] },
+                        { ...b, point: other, cost: costs?.[other.id] },
+                      ]}
+                    />
                   )
                 }
                 inspectSlot={inspectSlot}
@@ -926,90 +900,90 @@ export default function VideoResultsClips({
               namedRun={unofficialRun}
               onShowMe={(target) => onShow(target, 'reference')}
             />
-            <details
-              data-testid="video-results-sources"
-              className="group/sources text-xs"
-              onToggle={(event) =>
-                track('video_results_sources_toggled', { enabled: event.currentTarget.open })
-              }
+          </div>
+          <details
+            data-testid="video-results-sources"
+            className={`group/sources text-xs ${REST_BOTTOM_BLOCK}`}
+            onToggle={(event) =>
+              track('video_results_sources_toggled', { enabled: event.currentTarget.open })
+            }
+          >
+            <summary
+              className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden"
+              tabIndex={0}
             >
-              <summary
-                className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden"
-                tabIndex={0}
-              >
-                <ChevronRight
-                  aria-hidden="true"
-                  className="size-3.5 transition-transform group-open/sources:rotate-90"
-                />
-                {s.sources}
-              </summary>
-              {(a.previewUrl || b.previewUrl) && (
-                <p className="mt-3 text-muted-foreground">{s.webEncode}</p>
-              )}
-              <ScrollFade className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[44rem] text-left">
-                  <thead className="whitespace-nowrap text-muted-foreground">
-                    <tr>
-                      <th className="pr-3 font-medium">{s.source}</th>
-                      <th className="pr-3 font-medium">{s.run}</th>
-                      <th className="pr-3 font-medium">{diagnostic ? s.receipt : s.artifact}</th>
-                      <th className="pr-3 font-medium">{s.runtime}</th>
-                      <th className="pr-3 font-medium">{s.approval}</th>
-                      <th className="font-medium">{s.media}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-3.5 transition-transform group-open/sources:rotate-90"
+              />
+              {s.sources}
+            </summary>
+            {(a.previewUrl || b.previewUrl) && (
+              <p className="mt-3 text-muted-foreground">{s.webEncode}</p>
+            )}
+            <ScrollFade className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[44rem] text-left">
+                <thead className="whitespace-nowrap text-muted-foreground">
+                  <tr>
+                    <th className="pr-3 font-medium">{s.source}</th>
+                    <th className="pr-3 font-medium">{s.run}</th>
+                    <th className="pr-3 font-medium">{diagnostic ? s.receipt : s.artifact}</th>
+                    <th className="pr-3 font-medium">{s.runtime}</th>
+                    <th className="pr-3 font-medium">{s.approval}</th>
+                    <th className="font-medium">{s.media}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <SourceRow
+                    label={a.label}
+                    point={point}
+                    native={native}
+                    diagnostic={diagnostic}
+                    url={clip?.url}
+                    s={s}
+                  />
+                  {other && (
                     <SourceRow
-                      label={a.label}
-                      point={point}
-                      native={native}
+                      label={b.label}
+                      point={other}
+                      native={otherNative}
                       diagnostic={diagnostic}
-                      url={clip?.url}
+                      url={otherClip?.url}
                       s={s}
                     />
-                    {other && (
-                      <SourceRow
-                        label={b.label}
-                        point={other}
-                        native={otherNative}
-                        diagnostic={diagnostic}
-                        url={otherClip?.url}
-                        s={s}
-                      />
-                    )}
-                    {reference && b.source === 'reference' && (
-                      <tr className="border-t align-top">
-                        <td className="pr-3 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1">
-                            {s.reference}
-                            <InfoHelp label={s.reference} value="reference-method">
-                              {s.referenceNote}
-                            </InfoHelp>
-                          </span>
-                        </td>
-                        <td className="pr-3">—</td>
-                        <td className="pr-3 break-all" title={reference.receipt_sha256}>
-                          {reference.receipt_sha256.slice(0, 12)}
-                        </td>
-                        <td className="pr-3 break-all">
-                          Diffusers {reference.diffusers_revision.slice(0, 12)} ·{' '}
-                          {s.schedule(reference.denoising_updates, reference.sigma_points)}
-                        </td>
-                        <td className="pr-3">—</td>
-                        <td className="whitespace-nowrap">
-                          <MediaLink
-                            url={reference.url}
-                            label={s.media}
-                            onOpen={() => track('video_results_reference_opened')}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </ScrollFade>
-            </details>
-          </div>
+                  )}
+                  {reference && b.source === 'reference' && (
+                    <tr className="border-t align-top">
+                      <td className="pr-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1">
+                          {s.reference}
+                          <InfoHelp label={s.reference} value="reference-method">
+                            {s.referenceNote}
+                          </InfoHelp>
+                        </span>
+                      </td>
+                      <td className="pr-3">—</td>
+                      <td className="pr-3 break-all" title={reference.receipt_sha256}>
+                        {reference.receipt_sha256.slice(0, 12)}
+                      </td>
+                      <td className="pr-3 break-all">
+                        Diffusers {reference.diffusers_revision.slice(0, 12)} ·{' '}
+                        {s.schedule(reference.denoising_updates, reference.sigma_points)}
+                      </td>
+                      <td className="pr-3">—</td>
+                      <td className="whitespace-nowrap">
+                        <MediaLink
+                          url={reference.url}
+                          label={s.media}
+                          onOpen={() => track('video_results_reference_opened')}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </ScrollFade>
+          </details>
         </>
       ) : (
         (titleRow || !loading) && (
@@ -1026,6 +1000,51 @@ export default function VideoResultsClips({
         )
       )}
     </section>
+  );
+}
+
+const STRONG = 'font-semibold whitespace-nowrap';
+
+/**
+ * A phone's one sentence under the stage: each deployment's median latency and modelled cost per
+ * clip of this workload, not the time of the clip on screen. Nothing unless both sides have both.
+ */
+function StageSentence({
+  template,
+  sides,
+}: {
+  template: string;
+  sides: readonly (StageClip & { point: VideoPoint; cost?: ResultCell['cost'] })[];
+}) {
+  const slots: Record<string, ReactNode> = {};
+  for (const [index, side] of sides.entries()) {
+    const key = 'ab'[index];
+    const seconds = figuresOf(side.point.p50);
+    const dollars = dollarsOf(side.cost?.participating?.perVideo);
+    if (seconds === null || dollars === null) return null;
+    const gpus = side.point.participating;
+    slots[key] = (
+      <>
+        <span
+          aria-hidden="true"
+          className="mr-1.5 inline-block size-2 rounded-full align-middle"
+          style={{ background: side.color ?? undefined }}
+        />
+        <b className={STRONG}>{gpus === null ? side.label : `${side.label} ×${gpus}`}</b>
+      </>
+    );
+    slots[`${key}s`] = <b className={STRONG}>{`${seconds} s`}</b>;
+    slots[`${key}d`] = <b className={STRONG}>{dollars}</b>;
+  }
+  return (
+    <p
+      data-testid="video-results-sentence"
+      className={cn(styles.stageSentence, 'text-sm leading-6 text-foreground md:hidden')}
+    >
+      {template.split(/\{(?<slot>\w+)\}/u).map((part, index) => (
+        <Fragment key={index}>{index % 2 ? slots[part] : part}</Fragment>
+      ))}
+    </p>
   );
 }
 
@@ -1136,12 +1155,14 @@ function PromptRow({
   group,
   s,
   onPick,
+  className,
   children,
 }: {
   groups: readonly ResultsClipGroup[];
   group: ResultsClipGroup | null;
   s: Strings;
   onPick: (group: ResultsClipGroup, index: number, poster: boolean) => void;
+  className: string;
   children: ReactNode;
 }) {
   const row = useRef<HTMLDivElement>(null);
@@ -1169,7 +1190,7 @@ function PromptRow({
     <div
       ref={row}
       data-testid="video-results-prompt-row"
-      className="flex flex-wrap items-center gap-x-4 gap-y-3"
+      className={cn('flex flex-wrap items-center gap-x-4 gap-y-3', className)}
     >
       {groups.length > 1 && (
         <div

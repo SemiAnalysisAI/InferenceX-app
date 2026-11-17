@@ -42,55 +42,19 @@ const STRINGS = {
 
 /** A downward drag this long on the sheet's header closes it, in px. */
 const SWIPE_CLOSE = 72;
-/** How much of what follows the first screen shows under it, cut mid-line to say it scrolls, in px. */
+/** How much of what follows the first screen shows under it, to say it scrolls, in px. */
 const PEEK = 24;
 /** Clear space kept between the point's mark and the sheet, in px. */
 const ANCHOR_GAP = 20;
-/** Frames after a dismissal on which the page is put back again if it has moved. */
-const RETURN_FRAMES = 5;
-
-export interface VideoPointSheetProps {
-  /** Hardware name, after its color dot. */
-  title: string;
-  color: string;
-  /** Engine, GPU count and run date, in that order; a named run's marker comes last. */
-  facts: readonly string[];
-  /**
-   * The point's clip of the shown prompt: undefined while it is still being read, null when the
-   * point has none.
-   */
-  clip: { poster: string | null; src: string | null } | null | undefined;
-  /** Shown in place of the clip for a point whose run has none. */
-  noClips?: string;
-  prompt: { id: string; seed: number } | null;
-  /** The four headline figures. */
-  metrics: readonly { label: string; value: string }[];
-  /** Plays the point on the clip stage; absent for a point without clips. */
-  onCompare?: () => void;
-  telemetry: { label: string; onOpen: () => void };
-  /** Analytics context: the point's hardware and whether it is a named run's. */
-  context: { gpu: string; overlay: boolean };
-  /** Identifies the point, so a sheet that moves to another point follows it. */
-  pointKey: string;
-  /** The point's mark on the chart, which the page scrolls clear of the sheet. */
-  anchor?: () => Element | null;
-  /** A tap beside the sheet at these viewport coordinates; true when it opened another point. */
-  onOutside?: (x: number, y: number) => boolean;
-  onClose: () => void;
-  /** Everything else the pinned panel shows, below the first screen. */
-  children: ReactNode;
-}
 
 /**
- * A touch screen's view of one chart point: a sheet over the bottom of the page, with the point's
- * clip, four figures and three actions on its first screen and the rest of the pinned panel below.
- * It reuses the chart tooltip's sheet style (`[data-chart-tooltip][data-sheet]` in globals.css).
- * It opens no taller than its first screen, so the chart and the point's mark stay in view above
- * it, and grows to the tooltip sheet's height once the reader scrolls it. The page behind is
- * never locked: a clear backdrop takes the touches, and closing returns the page to where a tap
- * found it.
+ * A touch screen's view of one chart point, in the chart tooltip's sheet style: its clip, four
+ * figures and three actions on the first screen, the rest of the pinned panel (`children`) below.
+ * It opens no taller than its first screen, so the point stays in view above it, and grows once
+ * scrolled. The page behind is not locked; closing returns it to where the tap found it.
  */
 export default function VideoPointSheet({
+  pointKey,
   title,
   color,
   facts,
@@ -100,13 +64,35 @@ export default function VideoPointSheet({
   metrics,
   onCompare,
   telemetry,
+  onTelemetry,
   context,
-  pointKey,
   anchor,
   onOutside,
   onClose,
   children,
-}: VideoPointSheetProps) {
+}: {
+  pointKey: string;
+  title: string;
+  color: string;
+  facts: readonly string[];
+  /** The point's clip of the shown prompt: undefined while it is read, null when it has none. */
+  clip: { poster: string | null; src: string | null } | null | undefined;
+  /** Shown in place of the clip for a point whose run has none. */
+  noClips?: string;
+  prompt: { id: string; seed: number } | null;
+  metrics: readonly (readonly [label: string, value: string])[];
+  /** Plays the point on the clip stage; absent for a point without clips. */
+  onCompare?: () => void;
+  telemetry: string;
+  onTelemetry: () => void;
+  context: { gpu: string; overlay: boolean };
+  /** The point's mark on the chart, which the page scrolls clear of the sheet. */
+  anchor: () => Element | null;
+  /** A tap beside the sheet; true when it opened another point. */
+  onOutside?: (x: number, y: number) => boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   const s = STRINGS[useLocale()];
   const titleId = useId();
   const sheet = useRef<HTMLDivElement>(null);
@@ -118,21 +104,19 @@ export default function VideoPointSheet({
   /** The drag on the header: its pointer, where it began and how far down it has gone. */
   const press = useRef<{ id: number; y: number; pull: number } | null>(null);
   const more = useRef<HTMLDivElement>(null);
-  /** Height of the first screen, measured; null before the sheet is drawn. */
+  /** Height of the first screen; null before the sheet is drawn. */
   const [fold, setFold] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   /** Where the page was before it scrolled the point clear of the sheet. */
   const origin = useRef<number | null>(null);
-  /** The point this sheet last scrolled the page for; a later run for it finds the page moving. */
   const scrolledFor = useRef<string | null>(null);
   /** Closes at the reader's word, which also puts the page back; an action that leaves does not. */
   const dismiss = () => {
     const top = origin.current;
     if (top !== null) {
       window.scrollTo({ top });
-      // The scroll that cleared the point may still be running, and it can carry on past this
-      // return or, when it has only just begun, through it; so the next frames check.
-      let frames = RETURN_FRAMES;
+      // The smooth scroll that cleared the point may still run past this, so five frames check.
+      let frames = 5;
       const hold = () => {
         if (window.scrollY !== top) window.scrollTo({ top });
         frames -= 1;
@@ -152,15 +136,13 @@ export default function VideoPointSheet({
   // The sheet covers the bottom of the screen; a point under it scrolls up into view.
   useEffect(() => {
     const element = sheet.current;
-    const mark = anchor?.()?.getBoundingClientRect();
-    // Not before the sheet has its opening height, and again if its first screen grows.
+    const mark = anchor()?.getBoundingClientRect();
     if (!element || !mark || fold === null) return;
     // The slide-in moves the sheet by a transform, so its resting top comes from its height.
     const over = mark.bottom + ANCHOR_GAP - (window.innerHeight - element.offsetHeight);
     if (over <= 0) return;
-    // The place to return to is where a tap found the page, so it is read before the first scroll
-    // for that point; a run that follows, once the clip is read, finds the page on its way. A
-    // point a link opened was never on screen, so it has no such place.
+    // The place to return to is read before the first scroll for a point; a point a link opened
+    // was never on screen, so it has none.
     if (
       origin.current === null &&
       scrolledFor.current !== pointKey &&
@@ -173,8 +155,7 @@ export default function VideoPointSheet({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
   }, [fold, pointKey, anchor]);
-  // Focus moves into the sheet and returns to where it was; Escape closes. The sheet is modal,
-  // so Tab goes round its own controls and never reaches the page under the backdrop.
+  // Focus moves into the sheet and back; Escape closes; Tab stays among the sheet's controls.
   useEffect(() => {
     if (!mounted) return undefined;
     const before = document.activeElement;
@@ -242,8 +223,7 @@ export default function VideoPointSheet({
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest('button')) return;
     press.current = { id: event.pointerId, y: event.clientY, pull: 0 };
-    // A finger's moves and its lift come here wherever it goes; a mouse's or a pen's go to what is
-    // under it, and a quick drag is off the header before the sheet has followed it.
+    // A mouse's or a pen's moves go to what is under it, and a quick drag leaves the header.
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
@@ -298,10 +278,7 @@ export default function VideoPointSheet({
         }}
       >
         <div className="px-4 pb-4 max-md:pt-0 md:pt-4">
-          {/*
-            Dragging the header down closes the sheet; its buttons keep their taps. Under 768 px it
-            reaches up over the grab bar the sheet style draws, which is where a thumb lands.
-          */}
+          {/* Dragging the header down closes the sheet. Under 768 px it reaches over the grab bar. */}
           <div
             className="flex touch-none items-center gap-2 max-md:relative max-md:z-[2] max-md:-mt-5 max-md:pt-5"
             data-testid="video-point-sheet-header"
@@ -356,7 +333,7 @@ export default function VideoPointSheet({
                         onPlay={() => setPlaying(true)}
                       />
                       {/* play() ends the poster; until a frame is drawn the first frame stays. */}
-                      {clip.poster && !firstFrame.presented && (
+                      {clip.poster && !firstFrame && (
                         <img
                           src={clip.poster}
                           alt=""
@@ -413,14 +390,14 @@ export default function VideoPointSheet({
                 </p>
               )}
               <dl className="space-y-1" data-testid="video-point-sheet-metrics">
-                {metrics.map((metric) => (
+                {metrics.map(([label, value]) => (
                   <div
-                    key={metric.label}
+                    key={label}
                     className="flex flex-wrap items-baseline justify-between gap-x-2"
                   >
-                    <dt className="text-xs text-muted-foreground">{metric.label}</dt>
+                    <dt className="text-xs text-muted-foreground">{label}</dt>
                     <dd className="m-0 ml-auto text-sm font-semibold text-foreground tabular-nums">
-                      {metric.value}
+                      {value}
                     </dd>
                   </div>
                 ))}
@@ -454,9 +431,9 @@ export default function VideoPointSheet({
               variant="outline"
               className="min-h-11 flex-1"
               data-action="view-telemetry"
-              onClick={telemetry.onOpen}
+              onClick={onTelemetry}
             >
-              {telemetry.label}
+              {telemetry}
             </Button>
           </div>
           <div ref={more} className="mt-4 text-xs" data-testid="video-point-sheet-more">

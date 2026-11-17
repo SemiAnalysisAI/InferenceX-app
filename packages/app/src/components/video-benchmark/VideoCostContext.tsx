@@ -125,7 +125,7 @@ export default function VideoCostContext({
                   label={s.basis}
                   value="video-gpu-basis"
                   align="start"
-                  // The caption sits between the legend and the price table, closer than a finger.
+                  // Between the legend and the price table, closer than a finger.
                   triggerClassName={styles.roomy}
                 >
                   {s.basisHelp}

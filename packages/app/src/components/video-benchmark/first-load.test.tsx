@@ -5,7 +5,6 @@ import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import VideoResultsClips from './VideoResultsClips';
 import { parseStage, writeStage } from './clip-stage';
 import { videoHistoryEntry, type VideoHistoryPage } from './history';
@@ -14,7 +13,7 @@ import { referenceQualityFixture } from './reference-quality.fixture';
 import { publishedResultsSide } from './results-clips';
 import { useVideoPoints } from './use-video-points';
 import { videoClipSourceKey } from './initial-data';
-import { usePhone } from './use-phone';
+import { MOBILE_VIEWPORT_QUERY, useMediaQuery } from '@/hooks/useMediaQuery';
 
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
@@ -300,7 +299,7 @@ function PhonePage({
   queryClient: QueryClient;
 }) {
   const against = parseStage(useClientSearch()).vs;
-  const phone = usePhone(guess);
+  const phone = useMediaQuery(MOBILE_VIEWPORT_QUERY, guess);
   return (
     <QueryClientProvider client={queryClient}>
       <VideoResultsClips

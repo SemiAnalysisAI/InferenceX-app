@@ -6,7 +6,6 @@ import {
   badgeBox,
   boxesOverlap,
   clearOfLabels,
-  deploymentLabels,
   labelShift,
   pillBox,
   placePill,
@@ -155,18 +154,6 @@ describe('clearOfLabels', () => {
   it('leaves a pill clear of every label alone', () => {
     const pill = { key: 'a', x: 200, y: 100, width: 80 };
     expect(clearOfLabels({ ...pill }, { x: 188 }, [label], 400)).toEqual(pill);
-  });
-});
-
-describe('deploymentLabels', () => {
-  it('starts with the GPU-count labels off on a phone and on elsewhere', () => {
-    expect(deploymentLabels(null, true)).toBe(false);
-    expect(deploymentLabels(null, false)).toBe(true);
-  });
-
-  it('follows the switch once the reader has set it, at any width', () => {
-    expect(deploymentLabels(true, true)).toBe(true);
-    expect(deploymentLabels(false, false)).toBe(false);
   });
 });
 

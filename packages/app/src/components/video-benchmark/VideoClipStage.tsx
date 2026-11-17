@@ -163,12 +163,11 @@ export interface VideoClipStageProps {
   /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
   swapped: boolean;
   onSwappedChange: (swapped: boolean) => void;
-  /** A line between the picture and the transport; the phone layout states the pair's figures there. */
+  /** A line between the picture and the transport. */
   caption?: ReactNode;
   /**
-   * Where a phone shows Inspect: its toggle and drawer leave the transport row for this element,
-   * which the caller places with the rest of the clip controls. Null until that element mounts;
-   * undefined keeps Inspect in the transport row at every width.
+   * Where a phone shows Inspect, toggle and drawer, in place of the transport row. Null until
+   * that element mounts; undefined keeps Inspect in the transport row at every width.
    */
   inspectSlot?: HTMLElement | null;
 }
@@ -180,9 +179,8 @@ const OTHER = { a: 'b', b: 'a' } as const;
 const DIFFERENCE_SYNC_SECONDS = 0.12;
 /** How many times the Difference picture adds the frames' difference up, as `absoluteFrameDifference` multiplies it. */
 const DIFFERENCE_GAIN = 4;
-/** How long after its frames last moved a Difference picture is still drawn at the full rate, in ms. */
+/** After its frames last moved, a Difference picture is drawn at the full rate this long, then once per still period, in ms. */
 const DIFFERENCE_SETTLE_MS = 500;
-/** How long a Difference picture of two frames that stand still is kept before it is drawn again. */
 const DIFFERENCE_STILL_MS = 1000;
 /** How far into the clips, in seconds, their first frames still stand for them. */
 const FIRST_FRAME_SECONDS = 0.25;
@@ -192,14 +190,26 @@ const WIPE_SLOP = 6;
 // The Compare row, stage, transport and readout fit under the sticky header together: a picture is at
 // most the window's height less 18rem, and the block narrows to match, one 16:9 frame wide or two
 // side by side.
-// A phone on its side lowers the reserve (`--stage-reserve` in results.module.css) to the header and
-// the transport, so the picture fills the height it has.
+// A phone on its side lowers the reserve (`--stage-reserve` in results.module.css).
 export const STAGE_FIT_WIDTH = {
   overlay: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 16 / 9))',
   side: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 32 / 9 + 0.75rem))',
 };
 const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;
+
+/** Renders `children` in `slot` when there is one, else in place; nothing while `show` is false. */
+function InSlot({
+  slot,
+  show = true,
+  children,
+}: {
+  slot: HTMLElement | null;
+  show?: boolean;
+  children: ReactNode;
+}) {
+  return show ? (slot ? createPortal(children, slot) : children) : null;
+}
 
 export default function VideoClipStage({
   ref,
@@ -264,12 +274,11 @@ export default function VideoClipStage({
     from: typeof lens | null;
     moved: boolean;
   }>(null);
-  /**
-   * A finger cannot hover, so on a touch screen the split follows a press dragged sideways from the
-   * picture or the handle. `moved` outlives the release, so the click that ends a drag does nothing.
-   */
+  // A finger cannot hover, so on a touch screen the split follows a press dragged sideways.
+  // `moved` outlives the release, so the click that ends a drag does nothing.
   const touch = useIsCoarsePointer();
-  const phone = useIsMobileViewport();
+  /** A phone shows Inspect, toggle and drawer, in the caller's slot. */
+  const slot = (useIsMobileViewport() && inspectSlot) || null;
   const wipe = useRef<{ id: number; x: number; moved: boolean }>(null);
   const handle = useRef<HTMLButtonElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -301,13 +310,9 @@ export default function VideoClipStage({
     b: useFirstFrame(() => videos.current.get('b'), b.url ? srcOf(b) : undefined),
   };
   const posterLoaded = (url = '') => loadedPosters.has(url) || Boolean(loadedFrames?.has(url));
-  /**
-   * At the start of the clips, each side's first frame covers its video until every side has put a
-   * frame of its own on screen, so the sides appear together and the stage is never empty while a
-   * clip loads. Elsewhere in the clips the first frame would be the wrong picture.
-   */
-  const covered =
-    time <= FIRST_FRAME_SECONDS && playable.some((role) => !firstFrame[role].presented);
+  // At the start of the clips, each side's first frame covers its video until every side has
+  // drawn a frame of its own, so the sides appear together and the stage is never empty.
+  const covered = time <= FIRST_FRAME_SECONDS && playable.some((role) => !firstFrame[role]);
   /**
    * Before the first Play, the idle frame replaces the split until there is a picture to split:
    * both sides' loaded posters in a view that shows them (Difference hides them behind its
@@ -359,7 +364,7 @@ export default function VideoClipStage({
     if (view !== 'diff' || !both) return undefined;
     let frame = 0;
     let lastDraw = -Infinity;
-    /** The playback times last seen and when they last moved: frames that stand still keep their picture. */
+    /** The playback times last seen and when they last moved. */
     let seen: { subject: number; pair: number; on: HTMLCanvasElement | null; moved: number } = {
       subject: NaN,
       pair: NaN,
@@ -385,9 +390,8 @@ export default function VideoClipStage({
         return;
       }
       if (Math.abs(subject.currentTime - pair.currentTime) > DIFFERENCE_SYNC_SECONDS) return;
-      // A seek shows its frame once it lands. A browser can show that frame a little after the
-      // seek ends, so the picture is drawn at the full rate for a moment after the times last
-      // moved; a pair that stands still after that keeps its picture, drawn again once a second.
+      // A browser can show a sought frame a little after the seek ends, so the picture is drawn at
+      // the full rate for a moment after the times last moved, then once a second.
       if (subject.seeking || pair.seeking) return;
       if (
         target !== seen.on ||
@@ -405,9 +409,8 @@ export default function VideoClipStage({
           surface.height = pair.videoHeight;
         }
       try {
-        // The canvases blend the frames themselves, which is `absoluteFrameDifference` without
-        // reading two full frames into script every draw. Off screen: |pair − subject| per
-        // channel. On the stage: that picture four times over, added up, which stops at white.
+        // The canvases blend the frames, which is `absoluteFrameDifference` without reading two
+        // frames into script: |pair − subject| off screen, then added up four times on the stage.
         work.globalCompositeOperation = 'copy';
         work.drawImage(pair, 0, 0);
         work.globalCompositeOperation = 'difference';
@@ -571,8 +574,7 @@ export default function VideoClipStage({
   /** Middle of the part of the stage a side shows, for its empty-state text. */
   const centerOf = (role: Role) =>
     view === 'wipe' ? (onLeft(role) ? split / 2 : split + (100 - split) / 2) : 50;
-  // Named only while the group waits for data: a paused clip may load nothing, and a clip that
-  // only catches up with the other is not loading.
+  // Named only while the group waits for data: a paused clip may load nothing.
   const progress = ready
     ? null
     : phase === 'buffering'
@@ -597,114 +599,6 @@ export default function VideoClipStage({
           {prompt}
         </p>
       )}
-    </div>
-  );
-
-  const inspectToggle = (testId: string, className?: string) => (
-    <Button
-      data-testid={testId}
-      variant="outline"
-      size="sm"
-      className={className}
-      aria-expanded={inspect}
-      aria-controls={inspectId}
-      onClick={() => {
-        setInspect(!inspect);
-        track('video_results_inspect_toggled', { enabled: !inspect });
-      }}
-    >
-      <ScanSearch aria-hidden="true" />
-      {s.inspect}
-    </Button>
-  );
-  // A phone opens the drawer beside its toggle in the slot, not under the transport.
-  const movedInspect = phone && Boolean(inspectSlot);
-  const drawer = inspect && (
-    <div
-      id={inspectId}
-      data-testid="video-results-inspect"
-      role="group"
-      aria-label={s.inspect}
-      className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg bg-muted/60 px-3 py-2 text-xs"
-    >
-      <div className="flex items-center gap-1.5">
-        <Button
-          data-testid="video-results-frame-previous"
-          variant="outline"
-          size="icon-xs"
-          aria-label={s.previousFrame}
-          title={s.previousFrameTitle}
-          disabled={!clock}
-          onClick={() => stepFrame(-1)}
-        >
-          <StepBack aria-hidden="true" />
-        </Button>
-        <Button
-          data-testid="video-results-frame-next"
-          variant="outline"
-          size="icon-xs"
-          aria-label={s.nextFrame}
-          title={s.nextFrameTitle}
-          disabled={!clock}
-          onClick={() => stepFrame(1)}
-        >
-          <StepForward aria-hidden="true" />
-        </Button>
-        <span
-          data-testid="video-results-frame"
-          className="min-w-28 font-mono text-muted-foreground"
-        >
-          {clock ? s.frame(frameAt(time, clock.fps, clock.total) + 1, clock.total) : '—'}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">{s.speed}</span>
-        <SegmentedToggle
-          role="group"
-          ariaLabel={s.speed}
-          value={String(playback.speed)}
-          size="sm"
-          options={SPEEDS.map((speed) => ({
-            value: String(speed),
-            label: `${speed}×`,
-            testId: `video-results-speed-${speed}`,
-          }))}
-          onValueChange={(value) => {
-            const speed = Number(value);
-            setPlayback((current) => ({ ...current, speed }));
-            track('video_results_speed_changed', { speed });
-          }}
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">{s.zoom}</span>
-        <SegmentedToggle
-          role="group"
-          ariaLabel={s.zoom}
-          value={String(lens.zoom)}
-          size="sm"
-          options={ZOOMS.map((zoom) => ({
-            value: String(zoom),
-            label: `${zoom}×`,
-            testId: `video-results-zoom-${zoom}`,
-          }))}
-          onValueChange={(value) => zoomTo(Number(value))}
-        />
-      </div>
-      <Button
-        data-testid="video-results-loop"
-        variant="outline"
-        size="sm"
-        aria-pressed={playback.loop}
-        onClick={() => {
-          setPlayback((current) => ({ ...current, loop: !current.loop }));
-          track('video_results_loop_toggled', { enabled: !playback.loop });
-        }}
-      >
-        <Repeat aria-hidden="true" />
-        {s.loop}
-      </Button>
-      {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint(touch)}</span>}
     </div>
   );
 
@@ -837,7 +731,6 @@ export default function VideoClipStage({
                             next.delete(clip.url);
                             return next;
                           });
-                          firstFrame[role].reset();
                           videos.current.get(role)?.load();
                         }}
                       >
@@ -998,10 +891,7 @@ export default function VideoClipStage({
         )}
       </div>
       {caption}
-      {/*
-        Under 768 px the row keeps one shape whatever plays: the button is as wide as its longer
-        label, and the time and the buffering note share one slot as wide as the longer of them.
-      */}
+      {/* Under 768 px the row keeps one shape whatever plays: the time and the buffering note share a slot. */}
       <div className="flex flex-wrap items-center gap-3 max-md:gap-2">
         <Button
           data-testid="video-results-play"
@@ -1061,21 +951,115 @@ export default function VideoClipStage({
         >
           <ArrowLeftRight aria-hidden="true" />
         </Button>
-        {/* Hidden by CSS from the first paint, before the slot it moves to has mounted. */}
-        {inspectToggle(
-          'video-results-inspect-toggle',
-          inspectSlot === undefined ? undefined : 'max-md:hidden',
-        )}
+        <InSlot slot={slot}>
+          <Button
+            data-testid="video-results-inspect-toggle"
+            variant="outline"
+            size="sm"
+            // Hidden by CSS from a phone's first paint, before the slot it moves to has mounted.
+            className={
+              slot ? 'self-start' : inspectSlot === undefined ? undefined : 'max-md:hidden'
+            }
+            aria-expanded={inspect}
+            aria-controls={inspectId}
+            onClick={() => {
+              setInspect(!inspect);
+              track('video_results_inspect_toggled', { enabled: !inspect });
+            }}
+          >
+            <ScanSearch aria-hidden="true" />
+            {s.inspect}
+          </Button>
+        </InSlot>
       </div>
-      {!movedInspect && drawer}
-      {inspectSlot &&
-        createPortal(
-          <>
-            {inspectToggle('video-results-inspect-toggle-phone', 'self-start md:hidden')}
-            {movedInspect && drawer}
-          </>,
-          inspectSlot,
-        )}
+      <InSlot slot={slot} show={inspect}>
+        <div
+          id={inspectId}
+          data-testid="video-results-inspect"
+          role="group"
+          aria-label={s.inspect}
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg bg-muted/60 px-3 py-2 text-xs"
+        >
+          <div className="flex items-center gap-1.5">
+            <Button
+              data-testid="video-results-frame-previous"
+              variant="outline"
+              size="icon-xs"
+              aria-label={s.previousFrame}
+              title={s.previousFrameTitle}
+              disabled={!clock}
+              onClick={() => stepFrame(-1)}
+            >
+              <StepBack aria-hidden="true" />
+            </Button>
+            <Button
+              data-testid="video-results-frame-next"
+              variant="outline"
+              size="icon-xs"
+              aria-label={s.nextFrame}
+              title={s.nextFrameTitle}
+              disabled={!clock}
+              onClick={() => stepFrame(1)}
+            >
+              <StepForward aria-hidden="true" />
+            </Button>
+            <span
+              data-testid="video-results-frame"
+              className="min-w-28 font-mono text-muted-foreground"
+            >
+              {clock ? s.frame(frameAt(time, clock.fps, clock.total) + 1, clock.total) : '—'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">{s.speed}</span>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={s.speed}
+              value={String(playback.speed)}
+              size="sm"
+              options={SPEEDS.map((speed) => ({
+                value: String(speed),
+                label: `${speed}×`,
+                testId: `video-results-speed-${speed}`,
+              }))}
+              onValueChange={(value) => {
+                const speed = Number(value);
+                setPlayback((current) => ({ ...current, speed }));
+                track('video_results_speed_changed', { speed });
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">{s.zoom}</span>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={s.zoom}
+              value={String(lens.zoom)}
+              size="sm"
+              options={ZOOMS.map((zoom) => ({
+                value: String(zoom),
+                label: `${zoom}×`,
+                testId: `video-results-zoom-${zoom}`,
+              }))}
+              onValueChange={(value) => zoomTo(Number(value))}
+            />
+          </div>
+          <Button
+            data-testid="video-results-loop"
+            variant="outline"
+            size="sm"
+            aria-pressed={playback.loop}
+            onClick={() => {
+              setPlayback((current) => ({ ...current, loop: !current.loop }));
+              track('video_results_loop_toggled', { enabled: !playback.loop });
+            }}
+          >
+            <Repeat aria-hidden="true" />
+            {s.loop}
+          </Button>
+          {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint(touch)}</span>}
+        </div>
+      </InSlot>
     </div>
   );
 }

@@ -225,10 +225,7 @@ const modelSlug = (model: string) =>
     .replaceAll(/[^a-z0-9.]+/gu, '-')
     .replaceAll(/^-+|-+$/gu, '');
 
-/**
- * Workload keys already parsed. A key carries its whole plan, every point of a workload shares
- * it, and a render reads the metadata of every point, so each key is parsed once.
- */
+/** Workload keys already parsed: every point of a workload shares its key, and a render reads them all. */
 const parsedWorkloads = new Map<string, Json>();
 
 function workloadIdentity(key: string | null | undefined): Json {

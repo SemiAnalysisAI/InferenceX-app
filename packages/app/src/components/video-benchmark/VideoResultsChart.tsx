@@ -239,7 +239,7 @@ export interface ClipLink {
   baseline: string | null;
   /** First frames of the stage's prompt by point key, for the hover card; null once read without one. */
   posters: Readonly<Record<string, string | null>>;
-  /** What plays for the stage's prompt by point key, and that prompt, for a touch screen's sheet. */
+  /** What plays for the stage's prompt by point key, and that prompt, for the point sheet. */
   media?: Readonly<Record<string, string | null>>;
   prompt?: { id: string; seed: number } | null;
   /** Playable points pulse until the reader first picks a clip. */
@@ -287,11 +287,7 @@ function pointPosition(node: Element): { x: number; y: number } | null {
   return match?.groups ? { x: Number(match.groups.x), y: Number(match.groups.y) } : null;
 }
 
-/**
- * Widths already measured, by type size, weight and text. Measuring a text forces a layout, and
- * the marks are redrawn on every frame of a transition, so each text is measured once. A font
- * that loads later changes every width, so they are measured again after it.
- */
+/** Measuring a text forces a layout and the marks redraw every frame, so each width is measured once per font load. */
 const measuredWidths = new Map<string, number>();
 if (typeof document !== 'undefined')
   document.fonts?.addEventListener('loadingdone', () => measuredWidths.clear());
@@ -321,7 +317,7 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
   const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
   const host = points[0]?.parentNode;
   if (!host) return;
-  // The point a sheet describes keeps a ring in the ink color, which reads over every series.
+  // The point a sheet describes keeps a ring in the ink color.
   const chosen = points.find(
     (node) => select<SVGGElement, PlotPoint>(node).datum().key === inputs.sheet,
   );
@@ -345,9 +341,8 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       focus.add(point.series);
   }
 
-  // Badges on the two points the stage plays. They are placed first, since each belongs to one
-  // point, and the labels and pills then keep clear of them; the layer is raised over the pills
-  // once those are drawn.
+  // Badges on the two points the stage plays go first, so labels and pills keep clear of them;
+  // their layer is raised over the pills at the end.
   const badgeLayer = link
     ? select(host as SVGGElement)
         .append('g')
@@ -355,7 +350,6 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
         .attr('pointer-events', 'none')
     : null;
   const badges: Box[] = [];
-  // Each point's place is parsed once per redraw; the badges, pills and lines all read it.
   const places = new Map(points.map((node) => [node, pointPosition(node)]));
   const spots = [...places.values()].flatMap((at) => at ?? []);
   const lines = inputs.pills.map((pill) =>
@@ -486,7 +480,6 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       .text(narrow ? pill.short : pill.text);
     const width = textWidth(text.node()!, CHART_TYPE.annotation) + 12;
     rect.attr('width', width);
-    // Each place is judged where the pill ends up once it is off the shown labels.
     const box = placePill(
       pill.key,
       at,
@@ -660,131 +653,6 @@ function PanelRuntime({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The pinned panel's parts, which a touch screen's sheet shows too. */
-interface PanelParts {
-  describe: (plot: PlotPoint) => {
-    title: string;
-    subtitle?: string;
-    date: string;
-    warning?: string;
-  };
-  links: (point: VideoPoint) => { action: string; label: string; href: string }[];
-  sections: (plot: PlotPoint) => ReactNode;
-  selection: Parameters<(typeof RESULTS_X_METRICS)['p50']['value']>[1];
-}
-
-/**
- * A touch screen's sheet for one plotted point: its clip of the stage's prompt, four figures and
- * three actions, then everything the pinned panel lists.
- */
-function PointSheet({
-  plot,
-  panel,
-  link,
-  labels,
-  anchor,
-  onOutside,
-  onOpen,
-  onClose,
-}: {
-  plot: PlotPoint;
-  panel: PanelParts;
-  link: ClipLink | undefined;
-  labels: Record<
-    'gpus' | 'latency' | 'perClip' | 'perDollar' | 'energy' | 'noClips' | 'telemetry',
-    string
-  >;
-  /** The point's mark on the chart. */
-  anchor: () => Element | null;
-  /** Opens the point a tap beside the sheet lands on; false when it lands on none. */
-  onOutside: (x: number, y: number) => boolean;
-  onOpen: (pointKey: string, source: 'popover') => void;
-  onClose: () => void;
-}) {
-  const { cell } = plot;
-  const d = panel.describe(plot);
-  const cost = cell.cost[panel.selection.basis];
-  const perDollar = RESULTS_Y_METRICS.videoSecondsPerDollar;
-  const poster = link?.posters[plot.key];
-  const media = link?.media?.[plot.key] ?? null;
-  // Unread clips show a placeholder; a point read without a first frame or media has none.
-  const clip =
-    !plot.clips || !link
-      ? null
-      : poster === undefined
-        ? undefined
-        : poster === null && media === null
-          ? null
-          : { poster, src: media };
-  return (
-    <VideoPointSheet
-      title={d.title}
-      color={plot.color}
-      facts={[d.subtitle, labels.gpus, d.date, d.warning].filter((fact) => fact !== undefined)}
-      clip={clip}
-      noClips={plot.clips ? undefined : labels.noClips}
-      prompt={clip === null ? null : (link?.prompt ?? null)}
-      metrics={[
-        {
-          label: labels.latency,
-          value: unit(reading(RESULTS_X_METRICS.p50.value(cell, panel.selection)) ?? '—', 's'),
-        },
-        { label: labels.perClip, value: cost ? usd(cost.perVideo) : '—' },
-        {
-          label: labels.perDollar,
-          value: reading(perDollar.value(cell, panel.selection)) ?? '—',
-        },
-        { label: labels.energy, value: kilojoules(cell.joulesPerClip) ?? '—' },
-      ]}
-      onCompare={
-        plot.clips && link
-          ? () => {
-              track('video_results_clip_selected', {
-                source: 'sheet',
-                gpu: plot.hardwareKey,
-                overlay: plot.overlay,
-                lossy: isLossy(cell.point),
-                engine: plot.engine,
-              });
-              link.onSelect(plot.key);
-              onClose();
-              link.onReveal();
-            }
-          : undefined
-      }
-      telemetry={{
-        label: labels.telemetry,
-        onOpen: () => {
-          onClose();
-          onOpen(plot.key, 'popover');
-        },
-      }}
-      context={{ gpu: plot.hardwareKey, overlay: plot.overlay }}
-      pointKey={plot.key}
-      anchor={anchor}
-      onOutside={onOutside}
-      onClose={onClose}
-    >
-      {panel.sections(plot)}
-      <div className="mt-2 flex flex-wrap gap-x-5">
-        {panel.links(cell.point).map((entry) => (
-          <a
-            key={entry.action}
-            data-action={entry.action}
-            href={entry.href}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-11 min-w-11 items-center text-brand-fill hover:underline"
-            onClick={() => track('video_results_sheet_link_opened', { action: entry.action })}
-          >
-            {entry.label}
-          </a>
-        ))}
-      </div>
-    </VideoPointSheet>
-  );
-}
-
 export default function VideoResultsChart({
   cells,
   history,
@@ -826,7 +694,7 @@ export default function VideoResultsChart({
   lossyNote?: ReactNode;
   /** The cohort is still loading: an empty plot shows a skeleton, not the no-data note. */
   loading?: boolean;
-  /** The phone layout, under 768 px: the chart drops its line of zoom gestures. */
+  /** The phone layout drops the line of zoom gestures. */
   phone?: boolean;
 }) {
   const locale = useLocale();
@@ -912,14 +780,12 @@ export default function VideoResultsChart({
       }),
     [series, s, history, colorFor, better, byEngine],
   );
-  // A touch screen opens a point in a sheet. The open point is `r_sheet`, so a shared link
-  // reopens it; a mouse keeps the pinned panel and ignores the key.
+  // A touch screen opens a point in a sheet (`r_sheet`); a mouse keeps the pinned panel.
   const touch = useIsCoarsePointer();
   const sheetKey = useStageValue('sheet');
   const sheetPoint =
     touch && sheetKey ? plotted.find((point) => point.key === sheetKey) : undefined;
-  // SVG shapes do not animate on the compositor: each ring costs a style pass and a layout every
-  // frame for as long as it runs. The chart is marked while it is off screen, and the rings rest.
+  // A ring costs a style pass and a layout every frame, so the rings rest while the chart is off screen.
   useEffect(() => {
     const root = chart.current
       ?.getSvgElement()
@@ -935,9 +801,8 @@ export default function VideoResultsChart({
   const lastTapped = useRef<string | null>(null);
   const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills, sheet: null });
   marks.current = { link: clipLink, hover: hover.current, pills, sheet: sheetPoint?.key ?? null };
-  // A finger covers several points on a narrow plot, and two can plot a pixel apart. On a touch
-  // screen a tap goes to the point `tapTarget` picks and opens its sheet; the plot's own handlers,
-  // which pin the panel a mouse uses, never see it.
+  // On a touch screen a tap opens the sheet of the point `tapTarget` picks; the plot's own
+  // handlers, which pin the panel a mouse uses, never see it.
   const openAt = useCallback((clientX: number, clientY: number) => {
     const svg = chart.current?.getSvgElement();
     if (!svg) return false;
@@ -970,7 +835,6 @@ export default function VideoResultsChart({
       optimal: point.optimal,
       playable: point.clips,
     });
-    // Its clips are read as a rest of the mouse reads them, for the sheet's first frame.
     if (point.clips) link.current?.onPeek(point.key);
     writeStage({ ...parseStage(location.search), sheet: point.key });
     return true;
@@ -984,7 +848,6 @@ export default function VideoResultsChart({
     svg.addEventListener('click', onClick, true);
     return () => svg.removeEventListener('click', onClick, true);
   }, [touch, openAt]);
-  /** The ring on the point the sheet describes, which the sheet keeps in view above itself. */
   const sheetAnchor = useCallback(
     () => chart.current?.getSvgElement()?.querySelector(`.${SHEET_RING}`) ?? null,
     [],
@@ -1097,8 +960,7 @@ export default function VideoResultsChart({
   const onRender = useCallback(
     ({ layout, width, height }: RenderContext) => {
       size.current = { width, height };
-      // The x title centres on the plot. Where the chart is too narrow for that, as for the zh
-      // title on a 320 px phone, it moves over just far enough to stay inside the chart.
+      // The x title centres on the plot, and moves over where the chart is too narrow for that.
       const title = layout.svg.select<SVGTextElement>('.x-axis-label').node();
       if (title) {
         const centre = layout.margin.left + width / 2;
@@ -1361,7 +1223,7 @@ export default function VideoResultsChart({
         pair.onSelect(point.key);
       },
     };
-    return { tooltip: config, panel: { describe, links, sections, selection } };
+    return { tooltip: config, panel: { describe, links, sections } };
   }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen, redraw]);
 
   const hidden = new Set(state.hidden);
@@ -1451,220 +1313,285 @@ export default function VideoResultsChart({
       )
     : [];
 
-  const sheet = sheetPoint && (
-    <PointSheet
-      plot={sheetPoint}
-      panel={panel}
-      link={clipLink}
-      labels={{
-        gpus: s.gpus(sheetPoint.cell.point.participating),
-        latency: RESULTS_X_METRICS.p50.label[locale],
-        perClip: s.perClip,
-        perDollar: RESULTS_Y_METRICS.videoSecondsPerDollar.label[locale],
-        energy: s.energy,
-        noClips: s.tipHollow,
-        telemetry: `${s.viewTelemetry} →`,
+  let sheet: ReactNode = null;
+  if (sheetPoint) {
+    const { cell, key } = sheetPoint;
+    const d = panel.describe(sheetPoint);
+    const cost = cell.cost[state.costBasis];
+    const selection = { basis: state.costBasis, tier: state.costTier };
+    const perDollar = RESULTS_Y_METRICS.videoSecondsPerDollar;
+    const playable = sheetPoint.clips && clipLink;
+    const poster = clipLink?.posters[key];
+    const src = clipLink?.media?.[key] ?? null;
+    sheet = (
+      <VideoPointSheet
+        pointKey={key}
+        title={d.title}
+        color={sheetPoint.color}
+        facts={[d.subtitle, s.gpus(cell.point.participating), d.date, d.warning].filter(
+          (fact) => fact !== undefined,
+        )}
+        // Unread clips show a placeholder; a point read without a first frame or media has none.
+        clip={
+          !playable || (poster === null && src === null)
+            ? null
+            : poster === undefined
+              ? undefined
+              : { poster, src }
+        }
+        noClips={sheetPoint.clips ? undefined : s.tipHollow}
+        prompt={clipLink?.prompt ?? null}
+        metrics={[
+          [
+            RESULTS_X_METRICS.p50.label[locale],
+            unit(reading(RESULTS_X_METRICS.p50.value(cell, selection)) ?? '—', 's'),
+          ],
+          [s.perClip, cost ? usd(cost.perVideo) : '—'],
+          [perDollar.label[locale], reading(perDollar.value(cell, selection)) ?? '—'],
+          [s.energy, kilojoules(cell.joulesPerClip) ?? '—'],
+        ]}
+        onCompare={
+          playable
+            ? () => {
+                track('video_results_clip_selected', {
+                  source: 'sheet',
+                  gpu: sheetPoint.hardwareKey,
+                  overlay: sheetPoint.overlay,
+                  lossy: isLossy(cell.point),
+                  engine: sheetPoint.engine,
+                });
+                clipLink.onSelect(key);
+                closeSheet();
+                clipLink.onReveal();
+              }
+            : undefined
+        }
+        telemetry={`${s.viewTelemetry} →`}
+        onTelemetry={() => {
+          closeSheet();
+          onOpen(key, 'popover');
+        }}
+        context={{ gpu: sheetPoint.hardwareKey, overlay: sheetPoint.overlay }}
+        anchor={sheetAnchor}
+        onOutside={openAt}
+        onClose={closeSheet}
+      >
+        {panel.sections(sheetPoint)}
+        <div className="mt-2 flex flex-wrap gap-x-5">
+          {panel.links(cell.point).map((entry) => (
+            <a
+              key={entry.action}
+              data-action={entry.action}
+              href={entry.href}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 min-w-11 items-center text-brand-fill hover:underline"
+              onClick={() => track('video_results_sheet_link_opened', { action: entry.action })}
+            >
+              {entry.label}
+            </a>
+          ))}
+        </div>
+      </VideoPointSheet>
+    );
+  }
+
+  const figure = (
+    <D3Chart<PlotPoint>
+      ref={chart}
+      chartId={VIDEO_RESULTS_CHART_ID}
+      testId="video-results-chart"
+      data={plotted}
+      height={440}
+      // The x title centres on the plot, so a wide left margin pushes the zh title past the
+      // right edge at 320 px in DM Sans.
+      margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
+      watermark="logo"
+      transitionDuration={transition}
+      xScale={xScale}
+      yScale={yScale}
+      xAxis={
+        x.scale === 'log'
+          ? {
+              label: xLabel,
+              tickValues: (scale) => {
+                const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
+                return [...new Set(plotted.map((point) => point.x))]
+                  .filter((value) => value >= lo && value <= hi)
+                  .toSorted((a, b) => a - b);
+              },
+              tickFormat: (value) => n(Number(value), x.digits),
+            }
+          : { label: xLabel, tickCount: 6 }
+      }
+      yAxis={{ label: yLabel, tickCount: 6 }}
+      layers={layers}
+      tooltip={tooltip}
+      onRender={onRender}
+      onExportRender={onExportRender}
+      zoom={{
+        enabled: true,
+        axes: 'both',
+        scaleExtent: [1, 20],
+        resetEventName: `video_results_zoom_reset_${VIDEO_RESULTS_CHART_ID}`,
       }}
-      anchor={sheetAnchor}
-      onOutside={openAt}
-      onOpen={onOpen}
-      onClose={closeSheet}
+      // A phone's chart has the reset button above it and no room for a line of gestures.
+      instructions={phone ? '' : s.controls}
+      noDataOverlay={
+        plotted.length === 0 ? (
+          loading ? (
+            <Skeleton
+              data-testid="video-results-chart-skeleton"
+              className="pointer-events-none absolute inset-0"
+            />
+          ) : (
+            <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
+              {s.noData}
+            </EmptyState>
+          )
+        ) : undefined
+      }
+      caption={heading}
+      footer={
+        single || footer ? (
+          <>
+            {single && (
+              <p
+                className="mb-3 text-xs text-muted-foreground"
+                data-testid="video-results-single-note"
+              >
+                {s.singleDeployment}
+              </p>
+            )}
+            {footer}
+          </>
+        ) : undefined
+      }
+      // An 18rem sidebar keeps a pinned point's details readable; it is sized before
+      // the pin so pinning never reflows the plot.
+      legendElement={
+        <div className="flex min-h-0 flex-1 flex-col lg:min-w-72">
+          <ChartLegend
+            variant="sidebar"
+            legendItems={legendItems}
+            onItemRemove={toggle}
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={(expanded) => {
+              onLegendExpandedChange(expanded);
+              track('video_results_legend_expanded', { enabled: expanded });
+            }}
+            reset={{
+              id: 'video-results-legend-reset',
+              disabled: state.hidden.length === 0,
+              onClick: () => {
+                onUpdate({ hidden: [] });
+                track('video_results_legend_reset');
+              },
+            }}
+            switches={[
+              {
+                id: 'video-results-optimal',
+                label: s.optimal,
+                checked: state.optimal,
+                infoTooltip: s.optimalHelp,
+                onCheckedChange: (optimal) => {
+                  onUpdate({ optimal });
+                  track('video_results_optimal_toggled', { enabled: optimal });
+                },
+              },
+              {
+                id: 'video-results-labels',
+                label: s.labels,
+                checked: labels,
+                onCheckedChange: (enabled) => {
+                  onLabelsChange(enabled);
+                  track('video_results_labels_toggled', { enabled });
+                },
+              },
+              ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
+                ? [
+                    {
+                      id: 'video-results-lossy',
+                      label: s.lossy,
+                      checked: state.lossy,
+                      infoTooltip: s.lossyHelp,
+                      onCheckedChange: (lossy: boolean) => {
+                        onUpdate({ lossy });
+                        track('video_results_lossy_toggled', { enabled: lossy });
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+            keyIndicators={
+              engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
+                <>
+                  {engines.length > 1 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.engines}
+                      data-testid="results-engine-key"
+                    >
+                      {engines.map((engine) => (
+                        <li
+                          key={engine ?? 'na'}
+                          className="flex items-center gap-2"
+                          data-engine={engine ?? 'na'}
+                        >
+                          <SeriesSwatch shape={engineShape(engine)} dashed={false} />
+                          {engine === null ? s.engineNotRecorded : engineLabel(engine)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {lossySeries.length > 0 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.lossySeries}
+                      data-testid="results-lossy-key"
+                    >
+                      {lossySeries.map((item) => (
+                        <li
+                          key={item.key}
+                          className="flex items-center gap-2"
+                          data-series={item.key}
+                          style={{
+                            color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
+                          }}
+                        >
+                          <SeriesSwatch
+                            shape={byEngine ? engineShape(item.engine) : 'circle'}
+                            dashed
+                          />
+                          <span className="text-muted-foreground">
+                            {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {lossySeries.length > 0 && lossyNote}
+                  {state.unofficialRun && (
+                    <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className="inline-block size-3 shrink-0 rounded-full"
+                        style={{ background: overlayRunColor(0) }}
+                      />
+                      {s.unofficial} #{state.unofficialRun}
+                    </p>
+                  )}
+                </>
+              ) : undefined
+            }
+          />
+        </div>
+      }
     />
   );
-
   return (
     <>
       {sheet}
-      <D3Chart<PlotPoint>
-        ref={chart}
-        chartId={VIDEO_RESULTS_CHART_ID}
-        testId="video-results-chart"
-        data={plotted}
-        height={440}
-        // The x title centres on the plot, so a wide left margin pushes the zh title past the
-        // right edge at 320 px in DM Sans.
-        margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
-        watermark="logo"
-        transitionDuration={transition}
-        xScale={xScale}
-        yScale={yScale}
-        xAxis={
-          x.scale === 'log'
-            ? {
-                label: xLabel,
-                tickValues: (scale) => {
-                  const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
-                  return [...new Set(plotted.map((point) => point.x))]
-                    .filter((value) => value >= lo && value <= hi)
-                    .toSorted((a, b) => a - b);
-                },
-                tickFormat: (value) => n(Number(value), x.digits),
-              }
-            : { label: xLabel, tickCount: 6 }
-        }
-        yAxis={{ label: yLabel, tickCount: 6 }}
-        layers={layers}
-        tooltip={tooltip}
-        onRender={onRender}
-        onExportRender={onExportRender}
-        zoom={{
-          enabled: true,
-          axes: 'both',
-          scaleExtent: [1, 20],
-          resetEventName: `video_results_zoom_reset_${VIDEO_RESULTS_CHART_ID}`,
-        }}
-        // A phone's chart has the reset button above it and no room for a line of gestures.
-        instructions={phone ? '' : s.controls}
-        noDataOverlay={
-          plotted.length === 0 ? (
-            loading ? (
-              <Skeleton
-                data-testid="video-results-chart-skeleton"
-                className="pointer-events-none absolute inset-0"
-              />
-            ) : (
-              <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
-                {s.noData}
-              </EmptyState>
-            )
-          ) : undefined
-        }
-        caption={heading}
-        footer={
-          single || footer ? (
-            <>
-              {single && (
-                <p
-                  className="mb-3 text-xs text-muted-foreground"
-                  data-testid="video-results-single-note"
-                >
-                  {s.singleDeployment}
-                </p>
-              )}
-              {footer}
-            </>
-          ) : undefined
-        }
-        // An 18rem sidebar keeps a pinned point's details readable; it is sized before
-        // the pin so pinning never reflows the plot.
-        legendElement={
-          <div className="flex min-h-0 flex-1 flex-col lg:min-w-72">
-            <ChartLegend
-              variant="sidebar"
-              legendItems={legendItems}
-              onItemRemove={toggle}
-              isLegendExpanded={legendExpanded}
-              onExpandedChange={(expanded) => {
-                onLegendExpandedChange(expanded);
-                track('video_results_legend_expanded', { enabled: expanded });
-              }}
-              reset={{
-                id: 'video-results-legend-reset',
-                disabled: state.hidden.length === 0,
-                onClick: () => {
-                  onUpdate({ hidden: [] });
-                  track('video_results_legend_reset');
-                },
-              }}
-              switches={[
-                {
-                  id: 'video-results-optimal',
-                  label: s.optimal,
-                  checked: state.optimal,
-                  infoTooltip: s.optimalHelp,
-                  onCheckedChange: (optimal) => {
-                    onUpdate({ optimal });
-                    track('video_results_optimal_toggled', { enabled: optimal });
-                  },
-                },
-                {
-                  id: 'video-results-labels',
-                  label: s.labels,
-                  checked: labels,
-                  onCheckedChange: (enabled) => {
-                    onLabelsChange(enabled);
-                    track('video_results_labels_toggled', { enabled });
-                  },
-                },
-                ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
-                  ? [
-                      {
-                        id: 'video-results-lossy',
-                        label: s.lossy,
-                        checked: state.lossy,
-                        infoTooltip: s.lossyHelp,
-                        onCheckedChange: (lossy: boolean) => {
-                          onUpdate({ lossy });
-                          track('video_results_lossy_toggled', { enabled: lossy });
-                        },
-                      },
-                    ]
-                  : []),
-              ]}
-              keyIndicators={
-                engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
-                  <>
-                    {engines.length > 1 && (
-                      <ul
-                        className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                        aria-label={s.engines}
-                        data-testid="results-engine-key"
-                      >
-                        {engines.map((engine) => (
-                          <li
-                            key={engine ?? 'na'}
-                            className="flex items-center gap-2"
-                            data-engine={engine ?? 'na'}
-                          >
-                            <SeriesSwatch shape={engineShape(engine)} dashed={false} />
-                            {engine === null ? s.engineNotRecorded : engineLabel(engine)}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {lossySeries.length > 0 && (
-                      <ul
-                        className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
-                        aria-label={s.lossySeries}
-                        data-testid="results-lossy-key"
-                      >
-                        {lossySeries.map((item) => (
-                          <li
-                            key={item.key}
-                            className="flex items-center gap-2"
-                            data-series={item.key}
-                            style={{
-                              color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
-                            }}
-                          >
-                            <SeriesSwatch
-                              shape={byEngine ? engineShape(item.engine) : 'circle'}
-                              dashed
-                            />
-                            <span className="text-muted-foreground">
-                              {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {lossySeries.length > 0 && lossyNote}
-                    {state.unofficialRun && (
-                      <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span
-                          className="inline-block size-3 shrink-0 rounded-full"
-                          style={{ background: overlayRunColor(0) }}
-                        />
-                        {s.unofficial} #{state.unofficialRun}
-                      </p>
-                    )}
-                  </>
-                ) : undefined
-              }
-            />
-          </div>
-        }
-      />
+      {figure}
     </>
   );
 }

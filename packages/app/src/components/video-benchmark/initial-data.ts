@@ -17,6 +17,6 @@ export interface VideoInitialData {
   sides: Record<string, ResultsClipSide | null>;
 }
 
-/** Whether a request's User-Agent names a phone: the server's guess for `usePhone`. */
+/** Whether a request's User-Agent names a phone: the server's guess of the viewport. */
 export const phoneUserAgent = (userAgent: string | null | undefined) =>
   /\bMobi/u.test(userAgent ?? '');

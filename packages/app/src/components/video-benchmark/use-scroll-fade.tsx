@@ -3,20 +3,10 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 
 /**
- * The edges of a sideways scroller that hide content, as its `data-scroll-more` names them:
- * `start`, `end`, both, or none. A pixel of slack absorbs fractional layout widths.
- */
-export function scrollMore(scrollLeft: number, clientWidth: number, scrollWidth: number): string {
-  return [
-    ...(scrollLeft > 1 ? ['start'] : []),
-    ...(scrollLeft + clientWidth < scrollWidth - 1 ? ['end'] : []),
-  ].join(' ');
-}
-
-/**
- * Keeps `data-scroll-more` on a sideways scroller, which results.module.css fades at those
- * edges. The scroller is `root` itself, or the element `selector` finds inside it when a shared
- * component owns the scroller; `dependency` re-reads it when that component remounts it.
+ * Names the edges of a sideways scroller that hide content in its `data-scroll-more` (`start`,
+ * `end`, both or none), which results.module.css fades. The scroller is `root`, or the element
+ * `selector` finds inside it when a shared component owns the scroller; `dependency` re-reads it
+ * when that component remounts it.
  */
 export function useScrollFade(
   root: RefObject<HTMLElement | null>,
@@ -27,11 +17,10 @@ export function useScrollFade(
     const scroller = selector ? root.current?.querySelector<HTMLElement>(selector) : root.current;
     if (!scroller) return undefined;
     const read = () => {
-      scroller.dataset.scrollMore = scrollMore(
-        scroller.scrollLeft,
-        scroller.clientWidth,
-        scroller.scrollWidth,
-      );
+      // A pixel of slack absorbs fractional layout widths.
+      const start = scroller.scrollLeft > 1;
+      const end = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1;
+      scroller.dataset.scrollMore = [start && 'start', end && 'end'].filter(Boolean).join(' ');
     };
     read();
     scroller.addEventListener('scroll', read, { passive: true });
