@@ -737,13 +737,6 @@ function sliceOverviewRow(
   };
 }
 
-function deployedGpuFactor(row: BenchmarkRow): number {
-  const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
-  return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0 && totalGpus > 0
-    ? row.num_decode_gpu / totalGpus
-    : 1;
-}
-
 function topologyEvidence(row: BenchmarkRow): string | undefined {
   return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
     ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
@@ -755,17 +748,18 @@ interface OverviewAgenticTierPoint extends TcoTierPoint {
 }
 
 /** AgentX: the tier axis stays P90 interactivity (the chart's SLA contract);
- *  the throughput read at the tier is total tok/s per deployed GPU. */
+ *  the throughput read at the tier is total tok/s per deployed GPU. The stored
+ *  `tput_per_gpu` already divides total throughput by every deployed GPU
+ *  (prefill + decode for disaggregated serving), so it is read as is. */
 function buildAgenticTierReads(
   rows: readonly BenchmarkRow[],
   tiers: readonly number[],
 ): TcoTierRead[] {
   const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
     const entry = rowToAggDataEntry(row, { modelPower: false });
-    const factor = deployedGpuFactor(row);
     const interactivity = entry.p90_intvty;
     const e2eLatency = entry.p90_e2el;
-    const totalThroughput = entry.tput_per_gpu * factor;
+    const totalThroughput = entry.tput_per_gpu;
     if (
       !Number.isFinite(interactivity) ||
       interactivity <= 0 ||
@@ -790,7 +784,8 @@ function buildAgenticTierReads(
 }
 
 /** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
- *  valued in total (input + output) tok/s per DEPLOYED GPU. Rows without a
+ *  valued in total (input + output) tok/s per DEPLOYED GPU, which is the stored
+ *  `tput_per_gpu` as is. Rows without a
  *  usable total-throughput metric are dropped — the overview cannot price
  *  them, so they must not shape the frontier either. */
 function buildSingleTurnTierReads(
@@ -804,7 +799,7 @@ function buildSingleTurnTierReads(
     return [
       {
         interactivity,
-        throughput: totalTput * deployedGpuFactor(row),
+        throughput: totalTput,
         date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
