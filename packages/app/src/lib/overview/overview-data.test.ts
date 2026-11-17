@@ -494,7 +494,7 @@ describe('overview engine scope and scenario selection', () => {
     });
   });
 
-  it('normalizes disaggregated total throughput by all deployed GPUs before interpolation', () => {
+  it('interpolates disaggregated rows on their stored per-deployed-GPU total throughput', () => {
     const summary = buildOverviewModelSummary(Model.DeepSeek_V4_Pro, [
       row({
         hardware: 'gb300',
@@ -533,11 +533,61 @@ describe('overview engine scope and scenario selection', () => {
       }),
     ]);
 
+    // Between the 5,169 (24P+8D) and 3,249 (16P+8D) knots, not a further
+    // decode ÷ total rescaling of them.
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: 1224.393,
+      value: 4546.165,
       boundary: 'interpolated',
       evidenceTopologies: ['24P+8D', '16P+8D'],
     });
+  });
+
+  // `tput_per_gpu` is already total tok/s ÷ (prefill + decode) GPUs, as produced by
+  // InferenceX (`total_token_throughput / total_gpus`). Scaling it by decode ÷ total
+  // again divided disaggregated throughput twice and overstated its cost.
+  it('prices disaggregated single-turn rows on the stored per-deployed-GPU total throughput', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      row({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        precision: Precision.FP4,
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 12,
+        num_decode_gpu: 8,
+        metrics: { median_intvty: 50, tput_per_gpu: 16200, output_tput_per_gpu: 2400 },
+      }),
+    ]);
+    const gb300 = summary.platforms.find((p) => p.hardware === 'gb300')!;
+
+    expect(gb300.read.value).toBe(16200);
+    expect(gb300.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (16200 * 3600),
+      9,
+    );
+  });
+
+  it('prices disaggregated AgentX rows on the stored per-deployed-GPU total throughput', () => {
+    // Shape of a production Qwen3.5 GB300 12P+8D AgentX row:
+    // total_tput_tps 2,627,360 over 20 GPUs = tput_per_gpu 131,368.
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, [
+      agenticRow(50, 25, 131_368, 2_100, {
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 12,
+        num_decode_gpu: 8,
+      }),
+    ]);
+    const gb300 = summary.platforms.find((p) => p.hardware === 'gb300')!;
+
+    expect(summary.scenario).toBe('agentx');
+    expect(gb300.read.value).toBe(131_368);
+    expect(gb300.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (131_368 * 3600),
+      9,
+    );
   });
 
   it('does not normalize aggregated multinode rows with duplicated P/D counts', () => {
@@ -558,7 +608,7 @@ describe('overview engine scope and scenario selection', () => {
     });
   });
 
-  it('normalizes disaggregated rows even when they run on one node', () => {
+  it('reads single-node disaggregated rows on their stored per-deployed-GPU total throughput', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([16200, 13500, 10800, 8100], {
         hardware: 'gb300',
@@ -571,7 +621,7 @@ describe('overview engine scope and scenario selection', () => {
     ]);
 
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: 9000,
+      value: 13500,
       evidenceTopologies: ['4P+8D'],
     });
   });
