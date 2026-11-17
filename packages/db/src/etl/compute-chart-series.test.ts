@@ -2,7 +2,12 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, computeChartSeries } from './compute-chart-series.js';
+import {
+  CHART_SERIES_VERSION,
+  computeChartDataFromMetricPhases,
+  computeChartSeries,
+  type MetricsMap,
+} from './compute-chart-series.js';
 
 function makeBlob(opts?: {
   prefixHits?: number;
@@ -740,17 +745,19 @@ describe('computeChartSeries', () => {
     expect(result?.hostKvCacheUsage).toEqual([{ t: 0, value: 0.25 }]);
     expect(result?.prefixCacheHitRate).toEqual([{ t: 0, value: 0.4 }]);
     expect(result?.queueDepth).toEqual([{ t: 0, running: 5, waiting: 4, total: 9 }]);
-    expect(result?.prefillTps).toEqual([{ t: 0, value: 300 }]);
+    // Decode re-reports prompts it received by transfer, so prompt counters come from prefill.
+    expect(result?.prefillTps).toEqual([{ t: 0, value: 100 }]);
     expect(result?.decodeTps).toEqual([{ t: 0, value: 50 }]);
     expect(result?.promptTokensBySource).toEqual({
-      'cache hit (HBM)': [{ t: 0, value: 120 }],
-      'compute (miss)': [{ t: 0, value: 180 }],
+      'cache hit (HBM)': [{ t: 0, value: 40 }],
+      'compute (miss)': [{ t: 0, value: 60 }],
     });
     expect(result?.metricSources.map(({ source }) => [source.role, source.endpointUrl])).toEqual([
       ['prefill', prefillUrl],
       ['decode', decodeUrl],
     ]);
     expect(result?.metricSources[0]?.promptTps).toEqual([{ t: 0, value: 100 }]);
+    expect(result?.metricSources[1]?.promptTps).toEqual([{ t: 0, value: 200 }]);
     expect(result?.metricSources[1]?.generationTps).toEqual([{ t: 0, value: 50 }]);
   });
 
@@ -1086,5 +1093,130 @@ describe('computeChartSeries summed series', () => {
       { t: 1, value: 20 },
       { t: 2, value: 30 },
     ]);
+  });
+});
+
+const trtllmCounter = (
+  endpoint_url: string,
+  dynamo_component: 'prefill' | 'backend',
+  slices: [startS: number, total: number][],
+) => ({
+  endpoint_url,
+  labels: { dynamo_component, worker_id: endpoint_url },
+  timeslices: slices.map(([startS, tokenCount]) => ({
+    start_ns: startS * 1e9,
+    end_ns: (startS + 1) * 1e9,
+    total: tokenCount,
+    rate: tokenCount,
+  })),
+});
+
+describe('TRT-LLM disaggregated prompt-token totals', () => {
+  const prefillUrl = 'http://prefill:7500/metrics';
+  const decodeUrls = ['http://decode-a:7501/metrics', 'http://decode-b:7502/metrics'];
+
+  // One prefill server computes 3% of 1000 prompt tokens; each decode server re-reports
+  // the 500 prompt tokens it received by transfer, with `decodeCached` of them as cached.
+  const disaggMetrics = (decodeCached: number): MetricsMap => ({
+    trtllm_prompt_tokens: {
+      series: [
+        trtllmCounter(prefillUrl, 'prefill', [[0, 1000]]),
+        ...decodeUrls.map((url) => trtllmCounter(url, 'backend', [[0, 500]])),
+      ],
+    },
+    trtllm_prompt_cached_tokens: {
+      series: [
+        trtllmCounter(prefillUrl, 'prefill', [[0, 970]]),
+        ...decodeUrls.map((url) => trtllmCounter(url, 'backend', [[0, decodeCached]])),
+      ],
+    },
+  });
+
+  it.each([
+    ['counts transferred KV as cached', 500],
+    ['reports no cached tokens', 0],
+  ])('reads the hit rate from prefill when decode %s', (_, decodeCached) => {
+    const { promptTokenTotals, series } = computeChartDataFromMetricPhases(
+      disaggMetrics(decodeCached),
+      {},
+      { framework: 'dynamo-trt', disagg: true },
+    );
+    expect(promptTokenTotals.prompt).toBe(1000);
+    expect(promptTokenTotals.prefixCacheHits).toBe(970);
+    expect(series.prefixCacheHitRate).toEqual([{ t: 0, value: 0.97 }]);
+    const decodeSource = series.metricSources.find(({ source }) => source.role === 'decode');
+    expect(decodeSource?.promptTps).toEqual([{ t: 0, value: 500 }]);
+  });
+
+  it('resolves roles from other metrics when native counters have no labels', () => {
+    const metrics = disaggMetrics(0);
+    metrics['roles'] = { series: metrics['trtllm_prompt_tokens']!.series };
+    for (const name of ['trtllm_prompt_tokens', 'trtllm_prompt_cached_tokens']) {
+      metrics[name] = {
+        series: metrics[name]!.series!.map(({ labels: _labels, ...series }) => series),
+      };
+    }
+    const { promptTokenTotals } = computeChartDataFromMetricPhases(
+      metrics,
+      {},
+      {
+        framework: 'dynamo-trt',
+        disagg: true,
+      },
+    );
+    expect(promptTokenTotals.prompt).toBe(1000);
+    expect(promptTokenTotals.prefixCacheHits).toBe(970);
+  });
+
+  it('uses identified prefill endpoints when decode counters have no role labels', () => {
+    const metrics = disaggMetrics(0);
+    for (const name of Object.keys(metrics)) {
+      metrics[name] = {
+        series: metrics[name]!.series!.map((series) =>
+          series.endpoint_url === prefillUrl ? series : { ...series, labels: {} },
+        ),
+      };
+    }
+    const { promptTokenTotals } = computeChartDataFromMetricPhases(
+      metrics,
+      {},
+      {
+        framework: 'dynamo-trt',
+        disagg: true,
+      },
+    );
+    expect(promptTokenTotals.prompt).toBe(1000);
+    expect(promptTokenTotals.prefixCacheHits).toBe(970);
+  });
+
+  it('does not substitute decode-only measurements for missing prefill data', () => {
+    const metrics = disaggMetrics(0);
+    for (const name of Object.keys(metrics)) {
+      metrics[name] = {
+        series: metrics[name]!.series!.filter((series) => series.endpoint_url !== prefillUrl),
+      };
+    }
+    const { promptTokenTotals, series } = computeChartDataFromMetricPhases(
+      metrics,
+      {},
+      {
+        framework: 'dynamo-trt',
+        disagg: true,
+      },
+    );
+    expect(promptTokenTotals.prompt).toBe(0);
+    expect(series.prefixCacheHitRate).toEqual([]);
+    expect(series.prefillTps).toEqual([]);
+    expect(series.metricSources[0]?.promptTps).toEqual([{ t: 0, value: 500 }]);
+  });
+
+  it('still sums every endpoint of an aggregated deployment', () => {
+    const { promptTokenTotals } = computeChartDataFromMetricPhases(
+      disaggMetrics(500),
+      {},
+      { framework: 'dynamo-trt', disagg: false },
+    );
+    expect(promptTokenTotals.prompt).toBe(2000);
+    expect(promptTokenTotals.prefixCacheHits).toBe(1970);
   });
 });

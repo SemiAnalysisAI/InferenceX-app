@@ -2038,7 +2038,10 @@ export const apiContractSourceDigests = [
     // buildOverviewModelSummaries reads /rankings tiers, including ones outside
     // OVERVIEW_TIERS. The Overview BFF parameters and response shape are unchanged.
     // Default controls are 100 tok/s/user and 30d; API docs and skills match.
-    sourceSha256: '66eb3d889e6d87beaee34051205a000628d607eca820eb0f765a3c88a4397c6d',
+    // Disaggregated rows now read the stored per-deployed-GPU tput_per_gpu without
+    // a second decode ÷ total rescale. costPerMtok values change; parameters,
+    // response shape and the documented cost formula are unchanged.
+    sourceSha256: 'd9e952b4fe64b4d797f1a23d28951091bf82b0460370dc1a4531b60cb8c61dd0',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -2099,7 +2102,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-chart-series.ts',
-    sourceSha256: '58aac3b66d93368fb19aad574636af843ed0d8150dff3b4a4c08804aaddf4095',
+    sourceSha256: 'ce00cbd168df883f1759cd7268726575d5effc3fe038a7f74d805df79072ab3a',
     reviewArea: {
       en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
       zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',

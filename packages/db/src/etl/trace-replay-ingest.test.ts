@@ -557,3 +557,53 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(after.trace_replay_id).toBe(row.trace_replay_id);
   }, 30_000);
 });
+
+const trtllmMetric = (prefill: number, decode: number) => ({
+  series: [
+    {
+      endpoint_url: 'prefill',
+      labels: { disaggregation_mode: 'prefill' },
+      timeslices: [slice(0, 1, prefill)],
+    },
+    {
+      endpoint_url: 'decode',
+      labels: { disaggregation_mode: 'decode' },
+      timeslices: [slice(0, 1, decode)],
+    },
+  ],
+});
+
+describe('TRT-LLM prefill cache-hit ingestion', () => {
+  it.each(['trtllm_prompt_tokens', 'trtllm_prompt_tokens_total'])(
+    'prepares corrected row rates and chart data from %s',
+    async (promptName) => {
+      const cachedName = promptName.replace('prompt_tokens', 'prompt_cached_tokens');
+
+      const metrics = Buffer.from(
+        JSON.stringify({
+          metrics: {
+            trtllm_request_type_total: trtllmMetric(1, 1),
+            [promptName]: {
+              series: trtllmMetric(1000, 1000).series.map(({ labels: _labels, ...s }) => s),
+            },
+            [cachedName]: {
+              series: trtllmMetric(970, 0).series.map(({ labels: _labels, ...s }) => s),
+            },
+          },
+        }),
+      );
+      const prepared = await prepareTraceReplay(null, null, metrics, {
+        framework: 'dynamo-trt',
+        disagg: true,
+      });
+      expect(prepared.cacheHitRates).toEqual({ gpu: 0.97, cpu: null });
+      const chart = JSON.parse(prepared.chartSeriesJson!.toString());
+      expect(chart.prefixCacheHitRate).toEqual([{ t: 0, value: 0.97 }]);
+      expect(chart.prefillTps).toEqual([{ t: 0, value: 1000 }]);
+      expect(
+        chart.metricSources.find((s: { source: { role: string } }) => s.source.role === 'decode')
+          .promptTps,
+      ).toEqual([{ t: 0, value: 1000 }]);
+    },
+  );
+});

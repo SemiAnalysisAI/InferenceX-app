@@ -5,7 +5,7 @@ import {
   type ServerMetricsContext,
 } from './server-metrics-adapters';
 
-export const CHART_SERIES_VERSION = 20;
+export const CHART_SERIES_VERSION = 21;
 
 export interface TimeSeriesPoint {
   t: number;
@@ -120,6 +120,8 @@ export const CHART_METRIC_KEYS = new Set([
   'trtllm_generation_tokens_total',
   'trtllm_num_requests_running',
   'trtllm_num_requests_waiting',
+  'trtllm_request_type',
+  'trtllm_request_type_total',
 ]);
 
 function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMap {
@@ -613,13 +615,64 @@ function scopeAtomPdToPrefill(metrics: MetricsMap): { metrics: MetricsMap; pd: b
   return { metrics: scoped, pd: true };
 }
 
+const TRTLLM_PROMPT_METRICS = [
+  'trtllm_prompt_tokens',
+  'trtllm_prompt_tokens_total',
+  'trtllm_prompt_cached_tokens',
+  'trtllm_prompt_cached_tokens_total',
+  'trtllm_prefill_batch_tokens',
+  'trtllm_kv_cache_hit_rate',
+];
+
+/**
+ * A disaggregated TRT-LLM decode worker re-reports every prompt it receives
+ * and counts the KV transferred from prefill as cached (or, on some builds, as
+ * not cached at all), so the prompt and cache counters would count each prompt
+ * twice. Prefer identified prefill endpoints, otherwise exclude identified decode endpoints.
+ */
+function scopeTrtllmDisaggToPrefill(
+  metrics: MetricsMap,
+  context: ServerMetricsContext,
+): MetricsMap {
+  const adapter = selectServerMetricsAdapter(context);
+  if (!context.disagg || adapter.id !== 'trtllm') return metrics;
+  const decode = new Set<string>();
+  const prefill = new Set<string>();
+  for (const metric of Object.values(metrics)) {
+    for (const s of metric.series ?? []) {
+      if (!s.endpoint_url) continue;
+      const role = adapter.identifySource(s).role;
+      if (role === 'decode') decode.add(s.endpoint_url);
+      if (role === 'prefill') prefill.add(s.endpoint_url);
+    }
+  }
+  if (decode.size === 0 && prefill.size === 0) return metrics;
+  const scoped = { ...metrics };
+  for (const name of TRTLLM_PROMPT_METRICS) {
+    const series = metrics[name]?.series;
+    if (series) {
+      const prefillSeries = series.filter((s) =>
+        prefill.size > 0
+          ? typeof s.endpoint_url === 'string' && prefill.has(s.endpoint_url)
+          : !s.endpoint_url || !decode.has(s.endpoint_url),
+      );
+      scoped[name] = { series: prefillSeries };
+    }
+  }
+  // A decode worker's own source breakdown keeps its counters.
+  return scoped;
+}
+
 function buildChartData(
   rawMetrics: MetricsMap,
   context: ServerMetricsContext,
   includeMetricSources = true,
   originStartNs?: number,
 ): ChartData {
-  const { metrics, pd: atomPd } = scopeAtomPdToPrefill(rawMetrics);
+  const { metrics: sourceMetrics, pd: atomPd } = scopeAtomPdToPrefill(rawMetrics);
+  const metrics = includeMetricSources
+    ? scopeTrtllmDisaggToPrefill(sourceMetrics, context)
+    : sourceMetrics;
   let startNs = Number.POSITIVE_INFINITY;
   let endNs = 0;
   let timeslicesCount = 0;
@@ -889,7 +942,7 @@ function buildChartData(
   const adapter = selectServerMetricsAdapter(context);
   if (includeMetricSources && context.disagg && adapter.id !== 'generic') {
     const endpointRoles = new Map<string, string>();
-    for (const metric of Object.values(metrics)) {
+    for (const metric of Object.values(sourceMetrics)) {
       for (const series of metric.series ?? []) {
         const endpointUrl = series.endpoint_url;
         const role = series.labels?.['disaggregation_mode'] ?? series.labels?.['dynamo_component'];
@@ -897,7 +950,7 @@ function buildChartData(
       }
     }
     const grouped = new Map<string, { source: MetricSource; metrics: MetricsMap }>();
-    for (const [metricName, metric] of Object.entries(metrics)) {
+    for (const [metricName, metric] of Object.entries(sourceMetrics)) {
       for (const series of metric.series ?? []) {
         const roleHint = series.endpoint_url ? endpointRoles.get(series.endpoint_url) : undefined;
         const identifiedSeries =
@@ -915,9 +968,9 @@ function buildChartData(
         groupedMetric.series!.push(series);
       }
     }
-    for (const { source, metrics: sourceMetrics } of grouped.values()) {
+    for (const { source, metrics: workerMetrics } of grouped.values()) {
       const sourceSeries = buildChartData(
-        sourceMetrics,
+        workerMetrics,
         context,
         false,
         originStartNs ?? startNs,

@@ -151,3 +151,76 @@
     opacity: 0;
   }
 }
+
+/* AgentX session replay (`agentx-session-replay.tsx`). The finished chart is the resting state.
+   While a replay draws, each bar segment runs one animation whose delay and length come from
+   the replay timeline, on transform and opacity only. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-replay='out'] .replay-rows {
+    animation: replay-out 250ms var(--motion-ease-exit) forwards;
+  }
+
+  [data-replay='play'] .replay-rows {
+    animation: replay-in 200ms var(--motion-ease-enter) both;
+  }
+
+  [data-replay='play'] :is(.replay-slot, .replay-carry, .replay-grow) {
+    transform-origin: left center;
+    animation: var(--ms) var(--motion-ease-enter) var(--at) both;
+  }
+
+  /* The empty track of a request that has not been sent yet. */
+  [data-replay='play'] .replay-slot {
+    animation-name: replay-slot;
+  }
+
+  /* The previous request's whole bar turns into cache where it is, then drops into this row. */
+  [data-replay='play'] .replay-carry {
+    animation-name: replay-carry;
+    animation-timing-function: ease-in-out;
+  }
+
+  [data-replay='play'] .replay-grow {
+    animation-name: replay-grow;
+  }
+
+  [data-replay-paused] .replay-rows,
+  [data-replay-paused] .replay-rows * {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes replay-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes replay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes replay-slot {
+  from {
+    opacity: 1;
+  }
+}
+
+@keyframes replay-carry {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--carry) * var(--row) * -1));
+  }
+  20% {
+    opacity: 0.65;
+    transform: translateY(calc(var(--carry) * var(--row) * -1));
+  }
+}
+
+@keyframes replay-grow {
+  from {
+    transform: scaleX(0);
+  }
+}

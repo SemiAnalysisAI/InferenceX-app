@@ -356,8 +356,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the dashboard route registry gained share params; entries are unchanged.
-      sources: '90ee3a3f5f81b979ab9cfcf223fa06d552ba815c06c9292c04b8974635a457fe',
+      // Re-pinned after the overview disaggregated-throughput fix, which only touches
+      // LLM overview tier reads; video entries are unchanged.
+      sources: 'ff79147adaef68f77f332c03de290d8ff428cd85d791add401af4b38a0039632',
     });
   });
 });

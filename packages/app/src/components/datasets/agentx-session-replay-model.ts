@@ -1,7 +1,7 @@
 export const CONTEXT_CAP = 256_000;
 export const WARM_PREFIX = 105_000;
 
-export type StepNote = 'warmStart' | 'fanOut' | 'subagentsReturn';
+export type StepNote = 'warmStart' | 'fanOut' | 'subagentsReturn' | 'mainTurns';
 
 interface Request {
   fresh: number;
@@ -34,7 +34,7 @@ const STEPS: Step[] = [
     ],
   },
   { kind: 'main', note: 'subagentsReturn', fresh: 4_300, output: 1_380 },
-  { kind: 'main', fresh: 21_600, output: 310 },
+  { kind: 'main', note: 'mainTurns', fresh: 21_600, output: 310 },
   { kind: 'main', fresh: 3_300, output: 2_050 },
   { kind: 'main', fresh: 1_100, output: 444 },
   { kind: 'main', fresh: 17_200, output: 260 },
@@ -80,42 +80,101 @@ export function buildReplay(steps: Step[] = STEPS): ReplayStep[] {
 export const REPLAY = buildReplay();
 export const REPLAY_ROWS = REPLAY.flatMap((step) => step.rows);
 
-export type Phase = 'cached' | 'prefill' | 'decode';
+/** The note showing at each step: a step without one keeps the note before it. */
+export const NOTES = REPLAY.map(
+  (_, step) => REPLAY.findLast((other, index) => index <= step && other.note)?.note ?? 'warmStart',
+);
+const FAN_OUT = NOTES.indexOf('fanOut');
+const RUN = NOTES.indexOf('mainTurns');
+
+/**
+ * Rows in drawing order, each subagent's second request under its first. `carry` is how many
+ * rows up the same agent's previous request sits (0 for none): that whole bar is this row's
+ * cached prefix.
+ */
+export const DISPLAY_ROWS = REPLAY_ROWS.toSorted(
+  (a, b) =>
+    (a.lane === null ? a.step : FAN_OUT) - (b.lane === null ? b.step : FAN_OUT) ||
+    (a.lane ?? 0) - (b.lane ?? 0) ||
+    a.step - b.step,
+).map((row, index, rows) => {
+  const from = rows.findLastIndex((other, at) => at < index && other.lane === row.lane);
+  return { ...row, carry: from === -1 ? 0 : index - from };
+});
+
+/** The finished chart fades out for this long before a replay draws. */
+export const LEAD_OUT_MS = 250;
+
+/** Carry, prefill, decode and hold time of a step under each note, in ms. */
+const PACE: Record<StepNote, number[]> = {
+  warmStart: [350, 450, 300, 200],
+  fanOut: [400, 600, 350, 650],
+  subagentsReturn: [650, 500, 350, 1_100],
+  // Shares of a turn that shortens from 900 ms to 500 ms through the look-alike main turns.
+  mainTurns: [0.45, 0.33, 0.22, 0],
+};
+
+let clock = LEAD_OUT_MS;
+/** When each step's cached prefix, prefill and output start, and when it is drawn and over. */
+export const TIMELINE = NOTES.map((note, step) => {
+  const turn = Math.max(500, 900 - 100 * (step - RUN));
+  const [carry, prefill, decode, hold] =
+    note === 'mainTurns' ? PACE.mainTurns.map((share) => Math.round(share * turn)) : PACE[note];
+  const start = clock;
+  clock += carry + prefill + decode + hold;
+  return {
+    start,
+    prefill: start + carry,
+    decode: start + carry + prefill,
+    drawn: clock - hold,
+    end: clock,
+  };
+});
+export const DURATION_MS = clock;
 
 export interface Frame {
+  /** `rest` is the finished chart, `out` is that chart fading away, `play` is drawing. */
+  phase: 'rest' | 'out' | 'play';
   step: number;
-  phase: Phase;
+  /** The numbers under the chart for `step`; null until that bar segment starts moving. */
+  cached: number;
+  fresh: number | null;
+  output: number | null;
+  /** Session cache hit through the last request whose input is drawn. */
+  hit: number | null;
 }
 
-export const FIRST_FRAME: Frame = { step: 0, phase: 'cached' };
-export const LAST_FRAME: Frame = { step: REPLAY.length - 1, phase: 'decode' };
-
-const PHASE_MS: Record<Phase, number> = { cached: 220, prefill: 580, decode: 530 };
-const LOOP_HOLD_MS = 2_800;
-
-export function nextFrame(frame: Frame): Frame {
-  if (frame.phase === 'cached') return { step: frame.step, phase: 'prefill' };
-  if (frame.phase === 'prefill') return { step: frame.step, phase: 'decode' };
-  return frame.step >= LAST_FRAME.step ? FIRST_FRAME : { step: frame.step + 1, phase: 'cached' };
-}
-
-export function frameDuration(frame: Frame): number {
-  return frame.step === LAST_FRAME.step && frame.phase === 'decode'
-    ? LOOP_HOLD_MS
-    : PHASE_MS[frame.phase];
-}
-
-export function visibleTokens(
-  row: ReplayRow,
-  frame: Frame,
-): Omit<ReplayRow, 'step' | 'lane'> | null {
-  if (row.step > frame.step) return null;
-  if (row.step < frame.step) return row;
+function drawing(time: number): Frame {
+  const step = TIMELINE.findIndex((timing) => time < timing.end);
+  const total = (key: 'cached' | 'fresh' | 'output') =>
+    REPLAY[step].rows.reduce((sum, row) => sum + row[key], 0);
+  // The quick main turns set every number at once, or they would flicker.
+  const quick = step >= RUN;
+  const input = quick || time >= TIMELINE[step].prefill;
   return {
-    cached: row.cached,
-    fresh: frame.phase === 'cached' ? 0 : row.fresh,
-    output: frame.phase === 'decode' ? row.output : 0,
+    phase: 'play',
+    step,
+    cached: total('cached'),
+    fresh: input ? total('fresh') : null,
+    output: quick || time >= TIMELINE[step].decode ? total('output') : null,
+    hit: input || step > 0 ? sessionCacheHit(REPLAY_ROWS, input ? step : step - 1) : null,
   };
+}
+
+export const REST_FRAME: Frame = { ...drawing(DURATION_MS - 1), phase: 'rest' };
+
+/** What the replay shows `time` ms after it began; outside a replay, the finished chart. */
+export function frameAt(time: number): Frame {
+  if (!(time >= 0 && time < DURATION_MS)) return REST_FRAME;
+  return time < LEAD_OUT_MS ? { ...REST_FRAME, phase: 'out' } : drawing(time);
+}
+
+/** The next moment `frameAt` changes, or null once the replay is over. */
+export function nextChange(time: number): number | null {
+  const moments = TIMELINE.flatMap(({ start, prefill, decode }, step) =>
+    step < RUN ? [start, prefill, decode] : [start],
+  );
+  return [...moments, DURATION_MS].find((moment) => moment > time) ?? null;
 }
 
 export function sessionCacheHit(rows: ReplayRow[], throughStep: number): number {
