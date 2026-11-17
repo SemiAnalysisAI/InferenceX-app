@@ -169,11 +169,12 @@ export function frameAt(time: number): Frame {
   return time < LEAD_OUT_MS ? { ...REST_FRAME, phase: 'out' } : drawing(time);
 }
 
-/** The next moment `frameAt` can change, or null once the replay is over. */
+/** The next moment `frameAt` changes, or null once the replay is over. */
 export function nextChange(time: number): number | null {
-  return (
-    TIMELINE.flatMap((timing) => Object.values(timing)).find((moment) => moment > time) ?? null
+  const moments = TIMELINE.flatMap(({ start, prefill, decode }, step) =>
+    step < RUN ? [start, prefill, decode] : [start],
   );
+  return [...moments, DURATION_MS].find((moment) => moment > time) ?? null;
 }
 
 export function sessionCacheHit(rows: ReplayRow[], throughStep: number): number {
