@@ -135,6 +135,7 @@ export default function VideoPointSheet({
     exit.current?.cancel();
     exit.current = null;
     setLeaving(false);
+    setPull(0);
   }, [pointKey]);
   useEffect(() => () => exit.current?.cancel(), []);
   const moved = useChanges(pointKey);

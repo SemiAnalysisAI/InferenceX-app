@@ -211,7 +211,7 @@ describe('useHeightEase', () => {
   });
 });
 
-function Counter({ token }: { token: string }) {
+function Counter({ token }: { token: string | null }) {
   return <output>{useChanges(token)}</output>;
 }
 
@@ -225,5 +225,17 @@ describe('useChanges', () => {
     expect(container!.textContent).toBe('1');
     act(() => root!.render(<Counter token="b200|reference" />));
     expect(container!.textContent).toBe('2');
+  });
+
+  it('does not count the first token to arrive, or a gap before the same one comes back', () => {
+    mount(<Counter token={null} />);
+    act(() => root!.render(<Counter token="b200|reference" />));
+    expect(container!.textContent).toBe('0');
+    act(() => root!.render(<Counter token={null} />));
+    act(() => root!.render(<Counter token="b200|reference" />));
+    expect(container!.textContent).toBe('0');
+    act(() => root!.render(<Counter token={null} />));
+    act(() => root!.render(<Counter token="b200|h100" />));
+    expect(container!.textContent).toBe('1');
   });
 });

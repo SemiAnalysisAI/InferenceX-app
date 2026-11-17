@@ -693,9 +693,10 @@ export default function VideoResultsClips({
     });
     onSubjectChange(stagePointKey(p));
   };
-  // What the stage and readout show; a change of it swaps their values in place.
+  // What the stage and readout show; a change of it swaps their values in place. The first pair
+  // to be read is not a change: it arrives with the page.
   const shownPair = useChanges(
-    [a?.source, b.source, group?.key, option?.kind, a?.url, b.url].join('\n'),
+    group ? [a?.source, b.source, group.key, option?.kind].join('\n') : null,
   );
   const optionLabel = (item: StageOption) =>
     item.kind === 'reference'

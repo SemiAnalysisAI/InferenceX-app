@@ -80,13 +80,17 @@ export function useHeightEase<T extends HTMLElement>(
   return { ref, before: <BeforeCommit token={token} run={read} /> };
 }
 
-/** How many times `token` has changed since the component mounted; 0 until the first change. */
+/**
+ * How many times `token` has changed since the component mounted; 0 until the first change. A
+ * null token is one that is not there yet: arriving at the first token is not a change, and
+ * neither is a gap between two renders of the same one.
+ */
 export function useChanges(token: unknown): number {
   const last = useRef(token);
   const count = useRef(0);
-  if (last.current !== token) {
+  if (token !== null && last.current !== token) {
+    if (last.current !== null) count.current += 1;
     last.current = token;
-    count.current += 1;
   }
   return count.current;
 }
@@ -112,8 +116,8 @@ export function useDisclosureMotion<T extends HTMLElement>(): RefObject<T | null
     const host = root.current;
     if (!host) return undefined;
     const running = new WeakMap<HTMLDetailsElement, Easing>();
-    /** The height each one had while closed, the last time it was seen closed. */
-    const closed = new WeakMap<HTMLDetailsElement, number>();
+    /** The height each one had while closed, the last time it was seen closed, and its width then. */
+    const closed = new WeakMap<HTMLDetailsElement, { width: number; height: number }>();
     const onClick = (event: MouseEvent) => {
       const summary = event.target instanceof Element ? event.target.closest('summary') : null;
       const details = summary?.parentElement;
@@ -137,15 +141,25 @@ export function useDisclosureMotion<T extends HTMLElement>(): RefObject<T | null
       running.delete(details);
       current?.animation.cancel();
       if (opening) {
-        if (!details.open) closed.set(details, from);
+        if (!details.open) closed.set(details, { width: details.offsetWidth, height: from });
         delete details.dataset.closing;
         details.open = true;
         const animation = easeHeight(details, from, details.offsetHeight);
         if (animation) running.set(details, { animation, closing: false });
         return;
       }
-      const edge = summary.getBoundingClientRect().bottom - details.getBoundingClientRect().top;
-      const animation = easeHeight(details, from, closed.get(details) ?? edge);
+      // Its closed height is the one it opened from; at another width, or opened by something
+      // else, it is the summary's own box.
+      const seen = closed.get(details);
+      const edge =
+        summary.getBoundingClientRect().bottom -
+        details.getBoundingClientRect().top +
+        (Number.parseFloat(getComputedStyle(summary).marginBottom) || 0);
+      const animation = easeHeight(
+        details,
+        from,
+        seen?.width === details.offsetWidth ? seen.height : edge,
+      );
       const shut = () => {
         delete details.dataset.closing;
         details.open = false;
