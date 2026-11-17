@@ -2,6 +2,7 @@ import {
   at,
   canonical,
   entries,
+  generationDuration,
   number,
   ROLES,
   rows,
@@ -49,15 +50,16 @@ function workloadInfo(plan: Json, identity: string, semantics: Json) {
   const completeWorkload =
     text(at(plan, 'model_id')) &&
     text(at(plan, 'model_revision')) &&
-    ['width', 'height', 'duration_seconds', 'fps', 'num_inference_steps'].every(
+    ['width', 'height', 'fps', 'num_inference_steps'].every(
       (key) => positive(at(generation, key)) !== null,
     ) &&
+    generationDuration(generation) !== null &&
     cases.length > 0 &&
     cases.every((item) => text(at(item, 'prompt')) && Number.isInteger(number(at(item, 'seed'))));
   const group = completeWorkload ? canonical({ plan: workload, semantics }) : `unknown:${identity}`;
   const workloadLabel = [
     `${number(at(generation, 'width')) ?? '?'} × ${number(at(generation, 'height')) ?? '?'}`,
-    `${number(at(generation, 'duration_seconds')) ?? '?'} s`,
+    `${generationDuration(generation) ?? '?'} s`,
     `${number(at(generation, 'fps')) ?? '?'} fps`,
     `${number(at(generation, 'num_inference_steps')) ?? '?'} steps`,
     `${text(at(plan, 'model_id'))} @ ${text(at(plan, 'model_revision')).slice(0, 12)}`,

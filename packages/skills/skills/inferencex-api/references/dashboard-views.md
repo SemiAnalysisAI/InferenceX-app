@@ -157,7 +157,55 @@ and AgentX runs alike. The AgentX producer divides all three rates by every chip
 backfill move those rows to the per-pool basis and keep the producer's original
 rates as `input_tput_per_total_gpu` and `output_tput_per_total_gpu`.
 
+## Glossary terminology
+
+Read `/glossary` and `/glossary/<slug>` for static definitions; Chinese siblings use
+`/zh/glossary` and `/zh/glossary/<slug>`. The glossary now distinguishes arrival
+rate (`request-rate`) from completions (`request-throughput`), queue counts
+(`request-queue-depth`) from wait time (`queueing-latency`), and draft acceptance
+fractions (`acceptance-rate`) from per-step lengths (`acceptance-length`).
+Other serving diagnostics include `open-loop-benchmark`, `kv-working-set`,
+`kv-cache-eviction`, `preemption`, and `inter-chunk-latency`.
+The TPU AgentX follow-up adds `decode-megakernel`, `kernel-launch-overhead`,
+`decode-context-parallelism`, `prefill-context-parallelism`,
+`attention-head-dimension`, `hicache`, `decode-admission-control`, and
+`kv-cache-affinity`. DCP can also shard state used during prefill; FP4 weight
+storage does not imply native FP4 arithmetic. The TPU, TorchTPU, TPU-Sync, and
+llm-d entries distinguish the September preview from the November AgentX results.
+
+The Huawei and Blackwell ports add accelerator execution and microbenchmark
+terminology: Ascend/CANN, Cube/vector cores, TileLang, DeepGEMM/DeepEP, URMA,
+SM/GPC/CTA clusters, PTX/SASS, TMEM/TMA, multicast, MMA, occupancy, bytes in flight,
+and warm-cache testing. Memory bandwidth must identify its storage level; summed
+task durations are not exclusive physical-unit utilization. Hardware rooflines
+in the Blackwell article differ from the dashboard's empirical Pareto envelopes.
+
+These are editorial definitions, not additional measurements or view API fields.
+The existing glossary search, categories, and alphabet controls only filter
+static entries. No benchmark selector, calculation, response schema, or API
+contract changes with this content update. Glossary pages expose `DefinedTerm`
+JSON-LD and localized sitemap URLs; `/llms-full.txt` remains an article and
+hardware-results feed, not a glossary export. Use the existing view contracts for
+measured data rather than treating an example formula as a measured result.
+
 ## Historical editorial articles
+
+`/blog/huawei-deepseek` (October 21, 2026) and
+`/blog/dissecting-nvidia-blackwell-tensor` (March 31, 2026), with matching `/zh`
+routes, preserve the two newsletters' public sections and 24/27 figures.
+Subscriber continuations remain at the original publications, not in local
+pages, feeds, or APIs. Editorial notes label the Huawei release-timeline
+inconsistency and the Blackwell arithmetic and bytes/KiB discrepancies without
+silently changing the historical claims. These static articles and glossary
+definitions add no benchmark fields, selectors, calculations, or API schemas.
+
+`/blog/tpu-strikes-the-king` and `/zh/blog/tpu-strikes-the-king` preserve the public
+portion of the November 5, 2026 TPU AgentX newsletter, with its 25 source figures.
+The original publication's precision, external-versus-internal TCO, decode-versus-
+end-to-end comparisons, and Rubin preview qualifications remain historical.
+The subscriber-only continuation stays at the original publication; this port
+does not expose it through pages, feeds, or APIs. New glossary links explain the
+serving techniques without adding measured fields or changing view contracts.
 
 The GLM-5.3 article at
 `/blog/sparse-savings-persistent-demand-inside-glm53` (Chinese:
@@ -356,8 +404,8 @@ there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
 annotations are independent presentation controls, not data filters. Both
 Agentic and fixed-sequence charts default to line labels on and point labels off;
-Parallelism Labels is outside Advanced. Advanced's default-on Offloading Label
-uses `i_offloadlabel=0` to hide the dotted-circle “KV offload ON” footer key and
+Parallelism Labels is outside Advanced. Advanced's default-off Offloading Label
+uses `i_offloadlabel=1` to show the dotted-circle “KV offload ON” footer key and
 the dotted point halos, including in chart exports. It does not remove official,
 historical, or unofficial points or benchmark rows. These controls have no
 read-only API parameters; offload fields
@@ -617,6 +665,10 @@ flagged.
 OperatorX is available in primary navigation without an unlock. Its read-only view
 is `/api/v1/views/operatorx`; OperatorX `flops` and `bytes` are useful work per GPU,
 so `tflops` compares across device splits; pick one `parallel` split per comparison.
+Page share links keep the selection in plain query params: `workload` or `model`,
+`parallel`, `metric`, `hardware` (comma-separated GPU keys, same as the view API's
+`hardware`), and `baseline` (presentation-only; it picks the speedup reference and
+does not change returned rows). The view response's `url` carries `hardware` when narrowed.
 Its other `/api/v1/operatorx/*` routes belong to the page and are not part of this
 skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
@@ -994,14 +1046,15 @@ they add no API selectors and change no metrics or official/unofficial membershi
 qualified approved evidence or the exact named diagnostic run is available; the
 same canonical workload and sample floor apply. `r_hidden=h100` hides its results
 and clips. Dismissing an unapproved H100 run removes its slot unless approved H100
-evidence remains. An older H100 workload does not qualify a newer workload.
+evidence remains. An older H100 workload does not qualify a newer workload. B300 has
+no default slot; it appears only with qualified evidence or the named run.
 
 | UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                                                                                                                                                            |
-| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value, not decoded output duration. No mode inferred from model names.                                                                                                                                                                                                                              |
+| Model and frozen workload         | `r_model`, `r_workload`                              | Model slug (`options.workloads[].slug`, such as `minimax-h3`) selects that model's best-covered workload; a compact key from options.workloads selects any other. Both resolve to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                         |
+| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value (`duration_seconds`, or `frame_count ÷ fps` for frame-count plans), not decoded output duration. No mode inferred from model names.                                                                                                                                                           |
 | Engine, execution date            | `r_engine`, `r_date`                                 | Recorded engine and as-of execution date. All GPU counts are included.                                                                                                                                                                                                                                                                                      |
-| X metric                          | `r_x`                                                | `p50` (default) or `p90` per-clip latency, or `gpus` (participating GPUs per deployment, log axis). Presentation only; the GPU axis keeps the median-latency frontier and Best engine, and Chip config history plots median latency for `gpus`.                                                                                                             |
+| X metric                          | `r_x`                                                | `p50` per-clip latency (default) or `gpus` (participating GPUs per deployment, log axis). Presentation only; the GPU axis keeps the median-latency frontier and Best engine, and Chip config history plots median latency for `gpus`. The retired `p90` falls back to `p50`.                                                                                |
 | Fixed overview settings           | `r_gpus`, `r_basis` (deprecated)                     | Accepted but ignored: `params.gpuCount=null`, `params.costBasis=participating`. New share/export URLs omit these keys.                                                                                                                                                                                                                                      |
 | Advanced disclosure               | None                                                 | Profit estimator is collapsed by default. Opening/closing preserves inputs and does not change data or calculations.                                                                                                                                                                                                                                        |
 | Representative deployments table  | None                                                 | Removed from the UI; representative cells, deadline metrics and both GPU cost bases remain in the read-only evidence.                                                                                                                                                                                                                                       |
@@ -1012,7 +1065,7 @@ evidence remains. An older H100 workload does not qualify a newer workload.
 | Utilization                       | `r_utilization`                                      | Fraction 0-1, default 1. Modelled revenue scales; reserved GPU hourly cost does not.                                                                                                                                                                                                                                                                        |
 | Named run overlay                 | `unofficialrun` / `unofficialruns`                   | Exact run only, in separate `overlayCells` and `overlayDeploymentCells`, excluded from official cells, deployments and workload mix. A stored run keeps its actual approval. A run absent from History is read live from the JSON documents of its public `h3-results` artifacts: unapproved, `publishedAt` null, no media. Nothing is stored or published. |
 
-中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50`（默认）或 `p90` 延迟，或 `gpus`（每个部署参与计算的 GPU 数，对数坐标）；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表已移除，利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的输入会保留。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
+中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50` 延迟（默认）或 `gpus`（每个部署参与计算的 GPU 数，对数坐标），已停用的 `p90` 按 `p50` 处理；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表已移除，利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的输入会保留。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
 
 `cells` carries the source point, per-clip/frame energy, P95 only with 20 complete
 request samples, deadline metrics, both cost bases and modelled profit per GPU-hour.
@@ -1301,3 +1354,13 @@ Vendor-series colors are presentation-only. Huawei/Ascend series use a shared, t
 ### Huawei small-message bandwidth extension
 
 `test=mem-bw&gpu=Huawei%20950PR` covers 51 sizes, 8 B through 16 GiB. The nine 8 B–2 KiB points have 360 observations each from a separate CANN 9.2.1 run. `metadata.smallMessageExtension` preserves its date, versions, board, size range, 4096-byte slot stride, archive digest and cache qualification. The original metadata and all 42 measurements from 4 KiB upward are unchanged. These graph-amortized rates include possible cache residency and are not isolated-copy latency or cold-HBM bandwidth.
+
+OperatorX share links also keep `modelPrecision=fp4|fp8|bf16`, `modelBin`
+(half-octave bin, `round(log2(x) * 2)`), `modelSweep=true|false`, `scatterPrecision`,
+`scatterNormalized`, `scatterLog`, `summaryPrecision`, `summaryNormalized`, and
+`summarySharedOnly`. To fetch the model view's rows, pass `modelPrecision` and
+`modelBin` to `/api/v1/views/operatorx` as `precision` and `bin` (omit `bin` for
+`modelSweep=true`). The view response's `url` carries them back for a model selection.
+Summary bars are the page-owned compare API's `rooflinePrecision`,
+`rooflineNormalized`, `rooflineSharedOnly` and `rooflineHardware` (the GPU picks).
+`scatterLog` and `baseline` are presentation only.

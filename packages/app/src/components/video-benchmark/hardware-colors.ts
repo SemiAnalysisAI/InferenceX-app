@@ -9,6 +9,7 @@
  */
 const VIDEO_HARDWARE_COLORS: Record<string, { light: string; dark: string }> = {
   b200: { light: '#5f9e45', dark: '#7fc45f' },
+  b300: { light: '#6d28d9', dark: '#a78bfa' },
   mi355x: { light: '#c2410c', dark: '#f07a3e' },
   h200: { light: '#1d6fb8', dark: '#5aa9ec' },
   h100: { light: '#0b5c3c', dark: '#2fb58a' },

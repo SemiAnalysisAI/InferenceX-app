@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -25,10 +25,13 @@ export function BlogSidebarCta({ href, slug, labels }: BlogSidebarCtaProps) {
       <p className={cn(headingVariants({ level: 'card' }), 'text-balance')}>{labels.title}</p>
       <p className="text-sm leading-6 text-muted-foreground">{labels.body}</p>
       <Button asChild variant="brand" size="sm" className="w-fit">
-        <Link href={href} onClick={() => track('blog_sidebar_cta_clicked', { slug, href })}>
+        <IntentPrefetchLink
+          href={href}
+          onClick={() => track('blog_sidebar_cta_clicked', { slug, href })}
+        >
           {labels.button}
           <ArrowRight aria-hidden="true" />
-        </Link>
+        </IntentPrefetchLink>
       </Button>
     </div>
   );

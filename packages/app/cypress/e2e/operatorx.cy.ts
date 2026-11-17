@@ -58,7 +58,7 @@ const gemm = comparisonView(
 );
 const moe = comparisonView(buildComparison('moe', []), null);
 
-it('shows measured and missing GPU coverage, then switches the path to MoE', () => {
+it('shows measured and missing GPU coverage, then links to MoE and back', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
@@ -74,11 +74,42 @@ it('shows measured and missing GPU coverage, then switches the path to MoE', () 
     .and('contain.text', '1/2');
   cy.get('[data-testid="operatorx-viz-metric-vs-size"]').should('contain.text', 'M');
 
-  cy.get('[data-testid="operatorx-page"]').contains('button', 'MoE').click();
+  cy.get('[data-testid="operatorx-page"] nav')
+    .contains('a', 'MoE')
+    .should('have.attr', 'href', '/opx/moe?model=DeepSeek-V4-Pro')
+    .click();
   cy.wait('@moe');
   cy.location('pathname').should('eq', '/opx/moe');
   cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
   cy.contains('No results yet').should('be.visible');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', moe).as('attention');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Attention').click();
+  cy.location('pathname').should('eq', '/opx/attention');
+  cy.go('back');
+  cy.location('pathname').should('eq', '/opx/moe');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+
+  cy.go('back');
+  cy.location('pathname').should('eq', '/opx/gemm');
+  cy.get('[data-testid="operatorx-coverage"]').should('contain.text', 'Coverage of 2 cases');
+});
+
+it('keeps the view filters when the current category is clicked again', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
+  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro&parallel=tp8');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'GEMM').click();
+  cy.location('pathname').should('eq', '/opx/gemm');
+  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro&parallel=tp8');
 });
 
 it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
@@ -98,10 +129,10 @@ it('redirects a legacy ?op= link to the category path', () => {
   cy.visit('/opx?op=model');
   cy.location('pathname').should('eq', '/opx/model');
   cy.location('search').should('eq', '');
-  cy.contains('[data-testid="operatorx-page"] [role="tab"]', 'Model view').should(
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Model view').should(
     'have.attr',
-    'aria-selected',
-    'true',
+    'aria-current',
+    'page',
   );
 });
 
@@ -378,9 +409,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
       cy.visit(prefix || '/');
       const link = '[data-testid="landing-huawei-results-link"]';
-      cy.get(link)
-        .should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
-        .and('not.have.attr', 'data-prefetch-ready');
+      cy.get(link).should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`);
       cy.get('@operatorxIntent.all').should('have.length', 0);
       cy.get(link).focus();
       cy.location('pathname').should('eq', prefix || '/');
@@ -499,4 +528,83 @@ it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switc
     .find('span')
     .first()
     .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+});
+
+it('reopens shared roofline and summary controls independently', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
+  cy.visit('/opx/gemm?scatterPrecision=bf16&summaryPrecision=bf16');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-roofline-log').click().should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="share-button"]').first().click();
+  cy.get('input[aria-label="Share link for the current view"]')
+    .invoke('val')
+    .then((value) => {
+      const url = new URL(String(value));
+      expect(url.searchParams.get('summarySharedOnly')).to.eq('false');
+      expect(url.searchParams.get('scatterNormalized')).to.eq('false');
+      expect(url.searchParams.get('scatterLog')).to.eq('true');
+      cy.visit(url.pathname + url.search);
+    });
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-roofline-log').should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="operatorx-viz-roofline"] circle.point').should('have.length', 3);
+});
+
+it('reopens the model token selection and sweep mode from a share link', () => {
+  const model = gemm.models[0];
+  const view = {
+    ...gemm,
+    model,
+    modelOptions: [model],
+    hardware: gemm.hardware.filter((hw) => hw.id === 'h200'),
+    measurements: { h200: gemm.measurements.h200 },
+  };
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', {
+    ...moe,
+    model,
+    modelOptions: [model],
+  });
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', {
+    ...moe,
+    op: 'attention',
+    model,
+    modelOptions: [model],
+  });
+  cy.visit(`/opx/model?model=${encodeURIComponent(model)}&modelPrecision=bf16&modelBin=12`);
+  cy.get('[data-testid="operatorx-model-gpu-h200"]')
+    .click()
+    .should('have.attr', 'aria-pressed', 'true');
+  cy.location('search').should((search) =>
+    expect(new URLSearchParams(search).has('hardware')).to.eq(false),
+  );
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', '64 tokens');
+  cy.get('#operatorx-model-tokens').then(($input) => {
+    const input = $input[0] as HTMLInputElement;
+    const win = input.ownerDocument.defaultView!;
+    Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      input.max,
+    );
+    input.dispatchEvent(new win.Event('input', { bubbles: true }));
+  });
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
+  cy.get('[data-testid="share-button"]').first().click();
+  cy.get('input[aria-label="Share link for the current view"]')
+    .invoke('val')
+    .then((value) => {
+      const url = new URL(String(value));
+      expect(url.searchParams.get('modelBin')).to.eq('12');
+      expect(url.searchParams.get('modelSweep')).to.eq('true');
+      expect(url.searchParams.get('modelPrecision')).to.eq('bf16');
+      cy.visit(url.pathname + url.search);
+    });
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
 });

@@ -49,13 +49,11 @@ const STRINGS = {
     counts: 'Valid / completed / scheduled',
     failed: 'Failed',
     latency: 'Client-ready latency (s)',
-    p50: 'P50',
-    p90: 'P90',
+    median: 'Median',
     throughput: 'Valid clips / GPU-hour',
     energy: 'GPU-board kJ / valid clip',
     status: 'Execution',
-    missing:
-      '— means unavailable, invalid or insufficient samples. P90 requires at least 10 valid samples per cell.',
+    missing: '— means unavailable or invalid.',
     metricNote:
       'Latency and throughput cover submission to downloaded media. Energy uses the recorded generation window and participating GPU boards; lower is better. Failed attempts remain in the recorded measurement window.',
     samples: 'Valid latency samples',
@@ -97,12 +95,11 @@ const STRINGS = {
     counts: '有效 / 已完成 / 计划',
     failed: '失败',
     latency: '客户端就绪延迟（秒）',
-    p50: 'P50',
-    p90: 'P90',
+    median: '中位',
     throughput: '有效视频数 / GPU 小时',
     energy: '每有效视频 GPU 板卡能耗（kJ）',
     status: '执行状态',
-    missing: '— 表示无数据、数据无效或样本不足。每个配置至少有 10 个有效样本才显示 P90。',
+    missing: '— 表示无数据或数据无效。',
     metricNote:
       '延迟与吞吐量涵盖提交到媒体下载完成。能耗使用记录的生成时间窗口，按参与计算的 GPU 板卡统计，越低越好；失败尝试的耗时仍计入对应测量窗口。',
     samples: '有效延迟样本数',
@@ -339,7 +336,7 @@ export default function VideoHistory() {
                         <th className="px-2 pb-2 font-medium">
                           {s.latency}
                           <br />
-                          {s.p50} / {s.p90}
+                          {s.median}
                         </th>
                         <th className="px-2 pb-2 font-medium">{s.throughput}</th>
                         <th className="px-2 pb-2 font-medium">{s.energy}</th>
@@ -368,7 +365,7 @@ export default function VideoHistory() {
                           </td>
                           <td className="p-2">{status(point.status)}</td>
                           <td className="p-2">
-                            {fmt(point.p50)} / {fmt(point.p90)}
+                            {fmt(point.p50)}
                             <p className="text-xs text-muted-foreground">n={point.samples}</p>
                           </td>
                           <td className="p-2">{fmt(point.clipsGpuHour)}</td>

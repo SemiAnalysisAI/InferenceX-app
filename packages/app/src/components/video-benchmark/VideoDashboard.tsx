@@ -45,11 +45,13 @@ import type { VideoPoint } from './metrics';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
+  isUnofficialRunParam,
   MAX_CHIP_CONFIGS,
   parseResultsState,
   resultProjection,
   resultsSearch,
   resultMetadata,
+  workloadSummary,
   type ResultCell,
   type ResultsState,
   type VideoMode,
@@ -90,6 +92,8 @@ const STRINGS = {
     title: 'VideoGenX',
     description:
       'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.',
+    benchmarkConfig: 'Benchmark config',
+    model: 'Model',
     chartConfig: 'Chart config',
     runContext: 'Run context',
     compareHistory: 'Compare history',
@@ -165,6 +169,8 @@ const STRINGS = {
     title: 'VideoGenX',
     description:
       '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。点击“查看遥测”可打开对应部署。',
+    benchmarkConfig: '基准测试配置',
+    model: '模型',
     chartConfig: '图表配置',
     runContext: '运行信息',
     compareHistory: '对比历史趋势',
@@ -369,10 +375,7 @@ export default function VideoDashboard({
     latest.current = next;
     const params = new URLSearchParams(
       [...new URLSearchParams(location.search)].filter(
-        ([key]) =>
-          (!key.startsWith('r_') || isStageParam(key)) &&
-          key !== 'unofficialrun' &&
-          key !== 'unofficialruns',
+        ([key]) => (!key.startsWith('r_') || isStageParam(key)) && !isUnofficialRunParam(key),
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
@@ -450,19 +453,23 @@ export default function VideoDashboard({
   const shown = (cell: ResultCell) => !hidden.has(cell.point.hardwareKey ?? '');
   const workloadLabel = useMemo(() => {
     const point = [...namedPoints, ...points].find((p) => p.id === projection.state.workload);
-    if (!point) return null;
-    const metadata = resultMetadata(point);
-    return [
-      metadata.model,
-      metadata.resolution,
-      metadata.duration === null ? null : `${metadata.duration} s`,
-      metadata.fps === null ? null : `${metadata.fps} fps`,
-      metadata.steps === null ? null : `${metadata.steps} ${s.stepsUnit}`,
-      metadata.mode?.toUpperCase(),
-    ]
-      .filter(Boolean)
-      .join(' · ');
+    return point ? workloadSummary(point, s.stepsUnit) : null;
   }, [projection.state.workload, points, namedPoints, s]);
+  const workloadOptions = useMemo(() => {
+    const byId = new Map([...points, ...namedPoints].map((p) => [p.id, p]));
+    const listed = options.workloads.flatMap(({ key }) => {
+      const point = byId.get(key);
+      return point ? [{ key, point, model: resultMetadata(point).model }] : [];
+    });
+    // Name a workload by its model; add its settings only when another workload shares the model.
+    return listed.map(({ key, point, model }) => ({
+      value: key,
+      label:
+        listed.filter((other) => other.model === model).length > 1
+          ? workloadSummary(point, s.stepsUnit)
+          : model,
+    }));
+  }, [options.workloads, points, namedPoints, s]);
   const allCells = [...projection.cells, ...projection.overlayCells];
   const deploymentCells = useMemo(
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
@@ -606,7 +613,7 @@ export default function VideoDashboard({
       ),
     [projection.history, deploymentCells],
   );
-  const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
+  const apiUrl = `/api/v1/views/video?${['view=overview', resultsSearch(state)].filter(Boolean).join('&')}`;
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
@@ -686,6 +693,42 @@ export default function VideoDashboard({
                 headingAs="h1"
               />
               <div className={styles.controls}>
+                <ControlPanel
+                  legend={s.benchmarkConfig}
+                  className={styles.benchmarkConfig}
+                  data-testid="results-benchmark-config"
+                >
+                  <MetricSelect
+                    id="results-workload"
+                    label={s.model}
+                    value={projection.state.workload ?? ''}
+                    groups={[{ label: '', options: workloadOptions }]}
+                    onValueChange={(workload) => {
+                      if (workload === projection.state.workload) return;
+                      track('video_results_workload_selected', { workload });
+                      // Run, pinned point, chip configs and workload filters (including
+                      // retired URL filters) belong to the previous workload.
+                      update({
+                        // The readable slug when it selects this workload, else its point ID.
+                        workload:
+                          options.workloads.find((option) => option.key === workload)?.slug ??
+                          workload,
+                        model: null,
+                        resolution: null,
+                        duration: null,
+                        mode: null,
+                        steps: null,
+                        engine: null,
+                        date: null,
+                        run: null,
+                        point: null,
+                        configs: [],
+                        compareFrom: null,
+                        compareTo: null,
+                      });
+                    }}
+                  />
+                </ControlPanel>
                 <MobileControlSection
                   label={s.secondaryControls}
                   count={secondaryChanged}
@@ -770,7 +813,11 @@ export default function VideoDashboard({
                       </div>
                     )}
                   </ControlPanel>
-                  <ControlPanel legend={s.compareHistory} data-testid="results-compare-history">
+                  <ControlPanel
+                    legend={s.compareHistory}
+                    className={styles.compareHistory}
+                    data-testid="results-compare-history"
+                  >
                     <div className="grid min-w-0 gap-3">
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <LabelWithTooltip
@@ -927,16 +974,11 @@ export default function VideoDashboard({
                 className="sm:ml-auto"
                 data-testid="results-overlay-dismiss"
                 onClick={() => {
-                  const approvedWorkloads = resultProjection(points, {
-                    ...state,
-                    unofficialRun: null,
-                  }).options.workloads;
+                  // A workload only the named run publishes does not resolve without it.
+                  const approved = resultProjection(points, { ...state, unofficialRun: null });
                   update({
                     unofficialRun: null,
-                    ...(state.workload !== null &&
-                    !approvedWorkloads.some((workload) => workload.key === state.workload)
-                      ? { workload: null }
-                      : {}),
+                    ...(approved.workloadKey === null ? { workload: null } : {}),
                   });
                   track('video_results_overlay_dismissed');
                 }}

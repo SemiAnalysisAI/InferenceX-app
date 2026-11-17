@@ -452,7 +452,6 @@ const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> 
   [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
   [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
-  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
@@ -468,7 +467,6 @@ const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.Muse_Spark_Open]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
   ),
-  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {
@@ -498,6 +496,8 @@ const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = 
   // GLM-5.2 and GLM-5.3 Flash have TPUv7 results on Agentic Traces only.
   [Model.GLM_5_2]: new Set([Sequence.AgenticTraces]),
   [Model.GLM_5_3_Flash]: new Set([Sequence.AgenticTraces]),
+  // Qwen3.8 Flash Next has TPUv7 results on Agentic Traces only.
+  [Model.Qwen3_8_Flash_Next]: new Set([Sequence.AgenticTraces]),
 };
 
 export function showsTcoBasisSelector(

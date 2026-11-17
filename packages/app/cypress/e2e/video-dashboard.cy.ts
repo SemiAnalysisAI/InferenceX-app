@@ -43,7 +43,7 @@ describe('VideoGenX results routes', () => {
         expect(point.y, 'UI matches the shared projection for the intercepted fixture').to.equal(
           (h200!.clipsPerSecond! * 3600) / h200!.point.participating!,
         );
-        expect(point.x).to.equal(h200!.point.p90);
+        expect(point.x).to.equal(h200!.point.p50);
       });
       for (const id of ['results-table', 'results-gpus', 'results-cost-basis'])
         cy.get(`[data-testid="${id}"]`).should('not.exist');

@@ -1,3 +1,5 @@
+import { acceleratorEntries } from './glossary-accelerators';
+
 export const GLOSSARY_CATEGORIES = [
   'Benchmark metrics',
   'Serving',
@@ -84,9 +86,403 @@ const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
+const TPU_AGENTX = 'tpu-strikes-the-king';
 const ENGRAM = 'engrams-embedding-entendre-codesign';
 
 const entries = [
+  ...acceleratorEntries,
+  {
+    slug: 'decode-megakernel',
+    term: 'Decode megakernel',
+    aliases: ['megakernel', 'whole-model kernel', 'MonoKernel'],
+    category: 'Software',
+    plainEnglish:
+      'A decode megakernel combines many operations across model layers into a long-running device program, reducing gaps between launches while overlapping weight transfers with computation.',
+    definition:
+      'A decode megakernel fuses a substantial part of the model forward pass across operations or layers, with explicit scheduling of computation, data movement, and sometimes collectives.',
+    explanation:
+      'Conventional execution launches many separate kernels for attention, projections, expert routing, and other operations. A megakernel can prefetch the next layer’s weights while computing the current layer. Implementations differ in how much they fuse; the name does not guarantee that every operation, communication step, or request runs in one launch. Engine scheduling and prefix-cache management can remain outside the fused forward path.',
+    significance:
+      'At low concurrency, short operations may leave the accelerator idle between launches. Reducing those gaps can improve interactivity, but long-context attention, prefill, cache transfers, and high-concurrency throughput still need separate measurement.',
+    benchmarkContext:
+      'The November 2026 TPU AgentX article describes SGLang and vLLM megakernel paths and AMD’s MonoKernel. Inferact integrates its fused forward path with vLLM scheduling and KV transfer; these results do not imply that the full serving system is a single kernel.',
+    relatedTerms: [
+      'kernel-launch-overhead',
+      'kernel-fusion',
+      'double-buffering',
+      'decode',
+      'torchtpu',
+    ],
+    articleSlugs: [TPU_AGENTX, TILERT],
+  },
+  {
+    slug: 'kernel-launch-overhead',
+    term: 'Kernel launch overhead',
+    aliases: ['launch latency', 'kernel dispatch overhead', 'launch-bound execution'],
+    category: 'Software',
+    plainEnglish:
+      'Kernel launch overhead is the work needed to dispatch device operations; when operations are short, dispatch gaps can take a noticeable share of a decode step.',
+    definition:
+      'Kernel launch overhead is the host and runtime cost of submitting device work, together with dispatch-related delays that can leave gaps between useful device operations.',
+    explanation:
+      'A CPU-side launch duration is not automatically equal to accelerator idle time because dispatch and execution may overlap. A timeline distinguishes submission work, synchronization, dependency stalls, and actual device gaps. Graph replay and fusion reduce different parts of this overhead. Neither technique eliminates the need to launch work or makes memory transfers and collectives free.',
+    significance:
+      'Low-batch decode can be launch-bound even when peak compute capability is high. Counting launches alone cannot establish speedup: the remaining kernels may take longer, and the critical path can move to memory or communication.',
+    benchmarkContext:
+      'The TPU article contrasts conventional decode with megakernels and cites an AMD reduction in launch count. Treat that count and the reported speedup as properties of the named model and recipe, not as a universal conversion between launches and tokens per second.',
+    relatedTerms: ['decode-megakernel', 'kernel-fusion', 'cuda-graphs', 'interactivity'],
+    articleSlugs: [TPU_AGENTX, TILERT],
+  },
+  {
+    slug: 'decode-context-parallelism',
+    term: 'Decode context parallelism',
+    abbreviation: 'DCP',
+    aliases: ['DCP', 'KV sequence sharding'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Decode context parallelism spreads a sequence’s KV cache across ranks, so each rank reads part of the history and their partial attention results are combined.',
+    definition:
+      'Decode context parallelism shards attention KV state along the sequence dimension and merges partial attention outputs with their normalization statistics across the participating ranks.',
+    explanation:
+      'This can reduce KV duplication when tensor parallelism has more ranks than independently shardable KV heads, especially with MLA’s shared latent cache. Each rank attends to its local token slice, and a numerically correct merge combines the results. The name describes its usual motivation, not a decode-only restriction: an implementation can use the same sharded cache during prefill.',
+    significance:
+      'Sharding increases effective KV capacity and distributes cache reads, but adds communication and merge work. The best degree depends on context length, attention structure, topology, and the engine’s supported combinations with tensor and prefill context parallelism.',
+    benchmarkContext:
+      'The TPU AgentX article explains DCP for GLM and Kimi K3. K3 uses the sharded layout during prefill too, avoiding the assumption that a DCP label means the prefill cache is replicated. Compare actual rank groups and cache layouts, not just the acronym.',
+    relatedTerms: [
+      'context-parallelism',
+      'prefill-context-parallelism',
+      'kv-head-replication',
+      'multi-head-latent-attention',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'prefill-context-parallelism',
+    term: 'Prefill context parallelism',
+    abbreviation: 'PCP',
+    aliases: ['PCP', 'prefill sequence splitting'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Prefill context parallelism divides a long prompt’s new-token computation across ranks so one accelerator does not have to process the entire prompt alone.',
+    definition:
+      'Prefill context parallelism distributes query-token computation for a prompt across ranks, exchanging the key and value information needed to preserve the model’s attention semantics.',
+    explanation:
+      'One implementation gathers keys and values while each rank owns a query chunk; another circulates KV chunks to avoid keeping the complete history on every rank. Causal attention requires load balancing because later queries can attend to more tokens. PCP’s execution partition and DCP’s KV-storage partition are related but distinct, and supported combinations vary across engines and models.',
+    significance:
+      'PCP can reduce long-prompt processing time, but additional communication, replicated weights, or a different parallel layout may consume capacity needed for KV state. The smallest prefill latency does not necessarily produce the best end-to-end serving configuration.',
+    benchmarkContext:
+      'The Kimi K3 discussion in the TPU article explains why that recipe used a DCP-sharded cache during prefill instead of its alternative PCP configuration. This is a recipe-specific memory trade-off, not a rule that PCP and DCP can never be combined.',
+    relatedTerms: [
+      'context-parallelism',
+      'decode-context-parallelism',
+      'prefill',
+      'time-to-first-token',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'attention-head-dimension',
+    term: 'Attention head dimension',
+    aliases: ['head dimension', 'head_dim', 'head dim'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Attention head dimension is the vector width used by an attention head, which affects its arithmetic, cache footprint, and fit to accelerator matrix tiles.',
+    definition:
+      'An attention head dimension is the feature width of a per-head query, key, or value representation; those widths need not all be equal in every architecture.',
+    explanation:
+      'Matrix engines compute fixed tile shapes. A kernel may pad, pack, or reshape attention dimensions to fit those tiles. Consequently, a head width smaller than a matrix array can waste work in one layout while a different mapping fills more of the array. Head count, sequence length, precision, sharding, and the query-key versus value dimensions all influence the actual utilization.',
+    significance:
+      'A dimension favorable for model quality or a GPU kernel may require a different layout on a TPU. Dividing head dimension by array width is not a universal estimate of model throughput or even of every attention matmul’s utilization.',
+    benchmarkContext:
+      'The TPU AgentX article discusses Muse Spark Open’s head dimension of 64 and the fit of model shapes to TPU matrix hardware. Read that example together with its kernel and layout context rather than turning the dimensional ratio into a whole-model performance prediction.',
+    relatedTerms: ['tile-padding', 'mxu', 'systolic-array', 'grouped-query-attention'],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
+  },
+  {
+    slug: 'hicache',
+    term: 'HiCache',
+    expansion: 'Hierarchical KV caching',
+    aliases: ['SGLang HiCache', 'hierarchical KV cache'],
+    category: 'Software',
+    plainEnglish:
+      'HiCache extends SGLang’s prefix cache beyond accelerator memory, retaining reusable attention state in host memory and optionally a storage backend.',
+    definition:
+      'HiCache is SGLang’s hierarchical KV-cache system, extending radix-based prefix reuse across accelerator memory, instance-local host memory, and an optional storage tier.',
+    explanation:
+      'The hierarchy tracks where cached state resides and manages loading, prefetching, and write-back. A host-memory hit still needs a transfer before device computation can reuse the state. Host memory is private to an inference instance; cross-instance reuse requires a storage backend configured for the intended sharing scope. Transfer implementations and supported model state depend on the serving stack.',
+    significance:
+      'A larger retained prefix cache can reduce repeated prefill in long multi-turn workloads, but transfer latency, bandwidth, and eviction policy determine whether a hit actually improves service time. High hit rate alone is not proof of lower end-to-end latency.',
+    benchmarkContext:
+      'The TPU article describes SGLang HiCache host-DRAM offload through TPU-Sync for Muse Spark Open at high concurrency. That measured recipe does not imply that every HiCache backend or configuration supports the same accelerator and model combinations.',
+    relatedTerms: [
+      'sglang',
+      'tpu-sync',
+      'kv-cache-offload',
+      'prefix-cache-hit-rate',
+      'mooncake-store',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'decode-admission-control',
+    term: 'Decode admission control',
+    aliases: ['decode concurrency cap', 'decode request limit'],
+    category: 'Serving',
+    plainEnglish:
+      'Decode admission control limits how many requests enter a decode worker, trading faster generation for admitted requests against waiting time for those still queued.',
+    definition:
+      'Decode admission control is the policy that determines when a request may occupy a decode worker’s active capacity, often using a request-count or resource limit.',
+    explanation:
+      'A request may wait at the router or engine until an eligible worker has room. A lower cap can reduce the active batch and improve per-user generation speed, while a higher cap can increase throughput through batching. The location of the queue determines which latency interval includes the wait. A router cap is distinct from client concurrency and from a physical KV-memory limit.',
+    significance:
+      'A fast decode curve can coexist with slow time to first token when requests wait outside the worker. Evaluate admission policies with queueing, TTFT, end-to-end latency, and completed work under the same offered load.',
+    benchmarkContext:
+      'The TPU article’s llm-d Qwen3.5 comparison varies the number of requests admitted to a decode host. It explicitly discusses the resulting TTFT and end-to-end trade-offs, so its fastest decode point should not be treated as the fastest complete response.',
+    relatedTerms: [
+      'llm-d',
+      'request-queue-depth',
+      'queueing-latency',
+      'concurrency',
+      'end-to-end-latency',
+    ],
+    articleSlugs: [TPU_AGENTX],
+  },
+  {
+    slug: 'kv-cache-affinity',
+    term: 'KV-cache affinity',
+    aliases: ['cache affinity', 'session affinity', 'rank-aware routing'],
+    category: 'Serving',
+    plainEnglish:
+      'KV-cache affinity sends related requests back to a worker or rank that already holds their prefix, avoiding unnecessary cache transfers or repeated prefill.',
+    definition:
+      'KV-cache affinity is a routing preference that preserves locality between a request’s reusable state and the worker or rank chosen to serve it.',
+    explanation:
+      'A host can contain multiple data-parallel ranks with separate cache ownership. Routing to the correct host alone may therefore miss the useful prefix. A policy can track prefix locations or keep a session attached to its previous worker, while allowing reassignment when the worker is full or unavailable. Affinity is a preference, not a guarantee that state has survived eviction.',
+    significance:
+      'Locality can improve cache reuse but concentrate load on a subset of workers. A scheduler must balance the saved computation or transfer against queueing, capacity, and failover. Session affinity and general prefix-aware routing overlap without being identical policies.',
+    benchmarkContext:
+      'The TPU Qwen3.5 article attributes a decode cache-hit improvement to routing to the exact data-parallel rank. It also describes keeping sessions on a decode host unless the host is full, connecting cache locality to admission control.',
+    relatedTerms: [
+      'kv-aware-routing',
+      'prefix-caching',
+      'dp-attention',
+      'decode-admission-control',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3],
+  },
+  {
+    slug: 'open-loop-benchmark',
+    term: 'Open-loop benchmark',
+    aliases: ['open-loop load test', 'arrival-driven load'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'An open-loop benchmark schedules new requests independently of when earlier requests finish, exposing what happens when arrivals exceed serving capacity.',
+    definition:
+      'An open-loop benchmark schedules request arrivals from an external rate or timestamp sequence rather than waiting for each client’s previous response.',
+    explanation:
+      'Arrivals may be evenly spaced, sampled from a distribution, or replayed from timestamps. When service slows, the offered load can continue and the queue can grow. A client-side concurrency cap or backpressure can prevent scheduled arrivals from being dispatched, so the requested rate and actual send rate must be distinguished.',
+    significance:
+      'This load model exposes overload and queueing that a completion-driven client can hide by sending fewer requests as latency rises. Results depend on arrival burstiness and the duration of the measurement window, as well as the mean rate.',
+    benchmarkContext:
+      'AgentX uses dependent, closed-loop agent sessions. Do not interpret its client concurrency as an open-loop request rate or compare the two load models without identifying their arrival rules.',
+    relatedTerms: ['closed-loop-benchmark', 'request-rate', 'request-queue-depth', 'concurrency'],
+    articleSlugs: [AGENT_BENCHMARK, AGENTX_V3],
+  },
+  {
+    slug: 'request-rate',
+    term: 'Request rate',
+    abbreviation: 'RPS',
+    aliases: ['arrival rate', 'offered load', 'requests per second'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Request rate describes how quickly new requests arrive, rather than how many requests are already running or have finished.',
+    definition:
+      'Request arrival rate is the number of new requests offered or dispatched per unit of time, usually expressed in requests per second.',
+    explanation:
+      'A configured target rate, the actual client dispatch rate, and the rate observed by the server can differ. Network delays, client limits, and backpressure affect delivery. The same average rate can describe smooth arrivals or sharp bursts, and different prompt lengths can impose very different work at that rate.',
+    significance:
+      'Arrival rate sets demand; request throughput measures completions. If demand persistently exceeds capacity, requests accumulate, fail, or time out. Comparing only completed throughput can hide this overload and the associated latency.',
+    benchmarkContext:
+      'Read the workload’s arrival model alongside its sequence lengths and concurrency. AgentX client counts describe active sessions whose requests depend on prior completions and tool pauses; they do not specify a fixed requests-per-second load.',
+    measurement: { label: 'Typical unit', value: 'requests per second (requests/s)' },
+    relatedTerms: [
+      'open-loop-benchmark',
+      'request-throughput',
+      'concurrency',
+      'request-queue-depth',
+    ],
+    articleSlugs: [AGENT_BENCHMARK, AGENTX_V3],
+  },
+  {
+    slug: 'request-throughput',
+    term: 'Request throughput',
+    aliases: ['completed requests per second', 'completion rate'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Request throughput counts finished requests per second; token throughput counts how much generated text the system delivers in that time.',
+    definition:
+      'Request throughput is the number of successfully completed requests divided by the elapsed time in a specified measurement window.',
+    explanation:
+      'A short response and a long response each count as one completed request. Completion rate therefore changes with the request mix even when token throughput stays similar. Report how failures, timeouts, warmup, and requests crossing the measurement boundary are handled; different window rules change the result.',
+    significance:
+      'A high completion rate can come from serving shorter requests rather than a faster system. It also does not establish that completed requests met their latency targets. Goodput adds an explicit service-level requirement to the counted work.',
+    benchmarkContext:
+      'InferenceX throughput curves primarily compare token rates, with the selected normalization shown on the axis. Do not relabel tokens per second as requests per second or interpret completed AgentX requests as completed agent sessions.',
+    measurement: {
+      label: 'Relationship',
+      value: 'request throughput = successful completed requests / measurement seconds',
+    },
+    relatedTerms: ['request-rate', 'throughput', 'goodput', 'multi-turn-inference'],
+    articleSlugs: [INFERENCEX_V2, AGENTX_V3],
+  },
+  {
+    slug: 'request-queue-depth',
+    term: 'Request queue depth',
+    aliases: ['waiting requests', 'pending requests', 'scheduler queue'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Queue depth counts requests waiting for service, which can rise even while the accelerators remain busy producing tokens.',
+    definition:
+      'Request queue depth is the number of requests waiting at a specified scheduling or admission boundary at a given time.',
+    explanation:
+      'A deployment can have separate queues at the frontend, router, and engine. A server’s waiting-request metric describes its own boundary, not every outstanding client request. Requests may wait for compute, available KV-cache blocks, or a compatible batch. A sampled queue depth is an instantaneous count rather than a duration.',
+    significance:
+      'A growing queue can explain rising time to first token without a change in prefill kernel speed. Brief spikes may reflect subagent bursts; a sustained increase can indicate that arrivals exceed the system’s ability to admit work.',
+    benchmarkContext:
+      'AgentX detailed-point telemetry includes request queue depth when available. Read it alongside running requests, KV-cache utilization, and throughput, and check which engine exported the metric before comparing values across serving stacks.',
+    measurement: { label: 'Typical unit', value: 'waiting requests at the sampled boundary' },
+    relatedTerms: ['queueing-latency', 'request-rate', 'subagent-bursts', 'kv-working-set'],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'queueing-latency',
+    term: 'Queueing latency',
+    aliases: ['queue latency', 'queueing time', 'queuing latency', 'scheduler wait time'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Queueing latency is time a request spends waiting for resources before the serving system can schedule its work.',
+    definition:
+      'Queueing latency measures the elapsed time a request waits at a defined admission or scheduling queue before it is selected for execution.',
+    explanation:
+      'Frontend waiting, engine admission, and later scheduler stalls can have different timing boundaries. State which interval a metric records. Client-observed time to first token also includes network delivery, prompt processing, and first-token generation, so it cannot by itself isolate time spent in the queue.',
+    significance:
+      'Near saturation, waiting can dominate the response delay even if kernels run at their usual speed. Faster prefill does not necessarily fix an overloaded queue; admission policy, request mix, and available capacity also determine waiting time.',
+    benchmarkContext:
+      'Use queue depth and server timing metrics, when present, to investigate TTFT changes across concurrency points. Do not subtract an unrelated prefill estimate from client TTFT and report the remainder as measured queueing latency.',
+    measurement: { label: 'Typical unit', value: 'milliseconds or seconds of queue wait' },
+    relatedTerms: ['request-queue-depth', 'time-to-first-token', 'tail-latency', 'prefill'],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
+  {
+    slug: 'kv-working-set',
+    term: 'KV working set',
+    aliases: ['KV cache working set', 'active KV footprint'],
+    category: 'Serving',
+    plainEnglish:
+      'The KV working set is the attention state needed by the requests and reusable prefixes active over a particular interval.',
+    definition:
+      'A KV working set is the collection of attention key and value states used by a workload over a specified interval and memory tier.',
+    explanation:
+      'Its footprint depends on context lengths, concurrent sequences, shared prefixes, cache precision, and model architecture. Shared blocks should not be counted once per request when measuring physical residency. Allocated cache capacity can also include unused blocks or retained prefixes that are not part of the current working set.',
+    significance:
+      'When frequently reused state no longer fits in accelerator memory, the system must transfer, evict, or recompute it. This can produce a sharp latency change as concurrency rises, even though the model weights still fit comfortably.',
+    benchmarkContext:
+      'AgentX’s long sessions and overlapping branches stress the KV working set. Compare cache capacity and offload policy alongside throughput; raw accelerator memory capacity alone does not reveal how much useful state a serving configuration can retain.',
+    relatedTerms: ['kv-cache', 'kv-cache-eviction', 'kv-cache-offload', 'prefix-caching'],
+    articleSlugs: [AGENTX_DSV4_B200_B300, AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'kv-cache-eviction',
+    term: 'KV cache eviction',
+    aliases: ['prefix eviction', 'cache replacement'],
+    category: 'Serving',
+    plainEnglish:
+      'KV cache eviction removes retained attention state from a cache tier so its space can be reused for other work.',
+    definition:
+      'KV cache eviction reclaims cached attention-state blocks according to a replacement policy when they are no longer retained in a memory tier.',
+    explanation:
+      'A prefix cache can discard inactive blocks while protecting blocks still referenced by running requests. Recency, reuse, and prefix structure can guide replacement. Removing an accelerator copy does not necessarily destroy every copy: a lower-tier cache may retain the state for later reload.',
+    significance:
+      'Evicting a prefix that is reused soon adds transfer or recomputation work. A high cache occupancy therefore says little about whether useful state survives. Cache hit rate, reuse distance, and the workload’s branching pattern help explain the cost.',
+    benchmarkContext:
+      'AgentX tool pauses and subagent bursts create competing cache lifetimes. Distinguish eviction of inactive cached prefixes from preemption of an in-progress request, and distinguish discarding state from offloading it to another memory tier.',
+    relatedTerms: ['kv-working-set', 'preemption', 'prefix-cache-hit-rate', 'kv-cache-offload'],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'preemption',
+    term: 'Request preemption',
+    aliases: ['preemption', 'request recomputation', 'scheduler preemption'],
+    category: 'Serving',
+    plainEnglish:
+      'Preemption interrupts an in-progress request so other work can run, sometimes requiring its attention state to be rebuilt before it resumes.',
+    definition:
+      'Request preemption suspends a scheduled request and reclaims resources needed by other requests, with the suspended work resumed according to the engine’s policy.',
+    explanation:
+      'KV-cache pressure can force a serving engine to stop a sequence that has already begun generating. The engine may recompute discarded state or restore saved state before continuing. This differs from evicting an unused prefix because an active request now loses progress time, even if its previously emitted tokens remain valid.',
+    significance:
+      'Repeated preemption adds work and can create long response stalls. High accelerator utilization during recomputation does not imply useful progress at the same rate. Counts of preemptions and request latency together help identify this failure mode.',
+    benchmarkContext:
+      'Inspect engine telemetry and logs when a concurrency sweep suddenly loses interactivity or throughput. Do not assume every stack exports the same preemption counter or infer preemption solely from a high KV-cache utilization reading.',
+    relatedTerms: ['kv-cache-eviction', 'kv-working-set', 'tail-latency', 'concurrency'],
+    articleSlugs: [AGENTX_V3, AGENTX_DSV4_B200_B300],
+  },
+  {
+    slug: 'acceptance-rate',
+    term: 'Draft acceptance rate',
+    aliases: ['acceptance rate', 'speculative acceptance rate', 'draft acceptance ratio'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Draft acceptance rate is the fraction of proposed tokens that pass verification, rather than the number emitted by each verification step.',
+    definition:
+      'Draft acceptance rate is the number of accepted draft tokens divided by the number of proposed draft tokens over a specified sample.',
+    explanation:
+      'It is a dimensionless fraction, often reported as a percentage. Acceptance length instead counts tokens per verification step. With a fixed draft length and matching counting rules, the accepted-draft length equals draft length times acceptance rate. An engine may include a target-generated bonus token in its reported length, so that convention must be stated separately.',
+    significance:
+      'The same acceptance rate can correspond to different numbers of accepted tokens when draft lengths differ. Neither rate nor length alone determines speedup: draft generation, verification cost, batching, and rejected work also matter.',
+    benchmarkContext:
+      'AgentX uses externally calibrated acceptance behavior for synthetic replay. Compare the draft length, speculator, counting convention, and forced-versus-natural setting before treating two reported acceptance values as equivalent.',
+    measurement: {
+      label: 'Relationship',
+      value: 'draft acceptance rate = accepted draft tokens / proposed draft tokens',
+    },
+    relatedTerms: [
+      'acceptance-length',
+      'speculative-decoding',
+      'draft-model',
+      'multi-token-prediction',
+    ],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
+  {
+    slug: 'inter-chunk-latency',
+    term: 'Inter-chunk latency',
+    abbreviation: 'ICL',
+    aliases: ['streaming chunk gap', 'chunk arrival latency'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Inter-chunk latency measures pauses between streamed messages arriving at the client, and each message may contain more than one token.',
+    definition:
+      'Inter-chunk latency is the elapsed time between consecutive qualifying response chunks received by a streaming client.',
+    explanation:
+      'A server can buffer multiple generated tokens into one chunk, especially with speculative decoding or a configured streaming interval. Chunk arrival gaps then differ from token-normalized decode latency. An average TPOT can look good while users still see irregular bursts separated by long pauses.',
+    significance:
+      'Chunk timing describes delivery smoothness at the client boundary. It includes effects of buffering and transport as well as server scheduling. A percentile of chunk gaps and a percentile of per-request average token latency summarize different populations and should not share a label.',
+    benchmarkContext:
+      'Keep chunk-based timing separate from the selected InferenceX interactivity metric. Check the benchmark client’s content-chunk rules and token-count convention before comparing streamed results from different engines or speculative settings.',
+    measurement: {
+      label: 'Relationship',
+      value: 'chunk gap = current chunk arrival time - previous chunk arrival time',
+    },
+    relatedTerms: [
+      'time-per-output-token',
+      'time-to-first-token',
+      'interactivity',
+      'speculative-decoding',
+    ],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
   {
     slug: 'ai-inference',
     term: 'AI inference',
@@ -205,7 +601,14 @@ const entries = [
       'This load model resembles interactive agents, where the next action depends on the previous result. Throughput and latency remain coupled: a faster response advances the session and creates later work sooner. Low-concurrency runs can show more sampling variation than large pooled runs.',
     benchmarkContext:
       'AgentX uses closed-loop concurrency. Its concurrency value is the number of agent clients; request batch size changes as the sessions advance. Read throughput, time to first token, and interactivity together.',
-    relatedTerms: ['agentx', 'trace-replay', 'concurrency', 'throughput', 'latency'],
+    relatedTerms: [
+      'agentx',
+      'trace-replay',
+      'concurrency',
+      'throughput',
+      'latency',
+      'open-loop-benchmark',
+    ],
     articleSlugs: [AGENT_BENCHMARK, TILERT, INFERENCEX_V2, AGENTX_V3],
   },
   {
@@ -344,13 +747,19 @@ const entries = [
     definition:
       'Time per output token is the average delay between generated tokens after the first token has arrived.',
     explanation:
-      'TPOT measures the decode cadence of a streaming response. Ignoring unit conversion, it is the inverse of per-user token rate: 20 ms per token corresponds to about 50 tokens per second per user.',
+      'A common per-request calculation is the time from first to last output divided by the number of output tokens after the first. Streaming chunks may contain multiple tokens, so check the client’s first-chunk counting convention. For a matching per-request metric, 20 ms per token corresponds to 50 tokens per second; taking reciprocals does not commute with averaging across requests.',
     significance:
       'TPOT isolates the part of latency that controls how fluid a streamed answer feels. It normally worsens as more requests share the system, even while aggregate throughput rises.',
     benchmarkContext:
       'InferenceX often presents the reciprocal measure, tok/s/user, because higher is visually better. Recipe tables may include TPOT directly, especially when comparing scheduler or kernel changes at matched concurrency.',
     measurement: { label: 'Relationship', value: 'interactivity ≈ 1000 / TPOT(ms)' },
-    relatedTerms: ['interactivity', 'time-to-first-token', 'decode', 'concurrency'],
+    relatedTerms: [
+      'interactivity',
+      'time-to-first-token',
+      'decode',
+      'concurrency',
+      'inter-chunk-latency',
+    ],
     articleSlugs: [INFERENCEX_V2, SGLANG_056, MI355X_GLM5, TILERT],
   },
   {
@@ -366,8 +775,8 @@ const entries = [
     significance:
       'A single concurrency value reveals only one operating point. Production traffic changes over time, and a recipe that looks best at low concurrency may be overtaken when batches become large or communication begins to dominate.',
     benchmarkContext:
-      'InferenceX sweeps concurrency to build a throughput-interactivity curve. Labels on the curve identify the request count behind each point and expose where a configuration saturates or collapses.',
-    relatedTerms: ['throughput', 'interactivity', 'batching', 'pareto-frontier'],
+      'InferenceX sweeps concurrency to build a throughput-interactivity curve. Fixed-sequence concurrency controls outstanding requests; AgentX concurrency counts agent clients whose tool pauses and branches change the simultaneous request count. Neither value is necessarily the engine’s scheduled batch size or a fixed request arrival rate.',
+    relatedTerms: ['throughput', 'interactivity', 'batching', 'pareto-frontier', 'request-rate'],
     articleSlugs: [SGLANG_056, GB200_KIMI, MI355X_QWEN],
   },
   {
@@ -707,9 +1116,16 @@ const entries = [
     significance:
       'The speedup depends on how many draft tokens are accepted and on the cost of drafting and verification. Dense and MoE models can behave differently because verifying several positions may activate more expert weights.',
     benchmarkContext:
-      'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset.',
-    relatedTerms: ['multi-token-prediction', 'acceptance-length', 'decode', 'batching', 'agentx'],
-    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
+      'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset. The Huawei execution profile separates DSpark drafting, sequential token sampling, and target verification. An apparently short draft block does not by itself establish the full-step gain; accepted tokens and all dependent work determine delivered decode progress.',
+    relatedTerms: [
+      'microbenchmark',
+      'multi-token-prediction',
+      'acceptance-length',
+      'decode',
+      'batching',
+      'agentx',
+    ],
+    articleSlugs: ['huawei-deepseek', INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
   },
   {
     slug: 'multi-token-prediction',
@@ -919,9 +1335,15 @@ const entries = [
     significance:
       'A kernel waiting on memory gains little from additional tensor-core FLOPS. Quantization, batching, cache compression, and expert sharding help by reducing bytes moved or amortizing each weight read across more tokens.',
     benchmarkContext:
-      'Use the shape of the concurrency curve to infer regime changes carefully: low batches may be launch or bandwidth bound, while large batches can raise arithmetic intensity and approach compute saturation.',
-    relatedTerms: ['high-bandwidth-memory', 'decode', 'quantization', 'wide-expert-parallelism'],
-    articleSlugs: [B200_KIMI, GB300_DSV4, SGLANG_056],
+      'Use the shape of the concurrency curve to infer regime changes carefully: low batches may be launch or bandwidth bound, while large batches can raise arithmetic intensity and approach compute saturation. Identify the measured path and byte denominator. The Blackwell port separates DRAM bandwidth, SMEM fill throughput, and L2 traffic; multicast can deliver the same input to multiple destinations without fetching every delivered byte from HBM.',
+    relatedTerms: [
+      'bytes-in-flight',
+      'high-bandwidth-memory',
+      'decode',
+      'quantization',
+      'wide-expert-parallelism',
+    ],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', B200_KIMI, GB300_DSV4, SGLANG_056],
   },
   {
     slug: 'nvlink',
@@ -1088,9 +1510,16 @@ const entries = [
     significance:
       'Sparse attention can make very long context practical, but theoretical sparsity alone says little about runtime. Index construction, irregular access, kernel fusion, and precision support determine the realized speedup.',
     benchmarkContext:
-      'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly.',
-    relatedTerms: ['multi-head-latent-attention', 'kv-cache', 'decode', 'inference-engine'],
+      'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly. On Ascend, selected KV data must still be fetched in a hardware-friendly layout. Reducing the number of attended tokens does not automatically minimize physical transfers when alignment, transfer granularity, and index processing add work.',
+    relatedTerms: [
+      'memory-transfer-engine',
+      'multi-head-latent-attention',
+      'kv-cache',
+      'decode',
+      'inference-engine',
+    ],
     articleSlugs: [
+      'huawei-deepseek',
       B200_GLM5,
       MI355X_DSV4,
       GB300_DSV4,
@@ -1289,15 +1718,22 @@ const entries = [
     plainEnglish:
       'Context parallelism splits one long prompt across several chips so they share the work of reading it and of scanning its stored attention state.',
     definition:
-      'Context parallelism shards query tokens across accelerators, in a prefill form known as PCP and a decode form known as DCP.',
+      'Context parallelism distributes attention computation or KV state along the sequence dimension across accelerators, including prefill context parallelism (PCP) and decode context parallelism (DCP).',
     explanation:
-      'PCP gives each rank a chunk of the query while keys and values are passed around a ring, which parallelizes the compute-bound prefill and stops one rank absorbing an entire long prompt. DCP shards the KV cache itself, so every rank scans its own slice and the partial attention results merge flash-decode style. Because decode is memory-bandwidth bound, parallel KV reads raise the achievable token rate.',
+      'PCP partitions new query-token computation and exchanges the needed keys and values, using a gather or a ring depending on the implementation. DCP shards KV state by token position, then combines local attention results and normalization statistics. A DCP-sharded cache can also be used during prefill; the names describe common optimization goals rather than mutually exclusive execution phases.',
     significance:
-      'Tensor parallelism replicates the full KV cache on each rank and data-parallel attention pins a session to whichever rank owns its shard, so neither scales cleanly as contexts reach hundreds of thousands of tokens. Context parallelism attacks that directly, and its gain grows with input length rather than with batch size.',
+      'Tensor parallelism can shard KV heads when the architecture has enough independent heads. Replication becomes a problem when the TP degree exceeds that head count or the model shares a latent cache across heads. Context parallelism can reduce that duplication or distribute long-prompt work, with communication and memory trade-offs that depend on the recipe.',
     benchmarkContext:
-      'InferenceX surfaces DCP and PCP degrees in point tooltips and parallelism labels alongside TP, EP, and DP. Support is uneven across vendors: the technique remains part of the practical CUDA advantage because the AMD attention backends were still listed as unsupported in the vLLM matrix at the time of the AgentX 1.0 results.',
-    relatedTerms: ['tensor-parallelism', 'data-parallelism', 'kv-cache', 'prefill', 'decode'],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2, AGENTX_M3_RACK],
+      'InferenceX surfaces DCP and PCP degrees alongside TP, EP, and DP. The November 2026 TPU AgentX article describes DCP for GLM and its use during Kimi K3 prefill. Support must be checked for the selected engine, model, and version rather than inferred from an older vendor support matrix.',
+    relatedTerms: [
+      'decode-context-parallelism',
+      'prefill-context-parallelism',
+      'tensor-parallelism',
+      'kv-cache',
+      'prefill',
+      'decode',
+    ],
+    articleSlugs: [TPU_AGENTX, AGENTX_V3, INFERENCEX_V2, AGENTX_M3_RACK],
   },
   {
     slug: 'kv-cache-offload',
@@ -1517,19 +1953,25 @@ const entries = [
     slug: 'acceptance-length',
     term: 'Acceptance length',
     abbreviation: 'AL',
-    aliases: ['acceptance rate', 'draft acceptance'],
+    aliases: ['accepted tokens per verification step', 'draft acceptance length'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'Acceptance length is how many drafted tokens the full model actually approves per verification step, which is what decides whether speculation pays off.',
+      'Acceptance length counts how many tokens each verification step accepts; check whether the reported count includes a target-generated bonus token.',
     definition:
-      'Acceptance length is the average number of speculatively drafted tokens accepted by the target model in one verification pass.',
+      'Acceptance length reports average accepted tokens per verification pass. Some engines count only accepted draft tokens, while others include a target-generated bonus token in the reported length.',
     explanation:
-      'Speculative decoding only saves time when drafts survive verification. An acceptance length near one means the draft and verify machinery ran for nothing, while a high value amortizes one expensive target-model step across several emitted tokens. The value depends on the speculator, the draft length, the model, and the content being generated.',
+      'More accepted tokens can amortize target-model verification across several outputs, but the speedup also depends on draft and verification costs. A value near one has different meanings under draft-only and bonus-inclusive conventions. Unlike acceptance rate, length is a token count rather than a fraction; compare values only after matching the convention and draft length.',
     significance:
       'Because acceptance depends on content, a benchmark can accidentally decide the result. Synthetic or anonymized text is out of distribution for a speculator trained on real language, so measured acceptance drifts away from what production would see, in either direction.',
     benchmarkContext:
       'AgentX replays anonymized traces filled with synthetic tokens, so it does not let acceptance emerge from that content. Runs instead apply a fixed acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset, which keeps the comparison vendor neutral.',
-    relatedTerms: ['speculative-decoding', 'multi-token-prediction', 'eagle', 'agentx'],
+    relatedTerms: [
+      'speculative-decoding',
+      'multi-token-prediction',
+      'eagle',
+      'agentx',
+      'acceptance-rate',
+    ],
     articleSlugs: [AGENTX_V3, INFERENCEX_V2, DEEPSEEK_V4],
   },
   {
@@ -1582,9 +2024,21 @@ const entries = [
     significance:
       'Reading a cloud of raw points invites cherry-picking, since a badly tuned configuration contributes points that no operator would ever choose. The envelope shows the achievable boundary per system, which is the shape a capacity decision is actually made against.',
     benchmarkContext:
-      'This is not the classic roofline model from HPC, which plots attainable FLOPS against arithmetic intensity to expose a compute or memory bound. The dashboard borrows only the picture of an upper bound. Roofline direction is configured per metric, so the same points can produce a different envelope on a different axis.',
-    relatedTerms: ['pareto-frontier', 'iso-interactivity', 'throughput', 'recipe'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, B200_GLM5, AGENTX_GLM_ATOM],
+      'This is not the classic roofline model from HPC, which plots attainable FLOPS against arithmetic intensity to expose a compute or memory bound. The dashboard borrows only the picture of an upper bound. Roofline direction is configured per metric, so the same points can produce a different envelope on a different axis. The Blackwell microbenchmark article instead uses the classic hardware roofline, including a shared-memory bandwidth slope. That instruction-level ceiling is distinct from the dashboard’s empirical Pareto envelope.',
+    relatedTerms: [
+      'speed-of-light',
+      'pareto-frontier',
+      'iso-interactivity',
+      'throughput',
+      'recipe',
+    ],
+    articleSlugs: [
+      'dissecting-nvidia-blackwell-tensor',
+      INFERENCEMAX,
+      INFERENCEX_V2,
+      B200_GLM5,
+      AGENTX_GLM_ATOM,
+    ],
   },
   {
     slug: 'arithmetic-intensity',
@@ -1600,9 +2054,21 @@ const entries = [
     significance:
       'The two phases are limited by different parts of the chip, which is why a specification sheet with impressive peak FLOPS can disappoint on decode and why batching helps: grouping sequences raises intensity by reusing each weight read across more tokens.',
     benchmarkContext:
-      'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput.',
-    relatedTerms: ['prefill', 'decode', 'memory-bandwidth', 'batching'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT, JALAPENO],
+      'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput. State the memory boundary when quoting FLOPs per byte: HBM, L2, and SMEM traffic give different intensities. Blackwell MMA shapes can be SMEM-bound even when an HBM-based calculation suggests sufficient reuse.',
+    relatedTerms: [
+      'matrix-multiply-accumulate',
+      'prefill',
+      'decode',
+      'memory-bandwidth',
+      'batching',
+    ],
+    articleSlugs: [
+      'dissecting-nvidia-blackwell-tensor',
+      INFERENCEMAX,
+      INFERENCEX_V2,
+      TILERT,
+      JALAPENO,
+    ],
   },
   {
     slug: 'prefix-cache-hit-rate',
@@ -1757,9 +2223,9 @@ const entries = [
     significance:
       'On long-context serving this often buys more than shrinking the weights, because at high concurrency the cache, not the weights, is what exhausts memory. Accuracy sensitivity differs by model and by which of keys and values is quantized, so it needs evaluation rather than a blanket assumption.',
     benchmarkContext:
-      'Cache precision is part of the recipe, and mixed layouts exist in practice: some models keep two cache buffers at different widths, which disaggregated transfer paths then have to move as a pair. Read a memory-capacity claim together with the cache format behind it.',
-    relatedTerms: ['kv-cache', 'quantization', 'fp8', 'high-bandwidth-memory'],
-    articleSlugs: [INFERENCEX_V2, AGENTX_V3, GB300_DSV4],
+      'Cache precision is part of the recipe, and mixed layouts exist in practice: some models keep two cache buffers at different widths, which disaggregated transfer paths then have to move as a pair. Read a memory-capacity claim together with the cache format behind it. The Huawei profile highlights quantization work on vector-related paths and opportunities to fuse producer-consumer boundaries. Reduced cache bytes must be weighed against conversion cost, layout requirements, and validated numerical quality.',
+    relatedTerms: ['cube-vector-cores', 'kv-cache', 'quantization', 'fp8', 'high-bandwidth-memory'],
+    articleSlugs: ['huawei-deepseek', INFERENCEX_V2, AGENTX_V3, GB300_DSV4],
   },
   {
     slug: 'sliding-window-attention',
@@ -1904,9 +2370,16 @@ const entries = [
     significance:
       'Because backends are selected rather than fixed, kernel availability becomes a portability question. A feature implemented only for one vendor’s backend leaves the alternative running a generic path, which on long context is not a small compromise but the wrong kernel for the shape.',
     benchmarkContext:
-      'The backend in use is part of the recipe, and a change to it can move a curve without any hardware or engine version change. Support for checkpointing recurrent state in these kernels is what allowed hybrid models to participate in prefix reuse at all.',
-    relatedTerms: ['inference-engine', 'sparse-attention', 'kv-cache', 'vllm', 'sglang'],
-    articleSlugs: [AGENTX_V3, SGLANG_056, INFERENCEX_V2],
+      'The backend in use is part of the recipe, and a change to it can move a curve without any hardware or engine version change. Support for checkpointing recurrent state in these kernels is what allowed hybrid models to participate in prefix reuse at all. The Blackwell port studies copy configurations motivated by FlashInfer attention kernels and distinguishes TMA from LDGSTS paths. Some implementation discussion is explicitly inferred from binaries, not confirmed by publicly available kernel source.',
+    relatedTerms: [
+      'tensor-memory-accelerator',
+      'inference-engine',
+      'sparse-attention',
+      'kv-cache',
+      'vllm',
+      'sglang',
+    ],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', AGENTX_V3, SGLANG_056, INFERENCEX_V2],
   },
   {
     slug: 'cuda-graphs',
@@ -1983,15 +2456,16 @@ const entries = [
     significance:
       'The binding resource decides which hardware spec matters. Memory bound decode explains why HBM capacity and bandwidth headline every accelerator launch, why quantization speeds up decode by shrinking bytes moved, and why a chip with modest FLOPs but fast memory can win interactive serving.',
     benchmarkContext:
-      'InferenceX sweeps concurrency, which walks a system between regimes: low concurrency decode is bandwidth limited while high concurrency batching pushes toward compute limits. The shape of each throughput versus interactivity curve reflects where that transition happens for a given recipe.',
+      'InferenceX sweeps concurrency, which walks a system between regimes: low concurrency decode is bandwidth limited while high concurrency batching pushes toward compute limits. The shape of each throughput versus interactivity curve reflects where that transition happens for a given recipe. A memory bottleneck can sit inside the SM rather than at HBM. Blackwell’s SS and TS MMA comparisons change operand placement, so their different throughput limits require a storage-level analysis, not merely peak HBM bandwidth versus peak FLOPs.',
     relatedTerms: [
+      'tensor-memory',
       'arithmetic-intensity',
       'roofline',
       'memory-bandwidth',
       'high-bandwidth-memory',
       'decode',
     ],
-    articleSlugs: [INFERENCEX_V2, TILERT],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', INFERENCEX_V2, TILERT],
   },
   {
     slug: 'gpu-utilization',
@@ -2007,15 +2481,16 @@ const entries = [
     significance:
       'Fleet economics hinge on utilization. The gap between a well batched, well scheduled deployment and a naive one is often several times the cost per token on identical hardware, which is why serving software and request routing get as much attention as the chips themselves.',
     benchmarkContext:
-      'InferenceX benchmarks report delivered throughput per chip at each interactivity level rather than a utilization percentage, so utilization differences between engines, precisions, and parallelism plans show up directly as separation between curves on the same hardware.',
+      'InferenceX benchmarks report delivered throughput per chip at each interactivity level rather than a utilization percentage, so utilization differences between engines, precisions, and parallelism plans show up directly as separation between curves on the same hardware. The Huawei profile separately reports stream occupancy and summed task durations. Overlapping streams and mixed task types prevent those durations from being interpreted as exclusive physical Cube or vector utilization. Warp occupancy is another distinct metric.',
     relatedTerms: [
+      'cube-vector-cores',
       'model-flops-utilization',
       'batching',
       'concurrency',
       'throughput',
       'total-cost-of-ownership',
     ],
-    articleSlugs: [INFERENCEMAX, AGENTIC_WORKLOADS],
+    articleSlugs: ['huawei-deepseek', INFERENCEMAX, AGENTIC_WORKLOADS],
   },
   {
     slug: 'continuous-batching',
@@ -2474,9 +2949,9 @@ const entries = [
     significance:
       'Block scaling is the enabling idea behind the FP4 generation of inference: without per block scales, 4 bit floating point would be unusable for frontier models. Scale format and block size choices are now genuine differentiators between hardware vendors and quantization recipes.',
     benchmarkContext:
-      'The NVFP4 and MXFP4 results across InferenceX Blackwell and MI355X coverage are block scaled formats, and the compare-precision family exists largely to show what these recipes give up or gain against FP8 baselines on identical hardware.',
-    relatedTerms: ['nvfp4', 'mxfp4', 'fp4', 'fp8', 'quantization'],
-    articleSlugs: [B200_GLM5, GB300_DSV4],
+      'The NVFP4 and MXFP4 results across InferenceX Blackwell and MI355X coverage are block scaled formats, and the compare-precision family exists largely to show what these recipes give up or gain against FP8 baselines on identical hardware. The Blackwell port compares microscaled instruction formats with other formats at matched shapes. Similar saturated throughput does not imply identical single-instruction latency, and instruction-level results do not validate a model’s quantization accuracy.',
+    relatedTerms: ['matrix-multiply-accumulate', 'nvfp4', 'mxfp4', 'fp4', 'fp8', 'quantization'],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', B200_GLM5, GB300_DSV4],
   },
   {
     slug: 'flash-attention',
@@ -2528,9 +3003,9 @@ const entries = [
     significance:
       'CUTLASS is where NVIDIA teaches the ecosystem to use each new tensor core generation, including the FP4 and FP8 paths on Blackwell. The speed at which its patterns propagate into engines is a real component of how quickly new silicon reaches its advertised performance.',
     benchmarkContext:
-      'The GEMM and attention kernels behind InferenceX results on NVIDIA hardware lean heavily on CUTLASS derived code, and version bumps of these libraries inside engine images are a recurring source of day over day curve movement the platform tracks.',
-    relatedTerms: ['cuda', 'gemm', 'kernel-fusion', 'flashinfer', 'nvfp4'],
-    articleSlugs: [SGLANG_056, GB300_DSV4],
+      'The GEMM and attention kernels behind InferenceX results on NVIDIA hardware lean heavily on CUTLASS derived code, and version bumps of these libraries inside engine images are a recurring source of day over day curve movement the platform tracks. The Blackwell port uses CuTe MMA traits and preferred/fallback cluster examples to explain execution scope and launch placement. Its public section stops before the subscriber-only practical CUTLASS discussion; glossary links do not reproduce that continuation.',
+    relatedTerms: ['thread-block-cluster', 'cuda', 'gemm', 'kernel-fusion', 'flashinfer', 'nvfp4'],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', SGLANG_056, GB300_DSV4],
   },
   {
     slug: 'nccl',
@@ -2568,15 +3043,16 @@ const entries = [
     significance:
       'GEMM efficiency is the substrate of every performance claim in the industry. The gap between delivered and peak GEMM throughput at real serving shapes, especially the thin matrices of decode, explains much of why spec sheet ratios fail to predict benchmark rankings.',
     benchmarkContext:
-      'Behind every InferenceX curve sits a stack of GEMM kernels from libraries such as CUTLASS, hipBLASLt, and Triton generated code, and quantized recipes ultimately stand on how well each vendor executes low precision GEMMs at the shapes its scheduler produces.',
+      'Behind every InferenceX curve sits a stack of GEMM kernels from libraries such as CUTLASS, hipBLASLt, and Triton generated code, and quantized recipes ultimately stand on how well each vendor executes low precision GEMMs at the shapes its scheduler produces. Blackwell instruction tests show that tile shape, operand placement, and in-flight MMA count change attainable throughput. A saturated instruction stream excludes some load, synchronization, and epilogue costs of a complete GEMM kernel.',
     relatedTerms: [
+      'matrix-multiply-accumulate',
       'cutlass',
       'arithmetic-intensity',
       'memory-bound-vs-compute-bound',
       'mixture-of-experts',
       'triton',
     ],
-    articleSlugs: [INFERENCEX_V2, MI355X_GLM5],
+    articleSlugs: ['dissecting-nvidia-blackwell-tensor', INFERENCEX_V2, MI355X_GLM5],
   },
   {
     slug: 'kernel-fusion',
@@ -2592,15 +3068,16 @@ const entries = [
     significance:
       'In memory bound inference, removing intermediate traffic is worth more than raw arithmetic improvements, so fusion is one of the most reliable levers engines have. A large share of version over version engine speedups reduces to more aggressive or better targeted fusion.',
     benchmarkContext:
-      'InferenceX recipes pin engine images whose fusion inventories differ by version and by hardware backend, which is a recurring reason day over day tracking shows curves moving on unchanged silicon as fused kernels land for new models and precisions.',
+      'InferenceX recipes pin engine images whose fusion inventories differ by version and by hardware backend, which is a recurring reason day over day tracking shows curves moving on unchanged silicon as fused kernels land for new models and precisions. The Huawei profile identifies repeated quantization boundaries as fusion opportunities. Removing a boundary can save traffic or launches, but added storage pressure and dependencies may reduce overlap, so summed eliminated task time is not a guaranteed step-time saving.',
     relatedTerms: [
+      'auto-scheduling',
       'flash-attention',
       'cuda-graphs',
       'gemm',
       'memory-bandwidth',
       'inference-engine',
     ],
-    articleSlugs: [MI355X_KIMI, SGLANG_056],
+    articleSlugs: ['huawei-deepseek', MI355X_KIMI, SGLANG_056],
   },
   {
     slug: 'tpu',
@@ -2617,9 +3094,9 @@ const entries = [
     significance:
       'The design trades single-chip peak for system-level cost. Wide matrix units, a low-latency torus, and compiler-driven scheduling give Google a lower cost per token than a spec sheet would predict, but tile geometry punishes model shapes that do not fill the array. External adoption depends on the PyTorch-native TorchTPU stack reaching parity with the CUDA ecosystem in vLLM and SGLang.',
     benchmarkContext:
-      'The InferenceX Official Preview publishes the first third-party TPUv7 results, comparing FP8 aggregated serving against B200 and B300. Ironwood reaches up to 50% better performance per dollar in that comparison, and AgentX and disaggregated TPU results follow once the TorchTPU stack is open sourced.',
+      'The September 2026 Official Preview covers FP8 aggregated serving against B200 and B300. The November 2026 follow-up adds TPUv7 AgentX results for Muse Spark Open, GLM, Qwen3.5, and Kimi K3, including llm-d disaggregation. Those workloads, precision choices, cost bases, and latency axes must remain distinct when comparing the two articles.',
     relatedTerms: ['tpuv7-ironwood', 'mxu', 'sparsecore', 'ici', 'torchtpu', 'xla'],
-    articleSlugs: [TPU_IRONWOOD, VR_RUBIN],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD, VR_RUBIN],
   },
   {
     slug: 'tpuv7-ironwood',
@@ -2631,7 +3108,7 @@ const entries = [
     definition:
       'TPUv7 Ironwood is the Google accelerator with two independent compute dies per chip, native FP8 hardware, a 256x256 MXU, roughly six times the HBM of Trillium, and a 3D torus ICI fabric.',
     explanation:
-      'Ironwood drops the MegaCore convention of TPU v4 and v5p, where two cores shared one memory space. Its two dies run as separate logical devices joined by a die-to-die link, so frameworks see two devices per chip. Each chip carries two TensorCores and four third-generation SparseCores. The base pod unit is a 4x4x4 cube of 64 chips, and optical circuit switches stitch cubes into a 9,216-chip superpod. Ironwood has no native FP4, so the current comparison against NVIDIA uses FP8 on both sides.',
+      'Ironwood drops the MegaCore convention of TPU v4 and v5p, where two cores shared one memory space. Its two dies run as separate logical devices joined by a die-to-die link, so frameworks see two devices per chip. Each chip carries two TensorCores and four third-generation SparseCores. The base pod unit is a 4x4x4 cube of 64 chips, and optical circuit switches stitch cubes into a 9,216-chip superpod. Ironwood lacks native FP4 matrix arithmetic, but a serving recipe can still store quantized FP4 weights and convert them for computation. Weight format and arithmetic support are different properties.',
     significance:
       'This is the first generation where Google competes for outside inference workloads with chips that can be bought outright or rented. Anthropic alone committed to more than one million TPUs. The FP8-only compute path caps the comparison against Blackwell until TPUv8i adds native FP4.',
     benchmarkContext:
@@ -2657,8 +3134,16 @@ const entries = [
       ],
       caption: 'Source: SemiAnalysis, [Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
-    relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
-    articleSlugs: [TPU_IRONWOOD],
+    relatedTerms: [
+      'tpu',
+      'mxu',
+      'sparsecore',
+      'ici',
+      'fp8',
+      'weight-only-quantization',
+      'performance-per-dollar',
+    ],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
   },
   {
     slug: 'mxu',
@@ -2835,9 +3320,9 @@ const entries = [
     significance:
       'vLLM and SGLang can reuse upstream model code, schedulers, continuous batching, and feature logic instead of rebuilding them across a PyTorch-to-JAX boundary. That lowers the cost of bringing up new models and moves TPU toward day-zero support alongside NVIDIA. TorchTPU replaces TorchAX, which will be deprecated.',
     benchmarkContext:
-      'The TPUv7 results in the InferenceX Official Preview come from the native TorchTPU vLLM stack serving Qwen3.5 397B in FP8. TorchTPU is in private beta as of early September 2026 and is expected to be open sourced around mid-October at the PyTorch Conference, at which point SemiAnalysis moves TPU benchmarking from its fork to the public InferenceX repo.',
-    relatedTerms: ['torchax', 'xla', 'pallas', 'vllm', 'sglang', 'tpu'],
-    articleSlugs: [TPU_IRONWOOD],
+      'The September 2026 preview used TorchTPU vLLM for Qwen3.5 FP8 while the stack was in private beta. The November follow-up reports both SGLang-TorchTPU and vLLM-TorchTPU AgentX submissions, and links Inferact’s open-source Kimi K3 megakernel reproduction guide. Availability and model support should be read from the dated release and recipe, not the earlier beta forecast.',
+    relatedTerms: ['torchax', 'xla', 'pallas', 'vllm', 'sglang', 'tpu', 'decode-megakernel'],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
   },
   {
     slug: 'torchax',
@@ -2925,9 +3410,9 @@ const entries = [
     explanation:
       'Prefill-decode disaggregation needs a fast path to move a finished prefill’s KV cache from one pool of chips to another, and KV-cache offloading needs a path from HBM to host DRAM and back. TPU-Sync supplies both. It works natively with JAX and with the TorchTPU stack, and it supports native TPU KV-cache DRAM offloading for large models and medium-to-large batches where HBM cannot hold every user’s cache. Google has run disaggregation internally for Gemini for years; externalizing it began only a couple of months before the Official Preview, alongside TPU support in llm-d.',
     significance:
-      'Without a transfer library, TPU external serving is limited to aggregated mode, which is where the current results sit and where GB200 and GB300 NVL72 disaggregated serving currently leads on part of the curve. SemiAnalysis expects Mooncake Store support on TPU to be built on TPU-Sync primitives.',
+      'The transfer path determines whether retained state is cheaper to move than to recompute. Disaggregation requires compatible cache layouts between pools, while offload needs enough host bandwidth and capacity to keep useful prefixes available. A transfer library alone does not establish that a complete serving recipe is faster.',
     benchmarkContext:
-      'The InferenceX Official Preview compares aggregated TPUv7 against aggregated B200 and B300. A TPUv7 disaggregated versus GB200 and GB300 NVL72 disaggregated comparison is planned for a follow-up once TPU-Sync-based disaggregation is optimized in the external stack.',
+      'The November 2026 TPU AgentX article describes TPU-Sync host-DRAM offload for SGLang HiCache and for Qwen3.5 KV and linear-attention state. It also reports llm-d disaggregated serving, superseding the September preview’s plan to benchmark that path later.',
     relatedTerms: [
       'disaggregated-inference',
       'kv-cache-offload',
@@ -2935,8 +3420,9 @@ const entries = [
       'mooncake-store',
       'llm-d',
       'torchtpu',
+      'hicache',
     ],
-    articleSlugs: [TPU_IRONWOOD],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD],
   },
   {
     slug: 'mooncake-store',
@@ -2975,17 +3461,19 @@ const entries = [
     explanation:
       'A single vLLM instance serves one replica. Production deployments need a layer that routes each request to the replica most likely to hold its prefix in cache, splits prefill and decode across separate pools, and scales those pools independently. llm-d supplies that orchestration, backed by Red Hat, Google, and other contributors. TPU support in llm-d is part of Google’s externalization work for prefill-decode disaggregation, alongside the TPU-Sync transfer library, so external TPU customers can run the same disaggregated topology Google uses internally for Gemini.',
     significance:
-      'Disaggregation and KV-aware routing are where much of the remaining performance-per-dollar gain sits for TPU, and they only exist above the engine. Shipping TPU support in a widely used orchestrator matters as much as the engine backend for making those features usable outside Google.',
+      'Separating prefill and decode can protect generation from long prefills, while cache-aware routing can reduce repeated work. The router’s admission policy also introduces queueing trade-offs. Evaluate complete request latency and throughput rather than assuming that improved decode interactivity makes every request faster.',
     benchmarkContext:
-      'InferenceX single-node aggregated results do not exercise llm-d. The planned TPUv7 disaggregated comparison against GB200 and GB300 NVL72 depends on the llm-d and TPU-Sync work landing in the external stack.',
+      'The November 2026 TPU AgentX article reports Qwen3.5 llm-d disaggregation with four TPUv7 chips per host and 24 to 32 chips per result. It distinguishes decode interactivity gains from TTFT and end-to-end trade-offs, and describes rank-aware cache routing and decode admission limits.',
     relatedTerms: [
       'disaggregated-inference',
       'kv-aware-routing',
       'tpu-sync',
       'vllm',
       'nvidia-dynamo',
+      'decode-admission-control',
+      'kv-cache-affinity',
     ],
-    articleSlugs: [TPU_IRONWOOD, AGENTX_V3, AGENTIC_WORKLOADS],
+    articleSlugs: [TPU_AGENTX, TPU_IRONWOOD, AGENTX_V3, AGENTIC_WORKLOADS],
   },
   {
     slug: 'double-buffering',
@@ -3901,14 +4389,15 @@ const entries = [
     significance:
       'Sparse access makes a large parameter table a candidate for DRAM offload. Removing the table at inference changes the trained model, so an ablation is not a substitute for comparing separately trained architectures at matched quality.',
     benchmarkContext:
-      'The article reports roughly 189 GiB of Engram memory in its DeepSeek-V4.1-Flash configuration. Its DRAM and SSD comparisons retain Engram functionality while changing the serving path; the ablation experiments ask a separate model-quality question.',
+      'The article reports roughly 189 GiB of Engram memory in its DeepSeek-V4.1-Flash configuration. Its DRAM and SSD comparisons retain Engram functionality while changing the serving path; the ablation experiments ask a separate model-quality question. The Huawei profile discusses fetching Engram data from token IDs while layer 0 computes. Its DRAM overlap result depends on that schedule; a slower PCIe SSD path can expose transfer latency rather than preserve the same step time.',
     relatedTerms: [
+      'memory-transfer-engine',
       'n-gram-embedding',
       'conditional-memory',
       'parameter-offloading',
       'inference-time-ablation',
     ],
-    articleSlugs: [ENGRAM],
+    articleSlugs: ['huawei-deepseek', ENGRAM],
   },
   {
     slug: 'n-gram-embedding',

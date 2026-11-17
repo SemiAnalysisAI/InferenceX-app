@@ -1,22 +1,26 @@
 'use client';
 
 import { ChevronLeft } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Distribution } from '@/components/inference/agentic-point/distribution';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { ShareButton } from '@/components/ui/share-button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
+import { detailLinks } from './detail-links';
 import { runtimeLabel } from './optimizations';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
+import { usePowerTrace } from './use-power-trace';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
 import styles from './results.module.css';
 
@@ -45,13 +49,14 @@ const STRINGS = {
     sources: 'Sources',
     latency: 'Per-clip latency',
     latencyBoundary: 'Submit to downloaded media',
-    recorded: (p50: string, p90: string, p95: string) =>
-      `Recorded P50 ${p50} · P90 ${p90} · P95 ${p95}`,
+    recorded: (p50: string) => `Recorded median ${p50}`,
     deadline: (seconds: string, share: string | null) =>
       share === null
         ? `Deadline ${seconds} s · attainment needs every valid request time`
         : `Deadline ${seconds} s · ${share} of valid clips met it`,
     trace: 'GPU board power over time',
+    traceLoading: 'Loading power trace…',
+    traceFailed: 'Power trace could not be loaded',
     time: 'Time (s)',
     powerSummary: (avg: string, peak: string) => `Average ${avg} · observed peak ${peak}`,
     energy: 'Energy',
@@ -97,6 +102,12 @@ const STRINGS = {
     approval: 'Publication approval',
     approved: 'Approved',
     unapproved: 'No matching approval receipt',
+    actions: 'Run actions',
+    actionRun: 'GitHub Actions run',
+    actionArtifact: 'Download artifact',
+    actionReproduce: 'Reproduce',
+    actionRunShort: 'GitHub run',
+    actionArtifactShort: 'Artifact',
   },
   zh: {
     back: '返回概览',
@@ -122,13 +133,14 @@ const STRINGS = {
     sources: '来源',
     latency: '单条视频延迟',
     latencyBoundary: '从提交请求到下载完媒体',
-    recorded: (p50: string, p90: string, p95: string) =>
-      `记录值 P50 ${p50} · P90 ${p90} · P95 ${p95}`,
+    recorded: (p50: string) => `记录的中位延迟 ${p50}`,
     deadline: (seconds: string, share: string | null) =>
       share === null
         ? `截止时间 ${seconds} s · 需要全部有效请求的时间记录才能计算达成率`
         : `截止时间 ${seconds} s · ${share} 的有效视频按时完成`,
     trace: 'GPU 板卡功率时间序列',
+    traceLoading: '正在加载功率时间序列…',
+    traceFailed: '无法加载功率时间序列',
     time: '时间（s）',
     powerSummary: (avg: string, peak: string) => `平均 ${avg} · 观测峰值 ${peak}`,
     energy: '能耗',
@@ -174,6 +186,12 @@ const STRINGS = {
     approval: '发布批准',
     approved: '已批准',
     unapproved: '未找到匹配的发布批准回执',
+    actions: '运行操作',
+    actionRun: 'GitHub Actions 运行',
+    actionArtifact: '下载产物',
+    actionReproduce: '复现',
+    actionRunShort: 'GitHub 运行',
+    actionArtifactShort: '产物',
   },
 };
 
@@ -182,7 +200,7 @@ const withUnit = (value: number | null | undefined, unit: string, digits: number
 
 function Panel({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
-    <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-border/70 p-4">
+    <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-border/70 p-3 sm:p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <Heading as="h3" level="label">
           {title}
@@ -194,11 +212,12 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
   );
 }
 
-function Facts({ rows }: { rows: [string, ReactNode][] }) {
+/** Pairs two facts per row on phones; a `wide` fact (long prose) takes the full row there. */
+function Facts({ rows }: { rows: [string, ReactNode, { wide?: boolean }?][] }) {
   return (
-    <dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      {rows.map(([label, value]) => (
-        <div key={label} className="min-w-0">
+    <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 text-sm sm:gap-x-6 lg:grid-cols-4">
+      {rows.map(([label, value, options]) => (
+        <div key={label} className={options?.wide ? 'col-span-2 min-w-0 sm:col-span-1' : 'min-w-0'}>
           <dt className="text-xs text-muted-foreground">{label}</dt>
           <dd className="break-words">{value}</dd>
         </div>
@@ -253,6 +272,28 @@ export default function VideoDeploymentDetail({
         : s.notRecorded;
   const measuredCounts = new Set(siblings.map((sibling) => sibling.point.participating));
   const failures = evidence?.failures ?? null;
+  // Older History has no sample count, so only a recorded zero skips the artifact read.
+  const trace = usePowerTrace(
+    point,
+    state.unofficialRun,
+    evidence?.powerValid === true && evidence.powerSamples !== 0,
+  );
+  const actionLabel = {
+    run: s.actionRun,
+    artifact: s.actionArtifact,
+    reproduce: s.actionReproduce,
+  };
+  const actionShortLabel = {
+    run: s.actionRunShort,
+    artifact: s.actionArtifactShort,
+    reproduce: s.actionReproduce,
+  };
+  // The latency histogram reads in milliseconds; a phone gets a narrower canvas so its labels stay legible.
+  const latenciesMs = useMemo(
+    () => evidence?.latencies?.map((seconds) => seconds * 1000) ?? null,
+    [evidence?.latencies],
+  );
+  const phone = useMediaQuery('(max-width: 640px)');
   const code = (value: string | null | undefined) => (
     <span className="break-all font-mono text-xs">{value || s.notRecorded}</span>
   );
@@ -276,8 +317,12 @@ export default function VideoDeploymentDetail({
           <DashboardSectionHeader
             headingAs="h1"
             title={
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <span className={styles.dot} style={{ background: color }} />
+              <span>
+                <span
+                  className={`${styles.dot} mr-2 align-middle`}
+                  style={{ background: color }}
+                  aria-hidden="true"
+                />
                 {[hardware, cell.metadata.model, engine].join(' · ')}
               </span>
             }
@@ -331,7 +376,7 @@ export default function VideoDeploymentDetail({
               [s.concurrency, n(point.concurrency, 0)],
               [s.engine, engine],
               [s.runtime, code(point.runtime.slice(0, 12))],
-              [s.workload, workloadLabel],
+              [s.workload, workloadLabel, { wide: true }],
               [s.valid, `${n(point.valid, 0)} / ${n(point.scheduled, 0)}`],
               [s.power, powerEvidence],
               [
@@ -340,6 +385,30 @@ export default function VideoDeploymentDetail({
               ],
             ]}
           />
+          <div
+            className="grid grid-cols-3 gap-2 border-t border-border/70 pt-4 sm:flex sm:flex-wrap"
+            role="group"
+            aria-label={s.actions}
+            data-testid="results-detail-actions"
+          >
+            {detailLinks(point).map((link) => (
+              <Button key={link.action} asChild variant="outline" size="sm" className="min-w-0">
+                <a
+                  aria-label={actionLabel[link.action]}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-action={link.action}
+                  onClick={() =>
+                    track('video_results_detail_action_opened', { action: link.action })
+                  }
+                >
+                  <span className="truncate sm:hidden">{actionShortLabel[link.action]}</span>
+                  <span className="max-sm:hidden">{actionLabel[link.action]}</span>
+                </a>
+              </Button>
+            ))}
+          </div>
         </div>
       </Card>
       <Card>
@@ -361,17 +430,19 @@ export default function VideoDeploymentDetail({
           <TabsContent value="telemetry" className="flex flex-col gap-4 pt-2">
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
               <Panel title={s.latency} note={s.latencyBoundary}>
-                {evidence?.latencies ? (
-                  <Distribution values={evidence.latencies} unit="s" />
+                {latenciesMs ? (
+                  <Distribution
+                    values={latenciesMs}
+                    unit="ms"
+                    percentiles={['p50']}
+                    width={phone ? 380 : 720}
+                    height={phone ? 240 : 260}
+                  />
                 ) : (
                   <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
                 )}
                 <p className="text-xs" data-testid="results-detail-latency">
-                  {s.recorded(
-                    withUnit(point.p50, 's', 1),
-                    withUnit(point.p90, 's', 1),
-                    withUnit(cell.p95, 's', 1),
-                  )}
+                  {s.recorded(withUnit(point.p50, 's', 1))}
                 </p>
                 <p className="text-xs">
                   {s.deadline(
@@ -384,14 +455,14 @@ export default function VideoDeploymentDetail({
               </Panel>
               <Panel title={s.trace}>
                 <div data-testid="results-power-trace">
-                  {evidence?.powerSeries.length ? (
+                  {trace.status === 'ready' && trace.samples.length > 0 ? (
                     <ResultsLines
                       series={[
                         {
                           key: point.hardwareKey ?? '',
                           label: hardware,
                           color,
-                          points: evidence.powerSeries.map((sample) => ({
+                          points: trace.samples.map((sample) => ({
                             x: sample.seconds,
                             y: sample.watts,
                           })),
@@ -400,9 +471,19 @@ export default function VideoDeploymentDetail({
                       label={s.trace}
                       xLabel={s.time}
                       yLabel="W"
+                      width={phone ? 380 : 630}
+                    />
+                  ) : trace.status === 'loading' ? (
+                    // Holds the chart's canvas, so the panel does not grow when the trace arrives.
+                    <Skeleton
+                      className={phone ? 'aspect-[380/262] w-full' : 'aspect-[630/262] w-full'}
+                      role="status"
+                      aria-label={s.traceLoading}
                     />
                   ) : (
-                    <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {trace.status === 'failed' ? s.traceFailed : s.notRecorded}
+                    </p>
                   )}
                 </div>
                 <p className="text-xs">
@@ -465,26 +546,25 @@ export default function VideoDeploymentDetail({
                   }
                   label={s.warmup}
                 />
-                <div className={styles.scroll}>
-                  <table className={`${styles.table} text-xs`}>
-                    <thead>
-                      <tr>
-                        {[s.timeout, s.oom, s.engineError, s.transport, s.other].map((label) => (
-                          <th key={label}>{label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {(['timeout', 'oom', 'engine', 'transport', 'other'] as const).map(
-                          (key) => (
-                            <td key={key}>{failures ? failures[key] : s.notRecorded}</td>
-                          ),
-                        )}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <dl
+                  className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs sm:grid-cols-5"
+                  data-testid="results-detail-failures"
+                >
+                  {(
+                    [
+                      ['timeout', s.timeout],
+                      ['oom', s.oom],
+                      ['engine', s.engineError],
+                      ['transport', s.transport],
+                      ['other', s.other],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key} className="min-w-0">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="tabular-nums">{failures ? failures[key] : s.notRecorded}</dd>
+                    </div>
+                  ))}
+                </dl>
                 <p className="text-xs text-muted-foreground">
                   {s.failures}: {n(point.failed, 0)}
                 </p>
@@ -501,8 +581,8 @@ export default function VideoDeploymentDetail({
             <Panel title={s.identity}>
               <Facts
                 rows={[
-                  [s.workloadHash, code(evidence?.workloadHash)],
-                  [s.manifestHash, code(evidence?.manifestHash)],
+                  [s.workloadHash, code(evidence?.workloadHash), { wide: true }],
+                  [s.manifestHash, code(evidence?.manifestHash), { wide: true }],
                 ]}
               />
             </Panel>
@@ -540,7 +620,7 @@ export default function VideoDeploymentDetail({
                 rows={[
                   [s.sealed, evidence?.verified ? s.verified : s.notRecorded],
                   [s.power, powerEvidence],
-                  [s.runtime, code(point.runtime)],
+                  [s.runtime, code(point.runtime), { wide: true }],
                 ]}
               />
               <a
@@ -561,8 +641,8 @@ export default function VideoDeploymentDetail({
               <Facts
                 rows={[
                   [s.model, cell.metadata.model],
-                  [s.workload, point.workload],
-                  [s.runtime, code(point.runtime)],
+                  [s.workload, point.workload, { wide: true }],
+                  [s.runtime, code(point.runtime), { wide: true }],
                   [s.run, code(point.runId)],
                   [s.artifact, code(String(point.artifactId))],
                   [s.point, code(point.id)],

@@ -1,25 +1,28 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import { useReducedMotion } from '@/components/inference/replay/useReducedMotion';
+import { Button } from '@/components/ui/button';
 import { rangeTickAnchorClass } from '@/components/ui/range-ticks';
 import { Stat } from '@/components/ui/stat';
+import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 
 import {
   CONTEXT_CAP,
-  FIRST_FRAME,
+  DISPLAY_ROWS,
   type Frame,
-  frameDuration,
-  LAST_FRAME,
-  nextFrame,
+  frameAt,
+  LEAD_OUT_MS,
+  nextChange,
+  NOTES,
   REPLAY,
   REPLAY_ROWS,
-  type ReplayRow,
-  sessionCacheHit,
+  REST_FRAME,
   type StepNote,
-  visibleTokens,
+  TIMELINE,
   WARM_PREFIX,
 } from './agentx-session-replay-model';
 import { SEG } from './trace-flamegraph';
@@ -39,22 +42,16 @@ function requestNumber(n: number): string {
 const STRINGS = {
   en: {
     eyebrow: 'Session replay',
+    replay: 'Replay',
     request: (range: string, total: number) => `Request ${range} / ${total}`,
-    context: (n: number) => `context ${tokens(n)}`,
     main: 'main',
     sub: (n: number) => `sub ${n}`,
     notes: {
       warmStart: `Replay joins mid-session. Warmup already holds the ${tokens(WARM_PREFIX)}-token prefix in KV cache.`,
-      fanOut:
-        'Three subagents start in parallel with an empty KV cache, so each prompt prefills from scratch.',
-      subagentsReturn:
-        'Subagent reports return to the main agent as new input after its cached prefix.',
+      fanOut: 'Three subagents start in parallel with empty KV caches and prefill from scratch.',
+      subagentsReturn: 'Subagent reports return to the main agent as new input.',
+      mainTurns: 'Later turns reuse earlier context from KV cache and prefill only the new input.',
     } satisfies Record<StepNote, string>,
-    phases: {
-      cached: (n: number) => `${tokens(n)} tokens served from KV cache`,
-      prefill: (n: number) => `Prefilling ${tokens(n)} new tokens`,
-      decode: (n: number) => `Decoding ${tokens(n)} output tokens`,
-    },
     stats: {
       cached: 'From KV cache',
       fresh: 'Prefilled',
@@ -68,20 +65,16 @@ const STRINGS = {
   },
   zh: {
     eyebrow: '会话回放',
+    replay: '重新播放',
     request: (range: string, total: number) => `请求 ${range} / ${total}`,
-    context: (n: number) => `上下文 ${tokens(n)}`,
     main: '主',
     sub: (n: number) => `子 ${n}`,
     notes: {
       warmStart: `回放从会话中途开始。warmup 已将 ${tokens(WARM_PREFIX)} token 的 prefix 写入 KV cache。`,
       fanOut: '三个 subagent 并行启动。它们的 KV cache 为空，prompt 需要从头 prefill。',
-      subagentsReturn: 'subagent 的结果作为新 input 返回 main agent，接在已缓存的 prefix 之后。',
+      subagentsReturn: 'subagent 的结果作为新 input 返回 main agent。',
+      mainTurns: '后续轮次从 KV cache 复用此前的上下文，只 prefill 新增的 input。',
     } satisfies Record<StepNote, string>,
-    phases: {
-      cached: (n: number) => `${tokens(n)} token 来自 KV cache`,
-      prefill: (n: number) => `正在 prefill ${tokens(n)} 个新 token`,
-      decode: (n: number) => `正在 decode ${tokens(n)} 个 output token`,
-    },
     stats: {
       cached: '来自 KV cache',
       fresh: '已 prefill',
@@ -99,56 +92,84 @@ function pct(n: number): string {
   return `${(n / CONTEXT_CAP) * 100}%`;
 }
 
+/** When a segment's animation starts and how long it runs, read by the rules in `motion.css`. */
+function timing(at: number, ms: number, carry = 0): CSSProperties {
+  return { '--at': `${at - LEAD_OUT_MS}ms`, '--ms': `${ms}ms`, '--carry': carry } as CSSProperties;
+}
+
 function Segment({
   value,
   color,
   className,
   minPx = 0,
+  motion,
 }: {
   value: number;
   color: string;
   className?: string;
   minPx?: number;
+  motion: CSSProperties;
 }) {
   return (
     <span
-      className={cn('h-full shrink-0', className)}
-      style={{ width: pct(value), minWidth: value > 0 ? minPx : 0, backgroundColor: color }}
+      className={cn('relative h-full shrink-0', className)}
+      style={{
+        ...motion,
+        width: pct(value),
+        minWidth: value > 0 ? minPx : 0,
+        backgroundColor: color,
+      }}
     />
   );
 }
 
-function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: string }) {
-  const shown = visibleTokens(row, frame);
-  const active = row.step === frame.step;
+function Row({
+  row,
+  frame,
+  label,
+}: {
+  row: (typeof DISPLAY_ROWS)[number];
+  frame: Frame;
+  label: string;
+}) {
+  const { start, prefill, decode, drawn } = TIMELINE[row.step];
+  const playing = frame.phase === 'play';
+  const active = playing && row.step === frame.step;
   return (
-    <li className="flex h-3.5 items-center gap-2" data-testid="agentx-session-replay-row">
+    <li className="flex h-(--row) items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'min-w-12 shrink-0 whitespace-nowrap text-right text-xs leading-3.5 tabular-nums',
+          'min-w-12 shrink-0 whitespace-nowrap text-right text-xs leading-(--row) tabular-nums short:text-2xs',
           active ? 'font-semibold text-foreground' : 'text-muted-foreground',
-          shown ? 'opacity-100' : 'opacity-60',
+          playing && row.step > frame.step ? 'opacity-60' : 'opacity-100',
         )}
       >
         {label}
       </span>
-      <div className={cn('flex h-2.5 flex-1', !shown && 'bg-foreground/5')}>
-        <Segment value={shown?.cached ?? 0} color={SEG.cached} className="opacity-40" />
-        <Segment
-          value={shown?.fresh ?? 0}
-          color={SEG.uncached}
-          minPx={2}
-          className={cn(
-            active && 'transition-[width] duration-600 ease-out motion-reduce:transition-none',
-          )}
+      <div className="relative flex h-[calc(var(--row)-0.25rem)] flex-1">
+        <span
+          className="replay-slot absolute inset-0 bg-foreground/5 opacity-0"
+          style={timing(start, 150)}
         />
         <Segment
-          value={shown?.output ?? 0}
+          value={row.cached}
+          color={SEG.cached}
+          className="replay-carry opacity-40"
+          motion={timing(start, prefill - start, row.carry)}
+        />
+        <Segment
+          value={row.fresh}
+          color={SEG.uncached}
+          minPx={2}
+          className="replay-grow"
+          motion={timing(prefill, decode - prefill)}
+        />
+        <Segment
+          value={row.output}
           color={SEG.output}
           minPx={3}
-          className={cn(
-            active && 'transition-[width] duration-450 ease-out motion-reduce:transition-none',
-          )}
+          className="replay-grow"
+          motion={timing(decode, drawn - decode)}
         />
       </div>
     </li>
@@ -158,34 +179,74 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
 export function AgentXSessionReplay({ locale }: { locale: Locale }) {
   const t = STRINGS[locale];
   const reducedMotion = useReducedMotion();
-  const ref = useRef<HTMLElement>(null);
-  const [frame, setFrame] = useState<Frame>(LAST_FRAME);
+  const ref = useRef<HTMLOListElement>(null);
+  const start = useRef<() => void>(undefined);
+  const [frame, setFrame] = useState<Frame>(REST_FRAME);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
-    if (reducedMotion || !node || typeof IntersectionObserver === 'undefined') {
-      setFrame(LAST_FRAME);
-      return undefined;
-    }
-    let current = FIRST_FRAME;
+    if (reducedMotion || !node || typeof IntersectionObserver === 'undefined') return undefined;
+    // One clock: `elapsed` is how much of the replay has been shown and `since` is when it last
+    // started running (null while it is stopped).
+    let elapsed = 0;
+    let since: number | null = null;
+    let active = false;
+    let played = false;
+    let offscreen = false;
     let timer: number | undefined;
-    const advance = () => {
-      current = nextFrame(current);
-      setFrame(current);
-      timer = window.setTimeout(advance, frameDuration(current));
+    const now = () => (since === null ? elapsed : elapsed + performance.now() - since);
+    const tick = () => {
+      const time = now();
+      const next = nextChange(time);
+      setFrame(frameAt(time));
+      if (next === null) {
+        active = false;
+        since = null;
+      } else {
+        timer = window.setTimeout(tick, next - time);
+      }
+    };
+    // Runs the clock only while a replay is under way and the reader can see it.
+    const update = () => {
+      const run = active && !offscreen && document.visibilityState !== 'hidden';
+      if (run && since === null) {
+        since = performance.now();
+        tick();
+      } else if (!run && since !== null) {
+        elapsed = now();
+        since = null;
+        clearTimeout(timer);
+      }
+      setPaused(active && !run);
+    };
+    start.current = () => {
+      clearTimeout(timer);
+      played = true;
+      active = true;
+      elapsed = 0;
+      since = null;
+      update();
     };
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        clearTimeout(timer);
-        if (entry?.isIntersecting) timer = window.setTimeout(advance, frameDuration(current));
+      (entries) => {
+        const entry = entries.at(-1);
+        if (!entry) return;
+        offscreen = !entry.isIntersecting;
+        // First plays once half of the rows are on screen.
+        if (!played && entry.intersectionRatio >= 0.5) start.current?.();
+        else update();
       },
-      { threshold: 0.3 },
+      { threshold: [0, 0.5] },
     );
-    setFrame(current);
     observer.observe(node);
+    document.addEventListener('visibilitychange', update);
     return () => {
       observer.disconnect();
+      document.removeEventListener('visibilitychange', update);
       clearTimeout(timer);
+      setFrame(REST_FRAME);
+      setPaused(false);
     };
   }, [reducedMotion]);
 
@@ -196,51 +257,55 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
     firstIndex === lastIndex
       ? requestNumber(firstIndex)
       : `${requestNumber(firstIndex)}–${requestNumber(lastIndex)}`;
-  const totals = step.rows.reduce(
-    (sum, row) => ({
-      cached: sum.cached + row.cached,
-      fresh: sum.fresh + row.fresh,
-      output: sum.output + row.output,
-    }),
-    { cached: 0, fresh: 0, output: 0 },
-  );
-  const mainRow = step.rows[0].lane === null ? step.rows[0] : null;
-  const caption = step.note
-    ? t.notes[step.note]
-    : frame.phase === 'cached'
-      ? t.phases.cached(totals.cached)
-      : frame.phase === 'prefill'
-        ? t.phases.prefill(totals.fresh)
-        : t.phases.decode(totals.output);
+  const shown = (n: number | null) => (n === null ? '–' : tokens(n));
 
   const stats = [
-    { key: 'cached', label: t.stats.cached, value: tokens(totals.cached), color: SEG.cached },
-    { key: 'fresh', label: t.stats.fresh, value: tokens(totals.fresh), color: SEG.uncached },
-    { key: 'output', label: t.stats.output, value: tokens(totals.output), color: SEG.output },
+    { key: 'cached', label: t.stats.cached, value: tokens(frame.cached), color: SEG.cached },
+    { key: 'fresh', label: t.stats.fresh, value: shown(frame.fresh), color: SEG.uncached },
+    { key: 'output', label: t.stats.output, value: shown(frame.output), color: SEG.output },
     {
       key: 'hit',
       label: t.stats.hit,
-      value: `${(sessionCacheHit(REPLAY_ROWS, frame.step) * 100).toFixed(1)}%`,
+      value: frame.hit === null ? '–' : `${(frame.hit * 100).toFixed(1)}%`,
       color: null,
     },
   ];
 
   return (
     <figure
-      ref={ref}
       className="border-b border-border/20 px-5 py-5 sm:px-6"
       data-testid="agentx-session-replay"
+      data-replay={frame.phase}
+      data-replay-paused={paused ? '' : undefined}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+          {t.eyebrow}
+          {reducedMotion ? null : (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={t.replay}
+              data-testid="agentx-session-replay-restart"
+              className={cn('-my-3.5 md:-my-2', frame.phase !== 'rest' && 'invisible')}
+              onClick={() => {
+                track('agentx_replay_restarted');
+                start.current?.();
+              }}
+            >
+              <RotateCcw aria-hidden="true" />
+            </Button>
+          )}
+        </p>
         <p className="text-xs text-muted-foreground tabular-nums font-medium">
           {t.request(range, REPLAY_ROWS.length)}
-          {mainRow ? ` · ${t.context(mainRow.cached + mainRow.fresh)}` : null}
         </p>
       </div>
-      <p className="mt-2 min-h-10 text-sm leading-5 text-foreground sm:min-h-5">{caption}</p>
+      <p className="mt-2 min-h-10 text-sm leading-5 text-foreground short:mt-1 sm:min-h-5">
+        {t.notes[NOTES[frame.step]]}
+      </p>
 
-      <p className="mt-3 ml-14 text-xs text-muted-foreground" aria-hidden="true">
+      <p className="mt-3 ml-14 text-xs text-muted-foreground short:mt-1.5" aria-hidden="true">
         {t.axis}
       </p>
       <div className="relative mt-0.5" aria-hidden="true">
@@ -264,13 +329,14 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             </span>
           ))}
         </div>
-        <ol className="relative">
-          {REPLAY_ROWS.map((row, index) => (
+        <ol ref={ref} className="replay-rows relative [--row:0.875rem] short:[--row:0.625rem]">
+          {DISPLAY_ROWS.map((row, index) => (
             <Row
               key={index}
               row={row}
               frame={frame}
-              label={row.lane === null ? t.main : t.sub(row.lane + 1)}
+              // A subagent's second request sits under its first, without repeating the label.
+              label={row.lane === null ? t.main : row.carry ? '' : t.sub(row.lane + 1)}
             />
           ))}
         </ol>

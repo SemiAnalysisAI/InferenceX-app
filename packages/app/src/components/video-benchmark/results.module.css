@@ -41,6 +41,8 @@
 @media (min-width: 768px) {
   .controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Compare history fills the half row beside Benchmark config. */
+    grid-auto-flow: row dense;
   }
   .chartConfig {
     grid-column: 1 / -1;
@@ -53,10 +55,21 @@
   .controls {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  /* Benchmark config stacks over Compare history, so the model picker adds no row above the chart. */
+  .benchmarkConfig {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .compareHistory {
+    grid-column: 1;
+    grid-row: 2;
+  }
   .chartConfig {
-    grid-column: auto;
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
   .runContext {
-    grid-column: span 2;
+    grid-column: 3 / span 2;
+    grid-row: 1;
   }
 }

@@ -106,15 +106,15 @@ describe('AgentX quickstart', () => {
         cy.visit(`${prefix}${entry}`);
         cy.get('[data-testid="agentx-quickstart-callout"]').within(() => {
           cy.get('[data-testid="copyable-code-block"]').should('have.length', 1);
-          cy.contains('code', "pip install 'agentx-harness==1.0.13'").should('exist');
+          cy.contains('code', "pip install 'agentx-harness==1.0.14'").should('exist');
           cy.get(`a[href="${prefix}/infx/agentx/quickstart"]`).click();
         });
         cy.location('pathname').should('eq', `${prefix}/infx/agentx/quickstart`);
         cy.get('[data-testid="agentx-quickstart-article"]').should('be.visible');
-        cy.contains('#run code', "pip install 'agentx-harness==1.0.13'").should('exist');
-        cy.contains('header', 'agentx-harness · 1.0.13').should('be.visible');
+        cy.contains('#run code', "pip install 'agentx-harness==1.0.14'").should('exist');
+        cy.contains('header', 'agentx-harness · 1.0.14').should('be.visible');
         cy.get(
-          'a[href="https://github.com/SemiAnalysisAI/agentx-harness/tree/agentx-v1.0.13"]',
+          'a[href="https://github.com/SemiAnalysisAI/agentx-harness/tree/agentx-v1.0.14"]',
         ).should('be.visible');
       }
     });

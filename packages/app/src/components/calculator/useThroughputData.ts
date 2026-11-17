@@ -1,17 +1,19 @@
 'use client';
 
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { useBenchmarks } from '@/hooks/api/use-benchmarks';
+import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { type Sequence, Percentile, type Model } from '@/lib/catalog/data-mappings';
 
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { type FilterChange, useWarmFilterChange } from '@/providers/GlobalFilterContext';
 
 import {
   getCostField,
@@ -47,6 +49,63 @@ export interface OverlayInput {
   runIndexByUrl: Record<string, number>;
 }
 
+/**
+ * The benchmarks query behind the calculator-family charts. `initialCacheScope` keys seeded rows
+ * apart from the shared query. Power views need the full row, so they skip the calculator view.
+ */
+export function throughputQueryOptions(
+  model: Model,
+  sequence: Sequence,
+  runDate: string,
+  {
+    enabled = true,
+    includePower = false,
+    initialRows,
+    initialCacheScope,
+  }: {
+    enabled?: boolean;
+    includePower?: boolean;
+    initialRows?: BenchmarkRow[];
+    initialCacheScope?: string;
+  } = {},
+) {
+  return benchmarkQueryOptions(
+    model,
+    runDate,
+    enabled,
+    undefined,
+    undefined,
+    undefined,
+    includePower
+      ? undefined
+      : {
+          type: 'calculator',
+          sequence,
+          ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
+        },
+    includePower ? undefined : initialRows,
+  );
+}
+
+/**
+ * Returns a function that warms the throughput query a calculator runs after a filter change. The
+ * profit estimator passes its fixed `sequence`, and its power views pass `includePower`.
+ */
+export function useWarmThroughputChange({
+  sequence,
+  includePower = false,
+}: { sequence?: Sequence; includePower?: boolean } = {}): (change: FilterChange) => void {
+  return useWarmFilterChange(({ request, selection }, queryClient) => {
+    const options = throughputQueryOptions(
+      request.model,
+      sequence ?? selection.effectiveSequence,
+      selection.effectiveRunDate,
+      { includePower },
+    );
+    if (options.enabled) void queryClient.prefetchQuery(options);
+  });
+}
+
 export function useThroughputData(
   selectedModel: Model,
   selectedSequence: Sequence,
@@ -72,20 +131,13 @@ export function useThroughputData(
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(
-    selectedModel,
-    selectedRunDate,
-    enabled,
-    undefined,
-    undefined,
-    includePower
-      ? undefined
-      : {
-          type: 'calculator',
-          sequence: selectedSequence,
-          ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
-        },
-    includePower ? undefined : initialRows,
+  } = useQuery(
+    throughputQueryOptions(selectedModel, selectedSequence, selectedRunDate, {
+      enabled,
+      includePower,
+      initialRows,
+      initialCacheScope,
+    }),
   );
 
   const loading = queryLoading || !allRows;

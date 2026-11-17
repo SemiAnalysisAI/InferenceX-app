@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import type { ReactNode } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -102,9 +102,13 @@ export function BlogPostContent({
               {locale === 'zh' && (
                 <>
                   <span aria-hidden="true">&middot;</span>
-                  <Link href={`/blog/${slug}`} hrefLang="en" className="text-brand hover:underline">
+                  <IntentPrefetchLink
+                    href={`/blog/${slug}`}
+                    hrefLang="en"
+                    className="text-brand hover:underline"
+                  >
                     {t.readOriginal}
-                  </Link>
+                  </IntentPrefetchLink>
                 </>
               )}
             </div>
@@ -113,9 +117,9 @@ export function BlogPostContent({
                 {tags.map((tag) => (
                   <li key={tag}>
                     <Badge asChild variant="secondary">
-                      <Link href={`${basePath}?tag=${encodeURIComponent(tag)}`}>
+                      <IntentPrefetchLink href={`${basePath}?tag=${encodeURIComponent(tag)}`}>
                         {blogTagLabel(tag, locale)}
-                      </Link>
+                      </IntentPrefetchLink>
                     </Badge>
                   </li>
                 ))}

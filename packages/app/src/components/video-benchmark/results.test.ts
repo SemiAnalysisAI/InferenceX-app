@@ -10,6 +10,7 @@ import {
   resultsSearch,
   type ResultCell,
   type ResultsState,
+  workloadSummary,
 } from './results';
 import type { ResultsEvidence } from './results-evidence';
 
@@ -29,7 +30,7 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
   latencies: Array.from({ length: 20 }, (_, i) => i + 1),
   clientP50: 10.5,
   powerValid: true,
-  powerSeries: [],
+  powerSamples: 0,
   peakPowerW: 1500,
   gpuMemoryMiB: null,
   warmupSeconds: null,
@@ -250,6 +251,15 @@ describe('VideoGenX results contract', () => {
     expect(explicit.options.workloads.map((workload) => workload.key)).toContain(named.id);
     expect(explicit.workloadKey).toBe(named.workloadKey);
     expect(new URLSearchParams(resultsSearch(explicit.state)).get('r_workload')).toBe(named.id);
+    // A model slug shares the model's best-covered workload under any filter; the rest keep a point ID.
+    expect(explicit.options.workloads.map((workload) => workload.slug)).toEqual([
+      'minimax-h3',
+      undefined,
+    ]);
+    expect(
+      resultProjection([eligible], { ...state(), workload: 'minimax-h3', engine: 'other' })
+        .workloadKey,
+    ).toBe(eligible.workloadKey);
     expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
     // A shared link keeps its workload after another point of it becomes the representative.
     const republished = { ...eligible, id: 'republished:c1', hardwareKey: 'h200' };
@@ -263,6 +273,8 @@ describe('VideoGenX results contract', () => {
     expect(fallback.workloadMix).toEqual([]);
     expect(fallback.overlayCells[0].point.id).toBe(named.id);
     expect(fallback.state.workload).toBe(named.id);
+    // Official data arriving later would take the slug, so a named-only workload never gets one.
+    expect(fallback.options.workloads[0].slug).toBeUndefined();
     expect(resultProjection([], state(), [named]).options.workloads).toEqual([]);
     for (const change of [
       { samples: 9 },
@@ -271,6 +283,29 @@ describe('VideoGenX results contract', () => {
       { workloadKey: null },
     ])
       expect(resultProjection([], selection, [{ ...named, ...change }]).overlayCells).toEqual([]);
+  });
+
+  it('offers a second approved model as a selectable workload and names it by its derived duration', () => {
+    const identity = JSON.parse(eligible.workloadKey!);
+    identity.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+    Object.assign(identity.plan.generation, { width: 832, height: 480, frame_count: 81, fps: 16 });
+    delete identity.plan.generation.duration_seconds;
+    const wan = {
+      ...eligible,
+      id: 'wan:c1',
+      runId: '300',
+      hardwareKey: 'b200',
+      workloadKey: JSON.stringify(identity),
+    };
+    const offered = resultProjection([eligible, wan], state());
+    expect(offered.options.workloads.map((workload) => workload.key).sort()).toEqual(
+      [eligible.id, wan.id].sort(),
+    );
+    const selected = resultProjection([eligible, wan], { ...state(), workload: wan.id });
+    expect(selected.cells.map((cell) => cell.point.id)).toEqual([wan.id]);
+    expect(workloadSummary(wan, 'steps')).toContain(
+      'Wan-AI/Wan2.2-T2V-A14B-Diffusers · 832×480 · 5.06 s · 16 fps',
+    );
   });
 
   it('shows each deployment as of the selected run date and run', () => {
@@ -347,6 +382,7 @@ describe('VideoGenX results contract', () => {
     ).toEqual(selection);
     expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
     expect(parseResultsState(resultsSearch(state()))).toEqual(state());
+    expect(resultsSearch(state())).toBe('');
     const shared = new URLSearchParams(resultsSearch(selection));
     expect(shared.get('unofficialruns')).toBe('123');
     expect(shared.has('unofficialrun')).toBe(false);
@@ -354,6 +390,9 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
     for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
+    // PR visualizer links spell the overlay `unofficialRun`, as the other dashboards accept.
+    expect(parseResultsState('unofficialRun=43653414377').unofficialRun).toBe('43653414377');
+    expect(parseResultsState('UnofficialRuns=7').unofficialRun).toBe('7');
     // Retired engine comparison: an old link still plots the best engine per GPU.
     expect(parseResultsState('r_compare=1&r_lossy=1')).toEqual({ ...state(), lossy: true });
     expect(

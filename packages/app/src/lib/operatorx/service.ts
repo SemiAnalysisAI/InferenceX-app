@@ -203,8 +203,28 @@ export async function getTimelines(
     refs.map((ref) => [ref, null]),
   );
   let known = true;
-  const runs = [...Map.groupBy(refs, (ref) => ref.split(':')[0])];
   const source = getOperatorXSource();
+  // Precomputed rows answer most refs in one small query; only runs ingested before the
+  // timeline projection (or mid-backfill) load raw documents.
+  const stored = source.getTimelines
+    ? await source.getTimelines(
+        refs.map((ref) => {
+          const [runId, index, revision] = ref.split(':');
+          return { runId, index: Number(index), revision };
+        }),
+        op,
+      )
+    : new Map<string, { timeline: OperatorXTimeline | null; known: boolean }>();
+  for (const [ref, hit] of stored) {
+    timelines[ref] = hit.timeline;
+    if (!hit.known) known = false;
+  }
+  const runs = [
+    ...Map.groupBy(
+      refs.filter((ref) => !stored.has(ref)),
+      (ref) => ref.split(':')[0],
+    ),
+  ];
   const readRun = async ([runId, runRefs]: [string, string[]]) => {
     try {
       const { run, results, metrics } = normalizeBundle(await source.getBundle(runId));

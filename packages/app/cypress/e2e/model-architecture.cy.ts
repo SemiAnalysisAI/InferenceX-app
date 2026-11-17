@@ -28,6 +28,13 @@ function visitModelPage(slug: string) {
       const hydrated = Object.keys(svg).some((key) => key.startsWith('__reactProps'));
       expect(hydrated, 'architecture diagram is hydrated').to.equal(true);
     });
+  // The diagram redraws once its width settles; a click on a block it is about to replace is lost.
+  cy.get('[data-testid="model-architecture-svg"]').should(([svg]) => {
+    const snapshot = `${svg.getBoundingClientRect().width}:${svg.innerHTML.length}`;
+    const previous = svg.dataset.cySettled;
+    svg.dataset.cySettled = snapshot;
+    expect(previous, 'architecture diagram has settled').to.equal(snapshot);
+  });
 }
 
 describe('Model Architecture Diagram', () => {

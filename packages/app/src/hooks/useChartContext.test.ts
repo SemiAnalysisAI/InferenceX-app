@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
-import { reconcileActiveSet, resolveAvailableSelection } from '@/hooks/useChartContext';
+import {
+  reconcileActiveSet,
+  reconcileRememberingHidden,
+  resolveAvailableSelection,
+} from '@/hooks/useChartContext';
 
 describe('reconcileActiveSet', () => {
   it('initializes with all available items when no previous selection', () => {
@@ -41,6 +45,35 @@ describe('reconcileActiveSet', () => {
     expect(pruned).toEqual(new Set(['b200_sglang']));
 
     expect(reconcileActiveSet(pruned, full, true)).toBe(pruned);
+  });
+});
+
+describe('reconcileRememberingHidden', () => {
+  const oct17 = new Set(['gb300', 'h200', 'tpuv7', 'mi355x']);
+  const oct15 = new Set(['gb300', 'h200', 'mi355x']);
+
+  it('restores a picked key when it regains data after a date without it', () => {
+    const picked = new Set(['gb300', 'tpuv7', 'mi355x']);
+    const onOct15 = reconcileRememberingHidden(picked, null, oct15, true);
+    expect(onOct15.selection).toEqual(new Set(['gb300', 'mi355x']));
+
+    const backOnOct17 = reconcileRememberingHidden(onOct15.selection, onOct15, oct17, true);
+    expect(backOnOct17.selection).toEqual(picked);
+  });
+
+  it('keeps remembering across several dates without the key', () => {
+    const picked = new Set(['gb300', 'tpuv7']);
+    const first = reconcileRememberingHidden(picked, null, oct15, true);
+    const second = reconcileRememberingHidden(first.selection, first, new Set(['gb300']), true);
+    const back = reconcileRememberingHidden(second.selection, second, oct17, true);
+    expect(back.selection).toEqual(picked);
+  });
+
+  it('does not restore a key once the reader changes the selection in between', () => {
+    const onOct15 = reconcileRememberingHidden(new Set(['gb300', 'tpuv7']), null, oct15, true);
+    const readerPick = new Set(['h200']);
+    const back = reconcileRememberingHidden(readerPick, onOct15, oct17, true);
+    expect(back.selection).toEqual(readerPick);
   });
 });
 

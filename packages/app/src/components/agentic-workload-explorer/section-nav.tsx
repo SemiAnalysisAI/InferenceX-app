@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -144,7 +144,7 @@ function MoreMenu({
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col rounded-lg border border-border/30 bg-popover p-1 shadow-md">
           {MORE_SECTIONS.map((link) => (
-            <Link
+            <IntentPrefetchLink
               key={link.path}
               href={explorerHref(link.path, locale) + query}
               onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
@@ -156,7 +156,7 @@ function MoreMenu({
               )}
             >
               {link.label[locale]}
-            </Link>
+            </IntentPrefetchLink>
           ))}
         </div>
       )}
@@ -221,7 +221,7 @@ function SectionNavInner({ query }: { query: string }) {
           {PRIMARY_SECTIONS.map((link, index) => {
             const active = isActiveSection(relativePath, link.path);
             return (
-              <Link
+              <IntentPrefetchLink
                 key={link.path}
                 href={explorerHref(link.path, locale) + query}
                 aria-current={active ? 'page' : undefined}
@@ -230,7 +230,7 @@ function SectionNavInner({ query }: { query: string }) {
                 className={tabClass(active)}
               >
                 {link.label[locale]}
-              </Link>
+              </IntentPrefetchLink>
             );
           })}
           <MoreMenu relativePath={relativePath} locale={locale} query={query} />

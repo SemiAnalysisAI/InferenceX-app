@@ -1,11 +1,14 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { track } from '@/lib/analytics/analytics';
 
-interface AgenticCatalogLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
+interface AgenticCatalogLinkProps extends Omit<
+  React.ComponentProps<typeof IntentPrefetchLink>,
+  'href'
+> {
   href: string;
   analyticsEvent: 'agentic_catalog_tutorial_clicked' | 'agentic_catalog_point_clicked';
   analyticsTarget?: string;
@@ -19,7 +22,7 @@ export function AgenticCatalogLink({
   ...props
 }: AgenticCatalogLinkProps) {
   return (
-    <Link
+    <IntentPrefetchLink
       {...props}
       href={href}
       onClick={(event) => {

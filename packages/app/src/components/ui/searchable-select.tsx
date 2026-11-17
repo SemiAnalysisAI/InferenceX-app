@@ -17,6 +17,7 @@ import {
   CONTROL_SEARCH_STYLE,
   CONTROL_SEARCH_CLEAR_STYLE,
 } from './control-styles';
+import { useOptionIntent } from './option-intent';
 
 const STRINGS = {
   en: {
@@ -71,6 +72,8 @@ interface SearchableSelectProps {
   clearSearchLabel?: string;
   noResultsLabel?: string;
   trackPrefix?: string;
+  /** Called with an option's value once the user shows intent toward it. */
+  onOptionIntent?: (value: string) => void;
 }
 
 export function SearchableSelect({
@@ -95,6 +98,7 @@ export function SearchableSelect({
   clearSearchLabel: clearSearchLabelProp,
   noResultsLabel: noResultsLabelProp,
   trackPrefix,
+  onOptionIntent,
 }: SearchableSelectProps) {
   const t = STRINGS[useLocale()];
   const placeholder = placeholderProp ?? t.placeholder;
@@ -112,6 +116,7 @@ export function SearchableSelect({
   const listboxRef = React.useRef<HTMLDivElement>(null);
   const searchUsedRef = React.useRef(false);
   const escapeDismissedRef = React.useRef(false);
+  const optionIntent = useOptionIntent(isOpen, onOptionIntent);
   const tabFocusRef = React.useRef<HTMLElement | null>(null);
   const hasOptionHelp = [...groups, ...(searchGroups ?? [])].some((group) =>
     group.options.some((option) => option.help),
@@ -308,7 +313,9 @@ export function SearchableSelect({
                 ...(listboxRef.current?.querySelectorAll<HTMLElement>('[data-select-option]') ??
                   []),
               ];
-              (options.find((option) => option.dataset.value === value) ?? options[0])?.focus();
+              optionIntent.focusQuietly(
+                options.find((option) => option.dataset.value === value) ?? options[0],
+              );
             }
           }}
           className={cn(
@@ -407,6 +414,7 @@ export function SearchableSelect({
                             data-value={option.value}
                             data-testid={option.testId}
                             aria-pressed={isSelected}
+                            {...optionIntent.optionProps(option.value, !isSelected)}
                             onClick={() => handleSelect(option.value)}
                             onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                             className={cn(
@@ -457,6 +465,7 @@ export function SearchableSelect({
                       data-select-option
                       data-value={option.value}
                       data-testid={option.testId}
+                      {...optionIntent.optionProps(option.value, !isSelected)}
                       onClick={() => handleSelect(option.value)}
                       onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                       className={cn(

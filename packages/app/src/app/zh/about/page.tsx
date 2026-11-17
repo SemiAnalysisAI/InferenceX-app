@@ -9,6 +9,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import {
   ARTICLE_H2_CLASS,
   ARTICLE_PAGE_CLASS,
@@ -63,19 +64,19 @@ export default function AboutPageZh() {
               我们的开放数据与洞察已被 ML 社区广泛采用，用户包括万亿美元级 Token 工厂和 AI
               实验室中负责容量规划与战略的团队，以及多家价值数十亿美元的
               NeoCloud。更多详情请参阅以下文章：{' '}
-              <Link
+              <IntentPrefetchLink
                 href="/zh/blog/inferencemax-open-source-inference-benchmarking"
                 className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v1
-              </Link>
+              </IntentPrefetchLink>
               、{' '}
-              <Link
+              <IntentPrefetchLink
                 href="/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
                 className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v2
-              </Link>
+              </IntentPrefetchLink>
               。
             </p>
           </div>

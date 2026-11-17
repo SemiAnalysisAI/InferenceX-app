@@ -58,6 +58,8 @@ import {
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
 import { slices } from '../compare/slices';
+import { shareBin, shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
+import { HARDWARE_PARAM, parsePickedHardware, setPickedHardware } from '../compare/url-selection';
 import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
@@ -88,7 +90,9 @@ import {
   SWEEP_PX,
   tokenBin,
 } from './OpBars';
-import { DEFAULT_MODEL, ModelViewLoading } from './shell';
+import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
+
+import { ModelViewLoading } from './shell';
 
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
@@ -102,7 +106,6 @@ const STRINGS = {
     precision: 'Precision',
     computePrecision: 'Compute precision',
     oneDevice: '1 GPU',
-    split: (label: string, cases: number) => `${label} (${cases})`,
     metricOption: (label: string, unit: string) => `${label} (${unit})`,
     tokens: 'Tokens',
     all: 'All',
@@ -139,7 +142,6 @@ const STRINGS = {
     precision: '精度',
     computePrecision: '计算精度',
     oneDevice: '单 GPU',
-    split: (label: string, cases: number) => `${label}（${cases}）`,
     metricOption: (label: string, unit: string) => `${label}（${unit}）`,
     tokens: 'Token 数',
     all: '全部',
@@ -174,6 +176,9 @@ function setParam(key: string, value: string) {
   params.set(key, value);
   replaceClientSearch(params);
 }
+
+const setPrecision = (value: ComputePrecision) => setParam('modelPrecision', value);
+const setBin = (value: number) => setParam('modelBin', String(value));
 
 /** A module name with line breaks allowed after `_`, `.` and `+`, never mid-word. */
 function breakable(label: string): ReactNode[] {
@@ -829,7 +834,7 @@ const ModelControls = memo(
     requested: string;
     modelOptions: string[];
     split: string;
-    splits: { key: string; label: string; cases: number }[];
+    splits: { key: string; label: string }[];
     metric: string;
     precision: ComputePrecision | null;
     precisions: ComputePrecision[];
@@ -863,10 +868,7 @@ const ModelControls = memo(
                 label: '',
                 options: splits.map((o) => ({
                   value: o.key || ONE_DEVICE,
-                  label: STRINGS[locale].split(
-                    o.key ? o.label : STRINGS[locale].oneDevice,
-                    o.cases,
-                  ),
+                  label: o.key ? o.label : STRINGS[locale].oneDevice,
                 })),
               },
             ]}
@@ -1083,22 +1085,24 @@ export function ModelView({
   const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
-  const requested = search.get('model') ?? DEFAULT_MODEL;
+  const requested = search.get('model') ?? DEFAULT_OPERATORX_MODEL;
   const requestedSplit = search.get('parallel');
   const isDark = isDarkTheme(useTheme().resolvedTheme);
-  const [picked, setPicked] = useState<string[] | null>(null);
-  const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
+  // GPU picks live in the address bar so share links reproduce them.
+  const pickedParam = search.get(HARDWARE_PARAM);
+  const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
+  const pickedPrecision = sharePrecision(search.get('modelPrecision'));
   const [open, setOpen] = useState<SlotData | null>(null);
-  const [pickedBin, setBin] = useState<number | null>(null);
-  const [sweep, setSweep] = useState(false);
+  const pickedBin = shareBin(search.get('modelBin'));
+  const sweep = shareBoolean(search.get('modelSweep'), false);
 
   // Device splits any of the model's ops has cases at; one device by default.
   const splits = useMemo(() => {
-    const cases = new Map<string, number>();
+    const keys = new Set<string>();
     for (const v of [gemm.data, moe.data, attention.data])
-      for (const o of v?.parallelOptions ?? []) cases.set(o.key, (cases.get(o.key) ?? 0) + o.cases);
-    return [...cases]
-      .map(([key, n]) => ({ key, label: parallelLabel(key), cases: n }))
+      for (const o of v?.parallelOptions ?? []) keys.add(o.key);
+    return [...keys]
+      .map((key) => ({ key, label: parallelLabel(key) }))
       .sort((a, b) => compareSplits(a.key, b.key));
   }, [gemm.data, moe.data, attention.data]);
   // A split the model has; any other (e.g. the Data API's `1` for one device) opens on the
@@ -1120,7 +1124,10 @@ export function ModelView({
   const loaded = !gemm.isLoading && !moe.isLoading && !attention.isLoading;
   useEffect(() => {
     if (loaded && modelOptions.length > 0 && !modelOptions.includes(requested))
-      setParam('model', modelOptions.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : modelOptions[0]);
+      setParam(
+        'model',
+        modelOptions.includes(DEFAULT_OPERATORX_MODEL) ? DEFAULT_OPERATORX_MODEL : modelOptions[0],
+      );
   }, [loaded, modelOptions, requested]);
   // GPUs with measured results at the selected device split
   const available = useMemo(() => measuredHardware(atSplitViews), [atSplitViews]);
@@ -1167,14 +1174,15 @@ export function ModelView({
   const toggle = useCallback(
     (hw: string, placement: 'diagram' | 'chart') => {
       track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement });
-      setPicked(toggleHardwareSelection(hardware, hw));
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPickedHardware(next);
     },
     [hardware],
   );
   const models = useMemo(() => {
     const reset = () => {
       track('operatorx_legend_filter_reset', { op: 'model' });
-      setPicked(null);
+      setPickedHardware(null);
     };
     const build = (view: ComparisonView | undefined) =>
       view
@@ -1254,7 +1262,7 @@ export function ModelView({
   const toggleSweep = useCallback(
     (enabled: boolean) => {
       track('operatorx_model_sweep_toggled', { model: requested, enabled });
-      setSweep(enabled);
+      setParam('modelSweep', String(enabled));
     },
     [requested],
   );

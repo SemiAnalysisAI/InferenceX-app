@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
@@ -207,7 +208,8 @@ export const Footer = () => {
       <div className="container mx-auto border-t border-border/30 px-4 py-10 lg:px-8">
         <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
           <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
-            <IntentPrefetchLink
+            <Link
+              prefetch={false}
               data-testid="footer-brand-link"
               target="_blank"
               href="https://semianalysis.com/"
@@ -220,7 +222,7 @@ export const Footer = () => {
                 alt={t.logoAlt}
                 className="h-auto"
               />
-            </IntentPrefetchLink>
+            </Link>
             <p
               data-testid="footer-brand-description"
               className="max-w-prose text-sm leading-relaxed text-muted-foreground lg:max-w-xs"

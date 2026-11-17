@@ -496,3 +496,33 @@ describe('shared OperatorX comparisons', () => {
     expect(shared.set).toHaveBeenCalledTimes(2);
   });
 });
+
+it('answers precomputed timeline refs without loading raw bundles, falling back only for the rest', async () => {
+  const reads = source([bundle('1', ['vllm']), bundle('2', ['vllm'])]);
+  const stored = { spanUs: 3, names: ['precomputed'] } as never;
+  const getTimelines = vi.fn(() =>
+    Promise.resolve(
+      new Map([
+        ['1:0:1', { timeline: stored, known: true }],
+        ['1:9:1', { timeline: null, known: false }],
+      ]),
+    ),
+  );
+  reads.config.getTimelines = getTimelines;
+  const service = await import('./service');
+  const result = await service.getTimelines('gemm', ['1:0:1', '1:9:1', '2:0:1']);
+  expect(getTimelines).toHaveBeenCalledWith(
+    [
+      { runId: '1', index: 0, revision: '1' },
+      { runId: '1', index: 9, revision: '1' },
+      { runId: '2', index: 0, revision: '1' },
+    ],
+    'gemm',
+  );
+  // Run 1 is fully precomputed; only run 2 reads raw documents.
+  expect(reads.getBundle.mock.calls.map(([id]) => id)).toEqual(['2']);
+  expect(result.timelines['1:0:1']).toBe(stored);
+  expect(result.timelines['1:9:1']).toBeNull();
+  expect(result.timelines['2:0:1']).toMatchObject({ names: ['gemm_kernel'] });
+  expect(result.known).toBe(false);
+});

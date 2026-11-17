@@ -32,12 +32,12 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import {
-  latestRunId,
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
+  useWarmFilterChange,
 } from '@/providers/GlobalFilterContext';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
@@ -95,7 +95,6 @@ import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
   Model,
-  MODEL_PREFIX_MAPPING,
   Sequence,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
@@ -113,7 +112,7 @@ import {
   type ExclusionConflictPolicy,
 } from '@/lib/benchmarks/exclusion';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
-import { filterRunsByModel, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import {
   isAgenticOnlyXAxisMode,
   useChartData,
@@ -134,6 +133,8 @@ import { powerXViewFor } from './powerx/powerx-views';
 import { usePowerXSurface } from './ui/powerx-surface';
 import { bestSeriesPerSku, skuColumns, withUnrankedSkus } from './utils/best-series-per-sku';
 import { resolveBenchmarkSeed } from './utils/benchmark-seed';
+import { resolveChartRuns } from './utils/chart-runs';
+import { warmInferenceSelection } from './selection-warm';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -605,7 +606,7 @@ export function InferenceProvider({
   );
   const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
   const [showOffloadingLabel, setShowOffloadingLabel] = useState(
-    () => getUrlParam('i_offloadlabel') !== '0',
+    () => getUrlParam('i_offloadlabel') === '1',
   );
   const [showFrameworkLabel, setShowFrameworkLabel] = useState(
     () => getUrlParam('i_frameworklabel') !== '0',
@@ -639,65 +640,10 @@ export function InferenceProvider({
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
-  const modelPrefixes = useMemo(
-    () =>
-      Object.entries(MODEL_PREFIX_MAPPING)
-        .filter(([, model]) => model === selectedModel)
-        .map(([prefix]) => prefix),
-    [selectedModel],
+  const { filteredAvailableRuns, effectiveSelectedRunId, asOfRunId, benchmarkRunId } = useMemo(
+    () => resolveChartRuns(availableRuns, selectedRunId, selectedModel, effectivePrecisions),
+    [availableRuns, selectedRunId, selectedModel, effectivePrecisions],
   );
-
-  const filteredAvailableRuns = useMemo(
-    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]) ?? {},
-    [availableRuns, modelPrefixes, effectivePrecisions],
-  );
-
-  const latestRunIdForModel = useMemo(
-    () => latestRunId(filteredAvailableRuns),
-    [filteredAvailableRuns],
-  );
-
-  const effectiveSelectedRunId = useMemo(() => {
-    const filteredRunIds = Object.keys(filteredAvailableRuns);
-    if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return latestRunIdForModel;
-  }, [filteredAvailableRuns, selectedRunId, latestRunIdForModel]);
-
-  const asOfRunId =
-    effectiveSelectedRunId && latestRunIdForModel && effectiveSelectedRunId !== latestRunIdForModel
-      ? effectiveSelectedRunId
-      : undefined;
-
-  const contestedRunIds = useMemo(() => {
-    const runsByConfigKey = new Map<string, Set<string>>();
-    if (availableRuns) {
-      for (const [runId, runInfo] of Object.entries(availableRuns)) {
-        if (!runInfo.changelog) continue;
-        for (const entry of runInfo.changelog.entries) {
-          for (const key of entry.config_keys) {
-            const parts = key.split('-');
-            if (modelPrefixes.includes(parts[0]!) && effectivePrecisions.includes(parts[1]!)) {
-              let runs = runsByConfigKey.get(key);
-              if (!runs) {
-                runs = new Set<string>();
-                runsByConfigKey.set(key, runs);
-              }
-              runs.add(runId);
-            }
-          }
-        }
-      }
-    }
-    const contested = new Set<string>();
-    for (const runs of runsByConfigKey.values()) {
-      if (runs.size > 1) for (const r of runs) contested.add(r);
-    }
-    return contested;
-  }, [availableRuns, modelPrefixes, effectivePrecisions]);
-  const benchmarkRunId =
-    effectiveSelectedRunId && contestedRunIds.has(String(effectiveSelectedRunId))
-      ? String(effectiveSelectedRunId)
-      : undefined;
   const { rows: seedRows, scope: chartQueryScope } = resolveBenchmarkSeed({
     scope: benchmarkQueryScope,
     seedRows: initialBenchmarkRows,
@@ -706,6 +652,16 @@ export function InferenceProvider({
     selectedModel,
     selectedSequence: effectiveSequence,
   });
+  const warmFilterChange = useWarmFilterChange((preview, queryClient) =>
+    warmInferenceSelection(queryClient, preview, {
+      activeTab,
+      isActive,
+      scope: benchmarkQueryScope,
+      seedRows: initialBenchmarkRows,
+      seedModel: initialBenchmarkModel,
+      seedSequence: initialBenchmarkSequence,
+    }),
+  );
 
   const {
     graphs,
@@ -1149,6 +1105,7 @@ export function InferenceProvider({
 
   const selectableHwTypes = useChartDataFilter(
     hwSelectablePoints,
+    activeHwTypes,
     setActiveHwTypesWithFilter,
     extractHwKey,
   );
@@ -1974,6 +1931,7 @@ export function InferenceProvider({
     setUserPowers,
     setHwFilter: setPendingHwFilter,
     setActivePresetId,
+    warmFilterChange,
   };
 
   return (

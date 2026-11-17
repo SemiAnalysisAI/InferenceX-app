@@ -355,9 +355,10 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 4,
-      // Muse's catalog logo changed; recorded video entries are unchanged.
-      sources: 'db9aff5ef4468c7a1603cba0a93440bfcbfef2addaf4c5972aa9dcb771b30a8b',
+      projection: 6,
+      // Re-pinned after the overview disaggregated-throughput fix, which only touches
+      // LLM overview tier reads; video entries are unchanged.
+      sources: 'ff79147adaef68f77f332c03de290d8ff428cd85d791add401af4b38a0039632',
     });
   });
 });

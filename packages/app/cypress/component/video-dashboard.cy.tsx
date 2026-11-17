@@ -14,6 +14,7 @@ import { verifiedQuality } from '@/components/video-benchmark/reference-quality'
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { servingArtifact } from '../support/video-artifacts';
+import { mountWithProviders } from '../support/test-utils';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
 function assertResultsFit() {
@@ -58,7 +59,7 @@ function mount({
       <VideoDashboard />
     </PathnameContext.Provider>
   );
-  cy.mount(
+  mountWithProviders(
     theme ? (
       <ThemeProvider
         attribute="class"
@@ -179,15 +180,42 @@ const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
   latencies: Array.from({ length: 20 }, (_, index) => 70 + index * 0.5),
   clientP50: 75,
   powerValid: true,
-  powerSeries: [
-    { seconds: 0, watts: 3800 },
-    { seconds: 1, watts: 3900 },
-  ],
+  powerSamples: 2,
   peakPowerW: 3900,
   gpuMemoryMiB: null,
   warmupSeconds: 38.2,
   failures: { timeout: 0, oom: 0, engine: 0, transport: 0, other: 0 },
 });
+
+/** Publishes the B200 run with the two-sample power trace the detail view reads when it opens. */
+const b200PowerTrace = (page: VideoHistoryPage) => {
+  const entry = page.entries.find((item) => item.runId === B200_RUN)!;
+  const saved = servingArtifact(Number(B200_RUN), entry.artifact.id, 'NVIDIA B200');
+  const [source] = saved.sources;
+  const manifestSha = entry.sources[0].observations[0].id.split(':')[0];
+  source.checksums = source.checksums.map(([path, sha]) => [
+    path,
+    path === 'manifest.json' ? manifestSha : sha,
+  ]);
+  source.documents = source.documents.map(([path, document]) => [
+    path,
+    /^gpu\/c\d+\/power\.json$/u.test(path)
+      ? {
+          ...(document as Record<string, unknown>),
+          window: { start_unix: 100, end_unix: 101 },
+          sample_series: [
+            { unix_seconds: 100, aggregate_watts: 3800, valid: true },
+            { unix_seconds: 101, aggregate_watts: 3900, valid: true },
+          ],
+        }
+      : document,
+  ]) as typeof source.documents;
+  cy.intercept(
+    'GET',
+    `/api/video-runs?run=${B200_RUN}&artifact=${entry.artifact.id}&format=published`,
+    saved,
+  );
+};
 
 /** The streamed dashboard replaces the pending shell, so an edit made in it would be lost. */
 const focusFirstControl = (focusable: boolean) =>
@@ -213,7 +241,7 @@ describe('VideoGenX results', () => {
       nextPage: null,
     }).as('history');
     const initialData = { state: parseResultsState('?r_tier=r'), history: null, sides: {} };
-    cy.mount(
+    mountWithProviders(
       <PathnameContext.Provider value="/vgx">
         <VideoDashboard initialData={initialData} pending />
       </PathnameContext.Provider>,
@@ -225,7 +253,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results"]').should('be.visible');
     cy.get('@history.all').should('have.length', 0);
     focusFirstControl(false);
-    cy.mount(
+    mountWithProviders(
       <PathnameContext.Provider value="/vgx">
         <VideoDashboard initialData={initialData} />
       </PathnameContext.Provider>,
@@ -284,7 +312,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-table"]').should('not.exist');
     cy.get('[data-testid="results-gpus"]').should('not.exist');
     cy.get('[data-testid="results-cost-basis"]').should('not.exist');
-    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'P90');
+    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'Median latency');
     points(overlay).should('have.length', 2);
     // Same latency on half the boards doubles videos per GPU-hour, so the 4-GPU cell is dominated.
     points(`${overlay}[data-optimal="false"]`).should('have.length', 1);
@@ -316,7 +344,7 @@ describe('VideoGenX results', () => {
     cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
     cy.get('label[for="video-results-optimal"]').click();
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
-    searchParam('r_optimal').should('equal', '1');
+    searchParam('r_optimal').should('equal', null);
     for (const key of ['r_gpus', 'r_basis']) searchParam(key).should('equal', null);
     points(overlay).trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip="video-results-chart"] [data-hover-notice]').should(
@@ -425,6 +453,33 @@ describe('VideoGenX results', () => {
     cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
   });
 
+  it('switches between approved models from the benchmark config', () => {
+    mount({
+      // A filter left over from the previous workload must not hide the next one.
+      search: '?r_y=videosPerGpuHour&r_steps=50',
+      editPage: (page) => {
+        const entry = page.entries.find((item) => item.runId === B200_RUN)!;
+        for (const source of entry.sources)
+          for (const observation of source.observations) {
+            const workload = JSON.parse(observation.workloadKey!);
+            workload.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+            workload.plan.generation.num_inference_steps = 40;
+            observation.workloadKey = JSON.stringify(workload);
+          }
+      },
+    });
+    hardwarePoints('h200').should('exist');
+    hardwarePoints('b200').should('not.exist');
+    cy.get('[data-testid="results-benchmark-config"]').should('be.visible');
+    cy.get('#results-workload').should('contain', 'MiniMaxAI/MiniMax-H3').click();
+    cy.contains('[role="option"]', 'Wan-AI/Wan2.2-T2V-A14B-Diffusers').click();
+    hardwarePoints('b200').should('exist');
+    hardwarePoints('h200').should('not.exist');
+    cy.get('#video-results-chart-title').should('contain', 'Wan-AI/Wan2.2-T2V-A14B-Diffusers');
+    searchParam('r_workload').should('equal', 'wan2.2-t2v-a14b-diffusers');
+    searchParam('r_steps').should('be.null');
+  });
+
   it('opens the named re-export, not the official cell, when both share an observation ID', () => {
     const namedRun = '90000000001';
     mount({
@@ -524,7 +579,10 @@ describe('VideoGenX results', () => {
     hardwarePoints('h100').should('not.exist');
     cy.get('#checkbox-h100').should('not.exist');
     points('[data-hardware="h200"] .visible-shape').click({ force: true });
-    cy.get('[data-testid="point-details-panel"]').should('contain', '4 / —');
+    // An unrecorded allocation shows only the GPUs used, not a dangling "of —".
+    cy.get('[data-slot="point-details-setup"]')
+      .should('contain', 'GPUs')
+      .and('not.contain', ' of ');
     cy.get('[data-testid="results-tco-table"]')
       .should('contain', 'B200')
       .and('not.contain', 'MI355X');
@@ -698,6 +756,7 @@ describe('VideoGenX results', () => {
       edit: (observation) => {
         observation.results = evidence(observation);
       },
+      editPage: b200PowerTrace,
     });
     points('[data-hardware="b200"]').trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip="video-results-chart"]')
@@ -706,12 +765,24 @@ describe('VideoGenX results', () => {
       .and('contain', '4 GPU · TP2 × Ulysses 2');
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
     cy.get('[data-testid="point-details-panel"]')
-      .should('contain', 'GPUs (part. / alloc.)')
-      .and('contain', '4 / 8')
+      .should('contain', 'GPUs')
+      .and('contain', '4 of 8')
       .and('contain', 'Concurrency')
       .and('contain', 'TP2 × Ulysses 2')
       .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
       .should('contain', 'GitHub Actions run');
+    cy.get('[data-testid="point-details-panel"]')
+      .should('not.contain', '? attention')
+      .and('not.contain', 'replicas not recorded')
+      .within(() => {
+        cy.get('[data-action="artifact"]')
+          .should('have.attr', 'href')
+          .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
+        cy.get('[data-action="reproduce"]')
+          .should('have.attr', 'href')
+          .and('contain', 'video-generation/SUBMITTING.md');
+      });
+    cy.get('[data-testid="point-details-panel"]').invoke('outerWidth').should('be.gte', 280);
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
@@ -721,10 +792,46 @@ describe('VideoGenX results', () => {
       .find('[aria-pressed="true"]')
       .should('contain', '4 GPU');
     cy.get('[data-testid="video-results-detail"] nav').should('not.exist');
+    cy.get('[data-testid="results-detail-actions"]')
+      .should('have.attr', 'role', 'group')
+      .within(() => {
+        cy.get('[data-action="run"]')
+          .should(
+            'have.attr',
+            'href',
+            'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789',
+          )
+          .and('contain', 'GitHub Actions run');
+        cy.get('[data-action="artifact"]')
+          .should('have.attr', 'href')
+          .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
+        cy.get('[data-action="reproduce"]')
+          .should('have.attr', 'href')
+          .and('contain', 'video-generation/SUBMITTING.md');
+      });
+    cy.get('[data-testid="video-results-detail"]').should('contain', 'value (ms, log scale)');
+    cy.get('[data-testid="video-results-detail"]')
+      .invoke('text')
+      .should('match', /range \d{2},\d{3}–\d{2},\d{3} ms/u);
+    cy.viewport(393, 900);
+    cy.get('[data-testid="results-detail-actions"] a').then((links) => {
+      const tops = [...links].map((link) => link.getBoundingClientRect().top);
+      expect(new Set(tops).size, 'actions share one row on a phone').to.equal(1);
+    });
+    cy.get('[data-testid="results-detail-actions"] [data-action="run"]').should(
+      'have.attr',
+      'aria-label',
+      'GitHub Actions run',
+    );
+    cy.viewport(1280, 900);
     cy.get('[data-testid="results-power-trace"] svg').should('exist');
     cy.get('[data-testid="results-detail-latency"]')
       .invoke('text')
-      .should('match', /P95 \d/u);
+      .should('match', /^Recorded median \d/u);
+    // Twenty clips have no meaningful tail, so neither the readout nor the histogram names one.
+    cy.get('[data-testid="video-results-detail"]')
+      .invoke('text')
+      .should('not.match', /p9[05]/iu);
     cy.get('[data-testid="video-results-detail"]').should('contain', 'of valid clips met it');
     cy.get('[data-testid="video-results-detail"]').should('contain', '38.2 s');
     cy.get('[data-testid="results-detail-tab-validity"]').click();

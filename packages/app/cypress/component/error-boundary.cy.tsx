@@ -4,6 +4,8 @@ import AppError from '@/app/error';
 import { NotFoundContent } from '@/components/errors/not-found-content';
 import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
+import { mountWithProviders } from '../support/test-utils';
+
 describe('App error boundary localization', () => {
   it('preserves the accessible English recovery UI and tracks its lifecycle', () => {
     const capture = cy.stub().as('capture');
@@ -70,7 +72,7 @@ describe('Not-found recovery analytics', () => {
     registerAnalyticsClient({ capture });
     cy.viewport(375, 812);
 
-    cy.mount(<NotFoundContent locale="zh" />);
+    mountWithProviders(<NotFoundContent locale="zh" />);
     cy.contains('a[href="/zh"]', '返回首页')
       .then(($link) => {
         expect($link[0].getBoundingClientRect().height).to.be.at.least(44);

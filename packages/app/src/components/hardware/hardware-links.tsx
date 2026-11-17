@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Fragment } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -39,9 +39,9 @@ export function HardwareHeroLinks({
             {label}
           </a>
         ) : (
-          <Link href={link.href} {...anchorProps}>
+          <IntentPrefetchLink href={link.href} {...anchorProps}>
             {label}
-          </Link>
+          </IntentPrefetchLink>
         );
         return primary ? (
           <Button key={link.href} asChild size="lg" variant="brand">
@@ -57,13 +57,13 @@ export function HardwareHeroLinks({
 
 export function HardwareIndexLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={href}
       className="font-medium text-foreground hover:underline"
       onClick={() => track('hardware_back_clicked')}
     >
       {label}
-    </Link>
+    </IntentPrefetchLink>
   );
 }
 
@@ -77,12 +77,12 @@ export function HardwareCardLink({
   title: string;
 }) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={href}
       className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
       onClick={() => track('hardware_card_clicked', { slug, title })}
     >
       {title}
-    </Link>
+    </IntentPrefetchLink>
   );
 }

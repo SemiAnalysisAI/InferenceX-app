@@ -4,6 +4,9 @@ import { curveLinear } from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useId, useMemo, useState } from 'react';
 
+import { useClientSearch } from '@/hooks/useClientSearch';
+import { shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
+
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
@@ -21,6 +24,7 @@ import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
 import { originText } from '../compare/slices';
+import { setSearchParam } from '../compare/url-selection';
 import type { VizDefinition } from './types';
 import { RooflineBars } from './roofline-bars';
 
@@ -34,6 +38,7 @@ const STRINGS = {
     empty: 'No case has FLOP and byte counts',
     precision: 'Compute precision',
     normalized: 'Normalized',
+    logScale: 'Log scale',
     intensityAxis: 'Arithmetic intensity',
     shareAxis: 'Share of peak compute (%)',
     tflopsAxis: 'Achieved TFLOPS',
@@ -50,6 +55,7 @@ const STRINGS = {
     empty: '没有同时带 FLOP 和字节数的用例',
     precision: '计算精度',
     normalized: '归一化',
+    logScale: '对数刻度',
     intensityAxis: '算术强度',
     shareAxis: '计算峰值占比（%）',
     tflopsAxis: '实测 TFLOPS',
@@ -110,9 +116,12 @@ export function Roofline({
   }, [view]);
   const precisions = ORDER.filter((p) => counts.has(p));
   const defaults = view.defaults ?? comparisonDefaults(view);
-  const [picked, setPicked] = useState<ComputePrecision | null>(null);
-  const [sharedOnly, setSharedOnly] = useState(true);
-  const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const search = new URLSearchParams(useClientSearch());
+  const prefix = summaryOnly ? 'summary' : 'scatter';
+  const picked = sharePrecision(search.get(`${prefix}Precision`));
+  const sharedOnly = shareBoolean(search.get('summarySharedOnly'), true);
+  const normalized = shareBoolean(search.get(`${prefix}Normalized`), defaults.rooflineNormalized);
+  const logY = shareBoolean(search.get('scatterLog'), false);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
@@ -180,6 +189,25 @@ export function Roofline({
     ...points.map((p) => p.y),
     ...Object.values(rooflines).flatMap((r) => r.map((p) => p.y)),
   ];
+  const yHi = Math.max(...ys) * 1.1;
+  // Log y: the original full-range axis (all values, /1.5 below, *1.5 above) spent half its
+  // height on near-zero values. Raise the floor so that old midpoint sits a quarter of the
+  // way up, then clip roofline slopes; never above the lowest measured point, so none is hidden.
+  const yPos = ys.filter((y) => y > 0);
+  const yMid = Math.sqrt((Math.min(...yPos) / 1.5) * (Math.max(...yPos) * 1.5));
+  const ptPos = points.map((p) => p.y).filter((y) => y > 0);
+  const yLo = Math.min(
+    Math.exp((Math.log(yMid) - 0.25 * Math.log(yHi)) / 0.75),
+    ...(ptPos.length > 0 ? [Math.min(...ptPos) / 1.2] : []),
+  );
+  const shown = logY ? points.filter((p) => p.y > 0) : points;
+  if (logY)
+    for (const [hw, line] of Object.entries(rooflines)) {
+      const cut = line.findIndex((p) => p.y >= yLo);
+      if (cut <= 0) continue;
+      const below = line[cut - 1];
+      rooflines[hw] = [{ x: (below.x * yLo) / below.y, y: yLo }, ...line.slice(cut)];
+    }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -187,7 +215,7 @@ export function Roofline({
           value={precision}
           onValueChange={(value) => {
             track('operatorx_roofline_precision_selected', { precision: value });
-            setPicked(value);
+            setSearchParam(`${prefix}Precision`, value);
           }}
           ariaLabel={strings.precision}
           options={precisions.map((p) => ({ value: p, label: p }))}
@@ -198,7 +226,7 @@ export function Roofline({
             checked={normalized}
             onCheckedChange={(enabled) => {
               track('operatorx_roofline_normalized_toggled', { enabled });
-              setNormalized(enabled);
+              setSearchParam(`${prefix}Normalized`, String(enabled));
             }}
           />
           <Label
@@ -208,6 +236,21 @@ export function Roofline({
             {strings.normalized}
           </Label>
         </div>
+        {!summaryOnly && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="opx-roofline-log"
+              checked={logY}
+              onCheckedChange={(enabled) => {
+                track('operatorx_roofline_log_toggled', { enabled });
+                setSearchParam('scatterLog', String(enabled));
+              }}
+            />
+            <Label htmlFor="opx-roofline-log" className="text-sm font-normal text-muted-foreground">
+              {strings.logScale}
+            </Label>
+          </div>
+        )}
         {summaryOnly && (
           <div className="flex items-center gap-2">
             <Switch
@@ -215,7 +258,7 @@ export function Roofline({
               checked={sharedOnly}
               onCheckedChange={(enabled) => {
                 track('operatorx_summary_shared_toggled', { enabled });
-                setSharedOnly(enabled);
+                setSearchParam('summarySharedOnly', String(enabled));
               }}
             />
             <Label
@@ -234,11 +277,19 @@ export function Roofline({
           <OpxChart<Point>
             inspect={{ model, caseOf: (p) => p.i }}
             chartId="operatorx-roofline"
-            data={points}
+            data={shown}
             height={400}
             margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
             xScale={{ type: 'log', domain: [a0, a1], nice: false }}
-            yScale={{ type: 'sqrt', domain: [0, Math.max(...ys) * 1.1], nice: false }}
+            yScale={
+              logY
+                ? {
+                    type: 'log',
+                    domain: [yLo, yHi],
+                    nice: false,
+                  }
+                : { type: 'sqrt', domain: [0, yHi], nice: false }
+            }
             xAxis={
               normalized
                 ? {
@@ -281,7 +332,7 @@ export function Roofline({
               {
                 type: 'point',
                 key: 'points',
-                data: points,
+                data: shown,
                 config: {
                   getCx: () => 0,
                   getCy: () => 0,

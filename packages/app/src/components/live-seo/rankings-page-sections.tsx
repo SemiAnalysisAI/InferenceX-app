@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { fmtCostPerMtok, fmtThroughput, pctCheaper, pctFaster } from '@/components/live-seo/format';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -75,13 +75,13 @@ export function RankingsDetailContent({
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <Link
+            <IntentPrefetchLink
               href={`${prefix}/rankings`}
               className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft aria-hidden="true" className="size-4" />
               {t.backLabel}
-            </Link>
+            </IntentPrefetchLink>
             <p className="mt-6 text-xs font-medium text-muted-foreground">{entry.model.label}</p>
             <h1 className="mt-3 max-w-4xl text-3xl font-semibold text-balance md:text-5xl md:tracking-heading">
               {t.heading}
@@ -132,12 +132,12 @@ export function RankingsDetailContent({
                           <td className="w-16 px-4 py-3 text-right tabular-nums">{row.rank}</td>
                           <td className="px-4 py-3 font-medium">
                             {runEntry ? (
-                              <Link
+                              <IntentPrefetchLink
                                 href={`${prefix}/run/${runEntry.slug}`}
                                 className="text-brand hover:underline"
                               >
                                 {row.hardwareLabel}
-                              </Link>
+                              </IntentPrefetchLink>
                             ) : (
                               row.hardwareLabel
                             )}
@@ -164,12 +164,12 @@ export function RankingsDetailContent({
             )}
             <p className="mt-4 text-sm text-muted-foreground">
               {t.siblingLead}{' '}
-              <Link
+              <IntentPrefetchLink
                 href={`${prefix}/rankings/${entry.kind === 'fastest-gpu' ? 'cheapest-gpu' : 'fastest-gpu'}-for-${entry.model.slug}`}
                 className="font-medium text-brand hover:underline"
               >
                 {t.siblingLabel}
-              </Link>
+              </IntentPrefetchLink>
             </p>
           </section>
 
@@ -211,9 +211,12 @@ export function RankingsDetailContent({
             <ul className="mt-3 space-y-2">
               {t.exploreLinks.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-sm font-medium text-brand hover:underline">
+                  <IntentPrefetchLink
+                    href={link.href}
+                    className="text-sm font-medium text-brand hover:underline"
+                  >
                     {link.label}
-                  </Link>
+                  </IntentPrefetchLink>
                 </li>
               ))}
             </ul>

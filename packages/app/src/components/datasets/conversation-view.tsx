@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useSearchParams } from 'next/navigation';
 
 import { Card } from '@/components/ui/card';
@@ -90,9 +90,12 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         >
           {t.retry}
         </button>
-        <Link href={`${prefix}${AGENTX_ROUTE.path}/${slug}`} className="text-brand underline">
+        <IntentPrefetchLink
+          href={`${prefix}${AGENTX_ROUTE.path}/${slug}`}
+          className="text-brand underline"
+        >
           {t.backToDataset}
-        </Link>
+        </IntentPrefetchLink>
       </div>
     );
   }
@@ -104,9 +107,12 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         data-locale={locale}
       >
         {t.notFound}{' '}
-        <Link href={`${prefix}${AGENTX_ROUTE.path}/${slug}`} className="text-brand underline">
+        <IntentPrefetchLink
+          href={`${prefix}${AGENTX_ROUTE.path}/${slug}`}
+          className="text-brand underline"
+        >
           {t.backToDataset}
-        </Link>
+        </IntentPrefetchLink>
       </div>
     );
   }
@@ -117,13 +123,19 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
     <div className="flex flex-col gap-6">
       <div>
         <div className="mb-1 flex min-h-8 flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Link href={`${prefix}${AGENTX_ROUTE.path}`} className="hover:text-foreground">
+          <IntentPrefetchLink
+            href={`${prefix}${AGENTX_ROUTE.path}`}
+            className="hover:text-foreground"
+          >
             {t.breadcrumbDatasets}
-          </Link>
+          </IntentPrefetchLink>
           <span>/</span>
-          <Link href={`${prefix}${AGENTX_ROUTE.path}/${slug}`} className="hover:text-foreground">
+          <IntentPrefetchLink
+            href={`${prefix}${AGENTX_ROUTE.path}/${slug}`}
+            className="hover:text-foreground"
+          >
             {slug}
-          </Link>
+          </IntentPrefetchLink>
           <span>/</span>
           <span className="text-foreground">{t.breadcrumbConversation}</span>
         </div>

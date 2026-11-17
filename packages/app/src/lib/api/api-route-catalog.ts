@@ -221,7 +221,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: '38f35ad252e31f25db44060c2792384be6dbcb1dac69d217d857486a7ca3732a',
+    sourceSha256: 'f66f930fdbe5df99b73463f7875eaa6a6c405f9750d45e1e0377c9c67d4fe526',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -1343,7 +1343,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '20c70bc20a005cc24013ebc7b8d6782c9adef46030ca4b3104c35447e4e11e51',
+    sourceSha256: 'ac495d055a72e392c4ac15e6bd2b7d3291c08ded0fac2162ff6d4a112ba674dc',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
@@ -1367,7 +1367,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: '961cc09469965dbf6db6beefcc4749966ebdf62175676123b8f49d28d92c8c28',
+    sourceSha256: '225df1b266bf5ee0653aca2f03c4f8871bc535b52826082d81bb74673cf65743',
     reviewArea: {
       en: 'OperatorX bulk compact reads, revision-keyed shared Blob comparisons, raw fallback, partial/revision cache exclusion and bounded timeline reads.',
       zh: 'OperatorX 批量精简读取、按 revision 共享 Blob 对比缓存、原始数据回退、部分失败或 revision 变更时不缓存，以及时间线限流并行读取规则。',
@@ -1383,7 +1383,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: '793510ecbecb53632b4e60701a979d535548a22fa7fb5524172be9ce3de7303b',
+    sourceSha256: 'cbacce994faad1de48a48d4d1cb4c452f0467e5dfa7d3fd57fef25e94a751274',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -1552,7 +1552,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: '6ebd9cf0172a205df642e7b683012afbe657998a8280b652940e128333514519',
+    sourceSha256: 'ff9cf222674166bcd893f041bb135b9f5816ef3518c8a9e3b260fbdc15871b82',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '0e92ce3863fa78900eb99b21debf3ee83f3c3bbbd7786ec76d9f1d17f5d2665d',
+    sourceSha256: '085f6b70578c454aba295d461b341d773589db3857334402339f528f48a32687',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1576,7 +1576,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'a591229828b27d56b5b4e4793b97e90a9b956857b3180341f6c4ac6299c487b2',
+    sourceSha256: '7d845aa632bc9d00228ec77ba97989cb0708c7cb6bd3fc2a34236f2fb5983c09',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1584,7 +1584,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-csv.ts',
-    sourceSha256: '25d35cb98a304d628bd932129d1b0c36ba1cd1bc9064bba23add1c76f2d1e77a',
+    sourceSha256: 'a055811ee460f9a7f9edbbd5da241ae5f9d7378ce27a43f7dc647192513d5944',
     reviewArea: {
       en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
       zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
@@ -1600,7 +1600,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: '3f96b5214df42659c388e475429f0d0e9eb1ccc7701edc225f82ab4919cac556',
+    sourceSha256: '484f9d4a8d62b522c8132685bd4dd33786d7bc7a77b3ee31488e09c87dbfba19',
     reviewArea: {
       en: 'VideoGenX published History, media with its stored quality, and the derived-media (rendition and poster) listing cache shared across instances under the video tag; the listing key is versioned by its value shape.',
       zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及派生媒体（转码版本与封面）回执列表以 video 标签跨实例共享的缓存；列表缓存键随值结构变化而升级版本。',
@@ -1632,7 +1632,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-evidence.ts',
-    sourceSha256: 'c052acf13c5151344e9ce00e8966733fe79a137d3509ccfad88a6e83da9f265c',
+    sourceSha256: '613a2f8d913ddbb3c463986a8193d1d0761c1dc594db96a95716208eaf4c69f4',
     reviewArea: {
       en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
       zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',
@@ -1680,7 +1680,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/tradeoff.ts',
-    sourceSha256: 'f7ec9e081fa5bb279d896ddc7e9dc176a338e29da5f6dcd40bf50e53727d542f',
+    sourceSha256: '7d8ea4904eae396109f64644beea847f49166dac202019d95e9559761ffb57f7',
     reviewArea: {
       en: 'Video source metrics and GPU allocation evidence shared by history and API projections.',
       zh: '历史与 API 投影共用的视频来源指标及 GPU 分配证据。',
@@ -1688,7 +1688,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/history.ts',
-    sourceSha256: '49932cb03796c2e4e8f1ced73418cbe0ad690e42bd73596690f8f393cb6df7bd',
+    sourceSha256: '6d066cf0c77a15452141c1801b7a9680d3077d0d09fc7b211e2bbf15d774d953',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1704,7 +1704,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: '2f85517bf0fe796e2d416b9089de3e1b4fafb9e2ede1caccfe92466abc37e646',
+    sourceSha256: 'cb66f84c892a2ff2cd4bc5a0cb1af8fbb1c1abec5088b5d5fdba381cffe0f8b2',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1728,7 +1728,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/evidence.ts',
-    sourceSha256: '6337852b266d377873567964a2709bf64f0ed1adfea3c237bde8521dc3cd4886',
+    sourceSha256: 'ca0a142887e0490130ba5ef5f29d42befb4c20eaba56784ff11146e8ac2ba123',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1815,7 +1815,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '6be86db9c2dd179a6c9a83480d2ce6725cbe6a9fb16b90a20215501f9cb6f2bb',
+    sourceSha256: '6e64e03ecea5ab51e020ce29277698a01d9a8068072faf2d6c3a629ae1fccd6b',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1887,7 +1887,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'fc182b89629b0b0dce6df319ab8ddcfad3325dd0d0ee98c1f68913712910133a',
+    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -2038,7 +2038,10 @@ export const apiContractSourceDigests = [
     // buildOverviewModelSummaries reads /rankings tiers, including ones outside
     // OVERVIEW_TIERS. The Overview BFF parameters and response shape are unchanged.
     // Default controls are 100 tok/s/user and 30d; API docs and skills match.
-    sourceSha256: '66eb3d889e6d87beaee34051205a000628d607eca820eb0f765a3c88a4397c6d',
+    // Disaggregated rows now read the stored per-deployed-GPU tput_per_gpu without
+    // a second decode ÷ total rescale. costPerMtok values change; parameters,
+    // response shape and the documented cost formula are unchanged.
+    sourceSha256: 'd9e952b4fe64b4d797f1a23d28951091bf82b0460370dc1a4531b60cb8c61dd0',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

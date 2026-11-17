@@ -74,6 +74,17 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
 
+  it('defaults offloading labels off and preserves the on override in share links', async () => {
+    setupWindow('?i_offloadlabel=1');
+    const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =
+      await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.i_offloadlabel).toBe('0');
+    expect(readUrlParams().i_offloadlabel).toBe('1');
+    expect(new URL(buildShareUrl()).searchParams.get('i_offloadlabel')).toBe('1');
+    writeUrlParams({ i_offloadlabel: '0' });
+    expect(new URL(buildShareUrl()).searchParams.has('i_offloadlabel')).toBe(false);
+  });
+
   it('defaults framework labels on and preserves only the off override in share links', async () => {
     setupWindow('?i_frameworklabel=0');
     const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =
@@ -338,6 +349,44 @@ describe('writeUrlParams + buildShareUrl', () => {
       expect(url.searchParams.get('g_model')).toBe('DeepSeek-V4-Pro');
     },
   );
+
+  it.each(['/opx', '/zh/opx/moe', '/opx/model'])(
+    'carries the OperatorX selections in the address bar into share links from %s',
+    async (pathname) => {
+      setupWindow(
+        '?workload=dsv4&parallel=tp8&metric=time&model=DeepSeek-V4-Pro&hardware=b300,mi355x&baseline=b300&modelPrecision=fp8&modelBin=12&modelSweep=true&scatterPrecision=bf16&scatterNormalized=false&scatterLog=true&summaryPrecision=fp4&summaryNormalized=true&summarySharedOnly=false&unrelated=1',
+        pathname,
+      );
+      const { buildShareUrl } = await import('@/lib/routing/url-state');
+      const url = new URL(buildShareUrl());
+      expect(url.pathname).toBe(pathname);
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        workload: 'dsv4',
+        parallel: 'tp8',
+        metric: 'time',
+        model: 'DeepSeek-V4-Pro',
+        hardware: 'b300,mi355x',
+        baseline: 'b300',
+        modelPrecision: 'fp8',
+        modelBin: '12',
+        modelSweep: 'true',
+        scatterPrecision: 'bf16',
+        scatterNormalized: 'false',
+        scatterLog: 'true',
+        summaryPrecision: 'fp4',
+        summaryNormalized: 'true',
+        summarySharedOnly: 'false',
+      });
+    },
+  );
+
+  it('does not copy OperatorX params into share links on other tabs', async () => {
+    setupWindow('?workload=dsv4&hardware=b300', '/infx/inference');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    const params = new URL(buildShareUrl()).searchParams;
+    expect(params.has('workload')).toBe(false);
+    expect(params.has('hardware')).toBe(false);
+  });
 
   it('does not add the inference navigation default to other tabs', async () => {
     setupWindow('', '/infx/historical');

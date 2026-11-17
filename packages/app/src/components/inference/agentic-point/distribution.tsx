@@ -27,6 +27,8 @@ const GUIDES = [
   { label: 'p95', q: 0.95, color: PERCENTILE_COLORS.p95 },
 ] as const;
 
+type Percentile = (typeof GUIDES)[number]['label'];
+
 const STRINGS = {
   en: {
     requests: 'requests',
@@ -56,11 +58,13 @@ const STRINGS = {
 export function Distribution({
   values,
   unit,
+  percentiles,
   width = 720,
   height = 260,
 }: {
   values: readonly number[];
   unit: string;
+  percentiles?: readonly Percentile[];
   width?: number;
   height?: number;
 }) {
@@ -86,7 +90,8 @@ export function Distribution({
   const { sorted, histogram, excluded } = computed;
   const { counts, edges, lnMin, lnMax } = histogram;
 
-  const legendEntries: ChartLegendEntry[] = GUIDES.map(({ label, q, color }) => ({
+  const guides = percentiles ? GUIDES.filter(({ label }) => percentiles.includes(label)) : GUIDES;
+  const legendEntries: ChartLegendEntry[] = guides.map(({ label, q, color }) => ({
     label: `${label} ${fmtCount(quantile(sorted, q))}`,
     color,
     swatch: 'dashed-line',
@@ -182,7 +187,7 @@ export function Distribution({
           );
         })}
 
-        {GUIDES.map(({ q, color }) => {
+        {guides.map(({ q, color }) => {
           const v = quantile(sorted, q);
           const x = xScale(v);
           return (

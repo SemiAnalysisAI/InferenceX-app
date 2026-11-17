@@ -5,6 +5,7 @@ import {
   OPERATORX_COMPARISON_OPS,
   OPERATORX_COMPARISON_VERSION,
 } from './operatorx/comparison-cache';
+import { TIMELINE_VERSION } from './operatorx/timeline';
 import { backfillOperatorXRunComparisons, getOperatorXBundle } from './queries/operatorx';
 
 const sql = createAdminSql({
@@ -22,14 +23,16 @@ async function main(): Promise<void> {
     SELECT r.run_key FROM opx_runs r
     WHERE (SELECT count(*) FROM opx_run_comparisons c
            WHERE c.run_id = r.id AND c.format_version = ${OPERATORX_COMPARISON_VERSION}) < ${OPERATORX_COMPARISON_OPS.length}
+       OR NOT EXISTS (SELECT 1 FROM opx_run_timelines t
+           WHERE t.run_id = r.id AND t.format_version = ${TIMELINE_VERSION})
     ORDER BY r.generated_at DESC, r.id DESC
   `;
   console.log(
-    `OperatorX comparison format ${OPERATORX_COMPARISON_VERSION}: ${runs.length} runs need backfill.`,
+    `OperatorX comparison format ${OPERATORX_COMPARISON_VERSION} / timeline format ${TIMELINE_VERSION}: ${runs.length} runs need backfill.`,
   );
   if (!hasYesFlag()) {
     console.log(
-      'Dry run. Pass --yes to populate comparisons; raw runs and revisions are preserved.',
+      'Dry run. Pass --yes to populate comparisons and timelines; raw runs and revisions are preserved.',
     );
     return;
   }

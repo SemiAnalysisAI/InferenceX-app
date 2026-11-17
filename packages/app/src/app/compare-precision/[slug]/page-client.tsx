@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
@@ -118,9 +118,9 @@ export default function ComparePrecisionPageClient({
                 <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 两种量化精度对{' '}
                 <strong>{modelLabel}</strong> 推理的影响，涵盖不同 LLM
                 工作负载下的吞吐量、延迟和成本。可通过下方图表控件切换序列长度和指标，操作方式与
-                <Link href="/zh" className="underline hover:text-primary">
+                <IntentPrefetchLink href="/zh" className="underline hover:text-primary">
                   {t.mainChartLinkText}
-                </Link>
+                </IntentPrefetchLink>
                 相同。
               </p>
             ) : (
@@ -129,9 +129,9 @@ export default function ComparePrecisionPageClient({
                 <strong>{modelLabel}</strong> inference on <strong>{gpuLabel}</strong> ({gpuVendor}{' '}
                 {gpuArch}). Throughput, latency, and cost across LLM workloads. Use the chart
                 controls below to switch sequences and metrics — same interactions as{' '}
-                <Link href="/" className="underline hover:text-primary">
+                <IntentPrefetchLink href="/" className="underline hover:text-primary">
                   {t.mainChartLinkText}
-                </Link>
+                </IntentPrefetchLink>
                 .
               </p>
             )}
@@ -141,13 +141,13 @@ export default function ComparePrecisionPageClient({
                 data-testid="compare-agentic-intro"
               >
                 {agenticIntro.paragraph}{' '}
-                <Link
+                <IntentPrefetchLink
                   href={agenticIntro.href}
                   data-testid="compare-agentic-intro-link"
                   className="font-medium text-brand underline underline-offset-4 hover:no-underline"
                 >
                   {agenticIntro.linkLabel} →
-                </Link>
+                </IntentPrefetchLink>
               </p>
             )}
             {narrative.length > 0 && (
@@ -173,20 +173,20 @@ export default function ComparePrecisionPageClient({
               </div>
             )}
             <div className="mt-2 flex flex-wrap gap-4 text-sm">
-              <Link
+              <IntentPrefetchLink
                 href={isZh ? '/zh/compare-precision' : '/compare-precision'}
                 className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_precision_cross_link_index', { slug })}
               >
                 {t.allComparisonsLinkText}
-              </Link>
-              <Link
+              </IntentPrefetchLink>
+              <IntentPrefetchLink
                 href={isZh ? '/zh' : '/'}
                 className="text-muted-foreground underline hover:text-foreground"
                 onClick={() => track('compare_precision_cross_link_dashboard', { slug })}
               >
                 {t.dashboardLinkText}
-              </Link>
+              </IntentPrefetchLink>
             </div>
           </header>
           <CompareTableSection

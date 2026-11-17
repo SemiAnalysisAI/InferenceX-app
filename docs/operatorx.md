@@ -108,11 +108,22 @@ suppresses a SQL error. Responses and timeline identities are preserved.
 中文：一次 SQL 查询读取所列 revision，按最新优先合并；仅缺失或过期的记录回退至原始数据，
 仅缺表错误可触发整体回退。响应和时间线标识保持一致。
 
+### Precomputed kernel timelines
+
+`opx_run_timelines` (migration 004) stores one row per result with its compact kernel
+timeline (null when unprofiled), written in the same transaction as the comparisons.
+`/api/v1/operatorx/timelines` answers refs from it in one query; only runs without rows
+at the current `TIMELINE_VERSION` load raw documents. A GEMM case previously loaded
+~300 MiB of raw documents across eight runs per click.
+
+中文：`opx_run_timelines`（迁移 004）为每个结果存储一行精简的 kernel 时间线（未 profiling 时为 null），与比较数据在同一事务中写入。时间线接口通过一次查询读取；只有缺少当前版本记录的运行才回退读取原始文档。
+
 ### Rollout and backfill
 
 1. Apply the migration: `bun run admin:db:migrate:operatorx -- --yes`.
 2. Give the role used by `DATABASE_OPERATORX_READONLY_URL` SELECT access to
-   `opx_run_comparisons` if owner default privileges do not already cover new tables.
+   `opx_run_comparisons` and `opx_run_timelines` if owner default privileges do not
+   already cover new tables.
 3. Preview existing runs: `bun run admin:db:backfill:operatorx-comparisons -- --all`.
 4. Populate compact data: `bun run admin:db:backfill:operatorx-comparisons -- --all --yes`.
 5. Deploy the reader and purge `/api/v1/invalidate?scope=operatorx`; warm
@@ -534,6 +545,40 @@ OperatorX 自身的写入才会使其缓存失效。Vercel 的 CDN 缓存键包�
 
 The first chart mounts eagerly; others mount within 300px of the viewport or on
 focus, then retain their controls. Without IntersectionObserver all charts render.
-Landing-link hover/focus prefetches the localized route and default GEMM query,
-sharing the destination's five-minute cache. These are presentation-only controls;
+Links to `/opx` and its categories, including the category switcher, prefetch the
+route and warm its comparison or model-view queries on intent (`prefetchRouteData`).
 API selectors, results, and click analytics are unaffected.
+
+### Share-link control coverage
+
+OperatorX share links keep the category path (including `/zh`) and `workload`,
+`parallel`, `metric`, `model`, `hardware`, and `baseline`. Changing the workload drops
+`hardware` and `baseline`. Chart controls use separate URL keys, so the summary and
+scatter charts never overwrite each other. Scatter keys use the `scatter` prefix so they
+never collide with the compare API's `roofline*` summary selectors.
+
+| Control                           | URL key                                                      | Read-only API coverage                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| GPU picks                         | `hardware=a,b`                                               | `/api/v1/views/operatorx?hardware=`                                                                                     |
+| Model precision                   | `modelPrecision=fp4\|fp8\|bf16`                              | `/api/v1/views/operatorx?precision=` (filters `compute_precision`)                                                      |
+| Model token size                  | `modelBin=<integer>`                                         | `/api/v1/views/operatorx?bin=`, the same `sizeBin` half-octave function (`round(log2(x) * 2)`)                          |
+| Model all sizes                   | `modelSweep=true\|false`                                     | Omit `bin`                                                                                                              |
+| Summary precision / norm / cohort | `summaryPrecision`, `summaryNormalized`, `summarySharedOnly` | Compare API `rooflinePrecision`, `rooflineNormalized`, `rooflineSharedOnly`, with the GPU picks as `rooflineHardware`   |
+| Scatter precision / norm          | `scatterPrecision`, `scatterNormalized`                      | View API `precision=` returns the plotted cases; normalization divides by the hardware peaks in the comparison response |
+| Scatter log scale, baseline       | `scatterLog`, `baseline`                                     | Presentation only; returned rows do not change                                                                          |
+
+Unknown or malformed URL values fall back to the existing defaults in the UI; the APIs
+reject them with 400. Legend expansion, open dialogs and diagram folds are
+presentation-only and are not persisted.
+
+中文：OperatorX 分享链接保留类别路径（包括 `/zh`）以及 `workload`、`parallel`、`metric`、
+`model`、`hardware` 和 `baseline`；切换工作负载时会清除 `hardware` 和 `baseline`。
+图表控件使用各自独立的 URL 参数，汇总柱状图与散点图互不覆盖；散点图参数统一以
+`scatter` 为前缀，避免与对比 API 的 `roofline*` 汇总参数重名。模型视图的
+`modelPrecision` 和 `modelBin` 分别对应只读 API `/api/v1/views/operatorx` 的 `precision`
+和 `bin`（与 UI 共用 `sizeBin`，即 `round(log2(x) * 2)`）；`modelSweep=true` 对应不传 `bin`。
+汇总图的 `summaryPrecision`、`summaryNormalized`、`summarySharedOnly` 对应对比 API 的
+`rooflinePrecision`、`rooflineNormalized`、`rooflineSharedOnly`，GPU 选择对应
+`rooflineHardware`。`scatterLog` 和 `baseline` 仅影响展示，不改变返回的数据行。
+UI 遇到无效值时沿用默认设置，API 则返回 400。图例展开、详情弹窗和模型结构折叠仅影响展示，
+不写入分享链接。

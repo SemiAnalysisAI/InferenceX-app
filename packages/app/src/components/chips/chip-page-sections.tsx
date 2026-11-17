@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
@@ -240,9 +240,12 @@ const LiveResultsSection = ({ locale }: { locale: Locale }) => {
       <ul className="mt-3 space-y-2">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href} className="text-sm font-medium text-brand hover:underline">
+            <IntentPrefetchLink
+              href={link.href}
+              className="text-sm font-medium text-brand hover:underline"
+            >
               {link.label}
-            </Link>
+            </IntentPrefetchLink>
           </li>
         ))}
       </ul>
@@ -373,12 +376,12 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         <ul className="mt-3 space-y-2">
           {posts.map((post) => (
             <li key={post.slug}>
-              <Link
+              <IntentPrefetchLink
                 href={localePath(`/blog/${post.slug}`, locale)}
                 className="text-sm text-foreground hover:underline"
               >
                 {post.title}
-              </Link>
+              </IntentPrefetchLink>
             </li>
           ))}
         </ul>
@@ -388,12 +391,12 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         <ul className="mt-3 space-y-2">
           {terms.map((term) => (
             <li key={term.slug}>
-              <Link
+              <IntentPrefetchLink
                 href={localePath(`/glossary/${term.slug}`, locale)}
                 className="text-sm text-foreground hover:underline"
               >
                 {term.term}
-              </Link>
+              </IntentPrefetchLink>
             </li>
           ))}
         </ul>
@@ -403,12 +406,12 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         <ul className="mt-3 space-y-2">
           {chips.map((chip) => (
             <li key={chip.slug}>
-              <Link
+              <IntentPrefetchLink
                 href={localePath(`/chips/${chip.slug}`, locale)}
                 className="text-sm text-foreground hover:underline"
               >
                 {chip.title}
-              </Link>
+              </IntentPrefetchLink>
             </li>
           ))}
         </ul>
@@ -440,13 +443,13 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
         <article className="mx-auto max-w-5xl">
           <Card className="overflow-hidden p-0 md:p-0">
             <header className="relative border-b border-border/30 px-5 py-8 md:px-10 md:py-12">
-              <Link
+              <IntentPrefetchLink
                 href={localePath('/chips', locale)}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
                 {t.backToIndex}
-              </Link>
+              </IntentPrefetchLink>
               <p className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
                 <HwVendorLogo vendor={hw.vendor} />
                 {hw.vendor} · {hw.arch}
@@ -516,31 +519,31 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
         <article className="mx-auto max-w-5xl">
           <Card className="overflow-hidden p-0 md:p-0">
             <header className="relative border-b border-border/30 px-5 py-8 md:px-10 md:py-12">
-              <Link
+              <IntentPrefetchLink
                 href={localePath('/chips', locale)}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
                 {t.backToIndex}
-              </Link>
+              </IntentPrefetchLink>
               <Heading as="h1" level="display" className="mt-8 max-w-4xl">
                 {title}
               </Heading>
               <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">
                 {t.vsIntroPrefix}{' '}
-                <Link
+                <IntentPrefetchLink
                   href={localePath(`/chips/${page.a.slug}`, locale)}
                   className="text-brand hover:underline"
                 >
                   {page.a.title}
-                </Link>{' '}
+                </IntentPrefetchLink>{' '}
                 {t.vsIntroAnd}{' '}
-                <Link
+                <IntentPrefetchLink
                   href={localePath(`/chips/${page.b.slug}`, locale)}
                   className="text-brand hover:underline"
                 >
                   {page.b.title}
-                </Link>{' '}
+                </IntentPrefetchLink>{' '}
                 {t.vsIntroSuffix}
               </p>
             </header>

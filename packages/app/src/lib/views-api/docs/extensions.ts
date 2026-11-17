@@ -480,16 +480,16 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '完整模型标识；未指定时选择硬件覆盖最多的合格工作负载。',
   ],
   r_workload: [
-    'Compact key from options.workloads; resolves to the complete canonical workloadKey internally. Any source point ID of the same workload also resolves, so shared links survive later publications. One shared 20-scheduled-clip C1 spec with at least 10 valid samples per hardware.',
-    'options.workloads 中的短 key，内部解析为完整 canonical workloadKey。同一工作负载任一数据点的 ID 也能解析，因此之后有新结果发布时，已分享的链接仍然有效。所有硬件共用计划 20 条视频的 C1 spec，每种硬件至少 10 个有效样本。',
+    "Model slug from options.workloads[].slug, such as minimax-h3: that model's best-covered workload under any filter. A workload without a slug uses its compact key from options.workloads. Either resolves to the complete canonical workloadKey internally. Any source point ID of the same workload also resolves, so shared links survive later publications. One shared 20-scheduled-clip C1 spec with at least 10 valid samples per hardware.",
+    'options.workloads[].slug 中的模型 slug（如 minimax-h3），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载。没有 slug 的工作负载使用 options.workloads 中的短 key。两者都在内部解析为完整 canonical workloadKey。同一工作负载任一数据点的 ID 也能解析，因此之后有新结果发布时，已分享的链接仍然有效。所有硬件共用计划 20 条视频的 C1 spec，每种硬件至少 10 个有效样本。',
   ],
   r_resolution: [
     'Exact width×height from the sealed plan, such as 1344×768.',
     '封印计划中的完整宽×高，例如 1344×768。',
   ],
   r_duration: [
-    'Positive requested clip duration from the plan, in seconds; not decoded output duration.',
-    '计划中的请求视频时长，单位秒，必须为正数；不是解码输出时长。',
+    'Positive requested clip duration from the plan, in seconds: duration_seconds, or frame_count ÷ fps for plans that request frames; not decoded output duration.',
+    '计划中的请求视频时长，单位秒，必须为正数：取 duration_seconds，按帧数请求的计划取 frame_count ÷ fps；不是解码输出时长。',
   ],
   r_mode: [
     'Explicit generation mode; unknown modes are never inferred from model names.',
@@ -565,8 +565,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '估算利用率，范围 0–1，默认 1。收入随利用率变化，预留 GPU 每小时成本不变。',
   ],
   r_x: [
-    'Chart x metric: p50 (default) or p90 per-clip latency, or gpus (participating GPUs per deployment). Presentation only; echoed in params without changing returned cells, and invalid values use the default.',
-    '图表 X 轴指标：单条视频 p50（默认）或 p90 延迟，或 gpus（每个部署参与计算的 GPU 数）。仅影响展示，在 params 中返回，不改变返回的 cells；无效值使用默认值。',
+    'Chart x metric: p50 per-clip latency (default) or gpus (participating GPUs per deployment). Presentation only; echoed in params without changing returned cells. Invalid values, including the retired p90, use the default.',
+    '图表 X 轴指标：单条视频 p50 延迟（默认）或 gpus（每个部署参与计算的 GPU 数）。仅影响展示，在 params 中返回，不改变返回的 cells；无效值（包括已停用的 p90）使用默认值。',
   ],
   r_y: [
     'Chart y metric: videoSecondsPerDollar (default), videosPerGpuHour or kjPerClip. Presentation only; invalid values use the default.',

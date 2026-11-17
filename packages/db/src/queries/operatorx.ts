@@ -8,15 +8,17 @@ import {
   planFromManifest,
 } from '../operatorx/bundle';
 import { normalizeBundle } from '../operatorx/normalize';
-import type { Comparison, ComparisonOp } from '../operatorx/compare';
+import { type Comparison, type ComparisonOp, opFamily } from '../operatorx/compare';
 import {
   buildRunComparison,
   OPERATORX_COMPARISON_OPS,
   OPERATORX_COMPARISON_VERSION,
 } from '../operatorx/comparison-cache';
+import { compactTimeline, type OperatorXTimeline, TIMELINE_VERSION } from '../operatorx/timeline';
 
 const DOCS_INSERT_CHUNK = 20;
 const DOCS_READ_BATCH = 8;
+const TIMELINE_INSERT_CHUNK = 200;
 
 export const RUN_KEY_RE = /^[\w.-]{1,128}$/u;
 
@@ -94,10 +96,12 @@ export async function getOperatorXRunComparison(
 }
 
 /**
- * Runs per comparison read. Neon's HTTP driver rejects responses over 64 MiB, and one
- * run's gemm comparison reaches ~5 MiB, so a single query over every run overflows.
+ * Serialized comparison bytes per read. Neon's HTTP driver rejects responses over
+ * 64 MiB, and a single run's gemm comparison already reaches ~8.5 MiB, so reads are
+ * packed by stored size rather than run count. JSON transport escaping inflates the
+ * payload, so the budget leaves wide headroom under the hard limit.
  */
-const COMPARISON_READ_BATCH = 8;
+export const COMPARISON_READ_BYTES = 24 * 1024 * 1024;
 
 /**
  * Comparisons written before the encoding fix were double-encoded: the driver
@@ -107,30 +111,59 @@ function storedComparison(value: unknown): Comparison {
   return (typeof value === 'string' ? JSON.parse(value) : value) as Comparison;
 }
 
-/** Read the listed revisions in bounded batches; absent/old projections use raw fallback. */
+/**
+ * Pack items into consecutive groups whose summed size stays within `budget`.
+ * An item larger than the budget is read alone.
+ */
+export function packBySize<T>(items: T[], size: (item: T) => number, budget: number): T[][] {
+  const groups: T[][] = [];
+  let current: T[] = [];
+  let used = 0;
+  for (const item of items) {
+    const bytes = size(item);
+    if (current.length > 0 && used + bytes > budget) {
+      groups.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(item);
+    used += bytes;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
+/** Read the listed revisions in size-bounded batches; absent/old projections use raw fallback. */
 export async function getOperatorXRunComparisons(
   sql: DbClient,
   runs: Pick<OperatorXRunRef, 'run_id' | 'revision'>[],
   op: ComparisonOp,
 ): Promise<Map<string, Comparison>> {
   const comparisons = new Map<string, Comparison>();
+  if (runs.length === 0) return comparisons;
   try {
-    for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
-      // An object, not a string or array: Neon's HTTP driver and postgres.js both JSON-encode
-      // it exactly once (Neon turns arrays into Postgres arrays; postgres.js re-encodes strings).
-      const requested = {
-        runs: runs.slice(i, i + COMPARISON_READ_BATCH).map((run) => ({
-          run_key: run.run_id,
-          revision: run.revision ?? null,
-        })),
-      };
+    // An object, not a string or array: Neon's HTTP driver and postgres.js both JSON-encode
+    // it exactly once (Neon turns arrays into Postgres arrays; postgres.js re-encodes strings).
+    const requested = {
+      runs: runs.map((run) => ({ run_key: run.run_id, revision: run.revision ?? null })),
+    };
+    const sized = await sql`
+      SELECT c.run_id, octet_length(c.comparison::text)::bigint AS bytes
+      FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'runs')
+        AS requested(run_key text, revision text)
+      JOIN opx_runs r ON r.run_key = requested.run_key
+        AND (requested.revision IS NULL OR r.id::text = requested.revision)
+      JOIN opx_run_comparisons c ON c.run_id = r.id
+      WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
+    `;
+    const batches = packBySize(sized, (row) => Number(row.bytes), COMPARISON_READ_BYTES);
+    for (const batch of batches) {
+      const ids = { ids: batch.map((row) => String(row.run_id)) };
       const rows = await sql`
         SELECT r.run_key, c.comparison
-        FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'runs')
-          AS requested(run_key text, revision text)
-        JOIN opx_runs r ON r.run_key = requested.run_key
-          AND (requested.revision IS NULL OR r.id::text = requested.revision)
-        JOIN opx_run_comparisons c ON c.run_id = r.id
+        FROM jsonb_array_elements_text((${ids as never}::jsonb) -> 'ids') AS wanted(id)
+        JOIN opx_run_comparisons c ON c.run_id::text = wanted.id
+        JOIN opx_runs r ON r.id = c.run_id
         WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
       `;
       for (const row of rows)
@@ -162,6 +195,82 @@ async function writeRunComparisons(
       ON CONFLICT (run_id, op) DO UPDATE
       SET format_version = EXCLUDED.format_version, comparison = EXCLUDED.comparison
     `;
+  }
+  await writeRunTimelines(tx, dataset, revision);
+}
+
+/** One row per result, so a missing row means "not precomputed", never "not profiled". */
+async function writeRunTimelines(
+  tx: TransactionSql,
+  dataset: ReturnType<typeof normalizeBundle>,
+  revision: string,
+): Promise<void> {
+  await tx`DELETE FROM opx_run_timelines WHERE run_id = ${revision}`;
+  const rows = dataset.results.map((result, index) => ({
+    result_index: index,
+    op: opFamily(result.opType),
+    timeline: compactTimeline(dataset.metrics[index]),
+  }));
+  for (let i = 0; i < rows.length; i += TIMELINE_INSERT_CHUNK) {
+    const chunk = { rows: rows.slice(i, i + TIMELINE_INSERT_CHUNK) };
+    await tx`
+      INSERT INTO opx_run_timelines (run_id, result_index, format_version, op, timeline)
+      SELECT ${revision}, t.result_index, ${TIMELINE_VERSION}, t.op, t.timeline
+      FROM jsonb_to_recordset((${chunk as never}::jsonb) -> 'rows')
+        AS t(result_index int, op text, timeline jsonb)
+    `;
+  }
+}
+
+export interface StoredTimelineRef {
+  runId: string;
+  index: number;
+  revision: string;
+}
+
+/**
+ * Precomputed timelines keyed by `runId:index:revision`. A ref whose run revision has no
+ * rows at the current format is absent from the map (caller falls back to raw documents);
+ * otherwise `known` is false when the index is out of range or belongs to another op.
+ */
+export async function getOperatorXTimelines(
+  sql: DbClient,
+  refs: StoredTimelineRef[],
+  op: ComparisonOp,
+): Promise<Map<string, { timeline: OperatorXTimeline | null; known: boolean }>> {
+  const found = new Map<string, { timeline: OperatorXTimeline | null; known: boolean }>();
+  if (refs.length === 0) return found;
+  const requested = {
+    refs: refs.map((r) => ({ run_key: r.runId, revision: r.revision, result_index: r.index })),
+  };
+  try {
+    const rows = await sql`
+      SELECT q.run_key, q.revision, q.result_index,
+        t.result_index IS NOT NULL AS has_row, t.op, t.timeline,
+        EXISTS (
+          SELECT 1 FROM opx_run_timelines a
+          WHERE a.run_id = r.id AND a.format_version = ${TIMELINE_VERSION}
+        ) AS precomputed
+      FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'refs')
+        AS q(run_key text, revision text, result_index int)
+      JOIN opx_runs r ON r.run_key = q.run_key AND r.id::text = q.revision
+      LEFT JOIN opx_run_timelines t ON t.run_id = r.id
+        AND t.result_index = q.result_index AND t.format_version = ${TIMELINE_VERSION}
+    `;
+    for (const row of rows) {
+      if (!row.precomputed) continue;
+      const ref = `${row.run_key}:${row.result_index}:${row.revision}`;
+      const known = Boolean(row.has_row) && row.op === op;
+      found.set(ref, {
+        timeline: known ? ((row.timeline as OperatorXTimeline | null) ?? null) : null,
+        known,
+      });
+    }
+    return found;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '42P01')
+      return found;
+    throw error;
   }
 }
 

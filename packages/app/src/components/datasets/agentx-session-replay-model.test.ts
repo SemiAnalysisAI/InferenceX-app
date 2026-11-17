@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONTEXT_CAP,
-  FIRST_FRAME,
-  type Frame,
-  LAST_FRAME,
-  nextFrame,
+  DISPLAY_ROWS,
+  DURATION_MS,
+  frameAt,
+  NOTES,
   REPLAY,
   REPLAY_ROWS,
-  visibleTokens,
+  REST_FRAME,
+  TIMELINE,
   WARM_PREFIX,
 } from './agentx-session-replay-model';
 
@@ -43,36 +44,44 @@ describe('session replay script', () => {
   });
 });
 
-describe('replay frames', () => {
-  it('walks every step through cache, prefill and decode, then loops', () => {
-    const seen: Frame[] = [];
-    let frame = FIRST_FRAME;
-    do {
-      seen.push(frame);
-      frame = nextFrame(frame);
-    } while (frame !== FIRST_FRAME);
-    expect(seen).toHaveLength(REPLAY.length * 3);
-    expect(seen.at(-1)).toEqual(LAST_FRAME);
-    expect(seen.slice(0, 4).map((f) => `${f.step}:${f.phase}`)).toEqual([
-      '0:cached',
-      '0:prefill',
-      '0:decode',
-      '1:cached',
+describe('replay timeline', () => {
+  it('shows four notes in one play and speeds up through the look-alike main turns', () => {
+    const notes: string[] = [];
+    for (let time = 0; time <= DURATION_MS; time += 10) {
+      const note = NOTES[frameAt(time).step];
+      if (note !== notes.at(-1)) notes.push(note);
+    }
+    expect(notes).toEqual(['mainTurns', 'warmStart', 'fanOut', 'subagentsReturn', 'mainTurns']);
+    expect(TIMELINE.slice(6).map((timing) => timing.end - timing.start)).toEqual([
+      900, 800, 700, 600, 500, 500, 500, 500, 500, 500,
     ]);
+    expect(frameAt(0)).toEqual({ ...REST_FRAME, phase: 'out' });
+    expect(frameAt(DURATION_MS)).toBe(REST_FRAME);
   });
 
-  it('reveals the active request one segment per phase and hides later ones', () => {
+  it('shows each number once its bar segment starts, always for the step being drawn', () => {
     const [row] = REPLAY[1].rows;
-    expect(visibleTokens(row, { step: 0, phase: 'decode' })).toBeNull();
-    expect(visibleTokens(row, { step: 1, phase: 'cached' })).toEqual({
-      cached: row.cached,
-      fresh: 0,
-      output: 0,
-    });
-    expect(visibleTokens(row, { step: 1, phase: 'prefill' })).toMatchObject({
-      fresh: row.fresh,
-      output: 0,
-    });
-    expect(visibleTokens(row, { step: 2, phase: 'cached' })).toBe(row);
+    const { start, prefill, decode } = TIMELINE[1];
+    expect(frameAt(start)).toMatchObject({ cached: row.cached, fresh: null, output: null });
+    expect(frameAt(prefill)).toMatchObject({ fresh: row.fresh, output: null });
+    expect(frameAt(decode).output).toBe(row.output);
+    expect(frameAt(TIMELINE[0].start).hit).toBeNull();
+    // A fan-out step reports its three parallel requests together.
+    expect(frameAt(TIMELINE[3].decode)).toMatchObject({ cached: 0, fresh: 28_500, output: 820 });
+    // A quick main turn sets every number at once.
+    const [quick] = REPLAY[8].rows;
+    expect(frameAt(TIMELINE[8].start)).toMatchObject({ fresh: quick.fresh, output: quick.output });
+  });
+
+  it("draws a subagent's second request under its first and carries each bar from its agent", () => {
+    expect(DISPLAY_ROWS.slice(3, 9).map((row) => row.lane)).toEqual([0, 0, 1, 1, 2, 2]);
+    // The main agent resumes below the six subagent rows, 7 rows under its previous request.
+    expect(DISPLAY_ROWS.slice(0, 10).map((row) => row.carry)).toEqual([
+      0, 1, 1, 0, 1, 0, 1, 0, 1, 7,
+    ]);
+    for (const [index, row] of DISPLAY_ROWS.entries()) {
+      const from = DISPLAY_ROWS[index - row.carry];
+      if (row.carry) expect(row.cached).toBe(from.cached + from.fresh + from.output);
+    }
   });
 });

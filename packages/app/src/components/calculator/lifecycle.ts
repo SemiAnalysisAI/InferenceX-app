@@ -17,6 +17,17 @@ export const MS_PER_MONTH = DAYS_PER_MONTH * HOURS_PER_DAY * 3600 * 1000;
 const TOKENS_PER_MILLION = 1e6;
 const SECONDS_PER_DAY = 86_400;
 
+export function parseNonNegative(raw: string): number | null {
+  const parsed = parseFloat(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+/** Fleet size from the megawatt input, or null when it is not a positive number. */
+export function fleetMegawatts(mwInput: string): number | null {
+  const parsed = parseNonNegative(mwInput);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
 export function billableInputRate(
   inputTput: number,
   cacheHitRate: number | undefined,
