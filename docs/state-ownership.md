@@ -31,9 +31,11 @@ context value. Consumers subscribe through five independently memoized domains:
 GLM-5.3-Flash uses the existing Konami UI feature gate. The provider retains a
 requested model but publishes a safe effective selection while locked, including
 on first render and after relock. It waits for gate hydration before synchronizing
-the URL, so an unlocked deep link survives reload. Unofficial availability cannot
-unlock a model. The root model boundary also blocks direct gated routes; public
-discovery excludes them and client overview/search surfaces respect the gate.
+the URL, so an unlocked deep link survives reload. An unofficial-run overlay always
+shows its own models, gated or not, and the root model boundary lets a URL with an
+`unofficialrun`/`unofficialruns` parameter render a gated route. Otherwise the root
+model boundary blocks direct gated routes; public discovery excludes them and client
+overview/search surfaces respect the gate.
 Saved gated `g_model` selections on inference routes are canonicalized by the frontend
 proxy before rendering, preserving locale and query parameters. This gives SSR and
 the fresh client provider the same requested model without delaying public-model SSR.

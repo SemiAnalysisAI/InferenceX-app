@@ -264,8 +264,8 @@ export default function ChartControls({
         ? [
             ...MODEL_OPTIONS.filter(
               (model) =>
-                isModelVisible(model, featureGateUnlocked) &&
-                (availableModels.includes(model) || modelRequiresObservations(model)),
+                availableModels.includes(model) ||
+                (isModelVisible(model, featureGateUnlocked) && modelRequiresObservations(model)),
             ),
             ...availableModels.filter((model) => !isRegisteredModel(model)),
           ]

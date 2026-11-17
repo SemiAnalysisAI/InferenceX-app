@@ -408,13 +408,10 @@ describe('GlobalFilterProvider context isolation', () => {
     },
   );
 
-  it('does not unlock Flash from observations, an unofficial run, or an explicit selection', () => {
+  it('does not unlock Flash from observations or an explicit selection', () => {
     mocks.availability.data = indexRows([
       { model: 'glm5.3flash', precision: 'fp8', sequence: 'agentic-traces' },
     ]);
-    mocks.unofficialAvailable = [
-      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
-    ];
     mountProvider();
     act(() => selectModel?.(Model.GLM_5_3_Flash));
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
@@ -423,9 +420,9 @@ describe('GlobalFilterProvider context isolation', () => {
 
   it('removes the active Flash selection and availability immediately on relock', () => {
     mocks.featureGateUnlocked = true;
-    mocks.unofficialAvailable = [
-      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
-    ];
+    mocks.availability.data = indexRows([
+      { model: 'glm5.3flash', precision: 'fp8', sequence: 'agentic-traces' },
+    ]);
     mountProvider();
     act(() => selectModel?.(Model.GLM_5_3_Flash));
     expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
@@ -437,17 +434,33 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
   });
 
-  it('auto-selects a previously locked unofficial Flash run when the gate is enabled', () => {
+  it('shows and auto-selects an unofficial Flash run while the gate is locked', () => {
     mocks.unofficialAvailable = [
       { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
     ];
     mountProvider();
-    expect(selectionSnapshot?.selectedModel).not.toBe(Model.GLM_5_3_Flash);
+    expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
+    expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
+    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+  });
+
+  it('keeps an overlay-selected Flash run on relock and drops it once the overlay closes', () => {
+    mocks.featureGateUnlocked = true;
+    mocks.unofficialAvailable = [
+      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+    ];
+    mountProvider();
+    expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
     act(() => {
-      mocks.featureGateUnlocked = true;
+      mocks.featureGateUnlocked = false;
       rerenderProvider?.();
     });
     expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
-    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+    act(() => {
+      mocks.unofficialAvailable = [];
+      rerenderProvider?.();
+    });
+    expect(selectionSnapshot?.selectedModel).toBe(Model.Kimi_K3_1_Pro);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
   });
 });

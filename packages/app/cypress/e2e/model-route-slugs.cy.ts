@@ -143,7 +143,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       });
     }
 
-    it(`does not let an unofficial Flash run unlock ${locale || 'en'} selection`, () => {
+    it(`shows an unofficial Flash run without the ${locale || 'en'} feature gate`, () => {
       cy.fixture('api/muse-spark-unofficial-run.json').then((run) => {
         cy.intercept('GET', '/api/unofficial-run*', {
           body: {
@@ -167,11 +167,19 @@ describe('GLM-5.3-Flash registration without published observations', () => {
         },
       });
       cy.wait('@flashOverlay');
-      cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
-        win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
+        'have.length.greaterThan',
+        0,
+      );
+      cy.visit(`${locale}/infx/inference/glm-5-3-flash?unofficialrun=38825822770`, {
+        onBeforeLoad(win) {
+          visitOptions.onBeforeLoad(win);
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
       });
+      cy.wait('@flashOverlay');
+      cy.location('pathname').should('eq', `${locale}/infx/inference/glm-5-3-flash`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
       cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
         'have.length.greaterThan',

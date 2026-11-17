@@ -251,9 +251,32 @@ export function initialSelectedSequence(
   return Sequence.EightK_OneK;
 }
 
-/** A gated model renders as a public one until the gate unlocks. */
-export function visibleSelectedModel(requested: Model, featureGateUnlocked: boolean): Model {
-  return isModelVisible(requested, featureGateUnlocked) ? requested : Model.Kimi_K3_1_Pro;
+/** A gated model renders as a public one until the gate unlocks or an unofficial-run overlay carries it. */
+export function visibleSelectedModel(
+  requested: Model,
+  featureGateUnlocked: boolean,
+  overlayModels: ReadonlySet<string> = NO_OVERLAY_MODELS,
+): Model {
+  return isModelShown(requested, featureGateUnlocked, overlayModels)
+    ? requested
+    : Model.Kimi_K3_1_Pro;
+}
+
+const NO_OVERLAY_MODELS: ReadonlySet<string> = new Set();
+
+/** Unofficial-run overlays always show their models, gated or not. */
+export function isModelShown(
+  model: string,
+  featureGateUnlocked: boolean,
+  overlayModels: ReadonlySet<string>,
+): boolean {
+  return overlayModels.has(model) || isModelVisible(model, featureGateUnlocked);
+}
+
+export function overlayModelSet(
+  unofficialAvailable: readonly AvailableModelSequence[],
+): ReadonlySet<string> {
+  return new Set(unofficialAvailable.map((entry) => entry.model));
 }
 
 export interface FilterNavigationOverrides {
@@ -411,8 +434,8 @@ export function resolveAvailableModels(
 ): Model[] {
   const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
   const registered = MODEL_OPTIONS.filter((m) => {
-    if (!isModelVisible(m, featureGateUnlocked)) return false;
     if (unofficialModels.has(m)) return true;
+    if (!isModelVisible(m, featureGateUnlocked)) return false;
     if (!availability) return !modelRequiresObservations(m);
     return modelDbKeys(m).some((key) => availability.linesByModel.has(key));
   });
@@ -539,13 +562,19 @@ export function applyFilterChange(
   {
     featureGateUnlocked,
     initialPrecisions,
+    unofficialAvailable = [],
   }: {
     featureGateUnlocked: boolean;
     /** The provider's `initialPrecisions`, already passed through `validPrecisions`. */
     initialPrecisions: string[];
+    unofficialAvailable?: readonly AvailableModelSequence[];
   },
 ): FilterRequest | null {
-  if (change.model !== undefined && !isModelVisible(change.model, featureGateUnlocked)) {
+  const overlayModels = overlayModelSet(unofficialAvailable);
+  if (
+    change.model !== undefined &&
+    !isModelShown(change.model, featureGateUnlocked, overlayModels)
+  ) {
     return null;
   }
   const next: FilterRequest = { ...request };
@@ -570,7 +599,7 @@ export function applyFilterChange(
     initialChipBasis: undefined,
   });
   if (overrides.model !== undefined) {
-    next.model = visibleSelectedModel(overrides.model, featureGateUnlocked);
+    next.model = visibleSelectedModel(overrides.model, featureGateUnlocked, overlayModels);
   }
   if (overrides.sequence !== undefined) {
     next.selectedSequence = overrides.sequence;
@@ -664,13 +693,15 @@ export function GlobalFilterProvider({
   const featureGateUnlocked = useFeatureGate();
   const [featureGateReady, setFeatureGateReady] = useState(false);
   useEffect(() => setFeatureGateReady(true), []);
+  const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
+  const overlayModels = useMemo(() => overlayModelSet(unofficialAvailable), [unofficialAvailable]);
   const [requestedModel, setSelectedModel] = useState<Model>(() =>
     initialRequestedModel(initialModel, pathname),
   );
   const modelGatePending = modelRequiresFeatureGate(requestedModel) && !featureGateReady;
   // Derive the safe value during render, including the first SSR/hydration render
   // and the render immediately after relocking. Every consumer sees this value.
-  const selectedModel = visibleSelectedModel(requestedModel, featureGateUnlocked);
+  const selectedModel = visibleSelectedModel(requestedModel, featureGateUnlocked, overlayModels);
   useIsomorphicLayoutEffect(() => {
     if (!modelGatePending) setInferenceNavigationModel(selectedModel);
   }, [selectedModel, modelGatePending]);
@@ -678,11 +709,11 @@ export function GlobalFilterProvider({
   const userSelectedModelRef = useRef<Model | null>(null);
   const selectModel = useCallback(
     (model: Model, { userSelection = true }: ModelSelectionOptions = {}) => {
-      if (!isModelVisible(model, featureGateUnlocked)) return;
+      if (!isModelShown(model, featureGateUnlocked, overlayModels)) return;
       if (userSelection) userSelectedModelRef.current = model;
       setSelectedModel(model);
     },
-    [featureGateUnlocked],
+    [featureGateUnlocked, overlayModels],
   );
 
   const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() =>
@@ -761,7 +792,6 @@ export function GlobalFilterProvider({
   const retryAvailability = useCallback(() => {
     void refetchAvailability();
   }, [refetchAvailability]);
-  const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
   const dbModelKeys = useMemo<string[]>(() => modelDbKeys(selectedModel), [selectedModel]);
 
@@ -778,7 +808,7 @@ export function GlobalFilterProvider({
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
     const decision = computeAutoSwitchDecision(
-      unofficialAvailable.filter((entry) => isModelVisible(entry.model, featureGateUnlocked)),
+      unofficialAvailable,
       hasExplicitUrlParam('g_model') ? getUrlParam('g_model') : undefined,
       selectedModel,
       lastAutoSwitchKeyRef.current,
@@ -787,7 +817,7 @@ export function GlobalFilterProvider({
     if (decision.modelToSet !== null) {
       setSelectedModel(decision.modelToSet);
     }
-  }, [unofficialAvailable, selectedModel, featureGateUnlocked]);
+  }, [unofficialAvailable, selectedModel]);
 
   const availableSequences = useMemo(
     () => resolveAvailableSequences(modelLines, unofficialAvailable, selectedModel),

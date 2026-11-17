@@ -253,7 +253,7 @@ Qwen3.5 workload-retirement coverage:
    or the overview's model order.
    GLM-5.3-Flash supports `8k/1k` and `agentic-traces` with raw key `glm5.3flash`,
    distinct from the historical GLM-5.2/5.3 bucket. The inference model selector
-   permits selecting it only after the existing UI feature gate is enabled,
+   permits selecting it only after the existing UI feature gate is enabled, or when an unofficial-run overlay contains it,
    placing it after GLM5.2/GLM5.3. It can be selected before published observations exist and preserves an
    empty chart; shared calculator/TCO choices require its own observations.
    Static `options.models` membership does not establish measured availability,
