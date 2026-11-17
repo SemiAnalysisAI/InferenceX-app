@@ -450,6 +450,27 @@ The cluster average is then a mean across those logical engines on the union of 
 
 Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
 
+### TensorRT-LLM Disaggregated Prompt Counters
+
+A disaggregated TRT-LLM decode worker re-reports prompts received from prefill
+in `trtllm_prompt_tokens`. Older builds count transferred KV as cached;
+[TensorRT-LLM #19743](https://github.com/NVIDIA/TensorRT-LLM/pull/19743)
+changes generation workers to report the prefix reused from their own cache.
+Summing every endpoint counts prompts twice and pushes the aggregate hit rate
+towards `(h + 1) / 2` or `h / 2`, where `h` is the prefill prefix hit rate.
+
+For disaggregated TRT-LLM, aggregate prompt, cached-prompt, prefill-batch and
+hit-rate metrics prefer identified prefill endpoints; without those, they exclude endpoints labelled decode (`disaggregation_mode=decode`
+or `dynamo_component=backend`). Role labels can come from another metric on the
+same endpoint. Per-worker sources retain their own counters, including decode
+measurements. Decode-only scrapes do not supply aggregate prefill measurements.
+
+The same scoped token totals produce chart data and the ingested
+`server_gpu_cache_hit_rate`. `db:backfill-chart-series` refreshes stored chart
+series and linked row rates atomically; failure leaves the previous chart version
+retryable. Merging changes to this parser triggers the existing
+`recompute-agentic-metrics.yml` stale-only repair and cache invalidation workflow.
+
 ### ATOM Server Metrics
 
 ATOM exports aggregate `atom:` gauges and counters. KV usage and request queues
