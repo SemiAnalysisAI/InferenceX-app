@@ -7,6 +7,8 @@
 
 @custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
+/* A viewport too short for a tall figure, such as a phone held sideways. */
+@custom-variant short (@media (max-height: 480px));
 
 .blog-prose h2[id],
 .blog-prose h3[id] {
