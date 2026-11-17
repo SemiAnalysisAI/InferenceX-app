@@ -11,6 +11,7 @@ import type { VideoPoint } from './metrics';
 import { lossyLabel, optimizationsOf } from './optimizations';
 import type { ResultCell } from './results';
 import type { ResultsClip } from './results-clips';
+import styles from './results.module.css';
 import { SideDot, type StageClip } from './VideoClipStage';
 
 /** Why reference PSNR alone cannot judge a clip; the quality explainer says it too. */
@@ -396,9 +397,17 @@ export interface VideoClipReadoutProps {
   b: ReadoutSide;
   /** The matched-noise rerun carries PSNR only; the cell's time, energy and cost are not its own. */
   diagnostic: boolean;
+  /** Counts the pairs shown so far; from the second on, the values ease in over the last pair's. */
+  swap?: number;
 }
 
-export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: VideoClipReadoutProps) {
+export default function VideoClipReadout({
+  kind,
+  a,
+  b: pair,
+  diagnostic,
+  swap = 0,
+}: VideoClipReadoutProps) {
   const locale = useLocale();
   const s = STRINGS[locale];
   const touch = useIsCoarsePointer();
@@ -418,8 +427,9 @@ export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: Video
       className="scroll-mt-24 space-y-2 text-xs"
     >
       <p
+        key={`pair-${swap}`}
         data-testid="video-results-readout-pair"
-        className="flex flex-wrap items-center gap-x-2 gap-y-1"
+        className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', swap > 0 && styles.swapIn)}
       >
         <PairSide side={a} diagnostic={diagnostic} locale={locale} />
         <span className="text-muted-foreground">{s.against}</span>
@@ -427,7 +437,13 @@ export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: Video
       </p>
       {/* Auto columns keep every pair, four or five cells, on one row from lg. A phone lists the
           cells in one column, each a label over its value with the pair's line beside it. */}
-      <dl className="m-0 grid grid-cols-2 overflow-hidden rounded-lg border border-border/30 bg-muted/10 tabular-nums max-md:grid-cols-1 max-md:divide-y max-md:divide-border/30 lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:divide-x lg:divide-border/30">
+      <dl
+        key={`cells-${swap}`}
+        className={cn(
+          'm-0 grid grid-cols-2 overflow-hidden rounded-lg border border-border/30 bg-muted/10 tabular-nums max-md:grid-cols-1 max-md:divide-y max-md:divide-border/30 lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:divide-x lg:divide-border/30',
+          swap > 0 && styles.swapIn,
+        )}
+      >
         {cells.map((item) => (
           <div
             key={item.metric}
