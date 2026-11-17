@@ -177,8 +177,8 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    The ring lives inside its point, so redraws on hover and zoom do not restart it, and the
    PNG export leaves it out. A browser animates an SVG shape on the main thread, with a
    layout on every frame, so the rings rest while the chart is off screen
-   (`data-off-screen`, kept by an `IntersectionObserver`) and go on when it returns. Points and lines glide to new data over 300 ms, as on the
-   inference scatter chart, and jump under `prefers-reduced-motion`; the badges, series pills
+   (`data-off-screen`, kept by an `IntersectionObserver`) and go on when it returns. Points, lines, axes and grid glide to new data over 300 ms, as the points do on the
+   inference scatter chart, and jump under `prefers-reduced-motion` (see Motion); the badges, series pills
    and labels are redrawn on every frame of the glide, so they stay on their points. Each
    text is measured once (`textWidth`) and its width reused until a font loads, so a redraw
    forces no layout. While
@@ -647,6 +647,68 @@ unchanged.
 
 中文：触屏规则沿用应用已有的判断：行为用 `useIsCoarsePointer`（`(hover: none) and (pointer: coarse)`），布局用 `useIsMobileViewport`（767 px）；鼠标和键盘的行为不变。点按区域：在触屏设备上，`results.module.css` 为说明按钮、开关、视频扬声器按钮、分界线按钮和 prompt 列表的“+N”卡片加上 44 px 的点按区域（用伪元素实现，控件本身大小不变；`--hit-x`/`--hit-y` 可把这一区域从相邻控件上移开），把详情页标签的点按高度扩大到 44 px，并让图例的每一行和每个开关各占 44 px 高。各个折叠标题行（`summary`）和图例工具栏的按钮（“重置筛选”和图例开关按钮）以同样的方式获得与自身等宽、44 px 高的点按区域；正文中的文字链接保持原有行高。说明文字：读数区中靠 `title` 说明自己的每一格，另带一个内容相同的 `InfoHelp` 按钮；“对比视频”的说明先列出当前视图的触屏手势，页首简介和“检查”面板的提示改用触屏说法，图例中没有匹配运行的硬件只在自己的标签里注明一次（“B300 · 无匹配运行”）。数据点：轻点会选中 22 px 内最近的数据点（`chart-marks.ts` 中的 `tapTarget`）；与最近的数据点相距不到 8 px 的几个点在连续轻点时轮流选中，因此只相隔一个像素的两个点都能选到。监听器只加在视频图表上，共享的图表封装没有改动。数据点面板：在触屏设备上，轻点数据点会打开 `VideoPointSheet`，代替鼠标使用的固定面板。面板沿用图表提示在窄屏上的底部面板样式，打开时高度不超过首屏内容，图表仍留在视野内，所选数据点带有圆环标记；数据点若会被面板挡住，页面会滚动到露出它的位置，关闭后回到原处。首屏依次是硬件、引擎、GPU 数量和运行日期，该数据点在对比区当前 prompt 下的视频（先显示首帧和播放按钮；静音、内联播放，轻点前为 `preload="none"`），prompt ID 和 seed，四个数值（单条视频延迟中位数、每条视频成本、每 1 美元 TCO 生成的视频秒数、每条视频能耗），以及三个操作：“对比”把该数据点设为对比对象并滚动到对比区，“分享”在浏览器支持 `navigator.share` 时调用系统分享，否则复制链接，“查看遥测”打开该部署的详情。固定面板中的其余内容在面板内向下滚动即可看到，此时面板会增高到底部面板样式的上限。没有视频的数据点使用同一面板，视频位置显示图例中的说明文字，且没有“对比”；来自指定运行的数据点带有运行标记。关闭按钮、轻点面板以外的位置、向下拖动面板顶部和 `Esc` 都可以关闭面板；轻点面板以外的另一个数据点则切换到该点。面板是模态对话框：透明的背景层接收面板以外的所有触摸，焦点移入面板，`Tab` 只在面板自身的控件之间循环。打开的数据点记录在 `r_sheet` 中，分享链接会重新打开它；鼠标设备忽略该参数。手机上的顺序：宽度小于 768 px 时页面先展示视频，依次是精简的标题行（页面标题、工作负载说明和分享）、对比区、一句话说明、播放控件、“对比”一行和列出全部 prompt 的横向滚动条，随后才是简介、基准测试配置、图表、图例、成本说明、视频区的其余部分（prompt 文本、视图切换器、“检查”、读数区、质量方法和来源）以及其余各节，内容没有删减。顺序只由 CSS 调整（`results.module.css` 和 `max-md:` 工具类），DOM、焦点顺序和更宽的布局都不变。默认配对：URL 中没有 `r_vs` 时，手机上对比对象的配对视频是另一种 GPU 而不是参考视频（`clip-stage.ts` 中的 `phonePairing`）：在工作负载、引擎和 GPU 数量相同且有视频的硬件部署中，取延迟中位数最高的一个。服务端根据 User-Agent 判断是否为手机（`phoneUserAgent`），首次渲染就显示这一组；手机还会把它写入 `r_vs`，因此链接在任何设备上都会打开同一组。写入发生在这一组的视频读取完成之后，并且只在地址中没有指定配对、视口宽度小于 768 px 时进行：hydration 会先重复服务端的渲染，而服务端既不知道链接指定的配对，也不知道实际视口，因此链接指定的配对会保留；被误判为手机的较宽屏幕最终回到默认配对，链接不变。没有符合条件的部署时仍使用默认配对。一句话说明：两侧都是硬件部署且都有延迟中位数和每条视频成本时，画面下方用一句话写出各自的延迟和成本（`stage-sentence.ts` 中的 `stageSentence`），取整方式与读数区相同，只在宽度小于 768 px 时显示；手机横屏（触屏设备横屏且高度不足 500 px）时，这句话排在播放控件之后，播放按钮因此与完整画面同屏。Prompt 条：宽度小于 768 px 时，prompt 卡片排成可横向滚动并带吸附点的一行，列出全部 prompt；轻点即选中该 prompt（`r_prompt`）。首帧延迟加载，不会自动播放。宽表格：`ScrollFade` 和 `useScrollFade`（`use-scroll-fade.tsx`）把还藏有列的一侧写入 `data-scroll-more`，CSS 让这一侧渐隐；成本表、详情页的成本表和完成情况表、“Prompt 与来源”以及每张 History 表都使用它。易读性：宽度小于 768 px 时，同一件事只说一次。图例改为紧凑布局（`results.module.css`）：硬件条目自动换行，行距 32 px，开关在放得下时排在同一行；每个条目的点按高度仍为 44 px，点按区域向上下两行之间的空隙各延伸一些。触屏设备上，只要图例还排在图表下方（宽度不超过 1023 px），就沿用这一布局。部署标签默认关闭，图表不再显示一行缩放手势说明（重置按钮保留），图表标题不再重复 X 轴指标，由坐标轴标题说明。页首简介删去上方样本组说明和“查看遥测”按钮已经表达的内容。“如何解读这些结果”收成一行默认折叠的说明，样式与“质量评分方法”一致，每条说明压缩为一行；注意事项全部保留（样本组与有效视频下限、延迟的起止范围、功率仅统计 GPU 板卡、TCO 为估算值而非账单），“尚未测量”的清单也保留。展开和收起记录 `video_results_how_to_read_toggled` 事件。数值：`format.ts` 统一延迟、成本和能耗在读数区、一句话说明、数据点面板、固定面板、悬停卡片和部署详情中的写法，各种宽度下一致：保留约三位有效数字（“35.4 s”“138 kJ”），100 及以上取整数，不足 1 美元的成本保留三位小数（“$0.068”）。API 和 CSV 仍保留完整精度。宽度：页面从 320 px 起不会横向滚动；视图切换器在 400 px 以下收紧内边距，在 374 px 以下缩小文字。质量指南的 PSNR 分布图中，轻点其他位置、滚动页面或按 `Esc` 都会关闭已点开的提示。
 
+## Motion
+
+A change of state on `/vgx` eases from the old state to the new one, on a mouse and on a touch
+screen alike. Nothing moves for its own sake: there is no entrance animation on the first page,
+no counting number and no shimmer. A tap or click takes effect at once, and the motion only
+shows what changed. Durations and curves are the site's, named once in `motion.ts` for script
+and read from `src/app/motion.css` in `results.module.css`:
+
+| Name            | Value                                | Used for                                                       |
+| --------------- | ------------------------------------ | -------------------------------------------------------------- |
+| `MOTION.fast`   | 150 ms (`--motion-dur-fast`)         | Feedback on a tap, values that swap in place, anything leaving |
+| `MOTION.base`   | 220 ms (`--motion-dur-base`)         | Content that appears, moves to a new place or opens            |
+| `MOTION.glide`  | 300 ms (the inference chart's glide) | Chart points, lines, axes and grid moving to new data          |
+| `EASE.enter`    | `cubic-bezier(0.22, 1, 0.36, 1)`     | Content that appears or opens                                  |
+| `EASE.standard` | `cubic-bezier(0.2, 0, 0, 1)`         | Content that moves between two places                          |
+| `EASE.exit`     | `cubic-bezier(0.3, 0, 1, 1)`         | Content that leaves                                            |
+
+What moves:
+
+- Chart. The shared plot glides points to new data; `chart-motion.ts` and the chart's render
+  hook add the rest without changing the shared layers. A capture layer ahead of them reads the
+  plot before each render. Lines are drawn through their points on every frame of the glide
+  (`followLines`), the axes ease to the new domain as a point at each tick value would
+  (`easeAxes`, d3's axis transition) and the grid keeps step (`placeGrid`). A point or line the
+  render removed fades out where it was, as a `plot-exit` that is no longer a point, and one it
+  added fades in (`settlePlot`); one that stays keeps its node. The first plot does not fade in.
+  Badges, series pills and the sheet's ring follow their point exactly while it glides, zooms or
+  pans; one eases only when it is attached to another point or placed on another side of its own,
+  and fades in when new (`markStep`). A render that arrives mid-glide starts from what is on
+  screen (`axesBetween`). A hover redraw starts nothing. A zoomed plot's axes change at once.
+  Named-run overlay marks go through the same code.
+- Point sheet. It slides in, and at the reader's word slides away from wherever a drag left it
+  while the page scrolls back smoothly; an action that leaves the page (Compare, View telemetry)
+  closes it at once. Let go short of closing, it settles back. Its figures ease in when it moves
+  to another point.
+- Stage. Just before the pair, prompt, view or Swap changes, the stage paints what it shows
+  onto a canvas (`ghostStage`, called from React's before-commit phase) and fades that out over
+  the new picture. No video element is added, moved or reloaded. Toggle's flip between the two
+  sides is immediate by design, and so are Play and Pause.
+- Values. The readout and the stage sentence ease in when the pair or prompt changes, from the
+  second pair on. The selected prompt's ring moves over.
+- Heights. Each disclosure row (`<details data-disclosure>`, `useDisclosureMotion`) grows from its
+  closed height to its open one and back; a close keeps `open` until it ends and sets
+  `data-closing` so the chevron turns at the click. The Inspect drawer, the prompt row's "+N"
+  tiles and the prompt's More link ease the space they take (`useHeightEase`). Each reads the
+  height once before the change and once after it and lets the browser animate between them; no
+  script measures during the animation. Performance history reads its pages after it opens, so
+  what it loads arrives at once.
+- Deployment page. Opening one from the overview, and coming back, eases in as the site's page
+  transition does. A link that lands on a deployment does not.
+
+The hover card, the hover dim, the pinned panel, the legend's own switches and the theme switch
+are the shared components' and are unchanged.
+
+`prefers-reduced-motion: reduce` makes every one of these an immediate change: the CSS sits
+under `prefers-reduced-motion: no-preference`, and script asks `reducedMotion()` before each
+animation (the chart once, when it mounts). While something moves, the page says so for a style
+or a test that must wait for rest instead of a time: `data-moving` on the plot's `svg` and on a
+badge on its way to another point, `data-easing` on an element whose height is easing.
+
+中文：`/vgx` 上的状态变化都从旧状态缓动到新状态，鼠标和触屏一致。动效只用来说明发生了什么变化：首屏没有入场动画，数字不滚动，也没有闪烁占位效果；点按和点击立即生效。时长和曲线沿用站点已有的定义，由 `motion.ts` 统一命名供脚本使用，`results.module.css` 直接读取 `src/app/motion.css` 中的变量：150 ms（`--motion-dur-fast`）用于点按反馈、原位替换的数值和离开的内容，220 ms（`--motion-dur-base`）用于出现、移动或展开的内容，300 ms 与推理图表一致，用于数据点、曲线、坐标轴和网格过渡到新数据。图表方面，共享图表本身只滑动数据点，其余由 `chart-motion.ts` 和图表的渲染回调补上，不改动共享图层：滑动的每一帧都按数据点的当前位置绘制曲线，坐标轴按各刻度值上数据点的移动方式过渡，网格同步；被移除的数据点和曲线在原位淡出，新增的淡入，保留的沿用原节点；首次绘制不淡入。标记、系列标签和数据点面板的圆环在数据点滑动、缩放或平移时始终贴着数据点，只有换到另一个数据点或另一侧时才缓动过去。滑动途中发生的变化从当前画面开始，悬停重绘不触发任何过渡，指定运行的叠加标记使用同一套代码。数据点面板滑入，关闭时从拖动停下的位置滑出，页面同时平滑滚回；“对比”“查看遥测”这类离开当前页面的操作立即关闭面板。对比区在配对、prompt、视图或互换两侧变化前，把当前画面绘制到画布上，再让它在新画面之上淡出，不新增、移动或重新加载 video 元素；“切换”视图的翻转以及播放、暂停保持立即生效。读数区和对比区下方的句子在配对或 prompt 变化时淡入。各折叠区从收起高度过渡到展开高度，收起时反向；“检查”抽屉、prompt 列表的“+N”和“展开”链接所占的空间同样缓动。这些高度变化只在变化前后各读取一次高度，动画期间脚本不再测量。从概览打开部署详情以及返回概览时，按站点的页面过渡淡入。悬停卡片、悬停变暗、固定的详情面板、图例开关和主题切换来自共享组件，保持不变。`prefers-reduced-motion: reduce` 下以上变化全部立即完成。有内容在移动时，页面用 `data-moving`（图表的 `svg` 以及正在移向另一个数据点的标记）和 `data-easing`（高度正在缓动的元素）标明，样式和测试可以等待状态而不是等待时间。
+
 ## Control coverage
 
 Both language routes stream in two parts. The document carries the page shell,
@@ -695,6 +757,7 @@ official/unofficial source membership remain unchanged.
 | Phone order, opening pair, stage sentence, prompt strip, point sheet                    | Presentation only; `r_sheet` is page state and every figure shown is already in the point's cell               |
 | How we score quality, Show me, See what changes                                         | Presentation only; the PSNR range comes from the existing published media reads                                |
 | Number format, readout comparison lines, compact legend, phone label default and notes  | Presentation only; rounding and wording of values every cell already carries, no new selector or calculation   |
+| Motion between states, and its absence under reduced motion                             | Presentation only; no selector, default, calculation or request changes                                        |
 | Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data                               |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
@@ -705,7 +768,9 @@ and overlay runs, legend filtering, deployment detail history, clip alignment, r
 browser playback and difference failure, bilingual layout and 390px overflow, the phone
 order, opening pair, sentence and strip, the touch point sheet for official, clipless and
 named-run points, the number format and comparison wording, the phone label default, the
-compact legend's pitch and tap height, and pill and badge placement.
+compact legend's pitch and tap height, pill and badge placement, and motion: a point that
+stays keeps its node, what leaves fades out and is removed, two quick changes end on the last,
+overlay points and lines glide alike, and reduced motion changes everything at once.
 
 ## 中文说明
 
