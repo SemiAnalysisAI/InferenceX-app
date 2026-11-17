@@ -9,6 +9,8 @@ vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 afterEach(() => {
+  // A return a test left on its way ends here, as a press on the page ends it.
+  window.dispatchEvent(new Event('pointerdown'));
   if (root) act(() => root?.unmount());
   container?.remove();
   vi.unstubAllGlobals();
@@ -171,4 +173,55 @@ it('closes at once under reduced motion', () => {
   sheet.close();
   expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000 });
   expect(sheet.onClose).toHaveBeenCalledOnce();
+});
+
+it('stops the page where it is once the reader takes hold of it on its way back', () => {
+  animated();
+  const page = { scrollY: 1100, markBottom: 580, firstScreen: 200 };
+  const sheet = open({ ...page, scrollY: 1000 });
+  Object.defineProperty(window, 'scrollY', { configurable: true, get: () => page.scrollY });
+  sheet.close();
+  expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000, behavior: 'smooth' });
+  // A second tap on the sheet as it leaves is not a hand on the page.
+  document
+    .querySelector('[data-testid="video-point-sheet-close"]')!
+    .dispatchEvent(new Event('pointerdown', { bubbles: true }));
+  expect(sheet.scrollTo).toHaveBeenCalledOnce();
+  // Part of the way back a wheel turns: a scroll to where the page is ends the smooth one.
+  page.scrollY = 1060;
+  window.dispatchEvent(new Event('wheel'));
+  expect(sheet.scrollTo).toHaveBeenLastCalledWith({ top: 1060 });
+  page.scrollY = 1070;
+  window.dispatchEvent(new Event('touchstart'));
+  expect(sheet.scrollTo).toHaveBeenCalledTimes(2);
+});
+
+it('ends the return for another point tapped while it slides away', () => {
+  animated();
+  // The second point is clear of the sheet where the page is, and would not be where it began.
+  const page = { scrollY: 1000, markBottom: 580, firstScreen: 200 };
+  const sheet = open(page);
+  Object.assign(page, { scrollY: 1100, markBottom: 480 });
+  sheet.close();
+  expect(sheet.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000, behavior: 'smooth' });
+  sheet.render('second');
+  expect(sheet.scrollTo).toHaveBeenLastCalledWith({ top: 1100 });
+  expect(sheet.scrollBy).toHaveBeenCalledOnce();
+  // The same point drawn again, as when its clip is read, sends no scroll of its own.
+  sheet.render('second');
+  expect(sheet.scrollTo).toHaveBeenCalledTimes(2);
+});
+
+it('ends the return for a point tapped after the sheet has gone', () => {
+  const slides = animated();
+  const page = { scrollY: 1000, markBottom: 580, firstScreen: 200 };
+  const first = open(page);
+  first.close();
+  act(() => slides[0].finish());
+  expect(first.onClose).toHaveBeenCalledOnce();
+  act(() => root!.unmount());
+  // The page is part of the way back when another point opens a sheet of its own.
+  const second = open({ scrollY: 1070, markBottom: 480, firstScreen: 200 });
+  expect(second.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1070 });
+  expect(second.scrollBy).not.toHaveBeenCalled();
 });

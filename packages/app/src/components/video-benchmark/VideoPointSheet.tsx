@@ -56,8 +56,13 @@ const RETURN_FRAMES = 5;
 const RETURN_WAIT_FRAMES = 120;
 /** How far from its place, in px, a page at rest is still put back after a smooth return. */
 const RETURN_SLACK = 24;
-/** What a reader does to scroll the page themselves, which ends the return. */
-const HOLDS = ['wheel', 'touchstart', 'keydown'] as const;
+/** The reader's hand on the page: a press, a wheel or a key. Each ends the return. */
+const HOLDS = ['pointerdown', 'touchstart', 'wheel', 'keydown'] as const;
+/**
+ * Ends the smooth return that is still on its way, where the page is; null when none is. It is
+ * kept outside the sheet, which is gone before the page it sent back has come to rest.
+ */
+let endReturn: (() => void) | null = null;
 
 export interface VideoPointSheetProps {
   /** Hardware name, after its color dot. */
@@ -156,6 +161,8 @@ export default function VideoPointSheet({
     const element = sheet.current;
     const still = reducedMotion() || typeof element?.animate !== 'function';
     if (top !== null) {
+      // An earlier sheet's return, if one is still running, is over.
+      endReturn?.();
       // The page goes back the way it came, by a smooth scroll.
       window.scrollTo(still ? { top } : { top, behavior: 'smooth' });
       // The scroll that cleared the point may still be running, and it can carry on past this
@@ -166,8 +173,15 @@ export default function VideoPointSheet({
       let last = Number.NaN;
       let rested = 0;
       let held = false;
-      const hold = () => {
+      // The reader's hand on the page, or a sheet for another point, ends the return: the page
+      // stops where it is, since a smooth scroll left running would carry on under a finger, a
+      // wheel or the point just tapped. A scroll to where the page already is ends it. A second
+      // tap on the sheet as it leaves is not a hand on the page.
+      const hold = (event?: Event) => {
+        if (held || (event?.target instanceof Node && element?.contains(event.target))) return;
         held = true;
+        if (endReturn === hold) endReturn = null;
+        window.scrollTo({ top: window.scrollY });
       };
       const check = () => {
         frames -= 1;
@@ -185,9 +199,15 @@ export default function VideoPointSheet({
           }
         }
         if (frames > 0) requestAnimationFrame(check);
-        else for (const type of HOLDS) window.removeEventListener(type, hold);
+        else {
+          for (const type of HOLDS) window.removeEventListener(type, hold);
+          if (endReturn === hold) endReturn = null;
+        }
       };
-      if (!still) for (const type of HOLDS) window.addEventListener(type, hold, { passive: true });
+      if (!still) {
+        for (const type of HOLDS) window.addEventListener(type, hold, { passive: true });
+        endReturn = hold;
+      }
       requestAnimationFrame(check);
     }
     if (still || !element) {
@@ -217,6 +237,9 @@ export default function VideoPointSheet({
   });
   // The sheet covers the bottom of the screen; a point under it scrolls up into view.
   useEffect(() => {
+    // A return still on its way would carry another point back under the sheet. It ends here,
+    // and the point is read where the page stopped.
+    if (scrolledFor.current !== pointKey) endReturn?.();
     const element = sheet.current;
     const mark = anchor?.()?.getBoundingClientRect();
     // Not before the sheet has its opening height, and again if its first screen grows.

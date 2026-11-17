@@ -686,7 +686,9 @@ What moves:
 - Point sheet. It slides in, and at the reader's word slides away from wherever a drag left it
   while the page scrolls back smoothly; an action that leaves the page (Compare, View telemetry)
   closes it at once. Let go short of closing, it settles back. Its figures ease in when it moves
-  to another point.
+  to another point. A press, a wheel or a key on the page, or a sheet for another point, ends
+  the scroll back where the page is, so it never runs on under a finger or carries the point
+  just tapped under the sheet.
 - Stage. Just before the pair, prompt, view or Swap changes, the stage paints what it shows
   onto a canvas (`ghostStage`, called from React's before-commit phase) and fades that out over
   the new picture. No video element is added, moved or reloaded. Toggle's flip between the two
@@ -713,7 +715,7 @@ or a test that must wait for rest instead of a time: `data-moving` on the plot's
 badge on its way to another point, `data-gliding` on the `svg` while its points glide,
 `data-easing` on an element whose height is easing.
 
-中文：`/vgx` 上的状态变化都从旧状态缓动到新状态，鼠标和触屏一致。动效只用来说明发生了什么变化：首屏没有入场动画，数字不滚动，也没有闪烁占位效果；点按和点击立即生效。时长和曲线沿用站点已有的定义，由 `motion.ts` 统一命名供脚本使用，`results.module.css` 直接读取 `src/app/motion.css` 中的变量：150 ms（`--motion-dur-fast`）用于点按反馈、原位替换的数值和离开的内容，220 ms（`--motion-dur-base`）用于出现、移动或展开的内容，300 ms 与推理图表一致，用于数据点、曲线、坐标轴和网格过渡到新数据。图表方面，共享图表本身只滑动数据点，其余由 `chart-motion.ts` 和图表的渲染回调补上，不改动共享图层：滑动的每一帧都按数据点的当前位置绘制曲线，坐标轴按各刻度值上数据点的移动方式过渡，网格同步；被移除的数据点和曲线在原位淡出，新增的淡入，保留的沿用原节点；首次绘制不淡入。标记、系列标签和数据点面板的圆环在数据点滑动、缩放或平移时始终贴着数据点，只有换到另一个数据点或另一侧时才缓动过去；这段移动和新标记的淡入是标记元素自身的动画，不需要逐帧重绘，点按只重绘一次标记。数据点滑动期间，标记按上一次摆放的位置跟随数据点，到位后再重新摆放，脉冲圆环暂停（`data-gliding`），滑动的每一帧因此比整体重绘标记更省。缩放或平移时标记不缓动。滑动途中发生的变化从当前画面开始，悬停重绘不触发任何过渡，指定运行的叠加标记使用同一套代码。数据点面板滑入，关闭时从拖动停下的位置滑出，页面同时平滑滚回；“对比”“查看遥测”这类离开当前页面的操作立即关闭面板。对比区在配对、prompt、视图或互换两侧变化前，把当前画面绘制到画布上，再让它在新画面之上淡出，不新增、移动或重新加载 video 元素；“切换”视图的翻转以及播放、暂停保持立即生效。读数区和对比区下方的句子在配对或 prompt 变化时淡入，随页面一起出现的第一组配对不淡入。各折叠区从收起高度过渡到展开高度，收起时反向；“检查”抽屉、prompt 列表的“+N”和“展开”链接所占的空间同样缓动。这些高度变化只在变化前后各读取一次高度，动画期间脚本不再测量。从概览打开部署详情以及返回概览时，按站点的页面过渡淡入。悬停卡片、悬停变暗、固定的详情面板、图例开关和主题切换来自共享组件，保持不变。`prefers-reduced-motion: reduce` 下以上变化全部立即完成。有内容在移动时，页面用 `data-moving`（图表的 `svg` 以及正在移向另一个数据点的标记）、`data-gliding`（数据点滑动期间的 `svg`）和 `data-easing`（高度正在缓动的元素）标明，样式和测试可以等待状态而不是等待时间。
+中文：`/vgx` 上的状态变化都从旧状态缓动到新状态，鼠标和触屏一致。动效只用来说明发生了什么变化：首屏没有入场动画，数字不滚动，也没有闪烁占位效果；点按和点击立即生效。时长和曲线沿用站点已有的定义，由 `motion.ts` 统一命名供脚本使用，`results.module.css` 直接读取 `src/app/motion.css` 中的变量：150 ms（`--motion-dur-fast`）用于点按反馈、原位替换的数值和离开的内容，220 ms（`--motion-dur-base`）用于出现、移动或展开的内容，300 ms 与推理图表一致，用于数据点、曲线、坐标轴和网格过渡到新数据。图表方面，共享图表本身只滑动数据点，其余由 `chart-motion.ts` 和图表的渲染回调补上，不改动共享图层：滑动的每一帧都按数据点的当前位置绘制曲线，坐标轴按各刻度值上数据点的移动方式过渡，网格同步；被移除的数据点和曲线在原位淡出，新增的淡入，保留的沿用原节点；首次绘制不淡入。标记、系列标签和数据点面板的圆环在数据点滑动、缩放或平移时始终贴着数据点，只有换到另一个数据点或另一侧时才缓动过去；这段移动和新标记的淡入是标记元素自身的动画，不需要逐帧重绘，点按只重绘一次标记。数据点滑动期间，标记按上一次摆放的位置跟随数据点，到位后再重新摆放，脉冲圆环暂停（`data-gliding`），滑动的每一帧因此比整体重绘标记更省。缩放或平移时标记不缓动。滑动途中发生的变化从当前画面开始，悬停重绘不触发任何过渡，指定运行的叠加标记使用同一套代码。数据点面板滑入，关闭时从拖动停下的位置滑出，页面同时平滑滚回；滚回途中，在页面上按下、滚动滚轮或按键，或者面板转到另一个数据点，页面都会停在当前位置，不会在手指下继续滚动，也不会把刚点按的数据点带到面板下方；“对比”“查看遥测”这类离开当前页面的操作立即关闭面板。对比区在配对、prompt、视图或互换两侧变化前，把当前画面绘制到画布上，再让它在新画面之上淡出，不新增、移动或重新加载 video 元素；“切换”视图的翻转以及播放、暂停保持立即生效。读数区和对比区下方的句子在配对或 prompt 变化时淡入，随页面一起出现的第一组配对不淡入。各折叠区从收起高度过渡到展开高度，收起时反向；“检查”抽屉、prompt 列表的“+N”和“展开”链接所占的空间同样缓动。这些高度变化只在变化前后各读取一次高度，动画期间脚本不再测量。从概览打开部署详情以及返回概览时，按站点的页面过渡淡入。悬停卡片、悬停变暗、固定的详情面板、图例开关和主题切换来自共享组件，保持不变。`prefers-reduced-motion: reduce` 下以上变化全部立即完成。有内容在移动时，页面用 `data-moving`（图表的 `svg` 以及正在移向另一个数据点的标记）、`data-gliding`（数据点滑动期间的 `svg`）和 `data-easing`（高度正在缓动的元素）标明，样式和测试可以等待状态而不是等待时间。
 
 ## Control coverage
 

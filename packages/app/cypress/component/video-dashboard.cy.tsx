@@ -326,6 +326,17 @@ const restingScroll = () =>
       }),
   );
 
+/** The sheet's close button, for a click in the same task as what the test does next. */
+const closeButton = (win: Window) =>
+  win.document.querySelector<HTMLElement>('[data-testid="video-point-sheet-close"]')!;
+/** The viewport y of the bottom edge of a chart point's mark. */
+const bottomOf = (group: Element) =>
+  group.querySelector('.visible-shape')!.getBoundingClientRect().bottom;
+/** The viewport y the open sheet's top rests at. */
+const restingTop = (win: Window) =>
+  win.innerHeight -
+  win.document.querySelector<HTMLElement>('[data-testid="video-point-sheet"]')!.offsetHeight;
+
 /** The viewport y of an element's top edge. */
 const topOf = (selector: string) =>
   cy.get(selector).then(($element) => $element[0].getBoundingClientRect().top);
@@ -1609,6 +1620,75 @@ describe('VideoGenX results', () => {
       cy.get('body').type('{esc}');
       sheet().should('not.exist');
       restingScroll().should('equal', found);
+    });
+  });
+
+  it('ends the page’s way back for the reader’s hand, and for another point tapped meanwhile', () => {
+    coarsePointer();
+    cy.viewport(390, 844);
+    mount({});
+    points().should('have.length.at.least', 2);
+    cy.get('[data-testid="d3-chart-svg"]').then(($svg) =>
+      $svg[0].scrollIntoView({ block: 'end', behavior: 'instant' }),
+    );
+    restingScroll().then((found) => {
+      lowestPoint().then(tapPoint);
+      sheet().should('exist');
+      restingScroll().then((cleared) => {
+        expect(cleared, 'scrolled clear of the sheet').to.be.greaterThan(found);
+        // Closed, and a wheel turns before the page has moved: it stays where the reader holds it.
+        cy.window().then((win) => {
+          closeButton(win).click();
+          win.dispatchEvent(new win.Event('wheel'));
+        });
+        sheet().should('not.exist');
+        restingScroll().should('equal', cleared);
+
+        cy.window().then((win) => win.scrollTo({ top: found, behavior: 'instant' }));
+        lowestPoint().then(tapPoint);
+        sheet().should('exist');
+        restingScroll().should('equal', cleared);
+        searchParam('r_sheet').then((first) => {
+          points().then(($groups) => {
+            const win = $groups[0].ownerDocument.defaultView!;
+            const resting = restingTop(win);
+            const lowest = Math.max(...[...$groups].map(bottomOf));
+            // Clear of the sheet where the page is; under it where the page is going back to.
+            const other = [...$groups].find(
+              (group) =>
+                bottomOf(group) < lowest - 10 &&
+                bottomOf(group) + 20 <= resting &&
+                bottomOf(group) + (cleared - found) > resting,
+            );
+            expect(other, 'a point the way back would cover').to.not.equal(undefined);
+            const { x, y } = centreOf(other!);
+            // Closed, and that point tapped while the sheet slides away.
+            closeButton(win).click();
+            win.document
+              .querySelector('[data-testid="d3-chart-svg"]')!
+              .dispatchEvent(
+                new win.MouseEvent('click', { bubbles: true, clientX: x, clientY: y }),
+              );
+            cy.wrap(other).as('other');
+          });
+          // The sheet stays for that point and the page stops, so the point is not carried under it.
+          cy.location('search').should((search) => {
+            const key = new URLSearchParams(search).get('r_sheet');
+            expect(key, 'open point').to.be.a('string');
+            expect(key, 'open point').to.not.equal(first);
+          });
+        });
+        sheet().should('exist').and('not.have.attr', 'data-leaving');
+        restingScroll().should('equal', cleared);
+        cy.get('@other').then(($other) => {
+          const win = $other[0].ownerDocument.defaultView!;
+          expect(bottomOf($other[0]), 'point above the sheet').to.be.at.most(restingTop(win));
+        });
+        // The place to go back to is still where the first tap found the page.
+        cy.get('[data-testid="video-point-sheet-close"]').click();
+        sheet().should('not.exist');
+        restingScroll().should('equal', found);
+      });
     });
   });
 
