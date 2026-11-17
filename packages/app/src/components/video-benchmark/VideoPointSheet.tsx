@@ -17,10 +17,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { buildShareUrl } from '@/lib/routing/url-state';
-import { cn } from '@/lib/shared/utils';
-import { EASE, MOTION, cssEase, reducedMotion } from './motion';
-import { useChanges } from './motion-dom';
-import styles from './results.module.css';
 import { useFirstFrame } from './use-first-frame';
 
 const STRINGS = {
@@ -52,17 +48,6 @@ const PEEK = 24;
 const ANCHOR_GAP = 20;
 /** Frames after a dismissal on which the page is put back again if it has moved. */
 const RETURN_FRAMES = 5;
-/** Frames a smooth return is given to come to rest before it is left alone. */
-const RETURN_WAIT_FRAMES = 120;
-/** How far from its place, in px, a page at rest is still put back after a smooth return. */
-const RETURN_SLACK = 24;
-/** The reader's hand on the page: a press, a wheel or a key. Each ends the return. */
-const HOLDS = ['pointerdown', 'touchstart', 'wheel', 'keydown'] as const;
-/**
- * Ends the smooth return that is still on its way, where the page is; null when none is. It is
- * kept outside the sheet, which is gone before the page it sent back has come to rest.
- */
-let endReturn: (() => void) | null = null;
 
 export interface VideoPointSheetProps {
   /** Hardware name, after its color dot. */
@@ -130,20 +115,6 @@ export default function VideoPointSheet({
   const [playing, setPlaying] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pull, setPull] = useState(0);
-  /** Let go short of closing: the sheet eases back to rest instead of following a finger. */
-  const [settling, setSettling] = useState(false);
-  /** Sliding away at the reader's word; the page behind already takes touches. */
-  const [leaving, setLeaving] = useState(false);
-  const exit = useRef<Animation | null>(null);
-  // A sheet that moves to another point while it slides away stays, for that point.
-  useEffect(() => {
-    exit.current?.cancel();
-    exit.current = null;
-    setLeaving(false);
-    setPull(0);
-  }, [pointKey]);
-  useEffect(() => () => exit.current?.cancel(), []);
-  const moved = useChanges(pointKey);
   /** The drag on the header: its pointer, where it began and how far down it has gone. */
   const press = useRef<{ id: number; y: number; pull: number } | null>(null);
   const more = useRef<HTMLDivElement>(null);
@@ -154,81 +125,22 @@ export default function VideoPointSheet({
   const origin = useRef<number | null>(null);
   /** The point this sheet last scrolled the page for; a later run for it finds the page moving. */
   const scrolledFor = useRef<string | null>(null);
-  /** The point this sheet last showed, whether or not the page had to move for it. */
-  const shownFor = useRef<string | null>(null);
   /** Closes at the reader's word, which also puts the page back; an action that leaves does not. */
   const dismiss = () => {
-    if (exit.current) return;
     const top = origin.current;
-    const element = sheet.current;
-    const still = reducedMotion() || typeof element?.animate !== 'function';
     if (top !== null) {
-      // An earlier sheet's return, if one is still running, is over.
-      endReturn?.();
-      // The page goes back the way it came, by a smooth scroll.
-      window.scrollTo(still ? { top } : { top, behavior: 'smooth' });
+      window.scrollTo({ top });
       // The scroll that cleared the point may still be running, and it can carry on past this
-      // return or, when it has only just begun, through it. An immediate return is checked on
-      // the next frames; a smooth one once the page has come to rest, unless the reader has
-      // taken hold of the page meanwhile.
-      let frames = still ? RETURN_FRAMES : RETURN_WAIT_FRAMES;
-      let last = Number.NaN;
-      let rested = 0;
-      let held = false;
-      // The reader's hand on the page, or a sheet for another point, ends the return: the page
-      // stops where it is, since a smooth scroll left running would carry on under a finger, a
-      // wheel or the point just tapped. A scroll to where the page already is ends it. A second
-      // tap on the sheet as it leaves is not a hand on the page.
-      const hold = (event?: Event) => {
-        if (held || (event?.target instanceof Node && element?.contains(event.target))) return;
-        held = true;
-        if (endReturn === hold) endReturn = null;
-        window.scrollTo({ top: window.scrollY });
-      };
-      const check = () => {
+      // return or, when it has only just begun, through it; so the next frames check.
+      let frames = RETURN_FRAMES;
+      const hold = () => {
+        if (window.scrollY !== top) window.scrollTo({ top });
         frames -= 1;
-        if (still) {
-          if (window.scrollY !== top) window.scrollTo({ top });
-        } else {
-          rested = window.scrollY === last ? rested + 1 : 0;
-          last = window.scrollY;
-          if (held) frames = 0;
-          else if (rested >= RETURN_FRAMES) {
-            // A few pixels short is the earlier scroll's doing; anywhere else, something else has
-            // moved the page since, and that stands.
-            if (last !== top && Math.abs(last - top) <= RETURN_SLACK) window.scrollTo({ top });
-            frames = 0;
-          }
-        }
-        if (frames > 0) requestAnimationFrame(check);
-        else {
-          for (const type of HOLDS) window.removeEventListener(type, hold);
-          if (endReturn === hold) endReturn = null;
-        }
+        if (frames > 0) requestAnimationFrame(hold);
       };
-      if (!still) {
-        for (const type of HOLDS) window.addEventListener(type, hold, { passive: true });
-        endReturn = hold;
-      }
-      requestAnimationFrame(check);
+      requestAnimationFrame(hold);
     }
-    if (still || !element) {
-      onClose();
-      return;
-    }
-    // The sheet leaves the way it came, from wherever a drag left it, and closes when it is gone.
-    setLeaving(true);
-    const slide = element.animate(
-      [
-        { transform: `translateY(${press.current?.pull ?? pull}px)`, opacity: 1 },
-        { transform: 'translateY(100%)', opacity: 0 },
-      ],
-      { duration: MOTION.fast, easing: cssEase(EASE.exit), fill: 'forwards' },
-    );
-    exit.current = slide;
-    slide.addEventListener('finish', () => {
-      if (exit.current === slide) onClose();
-    });
+    onClose();
   };
   const close = useRef(dismiss);
   close.current = dismiss;
@@ -239,13 +151,6 @@ export default function VideoPointSheet({
   });
   // The sheet covers the bottom of the screen; a point under it scrolls up into view.
   useEffect(() => {
-    // A return still on its way would carry another point back under the sheet. It ends here,
-    // and the point is read where the page stopped. Only another point ends it: the same point
-    // drawn again, as when its clip is read while the sheet leaves, lets the page go back.
-    if (shownFor.current !== pointKey) {
-      shownFor.current = pointKey;
-      endReturn?.();
-    }
     const element = sheet.current;
     const mark = anchor?.()?.getBoundingClientRect();
     // Not before the sheet has its opening height, and again if its first screen grows.
@@ -336,7 +241,6 @@ export default function VideoPointSheet({
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest('button')) return;
-    setSettling(false);
     press.current = { id: event.pointerId, y: event.clientY, pull: 0 };
     // A finger's moves and its lift come here wherever it goes; a mouse's or a pen's go to what is
     // under it, and a quick drag is off the header before the sheet has followed it.
@@ -354,15 +258,10 @@ export default function VideoPointSheet({
   const release = () => {
     const drag = press.current;
     if (!drag) return;
-    // A flick lifts before the last move is drawn, so the distance comes from the drag itself.
-    if (drag.pull > SWIPE_CLOSE) {
-      dismiss();
-      press.current = null;
-      return;
-    }
     press.current = null;
-    setSettling(true);
-    setPull(0);
+    // A flick lifts before the last move is drawn, so the distance comes from the drag itself.
+    if (drag.pull > SWIPE_CLOSE) dismiss();
+    else setPull(0);
   };
 
   return createPortal(
@@ -371,10 +270,7 @@ export default function VideoPointSheet({
         type="button"
         data-testid="video-point-sheet-backdrop"
         aria-label={s.close}
-        className={cn(
-          'fixed inset-0 z-[9998] cursor-default touch-none',
-          leaving && 'pointer-events-none',
-        )}
+        className="fixed inset-0 z-[9998] cursor-default touch-none"
         onClick={(event) => {
           // A tap that moves the sheet to another point leaves the focus in the sheet.
           if (onOutside?.(event.clientX, event.clientY))
@@ -391,13 +287,8 @@ export default function VideoPointSheet({
         data-chart-tooltip
         data-sheet="true"
         data-testid="video-point-sheet"
-        data-settling={settling || undefined}
-        data-leaving={leaving || undefined}
         // Under 768 px globals.css sizes the sheet; a wider touch screen gets the same sheet, centered.
-        className={cn(
-          styles.sheet,
-          'fixed inset-x-0 bottom-0 z-[9999] mx-auto w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-b-0 border-border bg-popover text-sm shadow-2xl outline-none',
-        )}
+        className="fixed inset-x-0 bottom-0 z-[9999] mx-auto w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-b-0 border-border bg-popover text-sm shadow-2xl outline-none"
         style={{
           maxHeight: `min(72dvh, ${expanded || fold === null ? 640 : fold}px)`,
           transform: pull > 0 ? `translateY(${pull}px)` : undefined,
@@ -443,11 +334,7 @@ export default function VideoPointSheet({
             </Button>
           </div>
           {/* The clip beside its four figures keeps the sheet short, so the chart stays in view. */}
-          <div
-            key={moved}
-            className={cn('flex items-start gap-3', moved > 0 && styles.swapIn)}
-            data-testid="video-point-sheet-figures"
-          >
+          <div className="flex items-start gap-3">
             {clip !== null && (
               <div className="w-[44%] max-w-44 shrink-0">
                 <div className="relative aspect-video overflow-hidden rounded-lg bg-black">

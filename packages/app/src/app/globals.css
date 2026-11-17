@@ -978,10 +978,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   animation: video-clip-pulse 2.2s ease-out infinite;
 }
 
-/* A ring is repainted by the main thread, so it rests while its chart is off screen, and holds
-   still for the 300 ms its chart's points glide to new data. */
-[data-off-screen] .video-clip-pulse,
-[data-gliding] .video-clip-pulse {
+/* A ring is repainted by the main thread, so it rests while its chart is off screen. */
+[data-off-screen] .video-clip-pulse {
   animation-play-state: paused;
 }
 

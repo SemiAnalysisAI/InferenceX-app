@@ -34,8 +34,6 @@ import { clipGroupActive, frameAt, frameClock } from './clip-sync';
 import { STAGE_ID, type StageView } from './clip-stage';
 import { useClipGroup } from './use-clip-group';
 import { useFirstFrame } from './use-first-frame';
-import { BeforeCommit, useHeightEase } from './motion-dom';
-import { ghostStage } from './stage-ghost';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -275,8 +273,6 @@ export default function VideoClipStage({
   const wipe = useRef<{ id: number; x: number; moved: boolean }>(null);
   const handle = useRef<HTMLButtonElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  /** Holds the last picture for a moment, so another pair, prompt or view fades in over it. */
-  const ghost = useRef<HTMLCanvasElement>(null);
   const pendingSplit = useRef<number | null>(null);
   const splitFrame = useRef(0);
   const inspectId = useId();
@@ -623,11 +619,6 @@ export default function VideoClipStage({
   );
   // A phone opens the drawer beside its toggle in the slot, not under the transport.
   const movedInspect = phone && Boolean(inspectSlot);
-  // What sits under the drawer eases down for it and back up: the stage's column, or a phone's slot.
-  const column = useRef<HTMLDivElement>(null);
-  const inspectEase = useHeightEase(inspect, () =>
-    movedInspect ? (inspectSlot ?? null) : column.current,
-  );
   const drawer = inspect && (
     <div
       id={inspectId}
@@ -719,7 +710,6 @@ export default function VideoClipStage({
 
   return (
     <div
-      ref={column}
       id={STAGE_ID}
       className={cn(styles.stageColumn, 'mx-auto w-full min-w-0 scroll-mt-24 space-y-3')}
       style={{ maxWidth: overlay ? STAGE_FIT_WIDTH.overlay : STAGE_FIT_WIDTH.side }}
@@ -784,14 +774,6 @@ export default function VideoClipStage({
             >
               <div
                 className={cn('absolute inset-0 bg-black', hidden && 'invisible')}
-                // The share of its width Wipe leaves in view, which the fading last picture copies.
-                data-shown={
-                  view === 'wipe' && role === 'b'
-                    ? onLeft(role)
-                      ? `0,${split}`
-                      : `${split},100`
-                    : undefined
-                }
                 style={
                   view === 'wipe' && role === 'b'
                     ? {
@@ -1014,17 +996,6 @@ export default function VideoClipStage({
             {lens.zoom}×
           </span>
         )}
-        {/* Toggle's flip between the sides stays immediate: it is there to compare them by eye. */}
-        <BeforeCommit
-          token={`${selection}\n${view}\n${swapped}`}
-          run={() => ghostStage(ghost.current)}
-        />
-        <canvas
-          ref={ghost}
-          aria-hidden="true"
-          data-testid="video-results-last-picture"
-          className="pointer-events-none absolute top-0 left-0 z-[5] max-h-full max-w-full object-cover object-left-top opacity-0"
-        />
       </div>
       {caption}
       {/*
@@ -1096,7 +1067,6 @@ export default function VideoClipStage({
           inspectSlot === undefined ? undefined : 'max-md:hidden',
         )}
       </div>
-      {inspectEase.before}
       {!movedInspect && drawer}
       {inspectSlot &&
         createPortal(

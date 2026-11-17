@@ -8,7 +8,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { DISCLOSURE } from './motion-dom';
 import VideoSelect from './VideoSelect';
 import { ScrollFade } from './use-scroll-fade';
 import type { VideoHistoryEntry, VideoHistoryPage } from './history';
@@ -378,11 +377,11 @@ export default function VideoHistory() {
                   </table>
                 </ScrollFade>
               )}
-              <details {...DISCLOSURE} className="group text-xs text-muted-foreground">
+              <details className="group text-xs text-muted-foreground">
                 <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 hover:text-foreground [&::-webkit-details-marker]:hidden">
                   <ChevronRight
                     aria-hidden="true"
-                    className="size-3.5 transition-transform group-open:rotate-90 group-data-closing:rotate-0"
+                    className="size-3.5 transition-transform group-open:rotate-90"
                   />
                   {s.details}
                 </summary>

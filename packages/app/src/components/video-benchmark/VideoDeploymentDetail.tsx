@@ -24,7 +24,6 @@ import { usePowerTrace } from './use-power-trace';
 import { ScrollFade } from './use-scroll-fade';
 import { dollarFigures, reading } from './format';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
-import { cn } from '@/lib/shared/utils';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -253,7 +252,6 @@ export default function VideoDeploymentDetail({
   siblings,
   gpuCounts,
   workloadLabel,
-  entering = false,
   state,
   color,
   notMeasured,
@@ -261,8 +259,6 @@ export default function VideoDeploymentDetail({
   onSelect,
   onPsnr,
 }: {
-  /** Opened from the overview, so it eases in as a page does; a link that lands here does not. */
-  entering?: boolean;
   cell: ResultCell;
   /** Deployments of the same hardware, runtime and run channel across every GPU count. */
   siblings: ResultCell[];
@@ -315,10 +311,7 @@ export default function VideoDeploymentDetail({
   );
 
   return (
-    <div
-      className={cn('flex min-w-0 flex-col gap-4', entering && styles.pageIn)}
-      data-testid="video-results-detail"
-    >
+    <div className="flex min-w-0 flex-col gap-4" data-testid="video-results-detail">
       <div>
         <Button
           variant="ghost"

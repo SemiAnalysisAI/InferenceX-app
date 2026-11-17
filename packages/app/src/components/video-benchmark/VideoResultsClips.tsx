@@ -59,7 +59,6 @@ import QualityMethod from './QualityMethod';
 import { stageSentence } from './stage-sentence';
 import styles from './results.module.css';
 import { ScrollFade } from './use-scroll-fade';
-import { DISCLOSURE, useChanges, useHeightEase } from './motion-dom';
 import { phoneViewport } from './use-phone';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { STAGE_FIT_WIDTH, type StageClip } from './VideoClipStage';
@@ -693,11 +692,6 @@ export default function VideoResultsClips({
     });
     onSubjectChange(stagePointKey(p));
   };
-  // What the stage and readout show; a change of it swaps their values in place. The first pair
-  // to be read is not a change: it arrives with the page.
-  const shownPair = useChanges(
-    group ? [a?.source, b.source, group.key, option?.kind].join('\n') : null,
-  );
   const optionLabel = (item: StageOption) =>
     item.kind === 'reference'
       ? s.referenceShort
@@ -861,11 +855,9 @@ export default function VideoResultsClips({
                 caption={
                   sentence && (
                     <p
-                      key={shownPair}
                       data-testid="video-results-sentence"
                       className={cn(
                         styles.stageSentence,
-                        shownPair > 0 && styles.swapIn,
                         'text-sm leading-6 text-foreground md:hidden',
                       )}
                     >
@@ -911,7 +903,6 @@ export default function VideoResultsClips({
           <div className={REST_BLOCK}>
             <div className="motion-stale" data-stale={stale || undefined}>
               <VideoClipReadout
-                swap={shownPair}
                 kind={option?.kind ?? 'reference'}
                 a={{
                   name: a.label,
@@ -936,7 +927,6 @@ export default function VideoResultsClips({
               onShowMe={(target) => onShow(target, 'reference')}
             />
             <details
-              {...DISCLOSURE}
               data-testid="video-results-sources"
               className="group/sources text-xs"
               onToggle={(event) =>
@@ -949,7 +939,7 @@ export default function VideoResultsClips({
               >
                 <ChevronRight
                   aria-hidden="true"
-                  className="size-3.5 transition-transform group-open/sources:rotate-90 group-data-closing/sources:rotate-0"
+                  className="size-3.5 transition-transform group-open/sources:rotate-90"
                 />
                 {s.sources}
               </summary>
@@ -1159,8 +1149,6 @@ function PromptRow({
   const [expanded, setExpanded] = useState(false);
   /** Posters that failed to load; their tiles fall back to the next poster, then to text. */
   const [failedPosters, setFailedPosters] = useState<ReadonlySet<string>>(new Set());
-  // The stage under the row eases down as the row shows every tile, and back up.
-  const { before } = useHeightEase(expanded, () => row.current);
   useLayoutEffect(() => {
     const element = row.current;
     if (!element || typeof ResizeObserver === 'undefined') return undefined;
@@ -1183,7 +1171,6 @@ function PromptRow({
       data-testid="video-results-prompt-row"
       className="flex flex-wrap items-center gap-x-4 gap-y-3"
     >
-      {before}
       {groups.length > 1 && (
         <div
           role="group"
@@ -1403,7 +1390,6 @@ function PromptTile({
         <>
           <span
             className={cn(
-              styles.tileFrame,
               'relative block aspect-[1344/768] overflow-hidden rounded-md bg-accent',
               loadedPoster !== poster && 'animate-pulse',
               pressed
@@ -1477,7 +1463,6 @@ function PromptLine({ group, take, s }: { group: ResultsClipGroup; take: boolean
   const text = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
   const [clamped, setClamped] = useState(false);
-  const { ref: line, before } = useHeightEase<HTMLDivElement>(open);
   useLayoutEffect(() => {
     const element = text.current;
     if (!element) return undefined;
@@ -1493,11 +1478,9 @@ function PromptLine({ group, take, s }: { group: ResultsClipGroup; take: boolean
   }, [group.prompt, open]);
   return (
     <div
-      ref={line}
       data-testid="video-results-prompt"
       className="flex min-w-0 flex-1 basis-56 items-baseline gap-2 max-[820px]:basis-full"
     >
-      {before}
       <span className="shrink-0 font-mono text-xs font-semibold text-foreground">
         {[`${s.seed} ${group.seed}`, group.scope ? s.diagnostic : take ? s.take(group.take) : null]
           .filter(Boolean)
