@@ -333,8 +333,8 @@ export const QUOTES: Quote[] = [
     textZh:
       '推理需求在长上下文推理的驱动下呈指数级增长。NVIDIA Grace Blackwell NVL72 正是为这个思考型 AI 的新时代而生。NVIDIA 通过持续的硬件和软件创新来满足这一需求，推动 AI 的下一步发展。通过高频基准测试，InferenceMAX™ 为行业提供了 LLM 推理在真实工作负载上性能的透明视角。结果一目了然：Grace Blackwell NVL72 搭配 TRT-LLM 和 Dynamo 提供了无与伦比的每美元性能和每兆瓦性能——驱动着全球生产力最高、最具成本效益的 AI 工厂。',
     name: 'Jensen Huang',
-    title: 'Former CEO, NVIDIA',
-    titleZh: 'NVIDIA 前首席执行官',
+    title: 'Founder & Former CEO, NVIDIA',
+    titleZh: 'NVIDIA 创始人兼前首席执行官',
     org: 'NVIDIA',
     logo: 'nvidia.svg',
     link: 'https://www.linkedin.com/in/jenhsunhuang/',
