@@ -22,6 +22,7 @@ import type { ResultCell, ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
 import { usePowerTrace } from './use-power-trace';
 import { ScrollFade } from './use-scroll-fade';
+import { dollarFigures, reading } from './format';
 import { ResultsLines, resultsNumber as n } from './VideoResultsCharts';
 import styles from './results.module.css';
 
@@ -194,6 +195,16 @@ const STRINGS = {
     actionRunShort: 'GitHub 运行',
     actionArtifactShort: '产物',
   },
+};
+
+/** A cost under a "$" column heading, or a dash when it could not be modelled. */
+const costFigures = (value: number | null | undefined) =>
+  typeof value === 'number' && Number.isFinite(value) ? dollarFigures(value) : '—';
+
+/** A measurement in the view's figures with its unit, or a dash when it was not recorded. */
+const inFigures = (value: number | null | undefined, unit: string) => {
+  const text = reading(value);
+  return text === null ? '—' : `${text} ${unit}`;
 };
 
 const withUnit = (value: number | null | undefined, unit: string, digits: number) =>
@@ -443,7 +454,7 @@ export default function VideoDeploymentDetail({
                   <p className="text-xs text-muted-foreground">{s.notRecorded}</p>
                 )}
                 <p className="text-xs" data-testid="results-detail-latency">
-                  {s.recorded(withUnit(point.p50, 's', 1))}
+                  {s.recorded(inFigures(point.p50, 's'))}
                 </p>
                 <p className="text-xs">
                   {s.deadline(
@@ -497,10 +508,12 @@ export default function VideoDeploymentDetail({
               <Panel title={s.energy}>
                 <div className="grid grid-cols-2 gap-4">
                   <Stat
-                    value={n(cell.joulesPerClip === null ? null : cell.joulesPerClip / 1000, 1)}
+                    value={
+                      reading(cell.joulesPerClip === null ? null : cell.joulesPerClip / 1000) ?? '—'
+                    }
                     label={s.perClip}
                   />
-                  <Stat value={n(cell.joulesPerFrame, 1)} label={s.perFrame} />
+                  <Stat value={reading(cell.joulesPerFrame) ?? '—'} label={s.perFrame} />
                 </div>
                 <p className="text-xs text-muted-foreground">{s.energyNote}</p>
               </Panel>
@@ -528,9 +541,9 @@ export default function VideoDeploymentDetail({
                           <td>{s[basis]}</td>
                           <td>{n(point[basis], 0)}</td>
                           <td data-value={cell.cost[basis]?.perVideo}>
-                            {n(cell.cost[basis]?.perVideo, 4)}
+                            {costFigures(cell.cost[basis]?.perVideo)}
                           </td>
-                          <td>{n(cell.cost[basis]?.perVideoSecond, 4)}</td>
+                          <td>{costFigures(cell.cost[basis]?.perVideoSecond)}</td>
                           <td>{n(cell.cost[basis]?.perHour, 2)}</td>
                         </tr>
                       ))}

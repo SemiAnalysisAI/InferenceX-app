@@ -133,7 +133,7 @@ const cost = (perVideo: number, perVideoSecond: number) => ({
   perHour: 1,
 });
 const readout = '[data-testid="video-results-readout"]';
-/** A readout cell's lines: its own value, its context, then the pair's value when it has one. */
+/** A readout cell's lines: its own value, then the pair's line when it has one. */
 const readoutLines = (metric: string) => cy.get(`${readout} [data-metric="${metric}"] dd`);
 const readoutValue = (metric: string, index = 0) => readoutLines(metric).eq(index);
 /** The readout's cells in reading order. */
@@ -473,12 +473,22 @@ describe('Video results clip stage', () => {
     readoutOrder(['psnr', 'wall', 'cost', 'energy']);
     readoutValue('psnr').should('have.text', '25 dB');
     readoutValue('wall').should('have.text', '120 s');
-    readoutValue('energy').should('have.text', '301,088 J');
-    readoutValue('cost').should('have.text', '$0.1');
-    readoutValue('cost', 1).should('have.text', '$0.02 / video-s');
+    readoutValue('energy').should('have.text', '301 kJ');
+    cy.get(`${readout} [data-metric="energy"] dt`).should('contain', 'Mean energy per clip');
+    // Against the reference a cell is its label and one value; the rest sits in its help.
+    readoutLines('cost').should('have.length', 1).and('have.text', '$0.100');
     cy.get(`${readout} [data-metric="cost"]`)
       .should('have.attr', 'title')
+      .and('contain', '$0.020 per video-second')
       .and('contain', 'On the allocated GPUs: not measured yet.');
+    cy.get(`${readout} [data-metric="psnr"]`)
+      .should('have.attr', 'title')
+      .and('contain', 'Higher is closer to the reference.');
+    // A phone lists the cells in one column, the pair's line beside each value.
+    cy.get(`${readout} [data-metric]`).should(($cells) => {
+      const lefts = new Set($cells.toArray().map((cell) => cell.getBoundingClientRect().left));
+      expect(lefts.size).to.equal(1);
+    });
     cy.get(`${readout} [data-testid="video-results-readout-pair"]`).should(
       'contain',
       '4 GPU · TP2 × Ulysses 2',
@@ -503,7 +513,7 @@ describe('Video results clip stage', () => {
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
-    readoutValue('cost').should('have.text', '$0.1');
+    readoutValue('cost').should('have.text', '$0.100');
     // A mouse reads each readout cell's explanation from its title; only touch adds a button.
     cy.get(`${readout} [data-slot="info-help"]`).should('not.exist');
 
@@ -728,7 +738,7 @@ describe('Video results clip stage', () => {
       .invoke('text')
       .should(
         'match',
-        /^Same prompt, same seed\. B200 ×\d+ takes a median [\d.]+ s per clip for \$0\.1; H100 ×\d+ takes [\d.]+ s for \$0\.3\.$/u,
+        /^Same prompt, same seed\. B200 ×\d+ takes a median [\d.]+ s per clip for \$0\.100; H100 ×\d+ takes [\d.]+ s for \$0\.300\.$/u,
       );
     // Title, picture, sentence, transport, Compare row on one line, prompt strip; then the rest.
     const order = [
@@ -1101,10 +1111,14 @@ describe('Video results clip stage', () => {
     cy.get(`${readout} [data-readout-side="h100"]`).should('not.contain', 'Unofficial run');
     readoutLines('wall').should('have.length', 2).last().should('have.text', 'H100 120 s');
     readoutValue('speed').should('have.text', '2.15× faster');
-    readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167.3 s');
-    readoutValue('psnr', 2).should('have.text', 'H100 25 dB');
-    readoutValue('cost', 1).should('have.text', '$0.02 / video-s');
-    readoutValue('cost', 2).should('have.text', 'H100 $0.3');
+    readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167 s');
+    // No cross-GPU quality score: PSNR gives the other GPU's value alone.
+    readoutLines('psnr').should('have.length', 2).last().should('have.text', 'H100 25 dB');
+    // Cost says how the subject stands against the pair, then the pair's value.
+    readoutLines('cost')
+      .should('have.length', 2)
+      .last()
+      .should('have.text', '3× cheaper than H100 · $0.300');
   });
 
   it('shows a dash, not a pending score or stray times, where a lossy pair has nothing to compare', () => {
@@ -1137,10 +1151,9 @@ describe('Video results clip stage', () => {
     cy.get(`${readout} [data-metric="paired"] dt`).should('have.text', 'Paired scores');
     readoutValue('paired').should('have.text', 'Planned');
     cy.get(`${readout} [data-metric="paired"]`).invoke('text').should('not.match', /\d/u);
-    readoutValue('cost').should('have.text', '$0.04');
-    readoutValue('cost', 1).should('have.text', '$0.01 / video-s');
-    readoutValue('cost', 2).should('have.text', 'B200 lossless $0.1');
-    readoutValue('psnr', 2).should('have.text', 'B200 lossless 25 dB');
+    readoutValue('cost').should('have.text', '$0.040');
+    readoutValue('cost', 1).should('have.text', '2.5× cheaper than B200 lossless · $0.100');
+    readoutValue('psnr', 1).should('have.text', 'B200 lossless 25 dB');
   });
 
   it('falls back to the sealed original when a web rendition cannot be played', () => {

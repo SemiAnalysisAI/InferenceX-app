@@ -1,4 +1,5 @@
 import type { Locale } from '@/lib/i18n/i18n';
+import { figures, usd } from './format';
 import type { VideoPoint } from './metrics';
 import type { ResultCell } from './results';
 
@@ -13,9 +14,6 @@ export interface SentenceSide {
   cost?: ResultCell['cost'];
 }
 
-const number = (value: number, digits: number) =>
-  value.toLocaleString('en-US', { maximumFractionDigits: digits });
-
 /** "B200 ×4", its median latency per clip and its modelled cost per clip, as the readout rounds them. */
 function facts(side: SentenceSide) {
   const seconds = side.point?.p50;
@@ -25,8 +23,8 @@ function facts(side: SentenceSide) {
   const gpus = side.point.participating;
   return {
     label: typeof gpus === 'number' ? `${side.name} ×${gpus}` : side.name,
-    seconds: `${number(seconds, 1)} s`,
-    dollars: `$${number(dollars, 4)}`,
+    seconds: `${figures(seconds)} s`,
+    dollars: usd(dollars),
   };
 }
 

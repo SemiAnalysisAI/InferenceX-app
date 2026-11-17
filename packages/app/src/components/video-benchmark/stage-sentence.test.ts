@@ -28,7 +28,7 @@ describe('stageSentence', () => {
   it('states each cell’s median latency and cost per clip, rounded as the readout rounds them', () => {
     const parts = stageSentence('en', b200, h200)!;
     expect(sentenceText(parts)).toBe(
-      'Same prompt, same seed. B200 ×4 takes a median 35.4 s per clip for $0.0682; H200 ×4 takes 71.7 s for $0.0971.',
+      'Same prompt, same seed. B200 ×4 takes a median 35.4 s per clip for $0.068; H200 ×4 takes 71.7 s for $0.097.',
     );
     // Each side's dot comes right before its name.
     expect(
@@ -42,7 +42,7 @@ describe('stageSentence', () => {
 
   it('reads the same in Chinese', () => {
     expect(sentenceText(stageSentence('zh', b200, h200)!)).toBe(
-      '相同的 prompt 和 seed。B200 ×4 每条视频的延迟中位数为 35.4 s，成本 $0.0682；H200 ×4 为 71.7 s，成本 $0.0971。',
+      '相同的 prompt 和 seed。B200 ×4 每条视频的延迟中位数为 35.4 s，成本 $0.068；H200 ×4 为 71.7 s，成本 $0.097。',
     );
   });
 
