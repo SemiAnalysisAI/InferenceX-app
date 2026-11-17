@@ -1364,3 +1364,14 @@ OperatorX share links also keep `modelPrecision=fp4|fp8|bf16`, `modelBin`
 Summary bars are the page-owned compare API's `rooflinePrecision`,
 `rooflineNormalized`, `rooflineSharedOnly` and `rooflineHardware` (the GPU picks).
 `scatterLog` and `baseline` are presentation only.
+
+### Disaggregated TRT-LLM cache metrics
+
+For disaggregated TRT-LLM, aggregate prompt throughput, cached-prompt throughput,
+prompt-token sources and prefix-cache hit rate exclude identified decode endpoints.
+Decode workers receive prompt KV from prefill and re-report prompt tokens; including
+those counters would count prompts twice. Per-source drilldowns retain decode workers'
+own measurements. The row's `server_gpu_cache_hit_rate` uses the same prefill token
+totals as chart derivation. Historical rows require the chart-series backfill before
+stored row rates reflect this calculation. Missing prefill measurements remain missing
+when only decode measurements are available.
