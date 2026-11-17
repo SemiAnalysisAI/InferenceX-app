@@ -1,6 +1,15 @@
 'use client';
 
-import { curveLinear, select, timer, type ScaleContinuousNumeric, type Timer } from 'd3';
+import {
+  curveLinear,
+  easeCubicInOut,
+  select,
+  timer,
+  zoomIdentity,
+  zoomTransform,
+  type ScaleContinuousNumeric,
+  type Timer,
+} from 'd3';
 import {
   useCallback,
   useEffect,
@@ -30,7 +39,29 @@ import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import type { AnyScale, AxisUpdateConfig } from '@/lib/d3-chart/chart-update';
+import type { ChartLayout } from '@/lib/d3-chart/types';
 import { logDomain, zeroAnchoredDomain } from './chart-domain';
+import {
+  axesBetween,
+  capturePlot,
+  easeAxes,
+  placeGrid,
+  restAxes,
+  sameAxes,
+  settlePlot,
+  stopAxes,
+  type AxisState,
+  type PlotBefore,
+} from './chart-motion';
+import {
+  MOTION,
+  markMotion,
+  markPassEnd,
+  markStep,
+  reducedMotion,
+  type MarkMotion,
+} from './motion';
 import {
   BADGE_HEIGHT,
   PILL_HEIGHT,
@@ -41,6 +72,7 @@ import {
   spreadPills,
   tapTarget,
   type Box,
+  type Spot,
 } from './chart-marks';
 import { mayHaveClips, parseStage, writeStage } from './clip-stage';
 import { useStageValue } from './use-stage-value';
@@ -272,12 +304,19 @@ function drawHollow(root: Element) {
 }
 
 const PILLS = 'series-pills';
-/** How long points and lines glide to new data, as on the inference scatter chart. */
-const TRANSITION_MS = 300;
 /** One display frame, so the marks' last redraw lands after the points' last step. */
 const FRAME_MS = 20;
 /** Plot width, in px, below which only focus overlay lines get a pill. */
 const NARROW_PLOT = 480;
+
+const now = () => performance.now();
+/** A mark's opacity attribute while it fades in; none once it is opaque. */
+const faded = (opacity: number) => (opacity < 1 ? opacity : null);
+/** Where the points sit among the plot's layers, after the capture layer and the lines; the hover card attaches there. */
+const POINTS_LAYER = 2;
+/** Ticks asked of each linear axis. */
+const X_TICKS = 6;
+const Y_TICKS = 6;
 
 /** The plot position a point's group was moved to. */
 function pointPosition(node: Element): { x: number; y: number } | null {
@@ -314,27 +353,56 @@ function textWidth(node: SVGTextElement, size: number, estimate = 0.6): number {
  * points' transforms, so this runs after every plot render, zoom frame, pick and hover,
  * never reordering the points themselves.
  */
-function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings) {
+function drawMarks(
+  root: Element,
+  size: PlotSize,
+  inputs: MarkInputs,
+  s: Strings,
+  motion: MarkMotion | null = null,
+  time = 0,
+): boolean {
+  let moving = false;
+  /** Where to draw a mark now: on its place, or on its way there from where it last was. */
+  const step = (id: string, anchor: string, anchorAt: Spot, target: Spot) => {
+    if (!motion) return { ...target, opacity: 1, moving: false };
+    const at = markStep(motion, id, anchor, anchorAt, target, time);
+    moving ||= at.moving;
+    return at;
+  };
   root.querySelector(`.${BADGES}`)?.remove();
   root.querySelector(`.${PILLS}`)?.remove();
   root.querySelector(`.${SHEET_RING}`)?.remove();
   const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
   const host = points[0]?.parentNode;
-  if (!host) return;
+  if (!host) {
+    if (motion) markPassEnd(motion);
+    return false;
+  }
   // The point a sheet describes keeps a ring in the ink color, which reads over every series.
   const chosen = points.find(
     (node) => select<SVGGElement, PlotPoint>(node).datum().key === inputs.sheet,
   );
-  if (chosen)
+  const chosenAt = chosen ? pointPosition(chosen) : null;
+  if (chosen && chosenAt) {
+    // The ring goes over to another point the sheet moves to.
+    const ring = step('sheet', inputs.sheet ?? '', chosenAt, chosenAt);
     select(host as SVGGElement)
       .append('circle')
       .attr('class', SHEET_RING)
-      .attr('transform', chosen.getAttribute('transform'))
+      // On its point it copies the point's own transform, as every mark does at rest.
+      .attr(
+        'transform',
+        ring.x === chosenAt.x && ring.y === chosenAt.y
+          ? chosen.getAttribute('transform')
+          : `translate(${ring.x},${ring.y})`,
+      )
+      .attr('opacity', faded(ring.opacity))
       .attr('r', 11)
       .attr('fill', 'none')
       .attr('stroke', 'var(--foreground)')
       .attr('stroke-width', 2)
       .attr('pointer-events', 'none');
+  }
   const { link, hover } = inputs;
   const nodes = new Map<string, SVGGElement>();
   const focus = new Set<string>(hover === null ? [] : [hover]);
@@ -414,7 +482,14 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       ? badgeBox(at, width, size, { boxes: badges, points: spots, lines })
       : { x0: at.x - width / 2, x1: at.x + width / 2, y0: at.y - 28, y1: at.y - 12 };
     if (inPlot) badges.push(box);
-    tag.attr('transform', `translate(${box.x0 - at.x},${box.y0 - at.y})`);
+    // A badge goes over to the point the stage plays next, ring and label together.
+    const ring = step(`${role}:ring`, point.key, at, at);
+    const label = step(`${role}:tag`, point.key, at, { x: box.x0, y: box.y0 });
+    // On its way to another point it says so; at rest and while its point glides it is on the point.
+    if (ring.x !== at.x || ring.y !== at.y)
+      badge.attr('transform', `translate(${ring.x},${ring.y})`).attr('data-moving', '');
+    badge.attr('opacity', faded(ring.opacity));
+    tag.attr('transform', `translate(${label.x - ring.x},${label.y - ring.y})`);
   }
 
   // Point labels: focus series only, kept inside the plot and off the badges and each other.
@@ -496,16 +571,20 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       covered,
     );
     taken.push({ x0: box.x, x1: box.x + width, y0: box.y, y1: box.y + PILL_HEIGHT });
-    return [{ box, group }];
+    return [{ box, group, pill, at }];
   });
   const spread = spreadPills(
     boxes.map(({ box }) => box),
     size.height,
     covered,
   );
-  boxes.forEach(({ group }, index) =>
-    group.attr('transform', `translate(${spread[index].x},${spread[index].y})`),
-  );
+  boxes.forEach(({ group, pill, at }, index) => {
+    // A pill stays on its line's end; it eases only to another end or another side of it.
+    const place = step(`pill:${pill.key}`, pill.end, at, spread[index]);
+    group
+      .attr('transform', `translate(${place.x},${place.y})`)
+      .attr('opacity', faded(place.opacity));
+  });
 
   // Pulses live inside each point, so a redraw on hover or zoom does not restart them.
   for (const node of points) {
@@ -530,6 +609,26 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
   }
 
   badgeLayer?.raise();
+  if (motion) markPassEnd(motion);
+  return moving;
+}
+
+/**
+ * Draws each frontier line through its points where they are now. The shared plot glides points
+ * to new data and jumps `line` layers, so while the points move the lines are drawn from them.
+ */
+function followLines(root: Element, pills: readonly SeriesPill[]) {
+  const places = new Map<string, Spot>();
+  for (const node of root.querySelectorAll<SVGGElement>('.dot-group')) {
+    const at = pointPosition(node);
+    if (at && node.dataset.point) places.set(node.dataset.point, at);
+  }
+  for (const path of root.querySelectorAll<SVGPathElement>('.line-path')) {
+    const line = pills.find((pill) => pill.key === path.dataset.lineKey)?.line ?? [];
+    const spots = line.flatMap((key) => places.get(key) ?? []);
+    if (spots.length < 2 || spots.length !== line.length) continue;
+    path.setAttribute('d', `M${spots.map((spot) => `${spot.x},${spot.y}`).join('L')}`);
+  }
 }
 
 /** "B200 (SGLang)" for a lossless line, "B200 · FirstBlockCache" for a lossy one, as the legend names them. */
@@ -848,14 +947,44 @@ export default function VideoResultsChart({
   const peekTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(peekTimer.current), []);
   const size = useRef<PlotSize>({ width: 0, height: 0 });
-  const [transition] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-      ? 0
-      : TRANSITION_MS,
-  );
+  // Asked once: under reduced motion every change below is immediate.
+  const [animated] = useState(() => !reducedMotion());
+  const transition = animated ? MOTION.glide : 0;
   /** Redraws the marks while points glide, since the marks copy the points' transforms. */
   const follow = useRef<Timer | null>(null);
   useEffect(() => () => follow.current?.stop(), []);
+  /** Where each badge, pill and ring was last drawn, so one that changes place eases there. */
+  const [markPlaces] = useState(() => (animated ? markMotion() : null));
+  /** The plot as it was before the render in progress, for what that render adds and removes. */
+  const before = useRef<PlotBefore | null>(null);
+  /** False until a plot with points has been drawn: the first one does not fade in. */
+  const drawnOnce = useRef(false);
+  /**
+   * The glide in progress: the plot it runs in, when its points arrive, each line's final shape,
+   * and the axes on their way from one render's scales to the next. `rest` is the axes' last
+   * resting state.
+   */
+  const glide = useRef<{
+    layout: ChartLayout | null;
+    root: SVGGElement | null;
+    until: number;
+    running: boolean;
+    lines: Map<SVGPathElement, string>;
+    from: AxisState | null;
+    to: AxisState | null;
+    start: number;
+    rest: AxisState | null;
+  }>({
+    layout: null,
+    root: null,
+    until: 0,
+    running: false,
+    lines: new Map(),
+    from: null,
+    to: null,
+    start: 0,
+    rest: null,
+  });
   // Hidden hardware is dropped after ranking, so its legend entry still names its engine.
   const ranked = useMemo(() => resultsPlotSeries(cells, history, state), [cells, history, state]);
   const series = useMemo(
@@ -998,6 +1127,23 @@ export default function VideoResultsChart({
   useEffect(() => {
     if (sheetClips) link.current?.onPeek(sheetClips);
   }, [sheetClips]);
+  /** The measured x values inside a scale's domain: the ticks of the GPU-count axis. */
+  const measuredTicks = (scale: AnyScale) => {
+    const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
+    return [...new Set(plotted.map((point) => point.x))]
+      .filter((value) => value >= lo && value <= hi)
+      .toSorted((a, b) => a - b);
+  };
+  const measuredFormat = (value: unknown) => n(Number(value), x.digits);
+  const measuredAxis = x.scale === 'log';
+  /** How the axes choose their ticks on a scale, as the plot itself is told just below. */
+  const axisConfig = useRef<(scale: AnyScale) => AxisUpdateConfig>(() => ({}));
+  axisConfig.current = (scale) => ({
+    yTickCount: Y_TICKS,
+    ...(measuredAxis
+      ? { xTickValues: measuredTicks(scale), xTickFormat: measuredFormat }
+      : { xTickCount: X_TICKS }),
+  });
   const lines = useMemo(
     () =>
       Object.fromEntries(
@@ -1023,6 +1169,15 @@ export default function VideoResultsChart({
   );
   const layers = useMemo<LayerConfig<PlotPoint>[]>(
     () => [
+      {
+        // First, so it reads the plot before the layers below redraw it.
+        type: 'custom',
+        key: 'video-results-before',
+        render: (group) => {
+          const root = group.node();
+          before.current = root && animated ? capturePlot(root) : null;
+        },
+      },
       {
         type: 'line',
         key: 'video-results-frontiers',
@@ -1064,22 +1219,98 @@ export default function VideoResultsChart({
           const root = group.node();
           if (root && link.current) drawHollow(root);
         },
-        onZoom: (group, { width, height }) => {
+        onZoom: (group, { width, height, layout }) => {
+          // A zoom redraws the axes itself, so axes still easing to new data stop for it.
+          if (glide.current.from) {
+            stopAxes(layout);
+            glide.current.from = null;
+            glide.current.to = null;
+          }
           const root = group.node();
-          if (root) drawMarks(root, { width, height }, marks.current, s);
+          if (root && drawMarks(root, { width, height }, marks.current, s, markPlaces, now()))
+            run.current();
         },
       },
     ],
-    [lines, lineColors, lineDashes, plotted, labels, s, history, byEngine, labelsRepeatX],
+    [
+      lines,
+      lineColors,
+      lineDashes,
+      plotted,
+      labels,
+      s,
+      history,
+      byEngine,
+      labelsRepeatX,
+      animated,
+      markPlaces,
+    ],
   );
   const playing = clipLink?.playing ?? null,
     baseline = clipLink?.baseline ?? null,
     pulse = clipLink?.pulse ?? false,
     posters = clipLink?.posters;
+  const rest = useRef(() => {});
+  rest.current = () => {
+    follow.current?.stop();
+    follow.current = null;
+    const svg = chart.current?.getSvgElement();
+    if (svg) delete svg.dataset.moving;
+  };
+  /**
+   * One frame of whatever is in motion: lines and grid keep step with the gliding points, and
+   * marks ease to their places. It ends itself once the points have arrived and no mark moves.
+   */
+  const frame = useCallback(() => {
+    const move = glide.current;
+    const { root, layout } = move;
+    if (!root?.isConnected) {
+      rest.current();
+      return;
+    }
+    const at = now();
+    const gliding = at < move.until;
+    if (move.running) {
+      followLines(root, marks.current.pills);
+      if (layout && move.from && move.to)
+        placeGrid(
+          layout,
+          move.from,
+          move.to,
+          easeCubicInOut(Math.min(1, (at - move.start) / MOTION.glide)),
+        );
+    }
+    const moving = drawMarks(root, size.current, marks.current, s, markPlaces, at);
+    if (move.running && !gliding) {
+      // The points have arrived: each line takes the shape the plot gave it, and the axes rest.
+      move.running = false;
+      for (const [path, shape] of move.lines) if (path.isConnected) path.setAttribute('d', shape);
+      move.lines = new Map();
+      if (layout && move.to) {
+        placeGrid(layout, move.to, move.to, 1);
+        restAxes(layout, move.to);
+      }
+      move.from = null;
+      move.to = null;
+    }
+    if (!gliding && !moving) rest.current();
+  }, [s, markPlaces]);
+  /**
+   * Keeps frames coming while something moves, each after the frame's transition ticks, which run
+   * later in the same timer flush. The plot says so meanwhile (`data-moving`), for whatever has to
+   * wait for it to come to rest.
+   */
+  const run = useRef(() => {});
+  run.current = () => {
+    if (!animated || follow.current) return;
+    follow.current = timer(() => queueMicrotask(frame));
+    const svg = chart.current?.getSvgElement();
+    if (svg) svg.dataset.moving = '';
+  };
   const redraw = useCallback(() => {
     const svg = chart.current?.getSvgElement();
-    if (svg) drawMarks(svg, size.current, marks.current, s);
-  }, [s]);
+    if (svg && drawMarks(svg, size.current, marks.current, s, markPlaces, now())) run.current();
+  }, [s, markPlaces]);
   useLayoutEffect(redraw, [playing, baseline, pulse, pills, sheetPoint?.key, redraw]);
   // A first frame read after its card opened fills the box the card reserved for it.
   useEffect(() => {
@@ -1095,7 +1326,7 @@ export default function VideoResultsChart({
   // Runs after the plot raises its points, so the badges stay in front, and on every frame
   // of the points' glide to new data, so the badges and pills move with them.
   const onRender = useCallback(
-    ({ layout, width, height }: RenderContext) => {
+    ({ layout, width, height, xScale: plotX, yScale: plotY }: RenderContext) => {
       size.current = { width, height };
       // The x title centres on the plot. Where the chart is too narrow for that, as for the zh
       // title on a 320 px phone, it moves over just far enough to stay inside the chart.
@@ -1108,16 +1339,67 @@ export default function VideoResultsChart({
       }
       const root = layout.zoomGroup.node();
       if (!root) return;
-      drawMarks(root, size.current, marks.current, s);
-      follow.current?.stop();
-      if (transition === 0) return;
-      follow.current = timer((elapsed) => {
-        // After the frame's transition ticks, which run later in the same timer flush.
-        queueMicrotask(() => drawMarks(root, size.current, marks.current, s));
-        if (elapsed >= transition + FRAME_MS) follow.current?.stop();
-      });
+      if (!animated) {
+        drawMarks(root, size.current, marks.current, s);
+        return;
+      }
+      const at = now();
+      const move = glide.current;
+      const next: AxisState = {
+        x: (plotX as AnyScale).copy() as AnyScale,
+        y: (plotY as AnyScale).copy() as AnyScale,
+        width,
+        height,
+        config: axisConfig.current(plotX as AnyScale),
+      };
+      // The plot has drawn these axes at rest. They start again from where the reader last saw
+      // them: their resting place, or part of the way there when this render cut a glide short.
+      const seen =
+        move.from && move.to
+          ? axesBetween(
+              move.from,
+              move.to,
+              easeCubicInOut(Math.min(1, (at - move.start) / MOTION.glide)),
+            )
+          : move.rest;
+      stopAxes(layout);
+      const svg = layout.svg.node();
+      const still =
+        !seen ||
+        seen.width !== width ||
+        seen.height !== height ||
+        (svg !== null && zoomTransform(svg) !== zoomIdentity) ||
+        sameAxes(seen, next);
+      move.from = still ? null : seen;
+      move.to = still ? null : next;
+      move.start = at;
+      move.rest = next;
+      if (move.from && move.to) {
+        easeAxes(layout, move.from, move.to);
+        placeGrid(layout, move.from, move.to, 0);
+      }
+      if (before.current) settlePlot(root, before.current, drawnOnce.current);
+      before.current = null;
+      const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
+      drawnOnce.current ||= points.length > 0;
+      // Only a render that moved points has a glide for the lines to follow.
+      move.layout = layout;
+      move.root = root;
+      move.running = move.from !== null || points.some((node) => '__transition' in node);
+      move.until = move.running ? at + MOTION.glide + FRAME_MS : at;
+      move.lines = new Map(
+        move.running
+          ? [...root.querySelectorAll<SVGPathElement>('.line-path')].map((path) => [
+              path,
+              path.getAttribute('d') ?? '',
+            ])
+          : [],
+      );
+      if (move.running) followLines(root, marks.current.pills);
+      drawMarks(root, size.current, marks.current, s, markPlaces, at);
+      run.current();
     },
-    [s, transition],
+    [s, animated, markPlaces],
   );
   // An image export renders a resized clone, so it must not overwrite the live plot size.
   const onExportRender = useCallback(
@@ -1233,7 +1515,7 @@ export default function VideoResultsChart({
     };
     const config: TooltipConfig<PlotPoint> = {
       rulerType: 'none',
-      attachToLayer: 1,
+      attachToLayer: POINTS_LAYER,
       content: (plot) => {
         const { point } = plot.cell;
         const d = describe(plot);
@@ -1489,20 +1771,11 @@ export default function VideoResultsChart({
         xScale={xScale}
         yScale={yScale}
         xAxis={
-          x.scale === 'log'
-            ? {
-                label: xLabel,
-                tickValues: (scale) => {
-                  const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
-                  return [...new Set(plotted.map((point) => point.x))]
-                    .filter((value) => value >= lo && value <= hi)
-                    .toSorted((a, b) => a - b);
-                },
-                tickFormat: (value) => n(Number(value), x.digits),
-              }
-            : { label: xLabel, tickCount: 6 }
+          measuredAxis
+            ? { label: xLabel, tickValues: measuredTicks, tickFormat: measuredFormat }
+            : { label: xLabel, tickCount: X_TICKS }
         }
-        yAxis={{ label: yLabel, tickCount: 6 }}
+        yAxis={{ label: yLabel, tickCount: Y_TICKS }}
         layers={layers}
         tooltip={tooltip}
         onRender={onRender}
