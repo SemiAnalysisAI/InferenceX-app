@@ -1246,8 +1246,12 @@ describe('VideoGenX results', () => {
         expect(area.width, `${selector} width`).to.be.at.least(44);
       }),
     );
-    // The first legend row under the toolbar keeps its own 44 px.
-    tapArea('[data-testid="chart-legend"] li label').its('height').should('be.at.least', 44);
+    // A legend entry's hit area is 44 px tall around its 32 px row.
+    cy.get('[data-testid="chart-legend"] li label').each(($label) => {
+      const area = getComputedStyle($label[0], '::after');
+      expect($label[0].getBoundingClientRect().height, 'row').to.equal(32);
+      expect(Number.parseFloat(area.height), 'hit area').to.equal(44);
+    });
     // Only the hit area grew: no control changed its height.
     cy.wrap([close, ...rows]).each((selector: string) =>
       cy
@@ -1384,11 +1388,101 @@ describe('VideoGenX results', () => {
         force: true,
       });
     closedBy('a swipe down');
-    // The blocked legend row's tooltip never shows on touch, so the legend spells it out.
-    cy.get('[data-testid="results-no-matched-run-note"]').should(
-      'contain',
-      'No qualifying run for this workload on this hardware.',
+  });
+
+  it('packs a phone’s legend into wrapped rows, names an unmatched GPU once and keeps the chart quiet', function () {
+    if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    cy.viewport(430, 900);
+    touchScreen(true);
+    mount({ editPage: publishEveryRun });
+    const legend = '[data-testid="chart-legend"]';
+    const tops = (selector: string) =>
+      cy
+        .get(`${legend} ${selector}`)
+        .then(($items) => $items.toArray().map((item) => item.getBoundingClientRect().top));
+    // Entries wrap into rows 32 px apart in place of one 44 px row each.
+    cy.get(`${legend} > ul`).should('have.css', 'flex-wrap', 'wrap');
+    tops('li').should((rows) => {
+      const distinct = [...new Set(rows)].toSorted((a, b) => a - b);
+      for (const [index, top] of distinct.slice(1).entries())
+        expect(top - distinct[index], 'pitch').to.equal(32);
+    });
+    cy.get(`${legend} > ul`).should(($list) => {
+      // Two entries that fit one row share it.
+      const [first, second] = [...$list[0].children].map((item) => item.getBoundingClientRect());
+      if (first.width + 16 + second.width <= $list[0].clientWidth)
+        expect(second.top, 'second entry').to.equal(first.top);
+    });
+    // Registry order survives the wrap, and an unmatched GPU is one muted entry with its reason.
+    cy.get(`${legend} li label`).should(($labels) => {
+      const names = $labels.toArray().map((label) => label.textContent?.trim());
+      expect(names.filter((name) => name?.includes('no matched run'))).to.have.length(1);
+      expect(names.at(-1)).to.contain('no matched run');
+    });
+    cy.get(`${legend} li label[data-blocked]`).should('have.length', 1);
+    cy.get('[data-testid="results-no-matched-run-note"]').should('not.exist');
+    // Both switches fit one row, and the GPU-count labels start off until the reader asks.
+    tops('[data-slot="switch"]').should((rows) => expect(new Set(rows).size).to.equal(1));
+    cy.get('#video-results-labels').should('have.attr', 'aria-checked', 'false');
+    points('[data-labelled]').should('not.exist');
+    cy.get('#video-results-labels').click();
+    cy.get('#video-results-labels').should('have.attr', 'aria-checked', 'true');
+    // No line of zoom gestures under a phone's chart; the reset button stays.
+    cy.get('[data-testid="chart-instructions"]').should('not.exist');
+    cy.get('[data-testid="zoom-reset-button"]').should('be.visible');
+    // A narrow plot names each line by its hardware, and no pill or badge covers another.
+    seriesPills().should(($pills) => {
+      const boxes = [
+        ...$pills.toArray().map((pill) => pill.querySelector('rect')!),
+        ...document.querySelectorAll('[data-clip-badge] rect'),
+      ].map((rect) => rect.getBoundingClientRect());
+      for (const pill of $pills) expect(pill.textContent).not.to.contain('(');
+      for (const [index, a] of boxes.entries())
+        for (const b of boxes.slice(index + 1))
+          expect(
+            a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom,
+            'overlap',
+          ).to.equal(false);
+    });
+    assertResultsFit();
+    // From 768 px the labels are on, the gestures are named and the notes are an open card.
+    cy.viewport(1280, 900);
+    cy.get('#video-results-labels').should('have.attr', 'aria-checked', 'true');
+    cy.get('[data-testid="chart-instructions"]').should('exist');
+    cy.get('section[data-testid="results-how-to-read"] li').should('have.length', 5);
+  });
+
+  it('folds How to read into one closed row on a phone and keeps every caveat', () => {
+    cy.intercept('GET', '/api/video-runs*', { statusCode: 204 });
+    cy.viewport(390, 844);
+    mount({ editPage: publishEveryRun });
+    const notes = 'details[data-testid="results-how-to-read"]';
+    cy.get(notes).should('not.have.attr', 'open');
+    cy.get(`${notes} > summary h2`).should('have.text', 'How to read these results');
+    // The row takes the look of "How we score quality".
+    cy.get(`${notes} > summary`).then(($row) =>
+      cy.get('[data-testid="video-results-quality-method"] > summary').should(($quality) => {
+        for (const property of ['borderRadius', 'padding', 'fontSize', 'fontWeight'] as const)
+          expect(getComputedStyle($row[0])[property], property).to.equal(
+            getComputedStyle($quality[0])[property],
+          );
+      }),
     );
+    cy.get(`${notes} > summary`).click();
+    cy.get(`${notes} li`).should(($items) => {
+      const text = $items.toArray().map((item) => item.textContent ?? '');
+      expect(text).to.have.length(5);
+      expect(text[0]).to.match(/20 scheduled clips.*concurrency 1.*10 valid/u);
+      expect(text[1]).to.contain('request submit to downloaded media');
+      expect(text[2]).to.match(/GPU boards only.*host, chassis or facility/u);
+      expect(text[3]).to.match(/modelled.*not a measurement or an API bill/u);
+      expect(text[4]).to.contain('LoRA switch time');
+      // Each of the four notes fits the two lines a phone gives it.
+      for (const item of $items.toArray().slice(0, 4))
+        expect(item.getBoundingClientRect().height, item.textContent ?? '').to.be.at.most(60);
+    });
+    assertResultsFit();
   });
 
   it('closes the sheet on a mouse drag that is off its header before the sheet follows', function () {
@@ -2091,7 +2185,10 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="video-results-readout"] dl').should(($grid) => {
         const cells = [...$grid[0].children];
         const rows = new Set(cells.map((cell) => cell.getBoundingClientRect().top)).size;
-        expect(rows, 'readout rows').to.equal(width >= 1024 ? 1 : Math.ceil(cells.length / 2));
+        // One row from 1024 px, two columns from 768 px, and one column on a phone.
+        expect(rows, 'readout rows').to.equal(
+          width >= 1024 ? 1 : width >= 768 ? Math.ceil(cells.length / 2) : cells.length,
+        );
         expect($grid.find('[data-metric="cost"]').attr('title')).to.contain(
           pathname.startsWith('/zh') ? '分配 GPU' : 'allocated',
         );

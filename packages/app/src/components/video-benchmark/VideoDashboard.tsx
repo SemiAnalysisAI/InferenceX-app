@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Activity,
   startTransition,
@@ -90,6 +90,7 @@ import {
   writeStage,
   type StagePair,
 } from './clip-stage';
+import { deploymentLabels } from './chart-marks';
 import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
@@ -106,6 +107,9 @@ const STRINGS = {
     title: 'VideoGenX',
     description: (touch: boolean) =>
       `Serving latency, cost and energy for one matched 20-clip video workload across hardware. ${touch ? 'Tap a point to see its clip and measurements' : 'Click a point to pin its measurements and play its clips below'}; hollow points have no clips. View telemetry opens that deployment.`,
+    // A phone shows the cohort line right above this and names View telemetry on its button.
+    descriptionPhone:
+      'Serving latency, cost and energy across hardware. Tap a point for its clip and measurements; hollow points have no clips.',
     benchmarkConfig: 'Benchmark config',
     model: 'Model',
     chartConfig: 'Chart config',
@@ -156,6 +160,12 @@ const STRINGS = {
       'Power is GPU-board power of the participating GPUs only. Host, chassis and facility power are excluded.',
       'TCO is modelled from registry $/GPU-hr and measured output, for both participating and allocated GPUs. It is not a measurement or an API bill.',
     ],
+    howToReadShort: [
+      '20 scheduled clips of one workload per hardware, at concurrency 1; shown from 10 valid clips.',
+      'Latency: request submit to downloaded media.',
+      'Power: participating GPU boards only; no host, chassis or facility.',
+      'TCO: modelled from $/GPU-hr and measured output; not a measurement or an API bill.',
+    ],
     notMeasured:
       'Not measured yet: server-side stage timing, host memory and GPU memory where not recorded, SSIM, VBench, CLIP and VLM quality, sustained load, model load, first-request latency, LoRA switch time and best topology per GPU count.',
     estimator: 'Profit estimator',
@@ -183,6 +193,8 @@ const STRINGS = {
     title: 'VideoGenX',
     description: (touch: boolean) =>
       `在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。${touch ? '轻点数据点可查看其视频和测量值' : '点击数据点可固定显示其测量值，并在下方播放其视频'}；空心点没有视频。${touch ? '轻点' : '点击'}“查看遥测”可打开对应部署。`,
+    descriptionPhone:
+      '比较各硬件的服务延迟、成本与能耗。轻点数据点可查看其视频和测量值；空心点没有视频。',
     benchmarkConfig: '基准测试配置',
     model: '模型',
     chartConfig: '图表配置',
@@ -230,6 +242,12 @@ const STRINGS = {
       '延迟从提交请求开始计算，到下载完生成的媒体为止。',
       '功率仅统计参与计算的 GPU 板卡，不含主机、机箱和设施功耗。',
       'TCO 根据硬件注册表中的 $/GPU-hr 和实测产出估算，同时给出参与计算和分配的 GPU 两种口径；它不是实测值，也不是 API 账单。',
+    ],
+    howToReadShort: [
+      '同一工作负载下，每种硬件以并发 1 计划生成 20 条视频；有效视频不少于 10 条才显示。',
+      '延迟：从提交请求到下载完媒体。',
+      '功率：仅统计参与计算的 GPU 板卡，不含主机、机箱和设施。',
+      'TCO：按 $/GPU-hr 和实测产出估算，不是实测值，也不是 API 账单。',
     ],
     notMeasured:
       '尚未测量：服务端阶段耗时、主机内存及未记录的 GPU 显存、SSIM、VBench、CLIP 与 VLM 质量评估、持续负载、模型加载、首次请求延迟、LoRA 切换时间，以及各 GPU 数量下的最优拓扑。',
@@ -312,7 +330,9 @@ export default function VideoDashboard({
     pending,
   );
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [labels, setLabels] = useState(true);
+  // Until the reader sets the switch, a phone's narrow plot leaves the GPU-count labels off.
+  const [labelsPick, setLabels] = useState<boolean | null>(null);
+  const labels = deploymentLabels(labelsPick, phone);
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
   const [stagePair, setStagePair] = useState<StagePair>({
@@ -672,9 +692,12 @@ export default function VideoDashboard({
     <div className="min-w-0 pr-0 md:pr-56">
       <Heading as="h2" level="card" id="video-results-chart-title">
         {model} · {RESULTS_Y_METRICS[state.yMetric].label[locale]}
-        <HeadingQualifier>
-          {s.vs} {RESULTS_X_METRICS[xMetric].label[locale]}
-        </HeadingQualifier>
+        {/* A phone leaves the x metric to the axis title right under the plot. */}
+        <span className="max-md:hidden">
+          <HeadingQualifier>
+            {s.vs} {RESULTS_X_METRICS[xMetric].label[locale]}
+          </HeadingQualifier>
+        </span>
       </Heading>
     </div>
   );
@@ -718,7 +741,7 @@ export default function VideoDashboard({
                 className={styles.intro}
                 description={
                   <>
-                    {s.description(touch)}
+                    {phone ? s.descriptionPhone : s.description(touch)}
                     {workloadLine && (
                       <span
                         className="mt-1 block text-xs font-medium max-md:hidden"
@@ -1081,6 +1104,7 @@ export default function VideoDashboard({
                       onOpen={openPoint}
                       clipLink={clipLink}
                       loading={loading}
+                      phone={phone}
                       heading={heading}
                       lossyNote={
                         <LossyQualityHint
@@ -1144,23 +1168,48 @@ export default function VideoDashboard({
               </Card>
             </figure>
           </section>
-          <Card>
-            <section
-              className="flex min-w-0 flex-col gap-3"
-              aria-labelledby="results-how-to-read-title"
+          {phone ? (
+            // A phone folds the notes into one closed row, in the style of "How we score quality".
+            <details
+              className="group/how-to-read text-xs"
               data-testid="results-how-to-read"
+              onToggle={(event) =>
+                track('video_results_how_to_read_toggled', { enabled: event.currentTarget.open })
+              }
             >
-              <Heading as="h2" level="card" id="results-how-to-read-title">
-                {s.howToRead}
-              </Heading>
-              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-                {s.howToReadItems.map((item) => (
+              <summary className="flex w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm font-semibold group-open/how-to-read:rounded-b-none hover:bg-muted/10 [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 transition-transform group-open/how-to-read:rotate-90"
+                />
+                <h2>{s.howToRead}</h2>
+              </summary>
+              <ul className="list-disc space-y-1.5 rounded-b-lg border border-t-0 border-border/30 bg-card p-3.5 pl-8 leading-relaxed text-muted-foreground">
+                {s.howToReadShort.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
                 <li data-testid="results-not-measured">{s.notMeasured}</li>
               </ul>
-            </section>
-          </Card>
+            </details>
+          ) : (
+            <Card>
+              <section
+                className="flex min-w-0 flex-col gap-3"
+                aria-labelledby="results-how-to-read-title"
+                data-testid="results-how-to-read"
+              >
+                <Heading as="h2" level="card" id="results-how-to-read-title">
+                  {s.howToRead}
+                </Heading>
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                  {s.howToReadItems.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                  <li data-testid="results-not-measured">{s.notMeasured}</li>
+                </ul>
+              </section>
+            </Card>
+          )}
           <details
             className="group/advanced"
             data-testid="results-advanced"

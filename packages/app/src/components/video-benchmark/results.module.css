@@ -171,6 +171,49 @@
   }
 }
 
+/* A phone's legend is compact: the hardware wraps into rows 32 px apart and the switches share a
+   row where they fit, in place of one 44 px row each. Every entry's hit area is still 44 px
+   tall: it reaches 6 px past the entry above and below, so neighbouring areas overlap in the
+   bands between two names, which hold no text. A touch screen keeps this while the legend sits
+   under the chart. This follows the touch rules above, so it also undoes their 44 px rows. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) and (max-width: 1023px) {
+  .page :global(.sidebar-legend) > ul {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+  }
+  .page :global(.sidebar-legend) > ul > li {
+    max-width: 100%;
+    margin-block: 0;
+  }
+  .page :global(.sidebar-legend) > ul > li[data-testid='legend-section-heading'] {
+    flex-basis: 100%;
+  }
+  .page :global(.sidebar-legend) li label {
+    position: relative;
+    min-height: 32px;
+  }
+  .page :global(.sidebar-legend) li label::after {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
+  }
+  /* A neighbour's hit area never lies over an entry's own dot and name. */
+  .page :global(.sidebar-legend) li label > span {
+    position: relative;
+    z-index: 1;
+  }
+  .page :global(.sidebar-legend) div:has(> div > [data-slot='switch']) {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+  }
+  .page :global(.sidebar-legend) div:has(> [data-slot='switch']) {
+    min-height: 36px;
+    margin-top: 0;
+  }
+}
+
 /* A phone on its side has no room for the Compare row and readout beside the picture, so the
    stage keeps only the sticky header and its transport in view with it. The stage sentence
    follows the transport there, which keeps Play on the screen under the whole picture. */

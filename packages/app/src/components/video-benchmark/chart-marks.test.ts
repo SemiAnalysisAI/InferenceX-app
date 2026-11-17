@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BADGE_HEIGHT,
   PILL_HEIGHT,
+  badgeBox,
   boxesOverlap,
   clearOfLabels,
+  deploymentLabels,
   labelShift,
   pillBox,
+  placePill,
+  segmentCrosses,
   spreadPills,
   tapTarget,
 } from './chart-marks';
@@ -150,6 +155,141 @@ describe('clearOfLabels', () => {
   it('leaves a pill clear of every label alone', () => {
     const pill = { key: 'a', x: 200, y: 100, width: 80 };
     expect(clearOfLabels({ ...pill }, { x: 188 }, [label], 400)).toEqual(pill);
+  });
+});
+
+describe('deploymentLabels', () => {
+  it('starts with the GPU-count labels off on a phone and on elsewhere', () => {
+    expect(deploymentLabels(null, true)).toBe(false);
+    expect(deploymentLabels(null, false)).toBe(true);
+  });
+
+  it('follows the switch once the reader has set it, at any width', () => {
+    expect(deploymentLabels(true, true)).toBe(true);
+    expect(deploymentLabels(false, false)).toBe(false);
+  });
+});
+
+describe('segmentCrosses', () => {
+  const box = { x0: 10, x1: 20, y0: 10, y1: 20 };
+
+  it('finds a line that passes through a box, whichever way it runs', () => {
+    expect(segmentCrosses({ x: 0, y: 15 }, { x: 30, y: 15 }, box)).toBe(true);
+    expect(segmentCrosses({ x: 30, y: 25 }, { x: 0, y: 5 }, box)).toBe(true);
+    expect(segmentCrosses({ x: 15, y: 0 }, { x: 15, y: 30 }, box)).toBe(true);
+  });
+
+  it('ignores a line that stops short of the box or passes beside it', () => {
+    expect(segmentCrosses({ x: 0, y: 15 }, { x: 9, y: 15 }, box)).toBe(false);
+    expect(segmentCrosses({ x: 0, y: 0 }, { x: 30, y: 5 }, box)).toBe(false);
+    expect(segmentCrosses({ x: 25, y: 0 }, { x: 25, y: 30 }, box)).toBe(false);
+  });
+});
+
+describe('badgeBox', () => {
+  const plot = { width: 230, height: 300 };
+  const clear = { boxes: [], points: [], lines: [] };
+
+  it('sits centred above its point when nothing is in the way', () => {
+    expect(badgeBox({ x: 100, y: 100 }, 50, plot, clear)).toEqual({
+      x0: 75,
+      x1: 125,
+      y0: 100 - 12 - BADGE_HEIGHT,
+      y1: 88,
+    });
+  });
+
+  it('stays inside the plot beside either edge', () => {
+    expect(badgeBox({ x: 5, y: 100 }, 50, plot, clear).x0).toBe(2);
+    expect(badgeBox({ x: 228, y: 100 }, 50, plot, clear).x1).toBe(228);
+  });
+
+  it('drops below a point at the top of the plot', () => {
+    expect(badgeBox({ x: 100, y: 10 }, 50, plot, clear).y0).toBe(22);
+  });
+
+  it('drops below its point rather than cover a line, a point or the other badge', () => {
+    const at = { x: 100, y: 100 };
+    const line = [
+      { x: 60, y: 90 },
+      { x: 140, y: 70 },
+    ];
+    expect(badgeBox(at, 50, plot, { ...clear, lines: [line] }).y0).toBe(112);
+    expect(badgeBox(at, 50, plot, { ...clear, points: [{ x: 110, y: 80 }] }).y0).toBe(112);
+    const other = badgeBox(at, 50, plot, clear);
+    expect(badgeBox({ x: 110, y: 102 }, 50, plot, { ...clear, boxes: [other] }).y0).toBe(114);
+  });
+
+  it('keeps to the top when below is no clearer', () => {
+    const lines = [
+      [
+        { x: 60, y: 80 },
+        { x: 140, y: 80 },
+      ],
+      [
+        { x: 60, y: 120 },
+        { x: 140, y: 120 },
+      ],
+    ];
+    expect(badgeBox({ x: 100, y: 100 }, 50, plot, { ...clear, lines }).y1).toBe(88);
+  });
+});
+
+const edges = (pill: { x: number; y: number; width: number }) => ({
+  x0: pill.x,
+  x1: pill.x + pill.width,
+  y0: pill.y,
+  y1: pill.y + PILL_HEIGHT,
+});
+
+describe('placePill', () => {
+  const plot = { width: 230, height: 300 };
+  const clear = { boxes: [], points: [], lines: [] };
+
+  it('sits right of the last point when that place is free', () => {
+    expect(placePill('a', { x: 100, y: 50 }, 60, plot, clear)).toEqual(
+      pillBox('a', { x: 100, y: 50 }, 60, plot.width),
+    );
+  });
+
+  it('goes above the point, inside the plot, when the right has no room', () => {
+    // The line reaches its last point from the lower left, so a pill on the left would lie on it.
+    const line = [
+      { x: 60, y: 140 },
+      { x: 200, y: 100 },
+    ];
+    const pill = placePill('a', line[1], 60, plot, { ...clear, points: line, lines: [line] });
+    expect(pill).toEqual({ key: 'a', x: 168, y: 100 - 12 - PILL_HEIGHT, width: 60 });
+    expect(segmentCrosses(line[0], line[1], edges(pill))).toBe(false);
+  });
+
+  it('takes the first place that covers no badge, label, point or line', () => {
+    const end = { x: 100, y: 100 };
+    const badge = { x0: 110, x1: 160, y0: 92, y1: 108 };
+    const above = placePill('a', end, 60, plot, { ...clear, boxes: [badge] });
+    expect(above.y).toBe(100 - 12 - PILL_HEIGHT);
+    expect(boxesOverlap(badge, edges(above))).toBe(false);
+    // With a point above as well, it goes below.
+    const below = placePill('a', end, 60, plot, {
+      ...clear,
+      boxes: [badge],
+      points: [{ x: 130, y: 78 }],
+    });
+    expect(below.y).toBe(112);
+  });
+
+  it('covers a line sooner than a point, and a point sooner than a badge', () => {
+    const end = { x: 200, y: 100 };
+    const badge = { x0: 160, x1: 228, y0: 68, y1: 90 };
+    const point = { x: 190, y: 120 };
+    const line = [
+      { x: 60, y: 100 },
+      { x: 200, y: 100 },
+    ];
+    // Right is off the plot, above is on the badge, below is on the point, left is on the line.
+    expect(
+      placePill('a', end, 60, plot, { boxes: [badge], points: [point], lines: [line] }),
+    ).toEqual({ key: 'a', x: 128, y: 91, width: 60 });
   });
 });
 

@@ -3,6 +3,14 @@
  * Pure, so the rules the chart draws by can be tested without a browser.
  */
 
+/**
+ * Whether the chart labels each focus point with its GPU count. The reader's switch decides once
+ * it is set; until then a phone's plot, too narrow for them, starts with the labels off. The
+ * point sheet states the GPU count either way.
+ */
+export const deploymentLabels = (picked: boolean | null, phone: boolean): boolean =>
+  picked ?? !phone;
+
 export const PILL_HEIGHT = 18;
 /** Vertical pitch between stacked pills: one pill and a 3 px gap. */
 const PILL_PITCH = PILL_HEIGHT + 3;
@@ -122,6 +130,138 @@ export function clearOfLabels(
 
 export const boxesOverlap = (a: Box, b: Box): boolean =>
   a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+export interface Spot {
+  x: number;
+  y: number;
+}
+
+/** Whether the straight line from `a` to `b` passes through `box` (Liang–Barsky clipping). */
+export function segmentCrosses(a: Spot, b: Spot, box: Box): boolean {
+  let enter = 0;
+  let leave = 1;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  for (const [step, room] of [
+    [-dx, a.x - box.x0],
+    [dx, box.x1 - a.x],
+    [-dy, a.y - box.y0],
+    [dy, box.y1 - a.y],
+  ]) {
+    if (step === 0) {
+      if (room <= 0) return false;
+      continue;
+    }
+    const at = room / step;
+    if (step < 0) enter = Math.max(enter, at);
+    else leave = Math.min(leave, at);
+    if (enter >= leave) return false;
+  }
+  return true;
+}
+
+/** Height of the Playing and Baseline badges. */
+export const BADGE_HEIGHT = 16;
+/** Gap between a point's centre and its badge. */
+const BADGE_OFFSET = 12;
+
+/** What a badge or pill should not cover: earlier badges, labels and pills, the points, and the lines. */
+export interface MarkObstacles {
+  boxes: readonly Box[];
+  points: readonly Spot[];
+  lines: readonly (readonly Spot[])[];
+}
+
+/** Half the side of the square a point's mark and its ring take on the plot. */
+const POINT_REACH = 10;
+
+/** How much of `obstacles` a mark in `box` covers: a box counts most, then a point, then a line. */
+function covered(box: Box, obstacles: MarkObstacles): number {
+  const boxes = obstacles.boxes.filter((other) => boxesOverlap(other, box)).length;
+  const points = obstacles.points.filter((point) =>
+    boxesOverlap(box, {
+      x0: point.x - POINT_REACH,
+      x1: point.x + POINT_REACH,
+      y0: point.y - POINT_REACH,
+      y1: point.y + POINT_REACH,
+    }),
+  ).length;
+  const lines = obstacles.lines.reduce(
+    (sum, line) =>
+      sum + line.slice(1).filter((spot, index) => segmentCrosses(line[index], spot, box)).length,
+    0,
+  );
+  return boxes * 100 + points * 10 + lines;
+}
+
+/**
+ * A badge for the point at `at`: centred above it and shifted sideways to stay inside the plot.
+ * It goes below the point instead when the plot's top edge is in the way, or when it would cover
+ * less of `obstacles` there: an earlier badge, another point or a line.
+ */
+export function badgeBox(
+  at: Spot,
+  width: number,
+  plot: { width: number; height: number },
+  obstacles: MarkObstacles,
+): Box {
+  const x0 = at.x - width / 2 + labelShift(at.x, width, plot.width);
+  const above = {
+    x0,
+    x1: x0 + width,
+    y0: at.y - BADGE_OFFSET - BADGE_HEIGHT,
+    y1: at.y - BADGE_OFFSET,
+  };
+  const below = { ...above, y0: at.y + BADGE_OFFSET, y1: at.y + BADGE_OFFSET + BADGE_HEIGHT };
+  if (above.y0 < EDGE) return below;
+  if (below.y1 > plot.height - EDGE) return above;
+  return covered(below, obstacles) < covered(above, obstacles) ? below : above;
+}
+
+/**
+ * Where a series pill goes: right of its last point, else above it, below it, or left of it, the
+ * first of those that stays inside the plot and covers none of `obstacles`. When every place
+ * covers something, the one that covers least wins. `spreadPills` still runs afterwards for pills
+ * left on each other.
+ */
+export function placePill(
+  key: string,
+  end: Spot,
+  width: number,
+  plot: { width: number; height: number },
+  obstacles: MarkObstacles,
+): PillBox {
+  const inside = (x: number) =>
+    Math.max(EDGE, Math.min(x, Math.max(EDGE, plot.width - EDGE - width)));
+  const middle = end.y - PILL_HEIGHT / 2;
+  const beside = inside(end.x + PILL_OFFSET);
+  const candidates: PillBox[] = [
+    ...(end.x + PILL_OFFSET + width <= plot.width
+      ? [{ key, x: end.x + PILL_OFFSET, y: middle, width }]
+      : []),
+    { key, x: beside, y: end.y - PILL_OFFSET - PILL_HEIGHT, width },
+    { key, x: beside, y: end.y + PILL_OFFSET, width },
+    { key, x: inside(end.x - PILL_OFFSET - width), y: middle, width },
+  ].filter((pill) => pill.y >= EDGE && pill.y + PILL_HEIGHT <= plot.height - EDGE);
+  // Off the plot at every place: the right or left of the point, which `spreadPills` clamps.
+  if (candidates.length === 0) return pillBox(key, end, width, plot.width);
+  const cost = (pill: PillBox) =>
+    covered(
+      { x0: pill.x, x1: pill.x + pill.width, y0: pill.y, y1: pill.y + PILL_HEIGHT },
+      obstacles,
+    );
+  let best = candidates[0];
+  let least = cost(best);
+  for (const candidate of candidates.slice(1)) {
+    if (least === 0) break;
+    const next = cost(candidate);
+    if (next < least) {
+      best = candidate;
+      least = next;
+    }
+  }
+  return best;
+}
 
 /** How far from a point's centre a finger still picks it, in px: half a 44 px touch target. */
 export const TAP_RADIUS = 22;
