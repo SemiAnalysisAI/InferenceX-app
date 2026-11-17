@@ -374,6 +374,7 @@ const plotPlaces = (svg: Element) => ({
 /** Whether anything in the plot is still on its way somewhere. */
 const plotBusy = (svg: Element) =>
   Object.hasOwn((svg as SVGElement).dataset, 'moving') ||
+  Object.hasOwn((svg as SVGElement).dataset, 'gliding') ||
   svg.querySelector('.plot-exit') !== null ||
   [svg, ...svg.querySelectorAll('*')].some((node) => '__transition' in node);
 /** Waits for the plot to come to rest: no glide, no mark on its way, nothing fading out. */
@@ -1938,10 +1939,15 @@ describe('VideoGenX results', () => {
     playing().should('have.attr', 'data-hardware', 'b200');
     plotAtRest();
     const frames: [string | null, string | null][] = [];
+    /** Where B200's series pill was on each frame, and whether the plot said it was gliding. */
+    const pills = new Set<string | null>();
+    const gliding = new Set<boolean>();
     const sampling = { on: true };
     cy.window().then((win) => {
       const chart = win.document.querySelector('[data-testid="video-results-chart"]')!;
       const tick = () => {
+        pills.add(chart.querySelector('[data-series-pill]')?.getAttribute('transform') ?? null);
+        gliding.add(chart.querySelector('svg[data-gliding]') !== null);
         // A badge on its way to another point is marked; this is about one that follows its point.
         const badge = chart.querySelector('[data-clip-badge="playing"]:not([data-moving])');
         if (badge)
@@ -1962,7 +1968,12 @@ describe('VideoGenX results', () => {
       sampling.on = false;
       expect(new Set(frames.map(([point]) => point)).size, 'positions').to.be.greaterThan(3);
       for (const [point, badge] of frames) expect(badge).to.equal(point);
+      // The series pill rides its line's end the same way, and the plot says it is gliding
+      // meanwhile, which is what holds the pulse rings still.
+      expect(pills.size, 'pill positions').to.be.greaterThan(3);
+      expect([...gliding].toSorted(), 'gliding, then not').to.deep.equal([false, true]);
     });
+    cy.get(`${PLOT}[data-gliding]`).should('not.exist');
   });
 
   it('moves the points that stay, fades out those that leave and keeps each line on its points', () => {
@@ -2122,6 +2133,8 @@ describe('VideoGenX results', () => {
         .then(($ring) => getComputedStyle($ring[0]).animationPlayState);
     cy.get('[data-testid="video-results-chart"]').scrollIntoView();
     cy.get('[data-testid="video-results-chart"]').should('not.have.attr', 'data-off-screen');
+    // They also hold still while the points glide, so the plot comes to rest first.
+    plotAtRest();
     ringState().should('equal', 'running');
     cy.scrollTo('bottom');
     cy.get('[data-testid="video-results-chart"]').should('have.attr', 'data-off-screen');
