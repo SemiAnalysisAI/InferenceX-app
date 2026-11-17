@@ -1,6 +1,6 @@
 # Video performance history
 
-`/vgx` and `/zh/vgx` lead with the cross-hardware dashboard (see [VideoGenX dashboard](./videogenx-dashboard.md)); the **Performance history** list described here sits in a collapsible section below it, which opens automatically when the URL carries a `history-*` filter (`history-hardware`, `history-concurrency`, `history-query`). Each entry links to its original GitHub Actions run. The earlier per-run viewer, trade-off chart and CI-run browser were removed with the dashboard rebuild; clips are compared in the dashboard's Compare panel.
+`/vgx` and `/zh/vgx` show the cross-hardware dashboard (see [VideoGenX dashboard](./videogenx-dashboard.md)), which reads the stored History described here. The **Performance history** list that sat below the dashboard has been removed, and its `history-hardware`, `history-concurrency` and `history-query` URL keys are ignored. The earlier per-run viewer, trade-off chart and CI-run browser were removed with the dashboard rebuild; clips are compared in the dashboard's Compare panel.
 
 ## Read path
 
@@ -162,11 +162,11 @@ unchanged.
 
 ## Evidence boundaries
 
-- Only descriptive observations are shown: this version has no selected matched baseline and computes no before/after delta.
-- Valid/completed/scheduled/failed counts stay separate. Missing or invalid metrics stay null. The table shows median latency only; the projected P90 keeps its per-cell ten-sample floor.
+- Only descriptive observations are stored: this version has no selected matched baseline and computes no before/after delta.
+- Valid/completed/scheduled/failed counts stay separate. Missing or invalid metrics stay null. The projected P90 keeps its per-cell ten-sample floor.
 - Latency and throughput use the submission-to-downloaded-media window. Energy uses the recorded generation window and participating GPU boards. Board energy is not facility energy.
-- Fidelity, calibration and release qualification are displayed independently. Stored/published does not mean qualified.
-- Filters apply to loaded pages. The user can load older pages without losing already loaded entries. Global execution-time sorting and an editorial change/PR catalog require a later materialized catalog; the current implementation scans index metadata only, never all full indexes.
+- Fidelity, calibration and release qualification are recorded independently. Stored/published does not mean qualified.
+- Global execution-time sorting and an editorial change/PR catalog require a later materialized catalog; the current implementation scans index metadata only, never all full indexes.
 
 ## Local replay
 
@@ -281,13 +281,13 @@ GitHub 产物元数据和预期 plan SHA256。读取器校验原始字节摘要�
 
 历史快照是 `h3-video-media/v1/runs/history/v<projection>/<毫秒>-<后缀>.json` 下的一个不可变 JSON，按索引路径保存投影条目，以及构建时验证的批准回执上传时间（无回执时为 null）。读取只使用当前 `VIDEO_HISTORY_PROJECTION` 的最新快照。授权 POST 批准产物后写入新快照，保留仍然有效的记录并加入该产物，然后删除除被替换快照以外的旧快照。以同一 Bearer 密钥向 `POST /api/video-runs` 发送 `{"history":"backfill"}` 会为所有缺少有效记录的索引补建条目。Warm After Deploy 工作流在每次生产发布后调用它，所有记录有效时不写入。构建时读不到回执的索引不进快照，不会被记成未批准。投影版本写在路径中，测试固定生成条目的源码摘要，可能改变条目的修改须提升版本，下一次补建会重建快照。并发写入可能丢掉对方新增的记录，此后读取会直接投影该索引，直到下次发布或补建，输出不变。
 
-`/vgx` 与 `/zh/vgx` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
+`/vgx` 与 `/zh/vgx` 展示跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)），其数据来自本文描述的已存储 History。仪表板下方原有的“性能历史”列表已移除，`history-hardware`、`history-concurrency`、`history-query` 这三个 URL 参数不再生效。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
 
 历史读取列举既有发布索引与批准回执的元数据，按索引发布时间排序，并读取一份历史快照。记录仍对应索引与回执上传时间的条目直接取自快照，其余条目才读取完整索引与回执。`pages=2` 至 `pages=5` 在一次响应中返回连续多页，条目与 `nextPage` 和逐页读取相同。读取不下载或发布媒体，也不写入。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。已分配 GPU 数须有保留的 Slurm `AllocTRES` 或通过验证的 AMD allocation binding；原生功率文档的 `expected_gpu_count` 仅描述遥测覆盖范围，不能证明预留数量。缺少分配证据时，该数量及按分配数量归一化的指标保持 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）、配置的 `tp_size` / `ulysses_degree` / `attention_backend`，以及端点的副本数（`execution.deployment.replica_count`，早于该记录的产物包为 null）；`workloadKey` 在信息完整时保留完整工作负载身份，prompts 与 seeds 不能由缩写显示标签替代。这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板以一次请求最多读取五页，并据此推导全部指标，浏览器不再解析产物包。逐采样点的 GPU 功率时间序列除外：按 1 Hz 采样时，它比 History 其余字段的总和还大，因此 `results.powerSamples` 只保留测量窗口内有效采样点的数量，部署详情页再从产物读取时间序列。
 
 serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` 区分契约：旧的受控 GPU supervisor（`controlled_h3_gpu`）写入 `controlled_serving_smoke` 回执、设备清单、功率上限快照和带完整计时的请求记录；原生 srt-slurm launcher（`srt_slurm_h3_service`，InferenceX #2916）写入 `srt_slurm_h3_service_receipt` 回执，并对 `h3_native_power` 功率文档做封印（`power.valid`、回执中的 `power.sha256` 与测量阶段必须一致），同时附带每个 cell 的 InferenceX sidecar（`aggregate.json`、`benchmark_concurrency_<N>.json`；`power_valid` 为 0 或 `energy_normalization` 不是 `clips` 时不显示对应数值），矩阵级的 `power_verified` 结论显示在来源行。原生产物包不记录 GPU 型号：投影优先读取 `ci.site.gpu_model`，其次从 `ci.ci.runner_name` 中识别注册表 SKU，都没有时硬件留空。srt-client 的运行记录没有逐请求延迟时，以 harness 汇总（`latency_median_seconds`、`valid_clips_per_second`，并与矩阵 cell 交叉核对）代替 P50 与吞吐量；P90 仍需要逐请求样本。功率未通过 `valid` 校验时一律显示为未测得，不显示数字。
 
-当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
+当前只存储观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收分别记录。
 
 仅在开发环境中，`E2E_FIXTURES=1` 使用保留结果的脱敏元数据回放，遵循现有 fixture 校验和清单，并显示回放提示。fixture 中合成的 `approved: true` 仅验证图表布局，不是实际批准回执。未知发布时间保持为空；这不是新测量或新发布。
 

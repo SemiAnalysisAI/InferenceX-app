@@ -537,7 +537,7 @@ which API selectors belong together.
 
 With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
 approved-history projection, not CI discovery. Legacy stored sources remain in
-Performance history but cannot enter default charts without a matching immutable
+stored History but cannot enter default charts without a matching immutable
 publication receipt. Authorization to publish is separate from benchmark qualification.
 All public video GET paths, including a `format=media` cache miss, are read-only;
 the miss returns 204. Copy its URL selectors directly:

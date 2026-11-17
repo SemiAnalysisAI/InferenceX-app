@@ -262,34 +262,6 @@ describe('VideoGenX results', () => {
     focusFirstControl(true);
   });
 
-  for (const pathname of ['/zh/vgx']) {
-    it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
-      const zh = pathname.startsWith('/zh');
-      mount({
-        pathname,
-        editPage: (page) => {
-          page.entries[0].sources[0].powerVerified = true;
-          page.entries[2].sources[0].powerVerified = false;
-        },
-      });
-      cy.contains('summary', zh ? '性能历史' : 'Performance history').click();
-      cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
-      cy.get('[data-testid="video-history-publication"]')
-        .first()
-        .should('contain', zh ? '已批准用于仪表板' : 'Approved for dashboard');
-      cy.get('[data-testid="video-history-publication"]')
-        .eq(4)
-        .should('contain', zh ? '未找到匹配的发布批准回执' : 'No matching approval receipt');
-      cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
-        expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal(
-          zh
-            ? ['· GPU 功率: 已测得', '· GPU 功率: 未测得', '· GPU 功率: 已测得']
-            : ['· GPU power: Measured', '· GPU power: Not measured', '· GPU power: Measured'],
-        );
-      });
-    });
-  }
-
   it('ignores retired controls and plots every named-run GPU count on either X axis', () => {
     mount({
       search:
@@ -390,11 +362,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-stage"]').should('not.exist');
     // Rewriting the results keys keeps the clip stage's own keys.
     searchParam('r_view').should('equal', 'side');
-    cy.contains('summary', 'Performance history').click();
-    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
-    cy.get('[data-testid="video-history-publication"]').each(($entry) => {
-      expect($entry).to.contain('No matching approval receipt');
-    });
   });
 
   it('shows a lossy named run’s clip, which leads no card, in the overlay color', () => {
@@ -565,9 +532,7 @@ describe('VideoGenX results', () => {
       'have.text',
       'How to read these results',
     );
-    cy.get('details[data-testid^="results-"] > summary h2').should(($titles) => {
-      expect([...$titles].map((title) => title.textContent)).to.deep.equal(['Performance history']);
-    });
+    cy.get('details[data-testid^="results-"] > summary h2').should('not.exist');
     cy.get('[data-testid="results-not-measured"]').should('contain', 'LoRA switch time');
     cy.get('[data-testid="results-empty"][data-state="planned"]').should('not.exist');
     points().should('have.length', 2);

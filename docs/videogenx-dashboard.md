@@ -20,7 +20,7 @@ Comparisons require one complete canonical workload identity, C1, exactly 20
 scheduled clips and at least ten valid samples on every hardware. Model revision,
 all generation settings, prompts, seeds and measurement semantics remain in the
 identity. The default selects the cohort covering the most target hardware.
-Smoke, incomplete and unmatched evidence stays in Performance history. MI355X is
+Smoke, incomplete and unmatched evidence stays out of the comparison. MI355X is
 listed before its first matched run, without invented results. GB200, H200 and H100
 join the roster when qualified approved evidence or the exact named diagnostic run
 is available, with the same workload and sample requirements. Its label and costs use the hardware registry. These are
@@ -201,14 +201,12 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
 4. A How to read these results card, always open from 768 px and one closed disclosure row
    on a phone. How to read lists the measurements not yet collected. No placeholder chart,
    illustrative value or uncalibrated rating schema is shipped.
-5. Performance history, collapsed under a chevron heading until opened or deep-linked,
-   because opening it reads stored History pages.
 
 `r_point` opens one deployment detail. Opening pushes a history entry marked in
 `history.state` through the `client-navigation` helpers, so the in-page Back button
 pops that entry even after reload or Forward. Browser Back also returns to the
 overview at its previous scroll position. The overview stays mounted but hidden
-under React `Activity`, so clip media, the selected clip group, loaded History pages
+under React `Activity`, so clip media, the selected clip group
 and chart state survive the visit. An unknown, filtered or hidden `r_point` falls
 back to the overview. Once results load, the URL drops that key, so showing the
 hardware again or Share cannot reopen it. Overlay deployments open the same way.
@@ -554,22 +552,22 @@ official/unofficial source membership remain unchanged.
 中描述的共享标签缓存，只有发布后的首次读取需要等待存储。这只是加载方式的调整，
 不改变只读 API 的选择项、默认值、计算或正式／指定运行的来源归属。
 
-| Control                                                                                 | Read-only API coverage                                                                                         |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Model, workload, resolution, duration, mode, steps, engine, date                        | `r_*` selection fields                                                                                         |
-| Hardware visibility, named run (stored or read live)                                    | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                                        |
-| Deadline, cost tier                                                                     | Same pure calculations in `resultProjection`                                                                   |
-| X and Y metrics, Optimal only, open deployment                                          | `r_x`, `r_y`, `r_optimal`, `r_point`; every axis value is in each cell                                         |
-| Engine comparison, Lossy optimizations                                                  | `r_lossy` (`r_compare` is retired and ignored); presentation only, every cell carries `metadata.optimizations` |
-| Fixed GPU basis, all GPU counts                                                         | `r_basis`, `r_gpus` accepted but ignored; resolved params are participating and null                           |
-| Profit estimator (removed)                                                              | `r_api`, `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_utilization` accepted but ignored                     |
-| Deployment labels, detail tab, pinned point                                             | Presentation only                                                                                              |
-| Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract                         |
-| Clip subject, its pair and Swap                                                         | Presentation only; `r_clip`, `r_vs` and `r_swap` are page state                                                |
-| Phone order, opening pair, stage sentence, prompt strip, point sheet                    | Presentation only; `r_sheet` is page state and every figure shown is already in the point's cell               |
-| Number format, readout comparison lines, compact legend, phone label default            | Presentation only; rounding and wording of values every cell already carries, no new selector or calculation   |
-| How we score quality, Show me, See what changes                                         | Presentation only; the PSNR range comes from the existing published media reads                                |
-| Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data                               |
+| Control                                                                      | Read-only API coverage                                                                                         |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Model, workload, resolution, duration, mode, steps, engine, date             | `r_*` selection fields                                                                                         |
+| Hardware visibility, named run (stored or read live)                         | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                                        |
+| Deadline, cost tier                                                          | Same pure calculations in `resultProjection`                                                                   |
+| X and Y metrics, Optimal only, open deployment                               | `r_x`, `r_y`, `r_optimal`, `r_point`; every axis value is in each cell                                         |
+| Engine comparison, Lossy optimizations                                       | `r_lossy` (`r_compare` is retired and ignored); presentation only, every cell carries `metadata.optimizations` |
+| Fixed GPU basis, all GPU counts                                              | `r_basis`, `r_gpus` accepted but ignored; resolved params are participating and null                           |
+| Profit estimator (removed)                                                   | `r_api`, `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_utilization` accepted but ignored                     |
+| Deployment labels, detail tab, pinned point                                  | Presentation only                                                                                              |
+| Clip transport, audio source, Difference, case navigation, theme, Share      | Presentation only; published media metadata uses the existing read-only media contract                         |
+| Clip subject, its pair and Swap                                              | Presentation only; `r_clip`, `r_vs` and `r_swap` are page state                                                |
+| Phone order, opening pair, stage sentence, prompt strip, point sheet         | Presentation only; `r_sheet` is page state and every figure shown is already in the point's cell               |
+| Number format, readout comparison lines, compact legend, phone label default | Presentation only; rounding and wording of values every cell already carries, no new selector or calculation   |
+| How we score quality, Show me, See what changes                              | Presentation only; the PSNR range comes from the existing published media reads                                |
+| Cohort help, prompt/source and hash disclosures, media link                  | Presentation only; existing history and published media reads provide their data                               |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
 Video results controls and the new disclosures/media link record `video_results_*`
@@ -583,15 +581,15 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 `/vgx` 与 `/zh/vgx` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
 未记录服务端布局（TP、Ulysses）的早期数据点无法与同一 GPU 数量下已记录布局的数据点区分，因此会被同一硬件、GPU 数量和并发数下更新的数据点取代；通过运行信息选择更早的运行时仍会显示。
 比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
-生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
+生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果不混入比较。
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
 发布批准与 full-sweep 或发布资格验收分开。
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X 与 Y 指标）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，指定的叠加运行中匹配的部署单独成一组，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴可选单条视频延迟或每个部署的 GPU 数（见 X-axis metric 一节），所有部署生成的视频时长和帧率相同时，延迟坐标轴的标题会注明这两项；
 Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，并提供部署标签开关和“重置筛选”。图表卡片使用 `ChartSection`，带有共享的图表按钮（PNG 导出、overview API `format=csv` 的 CSV、图例开关和缩放重置），图表标题放在图表说明中，导出的 PNG 也会带上标题。图表下方的 `ResultContext` 页脚与推理页一致，可切换成本层级，并标明固定使用的参与计算 GPU 口径，同时列出更新时间、来源、各硬件 TCO $/chip/hr 价格表（`TcoPriceTable`）及价格来源链接。
 每种硬件、runtime 和运行通道各为一组，各自计算 Pareto 前沿。默认每种硬件只绘制一条无损曲线，即前沿面积最大的一条（`frontierArea`，与推理页每个 SKU 选最优曲线的 hypervolume 规则相同），指定运行单独评选。数据中有两个引擎时，图表配置里的引擎选择器可选「最优」（默认）或单个引擎；曾用于绘制全部引擎的 `r_compare` 仍可传入，但会被忽略。`optimizations.ts` 判定声明的优化项是否有损，未登记的优化项按有损处理；有损曲线不参与评选，存在时图例中的「有损优化」开关可以把它们以虚线加入，并在图例下方列出，例如 “H100 (NVIDIA Sol Engine · Sol-Attn + FirstBlockCache)”。每条有损曲线都会带上它的无损对照曲线，即使该引擎不是「最优」：`losslessTwin`（`deployment.ts`）只把有损数据点与同一运行、硬件、引擎、GPU 数量和服务器布局的无损数据点配对，并优先选择相同并发数。无损对照曲线只用于对比，不会作为硬件的代表出现在卡片或视频中。有损曲线下方的说明指出，有损配置以部分画质换取速度，以各配置自身无损运行为基准的评分尚在计划中；其中的“查看画面变化”（`seeChangesPair`，`quality-method.ts`）以卷帘视图播放一个已绘制的有损数据点及其无损对照，并像“在下方对比”一样把对比区滚入视野。指定运行的有损数据点优先，且只与同一运行配对；其次按 B200 和名单顺序，取各硬件的有损代表部署。两个数据点都可能有视频时才显示该操作。目前生产数据没有有损测量单元，因此这部分用 fixture 验证。任何操作第一次让同一 GPU 出现两个引擎时，先弹出共享的引擎对比确认框，此后才按引擎区分点形。图例写明每张 GPU 的无损引擎，例如 “H100 (SGLang)”。有损部署不会作为硬件的代表出现在卡片、视频或证据对比中。悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。已存储数据点的卡片顶部显示它在当前 prompt 下的封面。对比区尚未读取该数据点的视频时，卡片先保留封面的位置，并像 `Skeleton` 一样闪动；指针在该数据点上停留 250 ms 后，发起与点击相同的读取，读取完成后封面填入该位置，若该数据点没有封面或读取失败，则收起这一位置；点击该数据点会重新读取。停留到其他数据点上会中止这次读取，它也不计入对比区的加载状态。实时读取的指定运行数据点没有媒体，卡片只显示文字。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值，随后先列能耗、功率和功率上限，再列并发数、参与和分配的 GPU、有效视频数、部署、不在 X 轴上的各项延迟、成本和 Runtime；非官方运行的数据点在两处都会标出运行编号。GitHub Actions 运行链接和“查看遥测”位于面板固定的操作行，无需滚动即可看到；点击“查看遥测”进入部署详情（`r_point`）。同一次点击还会在下方对比区播放该部署的视频（`r_clip`），面板中的“在下方对比”会等对比区所需的视频读取全部完成后，再用 `scrollIntoView({ block: 'nearest' })` 把对比区及其播放控件滚入视野，并让焦点落在对比区上，这样随读取结果出现的 prompt 行不会把对比区挤出视野；仅点击数据点不会滚动页面。只有已存储的数据点（有 `publishedAt`）可能有视频：实时读取的指定运行的数据点画成空心，点击只固定其详情；已存储但没有视频的数据点仍由对比区显示空状态。对比区两侧播放的数据点分别标有“播放中”和“基线”。在读者第一次选择视频之前（点击数据点、“对比”一行、“在下方对比”或“查看画面变化”），其余已存储的数据点会以系列颜色向外扩散的圆环闪动；开启 `prefers-reduced-motion` 时圆环保持静止。圆环位于数据点内部，悬停和缩放引起的重绘不会让它重新开始，PNG 导出也不包含它。数据点和曲线切换到新数据时，与推理页散点图一样用 300 ms 平滑移动；开启 `prefers-reduced-motion` 时直接跳到新位置。移动过程中每一帧都会重绘标记、系列标签和数据点标签，使它们始终贴着数据点。样本组加载时，绘图区显示 `Skeleton`，而不是选择为空时的提示；加载状态只向屏幕阅读器播报。图上已有数据点时重新加载，图表卡片以 `motion-stale` 变暗。这些标记和空心点由自定义图层绘制，它从 ref 读取选择并通过 `D3ChartHandle` 重绘；选择不会进入图表的数据、图层、悬停配置或坐标轴配置，因为其中任何一项变化都会重建图表，并关闭刚刚固定的详情面板。同一图层在每条曲线最后一个前沿点旁绘制系列标签，颜色与曲线一致，文字与图例相同（如“B200 (SGLang)”；有损曲线为虚线描边，指定叠加运行使用 `overlayRunColor`）。系列标签会避开已显示的数据点标签（向右让开或移到其下方），彼此会重叠的每次下移 21 px，并始终留在绘图区内，跟随缩放和平移，也会出现在 PNG 导出中。绘图区窄于 480 px 时，叠加运行只为焦点曲线绘制系列标签，避免手机画面被非官方标签覆盖。开启部署标签时，GPU 数标签只显示在焦点系列上，即播放中、基线和悬停的系列；靠近边缘的标签会移回绘图区内，会与其他标签重叠的则不显示。曲线、数据点、图例、系列标签以及对比区、“对比”一行和读数中的色点使用 VideoGenX 专用配色（`hardware-colors.ts`），每种 GPU 各有浅色和深色主题取值，H100 与 H200 不再共用站点的 NVIDIA 绿色；其他仪表板保持原有配色。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
-刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
-详情页分为遥测、有效性、来源三个标签页。功率时间序列不在 History 中：详情页打开时从该部署的产物读取（`use-power-trace.ts`；`format=published`，尚未存储的指定运行用 `format=live`），读取期间以 `Skeleton` 占位；History 记录的有效采样点数量为 0 时不发起读取。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”在宽度不小于 768 px 时始终展开，在手机上收成一行默认折叠的说明；利润估算器位于默认收起的“高级选项”中，其各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
+刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频和图表状态不会丢失。
+详情页分为遥测、有效性、来源三个标签页。功率时间序列不在 History 中：详情页打开时从该部署的产物读取（`use-power-trace.ts`；`format=published`，尚未存储的指定运行用 `format=live`），读取期间以 `Skeleton` 占位；History 记录的有效采样点数量为 0 时不发起读取。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”在宽度不小于 768 px 时始终展开，在手机上收成一行默认折叠的说明。尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。
 
 视频对比只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。视频区接在图表卡片的分隔线下方，在与卡片同宽的双侧对比区（`VideoClipStage`）中播放：左侧为配对视频（基线），右侧为对比对象。画面高度不超过窗口高度减去 18rem，窗口较矮时对比区和播放控件一起收窄并居中，使“对比”一行、画面、播放控件和读数区一起留在页首下方的视野内；并排视图按两个画面的宽度计算这一上限。`r_clip` 指向的数据点若在图表中绘制，就以它为对比对象；否则通过 `?unofficialrun=` 指定的运行若有可见数据点，无论是否有视频，都以它为对比对象；否则默认对比对象为 B200 的起始部署（`stageOpenings`）：B200 代表部署所在前沿上延迟处于下中位的数据点。这样对比区从曲线中段开始（在 1、2、4、8 张 GPU 中为 4 张），而不是从卡片和对比所用的最高效一端，或成本最高的最快一端开始。B200 被隐藏或没有已发布视频时，改用名单中第一个有视频且未隐藏的硬件，并按同样规则选择部署。服务端会连同各代表部署一起预取起始部署的视频。优先的硬件仍在加载时会先占住位置，加载完成后画面不会跳到别的硬件。切换到视频尚未读取的一组对比时（点击数据点、“对比”一行或“在下方对比”），对比区和读数区先保留上一组，并像推理页图表重新获取数据时那样以 `motion-stale` 变暗，读取完成后再切换；图表标记和“对比”一行会立即跟随新的选择，prompt 行也保留原有卡片。新一组的首帧加载完成前（最长 800 ms），对比区同样保留上一组但不变暗，因此切换对比或 prompt 时画面不会先变黑。第一组读取完成前，prompt 行和对比区以 `Skeleton` 占位。加载状态只向屏幕阅读器播报。“对比”一行写作“[配置] 对比 [配对]”，由两个与站内样式一致的下拉框组成。第一个选择播放的对象：每种可见硬件的起始部署；开启有损曲线时，再加上每个已绘制的有损配置，取其延迟处于下中位的部署（`compareConfigs`）。选择后与点击图表一样写入 `r_clip`。第二个自动跟随（`defaultPairing`）：有损配置配其无损对照，来自 `?unofficialrun=` 的对象配同一 GPU 上部署相同的官方数据点，没有时配该 GPU 的官方起始部署（`officialCounterpart`），其余对象配各自已封存的 Diffusers 参考；也可以改选其他每种可见硬件的起始部署，即第一个下拉框为该硬件播放的部署。配对一侧播放与对象相同 prompt、seed 和重复次数的视频；找不到无损对照时，画面位置会说明原因。这一选择写入页面 URL 的 `r_vs`（`reference`、`twin` 或硬件键），与对象的默认配对相同时省略，因此分享链接能还原同一组对比；通过该行或图表换成新对象时，配对回到默认；对象没有所选项时显示参考。每侧左上或右上的标签注明硬件与引擎，随后是 GPU 数量（有损一侧另注优化项，无损对照注明“无损”），或注明参考并标为“官方”，并带有扬声器按钮；`?unofficialrun=` 叠加运行使用 `overlayRunColor`，并标注“非官方运行”。“Prompt 与来源”列出画面中的两侧。

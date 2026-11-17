@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import {
   Activity,
   Children,
@@ -95,7 +95,6 @@ import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
 import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
-import VideoHistory from './VideoHistory';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -143,7 +142,7 @@ const STRINGS = {
     retry: 'Retry',
     cohort: '20-clip C1 cohort · ≥10 valid per hardware',
     cohortHelp:
-      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
+      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. A fixture replay reads retained evidence and is not a new measurement.',
     replay: 'Local replay · unpublished',
     vs: 'vs.',
     howToRead: 'How to read these results',
@@ -155,8 +154,6 @@ const STRINGS = {
     ],
     notMeasured:
       'Not measured yet: server-side stage timing, host memory and GPU memory where not recorded, SSIM, VBench, CLIP and VLM quality, sustained load, model load, first-request latency, LoRA switch time and best topology per GPU count.',
-    history: 'Performance history',
-    historyNote: 'Stored evidence, including unapproved, low-sample and unmatched runs',
     overlay: 'Unofficial run',
     overlayMissing:
       'No matching stored observation for this run. Loading it does not publish or generate media.',
@@ -207,7 +204,7 @@ const STRINGS = {
     retry: '重试',
     cohort: '20 条视频的 C1 工作负载 · 每种硬件至少 10 个有效样本',
     cohortHelp:
-      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
+      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。Fixture 回放只读取已保留的证据，不是新测量。',
     replay: '本地回放 · 未发布',
     vs: 'vs',
     howToRead: '如何解读这些结果',
@@ -219,8 +216,6 @@ const STRINGS = {
     ],
     notMeasured:
       '尚未测量：服务端阶段耗时、主机内存及未记录的 GPU 显存、SSIM、VBench、CLIP 与 VLM 质量评估、持续负载、模型加载、首次请求延迟、LoRA 切换时间，以及各 GPU 数量下的最优拓扑。',
-    history: '性能历史',
-    historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行',
     overlay: '非官方运行',
     overlayMissing: '这个运行没有匹配的已存储观测；加载不会发布或生成媒体。',
     overlayLive: '该运行尚未发布，数据直接从其 GitHub 产物实时读取；不显示媒体。',
@@ -316,7 +311,6 @@ export default function VideoDashboard({
     initialData?.history,
     pending,
   );
-  const [historyOpen, setHistoryOpen] = useState(false);
   // Until the reader sets the switch, a phone's narrow plot leaves the GPU-count labels off.
   const [labelsPick, setLabels] = useState<boolean | null>(null);
   const labels = labelsPick ?? !phone;
@@ -375,11 +369,6 @@ export default function VideoDashboard({
       const next = parseResultsState(location.search);
       latest.current = next;
       setState(next);
-      const params = new URLSearchParams(location.search);
-      if (
-        ['history-hardware', 'history-concurrency', 'history-query'].some((key) => params.has(key))
-      )
-        setHistoryOpen(true);
     };
     read();
     window.addEventListener('popstate', read);
@@ -1136,27 +1125,6 @@ export default function VideoDashboard({
               </section>
             </Card>
           )}
-          <details
-            className="group/history"
-            data-testid="results-history"
-            open={historyOpen}
-            onToggle={(event) => {
-              const enabled = event.currentTarget.open;
-              if (enabled === historyOpen) return;
-              setHistoryOpen(enabled);
-              track('video_results_history_toggled', { enabled });
-            }}
-          >
-            <summary className="mb-2 flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 [&::-webkit-details-marker]:hidden">
-              <ChevronDown
-                aria-hidden="true"
-                className="size-5 text-muted-foreground transition-transform duration-200 group-open/history:rotate-180"
-              />
-              <h2 className="text-lg font-medium">{s.history}</h2>
-              <span className="text-sm text-muted-foreground">{s.historyNote}</span>
-            </summary>
-            <div>{historyOpen && <VideoHistory />}</div>
-          </details>
           <footer className="flex flex-wrap justify-end gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
             <a
               className="text-brand-fill hover:underline"
