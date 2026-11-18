@@ -2,6 +2,13 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+
+import {
+  parsePowerXCompareAt,
+  POWERX_COMPARE_AT_DEFAULT,
+  serializePowerXCompareAt,
+} from '../powerx/powerx-compare-at';
 import type { InferenceData } from '../types';
 
 /**
@@ -12,10 +19,9 @@ import type { InferenceData } from '../types';
 const PowerXSurfaceContext = createContext(false);
 
 /**
- * The interactivity the chip comparison is read at. The main chart, the
- * comparison slider and the per-chip drill-down all move it, so the overview
- * and the detail stay on the same point. Split into value and setter so charts
- * that only write it do not re-render when it changes.
+ * Compare at: the interactivity every PowerX tab reads at (`i_at`, default 80 tok/s/user).
+ * The context strip, the reading line on the chart and the Breakdown drill-down move it.
+ * Split into value and setter so charts that only write it do not re-render when it changes.
  */
 const CompareTargetContext = createContext<number | null>(null);
 const SetCompareTargetContext = createContext<((value: number | null) => void) | null>(null);
@@ -43,7 +49,20 @@ const SetActivePointContext = createContext<((value: PowerXActivePointUpdate) =>
 );
 
 export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
-  const [target, setTarget] = useState<number | null>(null);
+  const [target, setTargetState] = useState<number>(() =>
+    parsePowerXCompareAt(readUrlParams().i_at),
+  );
+  // `null` returns to the default; every change lands in `i_at`.
+  const setTarget = useMemo(
+    () => (value: number | null) => {
+      const next = parsePowerXCompareAt(
+        value === null ? String(POWERX_COMPARE_AT_DEFAULT) : String(value),
+      );
+      setTargetState(next);
+      writeUrlParams({ i_at: serializePowerXCompareAt(next) });
+    },
+    [],
+  );
   const [includeFacility, setIncludeFacility] = useState(true);
   const [activePoint, setActivePointState] = useState<PowerXActivePoint | null>(null);
   // A hover never replaces a pinned point; hover end only clears a hover. A scrub
@@ -82,7 +101,7 @@ export function usePowerXSurface(): boolean {
   return useContext(PowerXSurfaceContext);
 }
 
-/** Shared comparison interactivity; null outside PowerX or before anyone picks one. */
+/** Compare at (tok/s/user) on PowerX; null outside PowerX. */
 export function usePowerXCompareTarget(): number | null {
   return useContext(CompareTargetContext);
 }

@@ -8,14 +8,49 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { powerxTutorialPath } from '@/lib/powerx/tutorial-path';
 import { cn } from '@/lib/shared/utils';
 
-const STRINGS: Record<Locale, { badge: string; eyebrow: string; title: string }> = {
-  en: { badge: 'New', eyebrow: 'Interactive tutorial', title: 'How we measure power' },
-  zh: { badge: '新', eyebrow: '交互式教程', title: 'PowerX 如何测量功耗' },
+const STRINGS: Record<Locale, { badge: string; eyebrow: string; title: string; short: string }> = {
+  en: {
+    badge: 'New',
+    eyebrow: 'Interactive tutorial',
+    title: 'How we measure power',
+    short: 'How we measure',
+  },
+  zh: { badge: '新', eyebrow: '交互式教程', title: 'PowerX 如何测量功耗', short: '测量方法' },
 };
 
-/** Header call-to-action that points first-time PowerX readers at the tutorial. */
-export function PowerXTutorialCta({ locale, className }: { locale: Locale; className?: string }) {
+/**
+ * Header call-to-action that points first-time PowerX readers at the tutorial. `link` is
+ * the quiet text button the PowerX title row uses.
+ */
+export function PowerXTutorialCta({
+  locale,
+  className,
+  variant = 'card',
+}: {
+  locale: Locale;
+  className?: string;
+  variant?: 'card' | 'link';
+}) {
   const t = STRINGS[locale];
+
+  if (variant === 'link') {
+    return (
+      <TutorialLink
+        href={powerxTutorialPath(locale)}
+        analyticsEvent="powerx_tutorial_section_opened"
+        analyticsTarget="powerx-header"
+        data-testid="powerx-tutorial-link"
+        aria-label={`${t.eyebrow}: ${t.title}`}
+        className={cn(
+          'inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none',
+          className,
+        )}
+      >
+        <GraduationCap aria-hidden className="size-4 shrink-0" />
+        {t.short}
+      </TutorialLink>
+    );
+  }
 
   return (
     <TutorialLink

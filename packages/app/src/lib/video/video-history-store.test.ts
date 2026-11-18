@@ -356,10 +356,10 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the PowerX GPU role touched shared inference types and URL keys, and
-      // chartStateHref learned to drop empty overrides; no video entry reads either, so recorded
+      // Re-pinned after the PowerX layout added the i_at URL key, the live address bar and a
+      // ranking slot on the shared scatter props; no video entry reads any of them, so recorded
       // entries are unchanged.
-      sources: '85704f06d9b03a47d589f692ce4ecaa36005c83a6bad075b1bd9da88c0e2c61b',
+      sources: '958b4aab25069b88b5201e17d67b2790851b69beb3d7bab28bcd264e6760a471',
     });
   });
 });

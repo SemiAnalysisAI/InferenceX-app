@@ -17,7 +17,7 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC, setLiveAddressBar } from '@/lib/routing/url-state';
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import {
@@ -56,13 +56,24 @@ import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { formatMetricValue } from '@/components/inference/utils/tooltipUtils';
 import {
-  PowerXChartConfig,
   PowerXFacilitySwitch,
   PowerXReadout,
-  PowerXRoleControl,
-  PowerXViewTabs,
   usePowerXStrings,
 } from '@/components/inference/powerx/PowerXLayout';
+import {
+  POWERX_QUIET_BUTTON,
+  PowerXContextStrip,
+  PowerXPinnedSlot,
+  PowerXTabs,
+  PowerXTitleRow,
+  PowerXToolbar,
+  PowerXYTitleRow,
+} from '@/components/inference/powerx/PowerXShell';
+import {
+  PowerXEnergyPowerMore,
+  PowerXEnergyPowerOptions,
+  powerXPinFor,
+} from '@/components/inference/powerx/PowerXToolbarOptions';
 import {
   POWERX_DEFAULT_METRIC,
   powerXShowsHeadroom,
@@ -407,12 +418,16 @@ export default function ChartDisplay({
     [setPowerRole, setPowerXActivePoint],
   );
   const powerXHeadroom = powerXSurface && powerXShowsHeadroom(selectedYAxisMetric, powerCompare);
-  // Phones: cap the plot so the legend rail and the footer notes stay within reach.
-  const phoneViewport = useMediaQuery('(max-width: 640px)');
-  const powerXChartHeight =
-    powerXSurface && phoneViewport && typeof window !== 'undefined'
-      ? Math.min(600, Math.max(320, Math.round(window.innerHeight * 0.55)))
-      : undefined;
+  // PowerX plot heights (mockup v3): 520 desktop, 480 below lg, 456 on phones.
+  const phoneViewport = useMediaQuery('(max-width: 767px)');
+  const belowLgViewport = useMediaQuery('(max-width: 1023px)');
+  const powerXChartHeight = powerXSurface
+    ? phoneViewport
+      ? 456
+      : belowLgViewport
+        ? 480
+        : 520
+    : undefined;
   // Power metrics live on the PowerX tab only; old Inference Performance links are
   // redirected there by the request proxy. Anything else falls back to the default metric.
   useEffect(() => {
@@ -424,6 +439,12 @@ export default function ChartDisplay({
   const powerXTab = powerXViewFor(selectedYAxisMetric, powerCompare);
   // PowerX v2 owns the page frame; embeds and minimal chrome keep the shared layout.
   const powerXLayout = powerXSurface && !embedded && !minimalChrome;
+  // PowerX keeps the address bar current (tab, options, Compare at) so links share state.
+  useEffect(() => {
+    if (!powerXLayout) return;
+    setLiveAddressBar(true);
+    return () => setLiveAddressBar(false);
+  }, [powerXLayout]);
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
@@ -999,7 +1020,15 @@ export default function ChartDisplay({
     selectedPercentile,
   ]);
 
-  const renderChartButtons = (graph: (typeof renderableGraphs)[number], graphIndex: number) => {
+  const renderChartButtons = (
+    graph: (typeof renderableGraphs)[number],
+    graphIndex: number,
+    // On desktop the actions sit on the card's heading row, inset by the card padding,
+    // so the plot starts one row higher. PowerX places them in its toolbar instead.
+    className = 'md:absolute md:right-6 md:top-6 md:z-10 md:mb-0',
+    // PowerX phones: a one-word Chart / Table switch instead of the segmented toggle.
+    compactViewToggle = false,
+  ) => {
     const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
     const isTimelineMode = Boolean(
       selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
@@ -1018,9 +1047,7 @@ export default function ChartDisplay({
           gpuCount: selectedOfficialHwTypes.size,
         })}
         mobileVisible
-        // On desktop the actions sit on the card's heading row, inset by the card padding,
-        // so the plot starts one row higher.
-        className="md:absolute md:right-6 md:top-6 md:z-10 md:mb-0"
+        className={className}
         analyticsPrefix={
           isTimelineMode
             ? 'gpu_timeseries'
@@ -1029,15 +1056,34 @@ export default function ChartDisplay({
               : 'interactivity'
         }
         leadingControls={
-          <SegmentedToggle
-            value={getViewMode(graphIndex)}
-            options={viewModeOptions}
-            onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-            ariaLabel={t.viewMode}
-            testId={`inference-view-toggle-${graphIndex}`}
-          />
+          compactViewToggle ? (
+            <button
+              type="button"
+              className={`${POWERX_QUIET_BUTTON} max-md:h-11`}
+              aria-label={t.viewMode}
+              data-testid={`inference-view-toggle-${graphIndex}`}
+              onClick={() =>
+                handleViewModeChange(
+                  graphIndex,
+                  getViewMode(graphIndex) === 'table' ? 'chart' : 'table',
+                )
+              }
+            >
+              {viewModeOptions.find((option) => option.value !== getViewMode(graphIndex))?.label ??
+                null}
+            </button>
+          ) : (
+            <SegmentedToggle
+              value={getViewMode(graphIndex)}
+              options={viewModeOptions}
+              onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+              ariaLabel={t.viewMode}
+              testId={`inference-view-toggle-${graphIndex}`}
+            />
+          )
         }
         hideImageExport={getViewMode(graphIndex) === 'table'}
+        hideZoomReset={compactViewToggle}
         setIsLegendExpanded={setIsLegendExpanded}
         hideLegendOnExport={showLineLabels}
         exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
@@ -1233,8 +1279,15 @@ export default function ChartDisplay({
             return (
               <section key={graphIndex}>
                 <figure data-testid="chart-figure" className="relative min-w-0">
-                  <Card data-coach-mark-root="" className="relative">
-                    {!minimalChrome && renderChartButtons(graph, graphIndex)}
+                  <Card
+                    data-coach-mark-root=""
+                    className={
+                      powerXLayout
+                        ? 'relative rounded-none border-0 bg-transparent p-0 md:p-0'
+                        : 'relative'
+                    }
+                  >
+                    {!minimalChrome && !powerXLayout && renderChartButtons(graph, graphIndex)}
                     {(() => {
                       const chartHeading = (
                         <>
@@ -1434,37 +1487,8 @@ export default function ChartDisplay({
                             />
                           )}
                           {powerXLayout && powerXMounted && powerXVisibleRows && powerXTab && (
-                            <>
-                              <PowerXRoleNoData role={powerRole} points={powerXVisibleRows} />
-                              {/* Over time renders its card from the power traces instead. */}
-                              {powerXTab !== 'time' && (
-                                <PowerXInsightCard
-                                  view={powerXTab}
-                                  role={powerRole}
-                                  points={powerXVisibleRows}
-                                  onRoleChange={handlePowerRoleChange}
-                                  hardwareLabel={powerXHardwareLabel}
-                                />
-                              )}
-                            </>
+                            <PowerXRoleNoData role={powerRole} points={powerXVisibleRows} />
                           )}
-                          {powerXLayout &&
-                            powerXMounted &&
-                            powerXReadoutPoints &&
-                            getViewMode(graphIndex) === 'chart' && (
-                              <PowerXReadout
-                                role={powerRole}
-                                points={powerXReadoutPoints}
-                                yMetric={{
-                                  label: metricLabel(
-                                    graph.chartDefinition,
-                                    selectedYAxisMetric,
-                                    locale,
-                                  ),
-                                  value: (point) => formatMetricValue(point.y, selectedYAxisMetric),
-                                }}
-                              />
-                            )}
                           {!powerXSurface && (
                             <>
                               {/* One caption line for the power method: boundary, then the modeled-
@@ -1508,15 +1532,89 @@ export default function ChartDisplay({
                             )}
                         </div>
                       );
-                      const chartCaption = (
+                      const powerXWherePues =
+                        powerXLayout && powerXTab === 'where'
+                          ? graph.data.flatMap((point) =>
+                              point.modeledSystemPower?.status === 'supported'
+                                ? [point.modeledSystemPower.pue]
+                                : [],
+                            )
+                          : [];
+                      const powerXEnergyOrPower = powerXTab === 'energy' || powerXTab === 'draw';
+                      // PowerX: one toolbar row (tab options + More left, Chart | Table and
+                      // Export right), then the y-title row with the role pin line. The model
+                      // heading stays for screen readers; the context strip shows it.
+                      const powerXCaption =
+                        powerXLayout && powerXMounted ? (
+                          <>
+                            <div className="sr-only">{chartHeading}</div>
+                            <PowerXToolbar
+                              options={
+                                powerXEnergyOrPower ? (
+                                  <PowerXEnergyPowerOptions
+                                    selection={powerXSelection}
+                                    onSelectionChange={setPowerXSelection}
+                                    role={powerRole}
+                                  />
+                                ) : powerXTab === 'where' ? (
+                                  <PowerXFacilitySwitch pues={powerXWherePues} compact />
+                                ) : undefined
+                              }
+                              more={
+                                powerXEnergyOrPower ? (
+                                  <PowerXEnergyPowerMore
+                                    selection={powerXSelection}
+                                    onSelectionChange={setPowerXSelection}
+                                    role={powerRole}
+                                  />
+                                ) : undefined
+                              }
+                              actions={
+                                minimalChrome
+                                  ? undefined
+                                  : renderChartButtons(
+                                      graph,
+                                      graphIndex,
+                                      'mb-0 flex-nowrap',
+                                      phoneViewport,
+                                    )
+                              }
+                            />
+                            <PowerXYTitleRow
+                              title={
+                                powerXTab === 'time' || powerXTab === 'where'
+                                  ? undefined
+                                  : metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)
+                              }
+                              pin={powerXPinFor(powerXSelection, powerRole, locale)}
+                            />
+                          </>
+                        ) : null;
+                      const chartCaption = powerXCaption ?? (
                         <>
                           {chartHeading}
                           {powerXSurface && chartContext}
                         </>
                       );
-                      const chartFooter = (!powerXSurface || hasAtomSeries) && (
+                      const chartFooter = (!powerXSurface || powerXLayout || hasAtomSeries) && (
                         <div className="mt-3">
-                          {!powerXSurface && chartContext}
+                          {powerXLayout && powerXMounted && powerXReadoutPoints && (
+                            <PowerXPinnedSlot>
+                              <PowerXReadout
+                                role={powerRole}
+                                points={powerXReadoutPoints}
+                                yMetric={{
+                                  label: metricLabel(
+                                    graph.chartDefinition,
+                                    selectedYAxisMetric,
+                                    locale,
+                                  ),
+                                  value: (point) => formatMetricValue(point.y, selectedYAxisMetric),
+                                }}
+                              />
+                            </PowerXPinnedSlot>
+                          )}
+                          {(!powerXSurface || powerXLayout) && chartContext}
                           {hasAtomSeries && <AtomEngineFootnote className="mt-2" />}
                         </div>
                       );
@@ -1678,20 +1776,6 @@ export default function ChartDisplay({
                           : visibleComparisonRows(graph.data, overlay);
                         return (
                           <>
-                            {powerXLayout && (
-                              <div
-                                className="order-first mb-3 flex flex-wrap items-start gap-x-6"
-                                data-testid="powerx-where-controls"
-                              >
-                                <PowerXFacilitySwitch
-                                  pues={[...officialRows, ...overlayRows].flatMap((point) =>
-                                    point.modeledSystemPower?.status === 'supported'
-                                      ? [point.modeledSystemPower.pue]
-                                      : [],
-                                  )}
-                                />
-                              </div>
-                            )}
                             <PowerAnalysisPanels
                               chartId={`chart-${graphIndex}`}
                               contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
@@ -1737,9 +1821,77 @@ export default function ChartDisplay({
       data-testid="inference-chart-display"
       // PowerX phones: globals.css enlarges shared chart chrome under this marker.
       data-powerx-surface={powerXLayout ? '' : undefined}
-      className="flex flex-col gap-4"
+      // PowerX is one flat surface: the strip, tabs and chart toolbar stack without gaps.
+      className={powerXLayout ? 'flex flex-col' : 'flex flex-col gap-4'}
     >
-      {!minimalChrome && (
+      {!minimalChrome && powerXLayout && (
+        <section className="relative z-30 flex flex-col" data-testid="powerx-shell">
+          <PowerXTitleRow
+            actions={
+              <>
+                <PowerXTutorialCta locale={locale} variant="link" />
+                <ShareButton />
+              </>
+            }
+          />
+          {powerXMounted && (
+            <>
+              <ChartControls
+                showXAxisMode
+                powerXStrip={(parts) => (
+                  <PowerXContextStrip
+                    parts={parts}
+                    role={powerRole}
+                    onRoleChange={handlePowerRoleChange}
+                    runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
+                    runLabel={selectedRunDate}
+                    sheetActions={
+                      <>
+                        <PowerXTutorialCta locale={locale} variant="link" />
+                        <ShareButton />
+                      </>
+                    }
+                    modelLabel={getModelLabel(selectedModel)}
+                    scenarioLabel={getSequenceLabel(selectedSequence, locale)}
+                  />
+                )}
+              />
+              <PowerXTabs selection={powerXSelection} onSelectionChange={setPowerXSelection} />
+            </>
+          )}
+          {selectedGPUs.length > 0 && (
+            <div className="mt-3">
+              <ComparisonChangelog
+                changelogs={changelogs}
+                selectedGPUs={selectedGPUs}
+                selectedPrecisions={selectedPrecisions}
+                modelDbKeys={modelDbKeys}
+                selectedSequence={selectedSequence}
+                defaultExpanded={false}
+                loading={changelogsLoading}
+                deferred={!changelogsEnabled}
+                onExpandedChange={(expanded) => {
+                  if (expanded) setChangelogOpened(true);
+                }}
+                totalDatesQueried={totalDatesQueried}
+                selectedDates={selectedDates}
+                selectedDateRange={selectedDateRange}
+                onAddDate={(date) => {
+                  setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
+                }}
+                onRemoveDate={(date) => {
+                  setSelectedDates((prev) => prev.filter((d) => d !== date));
+                }}
+                onAddAllDates={(dates) => {
+                  setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
+                }}
+                firstAvailableDate={dateRangeAvailableDates[0]}
+              />
+            </div>
+          )}
+        </section>
+      )}
+      {!minimalChrome && !powerXLayout && (
         <section className="relative z-20">
           <Card>
             <div className="flex flex-col gap-4">
@@ -1750,42 +1902,12 @@ export default function ChartDisplay({
                     title={powerXSurface ? powerXT.title : t.inferencePerformance}
                     level={headerLevel}
                     description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}
-                    actions={
-                      powerXSurface ? (
-                        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-                          <PowerXTutorialCta locale={locale} className="min-w-0 flex-1" />
-                          <ShareButton />
-                        </div>
-                      ) : (
-                        <ShareButton />
-                      )
-                    }
+                    actions={<ShareButton />}
                   />
-                  {powerXLayout && powerXMounted && (
-                    <>
-                      <PowerXViewTabs
-                        selection={powerXSelection}
-                        onSelectionChange={setPowerXSelection}
-                      />
-                      <PowerXRoleControl role={powerRole} onRoleChange={handlePowerRoleChange} />
-                    </>
-                  )}
                   <ChartControls
                     scenarioInFooter={!powerXSurface}
                     showXAxisMode
                     runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
-                    powerXControls={
-                      powerXLayout && powerXMounted
-                        ? (slots) => (
-                            <PowerXChartConfig
-                              role={powerRole}
-                              selection={powerXSelection}
-                              onSelectionChange={setPowerXSelection}
-                              slots={slots}
-                            />
-                          )
-                        : undefined
-                    }
                   />
                 </>
               )}
@@ -1833,7 +1955,8 @@ export default function ChartDisplay({
           <CustomPowers loading={loading} />
         </section>
       )}
-      {!minimalChrome && <ActiveQuickFilters />}
+      {/* PowerX lists active filters in the ranking header (Filter (n)). */}
+      {!minimalChrome && !powerXLayout && <ActiveQuickFilters />}
       <div
         className="motion-stale flex flex-col gap-4"
         data-stale={isRefetching || undefined}

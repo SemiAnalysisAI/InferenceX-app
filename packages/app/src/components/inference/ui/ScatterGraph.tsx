@@ -219,11 +219,9 @@ import {
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
-import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
 import {
   usePowerXSurface,
   useSetPowerXActivePoint,
-  useSetPowerXCompareTarget,
   type PowerXActivePointUpdate,
 } from '@/components/inference/ui/powerx-surface';
 import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
@@ -593,6 +591,7 @@ const ScatterGraph = React.memo(
     xExtentOverride,
     yExtentOverride,
     plotHeight,
+    ranking,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -2093,7 +2092,6 @@ const ScatterGraph = React.memo(
       [runIndexByUrl, clampPerfRulerIsoXToOverlap],
     );
 
-    const setCompareTarget = useSetPowerXCompareTarget();
     // PowerX: the readout row under the caption follows the hovered or pinned point.
     const setActivePoint = useSetPowerXActivePoint();
     const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
@@ -2101,11 +2099,6 @@ const ScatterGraph = React.memo(
     // PowerX on a coarse pointer: the finger in flight on the plot (its pointer id).
     const scrubPointerRef = useRef<number | null>(null);
     const touchScrub = powerXSurface && touchPrimary;
-    const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
-    compareFollowsHoverRef.current =
-      setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
-        ? setCompareTarget
-        : null;
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
@@ -2516,8 +2509,6 @@ const ScatterGraph = React.memo(
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
-          // PowerX: the chip comparison follows the hovered point's interactivity.
-          if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
           activePointRef.current?.({ point: d, source: 'hover' });
         },
         onHoverEnd: () => {
@@ -4468,349 +4459,355 @@ const ScatterGraph = React.memo(
             ) : undefined
           }
           legendElement={
-            <>
-              {!minimalChrome && (
-                <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
-              )}
-              <EngineComparisonConflictNotice className="mb-2" />
-              <ChartLegend
-                variant="sidebar"
-                onItemHover={handleLegendHover}
-                onItemHoverEnd={handleLegendHoverEnd}
-                onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
-                legendItems={[
-                  ...(overlayData && unofficialRunInfos.length > 0
-                    ? unofficialRunInfos
-                        .map((info, idx) => {
-                          const hasPoints = overlayData.data.some(
-                            (d) =>
-                              overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
-                              selectedPrecisions.includes(d.precision),
-                          );
-                          if (!hasPoints) return null;
-                          const branch = info.branch || `run ${info.id}`;
-                          return {
-                            name: `✕ unofficial-run-${info.id}`,
-                            label: getInferenceRunLabel(
-                              `✕ ${branch}`,
-                              overlayData.data.filter(
-                                (point) =>
-                                  overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
-                                  selectedPrecisions.includes(point.precision),
+            ranking ?? (
+              <>
+                {!minimalChrome && (
+                  <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+                )}
+                <EngineComparisonConflictNotice className="mb-2" />
+                <ChartLegend
+                  variant="sidebar"
+                  onItemHover={handleLegendHover}
+                  onItemHoverEnd={handleLegendHoverEnd}
+                  onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
+                  legendItems={[
+                    ...(overlayData && unofficialRunInfos.length > 0
+                      ? unofficialRunInfos
+                          .map((info, idx) => {
+                            const hasPoints = overlayData.data.some(
+                              (d) =>
+                                overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
+                                selectedPrecisions.includes(d.precision),
+                            );
+                            if (!hasPoints) return null;
+                            const branch = info.branch || `run ${info.id}`;
+                            return {
+                              name: `✕ unofficial-run-${info.id}`,
+                              label: getInferenceRunLabel(
+                                `✕ ${branch}`,
+                                overlayData.data.filter(
+                                  (point) =>
+                                    overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
+                                    selectedPrecisions.includes(point.precision),
+                                ),
                               ),
-                            ),
-                            color: overlayRunColor(idx),
-                            lineDasharray:
-                              powerCompareMode === 'none'
-                                ? overlayRooflineDasharray(idx)
-                                : undefined,
-                            title: legendT.unofficialTitle(branch),
-                            isHighlighted: true,
-                            hw: `overlay-run-${info.id}`,
-                            isActive: true,
-                            onClick: () => {},
-                            onShowPoints: () => {
-                              setPointsTableTarget({
-                                kind: 'overlay',
-                                runIndex: idx,
-                                runId: info.id,
-                                branch,
-                              });
-                              track('inference_legend_points_table_opened', {
-                                gpu: `overlay-run-${info.id}`,
-                                framework: 'overlay',
-                              });
-                            },
-                            tooltip: (
-                              <div className="font-normal text-xs">
-                                <div className="font-medium text-destructive">
-                                  {legendT.unofficialRun}
-                                </div>
-                                <div>
-                                  {legendT.branch}: {branch}
-                                </div>
-                                {info.url && (
-                                  <a
-                                    href={info.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="underline"
-                                  >
-                                    {legendT.viewWorkflow}
-                                  </a>
-                                )}
-                              </div>
-                            ),
-                          };
-                        })
-                        .filter((x): x is NonNullable<typeof x> => x !== null)
-                    : []),
-                  ...Object.entries(hardwareConfig)
-                    .filter(([key]) =>
-                      showAllHardwareTypes
-                        ? effectiveActiveHwTypes.has(key)
-                        : hwTypesWithData.has(key),
-                    )
-                    .toSorted(
-                      ([a], [b]) =>
-                        getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                    )
-                    .map(([key, hwConfig]: [string, any]) => {
-                      const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
-                      const isActive =
-                        !aggregated &&
-                        (showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key));
-                      const blocked = isActive ? undefined : blockedHwToggles.get(key);
-                      return {
-                        name: hwConfig.name,
-                        label: aggregated
-                          ? `${getDisplayLabel(hwConfig)} · ${legendT.aggregatedTag}`
-                          : getDisplayLabel(hwConfig),
-                        color: resolveColor(key),
-                        lineDasharray:
-                          powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
-                        title: hwConfig.gpu,
-                        isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
-                        hw: key,
-                        isActive,
-                        blockedReason: aggregated
-                          ? legendT.aggregatedRoleReason
-                          : blocked
-                            ? describeEngineComparisonConflict(
-                                { kind: 'blocked', ...blocked },
-                                locale,
-                              )
-                            : undefined,
-                        onClick:
-                          showAllHardwareTypes || aggregated
-                            ? () => {}
-                            : () => {
-                                handleToggleHwType(key);
-                                track('latency_hw_type_toggled', { gpu: key });
-                              },
-                        onShowPoints: () => {
-                          setPointsTableTarget({ kind: 'official', hwKey: key });
-                          track('inference_legend_points_table_opened', {
-                            gpu: key,
-                            framework: hwConfig.framework ?? '',
-                          });
-                        },
-                        tooltip: legendChangelogs.has(key)
-                          ? formatChangelogDescription(
-                              legendChangelogs.get(key)!.entries.map((entry) => entry.description),
-                            )
-                          : null,
-                      };
-                    }),
-                  ...powerVariantLegendItems,
-                ]}
-                disableActiveSort={false}
-                isLegendExpanded={isLegendExpanded}
-                onExpandedChange={(expanded) => {
-                  setIsLegendExpanded(expanded);
-                  track('latency_legend_expanded', { enabled: expanded });
-                }}
-                switches={[
-                  ...(selectedYAxisMetric === 'y_inputTputPerGpu'
-                    ? []
-                    : [
-                        {
-                          id: 'scatter-log-scale',
-                          label: legendT.logScale,
-                          checked: logScale,
-                          onCheckedChange: (checked: boolean) => {
-                            setLogScale(checked);
-                            track('latency_log_scale_toggled', { enabled: checked });
-                          },
-                        },
-                      ]),
-                  ...(paretoDirection
-                    ? [
-                        {
-                          id: 'scatter-hide-non-optimal',
-                          label: legendT.optimalOnly,
-                          checked: hideNonOptimal,
-                          onCheckedChange: (checked: boolean) => {
-                            setHideNonOptimal(checked);
-                            track('latency_hide_non_optimal_toggled', { enabled: checked });
-                          },
-                          ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
-                            ? {
-                                infoTooltip: showPowerEnvelope
-                                  ? legendT.powerBoundaryInfo
-                                  : legendT.optimalInfo,
-                              }
-                            : {}),
-                        },
-                        {
-                          id: `${chartId}-pareto-frontier`,
-                          label: legendT.paretoFrontier,
-                          advanced: true,
-                          checked: showParetoFrontier,
-                          infoTooltip: legendT.paretoFrontierInfo,
-                          onCheckedChange: (checked: boolean) => {
-                            setShowParetoFrontier(checked);
-                            track('inference_pareto_frontier_toggled', { enabled: checked });
-                          },
-                        },
-                      ]
-                    : []),
-                  {
-                    id: 'scatter-point-labels',
-                    label: legendT.labels,
-                    advanced: true,
-                    checked: showPointLabels,
-                    onCheckedChange: (checked: boolean) => {
-                      setShowPointLabels(checked);
-                      track('latency_point_labels_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-high-contrast',
-                    label: legendT.highContrast,
-                    advanced: true,
-                    checked: highContrast,
-                    onCheckedChange: (checked: boolean) => {
-                      setHighContrast(checked);
-                      track('latency_high_contrast_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-parallelism-labels',
-                    label: legendT.parallelismLabels,
-                    checked: useAdvancedLabels,
-                    onCheckedChange: (checked: boolean) => {
-                      setUseAdvancedLabels(checked);
-                      track('latency_advanced_labels_toggled', { enabled: checked });
-                      if (checked && !showGradientLabels) {
-                        window.dispatchEvent(
-                          new CustomEvent(GRADIENT_NUDGE_EVENT, {
-                            detail: {
-                              enableGradient: () => {
-                                setShowGradientLabels(true);
-                                setUseAdvancedLabels(false);
-                                track('latency_gradient_labels_toggled', {
-                                  enabled: true,
-                                  source: 'nudge',
+                              color: overlayRunColor(idx),
+                              lineDasharray:
+                                powerCompareMode === 'none'
+                                  ? overlayRooflineDasharray(idx)
+                                  : undefined,
+                              title: legendT.unofficialTitle(branch),
+                              isHighlighted: true,
+                              hw: `overlay-run-${info.id}`,
+                              isActive: true,
+                              onClick: () => {},
+                              onShowPoints: () => {
+                                setPointsTableTarget({
+                                  kind: 'overlay',
+                                  runIndex: idx,
+                                  runId: info.id,
+                                  branch,
+                                });
+                                track('inference_legend_points_table_opened', {
+                                  gpu: `overlay-run-${info.id}`,
+                                  framework: 'overlay',
                                 });
                               },
-                            },
-                          }),
-                        );
-                      }
-                    },
-                  },
-                  {
-                    id: 'scatter-gradient-labels',
-                    label: legendT.gradientLabels,
-                    checked: showGradientLabels,
-                    onCheckedChange: (checked: boolean) => {
-                      setShowGradientLabels(checked);
-                      track('latency_gradient_labels_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-line-labels',
-                    label: legendT.lineLabels,
-                    advanced: true,
-                    checked: showLineLabels,
-                    onCheckedChange: (checked: boolean) => {
-                      setShowLineLabels(checked);
-                      track('latency_line_labels_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-framework-label',
-                    label: legendT.frameworkLabel,
-                    advanced: true,
-                    checked: showFrameworkLabel,
-                    onCheckedChange: (checked: boolean) => {
-                      setShowFrameworkLabel(checked);
-                      track('latency_framework_label_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-offloading-label',
-                    label: legendT.offloadingLabel,
-                    advanced: true,
-                    checked: showOffloadingLabel,
-                    onCheckedChange: (checked: boolean) => {
-                      setShowOffloadingLabel(checked);
-                      track('latency_offloading_label_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-perf-ruler',
-                    label: legendT.perfRuler,
-                    advanced: true,
-                    checked: perfRulerMode,
-                    infoTooltip: legendT.perfRulerInfo,
-                    onCheckedChange: (checked: boolean) => {
-                      setPerfRulerMode(checked);
-                      if (!checked) {
-                        setPerfRulerState(clearPerfRulers);
-                        persistedRulers?.discardPending();
-                      }
-                      track('latency_perf_ruler_toggled', { enabled: checked });
-                    },
-                  },
-                  {
-                    id: 'scatter-concurrency-labels',
-                    label: legendT.concurrencyLabels,
-                    advanced: true,
-                    checked: showConcurrencyLabels,
-                    onCheckedChange: (checked: boolean) => {
-                      setShowConcurrencyLabels(checked);
-                      track('latency_concurrency_labels_toggled', { enabled: checked });
-                    },
-                  },
-                ]}
-                onAdvancedExpandedChange={(expanded) => {
-                  track('latency_advanced_controls_toggled', { enabled: expanded });
-                }}
-                reset={{
-                  id: 'scatter-reset-filter',
-                  disabled:
-                    effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
-                    activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
-                    quickFilterCount === 0,
-                  onClick: () => {
-                    resetUnifiedSelection();
-                    clearQuickFilters();
-                    track('latency_legend_filter_reset');
-                  },
-                }}
-                actions={[
-                  ...(perfRulerState.rulers.length > 0
-                    ? [
-                        {
-                          id: 'scatter-clear-perf-rulers',
-                          label: legendT.clearPerfRulers(perfRulerState.rulers.length),
-                          onClick: () => {
-                            track('latency_perf_ruler_cleared', {
-                              count: perfRulerState.rulers.length,
+                              tooltip: (
+                                <div className="font-normal text-xs">
+                                  <div className="font-medium text-destructive">
+                                    {legendT.unofficialRun}
+                                  </div>
+                                  <div>
+                                    {legendT.branch}: {branch}
+                                  </div>
+                                  {info.url && (
+                                    <a
+                                      href={info.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline"
+                                    >
+                                      {legendT.viewWorkflow}
+                                    </a>
+                                  )}
+                                </div>
+                              ),
+                            };
+                          })
+                          .filter((x): x is NonNullable<typeof x> => x !== null)
+                      : []),
+                    ...Object.entries(hardwareConfig)
+                      .filter(([key]) =>
+                        showAllHardwareTypes
+                          ? effectiveActiveHwTypes.has(key)
+                          : hwTypesWithData.has(key),
+                      )
+                      .toSorted(
+                        ([a], [b]) =>
+                          getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+                      )
+                      .map(([key, hwConfig]: [string, any]) => {
+                        const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
+                        const isActive =
+                          !aggregated &&
+                          (showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key));
+                        const blocked = isActive ? undefined : blockedHwToggles.get(key);
+                        return {
+                          name: hwConfig.name,
+                          label: aggregated
+                            ? `${getDisplayLabel(hwConfig)} · ${legendT.aggregatedTag}`
+                            : getDisplayLabel(hwConfig),
+                          color: resolveColor(key),
+                          lineDasharray:
+                            powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
+                          title: hwConfig.gpu,
+                          isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
+                          hw: key,
+                          isActive,
+                          blockedReason: aggregated
+                            ? legendT.aggregatedRoleReason
+                            : blocked
+                              ? describeEngineComparisonConflict(
+                                  { kind: 'blocked', ...blocked },
+                                  locale,
+                                )
+                              : undefined,
+                          onClick:
+                            showAllHardwareTypes || aggregated
+                              ? () => {}
+                              : () => {
+                                  handleToggleHwType(key);
+                                  track('latency_hw_type_toggled', { gpu: key });
+                                },
+                          onShowPoints: () => {
+                            setPointsTableTarget({ kind: 'official', hwKey: key });
+                            track('inference_legend_points_table_opened', {
+                              gpu: key,
+                              framework: hwConfig.framework ?? '',
                             });
-                            setPerfRulerState(clearPerfRulers);
-                            persistedRulers?.discardPending();
                           },
-                        },
-                      ]
-                    : []),
-                  {
-                    id: 'scatter-quick-filters',
-                    label: legendT.quickFilters(quickFilterCount),
-                    onClick: () => {
-                      setQuickFiltersOpen(true);
-                      track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                          tooltip: legendChangelogs.has(key)
+                            ? formatChangelogDescription(
+                                legendChangelogs
+                                  .get(key)!
+                                  .entries.map((entry) => entry.description),
+                              )
+                            : null,
+                        };
+                      }),
+                    ...powerVariantLegendItems,
+                  ]}
+                  disableActiveSort={false}
+                  isLegendExpanded={isLegendExpanded}
+                  onExpandedChange={(expanded) => {
+                    setIsLegendExpanded(expanded);
+                    track('latency_legend_expanded', { enabled: expanded });
+                  }}
+                  switches={[
+                    ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                      ? []
+                      : [
+                          {
+                            id: 'scatter-log-scale',
+                            label: legendT.logScale,
+                            checked: logScale,
+                            onCheckedChange: (checked: boolean) => {
+                              setLogScale(checked);
+                              track('latency_log_scale_toggled', { enabled: checked });
+                            },
+                          },
+                        ]),
+                    ...(paretoDirection
+                      ? [
+                          {
+                            id: 'scatter-hide-non-optimal',
+                            label: legendT.optimalOnly,
+                            checked: hideNonOptimal,
+                            onCheckedChange: (checked: boolean) => {
+                              setHideNonOptimal(checked);
+                              track('latency_hide_non_optimal_toggled', { enabled: checked });
+                            },
+                            ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
+                              ? {
+                                  infoTooltip: showPowerEnvelope
+                                    ? legendT.powerBoundaryInfo
+                                    : legendT.optimalInfo,
+                                }
+                              : {}),
+                          },
+                          {
+                            id: `${chartId}-pareto-frontier`,
+                            label: legendT.paretoFrontier,
+                            advanced: true,
+                            checked: showParetoFrontier,
+                            infoTooltip: legendT.paretoFrontierInfo,
+                            onCheckedChange: (checked: boolean) => {
+                              setShowParetoFrontier(checked);
+                              track('inference_pareto_frontier_toggled', { enabled: checked });
+                            },
+                          },
+                        ]
+                      : []),
+                    {
+                      id: 'scatter-point-labels',
+                      label: legendT.labels,
+                      advanced: true,
+                      checked: showPointLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowPointLabels(checked);
+                        track('latency_point_labels_toggled', { enabled: checked });
+                      },
                     },
-                  },
-                ]}
-                hideAtomFootnote
-                readOnly={minimalChrome}
-                collapsible={!minimalChrome}
-                enableTooltips={true}
-              />
-            </>
+                    {
+                      id: 'scatter-high-contrast',
+                      label: legendT.highContrast,
+                      advanced: true,
+                      checked: highContrast,
+                      onCheckedChange: (checked: boolean) => {
+                        setHighContrast(checked);
+                        track('latency_high_contrast_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-parallelism-labels',
+                      label: legendT.parallelismLabels,
+                      checked: useAdvancedLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setUseAdvancedLabels(checked);
+                        track('latency_advanced_labels_toggled', { enabled: checked });
+                        if (checked && !showGradientLabels) {
+                          window.dispatchEvent(
+                            new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                              detail: {
+                                enableGradient: () => {
+                                  setShowGradientLabels(true);
+                                  setUseAdvancedLabels(false);
+                                  track('latency_gradient_labels_toggled', {
+                                    enabled: true,
+                                    source: 'nudge',
+                                  });
+                                },
+                              },
+                            }),
+                          );
+                        }
+                      },
+                    },
+                    {
+                      id: 'scatter-gradient-labels',
+                      label: legendT.gradientLabels,
+                      checked: showGradientLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowGradientLabels(checked);
+                        track('latency_gradient_labels_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-line-labels',
+                      label: legendT.lineLabels,
+                      advanced: true,
+                      checked: showLineLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowLineLabels(checked);
+                        track('latency_line_labels_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-framework-label',
+                      label: legendT.frameworkLabel,
+                      advanced: true,
+                      checked: showFrameworkLabel,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowFrameworkLabel(checked);
+                        track('latency_framework_label_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-offloading-label',
+                      label: legendT.offloadingLabel,
+                      advanced: true,
+                      checked: showOffloadingLabel,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowOffloadingLabel(checked);
+                        track('latency_offloading_label_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-perf-ruler',
+                      label: legendT.perfRuler,
+                      advanced: true,
+                      checked: perfRulerMode,
+                      infoTooltip: legendT.perfRulerInfo,
+                      onCheckedChange: (checked: boolean) => {
+                        setPerfRulerMode(checked);
+                        if (!checked) {
+                          setPerfRulerState(clearPerfRulers);
+                          persistedRulers?.discardPending();
+                        }
+                        track('latency_perf_ruler_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-concurrency-labels',
+                      label: legendT.concurrencyLabels,
+                      advanced: true,
+                      checked: showConcurrencyLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowConcurrencyLabels(checked);
+                        track('latency_concurrency_labels_toggled', { enabled: checked });
+                      },
+                    },
+                  ]}
+                  onAdvancedExpandedChange={(expanded) => {
+                    track('latency_advanced_controls_toggled', { enabled: expanded });
+                  }}
+                  reset={{
+                    id: 'scatter-reset-filter',
+                    disabled:
+                      effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
+                      activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
+                      quickFilterCount === 0,
+                    onClick: () => {
+                      resetUnifiedSelection();
+                      clearQuickFilters();
+                      track('latency_legend_filter_reset');
+                    },
+                  }}
+                  actions={[
+                    ...(perfRulerState.rulers.length > 0
+                      ? [
+                          {
+                            id: 'scatter-clear-perf-rulers',
+                            label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                            onClick: () => {
+                              track('latency_perf_ruler_cleared', {
+                                count: perfRulerState.rulers.length,
+                              });
+                              setPerfRulerState(clearPerfRulers);
+                              persistedRulers?.discardPending();
+                            },
+                          },
+                        ]
+                      : []),
+                    {
+                      id: 'scatter-quick-filters',
+                      label: legendT.quickFilters(quickFilterCount),
+                      onClick: () => {
+                        setQuickFiltersOpen(true);
+                        track('inference_quick_filters_dialog_opened', {
+                          source: 'scatter_legend',
+                        });
+                      },
+                    },
+                  ]}
+                  hideAtomFootnote
+                  readOnly={minimalChrome}
+                  collapsible={!minimalChrome}
+                  enableTooltips={true}
+                />
+              </>
+            )
           }
         />
         <QuickFiltersDialog

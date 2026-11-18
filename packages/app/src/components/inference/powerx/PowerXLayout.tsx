@@ -884,7 +884,14 @@ export function PowerXReadout({
  * The Where view's Include facility switch. `pues` are the PUEs of the visible chips;
  * the label shows their range, since air- and liquid-cooled systems differ.
  */
-export function PowerXFacilitySwitch({ pues }: { pues: readonly number[] }) {
+export function PowerXFacilitySwitch({
+  pues,
+  compact = false,
+}: {
+  pues: readonly number[];
+  /** Toolbar form: one row; the PUE note moves into the hover title. */
+  compact?: boolean;
+}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const includeFacility = usePowerXIncludeFacility();
@@ -893,7 +900,11 @@ export function PowerXFacilitySwitch({ pues }: { pues: readonly number[] }) {
   if (!setIncludeFacility) return null;
   return (
     <div className="flex min-w-0 flex-col gap-1" data-testid="powerx-facility-switch">
-      <label htmlFor={id} className="flex min-h-11 items-center gap-2 text-xs md:min-h-9">
+      <label
+        htmlFor={id}
+        className="flex min-h-11 items-center gap-2 text-xs whitespace-nowrap md:min-h-9"
+        title={compact ? FACILITY_PUE_NOTE[locale] : undefined}
+      >
         <Switch
           id={id}
           checked={includeFacility}
@@ -907,9 +918,11 @@ export function PowerXFacilitySwitch({ pues }: { pues: readonly number[] }) {
           {t.includeFacility(formatPueRange(pues))}
         </span>
       </label>
-      <span className="text-xs text-muted-foreground" data-testid="powerx-facility-note">
-        {FACILITY_PUE_NOTE[locale]}
-      </span>
+      {!compact && (
+        <span className="text-xs text-muted-foreground" data-testid="powerx-facility-note">
+          {FACILITY_PUE_NOTE[locale]}
+        </span>
+      )}
     </div>
   );
 }

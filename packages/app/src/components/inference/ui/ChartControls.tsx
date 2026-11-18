@@ -74,6 +74,8 @@ import { TokenBasisToggle } from './TokenBasisToggle';
 import {
   Sequence,
   type Model,
+  type Precision,
+  getPrecisionLabel,
   MODEL_OPTIONS,
   isModelVisible,
   isRegisteredModel,
@@ -199,6 +201,25 @@ interface ChartControlsProps {
   powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
   /** Extra details on each model's row in the model dropdown, e.g. its benchmark history. */
   modelDetails?: ReadonlyMap<string, ReactNode>;
+  /**
+   * PowerX: render the benchmark pickers as parts of one context strip instead of the
+   * Benchmark / Chart Config / Compare history panels.
+   */
+  powerXStrip?: (parts: PowerXStripParts) => ReactNode;
+}
+
+/** The pickers ChartControls hands the PowerX context strip. */
+export interface PowerXStripParts {
+  model: ReactNode;
+  scenario: ReactNode;
+  /** The selected precisions as text (PowerX has one precision with power data). */
+  precision: string;
+  /** Compare history: chip configs, then the date range once a config is picked. */
+  history: ReactNode;
+  /** True while a history comparison is active. */
+  historyActive: boolean;
+  /** The P/D badge when the selected model has prefill/decode data. */
+  modelBadge?: ReactNode;
 }
 
 export default function ChartControls({
@@ -210,6 +231,7 @@ export default function ChartControls({
   trailingPanel,
   powerXControls,
   modelDetails,
+  powerXStrip,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -561,6 +583,93 @@ export default function ChartControls({
         history: 'lg:col-span-4',
       };
 
+  const historyFields = (
+    <div className="grid min-w-0 gap-3">
+      <div className="flex min-w-0 flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="gpu-config-select"
+          label={t.gpuConfig}
+          tooltip={t.gpuConfigTooltip}
+        />
+        <div data-testid="gpu-multiselect" className="min-w-0">
+          <MultiSelect
+            options={availableGPUs}
+            value={selectedGPUs}
+            onChange={handleGPUChange}
+            open={openDropdown === 'gpu'}
+            onOpenChange={handleDropdownOpenChange('gpu')}
+            placeholder={t.gpuConfigPlaceholder}
+            maxSelections={4}
+            searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+            noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+            clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+            selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+          />
+        </div>
+      </div>
+
+      {selectedGPUs.length > 0 && (
+        <div className="flex min-w-0 flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="date-picker"
+            label={t.comparisonDateRange}
+            tooltip={t.comparisonDateRangeTooltip}
+          />
+          <DateRangePicker
+            dateRange={selectedDateRange}
+            onChange={handleDateRangeChange}
+            placeholder={t.dateRangePlaceholder}
+            availableDates={dateRangeAvailableDates}
+            isCheckingAvailableDates={isCheckingAvailableDates}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  if (powerXStrip) {
+    return (
+      <TooltipProvider delayDuration={0}>
+        {powerXStrip({
+          model: (
+            <ModelSelector
+              variant="strip"
+              value={selectedModel}
+              onChange={handleModelChange}
+              open={openDropdown === 'model'}
+              onOpenChange={handleDropdownOpenChange('model')}
+              onOptionIntent={handleModelIntent}
+              availableModels={selectableModels}
+              data-testid="model-selector"
+              newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
+              modelDetails={modelDetails}
+              modelBadges={powerXModelBadges}
+            />
+          ),
+          scenario: (
+            <ScenarioSelector
+              variant="strip"
+              value={selectedSequence}
+              onChange={handleSequenceChange}
+              open={openDropdown === 'sequence'}
+              onOpenChange={handleDropdownOpenChange('sequence')}
+              onOptionIntent={(sequence) => warmFilterChange({ sequence })}
+              availableSequences={availableSequences}
+              model={selectedModel}
+              data-testid="scenario-selector"
+            />
+          ),
+          precision: selectedPrecisions
+            .map((precision) => getPrecisionLabel(precision as Precision))
+            .join(', '),
+          history: historyFields,
+          historyActive: selectedGPUs.length > 0,
+          modelBadge: powerXModelBadges?.get(selectedModel),
+        })}
+      </TooltipProvider>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={0}>
       <div className="grid min-w-0 items-start gap-x-6 gap-y-4 lg:grid-cols-12">
@@ -794,47 +903,7 @@ export default function ChartControls({
           {runContext && <div className={`min-w-0 ${spans.run}`}>{runContext}</div>}
           {!hideGpuComparison && (
             <ControlPanel legend={t.compareHistory} className={spans.history}>
-              <div className="grid min-w-0 gap-3">
-                <div className="flex min-w-0 flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="gpu-config-select"
-                    label={t.gpuConfig}
-                    tooltip={t.gpuConfigTooltip}
-                  />
-                  <div data-testid="gpu-multiselect" className="min-w-0">
-                    <MultiSelect
-                      options={availableGPUs}
-                      value={selectedGPUs}
-                      onChange={handleGPUChange}
-                      open={openDropdown === 'gpu'}
-                      onOpenChange={handleDropdownOpenChange('gpu')}
-                      placeholder={t.gpuConfigPlaceholder}
-                      maxSelections={4}
-                      searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
-                      noResultsLabel={locale === 'zh' ? '无结果' : undefined}
-                      clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-                      selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
-                    />
-                  </div>
-                </div>
-
-                {selectedGPUs.length > 0 && (
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="date-picker"
-                      label={t.comparisonDateRange}
-                      tooltip={t.comparisonDateRangeTooltip}
-                    />
-                    <DateRangePicker
-                      dateRange={selectedDateRange}
-                      onChange={handleDateRangeChange}
-                      placeholder={t.dateRangePlaceholder}
-                      availableDates={dateRangeAvailableDates}
-                      isCheckingAvailableDates={isCheckingAvailableDates}
-                    />
-                  </div>
-                )}
-              </div>
+              {historyFields}
             </ControlPanel>
           )}
         </MobileControlSection>

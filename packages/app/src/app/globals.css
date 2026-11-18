@@ -216,6 +216,10 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-primary: var(--primary);
   --color-brand: var(--brand);
   --color-brand-fill: var(--brand-fill);
+  /* PowerX: Compare at (the orange reading line) and the GPU pools. */
+  --color-powerx-at: #e8900c;
+  --color-powerx-prefill: #7c4dcc;
+  --color-powerx-decode: #0b7f8c;
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);

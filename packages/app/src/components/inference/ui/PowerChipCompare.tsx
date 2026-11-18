@@ -285,8 +285,6 @@ export default function PowerChipCompare({
   // The target is shared with the drill-down and the main chart.
   const target = usePowerXCompareTarget();
   const setTarget = useSetPowerXCompareTarget();
-  // A new model or scenario changes the range; return to the shared middle.
-  useEffect(() => setTarget?.(null), [lo, hi, setTarget]);
   const value = target ?? fallback;
 
   // Rows keep the series order (registry order, overlays last) whatever the slider reads.
