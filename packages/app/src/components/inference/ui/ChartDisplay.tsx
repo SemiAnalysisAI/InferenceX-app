@@ -395,6 +395,10 @@ export default function ChartDisplay({
       setPowerXActivePoint,
     ],
   );
+  const powerXHardwareLabel = useCallback(
+    (hw: string) => getDisplayLabel(getHardwareConfig(hw)),
+    [],
+  );
   const handlePowerRoleChange = useCallback(
     (next: PowerXRole) => {
       setPowerRole(next);
@@ -1432,13 +1436,16 @@ export default function ChartDisplay({
                           {powerXLayout && powerXMounted && powerXVisibleRows && powerXTab && (
                             <>
                               <PowerXRoleNoData role={powerRole} points={powerXVisibleRows} />
-                              <PowerXInsightCard
-                                view={powerXTab}
-                                role={powerRole}
-                                points={powerXVisibleRows}
-                                onRoleChange={handlePowerRoleChange}
-                                hardwareLabel={(hw) => getDisplayLabel(getHardwareConfig(hw))}
-                              />
+                              {/* Over time renders its card from the power traces instead. */}
+                              {powerXTab !== 'time' && (
+                                <PowerXInsightCard
+                                  view={powerXTab}
+                                  role={powerRole}
+                                  points={powerXVisibleRows}
+                                  onRoleChange={handlePowerRoleChange}
+                                  hardwareLabel={powerXHardwareLabel}
+                                />
+                              )}
                             </>
                           )}
                           {powerXLayout &&
@@ -1567,6 +1574,20 @@ export default function ChartDisplay({
                               footer={chartFooter}
                               comparison={Boolean(isGpuComparison)}
                               runNumbering={runNumbering}
+                              insight={
+                                powerXLayout && powerXMounted && powerXVisibleRows
+                                  ? (traces) => (
+                                      <PowerXInsightCard
+                                        view="time"
+                                        role={powerRole}
+                                        points={powerXVisibleRows}
+                                        traces={traces}
+                                        onRoleChange={handlePowerRoleChange}
+                                        hardwareLabel={powerXHardwareLabel}
+                                      />
+                                    )
+                                  : undefined
+                              }
                             />
                           </div>
                         );

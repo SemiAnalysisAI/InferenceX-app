@@ -1,8 +1,10 @@
 import type { InferenceData } from '@/components/inference/types';
 import { poolPercentTdp } from '@/components/inference/utils/power-compare';
+import { tracePools, type PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 import { modeledFacilityWattsPerGpu } from '@/lib/power/power-basis';
 
+import { loadSwingRows } from './load-swing-rows';
 import { defaultReadoutPoint } from './PowerXLayout';
 import { hasPowerRoleData, type PowerXRole } from './powerx-role';
 import type { PowerXView } from './powerx-views';
@@ -21,6 +23,8 @@ export interface PoolPair {
  * - `power`: average W per GPU by pool and each pool's % of TDP (null when TDP is unknown).
  * - `gpuLayer`: each pool's share of the measured GPU layer (pool W × pool GPUs), and the
  *   facility uplift (modeled facility W per GPU ÷ measured W per GPU) when modeled.
+ * - `swing`: Over time under All GPUs, the largest 5 s change of the all-GPU mean trace
+ *   (W per GPU, the load-swings table's Max Δ5s) across the visible disaggregated traces.
  */
 export type PowerXInsightFinding =
   | { kind: 'energy'; joules: PoolPair; total: number; share: PoolPair }
@@ -31,7 +35,8 @@ export type PowerXInsightFinding =
       gpus: PoolPair;
       share: PoolPair;
       facilityUplift: number | null;
-    };
+    }
+  | { kind: 'swing'; trace: PowerTimelineTrace; deltaWatts: number; tdpWatts: number };
 
 export interface PowerXInsight {
   view: PowerXView;
@@ -39,7 +44,10 @@ export interface PowerXInsight {
   /** The row the numbers describe. */
   point: InferenceData;
   finding: PowerXInsightFinding;
-  /** Every visible chip config (hwKey) with prefill/decode telemetry, in first-seen order. */
+  /**
+   * Every visible chip config (hwKey) with prefill/decode telemetry, in first-seen order: rows
+   * with per-pool power, or for the swing finding traces with prefill/decode GPU pools.
+   */
   hardware: string[];
 }
 
@@ -113,10 +121,42 @@ function gpuLayerFinding(point: InferenceData): PowerXInsightFinding | null {
   };
 }
 
+const hasRolePools = (trace: PowerTimelineTrace) =>
+  tracePools(trace.series).some((pool) => pool.role !== 'all');
+
 /**
- * Which finding a view shows. All GPUs on Over time would show the 5 s load swing, which
- * lives in the power traces rather than the chart rows, so it has none; under a role the
- * Over time card states the pool's average draw.
+ * The 5 s load swing behind the Over time card under All GPUs, read from the same
+ * `loadSwingRows` the load-swings table prints (so the card's figure is one of its Max Δ5s
+ * cells). Only traces that split into prefill and decode pools count, since the card leads to
+ * the role split; the largest swing among them wins, the first on a tie.
+ */
+export function powerXLoadSwingInsight(
+  traces: readonly PowerTimelineTrace[],
+): PowerXInsight | null {
+  const split = traces.filter(hasRolePools);
+  let best: ReturnType<typeof loadSwingRows>[number] | null = null;
+  for (const row of loadSwingRows(split, 'all')) {
+    if (row.stats.maxDelta5s > (best?.stats.maxDelta5s ?? 0)) best = row;
+  }
+  if (!best) return null;
+  return {
+    view: 'time',
+    role: 'all',
+    point: best.trace.point,
+    finding: {
+      kind: 'swing',
+      trace: best.trace,
+      deltaWatts: best.stats.maxDelta5s,
+      tdpWatts: best.tdpWatts,
+    },
+    hardware: [...new Set(split.map((trace) => trace.point.hwKey))],
+  };
+}
+
+/**
+ * Which finding a view shows from the chart rows. All GPUs on Over time shows the 5 s load
+ * swing, which lives in the power traces rather than the chart rows (`powerXLoadSwingInsight`);
+ * under a role the Over time card states the pool's average draw.
  */
 function findingFor(view: PowerXView, role: PowerXRole) {
   if (view === 'energy') return energyFinding;
@@ -126,18 +166,23 @@ function findingFor(view: PowerXView, role: PowerXRole) {
 }
 
 /**
- * The insight for a view and role, or null when no visible row is disaggregated with
- * per-pool telemetry (aggregated rows run prefill and decode on the same GPUs).
+ * The insight for a view and role, or null when no visible row (or, for the Over time swing,
+ * no visible trace) is disaggregated with per-pool telemetry (aggregated rows run prefill and
+ * decode on the same GPUs).
  */
 export function powerXInsight({
   view,
   role,
   points,
+  traces,
 }: {
   view: PowerXView;
   role: PowerXRole;
   points: readonly InferenceData[];
+  /** Over time: the traces the load-swings table reads (the focused one when focused). */
+  traces?: readonly PowerTimelineTrace[];
 }): PowerXInsight | null {
+  if (view === 'time' && role === 'all') return traces ? powerXLoadSwingInsight(traces) : null;
   const compute = findingFor(view, role);
   if (!compute) return null;
   const rows = powerXRoleRows(points);

@@ -2,9 +2,13 @@
 
 import { Button } from '@/components/ui/button';
 import type { InferenceData } from '@/components/inference/types';
+import type { PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
 import { cn } from '@/lib/shared/utils';
+
+import { formatLoadSwingWatts, loadSwingPercentTdp } from './load-swing-rows';
 
 import { powerXInsight, type PoolPair, type PowerXInsight } from './powerx-insight';
 import type { PowerXRole } from './powerx-role';
@@ -66,6 +70,8 @@ const STRINGS = {
     whereSplit: (p: string, d: string, hw: string, x: string) =>
       `Prefill GPUs draw ${p} of the GPU layer and decode GPUs ${d} on ${hw} at ${x} tok/s/user.`,
     whereCaption: (p: number, d: number) => `Share of GPU layer · ${p} prefill + ${d} decode GPUs`,
+    swingAll: (hw: string, conc: number, w: string, tdp: string | null, kw: string) =>
+      `On ${hw} at c${conc}, GPU power swings by up to ${w} per GPU within 5 s${tdp ? ` (${tdp} of TDP)` : ''}, or ${kw} per NVL72 rack if all ${NVL72_GPUS_PER_RACK} GPUs swing together.`,
   },
   zh: {
     label: 'PowerX 洞察',
@@ -107,6 +113,8 @@ const STRINGS = {
     whereSplit: (p: string, d: string, hw: string, x: string) =>
       `在 ${x} tok/s/user 时，${hw} 的预填充 GPU 占 GPU 层功耗的 ${p}，解码 GPU 占 ${d}。`,
     whereCaption: (p: number, d: number) => `占 GPU 层功耗的比例 · ${p} 个预填充 + ${d} 个解码 GPU`,
+    swingAll: (hw: string, conc: number, w: string, tdp: string | null, kw: string) =>
+      `${hw} 在 c${conc} 下，GPU 功耗 5 秒内的最大波动为每 GPU ${w}${tdp ? `（TDP 的 ${tdp}）` : ''}；若 NVL72 机架内 ${NVL72_GPUS_PER_RACK} 颗 GPU 同步波动，相当于每机架 ${kw}。`,
   },
 } as const;
 
@@ -117,6 +125,8 @@ export interface PowerXInsightCardProps {
   role: PowerXRole;
   /** The chart's visible rows (overlay rows included); numbers are computed from these. */
   points: readonly InferenceData[];
+  /** Over time: the traces the load-swings table reads; the All GPUs card reads its swing. */
+  traces?: readonly PowerTimelineTrace[];
   onRoleChange: (role: PowerXRole) => void;
   hardwareLabel: (hwKey: string) => string;
 }
@@ -131,6 +141,20 @@ function insightCopy(t: Strings, insight: PowerXInsight, hw: string): Copy {
   const { finding, role, point } = insight;
   const x = rate(point.x);
   const pool: Pool | null = role === 'prefill' || role === 'decode' ? role : null;
+  if (finding.kind === 'swing') {
+    const tdp = loadSwingPercentTdp(finding.deltaWatts, finding.tdpWatts);
+    return {
+      headline: t.swingAll(
+        hw,
+        point.conc,
+        formatLoadSwingWatts(finding.deltaWatts, false),
+        tdp === null ? null : `${tdp}%`,
+        formatLoadSwingWatts(finding.deltaWatts, true),
+      ),
+      caption: '',
+      bars: null,
+    };
+  }
   if (finding.kind === 'energy') {
     const headline =
       role === 'all'
@@ -251,11 +275,12 @@ export function PowerXInsightCard({
   view,
   role,
   points,
+  traces,
   onRoleChange,
   hardwareLabel,
 }: PowerXInsightCardProps) {
   const t = STRINGS[useLocale()];
-  const insight = powerXInsight({ view, role, points });
+  const insight = powerXInsight({ view, role, points, traces });
   if (!insight) return null;
   const hw = hardwareLabel(insight.point.hwKey);
   const copy = insightCopy(t, insight, hw);
@@ -279,6 +304,7 @@ export function PowerXInsightCard({
       data-testid="powerx-insight-card"
       data-view={view}
       data-role={role}
+      data-finding={insight.finding.kind}
       className="mb-2 flex min-w-0 flex-col gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 sm:flex-row sm:items-center sm:gap-4"
     >
       <div className="min-w-0 flex-1">

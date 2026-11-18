@@ -951,7 +951,9 @@ trace (peak, min, idle floor, mean, P5/P95, max 1 s and 5 s change, ramp up/down
 a × 72 per NVL72 rack switch, and per-point CSV / JSON downloads served by
 `/api/v1/gpu-metrics-point/stats` (`format=csv|json`, `scale=gpu|nvl72`,
 `role=all|prefill|decode|split`), which computes the same statistics from the same stored
-buckets; under a GPU role each lane is one pool's GPU rows (`devices[].role`). None of this adds `inference` view selectors.
+buckets; under a GPU role each lane is one pool's GPU rows (`devices[].role`). Under All GPUs
+the Over time insight card states the largest Max Δ5s among the visible traces that split into
+prefill and decode pools, read from the same table rows (the stats route's `maxDelta5s`). None of this adds `inference` view selectors.
 A share link with `i_pcompare=all` (not offered by the UI) adds both provisioned bounds to the measured three. Inference Performance offers no power metrics: an `/infx/inference` link with a
 measured `metric`, or with a power-tier filter and no `metric`, opens `/pwx` with the same
 filters (the latter on the Power draw scatter, `i_metric=y_measuredAvgPower`, as it used to chart power). Historical Trends keeps its measured power and energy metrics.

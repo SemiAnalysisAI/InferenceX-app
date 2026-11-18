@@ -2,27 +2,21 @@
 
 import { Download, Info } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
-
 import type { InferenceData } from '@/components/inference/types';
-import {
-  poolSubsetSeries,
-  traceLanes,
-  type PowerLaneKind,
-  type PowerPoolRole,
-  type PowerTimelineTrace,
-} from '@/components/inference/utils/powerTimeline';
+import type { PowerPoolRole, PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 import { Switch } from '@/components/ui/switch';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
-import {
-  loadSwingStatsFromSeries,
-  NVL72_GPUS_PER_RACK,
-  type LoadSwingStats,
-} from '@/lib/power/load-swing-stats';
+import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
 
+import {
+  formatLoadSwingWatts,
+  loadSwingPercentTdp,
+  loadSwingRows,
+  type LoadSwingRow,
+} from './load-swing-rows';
 import { PowerBasisPill } from './PowerBasisPill';
 import type { PowerXRole } from './powerx-role';
 
@@ -95,49 +89,9 @@ const STRINGS = {
   },
 } as const;
 
-interface LoadSwingTraceRow {
-  key: string;
-  trace: PowerTimelineTrace;
+interface LoadSwingTraceRow extends LoadSwingRow {
   color: string;
   label: string;
-  /** Under a GPU role: the lane this row reads; absent under All GPUs. */
-  lane?: { role: PowerPoolRole; kind: PowerLaneKind; gpuCount: number };
-  stats: LoadSwingStats;
-  tdpWatts: number;
-}
-
-/**
- * Statistics of every visible trace, one row per lane under a GPU role (the pool subset via
- * `poolSubsetSeries`, the same function the stats API uses); rows without samples are left out.
- */
-function loadSwingRows(
-  traces: readonly PowerTimelineTrace[],
-  colorOf: (trace: PowerTimelineTrace) => string,
-  labelOf: (point: InferenceData) => string,
-  role: PowerXRole,
-): LoadSwingTraceRow[] {
-  return traces.flatMap((trace) =>
-    traceLanes(trace.series, role).flatMap((lane) => {
-      const series = lane.role === 'all' ? trace.series : poolSubsetSeries(trace.series, lane.role);
-      const stats =
-        series && loadSwingStatsFromSeries(series, trace.windowStartMs, trace.windowEndMs);
-      if (!stats) return [];
-      return [
-        {
-          key: role === 'all' ? trace.key : `${trace.key}:${lane.kind}:${lane.role}`,
-          trace,
-          color: colorOf(trace),
-          label: labelOf(trace.point),
-          lane:
-            role === 'all'
-              ? undefined
-              : { role: lane.role, kind: lane.kind, gpuCount: lane.rows.length },
-          stats,
-          tdpWatts: HW_REGISTRY[trace.point.hwKey.split('_')[0]]?.tdp ?? 0,
-        },
-      ];
-    }),
-  );
 }
 
 function statsDownloadUrl(
@@ -169,19 +123,21 @@ export function PowerLoadSwings({
   const t = STRINGS[locale];
   const [rack, setRack] = useState(false);
   const isPhone = useIsMobileViewport();
-  const rows = useMemo(
-    () => loadSwingRows(traces, colorOf, labelOf, role),
+  const rows = useMemo<LoadSwingTraceRow[]>(
+    () =>
+      loadSwingRows(traces, role).map((row) => ({
+        ...row,
+        color: colorOf(row.trace),
+        label: labelOf(row.trace.point),
+      })),
     [traces, colorOf, labelOf, role],
   );
   if (rows.length === 0) return null;
-  const unit = rack ? 'kW' : 'W';
-  const value = (watts: number | null) => {
-    if (watts === null) return '—';
-    const scaled = rack ? (watts * NVL72_GPUS_PER_RACK) / 1000 : watts;
-    return `${rack ? Number(scaled.toPrecision(3)).toLocaleString('en-US') : Math.round(scaled).toLocaleString('en-US')} ${unit}`;
+  const value = (watts: number | null) => formatLoadSwingWatts(watts, rack);
+  const pctTdp = (watts: number, tdp: number) => {
+    const pct = loadSwingPercentTdp(watts, tdp);
+    return pct === null ? '' : ` · ${pct}% ${t.tdp}`;
   };
-  const pctTdp = (watts: number, tdp: number) =>
-    tdp > 0 ? ` · ${Math.round((watts / tdp) * 100)}% ${t.tdp}` : '';
   // One column list feeds both the desktop table and the phone cards, so they cannot drift.
   const statCells = ({ stats, tdpWatts }: LoadSwingTraceRow) => [
     { key: 'peak', label: t.peak, value: value(stats.peak) },

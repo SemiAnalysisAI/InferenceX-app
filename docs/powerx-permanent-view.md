@@ -228,6 +228,12 @@ link still opens that view for locked visitors.
   [&scale=gpu|nvl72][&role=all|prefill|decode|split]`, which runs the same function over the same stored buckets
   (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·
   single node · inference only · sub-second swings not captured".
+- **Over time insight** (All GPUs): the insight card states the largest 5 s swing (Max Δ5s, W
+  per GPU, % of TDP and × 72 per NVL72 rack) among the visible traces that split into prefill
+  and decode pools, the focused trace when one is focused. `powerXLoadSwingInsight`
+  (`powerx/powerx-insight.ts`) reads the same `loadSwingRows` (`powerx/load-swing-rows.ts`)
+  and formatters as the load-swings table, so the card's number is one of the table's cells.
+  Under a role the card states the pool's average draw, as on Power draw.
 - **Labels**: `PowerBasisPill` (GPU / IT / Facility) on readouts, table headers, the breakdown
   totals and the tooltip's power-model block; each pill's `title` is the tag's one-clause
   meaning (GPU board power, measured by DCGM · GPU + modeled server, no PUE · IT × PUE).

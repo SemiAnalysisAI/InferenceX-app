@@ -365,6 +365,11 @@ export interface PowerTimelineProps {
   runNumbering?: Map<string, number>;
   /** PowerX GPU role: per-GPU mean lanes per worker pool instead of the all-GPU mean. */
   role?: PowerXRole;
+  /**
+   * PowerX insight card, rendered under the caption from the traces the load-swings table
+   * reads (empty while runs are still loading), so its 5 s swing matches the table.
+   */
+  insight?: (traces: readonly PowerTimelineTrace[]) => React.ReactNode;
 }
 
 type TimelineStrings = (typeof STRINGS)[keyof typeof STRINGS];
@@ -1019,6 +1024,7 @@ export default function PowerTimeline({
   comparison = false,
   runNumbering: providedRunNumbering,
   role = 'all',
+  insight,
 }: PowerTimelineProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -2002,9 +2008,14 @@ export default function PowerTimeline({
     </div>
   );
 
-  const loadSwings = powerXSurface && loadingRuns === 0 && visibleTraces.length > 0 && (
+  // The load-swings table and the insight card read the same traces: the focused one, or all.
+  const swingTraces = useMemo(
+    () => (loadingRuns > 0 ? [] : focusedTrace ? [focusedTrace] : visibleTraces),
+    [loadingRuns, focusedTrace, visibleTraces],
+  );
+  const loadSwings = powerXSurface && swingTraces.length > 0 && (
     <PowerLoadSwings
-      traces={focusedTrace ? [focusedTrace] : visibleTraces}
+      traces={swingTraces}
       colorOf={(trace) => colorForTrace(trace).color}
       labelOf={seriesLabel}
       role={role}
@@ -2097,6 +2108,7 @@ export default function PowerTimeline({
         caption={
           <>
             {caption}
+            {insight?.(swingTraces)}
             {toolbar}
             {!isPhone && loadSwings}
             {isPhone && model.labels.length > 0 && (
