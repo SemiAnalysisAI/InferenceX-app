@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after a comment in stored.ts stopped naming Difference; entries are unchanged.
-      sources: '5e220ee0779fb1d2db11d782e2dbbef1284d6f44b8ccbe9021a043e72c9dade6',
+      // GlobalFilterContext's overlay model visibility does not change recorded entries.
+      sources: 'b1fb17188bb727477ced971670ab16a4e4319cb6de9aa2fdf1a0c82773f6628d',
     });
   });
 });
