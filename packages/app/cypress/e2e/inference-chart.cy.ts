@@ -355,7 +355,7 @@ describe('Deprecated model source attribution', () => {
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
       cy.get('#chart-0 [data-testid="result-context"]')
         .should('contain.text', 'SemiAnalysis InferenceX™')
-        .and(deprecated ? 'contain.text' : 'not.contain.text', '(deprecated)');
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(Deprecated)');
       cy.get('.deprecated-watermark').should('not.exist');
     }
   });

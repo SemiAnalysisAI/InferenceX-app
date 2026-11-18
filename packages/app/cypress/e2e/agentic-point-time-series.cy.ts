@@ -413,7 +413,7 @@ describe('Agentic point request metric time series', () => {
   it('switches the TTFT chart to E2E request latency over time', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();
-      cy.contains('h2', 'E2E Latency Over Time').should('be.visible');
+      cy.contains('h2', 'E2E latency over time').should('be.visible');
       cy.get('[data-testid="e2e-point-count"]').should('have.text', '8 points');
       cy.get('svg circle').should('have.length', 8);
       cy.get('svg').should('contain.text', 'E2E latency (s)');

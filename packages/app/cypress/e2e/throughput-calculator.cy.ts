@@ -119,7 +119,7 @@ describe('TCO Calculator', () => {
         },
         {
           metric: 'cost',
-          title: 'Cost per million',
+          title: 'Cost per Million',
           badges: ['TCO', '$/chip/hr'],
         },
       ] as const;
