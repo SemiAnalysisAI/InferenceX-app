@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -276,6 +277,21 @@ export default function VideoDeploymentDetail({
         ? s.invalidPower
         : s.notRecorded;
   const measuredCounts = new Set(siblings.map((sibling) => sibling.point.participating));
+  /** A deployment's GPU count, then its server layout, concurrency and clip count. */
+  const deploymentParts = ({ point: p }: ResultCell) => {
+    const [gpus, ...layout] = layoutLabel(p, locale).split(' · ');
+    return [gpus, layout.join(' · '), `c=${p.concurrency}`, `${n(p.valid, 0)} ${s.clips}`];
+  };
+  // A segment shows the GPU count, plus only the parts that tell it from a sibling with that count.
+  const deploymentNames = siblings.map(deploymentParts).map((parts, _, all) => {
+    let rivals = all.filter((other) => other !== parts && other[0] === parts[0]);
+    const short = parts.filter((part, index) => {
+      const tells = index === 0 || rivals.some((other) => other[index] !== part);
+      if (tells) rivals = rivals.filter((other) => other[index] === part);
+      return tells;
+    });
+    return short.join(' · ');
+  });
   const failures = evidence?.failures ?? null;
   // Older History has no sample count, so only a recorded zero skips the artifact read.
   const trace = usePowerTrace(
@@ -338,32 +354,25 @@ export default function VideoDeploymentDetail({
             ].join(' · ')}
             actions={<ShareButton />}
           />
-          <div
-            className="flex flex-wrap items-center gap-2 text-xs"
-            role="group"
-            aria-label={s.deployments}
-            data-testid="results-detail-deployments"
-          >
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-muted-foreground">{s.deployments}</span>
-            {siblings.map((sibling) => {
-              const selected = resultsPointKey(sibling) === resultsPointKey(cell);
-              return (
-                <Button
-                  key={resultsPointKey(sibling)}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  aria-pressed={selected}
-                  className="text-xs"
-                  onClick={() => {
-                    if (!selected) onSelect(sibling);
-                  }}
-                >
-                  {layoutLabel(sibling.point, locale)} · c={sibling.point.concurrency} ·{' '}
-                  {n(sibling.point.valid, 0)} {s.clips}
-                </Button>
-              );
-            })}
+            {/* One row at every width: more deployments than fit scroll sideways. */}
+            <SegmentedToggle
+              role="group"
+              ariaLabel={s.deployments}
+              testId="results-detail-deployments"
+              className="flex-nowrap overflow-x-auto"
+              buttonClassName="shrink-0 text-xs whitespace-nowrap max-sm:px-1"
+              value={resultsPointKey(cell)}
+              options={siblings.map((sibling, index) => ({
+                value: resultsPointKey(sibling),
+                label: deploymentNames[index],
+              }))}
+              onValueChange={(key) => {
+                const next = siblings.find((sibling) => resultsPointKey(sibling) === key);
+                if (next && key !== resultsPointKey(cell)) onSelect(next);
+              }}
+            />
             {gpuCounts
               .filter((count) => !measuredCounts.has(count))
               .toSorted((a, b) => a - b)
@@ -375,6 +384,10 @@ export default function VideoDeploymentDetail({
                   {s.notMeasuredGpus(count)}
                 </span>
               ))}
+            {/* The segments name what tells the deployments apart; this line names the open one in full. */}
+            <p className="w-full text-muted-foreground" data-testid="results-detail-deployment">
+              {deploymentParts(cell).filter(Boolean).join(' · ')}
+            </p>
           </div>
           <Facts
             rows={[
