@@ -49,7 +49,7 @@ export default function AboutPage() {
           <Eyebrow as="p">About InferenceX</Eyebrow>
           <Heading as="h1" level="reading" className="mt-3">
             Open-Source Continuous Agentic Inference Benchmark Trusted by Operators of
-            trillion-Dollar, gigawatt-Scale Token Factories
+            Trillion-Dollar, GigaWatt-Scale Token Factories
           </Heading>
           <div className="mt-4 flex flex-col gap-4 leading-reading text-foreground">
             <p className={READING_DEK_CLASS}>

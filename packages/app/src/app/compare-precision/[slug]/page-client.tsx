@@ -22,7 +22,7 @@ import type { CompareTableData } from '@/lib/compare/compare-table-view';
 const STRINGS = {
   en: {
     eyebrowSuffix: 'Precision Comparison',
-    h1Prefix: 'precision Comparison',
+    h1Prefix: 'Precision Comparison',
     mainChartLinkText: 'the main inference chart',
     allComparisonsLinkText: 'All precision comparisons →',
     dashboardLinkText: 'Open the full dashboard →',

@@ -22,7 +22,7 @@ const supporterOrgs = (quotesPath: string) =>
   }));
 
 const HEADING = {
-  en: 'Open-Source Continuous AI Accelerator System Benchmark Trusted by gigawatt Token Factories',
+  en: 'Open-Source Continuous AI Accelerator System Benchmark Trusted by GigaWatt Token Factories',
   zh: 'InferenceX 提供持续更新的开源 AI 加速器系统基准测试，已获得吉瓦级 token 工厂运营方的信赖',
 } as const;
 
