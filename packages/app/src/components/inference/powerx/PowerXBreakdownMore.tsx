@@ -29,7 +29,7 @@ export function PowerXBreakdownMore({
   };
   return (
     <PowerXMore
-      tab="where"
+      tab="breakdown"
       changed={view === POWERX_BREAKDOWN_VIEW_DEFAULT ? 0 : 1}
       onReset={() => change(POWERX_BREAKDOWN_VIEW_DEFAULT)}
     >

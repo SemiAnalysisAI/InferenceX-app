@@ -10,15 +10,15 @@ export const POWERX_VOCAB = {
   en: {
     tabs: {
       energy: 'Energy per token',
-      draw: 'Power draw',
-      where: 'Breakdown',
+      power: 'Power draw',
+      breakdown: 'Breakdown',
       time: 'Over time',
     } satisfies Record<PowerXView, string>,
     /** Tab names that fit four across at 390 px. */
     tabsShort: {
       energy: 'Energy',
-      draw: 'Power',
-      where: 'Breakdown',
+      power: 'Power',
+      breakdown: 'Breakdown',
       time: 'Over time',
     } satisfies Record<PowerXView, string>,
     role: 'GPU role',
@@ -53,14 +53,14 @@ export const POWERX_VOCAB = {
   zh: {
     tabs: {
       energy: '每 Token 能耗',
-      draw: '功耗',
-      where: '功耗构成',
+      power: '功耗',
+      breakdown: '功耗构成',
       time: '随时间变化',
     } satisfies Record<PowerXView, string>,
     tabsShort: {
       energy: '能耗',
-      draw: '功耗',
-      where: '构成',
+      power: '功耗',
+      breakdown: '构成',
       time: '随时间',
     } satisfies Record<PowerXView, string>,
     role: 'GPU 角色',

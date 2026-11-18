@@ -160,8 +160,8 @@ export function powerXLoadSwingInsight(
  */
 function findingFor(view: PowerXView, role: PowerXRole) {
   if (view === 'energy') return energyFinding;
-  if (view === 'where') return gpuLayerFinding;
-  if (view === 'draw') return powerFinding;
+  if (view === 'breakdown') return gpuLayerFinding;
+  if (view === 'power') return powerFinding;
   return role === 'all' ? null : powerFinding;
 }
 

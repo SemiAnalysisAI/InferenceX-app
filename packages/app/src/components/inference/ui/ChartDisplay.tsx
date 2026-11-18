@@ -1203,7 +1203,7 @@ export default function ChartDisplay({
   }, [setPowerXCompareRange, powerXCoveredInteractivity]);
 
   const powerXReadoutPoints = useMemo(() => {
-    if (powerXTab === 'where' || powerXTab === 'time' || !powerXVisibleRows) return null;
+    if (powerXTab === 'breakdown' || powerXTab === 'time' || !powerXVisibleRows) return null;
     if (powerRole === 'all') return powerXVisibleRows;
     // Under a role the readout opens on a row that splits; aggregated rows are the fallback.
     const split = powerXVisibleRows.filter(hasPowerRoleData);
@@ -1237,7 +1237,8 @@ export default function ChartDisplay({
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
-            const powerXWherePanelsOnly = powerXLayout && powerXTab === 'where' && !isGpuComparison;
+            const powerXWherePanelsOnly =
+              powerXLayout && powerXTab === 'breakdown' && !isGpuComparison;
             const footerOverlay = overlayDataByChartType[graph.chartDefinition.chartType];
             const footerPoints = [
               ...graph.data,
@@ -1565,14 +1566,14 @@ export default function ChartDisplay({
                         </div>
                       );
                       const powerXWherePues =
-                        powerXLayout && powerXTab === 'where'
+                        powerXLayout && powerXTab === 'breakdown'
                           ? graph.data.flatMap((point) =>
                               point.modeledSystemPower?.status === 'supported'
                                 ? [point.modeledSystemPower.pue]
                                 : [],
                             )
                           : [];
-                      const powerXEnergyOrPower = powerXTab === 'energy' || powerXTab === 'draw';
+                      const powerXEnergyOrPower = powerXTab === 'energy' || powerXTab === 'power';
                       // PowerX: one toolbar row (tab options + More left, Chart | Table and
                       // Export right), then the y-title row with the role pin line. The model
                       // heading stays for screen readers; the context strip shows it.
@@ -1616,7 +1617,7 @@ export default function ChartDisplay({
                                   onSelectionChange={setPowerXSelection}
                                   role={powerRole}
                                 />
-                              ) : powerXTab === 'where' ? (
+                              ) : powerXTab === 'breakdown' ? (
                                 <div
                                   className="flex min-w-0 items-center"
                                   data-testid="powerx-where-controls"
@@ -1630,14 +1631,14 @@ export default function ChartDisplay({
                                   onSelectionChange={setPowerXSelection}
                                   role={powerRole}
                                 />
-                              ) : powerXTab === 'where' ? (
+                              ) : powerXTab === 'breakdown' ? (
                                 <PowerXBreakdownMore
                                   view={powerXBreakdownView}
                                   onViewChange={changePowerXBreakdownView}
                                 />
                               ) : undefined,
                               title:
-                                powerXTab === 'time' || powerXTab === 'where'
+                                powerXTab === 'time' || powerXTab === 'breakdown'
                                   ? undefined
                                   : metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
                             })
@@ -1661,7 +1662,9 @@ export default function ChartDisplay({
                                     formatMetricValue(point.y, selectedYAxisMetric)
                                   }
                                   onSeeBreakdown={() =>
-                                    setPowerXSelection(selectPowerXView('where', powerXSelection))
+                                    setPowerXSelection(
+                                      selectPowerXView('breakdown', powerXSelection),
+                                    )
                                   }
                                 />
                               ) : (
@@ -1857,7 +1860,7 @@ export default function ChartDisplay({
                       return scatter;
                     })()}
                     {powerXSurface &&
-                      powerXTab === 'where' &&
+                      powerXTab === 'breakdown' &&
                       !powerXWherePanelsOnly &&
                       getViewMode(graphIndex) !== 'table' &&
                       (() => {

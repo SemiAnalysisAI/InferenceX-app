@@ -116,7 +116,7 @@ describe('PowerXInsightCard', () => {
 
     const role = mount(
       <PowerXInsightCard
-        view="draw"
+        view="power"
         role="prefill"
         points={[disagg]}
         onRoleChange={onRoleChange}

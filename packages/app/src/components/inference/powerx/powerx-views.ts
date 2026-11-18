@@ -4,13 +4,26 @@ import { powerCompareVariants } from '../utils/power-compare';
 import type { MeasuredMetricField } from '../ui/MeasuredMetricControls';
 
 /** The four PowerX views; each maps onto existing metric + compare state, so no new URL param. */
-export type PowerXView = 'energy' | 'draw' | 'where' | 'time';
+export type PowerXView = 'energy' | 'power' | 'breakdown' | 'time';
 export const POWERX_VIEWS = [
   'energy',
-  'draw',
-  'where',
+  'power',
+  'breakdown',
   'time',
 ] as const satisfies readonly PowerXView[];
+/**
+ * The view id analytics events carry. Power draw and Breakdown were `draw` and `where`
+ * before the rename; events keep those values on purpose, so existing PowerX tab series
+ * do not split in two at the release. Nothing else reads view ids from outside: links
+ * encode the view through `i_metric` + `i_pcompare`.
+ */
+export const POWERX_VIEW_ANALYTICS_ID = {
+  energy: 'energy',
+  power: 'draw',
+  breakdown: 'where',
+  time: 'time',
+} as const satisfies Record<PowerXView, string>;
+
 /** The three measured boundaries the Count toggle names: GPU only, IT (no PUE), Facility. */
 type PowerXBoundary = 'gpu' | 'it' | 'system';
 /** Count on the Energy view: one boundary, or all three on one chart. */
@@ -50,9 +63,9 @@ export const POWERX_DEFAULT_METRIC = ENERGY_METRICS[DEFAULT_ENERGY_PER].gpu;
 
 /** Metric keys behind each view/boundary pair; the Energy view opens on the default unit. */
 export const VIEW_METRICS: Record<Exclude<PowerXView, 'time'>, BoundaryMetrics> = {
-  draw: { gpu: 'y_measuredAvgPower', it: 'y_itModeledWatts', system: 'y_utilityModeledWatts' },
+  power: { gpu: 'y_measuredAvgPower', it: 'y_itModeledWatts', system: 'y_utilityModeledWatts' },
   energy: ENERGY_METRICS[DEFAULT_ENERGY_PER],
-  where: { gpu: 'y_measuredAvgPower', it: 'y_measuredAvgPower', system: 'y_measuredAvgPower' },
+  breakdown: { gpu: 'y_measuredAvgPower', it: 'y_measuredAvgPower', system: 'y_measuredAvgPower' },
 };
 
 /** True when the unit has IT and facility boundaries (and the all-in provisioned bound). */
@@ -90,9 +103,9 @@ export function powerXViewFor(metric: string, compare: PowerCompare): PowerXView
   // The breakdown stacks are the Where view; a boundary overlay (Count: All, the rated
   // pair, or a share link's five lines) and the per-role lines a GPU role draws stay on
   // the metric's own view. Old `i_pcompare=roles` links are rewritten onto `i_role`.
-  if (compare === 'breakdown') return 'where';
+  if (compare === 'breakdown') return 'breakdown';
   if (config.family === 'energy') return 'energy';
-  return config.display === 'timeline' ? 'time' : 'draw';
+  return config.display === 'timeline' ? 'time' : 'power';
 }
 
 export function powerXBoundaryFor(metric: string): PowerXBoundary {
@@ -112,7 +125,7 @@ export function selectPowerXView(next: PowerXView, current: PowerXSelection): Po
   if (next === view) return current;
   if (next === 'time') return { metric: POWER_TIMELINE_METRIC, compare: 'none' };
   const boundary = powerXBoundaryFor(current.metric);
-  if (next === 'where') return { metric: VIEW_METRICS.where.gpu, compare: WHERE_COMPARE };
+  if (next === 'breakdown') return { metric: VIEW_METRICS.breakdown.gpu, compare: WHERE_COMPARE };
   return { metric: VIEW_METRICS[next][boundary], compare: 'none' };
 }
 
@@ -130,13 +143,13 @@ export function selectPowerXCount(next: PowerXCount, current: PowerXSelection): 
   if (next === 'both') {
     return {
       metric:
-        view === 'draw'
-          ? VIEW_METRICS.draw.gpu
+        view === 'power'
+          ? VIEW_METRICS.power.gpu
           : ENERGY_METRICS[boundaryEnergyPer(current.metric)].gpu,
       compare: 'boundaries',
     };
   }
-  if (view === 'draw') return { metric: VIEW_METRICS.draw[next], compare: 'none' };
+  if (view === 'power') return { metric: VIEW_METRICS.power[next], compare: 'none' };
   const per = next === 'gpu' ? energyPerFor(current.metric) : boundaryEnergyPer(current.metric);
   return { metric: energyMetric(per, next), compare: 'none' };
 }
@@ -168,8 +181,8 @@ export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerX
     const view = powerXViewFor(current.metric, current.compare);
     return {
       metric:
-        view === 'draw'
-          ? VIEW_METRICS.draw.gpu
+        view === 'power'
+          ? VIEW_METRICS.power.gpu
           : ENERGY_METRICS[boundaryEnergyPer(current.metric)].gpu,
       compare: 'provisioned',
     };
@@ -200,7 +213,7 @@ export function powerXShowAsFor(metric: string): PowerXShowAs {
 
 /** The Show as toggle on the Power draw view; % of TDP is a GPU-only reading. */
 export function selectPowerXShowAs(next: PowerXShowAs): string {
-  return next === 'tdp' ? POWER_PERCENT_TDP_METRIC : VIEW_METRICS.draw.gpu;
+  return next === 'tdp' ? POWER_PERCENT_TDP_METRIC : VIEW_METRICS.power.gpu;
 }
 
 /** True on the Power draw view shown as % of TDP, where the headroom shading and table apply. */
@@ -216,7 +229,7 @@ export function powerXShowsHeadroom(metric: string, compare: PowerCompare): bool
  */
 export function powerXChangedCount(selection: PowerXSelection): number {
   const view = powerXViewFor(selection.metric, selection.compare);
-  if (view !== 'energy' && view !== 'draw') return 0;
+  if (view !== 'energy' && view !== 'power') return 0;
   const config = getMeasuredMetricConfig(selection.metric);
   let changed = powerXCountFor(selection.metric, selection.compare) === 'gpu' ? 0 : 1;
   if (config?.scope !== undefined && config.scope !== 'all') changed += 1;
@@ -258,6 +271,6 @@ export function powerXMetricFields(
   const config = getMeasuredMetricConfig(metric);
   const view = powerXViewFor(metric, compare);
   if (!config || !view || compare !== 'none' || config.basis !== 'gpu-measured') return [];
-  if (view === 'draw') return ['statistic'];
+  if (view === 'power') return ['statistic'];
   return [];
 }

@@ -18,9 +18,9 @@ import {
 
 describe('powerXViewFor', () => {
   it('maps every measured metric to a view so the tabs never disappear', () => {
-    expect(powerXViewFor('y_measuredAvgPower', 'none')).toBe('draw');
-    expect(powerXViewFor('y_measuredP90Power', 'none')).toBe('draw');
-    expect(powerXViewFor('y_measuredPowerPercentTdp', 'none')).toBe('draw');
+    expect(powerXViewFor('y_measuredAvgPower', 'none')).toBe('power');
+    expect(powerXViewFor('y_measuredP90Power', 'none')).toBe('power');
+    expect(powerXViewFor('y_measuredPowerPercentTdp', 'none')).toBe('power');
     expect(powerXViewFor('y_measuredWhPerSuccessfulQuery', 'none')).toBe('energy');
     expect(powerXViewFor(POWERX_DEFAULT_METRIC, 'none')).toBe('energy');
     expect(powerXViewFor('y_measuredPowerTimeline', 'none')).toBe('time');
@@ -31,11 +31,11 @@ describe('powerXViewFor', () => {
 describe('selectPowerXView', () => {
   it('switches views through metric + compare only, keeping the chosen boundary', () => {
     const energy = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' as const };
-    expect(selectPowerXView('draw', energy)).toEqual({
+    expect(selectPowerXView('power', energy)).toEqual({
       metric: 'y_utilityModeledWatts',
       compare: 'none',
     });
-    expect(selectPowerXView('where', energy)).toEqual({
+    expect(selectPowerXView('breakdown', energy)).toEqual({
       metric: 'y_measuredAvgPower',
       compare: 'breakdown',
     });

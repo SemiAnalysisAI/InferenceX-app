@@ -69,7 +69,10 @@ const STRINGS = {
     energyPer: POWERX_VOCAB.en.energyPer,
     pers: POWERX_VOCAB.en.pers,
     showAs: 'Show as',
-    showAsOptions: { watts: POWERX_VOCAB.en.wPerGpu, tdp: '% of TDP' } satisfies Record<PowerXShowAs, string>,
+    showAsOptions: { watts: POWERX_VOCAB.en.wPerGpu, tdp: '% of TDP' } satisfies Record<
+      PowerXShowAs,
+      string
+    >,
     showAsShort: { watts: 'W/GPU', tdp: '% TDP' } satisfies Record<PowerXShowAs, string>,
     tdpGpuOnly: 'TDP bounds GPU power only',
     statistic: 'Statistic',
@@ -119,7 +122,10 @@ const STRINGS = {
     energyPer: POWERX_VOCAB.zh.energyPer,
     pers: POWERX_VOCAB.zh.pers,
     showAs: '显示为',
-    showAsOptions: { watts: POWERX_VOCAB.zh.wPerGpu, tdp: 'TDP 占比' } satisfies Record<PowerXShowAs, string>,
+    showAsOptions: { watts: POWERX_VOCAB.zh.wPerGpu, tdp: 'TDP 占比' } satisfies Record<
+      PowerXShowAs,
+      string
+    >,
     showAsShort: { watts: 'W/GPU', tdp: 'TDP %' } satisfies Record<PowerXShowAs, string>,
     tdpGpuOnly: 'TDP 仅限定 GPU 功耗',
     statistic: '统计量',
@@ -293,7 +299,7 @@ export function PowerXEnergyPowerOptions({
   const t = STRINGS[locale];
   const analyticsContext = useInferenceAnalyticsContext();
   const view = powerXViewFor(selection.metric, selection.compare);
-  if (view !== 'energy' && view !== 'draw') return null;
+  if (view !== 'energy' && view !== 'power') return null;
   const pinned = powerXPinnedControls(view, role);
   const effective = resolvePowerXRole(selection, role);
   const countLocked = pinned.includes('count');
@@ -438,7 +444,7 @@ export function PowerXEnergyPowerMore({
   const { setSelectedXAxisMode, setLogScale, setUseAdvancedLabels, setShowGradientLabels } =
     useInferenceActions();
   const view = powerXViewFor(selection.metric, selection.compare);
-  if (view !== 'energy' && view !== 'draw') return null;
+  if (view !== 'energy' && view !== 'power') return null;
   const ratedPinned = powerXPinnedControls(view, role).includes('rated');
   const ratedAvailable = view === 'energy' && powerXRatedAvailable(selection.metric);
   const ratedOn = !ratedPinned && powerXRatedOn(selection.compare);

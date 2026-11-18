@@ -65,7 +65,7 @@ function mountStrip(role: 'all' | 'decode') {
   act(() =>
     root.render(
       <PowerXPinnedStrip
-        tab="draw"
+        tab="power"
         role={role}
         metric="y_measuredAvgPower"
         formatValue={(point) => String(point.y)}

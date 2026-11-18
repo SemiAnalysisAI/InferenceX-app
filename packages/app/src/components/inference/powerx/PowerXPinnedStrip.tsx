@@ -117,7 +117,7 @@ export function powerXPinnedCells(
     value,
     t,
   }: {
-    tab: 'energy' | 'draw';
+    tab: 'energy' | 'power';
     role: PowerXRole;
     metric: string;
     /** The plotted y value, formatted. */
@@ -195,7 +195,7 @@ export function PowerXPinnedStrip({
   formatValue,
   onSeeBreakdown,
 }: {
-  tab: 'energy' | 'draw';
+  tab: 'energy' | 'power';
   role: PowerXRole;
   metric: string;
   formatValue: (point: InferenceData) => string;

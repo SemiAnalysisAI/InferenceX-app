@@ -91,7 +91,7 @@ export function resolvePowerXRole(selection: PowerXSelection, role: PowerXRole):
       compare: 'roles',
     };
   }
-  if (view === 'draw') {
+  if (view === 'power') {
     return {
       metric:
         powerXShowAsFor(selection.metric) === 'tdp'
@@ -112,7 +112,7 @@ export function powerXPinnedControls(
 ): readonly PowerXPinnedControl[] {
   if (role === 'all') return [];
   if (view === 'energy') return role === 'prefill' ? ['count', 'rated'] : ['count', 'per', 'rated'];
-  if (view === 'draw') return ['count', 'statistic', 'headroom'];
+  if (view === 'power') return ['count', 'statistic', 'headroom'];
   return [];
 }
 

@@ -32,6 +32,7 @@ import {
 import { POWERX_ROLES, type PowerXRole } from './powerx-role';
 import { POWERX_VOCAB } from './powerx-strings';
 import {
+  POWERX_VIEW_ANALYTICS_ID,
   POWERX_VIEWS,
   powerXViewFor,
   selectPowerXView,
@@ -85,8 +86,8 @@ const STRINGS = {
     tabsShort: POWERX_VOCAB.en.tabsShort,
     tabHints: {
       energy: 'Joules per token or Wh per query vs interactivity',
-      draw: 'Watts per GPU vs interactivity',
-      where: 'GPU, server and facility at Compare at',
+      power: 'Watts per GPU vs interactivity',
+      breakdown: 'GPU, server and facility at Compare at',
       time: 'Power trace through a run',
     } satisfies Record<PowerXView, string>,
     more: 'More',
@@ -134,8 +135,8 @@ const STRINGS = {
     tabsShort: POWERX_VOCAB.zh.tabsShort,
     tabHints: {
       energy: '每 Token 焦耳数或每次查询 Wh vs 交互性',
-      draw: '每 GPU 瓦数 vs 交互性',
-      where: '对比点处的 GPU、服务器与数据中心功耗',
+      power: '每 GPU 瓦数 vs 交互性',
+      breakdown: '对比点处的 GPU、服务器与数据中心功耗',
       time: '运行期间的功耗曲线',
     } satisfies Record<PowerXView, string>,
     more: '更多',
@@ -839,7 +840,10 @@ export function PowerXTabs({
             data-testid={`powerx-tab-${value}`}
             onClick={() => {
               if (selected) return;
-              track('inference_powerx_tab_selected', { ...analyticsContext, tab: value });
+              track('inference_powerx_tab_selected', {
+                ...analyticsContext,
+                tab: POWERX_VIEW_ANALYTICS_ID[value],
+              });
               onSelectionChange(selectPowerXView(value, selection));
             }}
             className={cn(
@@ -873,7 +877,7 @@ export function PowerXMore({ tab, changed, onReset, children }: PowerXMoreProps)
   const [open, setOpen] = useState(false);
   const onOpenChange = (next: boolean) => {
     setOpen(next);
-    if (next) track('powerx_more_opened', { tab, changed });
+    if (next) track('powerx_more_opened', { tab: POWERX_VIEW_ANALYTICS_ID[tab], changed });
   };
   const trigger = (
     <button
@@ -905,7 +909,7 @@ export function PowerXMore({ tab, changed, onReset, children }: PowerXMoreProps)
           disabled={changed === 0}
           onClick={() => {
             onReset();
-            track('powerx_more_reset', { tab, changed });
+            track('powerx_more_reset', { tab: POWERX_VIEW_ANALYTICS_ID[tab], changed });
           }}
           className={cn(POWERX_QUIET_BUTTON, 'disabled:opacity-50')}
           data-testid="powerx-more-reset"
