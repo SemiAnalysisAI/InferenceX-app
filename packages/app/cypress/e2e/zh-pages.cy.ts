@@ -135,14 +135,12 @@ describe('Chinese (/zh) pages', () => {
       cy.visit('/zh/infx/inference');
     });
 
-    it('renders the Chinese h1 without an intro box', () => {
+    it('renders the Chinese h1', () => {
       cy.location('pathname').should('eq', '/zh/infx/inference/kimi-k31-pro');
       cy.get('[data-testid="inference-page-heading"]').should(
         'have.text',
         'Kimi K3.1 Pro 推理基准测试',
       );
-      cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
-
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')

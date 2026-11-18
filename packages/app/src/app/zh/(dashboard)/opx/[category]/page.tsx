@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import OperatorXView from '@/components/operatorx/OperatorXView';
-import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
+
 import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import { operatorXCategoryMetaZh } from '@/lib/routing/operatorx-category-meta';
 import {
@@ -39,10 +39,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ZhOperatorXCategoryPage({ params }: Props) {
   const { category } = await params;
   if (!isOperatorXCategory(category)) notFound();
-  return (
-    <>
-      <OperatorXView />
-      <ZhTabIntro tab="operatorx" />
-    </>
-  );
+  return <OperatorXView />;
 }

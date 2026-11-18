@@ -1702,6 +1702,7 @@ export default function ChartDisplay({
               {!embedded && (
                 <>
                   <DashboardSectionHeader
+                    headingAs={powerXSurface ? 'h1' : 'h2'}
                     title={powerXSurface ? powerXT.title : t.inferencePerformance}
                     level={headerLevel}
                     description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}

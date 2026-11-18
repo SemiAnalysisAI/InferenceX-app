@@ -336,18 +336,10 @@ describe('Per-model dashboard routes', () => {
       .should('eq', 404);
   });
 
-  it('renders the /zh sibling with a model-specific Chinese intro', () => {
+  it('renders the /zh sibling with the dashboard header as its only h1', () => {
     cy.visit('/zh/infx/historical/minimax-m3', visitOptions);
-    cy.get('[data-testid="zh-tab-intro"]').should('be.visible').and('contain.text', 'MiniMax M3');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
-    cy.get('[data-testid="historical-trends-display"]').then(([display]) => {
-      cy.get('[data-testid="zh-tab-intro"]').then(([intro]) => {
-        // The intro sits below the dashboard so the chart and selectors load first.
-        expect(
-          display.compareDocumentPosition(intro) & Node.DOCUMENT_POSITION_FOLLOWING,
-        ).to.be.above(0);
-      });
-    });
+    cy.get('h1').should('have.length', 1);
   });
 });
 

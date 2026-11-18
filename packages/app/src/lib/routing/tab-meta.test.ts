@@ -113,7 +113,6 @@ describe('dashboard SEO metadata', () => {
         const description = meta.description(route.seoName);
         expect(description.length).toBeLessThanOrEqual(155);
         expect(description).toContain(route.seoName);
-        expect(meta.intro(route.seoName)).toContain(route.seoName);
       }
     }
   });

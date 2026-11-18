@@ -552,7 +552,14 @@ function CacheReuseInner() {
 
   if (!loading && error) {
     console.error(error);
-    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
+    return (
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
+    );
   }
 
   return (
@@ -560,7 +567,11 @@ function CacheReuseInner() {
       <section data-testid="cache-reuse-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
+            <DashboardSectionHeader
+              headingAs="h1"
+              title={t.title}
+              actions={<ChartShareActions />}
+            />
 
             <TooltipProvider delayDuration={0}>
               <ControlPanel

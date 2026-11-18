@@ -129,7 +129,7 @@ export default function AiChartDisplay() {
 
   return (
     <div className="flex flex-col gap-4">
-      <DashboardSectionHeader title={t.title} description={t.description} />
+      <DashboardSectionHeader headingAs="h1" title={t.title} description={t.description} />
       <div
         className={`grid items-start gap-4 ${!result && !isLoading && !error ? 'lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]' : ''}`}
       >

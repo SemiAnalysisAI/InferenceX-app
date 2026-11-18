@@ -114,46 +114,6 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   },
 };
 
-export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
-  powerx:
-    '本页面展示 PowerX 功耗数据：每个基准测试点的实测 GPU 功耗、每 Token 能耗与运行期间的功耗时间线。GPU 功耗为实测值，服务器其他组件与数据中心 PUE 为模型估算。',
-  inference:
-    '本页面展示 InferenceX 的智能体推理与固定序列 AI 推理基准测试结果：跨芯片、推理框架与模型对比吞吐量（token/s/chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。智能体推理数据来自 AgentX；该场景对公开智能体编码轨迹衍生出的长上下文、多轮、含 subagent 工作负载进行回放。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
-  evaluation:
-    '本页面展示 LLM 评估（evaluation）结果：使用标准化评估集对比各模型与部署配置的准确率，验证推理优化不会损害模型质量。',
-  historical:
-    '本页面展示历史趋势图表：跟踪各芯片、框架与模型的推理性能随时间的演进，量化软件栈优化带来的收益。',
-  calculator:
-    '本页面提供吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 LLM 推理服务的每百万 token 成本与性价比。',
-  fleet:
-    '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润与回本时间。',
-  'first-token':
-    '本页面展示首 token 延迟约束下的成本对比：在选定的最低交互性下，按 2 s、5 s、10 s 等各档首 token 延迟（TTFT）上限，逐档找出各芯片厂商每百万 token 成本最低的实测配置，并标注最优配置与厂商间的成本差距。所有柱形均来自实际运行过的配置，不做插值，可直接追溯到对应的 GitHub Actions 运行记录。',
-  'cache-reuse':
-    '本页面展示前缀缓存复用情况：选定模型与配置后，按并发数逐档以堆叠柱形拆分 prompt token 的来源，分为芯片 HBM 缓存命中、主机层缓存命中与未复用（重新计算）三部分，并可叠加 trace 的理论上限。所有数值均来自运行时实测的缓存计数，可追溯到对应的 GitHub Actions 运行记录。',
-  'profit-estimator':
-    '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
-  'profit-estimator-per-gigawatt':
-    '本页面提供每吉瓦推理利润估算器：在选定的交互性与利用率下，按每吉瓦全电源配置功率预算计算各芯片的年收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
-  'gpu-specs':
-    '本页面提供芯片规格对比：NVIDIA、AMD 等厂商加速器的显存容量、显存带宽、FLOPS、互连拓扑与功耗规格。',
-  operatorx:
-    '本页面展示 OperatorX 的 GEMM、attention 和路由 MoE 单卡 TFLOPS、实测延迟及完整测试覆盖情况。',
-  'agentic-workload-explorer':
-    '本页面基于 ProxyTrace 采集的匿名 coding agent trace 冻结快照，展示真实智能体负载的会话结构、输入/输出 token、前缀缓存命中、首 token 延迟（TTFT）与工具调用分布。快照数据不再更新，所有时间窗口均以快照截止时间为准。',
-  collectivex:
-    '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。',
-  submissions:
-    '本页面列出提交到 InferenceX 的全部基准测试配置：按芯片厂商查看提交历史、活动趋势与数据点数量。',
-  'ai-chart': '用自然语言描述想看的对比，即可获得基于 InferenceX 基准测试数据生成的图表。',
-  'current-inferencex-image':
-    '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
-  video:
-    '本页面只读展示已发布的视频生成结果，按同一 20 条视频 C1 工作负载比较各硬件；尚无实测证据的指标显示为空态。',
-  feedback:
-    '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
-};
-
 export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   powerx: 'PowerX 功耗',
   inference: '推理性能',
@@ -198,36 +158,27 @@ export const MODEL_TAB_META_ZH: Record<
   {
     title: (seoName: string) => string;
     description: (seoName: string) => string;
-    intro: (seoName: string) => string;
   }
 > = {
   historical: {
     title: (seoName) => `${seoName} 历史推理性能趋势`,
     description: (seoName) =>
       `跟踪 ${seoName} 推理性能随时间的变化。历史基准测试数据展示各芯片与服务商运行 ${seoName} 时在延迟、吞吐量和成本上的改进。`,
-    intro: (seoName) =>
-      `本页面展示 ${seoName} 的历史趋势图表：跟踪各芯片与框架运行 ${seoName} 时推理性能随时间的演进，量化软件栈优化带来的收益。`,
   },
   calculator: {
     title: (seoName) => `${seoName} 吞吐量与 TCO 计算器`,
     description: (seoName) =>
       `计算 ${seoName} 推理的吞吐量与总拥有成本（TCO）。跨硬件配置对比 ${seoName} 推理服务的芯片成本效益。`,
-    intro: (seoName) =>
-      `本页面提供 ${seoName} 吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 ${seoName} 推理服务的每百万 token 成本与性价比。`,
   },
   'profit-estimator': {
     title: (seoName) => `${seoName} 推理利润估算器`,
     description: (seoName) =>
       `估算每款芯片每小时运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。`,
-    intro: (seoName) =>
-      `本页面按芯片估算每小时运行 ${seoName} 智能体推理的收入、算力支出（TCO $/chip/hr）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
   },
   'profit-estimator-per-gigawatt': {
     title: (seoName) => `${seoName} 每吉瓦推理利润估算器`,
     description: (seoName) =>
       `估算每款芯片一个吉瓦年运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
-    intro: (seoName) =>
-      `本页面按芯片估算一个全电源配置吉瓦年运行 ${seoName} 智能体推理的收入、算力支出（TCO）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
   },
 };
 

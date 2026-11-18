@@ -380,6 +380,7 @@ export function GpuSpecsContent() {
       <section>
         <Card>
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.description}
             actions={<ChartShareActions />}

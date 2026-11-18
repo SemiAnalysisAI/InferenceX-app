@@ -3,10 +3,10 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
-import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
+
 import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
-import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
+import { modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -35,17 +35,9 @@ export default async function ZhHistoricalModelPage({ params }: Props) {
   // redirects known aliases with their query; this only catches other casings.
   if (resolved.isAlias)
     permanentRedirect(`/zh${modelRoutePath('historical', resolved.route.slug)}`);
-  const meta = MODEL_TAB_META_ZH.historical;
   return (
-    <>
-      <InferenceProvider activeTab="historical">
-        <HistoricalTrendsDisplay />
-      </InferenceProvider>
-      <ZhTabIntro
-        tab="historical"
-        title={meta.title(resolved.route.seoName)}
-        intro={meta.intro(resolved.route.seoName)}
-      />
-    </>
+    <InferenceProvider activeTab="historical">
+      <HistoricalTrendsDisplay />
+    </InferenceProvider>
   );
 }

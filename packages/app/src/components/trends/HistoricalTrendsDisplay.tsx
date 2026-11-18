@@ -671,6 +671,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card>
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.loadError}
             descriptionClassName="text-destructive"
@@ -697,7 +698,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.heading} description={t.description} />
+            <DashboardSectionHeader headingAs="h1" title={t.heading} description={t.description} />
             <ChartControls
               tcoSource="historical"
               hideGpuComparison
@@ -725,6 +726,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card data-testid="historical-trend-error">
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.trendLoadError}
             descriptionClassName="text-destructive"
@@ -751,6 +753,7 @@ export default function HistoricalTrendsDisplay() {
       <Card className="relative z-30">
         <div className="flex flex-col gap-4">
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.description}
             actions={<ChartShareActions />}

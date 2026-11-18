@@ -10,8 +10,7 @@ import {
   modelRoutesForTab,
   resolveModelRouteSlug,
 } from '@/lib/routing/model-routes';
-import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
-import { TabIntro } from '@/components/dashboard/tab-intro';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 type Props = ProfitRouteProps;
 
@@ -28,14 +27,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProfitEstimatorModelPage({ params }: Props) {
   const resolved = await profitRouteInput('profit-estimator', false, params);
-  return (
-    <>
-      <ProfitEstimatorDisplay basis="chip-hour" routeModel={resolved.route.model} />
-      <TabIntro
-        tab="profit-estimator"
-        title={MODEL_TAB_META['profit-estimator'].heading(resolved.route.seoName)}
-        intro={MODEL_TAB_META['profit-estimator'].intro(resolved.route.seoName)}
-      />
-    </>
-  );
+  return <ProfitEstimatorDisplay basis="chip-hour" routeModel={resolved.route.model} />;
 }

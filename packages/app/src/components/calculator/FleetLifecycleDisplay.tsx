@@ -352,7 +352,14 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
 
   if (!loading && error) {
     console.error(error);
-    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
+    return (
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
+    );
   }
 
   return (
@@ -361,6 +368,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title}
               description={t.description}
               actions={<ChartShareActions />}

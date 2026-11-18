@@ -126,12 +126,17 @@ export default function SubmissionsDisplay() {
 
   if (error) {
     return (
-      <RetryableQueryError
-        message={t.errorText}
-        analyticsEvent="submissions_retry_clicked"
-        onRetry={refetch}
-        testId="submissions-error"
-      />
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.heading} />
+        </Card>
+        <RetryableQueryError
+          message={t.errorText}
+          analyticsEvent="submissions_retry_clicked"
+          onRetry={refetch}
+          testId="submissions-error"
+        />
+      </div>
     );
   }
 
@@ -140,6 +145,7 @@ export default function SubmissionsDisplay() {
       <section>
         <Card>
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.description}
             actions={<ChartShareActions />}

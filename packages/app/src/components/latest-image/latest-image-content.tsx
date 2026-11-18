@@ -267,11 +267,7 @@ export function CurrentImageContent() {
   return (
     <div className="w-full min-w-0">
       <Card className="mb-6 gap-4">
-        <DashboardSectionHeader
-          headingAs={locale === 'zh' ? 'h2' : 'h1'}
-          title={t.title}
-          description={t.description}
-        />
+        <DashboardSectionHeader headingAs="h1" title={t.title} description={t.description} />
 
         {options && (
           <TooltipProvider delayDuration={0}>

@@ -206,11 +206,10 @@ describe('Prefix Cache Reuse', () => {
   });
 
   describe('Chinese page', () => {
-    it('renders the intro and Chinese tier labels', () => {
+    it('renders Chinese tier labels', () => {
       interceptOverlayRun();
       cy.visit('/zh/infx/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
-      cy.get('[data-testid="zh-tab-intro"]').should('be.visible');
       firstRowCell('HBM').should('have.text', '80.0%');
     });
   });

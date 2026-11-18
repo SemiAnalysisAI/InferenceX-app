@@ -941,6 +941,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     console.error(error);
     return (
       <Card>
+        <DashboardSectionHeader headingAs="h1" title={t.title} />
         <div className="flex items-center justify-center h-64 text-muted-foreground">
           {t.errorLoading}
         </div>
@@ -1068,6 +1069,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title}
               description={t.description}
               actions={<ChartShareActions />}
