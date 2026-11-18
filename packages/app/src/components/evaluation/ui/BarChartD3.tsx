@@ -74,7 +74,7 @@ const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number, locale
 
 const EVALUATION_TOOLTIP_STRINGS = {
   en: {
-    runLink: 'GitHub Actions run',
+    runLink: 'GitHub Actions Run',
     unofficial: 'Unofficial run',
     date: 'Date',
     meanScore: 'Mean Score',

@@ -106,7 +106,7 @@ describe('evaluation chart locale presentation', () => {
     const html = generateEvaluationTooltipContent(makeDatum('B200 SGLang', 0.9), '#000');
     expect(html).toContain('0.9000');
     expect(html).toContain('2026-01-01');
-    expect(html).not.toContain('Min score');
+    expect(html).not.toContain('Min Score');
     expect(html).not.toContain('Click elsewhere');
   });
 

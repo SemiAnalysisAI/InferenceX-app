@@ -10,7 +10,7 @@ export const OVERVIEW_STRINGS = {
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
     sourceLinkText: TCO_SOURCE_TITLE,
-    controlsGroup: 'Benchmark config',
+    controlsGroup: 'Benchmark Config',
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',

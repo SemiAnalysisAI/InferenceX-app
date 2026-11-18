@@ -142,7 +142,7 @@ const TOOLTIP_STRINGS = {
     powerWithheld: 'Measured power withheld',
     series: 'Series',
     roleEnergyShare: 'Share of request energy',
-    run: 'GitHub Actions run',
+    run: 'GitHub Actions Run',
   },
   zh: {
     unofficialRun: '非官方运行',

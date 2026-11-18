@@ -79,10 +79,10 @@ describe('Inference ChartControls', () => {
       expect(labels.filter((label) => label.includes('(Custom User Values)'))).to.deep.equal([
         'Token Throughput per All in Utility MW (Custom User Values)',
       ]);
-      expect(labels.some((label) => label.includes('Owning at large hyperscaler volume'))).to.equal(
+      expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
         false,
       );
-      expect(labels.some((label) => label.includes('Rent – 3-year commit'))).to.equal(false);
+      expect(labels.some((label) => label.includes('Rent – 3-Year Commit'))).to.equal(false);
     });
     cy.get('[data-testid="locked-tier-badge"]').should('not.exist');
   });

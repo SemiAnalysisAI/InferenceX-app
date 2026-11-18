@@ -59,7 +59,7 @@ const OVERLAY_STRINGS = {
     inputOutputCost: 'Input · output cost',
     inputOutputPower: 'Input · output tok/s/MW',
     cacheHit: 'KV cache hit rate',
-    theoreticalCacheHit: 'Theoretical cache hit rate',
+    theoreticalCacheHit: 'Theoretical Cache Hit Rate',
     inputShare: 'Input token share',
   },
   zh: {

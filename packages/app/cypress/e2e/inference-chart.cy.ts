@@ -176,7 +176,7 @@ describe('Inference Chart', () => {
       .find(
         '[data-testid="inference-tco-badges"] tbody th [data-testid="result-context-cost-tier"]',
       )
-      .should('contain.text', 'Owning at large hyperscaler volume');
+      .should('contain.text', 'Owning at Large Hyperscaler Volume');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')

@@ -52,8 +52,8 @@ describe('TCO Calculator', () => {
       cy.viewport(1280, 900);
       cy.get('[data-testid="calculator-controls"] fieldset legend').should(($legends) => {
         expect([...$legends].map((legend) => legend.textContent)).to.deep.equal([
-          'Benchmark config',
-          'Pricing config',
+          'Benchmark Config',
+          'Pricing Config',
           'Comparison target',
         ]);
       });
@@ -66,7 +66,7 @@ describe('TCO Calculator', () => {
       });
       cy.get('[data-testid="calc-cost-selector"]').should(
         'contain.text',
-        'Owning at large hyperscaler volume',
+        'Owning at Large Hyperscaler Volume',
       );
       cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
       cy.get('[data-testid="calculator-metric-throughput"]')

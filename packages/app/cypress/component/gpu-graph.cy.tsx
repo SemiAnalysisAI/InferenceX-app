@@ -381,7 +381,7 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-agentic-decorations svg .dot-group .visible-shape')
       .first()
       .click({ force: true });
-    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Speculative decoding');
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Speculative Decoding');
     cy.get('[data-testid="point-details-panel"]').should('contain.text', 'MTP');
   });
 

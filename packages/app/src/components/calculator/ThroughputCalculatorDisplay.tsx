@@ -191,8 +191,8 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 const STRINGS = {
   en: {
     title: 'TCO Calculator',
-    benchmarkGroup: 'Benchmark config',
-    pricingGroup: 'Pricing config',
+    benchmarkGroup: 'Benchmark Config',
+    pricingGroup: 'Pricing Config',
     comparisonGroup: 'Comparison target',
     secondaryControls: 'More chart controls',
     changed: 'changed',
@@ -215,7 +215,7 @@ const STRINGS = {
     targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',

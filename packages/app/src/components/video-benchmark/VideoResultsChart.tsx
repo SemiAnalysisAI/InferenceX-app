@@ -112,7 +112,7 @@ const STRINGS = {
     videoSecondsPerHour: 'Video-seconds per hour',
     powerLimit: 'Enforced power limit',
     runtime: 'Runtime',
-    runLink: 'GitHub Actions run',
+    runLink: 'GitHub Actions Run',
     viewTelemetry: 'View telemetry',
     engines: 'Engines',
     engineNotRecorded: 'Engine not recorded',

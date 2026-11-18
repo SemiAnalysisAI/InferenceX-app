@@ -105,7 +105,7 @@ const STRINGS = {
     approved: 'Approved',
     unapproved: 'No matching approval receipt',
     actions: 'Run actions',
-    actionRun: 'GitHub Actions run',
+    actionRun: 'GitHub Actions Run',
     actionArtifact: 'Download artifact',
     actionReproduce: 'Reproduce',
     actionRunShort: 'GitHub run',

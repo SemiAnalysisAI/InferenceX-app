@@ -232,7 +232,7 @@ const engines = () =>
     ...new Set([...$groups].map((group) => group.dataset.engine)),
   ]);
 
-describe('VideoGenX results', () => {
+describe('VideoGenX Results', () => {
   it('shows the loading state without reading History while the server streams the cohort', () => {
     readOnlyVideoRequests();
     cy.intercept('GET', '/api/video-runs?format=history&page=*', {
@@ -731,7 +731,7 @@ describe('VideoGenX results', () => {
             'href',
             'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789',
           )
-          .and('contain', 'GitHub Actions run');
+          .and('contain', 'GitHub Actions Run');
         cy.get('[data-action="artifact"]')
           .should('have.attr', 'href')
           .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
@@ -751,7 +751,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-detail-actions"] [data-action="run"]').should(
       'have.attr',
       'aria-label',
-      'GitHub Actions run',
+      'GitHub Actions Run',
     );
     cy.viewport(1280, 900);
     cy.get('[data-testid="results-power-trace"] svg').should('exist');

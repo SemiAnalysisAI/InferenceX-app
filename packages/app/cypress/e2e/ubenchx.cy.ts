@@ -189,7 +189,7 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
-  cy.contains('h1', 'uBenchX microbenchmarks').click();
+  cy.contains('h1', 'uBenchX Microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });

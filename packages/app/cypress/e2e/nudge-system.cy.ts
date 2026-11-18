@@ -339,7 +339,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-new-badge="launch-banner"]')
       .parent()
       .should('have.css', 'white-space', 'nowrap')
-      .and('contain.text', 'microbenchmarks');
+      .and('contain.text', 'Microbenchmarks');
     cy.get('[data-testid="launch-banner"] > svg').should('have.css', 'align-self', 'flex-start');
   });
 

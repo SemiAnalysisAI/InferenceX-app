@@ -105,7 +105,7 @@ const STRINGS = {
     // A phone shows the cohort line right above this and names View telemetry on its button.
     descriptionPhone:
       'Serving latency, cost and energy across hardware. Tap a point for its clip and measurements; hollow points have no clips.',
-    benchmarkConfig: 'Benchmark config',
+    benchmarkConfig: 'Benchmark Config',
     model: 'Model',
     chartConfig: 'Chart config',
     runContext: 'Run context',

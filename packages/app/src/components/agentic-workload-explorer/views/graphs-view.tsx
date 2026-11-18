@@ -121,7 +121,7 @@ const STRINGS = {
     outputAxis: 'Output Tokens',
     timeBetweenTurns: 'Time Between Turns',
     seconds: 'Seconds',
-    userIdleTimeBetweenTurns: (min: number) => `User idle time between turns (< ${min} min)`,
+    userIdleTimeBetweenTurns: (min: number) => `User Idle Time Between Turns (< ${min} min)`,
     userIdleAxis: 'User Idle (seconds)',
     cpuGpuRatioTitle: 'CPU Tool-Use Time : GPU Time Ratio',
     cpuGpuRatioAxis: 'Ratio (time between turns / E2E latency)',
@@ -143,7 +143,7 @@ const STRINGS = {
     prefillShareAxis: 'TTFT / E2E (% of latency spent in prefill)',
     interactivityDist: 'Interactivity Distribution',
     interactivityAxis: 'Interactivity (output tok/s/user)',
-    sessionDurationTitle: (v: number) => `Session duration (> 20 reqs, trace v${v})`,
+    sessionDurationTitle: (v: number) => `Session Duration (> 20 reqs, trace v${v})`,
     sessionDurationAxis: 'Session Duration (hours)',
     subagentCountTitle: (days: number, v: number) =>
       `Subagents per session · Final ${days} days (> 20 reqs, trace v${v})`,

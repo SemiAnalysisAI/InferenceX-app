@@ -37,7 +37,7 @@ const STRINGS = {
     copied: 'Copied',
     copyFailed: 'Could not copy. Select the text to copy it manually.',
     serverLog: 'Server log',
-    run: 'Workflow run',
+    run: 'Workflow Run',
     loading: 'Loading launch record…',
     error: 'The launch record could not be loaded.',
     recorded: (file: string) =>
@@ -79,7 +79,7 @@ const STRINGS = {
       srtctl_version: 'srtctl version',
       recipe: 'srtctl recipe',
       inferencex_commit: 'InferenceX commit',
-      workflow_run: 'Workflow run',
+      workflow_run: 'Workflow Run',
     } satisfies Record<EnvironmentKey, string>,
   },
   zh: {

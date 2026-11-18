@@ -31,7 +31,7 @@ describe('GPU Specs Tab', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h1').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip Specifications').should('exist');
   });
 
   it('specs table is visible with all GPUs', () => {
@@ -100,7 +100,7 @@ describe('GPU Specs Bar Chart View', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h1').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip Specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -147,7 +147,7 @@ describe('GPU Specs Radar Chart View', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h1').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip Specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -218,7 +218,7 @@ describe('Topology Dialog Navigation', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h1').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip Specifications').should('exist');
   });
 
   it('scale-out topology dialog next button navigates to next GPU', () => {

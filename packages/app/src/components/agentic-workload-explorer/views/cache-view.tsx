@@ -46,7 +46,7 @@ import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensio
 
 const STRINGS = {
   en: {
-    yHitRate: 'Hit rate',
+    yHitRate: 'Hit Rate',
     yTokens: 'Tokens',
     stats: 'Stats',
     cacheHitRateOverTime: 'Cache Hit Rate Over Time',
@@ -69,8 +69,8 @@ const STRINGS = {
     noClientCacheData: 'No client cache data available',
     failedToLoad: 'Failed to load cache data',
     allClients: 'All clients',
-    cacheReadLegend: 'Cache read',
-    cacheWriteLegend: 'Cache write',
+    cacheReadLegend: 'Cache Read',
+    cacheWriteLegend: 'Cache Write',
     modelHeader: 'Model',
     readWriteHeader: 'Read / write tokens',
     efficiency: 'Efficiency',

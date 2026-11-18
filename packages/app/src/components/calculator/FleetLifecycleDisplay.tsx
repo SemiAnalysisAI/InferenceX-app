@@ -91,7 +91,7 @@ const STRINGS = {
     targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Each chip\u2019s fleet serves this speed; every run date is read at it.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Each chip\u2019s fleet serves this speed; every run date is read at it.`,
     errorLoading: 'Error loading data. Please try a different selection.',

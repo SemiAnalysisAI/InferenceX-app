@@ -24,7 +24,7 @@ const STRINGS = {
     beta: 'Beta',
     subtitle:
       'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
-    controls: 'Benchmark config',
+    controls: 'Benchmark Config',
     chartControls: 'Chart config',
     test: 'Microbenchmark',
     testTooltip: 'The uBenchX microbenchmark to display.',

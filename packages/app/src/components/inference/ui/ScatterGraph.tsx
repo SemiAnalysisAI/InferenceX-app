@@ -509,7 +509,7 @@ const SCATTER_STRINGS = {
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,

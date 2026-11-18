@@ -123,7 +123,7 @@ const STRINGS = {
     tokenTypeTooltip:
       'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip unless the note below the chart switches them to every chip, so by default their input- and output-basis costs are not per chip overall.',
     tokenTypePlaceholder: 'Token type',
-    minInteractivityLabel: (stat: string) => `Minimum ${stat} interactivity (tok/s/user)`,
+    minInteractivityLabel: (stat: string) => `Minimum ${stat} Interactivity (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
       `Only rows whose ${stat} interactivity is at or above this floor are eligible. Set it to the streaming speed the workload needs; a cap on first-token wait is then applied on top.`,
     capsLabel: 'TTFT Caps (s, comma-separated)',

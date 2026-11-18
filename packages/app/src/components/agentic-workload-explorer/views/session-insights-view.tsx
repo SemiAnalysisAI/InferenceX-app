@@ -63,7 +63,7 @@ const STRINGS = {
     active: 'Active sessions',
     dailySessions: 'Daily Sessions',
     axisDuration: 'Session duration',
-    axisTurns: 'Turns per session',
+    axisTurns: 'Turns per Session',
     axisCost: 'Session cost (USD)',
     axisSessions: 'Sessions',
     sessionCount: { one: 'session', other: 'sessions' },

@@ -60,7 +60,7 @@ const STRINGS = {
     colVersion: 'Version',
     resetSort: 'Reset sort',
     minReqsFilterLabel: 'Minimum requests',
-    versionFilterLabel: 'Trace version',
+    versionFilterLabel: 'Trace Version',
     harnessFilterLabel: 'Harness',
     openSession: (id: string) => `Open session ${id}`,
   },

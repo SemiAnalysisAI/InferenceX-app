@@ -65,7 +65,7 @@ const STRINGS = {
     hourOfDay: 'Hour of day',
     scaleTitle: 'Requests per hour',
     requestsLabel: 'Requests',
-    dailyRequests: 'Daily requests',
+    dailyRequests: 'Daily Requests',
   },
   zh: {
     yRequests: '请求数',

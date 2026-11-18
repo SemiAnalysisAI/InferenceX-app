@@ -50,8 +50,8 @@ describe('InferenceTcoBadges', () => {
               <ResultContext
                 locale="en"
                 layout="footer"
-                costTier="Owning at large hyperscaler volume"
-                costTierControl={<button type="button">Cost tier</button>}
+                costTier="Owning at Large Hyperscaler Volume"
+                costTierControl={<button type="button">Cost Tier</button>}
                 priceTable={
                   <TcoPriceTable
                     items={items}
@@ -95,7 +95,7 @@ describe('InferenceTcoBadges', () => {
           expect(wrapper.scrollWidth, 'all columns fit').to.be.at.most(wrapper.clientWidth + 1);
           expect(wrapper.querySelectorAll('td')).to.have.length(count);
           expect(wrapper.querySelector('tbody th')!.textContent).to.contain(
-            'Owning at large hyperscaler volume',
+            'Owning at Large Hyperscaler Volume',
           );
           const frame = root.getBoundingClientRect();
           for (const cell of wrapper.querySelectorAll('th, td')) {
@@ -318,7 +318,7 @@ describe('InferenceTcoBadges', () => {
         <ResultContext
           locale="en"
           layout="footer"
-          costTier="Owning at large hyperscaler volume"
+          costTier="Owning at Large Hyperscaler Volume"
           costTierControl={<CostTierSelector footer />}
           priceTable={<InferenceTcoBadges bases={REGISTRY_BASES.slice(0, 9)} values={PUBLISHED} />}
           date="2026-11-07"
@@ -331,10 +331,10 @@ describe('InferenceTcoBadges', () => {
         .should('not.contain.text', 'TCO')
         .find('[data-testid="result-context-cost-tier"] [data-testid="cost-tier-selector"]')
         .should('be.visible')
-        .and('contain.text', 'Owning at large hyperscaler volume');
+        .and('contain.text', 'Owning at Large Hyperscaler Volume');
       cy.get('[data-testid="cost-tier-selector"]').should('have.length', 1);
       cy.get('[data-testid="result-context-cost-tier"] .export-only')
-        .should('have.text', 'Owning at large hyperscaler volume')
+        .should('have.text', 'Owning at Large Hyperscaler Volume')
         .and('not.be.visible');
       cy.get('[data-testid="inference-tco-badges"]').then(($table) => {
         const table = $table[0].getBoundingClientRect();
@@ -385,7 +385,7 @@ describe('InferenceTcoBadges', () => {
     cy.viewport(1440, 400);
     const widths: number[] = [];
     for (const [metric, label] of [
-      ['y_tokensPerDollarH', 'Owning at large hyperscaler volume'],
+      ['y_tokensPerDollarH', 'Owning at Large Hyperscaler Volume'],
       ['y_tokensPerDollarUser', 'Custom'],
     ] as const) {
       mountWithProviders(

@@ -97,7 +97,7 @@ export default async function CompareSpecDecodeIndexPage() {
             chip, covering throughput, cost and interactivity at matched operating points.
           </p>
           <CompareCatalogLinks testId="compare-spec-decode-index-links">
-            <CompareCatalogLink href="/compare">Chip comparisons</CompareCatalogLink>
+            <CompareCatalogLink href="/compare">Chip Comparisons</CompareCatalogLink>
             <CompareCatalogLink href="/compare-per-dollar">
               Performance per dollar
             </CompareCatalogLink>

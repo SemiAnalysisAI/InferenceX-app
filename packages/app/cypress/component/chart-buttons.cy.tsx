@@ -292,7 +292,7 @@ describe('ChartButtons', () => {
                     { value: 'cumulative', label: 'Cumulative' },
                   ]}
                   onValueChange={onModeChange}
-                  ariaLabel="Submission activity"
+                  ariaLabel="Submission Activity"
                 />
                 <ShareButton />
               </>

@@ -505,7 +505,7 @@ const STRINGS = {
     tokenIn: 'in:',
     tokenOut: 'out:',
     tok: 'tok',
-    cacheReadLabel: 'Cache read',
+    cacheReadLabel: 'Cache Read',
     cacheCreateLabel: 'Cache create',
   },
   zh: {

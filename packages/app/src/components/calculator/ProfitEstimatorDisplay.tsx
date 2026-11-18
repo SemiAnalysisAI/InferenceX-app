@@ -243,7 +243,7 @@ const STRINGS = {
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
     cachedPriceLabel: 'Cached input $/M tok',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
     cacheHitLabel: 'Cache Hit Rates',
@@ -262,7 +262,7 @@ const STRINGS = {
     errorLoading: 'Error loading data. Please try a different selection.',
     utilizationShort: 'Utilization',
     labCutShort: 'License fee',
-    highContrast: 'High contrast',
+    highContrast: 'High Contrast',
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
