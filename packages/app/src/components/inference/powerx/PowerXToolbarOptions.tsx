@@ -153,10 +153,10 @@ const STRINGS = {
         '按池计算的 TDP 占比为该池平均功耗相对额定 TDP 的比例。不显示余量阴影：它需要按 GPU 池统计的 P90，目前运行结果尚未提供。',
     } satisfies Record<PowerXPinnedControl | 'perPrefill', string>,
     pinnedWhat: {
-      count: `${POWERX_VOCAB.zh.boundary} ${POWERX_VOCAB.zh.boundaries.gpu}`,
-      per: `${POWERX_VOCAB.zh.energyPer} ${POWERX_VOCAB.zh.pers.output}`,
-      perPrefill: `${POWERX_VOCAB.zh.energyPer} ${POWERX_VOCAB.zh.pers.output}或${POWERX_VOCAB.zh.pers.input}`,
-      statistic: '统计量 平均',
+      count: `${POWERX_VOCAB.zh.boundary}为 ${POWERX_VOCAB.zh.boundaries.gpu}`,
+      per: `${POWERX_VOCAB.zh.energyPer}为${POWERX_VOCAB.zh.pers.output}`,
+      perPrefill: `${POWERX_VOCAB.zh.energyPer}为${POWERX_VOCAB.zh.pers.output}或${POWERX_VOCAB.zh.pers.input}`,
+      statistic: '统计量为平均',
     },
   },
 } as const;

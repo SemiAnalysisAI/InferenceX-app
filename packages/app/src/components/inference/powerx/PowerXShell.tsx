@@ -51,6 +51,9 @@ import {
  * `PowerXYTitleRow` (y title + pin line), `PowerXChartFrame` (chart, ranking, pinned, below).
  */
 
+// A space only after a Latin ending: 已按解码 GPU 固定, 已按预填充 vs 解码固定.
+const zhSetBy = (by: string) => `已按${by}${/[A-Za-z0-9]$/u.test(by) ? ' ' : ''}固定`;
+
 const STRINGS = {
   en: {
     title: 'PowerX',
@@ -69,6 +72,7 @@ const STRINGS = {
     model: 'Model',
     scenario: 'Scenario',
     precision: 'Precision',
+    precisionNote: 'the only precision with power data',
     compareAtAxis: 'tok/s/user · P90 interactivity',
     compareAt: POWERX_VOCAB.en.compareAt,
     compareAtHelp:
@@ -99,6 +103,7 @@ const STRINGS = {
     why: 'Why?',
     whyTitle: 'Why is this pinned?',
     setBy: (by: string) => `Set by ${by}`,
+    pinned: (by: string, what: string) => `Set by ${by}: ${what}.`,
     picksReturn: 'Your picks return on All GPUs.',
   },
   zh: {
@@ -118,6 +123,7 @@ const STRINGS = {
     model: '模型',
     scenario: '场景',
     precision: '精度',
+    precisionNote: '唯一有功耗数据的精度',
     compareAtAxis: 'tok/s/user · P90 交互性',
     compareAt: POWERX_VOCAB.zh.compareAt,
     compareAtHelp:
@@ -147,7 +153,8 @@ const STRINGS = {
     openSettings: '更改模型、场景、GPU 角色、对比点或运行',
     why: '原因',
     whyTitle: '为什么被固定？',
-    setBy: (by: string) => `由${by}设定`,
+    setBy: zhSetBy,
+    pinned: (by: string, what: string) => `${zhSetBy(by)}：${what}。`,
     picksReturn: '切回“全部 GPU”后恢复你的选择。',
   },
 } as const;
@@ -495,7 +502,8 @@ function SheetGroup({
   children,
   testId,
 }: {
-  label: string;
+  /** Omitted when the group's content carries its own legend. */
+  label?: string;
   children: ReactNode;
   testId?: string;
 }) {
@@ -504,7 +512,7 @@ function SheetGroup({
       className="flex flex-col gap-1 border-b border-border/60 py-3 first:pt-0 last:border-b-0"
       data-testid={testId}
     >
-      <h3 className="text-xs text-muted-foreground">{label}</h3>
+      {label && <h3 className="text-xs text-muted-foreground">{label}</h3>}
       {children}
     </section>
   );
@@ -537,7 +545,7 @@ function SheetRadio({
       onClick={() => {
         if (!checked) onSelect();
       }}
-      className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-sm px-1 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+      className="flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-sm px-1 py-1 text-left text-sm transition-colors hover:bg-muted"
     >
       <span className="inline-flex w-4 shrink-0 justify-center text-brand">
         {checked && <Check aria-hidden className="size-4" />}
@@ -639,6 +647,9 @@ function PowerXSettingsSheetBody({
         <SheetGroup label={t.precision}>
           <p className="py-1 text-sm" data-testid="powerx-precision">
             {parts.precision}
+            {!parts.precision.includes(',') && (
+              <span className="text-xs text-muted-foreground"> · {t.precisionNote}</span>
+            )}
           </p>
         </SheetGroup>
       )}
@@ -678,7 +689,7 @@ function PowerXSettingsSheetBody({
       <SheetGroup label={t.compareAt}>
         <PowerXCompareAtPicker range={compareAtRange} source="sheet" />
       </SheetGroup>
-      <SheetGroup label={t.run}>
+      <SheetGroup label={runContext ? undefined : t.run}>
         <RunPanel runContext={runContext} parts={parts} />
       </SheetGroup>
       {sheetActions && (
@@ -1024,8 +1035,7 @@ export function PowerXPinLine({ pin }: { pin: PowerXPin }) {
     >
       <Lock aria-hidden className="size-3.5 shrink-0" />
       <span className="min-w-0 truncate max-md:hidden">
-        {t.setBy(pin.by)}: {pin.what}.{' '}
-        <span className="text-muted-foreground">{t.picksReturn}</span>
+        {t.pinned(pin.by, pin.what)} <span className="text-muted-foreground">{t.picksReturn}</span>
       </span>
       <span className="md:hidden">{t.setBy(pin.by)}</span>
       <Popover>
