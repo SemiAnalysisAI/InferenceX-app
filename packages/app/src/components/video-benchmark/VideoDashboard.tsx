@@ -19,9 +19,7 @@ import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
 import { MOBILE_VIEWPORT_QUERY, useIsCoarsePointer, useMediaQuery } from '@/hooks/useMediaQuery';
-import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { isDarkTheme } from '@/lib/themes/themes';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { Button } from '@/components/ui/button';
 import { ShareButton } from '@/components/ui/share-button';
@@ -41,7 +39,6 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
-import { videoHardwareColor } from './hardware-colors';
 import { compareDeployments, layoutLabel, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
@@ -526,15 +523,10 @@ export default function VideoDashboard({
     () => true,
     () => false,
   );
-  const { resolvedTheme } = useTheme();
-  const paletteTheme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
-  // VideoGenX's own hues first, so H100 and H200 never share the site's NVIDIA green.
+  // The site palette, as on the inference chart.
   const colorFor = useCallback(
-    (key: string) =>
-      mounted
-        ? (videoHardwareColor(key, paletteTheme) ?? getCssColor(resolveColor(key)))
-        : 'var(--muted-foreground)',
-    [mounted, paletteTheme, getCssColor, resolveColor],
+    (key: string) => (mounted ? getCssColor(resolveColor(key)) : 'var(--muted-foreground)'),
+    [mounted, getCssColor, resolveColor],
   );
   const color = (cell: ResultCell) =>
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');

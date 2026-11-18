@@ -9,6 +9,7 @@ import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
@@ -95,6 +96,8 @@ const lineColor = (hardware: string) =>
     .filter('[data-overlay="false"]')
     .find('.visible-shape')
     .then(($shape) => getComputedStyle($shape[0]).stroke);
+/** A colour's numbers, so a computed `oklch(0.55 0.15 145)` matches the palette's `oklch(0.550 0.15 145.0)`. */
+const colourNumbers = (colour: string) => colour.match(/[\d.]+/gu)?.map(Number);
 const playing = () => points('[data-clip-role="playing"]');
 const gpusOf = (node: Element) =>
   (node as unknown as { __data__: { cell: { point: VideoPoint } } }).__data__.cell.point
@@ -1238,14 +1241,15 @@ describe('VideoGenX Results', () => {
     assertResultsFit();
   });
 
-  it('gives H100 and H200 distinct VideoGenX colours in light and dark themes', () => {
-    mount({ theme: 'light' });
-    lineColor('b200').should('equal', 'rgb(95, 158, 69)');
-    lineColor('h200').should('equal', 'rgb(29, 111, 184)');
-    lineColor('h100').should('equal', 'rgb(11, 92, 60)');
-    mount({ theme: 'dark' });
-    lineColor('h200').should('equal', 'rgb(90, 169, 236)');
-    lineColor('h100').should('equal', 'rgb(47, 181, 138)');
+  it('colours hardware with the site palette in light and dark themes', () => {
+    for (const theme of ['light', 'dark'] as const) {
+      mount({ theme });
+      const site = generateVendorColors(['b200', 'mi355x', 'h200', 'h100'], theme);
+      for (const key of ['b200', 'h200', 'h100'])
+        lineColor(key).should((stroke) =>
+          expect(colourNumbers(stroke)).to.deep.equal(colourNumbers(site[key])),
+        );
+    }
     cy.document().then((document) => document.documentElement.classList.remove('dark'));
   });
 
