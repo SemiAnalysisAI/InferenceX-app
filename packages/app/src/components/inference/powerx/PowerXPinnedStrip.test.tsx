@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +20,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
   point: null as InferenceData | null,
+  details: undefined as ((close: () => void) => ReactNode) | undefined,
   setSelectedYAxisMetric: vi.fn(),
   setActivePoint: vi.fn(),
 }));
@@ -30,7 +31,8 @@ vi.mock('@/components/inference/InferenceContext', () => ({
 }));
 vi.mock('@/components/inference/ui/powerx-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof PowerXSurface>()),
-  usePowerXActivePoint: () => (mocks.point ? { point: mocks.point, source: 'pinned' } : null),
+  usePowerXActivePoint: () =>
+    mocks.point ? { point: mocks.point, source: 'pinned', details: mocks.details } : null,
   useSetPowerXActivePoint: () => mocks.setActivePoint,
 }));
 
@@ -83,6 +85,7 @@ function mountStrip(role: 'all' | 'decode') {
 describe('PowerX pinned strip', () => {
   afterEach(() => {
     mocks.point = null;
+    mocks.details = undefined;
     const pending = peekPowerTraceFocus();
     if (pending) clearPowerTraceFocus(pending);
   });
@@ -117,5 +120,37 @@ describe('PowerX pinned strip', () => {
     );
     expect(host.querySelector('[data-testid="powerx-pinned-decode"]')).toBeNull();
     unmount();
+  });
+
+  it('opens the point details beside the ranking from Details, and Unpin clears the pin', () => {
+    mocks.point = pinned;
+    const { host, unmount } = mountStrip('all');
+    // No details renderer (the old legend holds the details panel): no Details action.
+    expect(host.querySelector('[data-testid="powerx-pinned-details"]')).toBeNull();
+    unmount();
+
+    const close = vi.fn();
+    mocks.details = (onClose) => (
+      <button type="button" data-testid="details-panel" onClick={() => (close(), onClose())}>
+        Run 34716669498
+      </button>
+    );
+    const second = mountStrip('all');
+    const details = second.host.querySelector<HTMLButtonElement>(
+      '[data-testid="powerx-pinned-details"]',
+    )!;
+    expect(details.textContent).toBe('Details');
+    act(() => details.click());
+    const panel = document.querySelector<HTMLButtonElement>('[data-testid="details-panel"]')!;
+    expect(panel.textContent).toContain('34716669498');
+    act(() => panel.click());
+    expect(close).toHaveBeenCalled();
+    expect(document.querySelector('[data-testid="details-panel"]')).toBeNull();
+
+    act(() =>
+      second.host.querySelector<HTMLButtonElement>('[data-testid="powerx-pinned-unpin"]')!.click(),
+    );
+    expect(mocks.setActivePoint).toHaveBeenCalledWith('clear');
+    second.unmount();
   });
 });

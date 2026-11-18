@@ -222,6 +222,7 @@ import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import {
   usePowerXCompareTarget,
+  usePowerXActivePoint,
   usePowerXSurface,
   useSetPowerXActivePoint,
   useSetPowerXCompareTarget,
@@ -606,6 +607,20 @@ const SCATTER_STRINGS = {
     viewWorkflow: '查看工作流运行记录',
   },
 } as const;
+
+/**
+ * PowerX: Unpin in the pinned strip also releases the chart's own pin (tooltip and details).
+ * A separate component so hover updates of the active point never re-render the scatter.
+ */
+function PowerXChartPinSync({ chartRef }: { chartRef: React.RefObject<D3ChartHandle | null> }) {
+  const activePoint = usePowerXActivePoint();
+  const pinnedRef = useRef(false);
+  useEffect(() => {
+    if (pinnedRef.current && activePoint === null) chartRef.current?.dismissTooltip(true);
+    pinnedRef.current = activePoint?.source === 'pinned';
+  }, [activePoint, chartRef]);
+  return null;
+}
 
 const ScatterGraph = React.memo(
   ({
@@ -2246,6 +2261,9 @@ const ScatterGraph = React.memo(
     // PowerX: the readout row under the caption follows the hovered or pinned point.
     const setActivePoint = useSetPowerXActivePoint();
     const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
+    const detailsRendererRef = useRef<
+      ((d: InferenceData, isOverlay: boolean, close: () => void) => React.ReactNode) | null
+    >(null);
     activePointRef.current = setActivePoint;
     // PowerX on a coarse pointer: the finger in flight on the plot (its pointer id).
     const scrubPointerRef = useRef<number | null>(null);
@@ -2646,17 +2664,20 @@ const ScatterGraph = React.memo(
           });
         }
       };
+      const renderDetails = (d: InferenceData, isOverlay: boolean, close: () => void) => (
+        <PointDetailsPanel
+          details={pointDetails(d, isOverlay)}
+          color={pointColor(d, isOverlay)}
+          onClose={close}
+          onAction={(action, event) => onAction(action, event, d, isOverlay)}
+        />
+      );
+      detailsRendererRef.current = renderDetails;
       return {
         rulerType: 'crosshair' as const,
         content: (d: InferenceData) => hoverCard(d, false),
-        details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
-          <PointDetailsPanel
-            details={pointDetails(d, isOverlay)}
-            color={pointColor(d, isOverlay)}
-            onClose={close}
-            onAction={(action, event) => onAction(action, event, d, isOverlay)}
-          />
-        ),
+        // PowerX ranking: the ranking keeps the legend slot; the pinned strip opens details.
+        details: rankingOn ? undefined : renderDetails,
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
@@ -2666,7 +2687,14 @@ const ScatterGraph = React.memo(
           activePointRef.current?.(null);
         },
         onPointClick: (d: InferenceData) => {
-          activePointRef.current?.({ point: d, source: 'pinned', color: pointColor(d, false) });
+          activePointRef.current?.({
+            point: d,
+            source: 'pinned',
+            color: pointColor(d, false),
+            details: rankingOn
+              ? (close) => detailsRendererRef.current?.(d, false, close) ?? null
+              : undefined,
+          });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
@@ -2682,7 +2710,7 @@ const ScatterGraph = React.memo(
         },
         attachToLayer: 1,
       };
-    }, [pointDetails, pointColor, hoverCard, openPowerTrace]);
+    }, [pointDetails, pointColor, hoverCard, openPowerTrace, rankingOn]);
 
     // PowerX ranking: the lines carry short direct labels instead of the label pills.
     const pillLineLabels = showLineLabels && !rankingOn;
@@ -4740,7 +4768,9 @@ const ScatterGraph = React.memo(
 
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
-        <div className="relative w-full p-3">
+        <div className={powerXSurface ? 'relative w-full' : 'relative w-full p-3'}>
+          {/* PowerX keeps its toolbar (Chart | Table, Export) and y-title row on an empty plot. */}
+          {powerXSurface && caption}
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
           {footer}
           <QuickFiltersDialog
@@ -4915,6 +4945,7 @@ const ScatterGraph = React.memo(
           selectedSequence === Sequence.AgenticTraces ? 'true' : undefined
         }
       >
+        {powerXSurface && <PowerXChartPinSync chartRef={chartRef} />}
         <D3Chart<InferenceData>
           ref={chartRef}
           // PowerX drops the interaction hint under its charts; /infx/inference keeps it.

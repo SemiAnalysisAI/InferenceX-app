@@ -1071,21 +1071,22 @@ export default function ChartDisplay({
         }
         leadingControls={
           compactViewToggle ? (
-            <button
-              type="button"
-              className={`${POWERX_QUIET_BUTTON} max-md:h-11`}
-              aria-label={t.viewMode}
-              data-testid={`inference-view-toggle-${graphIndex}`}
-              onClick={() =>
-                handleViewModeChange(
-                  graphIndex,
-                  getViewMode(graphIndex) === 'table' ? 'chart' : 'table',
-                )
-              }
-            >
-              {viewModeOptions.find((option) => option.value !== getViewMode(graphIndex))?.label ??
-                null}
-            </button>
+            // Phone: one button names the other view; it keeps that option's test id.
+            <span className="inline-flex" data-testid={`inference-view-toggle-${graphIndex}`}>
+              {viewModeOptions
+                .filter((option) => option.value !== getViewMode(graphIndex))
+                .map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${POWERX_QUIET_BUTTON} max-md:h-11`}
+                    data-testid={option.testId}
+                    onClick={() => handleViewModeChange(graphIndex, option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+            </span>
           ) : (
             <SegmentedToggle
               value={getViewMode(graphIndex)}

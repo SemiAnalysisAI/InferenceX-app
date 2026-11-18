@@ -1,8 +1,9 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import type { MouseEvent } from 'react';
+import { useState, type MouseEvent } from 'react';
 
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useInferenceActions } from '@/components/inference/InferenceContext';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import type { InferenceData } from '@/components/inference/types';
@@ -54,6 +55,7 @@ const STRINGS = {
     viewTrace: 'View power trace',
     seeBreakdown: 'See breakdown',
     unpin: 'Unpin',
+    details: 'Details',
   },
   zh: {
     energy: '能耗',
@@ -76,6 +78,7 @@ const STRINGS = {
     viewTrace: '查看功耗曲线',
     seeBreakdown: '查看分解',
     unpin: '取消固定',
+    details: '详情',
   },
 } as const;
 
@@ -204,6 +207,7 @@ export function PowerXPinnedStrip({
   const setActivePoint = useSetPowerXActivePoint();
   const { setSelectedYAxisMetric } = useInferenceActions();
   const { setUrlParams } = useUrlState();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   if (active?.source !== 'pinned') return null;
   const { point } = active;
   const traceKey = traceKeyForPoint(point);
@@ -278,6 +282,31 @@ export function PowerXPinnedStrip({
           {t.seeBreakdown}
           <ArrowRight className="size-3.5 opacity-60" aria-hidden />
         </button>
+        {active.details && (
+          // The chart's Point details panel (run, logs, reproduce) without taking the
+          // ranking's place beside the plot.
+          <Popover open={detailsOpen} onOpenChange={setDetailsOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={POWERX_QUIET_BUTTON}
+                data-testid="powerx-pinned-details"
+                onClick={() => {
+                  if (!detailsOpen)
+                    track('powerx_pinned_details_opened', { gpu, conc: point.conc });
+                }}
+              >
+                {t.details}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="max-h-[70vh] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto p-0"
+            >
+              {active.details(() => setDetailsOpen(false))}
+            </PopoverContent>
+          </Popover>
+        )}
         <button
           type="button"
           className={POWERX_QUIET_BUTTON}
