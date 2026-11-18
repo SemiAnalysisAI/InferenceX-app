@@ -1218,6 +1218,21 @@ describe('VideoGenX Results', () => {
       );
   });
 
+  it('dims the other hardware while a legend row is hovered, also for an unofficial run', () => {
+    cy.viewport(1440, 900);
+    mount({ search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`, editPage: addNamedRun });
+    cy.get('label[for="checkbox-h200"]').trigger('mouseover');
+    hardwarePoints('h200').should('have.css', 'opacity', '1');
+    hardwarePoints('b200').each(($point) => expect($point).to.have.css('opacity', '0.15'));
+    cy.contains('[data-series-pill]', 'unofficial').should('have.attr', 'opacity', '0.15');
+    cy.get('label[for="checkbox-h200"]').trigger('mouseout');
+    cy.get('label[for="checkbox-b200"]').trigger('mouseover');
+    hardwarePoints('h200').should('have.css', 'opacity', '0.15');
+    cy.contains('[data-series-pill]', 'unofficial').should('not.have.attr', 'opacity');
+    cy.get('label[for="checkbox-b200"]').trigger('mouseout');
+    points().each(($point) => expect($point).to.have.css('opacity', '1'));
+  });
+
   it('names only the focus overlay lines on a narrow plot', () => {
     cy.viewport(375, 844);
     mount({
