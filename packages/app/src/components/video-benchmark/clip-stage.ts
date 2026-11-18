@@ -1,12 +1,12 @@
-import { replaceClientSearch } from '@/lib/routing/client-navigation';
 import { deploymentKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import type { VideoPoint } from './metrics';
+import { setVideoSearch, videoSearch } from './page-search';
 import { isLossy } from './optimizations';
 import { RESULTS_HARDWARE } from './results';
 import { resultsPointKey } from './results-chart';
 import { resultsClipGroups, type ResultsClipGroup, type ResultsClipSide } from './results-clips';
 
-/** Ways the comparison stage shows its two clips; Wipe is the default and is omitted from the URL. */
+/** Ways the comparison stage shows its two clips; Wipe is the default and is omitted from a link. */
 export const STAGE_VIEWS = ['wipe', 'side', 'toggle', 'diff'] as const;
 export type StageView = (typeof STAGE_VIEWS)[number];
 
@@ -27,7 +27,7 @@ export interface StageState {
   sheet: string | null;
 }
 
-/** The stage's own URL keys. VideoDashboard's `commit` rewrites every other `r_` key and keeps these. */
+/** The stage's own link keys. VideoDashboard's `commit` rewrites every other `r_` key and keeps these. */
 const STAGE_PARAMS: readonly string[] = [
   'r_prompt',
   'r_view',
@@ -69,8 +69,9 @@ export function stageSearch(state: StageState, search: string): URLSearchParams 
   return params;
 }
 
-export function writeStage(state: StageState) {
-  replaceClientSearch(stageSearch(state, window.location.search));
+/** Changes the stage's part of the page's settings (`page-search.ts`). */
+export function setStage(patch: Partial<StageState>) {
+  setVideoSearch(stageSearch({ ...parseStage(videoSearch()), ...patch }, videoSearch()));
 }
 
 /** Element id of the stage and its transport, which a reveal scrolls into view. */

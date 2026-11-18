@@ -42,7 +42,7 @@ import {
   tapTarget,
   type Box,
 } from './chart-marks';
-import { mayHaveClips, parseStage, writeStage } from './clip-stage';
+import { mayHaveClips, setStage } from './clip-stage';
 import { useStageValue } from './use-stage-value';
 import type { VideoPoint } from './metrics';
 import VideoPointSheet from './VideoPointSheet';
@@ -836,7 +836,7 @@ export default function VideoResultsChart({
       playable: point.clips,
     });
     if (point.clips) link.current?.onPeek(point.key);
-    writeStage({ ...parseStage(location.search), sheet: point.key });
+    setStage({ sheet: point.key });
     return true;
   }, []);
   useEffect(() => {
@@ -852,10 +852,7 @@ export default function VideoResultsChart({
     () => chart.current?.getSvgElement()?.querySelector(`.${SHEET_RING}`) ?? null,
     [],
   );
-  const closeSheet = useCallback(
-    () => writeStage({ ...parseStage(location.search), sheet: null }),
-    [],
-  );
+  const closeSheet = useCallback(() => setStage({ sheet: null }), []);
   // A link that opens on a sheet reads its point's clips too.
   const sheetClips = sheetPoint?.clips ? sheetPoint.key : null;
   useEffect(() => {
