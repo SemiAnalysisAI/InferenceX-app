@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
-import type { TooltipConfig } from '@/components/inference/utils/tooltipUtils';
 import { detailsText } from '@/components/inference/utils/point-details-test-helpers';
+import { buildPointDetails, type TooltipConfig } from '@/components/inference/utils/tooltipUtils';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716669498';
 const AUDIT_NAME =
@@ -80,5 +80,25 @@ describe('View power trace tooltip action', () => {
     expect(html).toContain('View power trace');
     expect(html).not.toContain('data-action="view-logs"');
     expect(detailsText(overlayConfig({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(ACTION);
+  });
+});
+
+describe('View power trace link', () => {
+  it('opens Over time focused on the point, keeping the role and dropping a stale concurrency', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'https://inferencex.semianalysis.com',
+        pathname: '/pwx',
+        hash: '',
+        search: '?g_model=Kimi-K3&i_metric=y_measuredAvgPower&i_role=decode&i_ptconc=1',
+      },
+    });
+    const link = buildPointDetails(config()).links.find(
+      (entry) => entry.action === 'view-power-trace',
+    );
+    const url = new URL(link?.href ?? '');
+    expect(url.searchParams.get('i_metric')).toBe('y_measuredPowerTimeline');
+    expect(url.searchParams.get('i_ptfocus')).toBe(`34716669498:${AUDIT_NAME}`);
+    expect(url.searchParams.has('i_ptconc')).toBe(false);
   });
 });

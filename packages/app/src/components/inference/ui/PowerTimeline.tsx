@@ -14,6 +14,7 @@ import {
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
+import { useRequestedPowerTraceFocus } from '@/components/inference/hooks/useRequestedPowerTraceFocus';
 import {
   comparisonEntryDate,
   comparisonEntryLabel,
@@ -54,7 +55,6 @@ import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwing
 import PowerTimelineSummary from './PowerTimelineSummary';
 import {
   allGpuPool,
-  consumePowerTraceFocus,
   groupPoolsBySize,
   hasPowerTimelineWindow,
   parsePowerTimelineParams,
@@ -1066,10 +1066,7 @@ export default function PowerTimeline({
   const [raw, setRaw] = useState(initialView.raw);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
-  const requestedFocusRef = useRef<string | null | undefined>(undefined);
-  if (requestedFocusRef.current === undefined) {
-    requestedFocusRef.current = consumePowerTraceFocus();
-  }
+  const requestedFocusRef = useRequestedPowerTraceFocus();
   const [concurrency, setConcurrency] = useState<number | null>(() =>
     requestedFocusRef.current ? null : initialView.concurrency,
   );

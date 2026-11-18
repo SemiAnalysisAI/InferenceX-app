@@ -468,10 +468,14 @@ export function requestPowerTraceFocus(key: string): void {
   pendingFocus = key;
 }
 
-export function consumePowerTraceFocus(): string | null {
-  const key = pendingFocus;
-  pendingFocus = null;
-  return key;
+/** Reads the requested focus without clearing it: React may discard a render before commit. */
+export function peekPowerTraceFocus(): string | null {
+  return pendingFocus;
+}
+
+/** Clears a request once the timeline that read it has committed; a newer request is kept. */
+export function clearPowerTraceFocus(key: string): void {
+  if (pendingFocus === key) pendingFocus = null;
 }
 
 /**
