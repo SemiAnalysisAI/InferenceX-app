@@ -1,4 +1,5 @@
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { rewriteLegacyPowerRoleParams } from '@/components/inference/powerx/powerx-role';
 
 import { getDashboardRoute } from './dashboard-routes';
 import { getInferenceModelBySlug } from './inference-model-slug';
@@ -15,7 +16,8 @@ const INFERENCE_PATH = new RegExp(
  * filters; the latter used to open the measured power chart, so it lands on the Power
  * draw view rather than PowerX's default Energy per token view. A model route
  * (`/infx/inference/<slug>`) keeps its model as `g_model`, and its boundary compare, which
- * drew all four boundaries, becomes PowerX's `all`.
+ * drew all four boundaries, becomes PowerX's `all`. Old role encodings (a role-specific
+ * `i_metric` or `i_pcompare=roles`) move onto the GPU role control (`i_role`).
  * Returns null when the URL should load as is.
  */
 const LEGACY_POWER_METRIC = 'y_measuredAvgPower';
@@ -43,5 +45,13 @@ export function powerXRedirectUrl(url: URL): URL | null {
   if (target.searchParams.get('i_pcompare') === 'boundaries') {
     target.searchParams.set('i_pcompare', 'all');
   }
+  const role = rewriteLegacyPowerRoleParams({
+    metric: target.searchParams.get('i_metric'),
+    compare: target.searchParams.get('i_pcompare'),
+    role: target.searchParams.get('i_role'),
+  });
+  if (role.metric) target.searchParams.set('i_metric', role.metric);
+  if (role.compare) target.searchParams.set('i_pcompare', role.compare);
+  if (role.role && role.role !== 'all') target.searchParams.set('i_role', role.role);
   return target;
 }

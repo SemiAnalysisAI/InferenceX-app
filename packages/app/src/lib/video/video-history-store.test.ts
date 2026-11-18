@@ -356,8 +356,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after cost tier labels returned to title case; labels are not stored in entries.
-      sources: 'ed6de4a65a129a45ddcd7ee97b3f6647b0477206034c5f5ab2507d5ae7629d1e',
+      // Re-pinned after the PowerX GPU role touched shared inference types and URL keys; no
+      // video entry reads them, so recorded entries are unchanged.
+      sources: '4e7c59c2d722b22c0b56613e1bbbe0616c2b6c34889200b2e1b66649460957f1',
     });
   });
 });

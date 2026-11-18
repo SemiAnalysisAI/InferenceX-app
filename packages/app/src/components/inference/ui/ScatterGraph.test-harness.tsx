@@ -126,6 +126,7 @@ export function baseInferenceState() {
       computeToggle(prev, item, allItems),
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
+    powerRole: 'all' as const,
     tokenRevenuePriceSource: 'normalized' as const,
     tokenRevenuePricing: {
       source: 'normalized' as const,

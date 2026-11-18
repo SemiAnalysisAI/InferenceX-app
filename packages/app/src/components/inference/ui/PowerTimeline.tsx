@@ -48,6 +48,7 @@ import {
   useInferenceFilters,
 } from '../InferenceContext';
 import type { InferenceData, OverlayData } from '../types';
+import type { PowerXRole } from '../powerx/powerx-role';
 import { powerVariantDash } from '../utils/power-compare';
 import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwings';
 import PowerTimelineSummary from './PowerTimelineSummary';
@@ -69,9 +70,12 @@ import {
   runIdFromUrl,
   traceConfigLabel,
   traceKeyRunId,
+  traceLanes,
   tracePools,
   windowPhase,
   type PoolSizeGroup,
+  type PowerLaneKind,
+  type PowerTraceLane,
   type PowerPool,
   type PowerPoolRole,
   type PowerTimelineAxis,
@@ -162,6 +166,14 @@ const STRINGS = {
       string
     >,
     traceKey: 'Trace colours',
+    laneName: { prefill: 'Prefill workers', decode: 'Decode workers' } satisfies Record<
+      'prefill' | 'decode',
+      string
+    >,
+    laneAll: (count: number) => `All ${count} GPU${count === 1 ? '' : 's'}`,
+    aggregated: 'aggregated',
+    aggregatedNote: 'Aggregated runs stay dimmed: every GPU does both prefill and decode.',
+    lane: 'Lane',
     yMean: 'Mean power per GPU (W)',
     yGpu: 'Power per GPU (W)',
     yPool: 'GPU pool power (W)',
@@ -235,6 +247,14 @@ const STRINGS = {
       string
     >,
     traceKey: '曲线颜色',
+    laneName: { prefill: '预填充 worker', decode: '解码 worker' } satisfies Record<
+      'prefill' | 'decode',
+      string
+    >,
+    laneAll: (count: number) => `全部 ${count} 个 GPU`,
+    aggregated: '聚合',
+    aggregatedNote: '聚合运行以淡色显示：每个 GPU 同时承担预填充和解码。',
+    lane: '分组',
     yMean: '每 GPU 平均功耗（W）',
     yGpu: '单 GPU 功耗（W）',
     yPool: 'GPU 池功耗（W）',
@@ -253,6 +273,19 @@ const STRINGS = {
 
 type XMode = PowerTimelineAxis;
 type LineMode = PowerTimelineLines;
+/** What is drawn: the URL line choice, or per-GPU mean lanes per pool under a GPU role. */
+type DrawMode = LineMode | 'lane';
+
+function drawModeFor(lineMode: LineMode, role: PowerXRole): DrawMode {
+  if (role === 'all') return lineMode;
+  return lineMode === 'gpu' ? 'gpu' : 'lane';
+}
+
+interface LaneInfo {
+  role: PowerPoolRole;
+  kind: PowerLaneKind;
+  gpuCount: number;
+}
 
 interface TimelineSample {
   trace: PowerTimelineTrace;
@@ -267,6 +300,8 @@ interface TimelineSample {
   gpuCount: number;
   phase: WindowPhase;
   pool?: { role: PowerPoolRole; gpuCount: number };
+  /** Under a GPU role: the lane this per-GPU mean sample belongs to. */
+  lane?: LaneInfo;
   /** Y of the drawn (smoothed) line at this sample, so the hover dot sits on the line. */
   drawnY?: number;
 }
@@ -288,6 +323,7 @@ interface TracePath {
   opacity: number;
   points: TracePoint[];
   pool?: PowerPoolRole;
+  lane?: PowerLaneKind;
 }
 
 interface ReferenceLine {
@@ -307,6 +343,7 @@ interface TraceLabel {
   hwKey: string;
   series?: string;
   pool?: PowerPoolRole;
+  lane?: PowerLaneKind;
   color: string;
   text: string;
   x: number;
@@ -326,6 +363,8 @@ export interface PowerTimelineProps {
   footer?: React.ReactNode;
   comparison?: boolean;
   runNumbering?: Map<string, number>;
+  /** PowerX GPU role: per-GPU mean lanes per worker pool instead of the all-GPU mean. */
+  role?: PowerXRole;
 }
 
 type TimelineStrings = (typeof STRINGS)[keyof typeof STRINGS];
@@ -526,13 +565,66 @@ function poolDash(pool: PowerPoolRole): string | null {
   return dash === '' ? null : dash;
 }
 
+function laneLabel(
+  role: PowerPoolRole,
+  kind: PowerLaneKind,
+  gpuCount: number,
+  t: TimelineStrings,
+): string {
+  if (kind === 'aggregated') return t.aggregated;
+  return role === 'all' ? t.laneAll(gpuCount) : t.laneName[role];
+}
+
 interface TraceRow {
   id: string;
   pool?: PowerPoolRole;
+  lane?: PowerLaneKind;
   values: (number | null)[];
 }
 
-function traceRows(series: GpuPowerSeries, lineMode: LineMode): TraceRow[] {
+function meanPowerOfRows(
+  series: GpuPowerSeries,
+  rows: readonly number[],
+  column: number,
+): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const row of rows) {
+    const value = series.power[row]?.[column];
+    if (value === null || value === undefined) continue;
+    sum += value;
+    count += 1;
+  }
+  return count > 0 ? sum / count : null;
+}
+
+function lanePool(lane: Pick<PowerTraceLane, 'role'>): PowerPoolRole | undefined {
+  return lane.role === 'all' ? undefined : lane.role;
+}
+
+function traceRows(series: GpuPowerSeries, lineMode: DrawMode, role: PowerXRole): TraceRow[] {
+  if (role !== 'all') {
+    const lanes = traceLanes(series, role);
+    if (lineMode === 'gpu') {
+      // One line per GPU of the selected pools; the split's all-GPU context would repeat them.
+      return lanes
+        .filter((lane) => lane.kind !== 'context')
+        .flatMap((lane) =>
+          lane.rows.map((row) => ({
+            id: `gpu${series.gpus[row]}`,
+            pool: lanePool(lane),
+            lane: lane.kind,
+            values: series.power[row],
+          })),
+        );
+    }
+    return lanes.map((lane) => ({
+      id: `lane:${lane.kind}:${lane.role}`,
+      pool: lanePool(lane),
+      lane: lane.kind,
+      values: series.t.map((_, column) => meanPowerOfRows(series, lane.rows, column)),
+    }));
+  }
   if (lineMode === 'gpu') {
     return series.gpus.map((gpu, row) => ({ id: `gpu${gpu}`, values: series.power[row] }));
   }
@@ -551,14 +643,15 @@ function tracePaths(
   color: string,
   overlayIndex: number | null,
   xMode: XMode,
-  lineMode: LineMode,
+  lineMode: DrawMode,
   windowOnly: boolean,
   raw = false,
   dense = false,
+  role: PowerXRole = 'all',
 ): TracePath[] {
   const { series } = trace;
   const span = raw ? 1 : smoothSpan(series);
-  const rows = traceRows(series, lineMode).map((row) => ({
+  const rows = traceRows(series, lineMode, role).map((row) => ({
     ...row,
     values: rollingMean(row.values, span),
   }));
@@ -568,6 +661,9 @@ function tracePaths(
   const widths = lineMode === 'gpu' ? [1, 1.5] : dense ? [1, 1.4] : [1.25, 2.25];
   const paths: TracePath[] = [];
   for (const row of rows) {
+    // The split's all-GPU line sits faint behind the lanes; aggregated traces stay dimmed.
+    const dim = row.lane === 'context' ? 0.35 : row.lane === 'aggregated' ? 0.45 : 1;
+    const thin = row.lane === 'context' ? 0.75 : 1;
     const full: TracePoint[] = [];
     const window: TracePoint[] = [];
     row.values.forEach((value, column) => {
@@ -585,10 +681,11 @@ function tracePaths(
         overlayIndex,
         color,
         segment: 'full',
-        width: widths[0],
-        opacity: faint,
+        width: widths[0] * thin,
+        opacity: faint * dim,
         points: full,
         pool: row.pool,
+        lane: row.lane,
       });
     if (window.length > 1) {
       paths.push({
@@ -598,10 +695,11 @@ function tracePaths(
         overlayIndex,
         color,
         segment: 'window',
-        width: widths[1],
-        opacity: strong,
+        width: widths[1] * thin,
+        opacity: strong * dim,
         points: window,
         pool: row.pool,
+        lane: row.lane,
       });
     }
   }
@@ -618,11 +716,28 @@ function traceSamples(
   color: string,
   overlayIndex: number | null,
   xMode: XMode,
-  lineMode: LineMode,
+  lineMode: DrawMode,
   windowOnly: boolean,
   raw = false,
+  role: PowerXRole = 'all',
 ): TimelineSample[] {
   const { series } = trace;
+  if (role !== 'all') {
+    // Hover reads each lane's per-GPU mean, also when every GPU of the pools is drawn.
+    return traceLanes(series, role).flatMap((lane) =>
+      sampleRows(
+        trace,
+        color,
+        overlayIndex,
+        xMode,
+        windowOnly,
+        lane.rows,
+        undefined,
+        !raw && lineMode !== 'gpu',
+        { role: lane.role, kind: lane.kind, gpuCount: lane.rows.length },
+      ),
+    );
+  }
   if (lineMode !== 'pool') {
     const rows = series.power.map((_, row) => row);
     return sampleRows(trace, color, overlayIndex, xMode, windowOnly, rows, undefined, !raw);
@@ -650,6 +765,7 @@ function sampleRows(
   rows: readonly number[],
   pool: TimelineSample['pool'],
   smoothY = false,
+  lane?: LaneInfo,
 ): TimelineSample[] {
   const { series } = trace;
   const samples: TimelineSample[] = [];
@@ -683,6 +799,7 @@ function sampleRows(
       gpuCount: count,
       phase: windowPhase(trace, timeMs),
       pool,
+      lane,
     });
   }
   if (smoothY) {
@@ -734,6 +851,7 @@ function drawTraces(
     .attr('data-segment', (path) => path.segment)
     .attr('data-run-index', (path) => path.overlayIndex)
     .attr('data-pool', (path) => path.pool ?? null)
+    .attr('data-lane', (path) => path.lane ?? null)
     .attr('stroke-dasharray', (path) => (path.pool ? poolDash(path.pool) : null))
     .attr('stroke', (path) => path.color)
     .attr('stroke-width', (path) => path.width)
@@ -751,7 +869,8 @@ function traceOpacity(path: TracePath, highlight: string | null): number {
 }
 
 function labelOpacity(label: TraceLabel, highlight: string | null): number {
-  return highlight === null || isHighlighted(label, highlight) ? 1 : 0.2;
+  const base = label.lane === 'context' || label.lane === 'aggregated' ? 0.6 : 1;
+  return highlight === null || isHighlighted(label, highlight) ? base : 0.2 * base;
 }
 
 function labelWidth(text: string): number {
@@ -833,6 +952,7 @@ function drawLabels(
       .select('text.power-trace-label')
       .attr('data-hw', label.hwKey)
       .attr('data-pool', label.pool ?? null)
+      .attr('data-lane', label.lane ?? null)
       .attr('fill', label.color)
       .attr('opacity', opacity)
       .attr('text-anchor', 'start')
@@ -898,6 +1018,7 @@ export default function PowerTimeline({
   footer,
   comparison = false,
   runNumbering: providedRunNumbering,
+  role = 'all',
 }: PowerTimelineProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -1070,8 +1191,9 @@ export default function PowerTimeline({
     if (!trace) return;
     requestedFocusRef.current = null;
     setFocusKey(trace.key);
-    if (tracePools(trace.series).length > 0) setLineMode('pool');
-  }, [traces]);
+    // Under a GPU role the lanes already split the pools; keep the role's view.
+    if (role === 'all' && tracePools(trace.series).length > 0) setLineMode('pool');
+  }, [traces, role]);
 
   useEffect(() => {
     if (loadingRuns > 0 || responses.size === 0) return;
@@ -1143,6 +1265,13 @@ export default function PowerTimeline({
     [visibleTraces],
   );
   const xMode: XMode = xModeChoice ?? (visibleRunCount <= 1 ? 'wall' : 'elapsed');
+  const drawMode = drawModeFor(lineMode, role);
+  const hasAggregatedLane = useMemo(
+    () =>
+      role !== 'all' &&
+      visibleTraces.some((trace) => traceLanes(trace.series, role)[0]?.kind === 'aggregated'),
+    [visibleTraces, role],
+  );
 
   const hasPools = useMemo(
     () => visibleTraces.some((trace) => tracePools(trace.series).length > 0),
@@ -1210,38 +1339,58 @@ export default function PowerTimeline({
         color,
         overlayIndex,
         xMode,
-        lineMode,
+        drawMode,
         windowOnly,
         raw,
         visibleTraces.length > DENSE_TRACES,
+        role,
       ).map((path) => ({ ...path, series }));
       paths.push(...tracePathSet);
       if (visibleTraces.length > MAX_LABELED_TRACES) continue;
-      const groups: { pool?: PowerPoolRole; paths: TracePath[] }[] =
-        lineMode === 'pool'
-          ? drawnPools(trace.series).map((pool) => ({
-              pool: pool.role,
-              paths: tracePathSet.filter((path) => path.pool === pool.role),
-            }))
-          : [{ paths: tracePathSet }];
+      const groups: {
+        id?: string;
+        pool?: PowerPoolRole;
+        lane?: PowerTraceLane;
+        paths: TracePath[];
+      }[] =
+        role === 'all'
+          ? drawMode === 'pool'
+            ? drawnPools(trace.series).map((pool) => ({
+                id: pool.role,
+                pool: pool.role,
+                paths: tracePathSet.filter((path) => path.pool === pool.role),
+              }))
+            : [{ paths: tracePathSet }]
+          : traceLanes(trace.series, role)
+              .filter((lane) => drawMode !== 'gpu' || lane.kind !== 'context')
+              .map((lane) => ({
+                id: `${lane.kind}:${lane.role}`,
+                pool: lanePool(lane),
+                lane,
+                paths: tracePathSet.filter(
+                  (path) => path.lane === lane.kind && path.pool === lanePool(lane),
+                ),
+              }));
       for (const group of groups) {
         const anchor =
           group.paths.find((path) => path.segment === 'window') ??
           group.paths.find((path) => path.segment === 'full');
         const last = anchor?.points.filter((point) => point.y !== null).at(-1);
         if (!last || last.y === null) continue;
+        const suffix = group.lane
+          ? ` · ${laneLabel(group.lane.role, group.lane.kind, group.lane.rows.length, t)}`
+          : group.pool
+            ? ` · ${t.poolShort[group.pool]}`
+            : '';
         labels.push({
-          id: group.pool ? `${trace.key}:${group.pool}` : trace.key,
+          id: group.id ? `${trace.key}:${group.id}` : trace.key,
           traceKey: trace.key,
           hwKey: trace.point.hwKey,
           series,
           pool: group.pool,
+          lane: group.lane?.kind,
           color,
-          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}${
-            group.pool
-              ? `c${trace.point.conc} · ${t.poolShort[group.pool]}`
-              : `c${trace.point.conc}`
-          }`,
+          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}c${trace.point.conc}${suffix}`,
           x: last.x,
           y: last.y,
         });
@@ -1254,7 +1403,8 @@ export default function PowerTimeline({
     comparisonSeriesOf,
     entryLabel,
     xMode,
-    lineMode,
+    drawMode,
+    role,
     windowOnly,
     raw,
     t,
@@ -1274,9 +1424,9 @@ export default function PowerTimeline({
     () =>
       visibleTraces.flatMap((trace) => {
         const { color, overlayIndex } = colorForTrace(trace);
-        return traceSamples(trace, color, overlayIndex, xMode, lineMode, windowOnly, raw);
+        return traceSamples(trace, color, overlayIndex, xMode, drawMode, windowOnly, raw, role);
       }),
-    [visibleTraces, colorForTrace, xMode, lineMode, windowOnly, raw],
+    [visibleTraces, colorForTrace, xMode, drawMode, windowOnly, raw, role],
   );
 
   const referenceLines = useMemo<ReferenceLine[]>(() => {
@@ -1288,7 +1438,7 @@ export default function PowerTimeline({
       const size = pool?.size ?? 1;
       const id = pool ? `${base}:${pool.roles.join('+')}:${pool.size}` : base;
       const name = pool
-        ? `${label} ${pool.roles.map((role) => t.poolShort[role]).join(' / ')} ×${pool.size}`
+        ? `${label} ${pool.roles.map((poolRole) => t.poolShort[poolRole]).join(' / ')} ×${pool.size}`
         : label;
       if (specs.tdp > 0) {
         lines.push({
@@ -1316,17 +1466,17 @@ export default function PowerTimeline({
     for (const trace of visibleTraces) {
       const base = baseHardware(trace.point.hwKey);
       if (!perBase.has(base)) perBase.set(base, { color: colorForTrace(trace).color, pools: [] });
-      if (lineMode === 'pool') perBase.get(base)!.pools.push(...drawnPools(trace.series));
+      if (drawMode === 'pool') perBase.get(base)!.pools.push(...drawnPools(trace.series));
     }
     for (const [base, { color, pools }] of perBase) {
-      if (lineMode !== 'pool') {
+      if (drawMode !== 'pool') {
         pushLines(base, color);
         continue;
       }
       for (const group of groupPoolsBySize(pools)) pushLines(base, color, group);
     }
     return lines;
-  }, [visibleTraces, colorForTrace, showUtility, lineMode, t]);
+  }, [visibleTraces, colorForTrace, showUtility, drawMode, t]);
 
   const xDomain = useMemo<[number, number]>(() => {
     let min = Number.POSITIVE_INFINITY;
@@ -1409,9 +1559,11 @@ export default function PowerTimeline({
           getColor: (sample) => sample.color,
           getRadius: () => 2,
           keyFn: (sample) =>
-            sample.pool
-              ? `${sample.trace.key}:${sample.pool.role}:${sample.column}`
-              : `${sample.trace.key}:${sample.column}`,
+            sample.lane
+              ? `${sample.trace.key}:${sample.lane.kind}:${sample.lane.role}:${sample.column}`
+              : sample.pool
+                ? `${sample.trace.key}:${sample.pool.role}:${sample.column}`
+                : `${sample.trace.key}:${sample.column}`,
           maxPoints: Number.POSITIVE_INFINITY,
         },
       },
@@ -1464,7 +1616,7 @@ export default function PowerTimeline({
 
   const describeSample = useCallback(
     (sample: TimelineSample) => {
-      const { trace, pool } = sample;
+      const { trace, pool, lane } = sample;
       const point = trace.point;
       const overlayInfo =
         sample.overlayIndex === null ? null : unofficialRunInfos[sample.overlayIndex];
@@ -1484,7 +1636,11 @@ export default function PowerTimeline({
               ? `${clock} · +${elapsed} ${t.sinceStart}`
               : `+${elapsed} · ${clock}`,
         watts: pool ? formatWatts(sample.y) : sample.y.toFixed(1),
-        wattsLabel: pool ? t.poolPower : t.meanPerGpu,
+        wattsLabel: pool
+          ? t.poolPower
+          : lane
+            ? `${laneLabel(lane.role, lane.kind, lane.gpuCount, t)} · ${t.meanPerGpu}`
+            : t.meanPerGpu,
         tdp:
           tdpShare === null
             ? null
@@ -1498,7 +1654,14 @@ export default function PowerTimeline({
                 },
                 { label: t.meanPerGpu, value: `${(sample.y / sample.gpuCount).toFixed(1)} W` },
               ]
-            : [{ label: t.gpuCount, value: String(sample.gpuCount) }]),
+            : lane
+              ? [
+                  {
+                    label: t.lane,
+                    value: `${laneLabel(lane.role, lane.kind, lane.gpuCount, t)} · ${t.gpus(lane.gpuCount)}`,
+                  },
+                ]
+              : [{ label: t.gpuCount, value: String(sample.gpuCount) }]),
           {
             label: t.range,
             value: `${sample.min.toFixed(1)} W / ${sample.max.toFixed(1)} W`,
@@ -1526,7 +1689,9 @@ export default function PowerTimeline({
           color: sample.color,
           warning: info.warning,
           metrics: [{ value: info.watts, label: 'W' }, ...(info.tdp ? [info.tdp] : [])],
-          summary: `${info.time} · ${t.phase[sample.phase]}`,
+          summary: sample.lane
+            ? `${laneLabel(sample.lane.role, sample.lane.kind, sample.lane.gpuCount, t)} · ${t.gpus(sample.lane.gpuCount)} · ${info.time} · ${t.phase[sample.phase]}`
+            : `${info.time} · ${t.phase[sample.phase]}`,
         },
         { pinned: false },
       );
@@ -1677,7 +1842,8 @@ export default function PowerTimeline({
       infoTooltip: t.perGpuHelp,
     },
   ];
-  if (hasPools || lineMode === 'pool') {
+  // Under a GPU role the per-pool lanes supersede the summed pool lines.
+  if (role === 'all' && (hasPools || lineMode === 'pool')) {
     switches.push({
       id: 'power-timeline-pools',
       label: t.pools,
@@ -1841,6 +2007,7 @@ export default function PowerTimeline({
       traces={focusedTrace ? [focusedTrace] : visibleTraces}
       colorOf={(trace) => colorForTrace(trace).color}
       labelOf={seriesLabel}
+      role={role}
     />
   );
 
@@ -1867,7 +2034,7 @@ export default function PowerTimeline({
       data-status={status?.kind ?? 'ready'}
     >
       <D3Chart<TimelineSample>
-        key={`${chartId}-${xMode}-${lineMode}-${windowOnly}`}
+        key={`${chartId}-${xMode}-${drawMode}-${role}-${windowOnly}`}
         chartId={chartId}
         data={samples}
         height={CHART_HEIGHT}
@@ -1895,7 +2062,7 @@ export default function PowerTimeline({
           tickFormat: xTickFormat,
         }}
         yAxis={{
-          label: lineMode === 'pool' ? t.yPool : lineMode === 'gpu' ? t.yGpu : t.yMean,
+          label: drawMode === 'pool' ? t.yPool : drawMode === 'gpu' ? t.yGpu : t.yMean,
           tickCount: 8,
         }}
         layers={layers}
@@ -2004,6 +2171,7 @@ export default function PowerTimeline({
           </p>
         ))}
         {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
+        {hasAggregatedLane && <p data-testid="power-timeline-aggregated">{t.aggregatedNote}</p>}
         {runInfos.length > 0 && (
           <p data-testid="power-timeline-source">
             {t.telemetry}:{' '}
@@ -2031,6 +2199,7 @@ export default function PowerTimeline({
           colorOf={(trace) => colorForTrace(trace).color}
           hardwareLabel={seriesLabel}
           isOverlay={(point) => overlayPointSet.has(point)}
+          role={role}
         />
       )}
     </div>

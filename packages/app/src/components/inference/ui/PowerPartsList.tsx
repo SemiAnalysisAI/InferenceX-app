@@ -16,6 +16,8 @@ import {
   powerLayerFill,
   powerPartEmphasis,
   powerPartRows,
+  powerPartRowsByPool,
+  type GpuPool,
   sparklineGeometry,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
@@ -41,6 +43,7 @@ const STRINGS = {
     acrossLoad: 'W/GPU across this chip’s points, lowest interactivity first',
     allParts: (count: number) => `All ${count} parts · across load`,
     categories: SYSTEM_POWER_CATEGORY_LABELS.en,
+    poolRow: (pool: GpuPool, gpus: number, w: string) => `GPU · ${pool} pool (${gpus} × ${w} W)`,
   },
   zh: {
     list: '对比点处的功耗部件',
@@ -54,6 +57,8 @@ const STRINGS = {
     acrossLoad: '该芯片各数据点的 W/GPU，按交互性从低到高',
     allParts: (count: number) => `全部 ${count} 项 · 随负载变化`,
     categories: SYSTEM_POWER_CATEGORY_LABELS.zh,
+    poolRow: (pool: GpuPool, gpus: number, w: string) =>
+      `GPU · ${pool === 'prefill' ? '预填充' : '解码'}池（${gpus} × ${w} W）`,
   },
 };
 
@@ -63,6 +68,8 @@ export const SPARKLINE_WIDTH = 72;
 export const SPARKLINE_HEIGHT = 18;
 /** PowerX on a phone: the heaviest parts stay in view, the rest sit behind one row. */
 export const PHONE_VISIBLE_PARTS = 3;
+/** A pool row the GPU role leaves out: still readable, plainly secondary. */
+const DIMMED_POOL_ROW_OPACITY = 0.6;
 
 const behaviourLabel = (behaviour: PowerPartBehaviour, t: (typeof STRINGS)['en']) =>
   behaviour === 'measured' ? t.measured : behaviour === 'load' ? t.modeledLoad : t.modeledFixed;
@@ -115,6 +122,7 @@ export default function PowerPartsList({
   highlight,
   onHover,
   onTogglePin,
+  pools = [],
 }: {
   series: PowerBreakdownSeries;
   /** The compared point of `series`. */
@@ -123,10 +131,19 @@ export default function PowerPartsList({
   highlight: PowerLayerHighlight | null;
   onHover: (target: PowerLayerTarget | null) => void;
   onTogglePin: (target: PowerLayerTarget) => void;
+  /**
+   * The GPU pools the PowerX GPU role draws (`powerXRolePools`). When set, a disaggregated
+   * point's GPU row becomes one row per pool; a pool the role leaves out is dimmed.
+   */
+  pools?: readonly GpuPool[];
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const rows = useMemo(() => powerPartRows(series, entry), [series, entry]);
+  const splitByRole = pools.length > 0;
+  const rows = useMemo(
+    () => (splitByRole ? powerPartRowsByPool(series, entry) : powerPartRows(series, entry)),
+    [series, entry, splitByRole],
+  );
   const maxWatts = Math.max(1, ...rows.map((row) => row.watts));
   const heading = `${series.label} · ${t.at(entry.concurrency, formatInteractivity(entry.interactivity))}`;
   // PowerX under `md`: the accordion; desktop and other surfaces keep the full list.
@@ -159,9 +176,12 @@ export default function PowerPartsList({
     const facility = row.category === 'facility';
     const name = (
       <span className={`truncate ${emphasis === 'plain' ? '' : 'font-semibold'}`}>
-        {t.categories[row.category]}
+        {row.pool
+          ? t.poolRow(row.pool.pool, row.pool.gpus, watts(row.pool.watts))
+          : t.categories[row.category]}
       </span>
     );
+    const dimmedPool = row.pool !== undefined && !pools.includes(row.pool.pool);
     // A faint track, so a 3 % part still reads as a short bar on a full-width scale.
     const bar = (
       <span
@@ -216,13 +236,16 @@ export default function PowerPartsList({
     );
     return (
       <li
-        key={row.category}
+        key={row.pool ? `${row.category}-${row.pool.pool}` : row.category}
         className={facility ? 'mt-1 border-t border-border/60 pt-1' : undefined}
+        style={dimmedPool ? { opacity: DIMMED_POOL_ROW_OPACITY } : undefined}
       >
         <button
           type="button"
           data-testid="power-part-row"
           data-category={row.category}
+          data-pool={row.pool?.pool}
+          data-pool-emphasis={row.pool ? (dimmedPool ? 'dimmed' : 'shown') : undefined}
           data-band={row.band}
           data-emphasis={emphasis}
           data-share={row.share}
@@ -286,7 +309,10 @@ export default function PowerPartsList({
             aria-controls={restId}
             onClick={() => {
               setExpanded(!expanded);
-              track('powerx_parts_expanded', { enabled: !expanded, gpu: series.hwKey });
+              track('powerx_parts_expanded', {
+                enabled: !expanded,
+                gpu: series.hwKey,
+              });
             }}
             className="mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
           >

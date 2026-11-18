@@ -176,10 +176,9 @@ describe('Count, Per and Show as', () => {
 });
 
 describe('powerXMetricFields', () => {
-  it('keeps Scope for per-token energy, where a role has its own denominator', () => {
-    expect(powerXMetricFields('y_measuredJPerOutputToken', 'none')).toEqual(['scope']);
-    expect(powerXMetricFields('y_measuredJPerInputToken', 'none')).toEqual(['scope']);
-    expect(powerXMetricFields('y_measuredDecodeJPerOutputToken', 'none')).toEqual(['scope']);
+  it('drops Scope for per-token energy now that GPU role picks the pools', () => {
+    expect(powerXMetricFields('y_measuredJPerOutputToken', 'none')).toEqual([]);
+    expect(powerXMetricFields('y_measuredJPerInputToken', 'none')).toEqual([]);
     expect(powerXMetricFields('y_measuredJPerTotalToken', 'none')).toEqual([]);
     expect(powerXMetricFields('y_measuredWhPerSuccessfulQuery', 'none')).toEqual([]);
   });

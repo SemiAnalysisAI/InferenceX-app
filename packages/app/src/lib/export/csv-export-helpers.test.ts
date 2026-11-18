@@ -693,3 +693,57 @@ describe('inferenceChartToCsv power comparison', () => {
     expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
   });
 });
+
+describe('inferenceChartToCsv GPU role columns', () => {
+  const disagg = makePoint({
+    hwKey: 'gb300_dynamo-trt',
+    disagg: true,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 32,
+    measuredAvgPower: { y: 700, roof: false },
+    measuredPrefillAvgPower: { y: 760, roof: false },
+    measuredDecodeAvgPower: { y: 690, roof: false },
+  });
+  const aggregated = makePoint({ hwKey: 'mi355x_sglang', num_prefill_gpu: 8, num_decode_gpu: 0 });
+
+  it('writes "aggregated", never 0, for aggregated rows under a GPU role', () => {
+    const { headers, rows } = inferenceChartToCsv(
+      [disagg, aggregated],
+      'dsr1',
+      '1k/1k',
+      [],
+      undefined,
+      { role: 'prefill' },
+    );
+    const prefill = headers.indexOf('Prefill GPUs');
+    const decode = headers.indexOf('Decode GPUs');
+    expect(rows.map((row) => [row[prefill], row[decode]])).toEqual([
+      [8, 32],
+      ['aggregated', 'aggregated'],
+    ]);
+    const legacyDecode = headers.indexOf('Num Decode Chips');
+    expect(rows[1][legacyDecode]).toBe('aggregated');
+  });
+
+  it('adds the role columns to role-split rows and labels each clone by role', () => {
+    const points = expandPowerCompareSeries([disagg, aggregated], 'y_measuredAvgPower', 'roles');
+    const { headers, rows } = inferenceChartToCsv(points, 'dsr1', '1k/1k', [], {
+      yHeader: 'GPU power (W)',
+      yPath: 'measuredAvgPower.y',
+      xHeader: 'Interactivity',
+    });
+    const series = headers.indexOf('Power Series');
+    const decode = headers.indexOf('Decode GPUs');
+    expect(rows.map((row) => row[series])).toEqual(
+      expect.arrayContaining(['All GPUs', 'Prefill GPUs', 'Decode GPUs']),
+    );
+    expect(rows.map((row) => row[decode])).not.toContain(0);
+  });
+
+  it('keeps the CSV unchanged under All GPUs', () => {
+    const { headers } = inferenceChartToCsv([disagg], 'dsr1', '1k/1k', [], undefined, {
+      role: 'all',
+    });
+    expect(headers).not.toContain('Prefill GPUs');
+  });
+});

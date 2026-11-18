@@ -13,6 +13,7 @@ import type { PowerBasis } from '@/lib/power/power-basis';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import type { FilterChange } from '@/providers/GlobalFilterContext';
+import type { PowerXRole } from './powerx/powerx-role';
 
 export type { WorkerPower };
 
@@ -429,7 +430,13 @@ export interface InferenceDisplayContextType {
   selectedXAxisMode: XAxisMode;
   defaultXAxisMode: XAxisMode;
   scaleType: 'auto' | 'linear' | 'log';
+  /** The compare the chart draws: the stored one, or `roles` under a PowerX GPU role. */
   powerCompare: PowerCompare;
+  /** The user's own metric and compare, kept while a GPU role pins the drawn pair. */
+  storedYAxisMetric: string;
+  storedPowerCompare: PowerCompare;
+  /** PowerX GPU role (`i_role`); always `all` off PowerX. */
+  powerRole: PowerXRole;
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
   showPointLabels: boolean;
@@ -473,6 +480,7 @@ export interface InferenceActionsContextType {
   setSelectedXAxisMode: (mode: XAxisMode) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
   setPowerCompare: (mode: PowerCompare) => void;
+  setPowerRole: (role: PowerXRole) => void;
   setQuickFilterVendors: (vendors: string[]) => void;
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;

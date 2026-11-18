@@ -7,6 +7,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import type { GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
+import type { PowerXRole } from '../powerx/powerx-role';
 import type { InferenceData } from '../types';
 import {
   allGpuPool,
@@ -14,6 +15,7 @@ import {
   summarizeTraceWindow,
   telemetryNameForPoint,
   traceConfigLabel,
+  traceLanes,
   tracePools,
   type PowerPoolRole,
   type PowerTimelineTrace,
@@ -75,12 +77,15 @@ export default function PowerTimelineSummary({
   colorOf,
   hardwareLabel,
   isOverlay,
+  role = 'all',
 }: {
   traces: readonly PowerTimelineTrace[];
   responses: ReadonlyMap<string, GpuPowerSeriesResponse>;
   colorOf: (trace: PowerTimelineTrace) => string;
   hardwareLabel: (point: InferenceData) => string;
   isOverlay: (point: InferenceData) => boolean;
+  /** Under a GPU role only that role's pools (all GPUs too for split) get a row. */
+  role?: PowerXRole;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -88,12 +93,14 @@ export default function PowerTimelineSummary({
     () =>
       traces.map((trace) => ({
         trace,
-        summary: summarizeTraceWindow(trace, [
-          allGpuPool(trace.series),
-          ...tracePools(trace.series),
-        ]),
+        summary: summarizeTraceWindow(
+          trace,
+          role === 'all'
+            ? [allGpuPool(trace.series), ...tracePools(trace.series)]
+            : traceLanes(trace.series, role),
+        ),
       })),
-    [traces],
+    [traces, role],
   );
   const isPhone = useIsMobileViewport();
   if (isPhone) {

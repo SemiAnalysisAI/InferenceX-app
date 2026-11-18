@@ -51,11 +51,23 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Y-axis metric key or config key, e.g. tpPerGpu or y_tokensPerDollarN (see options → metrics).',
-      'Y 轴指标键或配置键，如 tpPerGpu 或 y_tokensPerDollarN（见 options → metrics）。',
+      'Y-axis metric key or config key, e.g. tpPerGpu or y_tokensPerDollarN (see options → metrics). The old role-specific keys are rewritten onto role: y_measuredPrefillAvgPower → y_measuredAvgPower + role=prefill, y_measuredDecodeAvgPower → y_measuredAvgPower + role=decode, y_measuredPrefillJPerInputToken → y_measuredJPerInputToken + role=prefill, y_measuredDecodeJPerOutputToken → y_measuredJPerOutputToken + role=decode (an explicit role wins).',
+      'Y 轴指标键或配置键，如 tpPerGpu 或 y_tokensPerDollarN（见 options → metrics）。旧的按角色区分的指标键会改写为 role：y_measuredPrefillAvgPower → y_measuredAvgPower + role=prefill，y_measuredDecodeAvgPower → y_measuredAvgPower + role=decode，y_measuredPrefillJPerInputToken → y_measuredJPerInputToken + role=prefill，y_measuredDecodeJPerOutputToken → y_measuredJPerOutputToken + role=decode（显式 role 优先）。',
     ),
     schema: { type: 'string', default: 'y_tokensPerDollarH' },
     example: 'y_tpPerGpu',
+  },
+  {
+    name: 'role',
+    location: 'query',
+    required: false,
+    type: 'enum',
+    description: text(
+      'PowerX GPU role (i_role): all GPUs, only the prefill or decode GPUs of disaggregated runs, or both pools (split). Resolved by the same pure transforms the page runs: a role other than all pins Energy metrics to GPU-only J per output token (J per input token for prefill with an input-token metric) and Power draw metrics to average W per GPU (or per-pool % of TDP); P75/P90, IT/facility and rated boundaries fall back. Each disaggregated row is then drawn per pool: series carry powerRole (prefill dashed, decode dotted on the page) and y is the pool’s value. Prefill J per output token is reconstructed so prefill + decode = measured J per output token. Rows without pool telemetry (aggregated serving, every GPU does both) are not drawn and are listed in roleAggregated. Other metrics return 400. Echoed in params.role with the pinned metric in params.metric.',
+      'PowerX GPU 角色（i_role）：全部 GPU、仅分离式部署的预填充或解码 GPU，或两个池并列（split）。与页面使用同一组纯函数解析：非 all 角色会将能耗指标固定为仅 GPU 的每输出 token 焦耳（预填充且按输入 token 计时为每输入 token 焦耳），将功耗指标固定为每 GPU 平均功耗（或按池的 TDP 占比）；P75/P90、IT/数据中心与额定边界会回退。随后每个分离式数据行按池绘制：series 带 powerRole（页面上预填充为虚线、解码为点线），y 为该池的数值。预填充每输出 token 焦耳为重建值，预填充 + 解码 = 实测每输出 token 焦耳。没有分池遥测的行（聚合部署，每块 GPU 同时承担两者）不绘制，列在 roleAggregated 中。其他指标返回 400。在 params.role 中回显，固定后的指标见 params.metric。',
+    ),
+    schema: { type: 'string', enum: ['all', 'prefill', 'decode', 'split'], default: 'all' },
+    example: 'split',
   },
   {
     name: 'precisions',
@@ -345,6 +357,12 @@ const seriesSchema = objectSchema(
     deployment: stringSchema,
     kvOffload: booleanSchema,
     bestPerSku: booleanSchema,
+    powerRole: {
+      type: 'string',
+      enum: ['prefill', 'decode'],
+      description:
+        'GPU pool the series draws when role is prefill, decode or split; absent under role=all.',
+    },
     points: arraySchema(pointSchema),
   },
   [
@@ -539,6 +557,23 @@ const responseSchema = objectSchema(
       ]),
     ),
     series: arraySchema(seriesSchema),
+    roleAggregated: {
+      ...arraySchema(
+        objectSchema(
+          {
+            hwKey: stringSchema,
+            gpu: stringSchema,
+            framework: stringSchema,
+            label: stringSchema,
+            reason: { type: 'string', enum: ['aggregated'] },
+            points: integerSchema,
+          },
+          ['hwKey', 'reason', 'points'],
+        ),
+      ),
+      description:
+        'role other than all only: chips whose rows have no prefill/decode telemetry (aggregated serving, every GPU does both), listed instead of drawn and never reported as 0. Also returned per comparison and overlay.',
+    },
     tableRows: {
       ...arraySchema(tableRowSchema),
       description:
@@ -735,6 +770,7 @@ const responseExample = {
     sequence: '8k/1k',
     precisions: ['fp8'],
     metric: 'y_tpPerGpu',
+    role: 'all',
     xmode: 'interactivity',
     xstat: 'median',
     xmetric: 'p90_ttft',

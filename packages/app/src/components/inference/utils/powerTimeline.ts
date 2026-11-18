@@ -5,6 +5,7 @@ import {
   type GpuPowerSeries,
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
+import { powerXRolePools, type PowerXRole } from '@/components/inference/powerx/powerx-role';
 import type { InferenceData } from '@/components/inference/types';
 
 export const POWER_TIMELINE_METRIC_KEY = 'y_measuredPowerTimeline';
@@ -371,6 +372,56 @@ export function spreadLabelYs(
 
 export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
   return { role: 'all', rows: series.power.map((_, row) => row) };
+}
+
+/**
+ * The GPUs of one worker-role pool as a series of their own: power, gpus and devices keep only
+ * the rows whose device role matches, buckets are unchanged. Null when the trace has no such
+ * pool (aggregated runs, where every GPU does both). The Over time load swings and
+ * `GET /api/v1/gpu-metrics-point/stats?role=` both read pool statistics through this.
+ */
+export function poolSubsetSeries(
+  series: GpuPowerSeries,
+  role: GpuPowerRole,
+): GpuPowerSeries | null {
+  const rows: number[] = [];
+  series.devices?.forEach((device, row) => {
+    if (device.role === role && row < series.power.length) rows.push(row);
+  });
+  if (rows.length === 0) return null;
+  return {
+    ...series,
+    gpus: rows.map((row) => series.gpus[row]),
+    power: rows.map((row) => series.power[row]),
+    devices: rows.map((row) => series.devices![row]),
+  };
+}
+
+/**
+ * How a lane is drawn under a GPU role: `lane` is a role pool (or every GPU under All GPUs),
+ * `context` the faint all-GPU line behind the split lanes, `aggregated` a trace without role
+ * pools, kept dimmed because its GPUs cannot be split.
+ */
+export type PowerLaneKind = 'lane' | 'context' | 'aggregated';
+
+export interface PowerTraceLane {
+  role: PowerPoolRole;
+  kind: PowerLaneKind;
+  rows: number[];
+}
+
+/** The per-GPU mean lanes Over time draws for a trace under the selected GPU role. */
+export function traceLanes(
+  series: Pick<GpuPowerSeries, 'devices' | 'power'>,
+  role: PowerXRole,
+): PowerTraceLane[] {
+  const all = allGpuPool(series).rows;
+  if (role === 'all') return [{ role: 'all', kind: 'lane', rows: all }];
+  const wanted = new Set<PowerPoolRole>(powerXRolePools(role));
+  const pools = tracePools(series).filter((pool) => wanted.has(pool.role));
+  if (pools.length === 0) return [{ role: 'all', kind: 'aggregated', rows: all }];
+  const lanes = pools.map((pool) => ({ role: pool.role, kind: 'lane' as const, rows: pool.rows }));
+  return role === 'split' ? [{ role: 'all', kind: 'context', rows: all }, ...lanes] : lanes;
 }
 
 export interface TracePoolSummary {

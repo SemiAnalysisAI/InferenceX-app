@@ -146,6 +146,8 @@ interface ModelSelectorProps {
    * the dropdown panel widens beyond the trigger so the details have room.
    */
   modelDetails?: ReadonlyMap<string, ReactNode>;
+  /** Small inline badges after a model's name (e.g. PowerX's P/D); the panel keeps its width. */
+  modelBadges?: ReadonlyMap<string, ReactNode>;
   /** Called with a model once the user shows intent toward its option. */
   onOptionIntent?: (value: Model) => void;
 }
@@ -161,6 +163,7 @@ export function ModelSelector({
   trailing,
   newModels,
   modelDetails,
+  modelBadges,
   onOptionIntent,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
@@ -171,9 +174,10 @@ export function ModelSelector({
   const optionFor = (model: string) =>
     toOption(
       model,
-      newModels?.has(model) || modelDetails?.has(model) ? (
+      newModels?.has(model) || modelDetails?.has(model) || modelBadges?.has(model) ? (
         <>
           {newModels?.has(model) && <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>}
+          {modelBadges?.get(model)}
           {modelDetails?.get(model)}
         </>
       ) : undefined,

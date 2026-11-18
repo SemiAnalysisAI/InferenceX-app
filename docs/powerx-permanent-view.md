@@ -79,7 +79,7 @@ the selection has no measured GPU power (`noMeasuredDataHint`) instead of the ge
 
 `/pwx` and `/zh/pwx` render the shared `ChartDisplay` data pipeline and the same page
 chrome as `/infx/inference`, so the two tabs read as one dashboard. Nothing in the data layer
-changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
+changes: PowerX writes the same `i_metric` and `i_pcompare` state (plus its own `i_role`), so share links,
 `?unofficialrun=` overlays and the views API are untouched.
 
 PowerX sits behind the ↑↑↓↓←→←→BA feature gate (uppercase `B` and `A`, no Enter):
@@ -225,7 +225,7 @@ link still opens that view for locked visitors.
   window, window mean, P5/P95, max Δ1s / Δ5s in W and % TDP, ramp up/down W/s, volatility =
   std ÷ mean; telemetry gaps are counted, never bridged), a × 72 per NVL72 rack switch, and
   per-point CSV / JSON links to `GET /api/v1/gpu-metrics-point/stats?id=N[&format=csv|json]
-  [&scale=gpu|nvl72]`, which runs the same function over the same stored buckets
+  [&scale=gpu|nvl72][&role=all|prefill|decode|split]`, which runs the same function over the same stored buckets
   (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·
   single node · inference only · sub-second swings not captured".
 - **Labels**: `PowerBasisPill` (GPU / IT / Facility) on readouts, table headers, the breakdown
@@ -247,8 +247,8 @@ no longer offers power metrics. Append:
 | 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=all` (single boundary: the matching `…JPerOutputToken` key)                                                                                                  |
 | 3b     | H200 J/total token, all four boundaries       | `&i_metric=y_measuredJPerTotalToken&i_pcompare=all` (single boundary: the matching `…JPerTotalToken` key)                                                                                                    |
 | 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                                                     |
-| 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                                                              |
-| 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                                                                |
+| 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_role=split`                                                                                                                                                                  |
+| 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_role=split` (prefill share in the clone's tooltip)                                                                                                                    |
 | 1      | Measured power over the benchmark job         | `&i_metric=y_measuredPowerTimeline` (Display → Timeline, see below)                                                                                                                                          |
 
 Pinned official dashboard points offer **View PowerX** when the feature gate is unlocked
@@ -262,7 +262,7 @@ resolves their run/audit provenance automatically.
 
 ## Comparison series (`i_pcompare`)
 
-`i_pcompare=boundaries|provisioned|all|roles` (default `''`, "Off") overlays sibling series on the selected
+`i_pcompare=boundaries|provisioned|all` (default `''`, "Off"; legacy `roles` is rewritten to `i_role=split`, below) overlays sibling series on the selected
 metric without changing it. `boundaries` draws GPU Level Measured, All in Measured IT (no PUE)
 and All in Measured; `provisioned` (the PowerX Rated boundaries toggle) draws GPU Level
 Measured and All in Provisioned only; `all` (share links only) adds both provisioned bounds
@@ -274,6 +274,39 @@ the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both cal
 untouched, so a chart without a comparison is byte-identical to before. A point lacking a
 sibling's value contributes nothing to that series (never a 0), so each boundary's and
 role's availability rules carry through unchanged.
+
+## GPU role (`i_role`)
+
+`i_role=all|prefill|decode|split` (default `all`, omitted from the URL) is the one GPU role
+control on every PowerX view (All GPUs · Prefill · Decode · Prefill vs decode; zh 全部 GPU ·
+预填充 · 解码 · 预填充 vs 解码). It replaces the old Scope control, Where's Split by and the
+legend role filter. `resolvePowerXRole({ metric, compare }, role)` (`powerx/powerx-role.ts`)
+pins the selection a role needs: Energy becomes GPU-only J per output token (prefill may keep
+J per input token, role-local), Power draw becomes average W per GPU or % of TDP, both with
+`compare: 'roles'`. `expandPowerCompareSeries` then clones each disaggregated point into its
+prefill and decode pools, and the role keeps only its pools (`split` keeps both). Rows with no
+pool telemetry (aggregated serving: every GPU does both) are listed as aggregated chips
+(聚合), never drawn and never 0.
+
+The views API takes the same control as `role` on `GET /api/v1/views/inference`
+(`lib/views-api/power-role.ts`: `resolvePowerRoleParams`, `powerRolePoints`), echoes
+`params.role` and the pinned `params.metric`, tags `series[].powerRole`, and lists aggregated
+rows in `roleAggregated`; a role on a metric with no pools (non-power, Over time) is a 400.
+Over time load swings take `role` on `GET /api/v1/gpu-metrics-point/stats`, which computes the
+stats over only that pool's GPU rows (`poolSubsetSeries`) and returns 404 for an aggregated
+trace.
+
+`rewriteLegacyPowerRoleParams` rewrites old role-specific links, both in the page state and in
+the `/infx/inference` → `/pwx` redirect (`lib/routing/powerx-redirect.ts`); an explicit
+`i_role` wins. The views API applies the same rewrite to old `metric` keys.
+
+| Old link                                   | Rewritten to                                       |
+| ------------------------------------------ | -------------------------------------------------- |
+| `i_pcompare=roles`                         | `i_role=split` (Where the power goes)              |
+| `i_metric=y_measuredPrefillAvgPower`       | `i_metric=y_measuredAvgPower&i_role=prefill`       |
+| `i_metric=y_measuredDecodeAvgPower`        | `i_metric=y_measuredAvgPower&i_role=decode`        |
+| `i_metric=y_measuredPrefillJPerInputToken` | `i_metric=y_measuredJPerInputToken&i_role=prefill` |
+| `i_metric=y_measuredDecodeJPerOutputToken` | `i_metric=y_measuredJPerOutputToken&i_role=decode` |
 
 ## Power timeline (Display → Timeline)
 

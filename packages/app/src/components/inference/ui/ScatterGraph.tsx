@@ -181,6 +181,10 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
+import {
+  powerRoleHiddenVariants,
+  powerXRolePools,
+} from '@/components/inference/powerx/powerx-role';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   isAllInMeasuredConfigKey,
@@ -515,6 +519,9 @@ const SCATTER_STRINGS = {
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    lineStyleRole: 'Line style = GPU role',
+    aggregatedTag: 'aggregated',
+    aggregatedRoleReason: 'Not split: every GPU does both prefill and decode.',
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
@@ -551,6 +558,9 @@ const SCATTER_STRINGS = {
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
     noData: '暂无数据',
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    lineStyleRole: '线型 = GPU 角色',
+    aggregatedTag: '聚合',
+    aggregatedRoleReason: '未拆分：每块 GPU 同时承担预填充与解码。',
     noRoleEnergyDataHint:
       '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
     noMeasuredDataHint:
@@ -616,6 +626,7 @@ const ScatterGraph = React.memo(
       showFrameworkLabel,
       showParetoFrontier,
       paretoFrontierPlayful,
+      powerRole,
     } = useInferenceDisplay();
     const {
       setBestPerSku,
@@ -677,8 +688,21 @@ const ScatterGraph = React.memo(
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
     const legendT = SCATTER_STRINGS[locale];
-    const [hiddenPowerVariants, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
+    const [hiddenSeriesChoice, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
       () => new Set(),
+    );
+    // PowerX GPU role: the role decides which per-pool lines draw (the legend no longer
+    // toggles roles); the boundary legend keeps its own toggles.
+    const roleHiddenVariants = useMemo<ReadonlySet<string>>(
+      () => (powerXSurface ? powerRoleHiddenVariants(powerRole) : new Set<string>()),
+      [powerRole, powerXSurface],
+    );
+    const hiddenPowerVariants = useMemo<ReadonlySet<string>>(
+      () =>
+        roleHiddenVariants.size === 0
+          ? hiddenSeriesChoice
+          : new Set([...hiddenSeriesChoice, ...roleHiddenVariants]),
+      [hiddenSeriesChoice, roleHiddenVariants],
     );
     const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
@@ -1378,12 +1402,19 @@ const ScatterGraph = React.memo(
     );
 
     const visiblePoints = useMemo(() => {
-      let pts = filteredData;
+      // Series the GPU role leaves out also leave the axes, so an undrawn all-GPU line cannot
+      // stretch the range the drawn pools read against. Legend toggles keep the axes still.
+      let pts =
+        roleHiddenVariants.size === 0
+          ? filteredData
+          : filteredData.filter((d) => !roleHiddenVariants.has(powerVariantId(d.powerVariant)));
       if (hideNonOptimal && !showPowerEnvelope) {
         pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
       const overlayPts = processedOverlayData.filter(
-        (point) => !hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point),
+        (point) =>
+          !roleHiddenVariants.has(powerVariantId(point.powerVariant)) &&
+          (!hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point)),
       );
       return overlayPts.length > 0 ? [...pts, ...overlayPts] : pts;
     }, [
@@ -1393,6 +1424,7 @@ const ScatterGraph = React.memo(
       optimalPointKeys,
       overlayOptimalPoints,
       showPowerEnvelope,
+      roleHiddenVariants,
     ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -1778,9 +1810,29 @@ const ScatterGraph = React.memo(
 
     const powerVariantLegendItems = useMemo(() => {
       const allPoints = [...pointsData, ...processedOverlayData];
-      const variants = powerVariantsInData(allPoints, selectedYAxisMetric);
+      const roleShown = new Set<string>(powerXRolePools(powerRole));
+      const variants = powerVariantsInData(allPoints, selectedYAxisMetric).filter(
+        (variant) => variant.kind !== 'role' || !powerXSurface || roleShown.has(variant.id),
+      );
       const baseId = powerCompareBaseId;
       return variants.map((variant) => {
+        if (variant.kind === 'role' && powerXSurface) {
+          // A key, not a filter: the GPU role control above the chart picks the pools.
+          const id = powerVariantId(variant);
+          const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
+          return {
+            name: legendId,
+            hw: legendId,
+            label: powerVariantLabel(variant, locale, powerLabelStyle),
+            section: legendT.lineStyleRole,
+            color: 'var(--foreground)',
+            lineDasharray: powerVariantDash(variant) || '1 0',
+            forceLineSwatch: true,
+            isActive: true,
+            isRemovable: false,
+            onClick: () => {},
+          };
+        }
         const id = powerVariantId(variant);
         const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
         const isBase = id === baseId;
@@ -1823,7 +1875,24 @@ const ScatterGraph = React.memo(
       locale,
       powerLabelStyle,
       hiddenPowerVariants,
+      powerRole,
+      powerXSurface,
+      legendT,
     ]);
+
+    // Under a GPU role, chips with no per-pool line are aggregated: listed, dimmed, never
+    // dropped and never a reason to leave the role.
+    const roleSplitHwKeys = useMemo(() => {
+      if (!powerXSurface || powerRole === 'all') return null;
+      const shown = new Set<string>(powerXRolePools(powerRole));
+      return new Set(
+        [...pointsData, ...processedOverlayData]
+          .filter(
+            (point) => point.powerVariant?.kind === 'role' && shown.has(point.powerVariant.id),
+          )
+          .map((point) => String(point.hwKey)),
+      );
+    }, [powerXSurface, powerRole, pointsData, processedOverlayData]);
 
     const isRooflineVisible = useCallback(
       (el: SVGElement) => {
@@ -4461,13 +4530,16 @@ const ScatterGraph = React.memo(
                         getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                     )
                     .map(([key, hwConfig]: [string, any]) => {
-                      const isActive = showAllHardwareTypes
-                        ? true
-                        : effectiveOfficialHwTypes.has(key);
+                      const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
+                      const isActive =
+                        !aggregated &&
+                        (showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key));
                       const blocked = isActive ? undefined : blockedHwToggles.get(key);
                       return {
                         name: hwConfig.name,
-                        label: getDisplayLabel(hwConfig),
+                        label: aggregated
+                          ? `${getDisplayLabel(hwConfig)} · ${legendT.aggregatedTag}`
+                          : getDisplayLabel(hwConfig),
                         color: resolveColor(key),
                         lineDasharray:
                           powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
@@ -4475,18 +4547,21 @@ const ScatterGraph = React.memo(
                         isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
                         hw: key,
                         isActive,
-                        blockedReason: blocked
-                          ? describeEngineComparisonConflict(
-                              { kind: 'blocked', ...blocked },
-                              locale,
-                            )
-                          : undefined,
-                        onClick: showAllHardwareTypes
-                          ? () => {}
-                          : () => {
-                              handleToggleHwType(key);
-                              track('latency_hw_type_toggled', { gpu: key });
-                            },
+                        blockedReason: aggregated
+                          ? legendT.aggregatedRoleReason
+                          : blocked
+                            ? describeEngineComparisonConflict(
+                                { kind: 'blocked', ...blocked },
+                                locale,
+                              )
+                            : undefined,
+                        onClick:
+                          showAllHardwareTypes || aggregated
+                            ? () => {}
+                            : () => {
+                                handleToggleHwType(key);
+                                track('latency_hw_type_toggled', { gpu: key });
+                              },
                         onShowPoints: () => {
                           setPointsTableTarget({ kind: 'official', hwKey: key });
                           track('inference_legend_points_table_opened', {

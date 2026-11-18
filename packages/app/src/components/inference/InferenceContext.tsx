@@ -74,6 +74,12 @@ import { serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
 import type { FixedSequenceStatistic } from '@/components/inference/utils/resolveXAxisField';
 import { parsePowerCompare } from '@/components/inference/utils/power-compare';
 import {
+  parsePowerXRole,
+  resolvePowerXRole,
+  rewriteLegacyPowerRoleParams,
+  type PowerXRole,
+} from '@/components/inference/powerx/powerx-role';
+import {
   PERSISTED_PERF_RULER_CHART_ID,
   PerfRulerStoreContext,
   persistedPerfRulerAxisKey,
@@ -431,9 +437,34 @@ export function InferenceProvider({
       });
     }
   }, [selectedGpuResolution]);
-  const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
-    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
+  // Old share links encoded a GPU role in i_metric or i_pcompare; read them onto i_role once.
+  const [initialRoleParams] = useState(() =>
+    rewriteLegacyPowerRoleParams({
+      metric: getUrlParam('i_metric'),
+      compare: getUrlParam('i_pcompare'),
+      role: getUrlParam('i_role'),
+    }),
   );
+  const [storedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
+    resolveMetricConfigKey(initialRoleParams.metric, initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
+  );
+  const powerXSurface = usePowerXSurface();
+  const [storedPowerCompare, setPowerCompare] = useState<PowerCompare>(() =>
+    parsePowerCompare(initialRoleParams.compare),
+  );
+  const [powerRoleState, setPowerRoleState] = useState<PowerXRole>(() =>
+    parsePowerXRole(initialRoleParams.role),
+  );
+  // The GPU role only exists on PowerX; elsewhere every chart reads all GPUs.
+  const powerRole: PowerXRole = powerXSurface ? powerRoleState : 'all';
+  const effectivePowerSelection = useMemo(
+    () => resolvePowerXRole({ metric: storedYAxisMetric, compare: storedPowerCompare }, powerRole),
+    [storedYAxisMetric, storedPowerCompare, powerRole],
+  );
+  // What the charts draw: the stored choice, or the metric + compare a GPU role pins.
+  const selectedYAxisMetric = effectivePowerSelection.metric;
+  const powerCompare = effectivePowerSelection.compare;
+  const setPowerRole = useCallback((role: PowerXRole) => setPowerRoleState(role), []);
   const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
     () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
   );
@@ -506,9 +537,6 @@ export function InferenceProvider({
   );
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
-  );
-  const [powerCompare, setPowerCompare] = useState<PowerCompare>(() =>
-    parsePowerCompare(getUrlParam('i_pcompare')),
   );
 
   const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
@@ -1296,7 +1324,6 @@ export function InferenceProvider({
   const lastHwResetKeyRef = useRef('');
   const lastHwResetModelRef = useRef(selectedModel);
   // PowerX Energy per token opens without H200: its joules per token flatten every other chip.
-  const powerXSurface = usePowerXSurface();
   const hideH200 = powerXSurface && powerXViewFor(selectedYAxisMetric, powerCompare) === 'energy';
   const lastHideH200Ref = useRef(hideH200);
   const automaticHardware = useCallback(
@@ -1552,9 +1579,9 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric:
-        selectedYAxisMetric === (initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC)
+        storedYAxisMetric === (initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC)
           ? ''
-          : selectedYAxisMetric,
+          : storedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_mstat: fixedSequenceStatistic,
       i_tokens: tokenBasis,
@@ -1592,9 +1619,13 @@ export function InferenceProvider({
       i_power: quickFilterPower.join(','),
       i_topology: quickFilterTopologies.join(','),
       i_rulers: iRulersStr,
-      i_pcompare: powerCompare === 'none' ? '' : powerCompare,
+      i_pcompare: storedPowerCompare === 'none' ? '' : storedPowerCompare,
+      i_role: powerXSurface && powerRoleState !== 'all' ? powerRoleState : '',
     },
     [
+      storedYAxisMetric,
+      powerRoleState,
+      powerXSurface,
       selectedYAxisMetric,
       initialYAxisMetric,
       tokenRevenuePriceSource,
@@ -1631,7 +1662,7 @@ export function InferenceProvider({
       quickFilterPower,
       quickFilterTopologies,
       iRulersStr,
-      powerCompare,
+      storedPowerCompare,
     ],
   );
 
@@ -1836,6 +1867,9 @@ export function InferenceProvider({
       defaultXAxisMode,
       scaleType,
       powerCompare,
+      storedYAxisMetric,
+      storedPowerCompare,
+      powerRole,
       isLegendExpanded,
       hideNonOptimal,
       showPointLabels,
@@ -1866,6 +1900,9 @@ export function InferenceProvider({
       defaultXAxisMode,
       scaleType,
       powerCompare,
+      storedYAxisMetric,
+      storedPowerCompare,
+      powerRole,
       isLegendExpanded,
       hideNonOptimal,
       showPointLabels,
@@ -1903,6 +1940,7 @@ export function InferenceProvider({
     setSelectedXAxisMode: handleSetXAxisMode,
     setScaleType,
     setPowerCompare,
+    setPowerRole,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDeployment,

@@ -5,6 +5,12 @@ import {
 } from '@/components/inference/utils/inference-table-data';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
 import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
+import type { PowerXRole } from '@/components/inference/powerx/powerx-role';
+import {
+  roleGpuCountLabel,
+  roleGpuCounts,
+  showRoleGpuColumns,
+} from '@/components/inference/powerx/powerx-role-split';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -36,17 +42,25 @@ function benchmarkMetric(point: InferenceData, key: string): number | '' {
   return typeof value === 'number' ? value : '';
 }
 
+function roleGpuCsvValue(point: InferenceData, pool: 'prefill' | 'decode'): number | string {
+  const count = roleGpuCounts(point)[pool];
+  return count === 'aggregated' ? roleGpuCountLabel(count, 'en') : count;
+}
+
 export function inferenceChartToCsv(
   data: InferenceData[],
   model: string,
   sequence: string,
   overlayData: InferenceData[] = [],
   displayedMetrics?: InferenceCsvDisplayedMetrics,
+  options: { role?: PowerXRole } = {},
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
   const allPoints = [...data, ...overlayData];
   const powerCompare = inferPowerCompare(allPoints);
   const showPowerSeries = powerCompare !== 'none';
+  // PowerX GPU roles: pool sizes per row; aggregated rows read "aggregated", never 0.
+  const showRoleGpus = showRoleGpuColumns(options.role, powerCompare);
   const plottedMetric = displayedMetrics ? `y_${displayedMetrics.yPath.split('.')[0]}` : '';
   const showAllInMeasured = isAllInMeasuredConfigKey(plottedMetric);
   const headers = [
@@ -94,6 +108,7 @@ export function inferenceChartToCsv(
     'Physical Chips',
     'DP',
     ...(showPowerSeries ? ['Power Series'] : []),
+    ...(showRoleGpus ? ['Prefill GPUs', 'Decode GPUs'] : []),
     ...(showAllInMeasured ? ['Measured GPU Power (W/chip)', 'All-in Estimate Status'] : []),
   ];
 
@@ -156,8 +171,8 @@ export function inferenceChartToCsv(
         benchmarkMetric(d, 'p99_e2el'),
         benchmarkMetric(d, 'std_e2el'),
         d.disagg ?? false,
-        d.num_prefill_gpu ?? '',
-        d.num_decode_gpu ?? '',
+        showRoleGpus ? roleGpuCsvValue(d, 'prefill') : (d.num_prefill_gpu ?? ''),
+        showRoleGpus ? roleGpuCsvValue(d, 'decode') : (d.num_decode_gpu ?? ''),
         d.spec_decoding ?? '',
         d.ep ?? '',
         d.dp_attention ?? '',
@@ -166,6 +181,7 @@ export function inferenceChartToCsv(
         d.physicalChips ?? d.tp,
         d.dp ?? '',
         ...(showPowerSeries ? [powerSeriesLabel(d, plottedMetric, powerCompare, 'en')] : []),
+        ...(showRoleGpus ? [roleGpuCsvValue(d, 'prefill'), roleGpuCsvValue(d, 'decode')] : []),
         ...(showAllInMeasured
           ? [d.measuredAvgPower?.y ?? '', allInMeasuredStatusLabel(d, plottedMetric.slice(2), 'en')]
           : []),

@@ -4,18 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
-import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
-import { shadeOklch } from '@/lib/charts/dynamic-colors';
-import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { AggDataEntry, InferenceData } from '../types';
-import {
-  equalServiceSourceKey,
-  getEqualServiceSources,
-  observedPoints,
-} from '../utils/equal-service-comparison';
 import PowerBreakdownPanel from './PowerBreakdownPanel';
 import PowerChipCompare from './PowerChipCompare';
 import {
@@ -28,7 +20,7 @@ import {
   type PowerComparedPoints,
   type PowerLayerHighlight,
 } from '../utils/power-breakdown';
-import PowerRoleGroup from './PowerRoleGroup';
+import type { PowerXRole } from '../powerx/powerx-role';
 import { usePowerXCompareTarget, usePowerXSurface } from './powerx-surface';
 
 const STRINGS = {
@@ -45,16 +37,6 @@ const STRINGS = {
   },
 };
 
-/** Hardware key of an equal-service source key (a JSON tuple that starts with hwKey). */
-function sourceHwKey(key: string): string {
-  try {
-    const parsed: unknown = JSON.parse(key);
-    return Array.isArray(parsed) && typeof parsed[0] === 'string' ? parsed[0] : key;
-  } catch {
-    return key;
-  }
-}
-
 export default function PowerAnalysisPanels({
   data,
   overlayData = [],
@@ -62,7 +44,7 @@ export default function PowerAnalysisPanels({
   xLabel,
   chartId,
   contextLabel,
-  showRoles = false,
+  role = 'all',
   placement = 'after',
 }: {
   data: InferenceData[];
@@ -71,8 +53,12 @@ export default function PowerAnalysisPanels({
   xLabel: string;
   chartId: string;
   contextLabel?: string;
-  /** PowerX tab: show the prefill/decode panel (driven by the Split by toggle). */
-  showRoles?: boolean;
+  /**
+   * The PowerX GPU role (`i_role`). Off All GPUs the chip comparison, the drill-down and
+   * the parts list split each disaggregated chip's measured GPU layer into its prefill
+   * and decode pools; the modeled layers stay whole and aggregated chips stay listed.
+   */
+  role?: PowerXRole;
   /**
    * `before`: the PowerX Where tab leads with the chip comparison (the answer),
    * and the boundary line chart follows as supporting detail.
@@ -87,49 +73,16 @@ export default function PowerAnalysisPanels({
   const touchCopy = powerX && coarsePointer;
   const drillSubtitle = touchCopy ? t.drillSubtitleTouch : t.drillSubtitle;
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
-  const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
-  // Panels reuse the main chart's hardware colors; several configs on one GPU get shades of it.
-  const sourceShade = useMemo(() => {
-    const seen = new Map<string, number>();
-    return new Map(
-      sources.map((source) => {
-        const hw = sourceHwKey(source.key);
-        const index = seen.get(hw) ?? 0;
-        seen.set(hw, index + 1);
-        return [source.key, { hw, index }];
-      }),
-    );
-  }, [sources]);
-  const hwKeys = useMemo(
-    () => [...new Set([...sourceShade.values()].map(({ hw }) => hw))],
-    [sourceShade],
-  );
-  const { resolveColor } = useThemeColors({
-    highContrast: false,
-    identifiers: hwKeys,
-    activeKeys: hwKeys,
-  });
-  const overlaySourceKeys = useMemo(
-    () => new Map(observedPoints(overlayData).map((p) => [equalServiceSourceKey(p), p.run_url])),
-    [overlayData],
-  );
-  const colorOf = useCallback(
-    (key: string) =>
-      overlaySourceKeys.has(key)
-        ? overlayRunColor(overlayRunIndex(overlaySourceKeys.get(key), runIndexByUrl))
-        : shadeOklch(
-            resolveColor(sourceShade.get(key)?.hw ?? sourceHwKey(key)),
-            sourceShade.get(key)?.index ?? 0,
-          ),
-    [overlaySourceKeys, runIndexByUrl, resolveColor, sourceShade],
-  );
   const [compareKey, setCompareKey] = useState<string | null>(null);
   // The drill-down is open under the compared chip (the one nearest the slider) from the
   // first render and follows the slider to another chip. A clicked bar or the Hardware
   // select pins it to a chip until the slider moves on; Collapse hides it for the rest of
   // the session (clicking a bar opens it again).
   const [nearestKey, setNearestKey] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<{ key: string; nearest: string | null } | null>(null);
+  const [pinned, setPinned] = useState<{
+    key: string;
+    nearest: string | null;
+  } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const expandedKey = collapsed
     ? null
@@ -167,7 +120,10 @@ export default function PowerAnalysisPanels({
   }, [sharedTarget, clearComparedPoints]);
   const pinComparedPoint = useCallback(
     (series: PowerBreakdownSeries, entry: PowerBreakdownPoint) => {
-      setComparedPoints((current) => ({ ...current, [series.key]: entry.concurrency }));
+      setComparedPoints((current) => ({
+        ...current,
+        [series.key]: entry.concurrency,
+      }));
       // The clicked chip stays the open one: its point moved, not the slider.
       openDrilldown(series.key);
       track('powerx_breakdown_point_pinned', {
@@ -184,7 +140,10 @@ export default function PowerAnalysisPanels({
       setComparedPoints(
         Object.fromEntries(Object.entries(comparedPoints).filter(([key]) => key !== series.key)),
       );
-      track('powerx_breakdown_point_unpinned', { gpu: series.hwKey, concurrency });
+      track('powerx_breakdown_point_unpinned', {
+        gpu: series.hwKey,
+        concurrency,
+      });
     },
     [comparedPoints],
   );
@@ -193,7 +152,11 @@ export default function PowerAnalysisPanels({
       buildPowerBreakdownsWithOverlays(
         data,
         overlayData.length > 0
-          ? { points: overlayData, runIndexByUrl, runInfos: unofficialRunInfos ?? [] }
+          ? {
+              points: overlayData,
+              runIndexByUrl,
+              runInfos: unofficialRunInfos ?? [],
+            }
           : undefined,
         locale,
         powerBreakdownInteractivity(xField),
@@ -214,66 +177,59 @@ export default function PowerAnalysisPanels({
       data-testid="power-analysis-panels"
       data-placement={placement}
     >
-      {showRoles ? (
-        <PowerRoleGroup
-          chartId={chartId}
-          data={data}
-          xField={xField}
-          xLabel={xLabel}
-          contextLabel={contextLabel}
-          sources={sources}
-          colorOf={colorOf}
-        />
-      ) : (
-        <PowerChipCompare
-          data={data}
-          overlayData={overlayData}
-          xField={xField}
-          layerHighlight={layerHighlight}
-          onLayerHighlight={setLayerHighlight}
-          selectedKey={drillSeries?.key ?? null}
-          expandedKey={expandedKey}
-          onNearestKeyChange={setNearestKey}
-          comparedPoints={comparedPoints}
-          onUnpinComparedPoint={unpinComparedPoint}
-          onTargetChange={clearComparedPoints}
-          onSelectKey={(key) => {
-            // Clicking the open bar closes it, like Collapse; any other bar opens there.
-            if (key === expandedKey) {
-              setCompareKey(key);
-              setCollapsed(true);
-            } else {
-              openDrilldown(key);
-            }
-          }}
-          renderExpanded={(key) => {
-            const series = breakdownSeries.find((entry) => entry.key === key);
-            return (
-              <PowerBreakdownPanel
-                chartId={chartId}
-                data={data}
-                overlayData={overlayData}
-                contextLabel={contextLabel}
-                xField={xField}
-                xLabel={xLabel}
-                selectedKey={key}
-                onSelectKey={openDrilldown}
-                comparedPoints={comparedPoints}
-                onPinComparedPoint={pinComparedPoint}
-                onUnpinComparedPoint={unpinComparedPoint}
-                layerHighlight={layerHighlight}
-                onLayerHighlight={setLayerHighlight}
-                onCollapse={() => setCollapsed(true)}
-                heading={
-                  series
-                    ? { title: t.drillTitle(series.label), subtitle: drillSubtitle }
-                    : undefined
-                }
-              />
-            );
-          }}
-        />
-      )}
+      <PowerChipCompare
+        role={role}
+        data={data}
+        overlayData={overlayData}
+        xField={xField}
+        layerHighlight={layerHighlight}
+        onLayerHighlight={setLayerHighlight}
+        selectedKey={drillSeries?.key ?? null}
+        expandedKey={expandedKey}
+        onNearestKeyChange={setNearestKey}
+        comparedPoints={comparedPoints}
+        onUnpinComparedPoint={unpinComparedPoint}
+        onTargetChange={clearComparedPoints}
+        onSelectKey={(key) => {
+          // Clicking the open bar closes it, like Collapse; any other bar opens there.
+          if (key === expandedKey) {
+            setCompareKey(key);
+            setCollapsed(true);
+          } else {
+            openDrilldown(key);
+          }
+        }}
+        renderExpanded={(key) => {
+          const series = breakdownSeries.find((entry) => entry.key === key);
+          return (
+            <PowerBreakdownPanel
+              chartId={chartId}
+              data={data}
+              overlayData={overlayData}
+              contextLabel={contextLabel}
+              xField={xField}
+              xLabel={xLabel}
+              selectedKey={key}
+              onSelectKey={openDrilldown}
+              comparedPoints={comparedPoints}
+              onPinComparedPoint={pinComparedPoint}
+              onUnpinComparedPoint={unpinComparedPoint}
+              layerHighlight={layerHighlight}
+              onLayerHighlight={setLayerHighlight}
+              onCollapse={() => setCollapsed(true)}
+              role={role}
+              heading={
+                series
+                  ? {
+                      title: t.drillTitle(series.label),
+                      subtitle: drillSubtitle,
+                    }
+                  : undefined
+              }
+            />
+          );
+        }}
+      />
     </div>
   );
 }
