@@ -513,8 +513,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '有损优化：为 1 时同时绘制声明了跳过或近似部分计算的优化（例如跨步 cache 或稀疏注意力）的曲线。这些曲线不参与每种硬件默认曲线的评选。仅影响展示。',
   ],
   r_date: [
-    'As-of execution date, YYYY-MM-DD; never publication date. Each official deployment shows its latest run measured on or before this date; named-run overlays are not filtered. runs lists every official run of the workload and run names the selected one.',
-    '截至该执行日期查看结果，格式 YYYY-MM-DD；不以发布日期替代。每个正式部署显示其在该日期或之前测得的最新运行；指定运行叠加不受此筛选。runs 列出该工作负载的全部正式运行，run 为当前选中的运行。',
+    'As-of execution date, YYYY-MM-DD; never publication date. Each official deployment shows its latest run measured on or before this date; named-run overlays are not filtered. runs lists the workload’s official runs. Before its first dated run, run is null and official cells are empty.',
+    '截至该执行日期查看结果，格式 YYYY-MM-DD；不以发布日期替代。每个正式部署显示其在该日期或之前测得的最新运行；指定运行叠加不受此筛选。runs 列出该工作负载的全部正式运行。早于首个有执行日期的运行时，run 为 null，正式结果为空。',
   ],
   r_run: [
     'GitHub Actions run ID on the r_date day to view as of; default is that day’s last run.',
