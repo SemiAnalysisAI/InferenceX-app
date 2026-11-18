@@ -89,7 +89,7 @@ import {
   stagePointKey,
   type StagePair,
 } from './clip-stage';
-import { setVideoSearch, videoSearch } from './page-search';
+import { readVideoLink, setVideoSearch, videoSearch } from './page-search';
 import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
@@ -316,12 +316,6 @@ export default function VideoDashboard({
   const touch = useIsCoarsePointer();
   const phone = useMediaQuery(MOBILE_VIEWPORT_QUERY, phoneGuess);
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
-  // The link is read in render, so the stage's first read already has it.
-  const [opened] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    setVideoSearch(new URLSearchParams(location.search));
-    return location.search;
-  });
   const latest = useRef(state);
   const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
     state.unofficialRun,
@@ -396,20 +390,17 @@ export default function VideoDashboard({
     setState(next);
   }, []);
   useEffect(() => {
-    // A client navigation renders before the address changes, so its link is read here.
-    if (location.search !== opened) setVideoSearch(new URLSearchParams(location.search));
-    const next = parseResultsState(videoSearch());
-    latest.current = next;
-    setState(next);
-    // Back and Forward move between the overview and a detail; the other settings stay as they are.
-    const onPopState = () =>
-      commit(
-        { ...latest.current, point: new URLSearchParams(location.search).get('r_point') || null },
-        'replace',
-      );
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [commit, opened]);
+    // The open deployment and the named run follow the address bar, also on Back and Forward;
+    // the other settings are the page's memory, which only a new link replaces.
+    const follow = () => {
+      readVideoLink();
+      const { point, unofficialRun } = parseResultsState(location.search);
+      commit({ ...parseResultsState(videoSearch()), point, unofficialRun }, 'replace');
+    };
+    follow();
+    window.addEventListener('popstate', follow);
+    return () => window.removeEventListener('popstate', follow);
+  }, [commit]);
   const update = useCallback(
     (patch: Partial<ResultsState>) => {
       commit({ ...latest.current, ...patch }, 'replace');

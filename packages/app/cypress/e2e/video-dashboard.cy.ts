@@ -64,6 +64,12 @@ describe('VideoGenX results routes', () => {
       .should('contain.value', 'r_tier=r')
       .and('not.contain.value', 'r_hidden=');
     cy.get('body').type('{esc}');
+    // The language switch carries the address bar's link; the change in memory survives it.
+    cy.get('[data-testid="language-toggle"]:visible').click();
+    cy.location('pathname').should('equal', '/vgx');
+    cy.get('#video-results-chart-title').should('contain', 'Videos per GPU-hour');
+    hardwarePoints('b200').should('exist');
+    cy.get('#checkbox-b200').should('be.checked');
     hardwarePoints('h200').find('.visible-shape').click({ force: true });
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
