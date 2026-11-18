@@ -809,9 +809,9 @@ const NEW_VIEWS = {
       roster: {
         ...strings,
         description:
-          'Default GB200, B200, MI355X and H200 slots, plus H100 when qualified approved or exact named diagnostic evidence is available.',
+          'Default GB200, B200, MI355X and H200 slots, plus H100, B300 or A100 when qualified approved or exact named diagnostic evidence is available.',
         'x-description-zh':
-          '默认包含 GB200、B200、MI355X 和 H200；存在符合门槛的已批准 H100 结果或明确指定的诊断运行时增加 H100。',
+          '默认包含 GB200、B200、MI355X 和 H200；存在符合门槛的已批准 H100、B300 或 A100 结果或明确指定的诊断运行时增加相应硬件。',
       },
       metricDefinitions: object,
       plot: object,
