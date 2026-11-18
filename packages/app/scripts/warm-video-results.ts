@@ -1,5 +1,9 @@
 import { env } from 'node:process';
-import { publishVideoResults } from '../src/lib/video/video-publication';
+import { readFile } from 'node:fs/promises';
+import {
+  publishVideoResults,
+  type VideoPublicationRequest,
+} from '../src/lib/video/video-publication';
 if (!env.INFERENCEX_APP_URL) throw new Error('INFERENCEX_APP_URL is not set');
 if (!env.INVALIDATE_SECRET) throw new Error('INVALIDATE_SECRET is not set');
 if (!env.H3_RUN_ID) throw new Error('H3_RUN_ID is not set');
@@ -21,7 +25,7 @@ async function get(path: string) {
     throw new Error('BLOB_READ_WRITE_TOKEN is not configured on the frontend');
   return response.json();
 }
-async function post(body: { runId: string; artifactId: string; mergeRunId: string | null }) {
+async function post(body: VideoPublicationRequest) {
   const response = await fetch(`${origin}/api/video-runs`, {
     method: 'POST',
     headers: {
@@ -39,6 +43,9 @@ await publishVideoResults({
   get,
   post,
   runId: env.H3_RUN_ID,
+  selection: env.H3_SELECTION_PATH
+    ? JSON.parse(await readFile(env.H3_SELECTION_PATH, 'utf8'))
+    : undefined,
   mergeRunId: env.H3_MERGE_RUN_ID || null,
   onStored: (run, artifact, sources, quality) => {
     const pairs =

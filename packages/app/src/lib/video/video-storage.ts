@@ -374,8 +374,24 @@ export async function approveVideoPublication(
   saved: StoredArtifact,
   mergeRunId: string | null,
   signal: AbortSignal,
+  selected?: { manifestSha256: string; sourceHeadSha: string },
 ): Promise<VideoPublicationReceipt> {
   const expected = expectedReceipt(runId, artifact, saved, mergeRunId);
+  if (selected) {
+    const [source] = expected.sources;
+    if (
+      expected.sources.length !== 1 ||
+      source.id !== runId ||
+      source.kind !== 'observation' ||
+      source.sha256 !== selected.manifestSha256 ||
+      at(
+        saved.sources[0].documents.find(([path]) => path === 'manifest.json')?.[1],
+        'ci',
+        'head_sha',
+      ) !== selected.sourceHeadSha
+    )
+      throw new Error('Stored source differs from the selected manifest');
+  }
   const existing = await readVideoPublication(runId, artifact, saved);
   if (existing) {
     // A manual republish names no merge run; it reuses the approval instead of asserting a new one.

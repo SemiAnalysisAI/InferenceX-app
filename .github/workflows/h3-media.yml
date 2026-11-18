@@ -21,10 +21,10 @@ jobs:
   publish:
     name: 'Publish H3 media'
     if: github.repository == 'SemiAnalysisAI/InferenceX-app' && !inputs.backfill_renditions && (github.event_name == 'workflow_dispatch' || (github.event.client_payload.source_run_id && github.event.client_payload.merge_run_id))
-    # Only publication is serialized. A group keeps one pending run and cancels older ones, so
-    # encodes must stay outside it; immutable uploads make concurrent rendition jobs safe.
+    # Keep distinct publication dispatches queued while the shared History snapshot is written.
     concurrency:
       group: h3-media-publication
+      queue: max
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -35,10 +35,17 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version-file: package.json
+      - name: Read the merge-selected artifact list
+        if: github.event_name == 'repository_dispatch'
+        id: selection
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+        run: python3 packages/app/scripts/read-video-publication-selection.py
       - name: Persist completed H3 artifacts
         env:
           H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
           H3_MERGE_RUN_ID: ${{ github.event.client_payload.merge_run_id }}
+          H3_SELECTION_PATH: ${{ steps.selection.outputs.path }}
           H3_PUBLICATION_EVENT: ${{ github.event_name }}
           INFERENCEX_APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}

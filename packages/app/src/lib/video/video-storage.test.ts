@@ -40,7 +40,7 @@ function archive(corrupt = false, extra: Record<string, string> = {}) {
       run_id: '10',
       run_attempt: '1',
       git_commit: 'a'.repeat(40),
-      ci: { repository: 'SemiAnalysisAI/InferenceX' },
+      ci: { repository: 'SemiAnalysisAI/InferenceX', head_sha: 'c'.repeat(40) },
     }),
     'synthetic.mp4': 'Synthetic test bytes, not a playable benchmark clip',
     ...extra,
@@ -79,6 +79,14 @@ describe('persistent H3 media', () => {
         .digest('hex')}`,
     };
     const saved = await storeVideoArtifact('10', withDigest, zip, new AbortController().signal);
+    const writes = vi.mocked(put).mock.calls.length;
+    await expect(
+      approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal, {
+        manifestSha256: '0'.repeat(64),
+        sourceHeadSha: 'c'.repeat(40),
+      }),
+    ).rejects.toThrow('selected manifest');
+    expect(vi.mocked(put).mock.calls).toHaveLength(writes);
     const before = vi.mocked(put).mock.calls.length;
     let receipt: unknown;
     vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
@@ -96,6 +104,10 @@ describe('persistent H3 media', () => {
       saved,
       '99',
       new AbortController().signal,
+      {
+        manifestSha256: storedBundle(saved.sources[0]).manifestSha256,
+        sourceHeadSha: 'c'.repeat(40),
+      },
     );
     expect(approved).toMatchObject({
       version: 1,

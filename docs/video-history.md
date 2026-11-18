@@ -66,6 +66,12 @@ verified, read-only snapshot and bypasses this cache.
 
 The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` takes a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
+New merge dispatches pin the `video-publication-selection` artifact from the public InferenceX merge run by artifact ID and the SHA256 of its JSON file. The publisher requires a push to main in `merge-ingest.yml`, verifies the digest, then resolves each selected native bundle name to one numeric artifact ID. One recipe can contribute an earlier attempt if it was not rerun. A superseded attempt or a bundle added after validation is excluded. Missing or ambiguous selected names fail before any publication POST. The selected POST carries the expected manifest SHA256 and source head SHA, which the App checks against the verified source before writing or reusing an approval receipt. The publication job serializes History writes with a bounded Actions queue (`queue: max`).
+
+Deploy the App route and workflow before enabling selection dispatches in InferenceX. An old App route rejects the new POST shape. Manual dispatches and older producer events that have neither selection field keep explicit run-wide publication. A partial selection reference fails closed; rerun the original merge dispatch with the complete reference to retry its selection.
+
+中文：新版合并事件提供清单产物 ID 和 JSON 文件的 SHA256。发布端核对清单来自 InferenceX 主分支的 merge-ingest 工作流，再为每个选中的原生产物名称解析唯一的数字 ID。没有重跑的配置可以沿用早期 attempt；已被替换的 attempt 和校验后新增的产物不会进入本次发布。App 在写入或复用批准回执前核对来源 manifest 的 SHA256 和源提交。先部署 App 的接口和工作流，再启用新版 producer。旧版合并事件和手动发布保留原有行为；清单字段不全或找不到唯一产物时发布失败。
+
 Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout, and finally records the artifact in a new History snapshot. A repeat with the same identity, or a manual republish without a merge run ID, reuses the receipt; a receipt with a different merge run ID does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
 
 ### Per-clip reference quality
@@ -98,19 +104,25 @@ missing, untrusted or failing quality artifact leaves the publication as it is, 
 succeeds; its response reports `quality` as the attached pair count, null when none is available
 yet, or `failed`.
 
-Quality usually finishes after the publication dispatch. A later manual h3-media dispatch with
-the same `run_id` attaches it. That dispatch names no merge run, so the POST reuses the recorded
-approval; indexes and History are reused too, and a stored attachment is returned without reading
-GitHub. The renditions job that follows also encodes stored reference
-clips by sealed SHA256, so the reference plays a light encode in every stage view, Difference
-included.
+Quality usually finishes after publication. For a selected merge, rerun the original **Publish H3 media**
+App workflow run while its selection and source artifacts are available. That run carries the original
+artifact ID and JSON digest. It reuses the approved receipts, attaches any newly available quality for
+those bundles, and runs the renditions job for the stored reference clips.
+
+If the selection expired, collect the existing approval receipts for the merge and the source head
+from the sealed manifests. The publication owner can replay the selected POST for each previously
+approved artifact whose original GitHub metadata is still available and unexpired, using the same
+merge ID, artifact ID, manifest SHA256 and source head. If the original identity or artifact can no
+longer be verified, record which approved bundles still lack quality for source recovery.
+A manual h3-media dispatch with only `run_id` enumerates the whole run and can approve a superseded
+attempt. Use it only when publication of all eligible artifacts in that run is intended.
 
 An unstored `?unofficialrun=` artifact is read with `format=live&run=<run>&artifact=<id>`: its
 documents plus the same verified pairs and unscored clips, without media URLs. Its clips show
 PSNR or the unscored reason over an empty media tile. Each artifact's live quality lookup, found or
 not, is reused for 5 minutes.
 
-中文：授权 POST 在批准和写入 History 之后，从 InferenceX 的 Video Quality 工作流附加逐条视频 PSNR。该工作流在每次 Run Sweep 完成后运行，把 `h3-quality-<run>-<attempt>`（`quality.json`、参考描述文件和 `SHA256SUMS`）上传到自己的运行中。POST 用 GitHub 仓库级产物名称筛选查找该产物，从结果产物所属的 attempt 开始，一直查到运行的最新 attempt，因为后续 attempt 的质量产物也会为未重跑的早期结果包评分。它只信任最新且未过期、由 `.github/workflows/video-quality.yml` 以 `workflow_run` 或 `workflow_dispatch` 方式在 `main` 分支上、且基于 `main` 已有提交运行后上传的副本（仓库和 head 仓库都必须是 SemiAnalysisAI/InferenceX，因此 fork PR 或其他分支不会被采信）。`quality.json` 中的评分器 revision 只作溯源，不作为信任依据。`SHA256SUMS` 必须封存 `quality.json` 与描述文件，`references.descriptor_sha256` 必须与描述文件一致。每个配对须按运行、产物、来源、manifest SHA、测量单元、slot、用例、prompt、seed、媒体路径和媒体 SHA 绑定到已存产物；参考视频必须是描述文件中 prompt、seed 和配置都一致的用例，路径为 `<case_id>.mp4`，SHA256 与描述文件一致。任一检查失败即拒绝整个附件。参考 MP4 从描述文件指定的 release 下载（只接受 SemiAnalysisAI/InferenceX），核对 SHA256 和大小后存入 `objects/<sha256>/<case_id>.mp4`，与候选视频使用相同的内容寻址路径，因此播放和“差异”画布都读取允许跨域像素访问的 Blob 媒体。随后把附件一次性写入 `quality/<run>/<产物名>_<产物 ID>.json`，与不可变索引分开存放；附件包含配对，以及未评分视频及其原因。读取已发布媒体时会把它合并到产物中。只标记该产物无法读取的结果不会存储，因此之后评分成功时仍可附加。质量产物缺失、不可信或校验失败时发布结果不变，POST 照常成功，响应中的 `quality` 为已附加的配对数量；暂无结果时为 null，附加失败时为 `failed`。质量评分通常晚于发布触发完成；之后以相同 `run_id` 手动触发 h3-media 即可附加。手动触发不带 merge 运行 ID，POST 会沿用已记录的批准回执；索引和 History 同样直接复用，已存附件直接返回，不再读取 GitHub。随后的转码 job 也按封存 SHA256 为已存参考视频生成网页转码版本，参考视频在对比区的所有视图（包括“差异”视图）都播放转码版本。未存储的 `?unofficialrun=` 产物通过 `format=live&run=<run>&artifact=<id>` 读取，返回其文档以及同样校验过的配对和未评分视频，不含媒体 URL；这些视频显示 PSNR 或未评分原因，媒体位置留空。每个产物的 live 质量查找结果无论有无都复用 5 分钟。
+中文：授权 POST 在批准和写入 History 之后，从 InferenceX 的 Video Quality 工作流附加逐条视频 PSNR。该工作流在每次 Run Sweep 完成后运行，把 `h3-quality-<run>-<attempt>`（`quality.json`、参考描述文件和 `SHA256SUMS`）上传到自己的运行中。POST 用 GitHub 仓库级产物名称筛选查找该产物，从结果产物所属的 attempt 开始，一直查到运行的最新 attempt，因为后续 attempt 的质量产物也会为未重跑的早期结果包评分。它只信任最新且未过期、由 `.github/workflows/video-quality.yml` 以 `workflow_run` 或 `workflow_dispatch` 方式在 `main` 分支上、且基于 `main` 已有提交运行后上传的副本（仓库和 head 仓库都必须是 SemiAnalysisAI/InferenceX，因此 fork PR 或其他分支不会被采信）。`quality.json` 中的评分器 revision 只作溯源，不作为信任依据。`SHA256SUMS` 必须封存 `quality.json` 与描述文件，`references.descriptor_sha256` 必须与描述文件一致。每个配对须按运行、产物、来源、manifest SHA、测量单元、slot、用例、prompt、seed、媒体路径和媒体 SHA 绑定到已存产物；参考视频必须是描述文件中 prompt、seed 和配置都一致的用例，路径为 `<case_id>.mp4`，SHA256 与描述文件一致。任一检查失败即拒绝整个附件。参考 MP4 从描述文件指定的 release 下载（只接受 SemiAnalysisAI/InferenceX），核对 SHA256 和大小后存入 `objects/<sha256>/<case_id>.mp4`，与候选视频使用相同的内容寻址路径，因此播放和“差异”画布都读取允许跨域像素访问的 Blob 媒体。随后把附件一次性写入 `quality/<run>/<产物名>_<产物 ID>.json`，与不可变索引分开存放；附件包含配对，以及未评分视频及其原因。读取已发布媒体时会把它合并到产物中。只标记该产物无法读取的结果不会存储，因此之后评分成功时仍可附加。质量产物缺失、不可信或校验失败时发布结果不变，POST 照常成功，响应中的 `quality` 为已附加的配对数量；暂无结果时为 null，附加失败时为 `failed`。质量评分通常晚于发布。按合并清单发布时，在清单和源产物仍可用期间，重新运行 App 原来的 **Publish H3 media** 工作流。它沿用原清单的产物 ID 和 JSON 摘要，为同一批已批准结果补附质量数据，并为参考视频生成网页转码版本。清单过期后，先收集合并对应的批准回执和已封存 manifest 中的 source head。原始 GitHub 产物信息仍可读取且未过期时，发布负责人可逐个重放 selected POST，沿用每个已批准产物的 merge ID、产物 ID、manifest SHA256 和 source head。如果原始身份或产物已无法核验，记录仍缺质量附件的产物，待恢复原始依据。只提供 `run_id` 的手动 h3-media 调度会处理整次运行，还可能批准被替换的旧 attempt，仅适用于明确要发布所有符合条件产物的场景。未存储的 `?unofficialrun=` 产物通过 `format=live&run=<run>&artifact=<id>` 读取，返回其文档以及同样校验过的配对和未评分视频，不含媒体 URL；这些视频显示 PSNR 或未评分原因，媒体位置留空。每个产物的 live 质量查找结果无论有无都复用 5 分钟。
 
 ### Web playback renditions
 
@@ -120,8 +132,7 @@ separate `renditions` job in `h3-media` installs ffmpeg and runs
 `scripts/video-renditions.ts --run <source run>`; its failure leaves the publication result
 and the original media unchanged. A manual dispatch with `backfill_renditions` skips
 publication and processes every stored index instead. Only `publish` holds the
-`h3-media-publication` concurrency group: a group keeps one pending run and cancels older
-ones, so a long encode inside it could drop a publication. Each rendition job has its own group
+`h3-media-publication` concurrency group, which queues incoming publications while a writer runs. Each rendition job has its own group
 per source run (one for backfill), so jobs for different runs overlap; uploads never overwrite. An unreadable index is logged and fails the job after the other clips
 are encoded. For each sealed
 MP4 without a receipt, the script downloads the original, checks its recorded SHA256 and
@@ -158,7 +169,7 @@ stays the sealed original, and metrics, PSNR and the media link never read a
 rendition or poster. A failed listing serves the originals only. Indexes, approvals and History are
 unchanged.
 
-中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。同一 job 还为每个封存 MP4 生成封面：`poster-f0-w672-q4` 配置不做 seek，直接解码第一帧，使封面与开始播放时的画面一致；按原始宽高比缩放到最宽 672 px（1344x768 的视频为 672x384），以 `-q:v 4` 输出单张 JPEG 并去除元数据。只有原始视频与记录的 SHA256 一致，且 ffprobe 显示输出为单帧 `mjpeg`、宽度不超过 672 px、宽高比与原始视频相差不超过 1% 时，封面才会被接受。脚本先把 JPEG 上传到 `objects/<output sha256>/poster-f0-w672-q4.jpg`，再写入回执 `renditions/<source sha256>/poster-f0-w672-q4/<output sha256>.json`，记录字节数、尺寸、ffmpeg 版本和参数。处理计划按原始视频和配置分别计算：每个原始视频只下载并校验一次，先生成封面再转码，已有回执的配置直接跳过，因此转码版本已存在时补转只生成封面。封面参数变化时须使用新的配置 ID。诊断视频不在计划内，没有封面。读取已发布媒体和已存参考视频时，封存 SHA256 有对应回执的媒体会附加 `previewUrl` 和 `posterUrl`；没有回执时对应字段不出现。回执列表跨实例共享缓存。转码和封面都在发布清除缓存之后才生成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；其缓存键随值结构升级版本。`url` 仍是封存的原始视频，指标、PSNR 和视频文件链接都不读取转码版本或封面；列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
+中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：发布 job 使用有界队列，长时间转码单独排队。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。同一 job 还为每个封存 MP4 生成封面：`poster-f0-w672-q4` 配置不做 seek，直接解码第一帧，使封面与开始播放时的画面一致；按原始宽高比缩放到最宽 672 px（1344x768 的视频为 672x384），以 `-q:v 4` 输出单张 JPEG 并去除元数据。只有原始视频与记录的 SHA256 一致，且 ffprobe 显示输出为单帧 `mjpeg`、宽度不超过 672 px、宽高比与原始视频相差不超过 1% 时，封面才会被接受。脚本先把 JPEG 上传到 `objects/<output sha256>/poster-f0-w672-q4.jpg`，再写入回执 `renditions/<source sha256>/poster-f0-w672-q4/<output sha256>.json`，记录字节数、尺寸、ffmpeg 版本和参数。处理计划按原始视频和配置分别计算：每个原始视频只下载并校验一次，先生成封面再转码，已有回执的配置直接跳过，因此转码版本已存在时补转只生成封面。封面参数变化时须使用新的配置 ID。诊断视频不在计划内，没有封面。读取已发布媒体和已存参考视频时，封存 SHA256 有对应回执的媒体会附加 `previewUrl` 和 `posterUrl`；没有回执时对应字段不出现。回执列表跨实例共享缓存。转码和封面都在发布清除缓存之后才生成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；其缓存键随值结构升级版本。`url` 仍是封存的原始视频，指标、PSNR 和视频文件链接都不读取转码版本或封面；列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
 
 ## Evidence boundaries
 

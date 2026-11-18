@@ -15,6 +15,7 @@ import {
   VIDEO_HISTORY_MAX_PAGES,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
+import { isSelectedVideoArtifact } from '@/lib/video/video-publication';
 import { recordVideoHistory } from '@/lib/video/video-history-store';
 import { liveVideoArtifact, liveVideoRunPage } from '@/lib/video/video-live-run';
 import { liveTrustedQuality, publishVideoQuality } from '@/lib/video/video-quality';
@@ -323,7 +324,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid publication request' }, { status: 400, headers });
   }
   const body = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
-  const { runId, artifactId, mergeRunId, history } = body as Record<string, unknown>;
+  const {
+    runId,
+    artifactId: legacyId,
+    selectedArtifact,
+    mergeRunId,
+    history,
+  } = body as Record<string, unknown>;
   if (history === 'backfill' && Object.keys(body).length === 1) {
     try {
       return NextResponse.json(await recordVideoHistory(null), { headers });
@@ -337,6 +344,16 @@ export async function POST(request: Request) {
       purgeVideo();
     }
   }
+  const selected = isSelectedVideoArtifact(selectedArtifact) ? selectedArtifact : undefined;
+  if (
+    selectedArtifact !== undefined &&
+    (legacyId !== undefined || mergeRunId === null || !selected)
+  )
+    return NextResponse.json(
+      { error: 'Invalid selected video artifact' },
+      { status: 400, headers },
+    );
+  const artifactId = selected?.id ?? legacyId;
   if (
     typeof runId !== 'string' ||
     !id(runId) ||
@@ -400,7 +417,14 @@ export async function POST(request: Request) {
       saved = await readStoredArtifact(runId, artifact);
       if (!saved) throw new Error('Stored video index readback failed');
     }
-    const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
+    const receipt = await approveVideoPublication(
+      runId,
+      artifact,
+      saved,
+      mergeRunId,
+      deadline,
+      selected,
+    );
     await recordVideoHistory(saved);
     // Quality arrives from a separate workflow, often after publication; it never blocks it.
     const quality = await publishVideoQuality(saved, github, deadline).then(

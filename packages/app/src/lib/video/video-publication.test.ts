@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { publishVideoResults } from './video-publication';
+import { publishVideoResults, type VideoPublicationRequest } from './video-publication';
 
 describe('explicit video publication job', () => {
   it('submits only unique artifacts from the selected source run, including an existing index', async () => {
@@ -11,8 +11,9 @@ describe('explicit video publication job', () => {
         { id: 22, name: 'h3-video-10-2' },
       ],
     });
-    const post = vi.fn((body: { runId: string; artifactId: string }) =>
-      Promise.resolve({
+    const post = vi.fn((body: VideoPublicationRequest) => {
+      if (!('artifactId' in body)) throw new Error('Expected a legacy publication');
+      return Promise.resolve({
         version: 1,
         runId: body.runId,
         artifactId: Number(body.artifactId),
@@ -20,8 +21,8 @@ describe('explicit video publication job', () => {
         mergeRunId: '99',
         sources: [{}, {}],
         quality: body.artifactId === '20' ? 20 : null,
-      }),
-    );
+      });
+    });
     const onStored = vi.fn();
     await publishVideoResults({ get, post, runId: '10', mergeRunId: '99', onStored });
     expect(get).toHaveBeenCalledExactlyOnceWith('?run=10');
@@ -33,6 +34,49 @@ describe('explicit video publication job', () => {
       ['10', '20', 2, 20],
       ['10', '22', 2, null],
     ]);
+  });
+
+  it('publishes the exact recipe attempts selected by the merge and refuses an incomplete catalog', async () => {
+    const config = 'a'.repeat(64);
+    const name = `h3-results-10-2-${config}`;
+    const hash = 'b'.repeat(64);
+    const selection = {
+      version: 1,
+      source_run_id: '10',
+      source_run_attempt: '2',
+      source_head_sha: 'c'.repeat(40),
+      artifacts: [{ name, manifest_sha256: hash }],
+    };
+    const artifacts = [
+      { id: 20, name: `h3-results-10-1-${config}` },
+      { id: 21, name },
+    ];
+    const get = vi.fn().mockResolvedValue({ artifacts });
+    const post = vi.fn().mockResolvedValue({
+      version: 1,
+      runId: '10',
+      artifactId: 21,
+      artifactName: name,
+      mergeRunId: '99',
+      sources: [{ id: '10', kind: 'observation', sha256: hash }],
+    });
+    const input = { get, post, runId: '10', mergeRunId: '99', selection, onStored: vi.fn() };
+    await publishVideoResults(input);
+    expect(post).toHaveBeenCalledExactlyOnceWith({
+      runId: '10',
+      mergeRunId: '99',
+      selectedArtifact: {
+        id: '21',
+        manifestSha256: hash,
+        sourceHeadSha: selection.source_head_sha,
+      },
+    });
+    post.mockClear();
+    for (const listing of [[artifacts[0]], [...artifacts, { id: 22, name }]]) {
+      get.mockResolvedValueOnce({ artifacts: listing });
+      await expect(publishVideoResults(input)).rejects.toThrow(/selected artifact/i);
+    }
+    expect(post).not.toHaveBeenCalled();
   });
 
   it('reports one failed artifact while still publishing the later exact artifact', async () => {

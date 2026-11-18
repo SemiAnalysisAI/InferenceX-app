@@ -519,6 +519,12 @@ describe('explicit H3 publication', () => {
       { runId: '10', artifactId: '9007199254740993', mergeRunId: null },
       { runId: '10', artifactId: '20' },
       { runId: '10', artifactId: '20', mergeRunId: '0' },
+      { runId: '10', artifactId: '20', mergeRunId: '99', selectedArtifact: {} },
+      {
+        runId: '10',
+        mergeRunId: '99',
+        selectedArtifact: { id: '20', manifestSha256: '0'.repeat(64) },
+      },
     ]) {
       const result = await POST(post(body));
       expect(result.status).toBe(400);
@@ -537,7 +543,10 @@ describe('explicit H3 publication', () => {
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
-    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const selected = { manifestSha256: 'd'.repeat(64), sourceHeadSha: 'c'.repeat(40) };
+    const result = await POST(
+      post({ runId: '10', mergeRunId: '99', selectedArtifact: { id: '20', ...selected } }),
+    );
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ...receipt, quality: 2 });
     expect(readStoredArtifact).toHaveBeenCalledWith('10', artifact);
@@ -547,6 +556,7 @@ describe('explicit H3 publication', () => {
       saved,
       '99',
       expect.any(AbortSignal),
+      { id: '20', ...selected },
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
