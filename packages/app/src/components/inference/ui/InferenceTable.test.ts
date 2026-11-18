@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -163,15 +164,16 @@ describe('formatInferenceTableNumber', () => {
   });
 });
 
+function cellText(cell: Element) {
+  return cell.textContent ?? '';
+}
+
 function tableCells(html: string) {
-  const head = [...html.matchAll(/<th\b[^>]*>(?<h>.*?)<\/th>/gu)].map((match) =>
-    match.groups!.h.replaceAll(/<[^>]+>/gu, ''),
-  );
-  const body = html.split('<tbody>')[1].split('</tbody>')[0];
-  const rows = [...body.matchAll(/<tr\b[^>]*>(?<row>.*?)<\/tr>/gu)].map((match) =>
-    [...match.groups!.row.matchAll(/<td\b[^>]*>(?<cell>.*?)<\/td>/gu)].map((cell) =>
-      cell.groups!.cell.replaceAll(/<[^>]+>/gu, ''),
-    ),
+  // Read cells as text through a real DOM rather than stripping tags by hand.
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const head = [...doc.querySelectorAll('thead th')].map(cellText);
+  const rows = [...doc.querySelectorAll('tbody tr')].map((row) =>
+    [...row.querySelectorAll('td')].map(cellText),
   );
   return { head, rows };
 }
