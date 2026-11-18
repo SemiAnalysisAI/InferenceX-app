@@ -40,8 +40,12 @@ const STRINGS = {
   },
 };
 
-/** A downward drag this long on the sheet's header closes it, in px. */
+/** A downward drag this long closes the sheet, in px. */
 const SWIPE_CLOSE = 72;
+/** How far a finger travels down, in px, before its press is a pull on the sheet and not a tap. */
+const PULL_SLOP = 6;
+/** The drag's pointer id while a finger pulls the sheet; a mouse or a pen drags its header. */
+const FINGER = -1;
 /** How much of what follows the first screen shows under it, to say it scrolls, in px. */
 const PEEK = 24;
 /** Clear space kept between the point's mark and the sheet, in px. */
@@ -101,7 +105,7 @@ export default function VideoPointSheet({
   const [playing, setPlaying] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pull, setPull] = useState(0);
-  /** The drag on the header: its pointer, where it began and how far down it has gone. */
+  /** The drag that pulls the sheet down: its pointer, where it began and how far down it has gone. */
   const press = useRef<{ id: number; y: number; pull: number } | null>(null);
   const more = useRef<HTMLDivElement>(null);
   /** Height of the first screen; null before the sheet is drawn. */
@@ -183,6 +187,55 @@ export default function VideoPointSheet({
       if (before instanceof HTMLElement) before.focus({ preventScroll: true });
     };
   }, [mounted]);
+  /** Ends a drag: far enough closes the sheet, anything less puts it back. */
+  const release = () => {
+    const drag = press.current;
+    if (!drag) return;
+    press.current = null;
+    // A flick lifts before the last move is drawn, so the distance comes from the drag itself.
+    if (drag.pull > SWIPE_CLOSE) close.current();
+    else setPull(0);
+  };
+  // A finger pulls the sheet down from anywhere on it while its content is at the top; any other
+  // drag scrolls the content. The move listener is not passive: it has to stop that scroll, and
+  // the bounce an iPhone answers a pull with.
+  useEffect(() => {
+    const element = sheet.current;
+    if (!element) return undefined;
+    let from: number | null = null;
+    const onStart = (event: TouchEvent) => {
+      from = event.touches.length === 1 && element.scrollTop <= 0 ? event.touches[0].clientY : null;
+    };
+    const onMove = (event: TouchEvent) => {
+      if (from === null) return;
+      const down = event.touches[0].clientY - from;
+      let drag = press.current;
+      if (!drag) {
+        // Upward, or the browser already scrolls: the gesture is the content's.
+        if (down < -PULL_SLOP || !event.cancelable) from = null;
+        if (from === null || down <= PULL_SLOP) return;
+        drag = { id: FINGER, y: from, pull: 0 };
+        press.current = drag;
+      }
+      if (event.cancelable) event.preventDefault();
+      drag.pull = Math.max(0, down);
+      setPull(drag.pull);
+    };
+    const onEnd = () => {
+      from = null;
+      if (press.current?.id === FINGER) release();
+    };
+    element.addEventListener('touchstart', onStart, { passive: true });
+    element.addEventListener('touchmove', onMove, { passive: false });
+    element.addEventListener('touchend', onEnd);
+    element.addEventListener('touchcancel', onEnd);
+    return () => {
+      element.removeEventListener('touchstart', onStart);
+      element.removeEventListener('touchmove', onMove);
+      element.removeEventListener('touchend', onEnd);
+      element.removeEventListener('touchcancel', onEnd);
+    };
+  }, [mounted]);
   // Another prompt or point is another clip, which starts paused.
   const src = clip?.src ?? null;
   useEffect(() => setPlaying(false), [src]);
@@ -221,6 +274,8 @@ export default function VideoPointSheet({
     }
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    // A finger's pull is the sheet's own, above; this is a mouse's or a pen's drag.
+    if (event.pointerType === 'touch') return;
     if (event.target instanceof Element && event.target.closest('button')) return;
     press.current = { id: event.pointerId, y: event.clientY, pull: 0 };
     // A mouse's or a pen's moves go to what is under it, and a quick drag leaves the header.
@@ -235,15 +290,6 @@ export default function VideoPointSheet({
     press.current.pull = Math.max(0, event.clientY - press.current.y);
     setPull(press.current.pull);
   };
-  const release = () => {
-    const drag = press.current;
-    if (!drag) return;
-    press.current = null;
-    // A flick lifts before the last move is drawn, so the distance comes from the drag itself.
-    if (drag.pull > SWIPE_CLOSE) dismiss();
-    else setPull(0);
-  };
-
   return createPortal(
     <>
       <button
@@ -278,7 +324,7 @@ export default function VideoPointSheet({
         }}
       >
         <div className="px-4 pb-4 max-md:pt-0 md:pt-4">
-          {/* Dragging the header down closes the sheet. Under 768 px it reaches over the grab bar. */}
+          {/* A mouse or a pen drags the header down to close. Under 768 px it reaches over the grab bar. */}
           <div
             className="flex touch-none items-center gap-2 max-md:relative max-md:z-[2] max-md:-mt-5 max-md:pt-5"
             data-testid="video-point-sheet-header"
