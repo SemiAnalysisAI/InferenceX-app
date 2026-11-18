@@ -88,6 +88,22 @@ function run(command: string, args: string[], stdout: number | 'inherit'): Promi
   return promise;
 }
 
+const ZIP_SIGNATURES = [
+  Buffer.from([0x50, 0x4B, 0x03, 0x04]),
+  Buffer.from([0x50, 0x4B, 0x05, 0x06]),
+] as const;
+
+function isZipArchive(filePath: string): boolean {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const head = Buffer.alloc(4);
+    const read = fs.readSync(fd, head, 0, head.length, 0);
+    return read === head.length && ZIP_SIGNATURES.some((signature) => head.equals(signature));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export async function downloadArtifact(artifact: ArtifactMeta, destRoot: string): Promise<string> {
   const zipDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-artifact-'));
   const zipPath = path.join(zipDir, 'artifact.zip');
@@ -100,7 +116,12 @@ export async function downloadArtifact(artifact: ArtifactMeta, destRoot: string)
       fs.closeSync(zip);
     }
     fs.mkdirSync(destDir, { recursive: true });
-    await run('unzip', ['-oq', zipPath, '-d', destDir], 'inherit');
+    if (isZipArchive(zipPath)) {
+      await run('unzip', ['-oq', zipPath, '-d', destDir], 'inherit');
+    } else {
+      // Artifacts uploaded with `archive: false` are served as the raw file, not a zip.
+      fs.copyFileSync(zipPath, path.join(destDir, path.basename(artifact.name)));
+    }
   } finally {
     fs.rmSync(zipDir, { recursive: true, force: true });
   }
