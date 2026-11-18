@@ -91,7 +91,9 @@ import { PowerXRoleNoData } from '@/components/inference/powerx/PowerXRoleNoData
 import {
   usePowerXSurface,
   useSetPowerXActivePoint,
+  useSetPowerXCompareRange,
 } from '@/components/inference/ui/powerx-surface';
+import { powerXCoveredRange } from '@/components/inference/powerx/powerx-compare-at';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -1170,6 +1172,23 @@ export default function ChartDisplay({
     visibleDateComparisonRows,
     visibleComparisonRows,
   ]);
+  // The default Compare at clamps into the interactivity range the visible GPUs cover.
+  const setPowerXCompareRange = useSetPowerXCompareRange();
+  const powerXCoveredInteractivity = useMemo(() => {
+    const xField = String(renderableGraphs[0]?.chartDefinition.x_scale_field ?? '');
+    if (!powerXVisibleRows || !xField.includes('intvty')) return null;
+    const byGpu = new Map<string, number[]>();
+    for (const row of powerXVisibleRows) {
+      const values = byGpu.get(row.hwKey) ?? [];
+      values.push(row.x);
+      byGpu.set(row.hwKey, values);
+    }
+    return powerXCoveredRange([...byGpu.values()]);
+  }, [powerXVisibleRows, renderableGraphs]);
+  useEffect(() => {
+    setPowerXCompareRange?.(powerXCoveredInteractivity);
+  }, [setPowerXCompareRange, powerXCoveredInteractivity]);
+
   const powerXReadoutPoints = useMemo(() => {
     if (powerXTab === 'where' || powerXTab === 'time' || !powerXVisibleRows) return null;
     if (powerRole === 'all') return powerXVisibleRows;

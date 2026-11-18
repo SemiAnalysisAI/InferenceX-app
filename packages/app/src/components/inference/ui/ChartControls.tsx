@@ -62,7 +62,6 @@ import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
 import { usePowerXModelBadges } from '../powerx/PowerXModelBadges';
 import { powerXChangedCount } from '../powerx/powerx-views';
-import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -196,9 +195,6 @@ interface ChartControlsProps {
   showXAxisMode?: boolean;
   runContext?: ReactNode;
   trailingPanel?: ReactNode;
-  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
-  /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
-  powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
   /** Extra details on each model's row in the model dropdown, e.g. its benchmark history. */
   modelDetails?: ReadonlyMap<string, ReactNode>;
   /**
@@ -229,7 +225,6 @@ export default function ChartControls({
   showXAxisMode = false,
   runContext,
   trailingPanel,
-  powerXControls,
   modelDetails,
   powerXStrip,
 }: ChartControlsProps) {
@@ -724,12 +719,7 @@ export default function ChartControls({
             className={spans.chart}
           >
             <div className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass}`}>
-              {powerXSurface && powerXControls
-                ? powerXControls({
-                    xAxisSelector: showXAxisMode ? <XAxisModeSelector /> : null,
-                    xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
-                  })
-                : showXAxisMode && <XAxisModeSelector />}
+              {showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
                 hidden={powerXSurface}

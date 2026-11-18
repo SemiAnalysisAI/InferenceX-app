@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { InferenceData } from '@/components/inference/types';
-import { POWER_PERCENT_TDP_METRIC, type PowerXSelection } from './powerx-views';
 
 const mocks = vi.hoisted(() => ({
   locale: 'en' as 'en' | 'zh',
@@ -26,12 +25,7 @@ declare global {
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-import {
-  defaultReadoutPoint,
-  PowerXCountControls,
-  PowerXReadout,
-  PowerXRoleControl,
-} from './PowerXLayout';
+import { defaultReadoutPoint, PowerXReadout } from './PowerXLayout';
 
 const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
   mocks.locale = locale;
@@ -39,82 +33,6 @@ const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
   container.innerHTML = renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>);
   return container;
 };
-const noop = () => {};
-
-describe('PowerXCountControls', () => {
-  it('disables the IT and facility Counts unless energy is per output token', () => {
-    const container = render(
-      <PowerXCountControls
-        selection={{ metric: 'y_measuredJPerInputToken', compare: 'none' }}
-        onSelectionChange={noop}
-      />,
-    );
-    const buttons = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
-    ];
-    expect(buttons.map((button) => button.disabled)).toEqual([false, true, true, true]);
-  });
-
-  it('disables % of TDP on the IT and facility Power draw boundaries', () => {
-    const container = render(
-      <PowerXCountControls
-        selection={{ metric: 'y_itModeledWatts', compare: 'none' }}
-        onSelectionChange={noop}
-      />,
-    );
-    const count = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
-    ];
-    expect(count.map((button) => button.getAttribute('aria-pressed'))).toEqual([
-      'false',
-      'true',
-      'false',
-      'false',
-    ]);
-    const showAs = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-unit"] button'),
-    ];
-    expect(showAs.map((button) => button.disabled)).toEqual([false, true]);
-  });
-});
-
-describe('PowerXRoleControl', () => {
-  it('offers the four GPU roles with the current one pressed', () => {
-    const container = render(<PowerXRoleControl role="decode" onRoleChange={noop} />);
-    const ids = [...container.querySelectorAll('[data-testid^="powerx-role-"]')]
-      .map((node) => (node as HTMLElement).dataset.testid)
-      .filter((id) => id !== 'powerx-role-toggle');
-    expect(ids).toEqual([
-      'powerx-role-all',
-      'powerx-role-prefill',
-      'powerx-role-decode',
-      'powerx-role-split',
-    ]);
-  });
-});
-
-describe('pinned controls under a GPU role', () => {
-  const energy: PowerXSelection = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' };
-  it('pins Count to GPU and says why, but leaves All untouched', () => {
-    const pinned = render(
-      <PowerXCountControls selection={energy} onSelectionChange={noop} role="decode" />,
-    );
-    expect(pinned.querySelector('[data-testid="powerx-count-pinned"]')).not.toBeNull();
-    expect(pinned.querySelector('[data-testid="powerx-per-pinned"]')).not.toBeNull();
-    const all = render(
-      <PowerXCountControls selection={energy} onSelectionChange={noop} role="all" />,
-    );
-    expect(all.querySelector('[data-testid="powerx-count-pinned"]')).toBeNull();
-  });
-
-  it('notes % of TDP is per pool on Power draw under a role', () => {
-    const draw: PowerXSelection = { metric: POWER_PERCENT_TDP_METRIC, compare: 'none' };
-    const container = render(
-      <PowerXCountControls selection={draw} onSelectionChange={noop} role="split" />,
-    );
-    expect(container.querySelector('[data-testid="powerx-headroom-pinned"]')).not.toBeNull();
-  });
-});
 
 const metric = (y: number) => ({ y, roof: false });
 function readoutPoint(x: number, overrides: Partial<InferenceData> = {}): InferenceData {

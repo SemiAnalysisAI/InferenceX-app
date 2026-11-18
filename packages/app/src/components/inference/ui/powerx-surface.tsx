@@ -7,6 +7,7 @@ import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
 import {
   parsePowerXCompareAt,
   POWERX_COMPARE_AT_DEFAULT,
+  resolvePowerXCompareAt,
   serializePowerXCompareAt,
 } from '../powerx/powerx-compare-at';
 import type { InferenceData } from '../types';
@@ -25,6 +26,10 @@ const PowerXSurfaceContext = createContext(false);
  */
 const CompareTargetContext = createContext<number | null>(null);
 const SetCompareTargetContext = createContext<((value: number | null) => void) | null>(null);
+/** The page publishes the interactivity range its visible GPUs cover (see the default clamp). */
+const SetCompareRangeContext = createContext<
+  ((range: readonly [number, number] | null) => void) | null
+>(null);
 
 /**
  * Whether the Where view counts the facility (PUE) overhead. On by default so
@@ -49,17 +54,27 @@ const SetActivePointContext = createContext<((value: PowerXActivePointUpdate) =>
 );
 
 export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
-  const [target, setTargetState] = useState<number>(() =>
-    parsePowerXCompareAt(readUrlParams().i_at),
+  const [stored, setStored] = useState<{ value: number; explicit: boolean }>(() => {
+    const raw = readUrlParams().i_at;
+    return { value: parsePowerXCompareAt(raw), explicit: Boolean(raw) };
+  });
+  const [range, setRangeState] = useState<readonly [number, number] | null>(null);
+  const setRange = useMemo(
+    () => (next: readonly [number, number] | null) =>
+      setRangeState((current) =>
+        current?.[0] === next?.[0] && current?.[1] === next?.[1] ? current : next,
+      ),
+    [],
   );
-  // `null` returns to the default; every change lands in `i_at`.
+  const target = resolvePowerXCompareAt(stored.value, stored.explicit, range);
+  // A pick is explicit and lands in `i_at`; `null` returns to the (clamped) default.
   const setTarget = useMemo(
     () => (value: number | null) => {
       const next = parsePowerXCompareAt(
         value === null ? String(POWERX_COMPARE_AT_DEFAULT) : String(value),
       );
-      setTargetState(next);
-      writeUrlParams({ i_at: serializePowerXCompareAt(next) });
+      setStored({ value: next, explicit: value !== null });
+      writeUrlParams({ i_at: value === null ? '' : serializePowerXCompareAt(next) });
     },
     [],
   );
@@ -81,17 +96,19 @@ export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
   return (
     <PowerXSurfaceContext.Provider value>
       <SetCompareTargetContext.Provider value={setTarget}>
-        <CompareTargetContext.Provider value={target}>
-          <SetIncludeFacilityContext.Provider value={setIncludeFacility}>
-            <IncludeFacilityContext.Provider value={includeFacility}>
-              <SetActivePointContext.Provider value={setActivePoint}>
-                <ActivePointContext.Provider value={activePoint}>
-                  {children}
-                </ActivePointContext.Provider>
-              </SetActivePointContext.Provider>
-            </IncludeFacilityContext.Provider>
-          </SetIncludeFacilityContext.Provider>
-        </CompareTargetContext.Provider>
+        <SetCompareRangeContext.Provider value={setRange}>
+          <CompareTargetContext.Provider value={target}>
+            <SetIncludeFacilityContext.Provider value={setIncludeFacility}>
+              <IncludeFacilityContext.Provider value={includeFacility}>
+                <SetActivePointContext.Provider value={setActivePoint}>
+                  <ActivePointContext.Provider value={activePoint}>
+                    {children}
+                  </ActivePointContext.Provider>
+                </SetActivePointContext.Provider>
+              </IncludeFacilityContext.Provider>
+            </SetIncludeFacilityContext.Provider>
+          </CompareTargetContext.Provider>
+        </SetCompareRangeContext.Provider>
       </SetCompareTargetContext.Provider>
     </PowerXSurfaceContext.Provider>
   );
@@ -109,6 +126,13 @@ export function usePowerXCompareTarget(): number | null {
 /** Setter for the shared comparison interactivity; null outside PowerX. */
 export function useSetPowerXCompareTarget(): ((value: number | null) => void) | null {
   return useContext(SetCompareTargetContext);
+}
+
+/** Publishes the covered interactivity range the default Compare at clamps into. */
+export function useSetPowerXCompareRange():
+  | ((range: readonly [number, number] | null) => void)
+  | null {
+  return useContext(SetCompareRangeContext);
 }
 
 /** Whether breakdown stacks include the facility (PUE) part; always true outside PowerX. */

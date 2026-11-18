@@ -47,3 +47,36 @@ export function nearestByInteractivity<T>(
   }
   return best;
 }
+
+/**
+ * The interactivity range every GPU can be read at: the overlap of the per-GPU ranges, or
+ * the full span when they do not overlap. Null when no GPU has a positive value.
+ */
+export function powerXCoveredRange(
+  perGpu: readonly (readonly number[])[],
+): readonly [number, number] | null {
+  const ranges = perGpu
+    .map((values) => values.filter((value) => Number.isFinite(value) && value > 0))
+    .filter((values) => values.length > 0)
+    .map((values) => [Math.min(...values), Math.max(...values)] as const);
+  if (ranges.length === 0) return null;
+  const lo = Math.max(...ranges.map(([min]) => min));
+  const hi = Math.min(...ranges.map(([, max]) => max));
+  if (lo <= hi) return [lo, hi];
+  return [Math.min(...ranges.map(([min]) => min)), Math.max(...ranges.map(([, max]) => max))];
+}
+
+/**
+ * The Compare at every tab reads. An explicit pick (from `i_at` or a control) is kept as is;
+ * the default (80) clamps into the range the visible GPUs cover, so a model whose sweep
+ * never reaches 80 tok/s/user still reads at a real point.
+ */
+export function resolvePowerXCompareAt(
+  value: number,
+  explicit: boolean,
+  range: readonly [number, number] | null,
+): number {
+  if (explicit || !range) return value;
+  const [lo, hi] = range;
+  return clampPowerXCompareAt(Math.min(Math.max(value, lo), hi));
+}

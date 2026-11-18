@@ -100,7 +100,7 @@ const STRINGS = {
       statistic:
         'Statistic is Avg: P75 and P90 are time-weighted percentiles of the whole fleet, so they need All GPUs.',
       headroom:
-        'Headroom shading is off: it needs a P90 per GPU pool, which runs do not publish yet.',
+        '% of TDP per pool is the pool’s average draw over its rated TDP. Headroom shading is off: it needs a P90 per GPU pool, which runs do not publish yet.',
     } satisfies Record<PowerXPinnedControl | 'perPrefill', string>,
     pinnedWhat: {
       count: 'Boundary GPU',
@@ -150,7 +150,8 @@ const STRINGS = {
       perPrefill: '预填充 GPU：输出按重构值计算，可与解码相加；输入仅统计本角色。',
       rated: '预配上限已关闭：整体预配上限按整个部署计算。',
       statistic: '统计量为平均：P75 与 P90 是整个集群按时间加权的百分位，需选择“全部 GPU”。',
-      headroom: '不显示余量阴影：它需要按 GPU 池统计的 P90，目前运行结果尚未提供。',
+      headroom:
+        '按池计算的 TDP 占比为该池平均功耗相对额定 TDP 的比例。不显示余量阴影：它需要按 GPU 池统计的 P90，目前运行结果尚未提供。',
     } satisfies Record<PowerXPinnedControl | 'perPrefill', string>,
     pinnedWhat: {
       count: '统计口径 GPU',
