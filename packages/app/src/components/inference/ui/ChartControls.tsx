@@ -110,6 +110,10 @@ const STRINGS = {
     gpuConfigTooltip:
       'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
     gpuConfigPlaceholder: 'Select Chip Config',
+    powerXGpuConfig: 'GPU config',
+    powerXGpuConfigTooltip:
+      'Pick up to 4 GPU configurations to compare across run dates, for example to see how a software update changed one setup.',
+    powerXGpuConfigPlaceholder: 'Select GPU config',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
@@ -151,6 +155,10 @@ const STRINGS = {
     gpuConfigTooltip:
       '最多选择 4 个芯片配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
     gpuConfigPlaceholder: '选择芯片配置',
+    powerXGpuConfig: 'GPU 配置',
+    powerXGpuConfigTooltip:
+      '最多选择 4 个 GPU 配置做跨日期对比，例如查看某次软件更新对某个配置的影响。',
+    powerXGpuConfigPlaceholder: '选择 GPU 配置',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表将展示所选芯片配置在此时间范围内的性能数据。',
@@ -216,6 +224,15 @@ export interface PowerXStripParts {
   historyActive: boolean;
   /** The P/D badge when the selected model has prefill/decode data. */
   modelBadge?: ReactNode;
+  /** The phone settings sheet lists models and scenarios as one-tap rows. */
+  models: readonly string[];
+  selectedModel: string;
+  onModelChange: (model: Model) => void;
+  scenarios: readonly string[];
+  selectedScenario: string;
+  onScenarioChange: (scenario: Sequence) => void;
+  /** P/D badges by model, as in the Model menu. */
+  modelBadges?: ReadonlyMap<string, ReactNode>;
 }
 
 export default function ChartControls({
@@ -583,8 +600,8 @@ export default function ChartControls({
       <div className="flex min-w-0 flex-col space-y-1.5">
         <LabelWithTooltip
           htmlFor="gpu-config-select"
-          label={t.gpuConfig}
-          tooltip={t.gpuConfigTooltip}
+          label={powerXStrip ? t.powerXGpuConfig : t.gpuConfig}
+          tooltip={powerXStrip ? t.powerXGpuConfigTooltip : t.gpuConfigTooltip}
         />
         <div data-testid="gpu-multiselect" className="min-w-0">
           <MultiSelect
@@ -593,7 +610,7 @@ export default function ChartControls({
             onChange={handleGPUChange}
             open={openDropdown === 'gpu'}
             onOpenChange={handleDropdownOpenChange('gpu')}
-            placeholder={t.gpuConfigPlaceholder}
+            placeholder={powerXStrip ? t.powerXGpuConfigPlaceholder : t.gpuConfigPlaceholder}
             maxSelections={4}
             searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
             noResultsLabel={locale === 'zh' ? '无结果' : undefined}
@@ -660,6 +677,13 @@ export default function ChartControls({
           history: historyFields,
           historyActive: selectedGPUs.length > 0,
           modelBadge: powerXModelBadges?.get(selectedModel),
+          models: selectableModels,
+          selectedModel,
+          onModelChange: handleModelChange,
+          scenarios: availableSequences,
+          selectedScenario: selectedSequence,
+          onScenarioChange: handleSequenceChange,
+          modelBadges: powerXModelBadges,
         })}
       </TooltipProvider>
     );

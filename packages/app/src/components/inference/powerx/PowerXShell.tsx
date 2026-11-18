@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Lock, SlidersHorizontal } from 'lucide-react';
+import { Check, ChevronDown, Lock, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
@@ -14,6 +14,12 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
+import {
+  type Model,
+  type Sequence,
+  getModelLabel,
+  getSequenceLabel,
+} from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
@@ -24,6 +30,7 @@ import {
   POWERX_COMPARE_AT_DEFAULT,
 } from './powerx-compare-at';
 import { POWERX_ROLES, type PowerXRole } from './powerx-role';
+import { POWERX_VOCAB } from './powerx-strings';
 import {
   POWERX_VIEWS,
   powerXViewFor,
@@ -48,26 +55,21 @@ const STRINGS = {
     title: 'PowerX',
     subtitle: 'Measured GPU power and energy for every benchmark point',
     context: 'Benchmark context',
-    role: 'GPU role',
-    roles: {
-      all: 'All GPUs',
-      prefill: 'Prefill',
-      decode: 'Decode',
-      split: 'Prefill vs decode',
-    } satisfies Record<PowerXRole, string>,
-    rolesShort: {
-      all: 'All GPUs',
-      prefill: 'Prefill',
-      decode: 'Decode',
-      split: 'P vs D',
-    } satisfies Record<PowerXRole, string>,
+    role: POWERX_VOCAB.en.role,
+    roles: POWERX_VOCAB.en.roles,
+    rolesShort: POWERX_VOCAB.en.rolesShort,
     roleHints: {
-      all: 'Every GPU of the deployment',
-      prefill: 'Only the GPUs that run prefill',
-      decode: 'Only the GPUs that run decode',
-      split: 'Prefill and decode pools side by side',
+      all: 'Every GPU in the deployment',
+      prefill: 'GPUs that process prompts',
+      decode: 'GPUs that generate tokens',
+      split: 'Both pools, side by side',
     } satisfies Record<PowerXRole, string>,
-    compareAt: 'Compare at',
+    roleNoData: 'no P/D data for this model',
+    model: 'Model',
+    scenario: 'Scenario',
+    precision: 'Precision',
+    compareAtAxis: 'tok/s/user · P90 interactivity',
+    compareAt: POWERX_VOCAB.en.compareAt,
     compareAtHelp:
       'The interactivity every tab reads at: the ranking, the Breakdown bars and the Over time trace use the point nearest it.',
     tokPerUser: 'tok/s/user',
@@ -77,21 +79,10 @@ const STRINGS = {
     run: 'Run',
     latest: 'Latest',
     history: 'History',
-    runContext: 'Run context',
-    compareHistory: 'Compare history',
+    compareHistory: 'Compare across dates',
     views: 'PowerX views',
-    tabs: {
-      energy: 'Energy per token',
-      draw: 'Power draw',
-      where: 'Breakdown',
-      time: 'Over time',
-    } satisfies Record<PowerXView, string>,
-    tabsShort: {
-      energy: 'Energy',
-      draw: 'Power',
-      where: 'Breakdown',
-      time: 'Over time',
-    } satisfies Record<PowerXView, string>,
+    tabs: POWERX_VOCAB.en.tabs,
+    tabsShort: POWERX_VOCAB.en.tabsShort,
     tabHints: {
       energy: 'Joules per token or Wh per query vs interactivity',
       draw: 'Watts per GPU vs interactivity',
@@ -113,26 +104,21 @@ const STRINGS = {
     title: 'PowerX 功耗',
     subtitle: '每个基准测试点的实测 GPU 功耗与能耗',
     context: '基准测试上下文',
-    role: 'GPU 角色',
-    roles: {
-      all: '全部 GPU',
-      prefill: '预填充',
-      decode: '解码',
-      split: '预填充 vs 解码',
-    } satisfies Record<PowerXRole, string>,
-    rolesShort: {
-      all: '全部 GPU',
-      prefill: '预填充',
-      decode: '解码',
-      split: '预填充 vs 解码',
-    } satisfies Record<PowerXRole, string>,
+    role: POWERX_VOCAB.zh.role,
+    roles: POWERX_VOCAB.zh.roles,
+    rolesShort: POWERX_VOCAB.zh.rolesShort,
     roleHints: {
-      all: '部署中的每块 GPU',
-      prefill: '仅承担预填充的 GPU',
-      decode: '仅承担解码的 GPU',
-      split: '并排对比预填充池与解码池',
+      all: '部署中的全部 GPU',
+      prefill: '处理提示词的 GPU',
+      decode: '生成 token 的 GPU',
+      split: '两个池并排对比',
     } satisfies Record<PowerXRole, string>,
-    compareAt: '对比点',
+    roleNoData: '该模型没有预填充/解码数据',
+    model: '模型',
+    scenario: '场景',
+    precision: '精度',
+    compareAtAxis: 'tok/s/user · P90 交互性',
+    compareAt: POWERX_VOCAB.zh.compareAt,
     compareAtHelp:
       '所有标签页读取的交互性：排名、功耗构成条形图与随时间变化曲线都取最接近该值的数据点。',
     tokPerUser: 'tok/s/user',
@@ -142,21 +128,10 @@ const STRINGS = {
     run: '运行',
     latest: '最新',
     history: '历史',
-    runContext: '运行信息',
-    compareHistory: '对比历史趋势',
+    compareHistory: '跨日期对比',
     views: 'PowerX 视图',
-    tabs: {
-      energy: '每 Token 能耗',
-      draw: '功耗',
-      where: '功耗构成',
-      time: '随时间变化',
-    } satisfies Record<PowerXView, string>,
-    tabsShort: {
-      energy: '能耗',
-      draw: '功耗',
-      where: '构成',
-      time: '随时间',
-    } satisfies Record<PowerXView, string>,
+    tabs: POWERX_VOCAB.zh.tabs,
+    tabsShort: POWERX_VOCAB.zh.tabsShort,
     tabHints: {
       energy: '每 Token 焦耳数或每次查询 Wh vs 交互性',
       draw: '每 GPU 瓦数 vs 交互性',
@@ -182,7 +157,42 @@ export function usePowerXShellStrings() {
 
 /** A bottom sheet on phones: the shared dialog pinned to the bottom edge. */
 export const POWERX_SHEET_CLASS =
-  'top-auto bottom-0 left-0 max-h-[85dvh] max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto rounded-b-none rounded-t-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100';
+  'top-auto bottom-0 left-0 flex max-h-[85dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none rounded-t-xl p-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100';
+
+/**
+ * One phone bottom sheet: a grab bar, a title that stays put (with the dialog's close
+ * button beside it) and a body that scrolls under it. Settings and More share it.
+ */
+export function PowerXSheet({
+  open,
+  onOpenChange,
+  title,
+  testId,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={POWERX_SHEET_CLASS} data-testid={testId}>
+        <span aria-hidden className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-border" />
+        <DialogTitle className="shrink-0 border-b border-border/60 px-4 pt-2 pb-3 pr-14 text-base">
+          {title}
+        </DialogTitle>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+          data-testid={`${testId}-body`}
+        >
+          {children}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /** The quiet text button of the strip and toolbar: no border, a fill on hover. */
 export const POWERX_QUIET_BUTTON =
@@ -309,9 +319,20 @@ export function PowerXCompareAtPicker({
     setValue?.(next);
     track('powerx_compare_at_changed', { ...analyticsContext, at: next, how, source });
   };
+  const sheet = source === 'sheet';
   return (
     <div className="flex flex-col gap-3" data-testid="powerx-compare-at-picker">
-      <div className="flex flex-wrap gap-1" role="group" aria-label={t.presets}>
+      {sheet && (
+        <p className="flex items-baseline gap-2" data-testid="powerx-compare-at-value">
+          <span className="text-xl font-semibold tabular-nums">{value}</span>
+          <span className="text-xs text-muted-foreground">{t.compareAtAxis}</span>
+        </p>
+      )}
+      <div
+        className={cn(sheet ? 'grid grid-cols-4 gap-1' : 'flex flex-wrap gap-1')}
+        role="group"
+        aria-label={t.presets}
+      >
         {POWERX_COMPARE_AT_PRESETS.map((preset) => (
           <button
             key={preset}
@@ -342,9 +363,11 @@ export function PowerXCompareAtPicker({
           data-testid="powerx-compare-at-slider"
           className="h-11 min-w-0 flex-1 accent-powerx-at"
         />
-        <span className="w-24 shrink-0 text-right tabular-nums">
-          {value} {t.tokShort}
-        </span>
+        {!sheet && (
+          <span className="w-24 shrink-0 text-right tabular-nums">
+            {value} {t.tokShort}
+          </span>
+        )}
       </label>
       <p className="text-xs text-muted-foreground">{t.compareAtHelp}</p>
     </div>
@@ -418,12 +441,7 @@ function RunPanel({ runContext, parts }: { runContext?: ReactNode; parts: PowerX
   const t = usePowerXShellStrings();
   return (
     <div className="flex flex-col gap-4" data-testid="powerx-run-panel">
-      {runContext && (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-semibold text-muted-foreground">{t.runContext}</h3>
-          {runContext}
-        </section>
-      )}
+      {runContext}
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold text-muted-foreground">{t.compareHistory}</h3>
         {parts.history}
@@ -463,6 +481,208 @@ function RunControl({
           <RunPanel runContext={runContext} parts={parts} />
         </PopoverContent>
       </Popover>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phone settings sheet
+
+/** A labelled group of the settings sheet, ruled off from the one above. */
+function SheetGroup({
+  label,
+  children,
+  testId,
+}: {
+  label: string;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <section
+      className="flex flex-col gap-1 border-b border-border/60 py-3 first:pt-0 last:border-b-0"
+      data-testid={testId}
+    >
+      <h3 className="text-xs text-muted-foreground">{label}</h3>
+      {children}
+    </section>
+  );
+}
+
+/** One radio row of the sheet: a check column, the label (and a hint), then a trailing badge. */
+function SheetRadio({
+  checked,
+  onSelect,
+  children,
+  hint,
+  icon,
+  trailing,
+  testId,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  children: ReactNode;
+  hint?: ReactNode;
+  icon?: ReactNode;
+  trailing?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      data-testid={testId}
+      onClick={() => {
+        if (!checked) onSelect();
+      }}
+      className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-sm px-1 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+    >
+      <span className="inline-flex w-4 shrink-0 justify-center text-brand">
+        {checked && <Check aria-hidden className="size-4" />}
+      </span>
+      {icon}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className={cn('truncate', checked && 'font-semibold')}>{children}</span>
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      </span>
+      {trailing}
+    </button>
+  );
+}
+
+/** The line style a role draws with: solid for all GPUs, dashed prefill, dotted decode. */
+function RoleGlyph({ role }: { role: PowerXRole }) {
+  if (role === 'split') {
+    return (
+      <span aria-hidden className="inline-flex w-5 shrink-0 items-center gap-0.5">
+        <span className="h-2 w-2 rounded-xs bg-powerx-prefill" />
+        <span className="h-2 w-2 rounded-xs bg-powerx-decode" />
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden className="inline-flex w-5 shrink-0 items-center">
+      <span
+        className={cn(
+          'w-full border-t-2 border-foreground',
+          role === 'prefill' && 'border-dashed',
+          role === 'decode' && 'border-dotted',
+        )}
+      />
+    </span>
+  );
+}
+
+/**
+ * The phone "View settings" sheet: model, scenario, precision, GPU role, Compare at, run
+ * and the page actions. Every pick applies at once and the sheet stays open, so the reader
+ * can change several things and watch the summary line follow.
+ */
+function PowerXSettingsSheetBody({
+  parts,
+  role,
+  onRoleChange,
+  runContext,
+  sheetActions,
+  scenarioLabel,
+  compareAtRange,
+}: {
+  parts: PowerXStripParts;
+  role: PowerXRole;
+  onRoleChange: (role: PowerXRole) => void;
+  runContext?: ReactNode;
+  sheetActions?: ReactNode;
+  scenarioLabel: string;
+  compareAtRange?: readonly [number, number];
+}) {
+  const t = usePowerXShellStrings();
+  const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
+  const hasRoleData = parts.modelBadges?.has(parts.selectedModel) ?? true;
+  return (
+    <div className="flex flex-col" data-testid="powerx-settings-sheet-content">
+      <SheetGroup label={t.model} testId="powerx-sheet-models">
+        <div role="radiogroup" aria-label={t.model} className="flex flex-col">
+          {parts.models.map((model) => (
+            <SheetRadio
+              key={model}
+              checked={model === parts.selectedModel}
+              onSelect={() => parts.onModelChange(model as Model)}
+              trailing={parts.modelBadges?.get(model)}
+              testId={`powerx-sheet-model-${model}`}
+            >
+              {getModelLabel(model as Model)}
+            </SheetRadio>
+          ))}
+        </div>
+      </SheetGroup>
+      <SheetGroup label={t.scenario}>
+        {parts.scenarios.length > 1 ? (
+          <PowerXSeg<string>
+            value={parts.selectedScenario}
+            ariaLabel={t.scenario}
+            testId="powerx-sheet-scenario"
+            className="flex-wrap"
+            onValueChange={(next) => parts.onScenarioChange(next as Sequence)}
+            options={parts.scenarios.map((scenario) => ({
+              value: scenario,
+              label: getSequenceLabel(scenario as Sequence, locale),
+            }))}
+          />
+        ) : (
+          <p className="py-1 text-sm">{scenarioLabel}</p>
+        )}
+      </SheetGroup>
+      {parts.precision && (
+        <SheetGroup label={t.precision}>
+          <p className="py-1 text-sm" data-testid="powerx-precision">
+            {parts.precision}
+          </p>
+        </SheetGroup>
+      )}
+      <SheetGroup label={t.role}>
+        <div
+          role="radiogroup"
+          aria-label={t.role}
+          className="flex flex-col"
+          data-testid="powerx-role-toggle"
+        >
+          {POWERX_ROLES.map((value) => (
+            <SheetRadio
+              key={value}
+              checked={value === role}
+              icon={<RoleGlyph role={value} />}
+              hint={
+                value !== 'all' && !hasRoleData
+                  ? `${t.roleHints[value]} · ${t.roleNoData}`
+                  : t.roleHints[value]
+              }
+              testId={`powerx-role-${value}`}
+              onSelect={() => {
+                track('powerx_role_changed', {
+                  ...analyticsContext,
+                  role: value,
+                  previous_role: role,
+                  source: 'sheet',
+                });
+                onRoleChange(value);
+              }}
+            >
+              {t.roles[value]}
+            </SheetRadio>
+          ))}
+        </div>
+      </SheetGroup>
+      <SheetGroup label={t.compareAt}>
+        <PowerXCompareAtPicker range={compareAtRange} source="sheet" />
+      </SheetGroup>
+      <SheetGroup label={t.run}>
+        <RunPanel runContext={runContext} parts={parts} />
+      </SheetGroup>
+      {sheetActions && (
+        <div className="flex items-center justify-between gap-2 pt-3">{sheetActions}</div>
+      )}
     </div>
   );
 }
@@ -509,13 +729,14 @@ export function PowerXContextStrip({
         <button
           type="button"
           aria-haspopup="dialog"
+          aria-expanded={sheetOpen}
           aria-label={t.openSettings}
           data-testid="powerx-context-summary"
           onClick={() => {
             setSheetOpen(true);
             track('powerx_settings_sheet_opened', { role });
           }}
-          className="flex h-11 w-full cursor-pointer items-center gap-1.5 text-left text-sm"
+          className="flex h-12 w-full cursor-pointer items-center gap-1.5 text-left text-sm"
         >
           <span className="min-w-0 flex-1 truncate">
             <span className="font-semibold">{modelLabel}</span>
@@ -524,7 +745,9 @@ export function PowerXContextStrip({
             {parts.precision && ` · ${parts.precision}`}
             {' · '}
             {t.rolesShort[role]}
-            {' · '}
+          </span>
+          <span aria-hidden className="shrink-0 text-muted-foreground">
+            ·
           </span>
           <CompareAtMark />
           <span className="shrink-0 tabular-nums">
@@ -532,37 +755,22 @@ export function PowerXContextStrip({
           </span>
           <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         </button>
-        <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
-          <DialogContent className={POWERX_SHEET_CLASS} data-testid="powerx-settings-sheet">
-            <DialogTitle className="text-base">{t.settings}</DialogTitle>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1">
-                  {parts.model}
-                  {parts.modelBadge}
-                </div>
-                <div className="flex items-center gap-2">
-                  {parts.scenario}
-                  {parts.precision && <span className="px-2 text-sm">{parts.precision}</span>}
-                </div>
-              </div>
-              <section className="flex flex-col gap-2">
-                <h3 className="text-xs font-semibold text-muted-foreground">{t.role}</h3>
-                <PowerXRoleSeg role={role} onRoleChange={onRoleChange} />
-              </section>
-              <section className="flex flex-col gap-2">
-                <h3 className="text-xs font-semibold text-muted-foreground">{t.compareAt}</h3>
-                <PowerXCompareAtPicker range={compareAtRange} source="sheet" />
-              </section>
-              <RunPanel runContext={runContext} parts={parts} />
-              {sheetActions && (
-                <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-                  {sheetActions}
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <PowerXSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          title={t.settings}
+          testId="powerx-settings-sheet"
+        >
+          <PowerXSettingsSheetBody
+            parts={parts}
+            role={role}
+            onRoleChange={onRoleChange}
+            runContext={runContext}
+            sheetActions={sheetActions}
+            scenarioLabel={scenarioLabel}
+            compareAtRange={compareAtRange}
+          />
+        </PowerXSheet>
       </div>
     );
   }
@@ -711,12 +919,14 @@ export function PowerXMore({ tab, changed, onReset, children }: PowerXMoreProps)
     return (
       <>
         {trigger}
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className={POWERX_SHEET_CLASS} data-testid="powerx-more-sheet">
-            <DialogTitle className="text-base">{t.moreTitle(t.tabs[tab])}</DialogTitle>
-            {body}
-          </DialogContent>
-        </Dialog>
+        <PowerXSheet
+          open={open}
+          onOpenChange={onOpenChange}
+          title={t.moreTitle(t.tabs[tab])}
+          testId="powerx-more-sheet"
+        >
+          {body}
+        </PowerXSheet>
       </>
     );
   }
