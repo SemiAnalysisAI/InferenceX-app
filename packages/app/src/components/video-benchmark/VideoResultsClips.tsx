@@ -256,8 +256,8 @@ const MORE = 40;
 const GAP = 8;
 /** The most tiles the collapsed strip shows, so the prompt beside it stays the row's subject. */
 const MAX_TILES = 3;
-/** The longest the stage holds the last pair for the next pair's first frames, in ms. */
-const FRAME_WAIT_MS = 800;
+/** How long the pointer rests on a prompt tile before its preview is requested, in ms. */
+const PREVIEW_REST_MS = 250;
 /** What the stage shows: `r_clip`, the pairing choice and `r_prompt`. */
 interface Selection {
   clip: string | null;
@@ -417,20 +417,28 @@ export default function VideoResultsClips({
     return [own, pairs].filter((url): url is string => Boolean(url));
   };
   const nextFrames = nextReady ? framesOf(next, stage.prompt) : [];
-  const nextFramesKey = nextFrames.join('\n');
-  /** First frames that loaded, failed or ran out of time; the stage waits for no others. */
+  /** First frames that loaded or failed; the stage waits for no others. */
   const [settledFrames, setSettledFrames] = useState<ReadonlySet<string>>(new Set());
   /** First frames that loaded, which the stage's idle frame never covers. */
   const [loadedFrames, setLoadedFrames] = useState<ReadonlySet<string>>(new Set());
-  const requestedFrames = useRef(new Set<string>());
-  const frameTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => () => frameTimers.current.forEach(clearTimeout), []);
+  /** Kept, so the stage paints a read frame from memory, both sides in one paint. */
+  const requestedFrames = useRef(new Map<string, HTMLImageElement>());
+  const configs = compareConfigs(opening, drawn, unofficialRun);
+  // A switch waits for the next pair's first frames, so every pair one pick away is read ahead:
+  // the shown pair for each prompt, and each Compare pick for the shown prompt.
   useEffect(() => {
-    for (const url of nextFramesKey.split('\n')) {
-      if (!url || requestedFrames.current.has(url)) continue;
-      requestedFrames.current.add(url);
+    if (!nextReady) return;
+    const ahead = [
+      ...nextFrames,
+      ...(next.subject?.groups ?? []).flatMap((item) => framesOf(next, promptKey(item))),
+      ...next.options.flatMap((item) => framesOf(pairFor(stage.clip, item.value), stage.prompt)),
+      ...configs.flatMap((p) => framesOf(pairFor(stagePointKey(p), null), stage.prompt)),
+    ];
+    for (const url of ahead) {
+      if (requestedFrames.current.has(url)) continue;
       const settle = () => setSettledFrames((previous) => new Set([...previous, url]));
       const image = new Image();
+      requestedFrames.current.set(url, image);
       image.addEventListener(
         'load',
         () => {
@@ -441,24 +449,19 @@ export default function VideoResultsClips({
       );
       image.addEventListener('error', settle, { once: true });
       image.src = url;
-      // A slow frame shows black for a moment rather than hold the last pair.
-      frameTimers.current.push(setTimeout(settle, FRAME_WAIT_MS));
     }
-  }, [nextFramesKey]);
-  // The stage and readout keep the last pair whose reads landed until the next pair's land, as
-  // the inference chart keeps its data while it refetches, dimmed by `motion-stale`. They also
-  // keep it, undimmed, until the next pair's first frames load. A switch so never blanks the
-  // stage or collapses the prompt row above it.
+  }, [next, nextReady, stage.prompt]);
+  // The stage and readout keep the last pair, dimmed by `motion-stale` as the inference chart is
+  // while it refetches, until the next pair's reads land and its first frames load. A switch so
+  // never blanks the stage, collapses the prompt row above it, or shows one side ahead of the other.
   const shownNext = nextReady && nextFrames.every((url) => settledFrames.has(url));
   const [held, setHeld] = useState<Selection | null>(null);
+  const switching =
+    held !== null &&
+    (held.clip !== stage.clip || held.against !== against || held.prompt !== stage.prompt);
   // The first ready pair is on screen as soon as it is read, so it is held at once; only a switch
   // away from a held pair waits for frames.
-  if (
-    (nextReady && !held) ||
-    (shownNext &&
-      held &&
-      (held.clip !== stage.clip || held.against !== against || held.prompt !== stage.prompt))
-  )
+  if ((nextReady && !held) || (shownNext && switching))
     setHeld({ clip: stage.clip, against, prompt: stage.prompt });
   const heldPair = useMemo(
     () => (!shownNext && held ? pairFor(held.clip, held.against) : null),
@@ -476,12 +479,7 @@ export default function VideoResultsClips({
     ],
   );
   const holding = heldPair !== null && ready(heldPair);
-  // A hold that waited on a read stays dimmed through its first frames, so the last pair never
-  // brightens just before the next replaces it.
-  const [reading, setReading] = useState(false);
-  if (holding && !nextReady && !reading) setReading(true);
-  if (!holding && reading) setReading(false);
-  const stale = holding && (reading || !nextReady);
+  const stale = holding && (switching || !nextReady);
   const { subject, option, other } = holding ? heldPair : next;
   const shownPrompt = holding && held ? held.prompt : stage.prompt;
   const wantedPoints = [
@@ -665,7 +663,6 @@ export default function VideoResultsClips({
             empty: s.noTwin,
           };
   // The Compare row and its pairing follow the reader's pick at once, not the held pair.
-  const configs = compareConfigs(opening, drawn, unofficialRun);
   const nextHardware = next.subject?.point.hardwareKey ?? '';
   const active = next.subject && configId(next.subject.point, unofficialRun);
   const configLabel = (p: VideoPoint) =>
@@ -1384,13 +1381,21 @@ function PromptTile({
   useLayoutEffect(() => {
     if (image.current?.complete && image.current.naturalWidth > 0) setLoadedPoster(poster);
   }, [poster]);
-  const start = () => {
-    if (preview && !matchMedia('(prefers-reduced-motion: reduce)').matches) setPreviewing(true);
-  };
+  // The preview is a whole clip, so it waits for the pointer to rest: a move that ends in a click
+  // would fetch it beside the clips that click has the stage load, the same clip among them.
+  const rest = useRef<ReturnType<typeof setTimeout>>(undefined);
   const stop = () => {
+    clearTimeout(rest.current);
     setPreviewing(false);
     setMoving(false);
   };
+  const start = () => {
+    if (!preview || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // Hover and focus can both start it; one rest runs at a time.
+    clearTimeout(rest.current);
+    rest.current = setTimeout(() => setPreviewing(true), PREVIEW_REST_MS);
+  };
+  useEffect(() => () => clearTimeout(rest.current), []);
   return (
     <button
       type="button"
@@ -1401,7 +1406,10 @@ function PromptTile({
         'group/tile flex w-23 shrink-0 flex-col gap-1 text-left outline-none',
         strip && 'snap-start',
       )}
-      onClick={onPick}
+      onClick={() => {
+        stop();
+        onPick();
+      }}
       // A touch would start a download only to pick the prompt.
       onPointerEnter={(event) => event.pointerType === 'mouse' && start()}
       onPointerLeave={stop}
