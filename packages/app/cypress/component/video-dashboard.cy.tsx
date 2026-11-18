@@ -125,6 +125,19 @@ const plottedY = (hardware: string) =>
 
 const B200_RUN = '34341996789';
 const FRAME = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
+/** Leaves the B200 run unapproved on a workload no approved source publishes. */
+const namedOnlyWorkload = (page: VideoHistoryPage) => {
+  const entry = page.entries.find((item) => item.runId === B200_RUN)!;
+  entry.approved = false;
+  for (const source of entry.sources)
+    for (const observation of source.observations) {
+      const workload = JSON.parse(observation.workloadKey!);
+      workload.plan.cases[0].seed += 1;
+      observation.workloadKey = JSON.stringify(workload);
+      if (observation.concurrency === 1) cy.wrap(observation.id).as('namedWorkload');
+    }
+};
+
 /**
  * Adds 1-, 2- and 8-GPU points to the B200 run, drawn and playable but neither its lead nor where
  * the stage opens: 1 and 2 GPUs are slower but more efficient, 8 GPUs is the fastest, costliest
@@ -386,29 +399,32 @@ describe('VideoGenX results', () => {
       .and('contain', overlayRunColor(0));
   });
 
+  it('opens a link that names only a run on the workload that run measured', () => {
+    mount({
+      search: '?unofficialRun=34341996789&r_y=videosPerGpuHour',
+      editPage: namedOnlyWorkload,
+    });
+    hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
+    hardwarePoints('h200').should('not.exist');
+    // A workload only the run publishes has no model slug, so the link carries a point ID.
+    searchParam('r_workload').should('match', /:c1$/u);
+    cy.get('[data-testid="results-overlay-dismiss"]').click();
+    hardwarePoints('h200').should('have.attr', 'data-overlay', 'false');
+    cy.location('search').should('not.contain', 'r_workload=');
+  });
+
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
     mount({
-      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
-      editPage: (page) => {
-        const entry = page.entries.find((item) => item.runId === '34341996789')!;
-        entry.approved = false;
-        for (const source of entry.sources)
-          for (const observation of source.observations) {
-            const workload = JSON.parse(observation.workloadKey!);
-            workload.plan.cases[0].seed += 1;
-            observation.workloadKey = JSON.stringify(workload);
-            if (observation.concurrency === 1) cy.wrap(observation.id).as('namedWorkload');
-          }
-      },
+      // The link's own workload wins over the one the named run measured.
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour&r_workload=minimax-h3',
+      editPage: namedOnlyWorkload,
     });
     hardwarePoints('h200').should('exist');
     cy.get<string>('@namedWorkload').then((sourceId) => {
       cy.window().then((win) => {
-        win.history.pushState(
-          null,
-          '',
-          `${win.location.pathname}${win.location.search}&r_workload=${sourceId}`,
-        );
+        const params = new URLSearchParams(win.location.search);
+        params.set('r_workload', sourceId);
+        win.history.pushState(null, '', `${win.location.pathname}?${params}`);
         win.dispatchEvent(new PopStateEvent('popstate'));
       });
     });
