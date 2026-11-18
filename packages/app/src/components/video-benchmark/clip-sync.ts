@@ -47,6 +47,7 @@ export interface ClipGroup {
    * Whether drift is closed with playbackRate. WebKit freezes a playing clip for about half a
    * second when its rate changes, which costs more than the drift, so there the clips keep one
    * speed and those ahead wait only for a clip that lacks data or is too far behind to catch up.
+   * A pause and a start cost it a wait as well, so there a loop rewinds the clips as they play.
    */
   nudge: boolean;
 }
@@ -87,6 +88,11 @@ export const CATCH_UP_SECONDS = 1;
 export const REST_SECONDS = 2;
 export const NUDGE_RATE = 0.1;
 const END_EPSILON = 0.02;
+/**
+ * How close to the shared end a loop rewinds clips that keep playing: two frames of a 60 Hz
+ * screen, so one late frame does not let a clip end first.
+ */
+const REWIND_EPSILON = 0.04;
 
 export const clipGroupActive = (phase: ClipPhase) =>
   phase === 'loading' || phase === 'buffering' || phase === 'playing';
@@ -238,6 +244,21 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
       if (phase === 'loading' || phase === 'buffering')
         return result(resume(group, leader, actions, phase));
       if (phase !== 'playing') return result(phase);
+      if (!group.nudge) {
+        // A rewind in flight: a seeking clip reports its target, so nothing is judged until all land.
+        if (clips.some((clip) => clip.seeking)) return result('playing');
+        // The first clip to reach the shared end sends every clip to 0, and each goes on from there
+        // when its seek lands. A clip that ended or stopped needs the restart below.
+        if (
+          group.loop &&
+          duration > 0 &&
+          clips.every((clip) => !clip.ended && !clip.paused) &&
+          Math.max(...clips.map((clip) => clip.currentTime)) >= duration - REWIND_EPSILON
+        ) {
+          for (const clip of clips) actions.push({ type: 'seek', key: clip.key, time: 0 });
+          return result('playing', 0);
+        }
+      }
       if (
         clips.some((clip) => clip.ended) ||
         (duration > 0 && leader.currentTime >= duration - END_EPSILON)

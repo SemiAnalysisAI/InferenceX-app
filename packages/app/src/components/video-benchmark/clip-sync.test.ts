@@ -38,7 +38,8 @@ const ofType = (step: ClipGroupStep, type: ClipAction['type']) =>
 /** One frame of a wait mid-play. */
 const wait = (clips: ClipSnapshot[]) => stepClipGroup(group(clips, { phase: 'buffering' }), 'tick');
 /** One frame of play where a rate change stalls a clip, so none is nudged. */
-const unnudged = (clips: ClipSnapshot[]) => stepClipGroup(group(clips, { nudge: false }), 'tick');
+const unnudged = (clips: ClipSnapshot[], changes: Partial<ClipGroup> = {}) =>
+  stepClipGroup(group(clips, { nudge: false, ...changes }), 'tick');
 
 describe('stepClipGroup', () => {
   it('waits for a clip that falls a quarter second behind, at once when it lacks data', () => {
@@ -157,6 +158,39 @@ describe('stepClipGroup', () => {
     });
     const far = unnudged([clip('b200', { currentTime: 1 + CATCH_UP_SECONDS + 0.1 }), clip('h100')]);
     expect(far).toMatchObject({ phase: 'buffering', actions: [{ type: 'pause', key: 'b200' }] });
+  });
+
+  it('where a pause and a start cost a wait, loops by rewinding the clips as they play', () => {
+    const looping = (clips: ClipSnapshot[]) => unnudged(clips, { loop: true });
+    // The clip ahead reaches the end first, whichever leads.
+    const rewound = looping([
+      clip('b200', { currentTime: 4.9 }),
+      clip('h100', { currentTime: 4.97 }),
+    ]);
+    expect(rewound).toMatchObject({
+      phase: 'playing',
+      actions: [
+        { type: 'seek', key: 'b200', time: 0 },
+        { type: 'seek', key: 'h100', time: 0 },
+      ],
+      time: 0,
+    });
+    const landing = looping([
+      clip('b200', { currentTime: 0, seeking: true, readyState: 1 }),
+      clip('h100', { currentTime: 0.4 }),
+    ]);
+    expect(landing).toMatchObject({ phase: 'playing', actions: [] });
+    // A clip that ended has stopped, so the group restarts from rest.
+    const ended = looping([
+      clip('b200', { currentTime: 4.9 }),
+      clip('h100', { currentTime: 5, ended: true, paused: true }),
+    ]);
+    expect(ended).toMatchObject({ phase: 'loading', actions: [{ type: 'pause-all' }, {}, {}] });
+    const once = unnudged([
+      clip('b200', { currentTime: 4.99 }),
+      clip('h100', { currentTime: 4.98 }),
+    ]);
+    expect(once).toMatchObject({ phase: 'ended', actions: [{ type: 'pause-all' }] });
   });
 
   it('ends at the shared duration and restarts every clip from zero through buffering', () => {
