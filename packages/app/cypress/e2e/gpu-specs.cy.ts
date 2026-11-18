@@ -31,7 +31,7 @@ describe('GPU Specs Tab', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h2').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip specifications').should('exist');
   });
 
   it('specs table is visible with all GPUs', () => {
@@ -100,7 +100,7 @@ describe('GPU Specs Bar Chart View', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h2').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -147,7 +147,7 @@ describe('GPU Specs Radar Chart View', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h2').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -203,7 +203,7 @@ describe('GPU Specs Navigation', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
     cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
     cy.url().should('include', '/infx/gpu-specs');
-    cy.get('h2').should('contain.text', 'Chip specifications');
+    cy.get('h1').should('contain.text', 'Chip specifications');
     cy.get('[data-testid="chart-section-tabs"] [data-tab-active="true"]')
       .should('have.length', 1)
       .and('have.attr', 'data-testid', 'tab-trigger-gpu-specs')
@@ -218,7 +218,7 @@ describe('Topology Dialog Navigation', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/infx/gpu-specs');
-    cy.get('h2').contains('Chip specifications').should('exist');
+    cy.get('h1').contains('Chip specifications').should('exist');
   });
 
   it('scale-out topology dialog next button navigates to next GPU', () => {
