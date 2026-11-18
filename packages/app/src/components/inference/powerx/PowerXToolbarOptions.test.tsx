@@ -165,6 +165,6 @@ describe('powerXPinFor', () => {
   it('speaks Chinese on /zh', () => {
     const pin = powerXPinFor(facilityTotal, 'decode', 'zh')!;
     expect(pin.by).toBe('解码 GPU');
-    expect(pin.what).toBe('统计口径 GPU，能耗计量 输出');
+    expect(pin.what).toBe('功耗边界 GPU，能耗计量 输出');
   });
 });

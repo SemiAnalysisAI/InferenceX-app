@@ -33,6 +33,7 @@ import {
   type PowerXPinnedControl,
   type PowerXRole,
 } from './powerx-role';
+import { POWERX_VOCAB } from './powerx-strings';
 import {
   energyPerFor,
   energyPerHasBoundaries,
@@ -56,11 +57,8 @@ type Statistic = 'average' | 'p75' | 'p90';
 
 const STRINGS = {
   en: {
-    boundary: 'Boundary',
-    boundaries: { gpu: 'GPU', it: 'IT', system: 'Facility', both: 'All' } satisfies Record<
-      PowerXCount,
-      string
-    >,
+    boundary: POWERX_VOCAB.en.boundary,
+    boundaries: POWERX_VOCAB.en.boundaries,
     boundaryHints: {
       gpu: 'Measured GPU board power',
       it: 'GPU measured; CPU, server parts, fans/PSU and network share modeled. No PUE.',
@@ -68,15 +66,10 @@ const STRINGS = {
       both: 'GPU (solid), IT (dashed) and Facility (dash-dot) per GPU on one chart',
     } satisfies Record<PowerXCount, string>,
     systemTokensOnly: 'IT and Facility are available for All tokens and Output only',
-    energyPer: 'Energy per',
-    pers: {
-      total: 'All tokens',
-      output: 'Output',
-      input: 'Input',
-      query: 'Query',
-    } satisfies Record<EnergyPer, string>,
+    energyPer: POWERX_VOCAB.en.energyPer,
+    pers: POWERX_VOCAB.en.pers,
     showAs: 'Show as',
-    showAsOptions: { watts: 'W per GPU', tdp: '% of TDP' } satisfies Record<PowerXShowAs, string>,
+    showAsOptions: { watts: POWERX_VOCAB.en.wPerGpu, tdp: '% of TDP' } satisfies Record<PowerXShowAs, string>,
     showAsShort: { watts: 'W/GPU', tdp: '% TDP' } satisfies Record<PowerXShowAs, string>,
     tdpGpuOnly: 'TDP bounds GPU power only',
     statistic: 'Statistic',
@@ -86,7 +79,7 @@ const STRINGS = {
     logScale: 'Log scale',
     parallelismLabels: 'Parallelism labels',
     gradientLabels: 'Gradient labels',
-    provisioned: 'Provisioned bound',
+    provisioned: POWERX_VOCAB.en.provisioned,
     provisionedHelp: 'Adds a dashed all-in provisioned bound per GPU beside the measured GPU line.',
     provisionedPinned: 'Off under a GPU role: the all-in provisioned bound is per deployment.',
     roleBy: {
@@ -107,18 +100,15 @@ const STRINGS = {
         '% of TDP per pool is the pool’s average draw over its rated TDP. Headroom shading is off: it needs a P90 per GPU pool, which runs do not publish yet.',
     } satisfies Record<PowerXPinnedControl | 'perPrefill', string>,
     pinnedWhat: {
-      count: 'Boundary GPU',
-      per: 'Energy per Output',
-      perPrefill: 'Energy per Output or Input',
+      count: `${POWERX_VOCAB.en.boundary} ${POWERX_VOCAB.en.boundaries.gpu}`,
+      per: `${POWERX_VOCAB.en.energyPer} ${POWERX_VOCAB.en.pers.output}`,
+      perPrefill: `${POWERX_VOCAB.en.energyPer} ${POWERX_VOCAB.en.pers.output} or ${POWERX_VOCAB.en.pers.input}`,
       statistic: 'Statistic Avg',
     },
   },
   zh: {
-    boundary: '统计口径',
-    boundaries: { gpu: 'GPU', it: 'IT', system: '数据中心', both: '全部' } satisfies Record<
-      PowerXCount,
-      string
-    >,
+    boundary: POWERX_VOCAB.zh.boundary,
+    boundaries: POWERX_VOCAB.zh.boundaries,
     boundaryHints: {
       gpu: '实测 GPU 板卡功耗',
       it: 'GPU 为实测；CPU、服务器部件、风扇/电源与网络分摊为模型估算。不含 PUE。',
@@ -126,15 +116,10 @@ const STRINGS = {
       both: '在同一图中按 GPU 对比 GPU（实线）、IT（虚线）与数据中心（点划线）',
     } satisfies Record<PowerXCount, string>,
     systemTokensOnly: 'IT 与数据中心能耗仅支持“全部 Token”和“输出”',
-    energyPer: '能耗计量',
-    pers: {
-      total: '全部 Token',
-      output: '输出',
-      input: '输入',
-      query: '每次查询',
-    } satisfies Record<EnergyPer, string>,
+    energyPer: POWERX_VOCAB.zh.energyPer,
+    pers: POWERX_VOCAB.zh.pers,
     showAs: '显示为',
-    showAsOptions: { watts: '每 GPU 瓦数', tdp: 'TDP 占比' } satisfies Record<PowerXShowAs, string>,
+    showAsOptions: { watts: POWERX_VOCAB.zh.wPerGpu, tdp: 'TDP 占比' } satisfies Record<PowerXShowAs, string>,
     showAsShort: { watts: 'W/GPU', tdp: 'TDP %' } satisfies Record<PowerXShowAs, string>,
     tdpGpuOnly: 'TDP 仅限定 GPU 功耗',
     statistic: '统计量',
@@ -144,7 +129,7 @@ const STRINGS = {
     logScale: '对数刻度',
     parallelismLabels: '并行策略标签',
     gradientLabels: '渐变标签',
-    provisioned: '预配上限',
+    provisioned: POWERX_VOCAB.zh.provisioned,
     provisionedHelp: '在实测 GPU 曲线旁为每块 GPU 增加一条虚线表示的整体预配上限。',
     provisionedPinned: '选择 GPU 角色时关闭：整体预配上限按整个部署计算。',
     roleBy: {
@@ -153,7 +138,7 @@ const STRINGS = {
       split: '预填充 vs 解码',
     } satisfies Record<Exclude<PowerXRole, 'all'>, string>,
     reasons: {
-      count: '统计口径为 GPU：IT 与数据中心功耗按整个部署建模，无法按 GPU 池拆分。',
+      count: '功耗边界为 GPU：IT 与数据中心功耗按整个部署建模，无法按 GPU 池拆分。',
       per: '能耗计量为输出：这是预填充与解码共用的唯一分母。',
       perPrefill: '预填充 GPU：输出按重构值计算，可与解码相加；输入仅统计本角色。',
       rated: '预配上限已关闭：整体预配上限按整个部署计算。',
@@ -162,9 +147,9 @@ const STRINGS = {
         '按池计算的 TDP 占比为该池平均功耗相对额定 TDP 的比例。不显示余量阴影：它需要按 GPU 池统计的 P90，目前运行结果尚未提供。',
     } satisfies Record<PowerXPinnedControl | 'perPrefill', string>,
     pinnedWhat: {
-      count: '统计口径 GPU',
-      per: '能耗计量 输出',
-      perPrefill: '能耗计量 输出或输入',
+      count: `${POWERX_VOCAB.zh.boundary} ${POWERX_VOCAB.zh.boundaries.gpu}`,
+      per: `${POWERX_VOCAB.zh.energyPer} ${POWERX_VOCAB.zh.pers.output}`,
+      perPrefill: `${POWERX_VOCAB.zh.energyPer} ${POWERX_VOCAB.zh.pers.output}或${POWERX_VOCAB.zh.pers.input}`,
       statistic: '统计量 平均',
     },
   },

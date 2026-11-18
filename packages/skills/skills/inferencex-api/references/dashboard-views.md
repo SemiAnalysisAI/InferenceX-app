@@ -928,8 +928,8 @@ and CSV call them GPU only, IT (no PUE) and Facility; the page has no further co
 Every power number on the tab carries a GPU, IT or Facility tag, explained in the tag's own
 tooltip, and a readout row under the caption gives the hovered or pinned point's IT W per
 GPU, GPUs per MW (1e6 ÷ IT W per GPU) and facility W per GPU at the model's PUE. The four
-views are tabs above the plot; Count, Per and Show as, then Power statistic and
-Rated boundaries (Off | All-in provisioned, `i_pcompare=provisioned`: GPU Level Measured
+views are tabs above the plot; Boundary, Energy per and Show as, then Power statistic and
+Provisioned bound (Off | All-in provisioned, `i_pcompare=provisioned`: GPU Level Measured
 solid and All in Provisioned dashed per chip, nothing else) are plain Chart
 Config controls, each shown only on the views where it applies. One GPU role control
 (All GPUs · Prefill · Decode · Prefill vs decode, `i_role=all|prefill|decode|split`, API

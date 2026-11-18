@@ -100,17 +100,17 @@ link still opens that view for locked visitors.
   draw, Breakdown, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
   Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
-  Metric beside `PowerXChartConfig`: Count, Per or Show as, then Scope and Power statistic
+  Metric beside `PowerXChartConfig`: Boundary, Energy per or Show as, then Scope and Power statistic
   on the views they apply to (the Energy view opens on Per: All tokens, J per input + output
   token, because aggregated serving shares GPUs between prefill and decode and cannot split
   their energy by phase; only All tokens and Output carry the IT, Facility and rated
-  boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Rated boundaries toggle where rated lines exist, all as
+  boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Provisioned bound toggle where rated lines exist, all as
   plain labelled controls with no expander) in place of the Y-axis metric pick, the
   **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
   Compare history fieldsets fold into "More chart controls" exactly as on `/infx/inference`. Under `md`
-  the view tabs become a 2×2 grid of 48 px buttons, Count and Per (or Show as) render as native
+  the view tabs become a 2×2 grid of 48 px buttons, Boundary and Energy per (or Show as) render as native
   selects (`SegmentedToggle` `variant="select"`, each option carrying the segment's hover hint),
-  and the X-Axis Metric, Scope, Power statistic and Rated boundaries sit behind one "More" row
+  and the X-Axis Metric, Scope, Power statistic and Provisioned bound sit behind one "More" row
   (`powerx-more`, "More · N changed" via `powerXSecondaryChangedCount`); dashboard toasts stay
   off there and the pinned point sheet says Tap. From `md` up nothing changes.
 - The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
@@ -181,11 +181,11 @@ link still opens that view for locked visitors.
   through `i_metric` like the other bases (no new URL parameter; old links are unchanged).
   `POWER_COUNT_LABELS` names the three measured boundaries GPU only / IT (no PUE) / Facility
   on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
-  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per token or per output token)
+  "All in Measured IT (no PUE)". Boundary: All on Power draw (and on Energy per token or per output token)
   sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
   (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
   legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
-  The **Rated boundaries** toggle in Chart Config (Off | All-in provisioned) sets
+  The **Provisioned bound** toggle in Chart Config (Off | All-in provisioned) sets
   `i_pcompare=provisioned` on the GPU-only metric, which draws exactly two lines per chip
   (`PROVISIONED_COMPARE_BASES`: GPU Level Measured solid, All in Provisioned dashed; no IT,
   Facility or GPU-level TDP line, to keep the chart readable); turning it off returns to the
@@ -270,7 +270,7 @@ resolves their run/audit provenance automatically.
 
 `i_pcompare=boundaries|provisioned|all` (default `''`, "Off"; legacy `roles` is rewritten to `i_role=split`, below) overlays sibling series on the selected
 metric without changing it. `boundaries` draws GPU Level Measured, All in Measured IT (no PUE)
-and All in Measured; `provisioned` (the PowerX Rated boundaries toggle) draws GPU Level
+and All in Measured; `provisioned` (the PowerX Provisioned bound toggle) draws GPU Level
 Measured and All in Provisioned only; `all` (share links only) adds both provisioned bounds
 to the measured three. `i_pcompare=breakdown` is the PowerX
 Breakdown view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and

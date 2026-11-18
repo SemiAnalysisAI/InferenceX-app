@@ -23,17 +23,17 @@ import { PowerBasisPill } from './PowerBasisPill';
 const STRINGS = {
   en: {
     title: 'Headroom by interactivity',
-    chip: 'Chip',
+    chip: 'GPU',
     perUser: (x: number) => `${x} tok/s/user`,
     avg: 'Avg W',
     p90: 'P90 W',
     pct: '% TDP (P90)',
     headroom: 'Headroom',
     download: 'Download CSV',
-    note: 'Interpolated along each chip’s optimal points (monotone, in log interactivity). "—" means outside the measured range; nothing is extrapolated. Headroom = 1 − P90 / TDP.',
-    key: 'Shaded band on the chart: headroom from each chip’s P90 draw (dotted) up to its TDP.',
+    note: 'Interpolated along each GPU’s optimal points (monotone, in log interactivity). "—" means outside the measured range; nothing is extrapolated. Headroom = 1 − P90 / TDP.',
+    key: 'Shaded band on the chart: headroom from each GPU’s P90 draw (dotted) up to its TDP.',
     empty:
-      'No chip in this view has measured average and P90 power at two or more interactivities.',
+      'No GPU in this view has measured average and P90 power at two or more interactivities.',
     example: (
       chip: string,
       hi: string,
@@ -48,16 +48,16 @@ const STRINGS = {
   },
   zh: {
     title: '按交互性划分的功耗余量',
-    chip: '芯片',
+    chip: 'GPU',
     perUser: (x: number) => `${x} tok/s/user`,
     avg: '平均 W',
     p90: 'P90 W',
     pct: 'TDP 占比（P90）',
     headroom: '余量',
     download: '下载 CSV',
-    note: '沿各芯片的最优点插值（单调样条，按对数交互性）。“—”表示超出实测范围，不做外推。余量 = 1 − P90 / TDP。',
-    key: '图中阴影：各芯片从 P90 功耗（虚线）到其 TDP 之间的余量。',
-    empty: '当前视图中没有芯片在两个及以上交互性下同时具备实测平均功耗与 P90 功耗。',
+    note: '沿各 GPU 的最优点插值（单调样条，按对数交互性）。“—”表示超出实测范围，不做外推。余量 = 1 − P90 / TDP。',
+    key: '图中阴影：各 GPU 从 P90 功耗（虚线）到其 TDP 之间的余量。',
+    empty: '当前视图中没有 GPU 在两个及以上交互性下同时具备实测平均功耗与 P90 功耗。',
     example: (
       name: string,
       hi: string,
@@ -68,7 +68,7 @@ const STRINGS = {
       loHead: string,
     ) =>
       `示例：${name} 从 ${hi} 降到 ${lo} tok/s/user 时，P90 功耗占 TDP 的比例从 ${hiPct}% 升至 ${loPct}%，余量从 ${hiHead}% 缩小到 ${loHead}%。`,
-    clipped: (hi: string) => ` ${hi} 是该芯片最快的实测点；300 不做外推。`,
+    clipped: (hi: string) => ` ${hi} 是该 GPU 最快的实测点；300 不做外推。`,
   },
 } as const;
 
