@@ -34,11 +34,12 @@ import {
   stageOptions,
   stagePointKey,
   stagePrompt,
+  setStage,
   stageSubject,
-  writeStage,
   type StageOption,
   type StagePair,
 } from './clip-stage';
+import { videoSearch } from './page-search';
 import { useStageValue } from './use-stage-value';
 import { engineLabel } from './engines';
 import { hardwareLabel } from './hardware';
@@ -216,7 +217,7 @@ export interface VideoResultsClipsProps {
    * one the subject lacks pairs it by default too. Page state, so the chart can reset it with a new subject.
    */
   against: string | null;
-  /** Null for the subject's default pairing, which stays out of the URL. */
+  /** Null for the subject's default pairing, which stays out of a link. */
   onAgainstChange: (value: string | null) => void;
   /** Plays the chart point with this key, as a chart click does. */
   onSubjectChange: (clipKey: string) => void;
@@ -382,7 +383,7 @@ export default function VideoResultsClips({
     ],
   );
   const nextReady = ready(next);
-  // A phone's opening pair is not the link's default, so the URL names it once its clips are
+  // A phone's opening pair is not the link's default, so the link names it once its clips are
   // read, and a shared link reopens the same two clips on any screen.
   const openedPair =
     against === null &&
@@ -393,10 +394,9 @@ export default function VideoResultsClips({
       : null;
   useEffect(() => {
     if (!openedPair) return;
-    // Hydration renders with the server's guess, so the URL and the screen are read here.
-    const live = parseStage(location.search);
-    if (live.vs === null && matchMedia(MOBILE_VIEWPORT_QUERY).matches)
-      writeStage({ ...live, vs: openedPair });
+    // Hydration renders with the server's guess, so the settings and the screen are read here.
+    if (parseStage(videoSearch()).vs === null && matchMedia(MOBILE_VIEWPORT_QUERY).matches)
+      setStage({ vs: openedPair });
   }, [openedPair]);
   /** The first frames a pair shows for a prompt. */
   const framesOf = (
@@ -730,7 +730,7 @@ export default function VideoResultsClips({
             s={s}
             onPick={(item, index, poster) => {
               track('video_results_prompt_selected', { index, case: caseOf(item), poster });
-              writeStage({ ...parseStage(location.search), prompt: promptKey(item) });
+              setStage({ prompt: promptKey(item) });
             }}
           >
             <div className="flex shrink-0 items-center gap-1.5 max-[343px]:gap-1">
@@ -749,7 +749,7 @@ export default function VideoResultsClips({
                 }))}
                 onValueChange={(view) => {
                   track('video_results_clips_view', { view });
-                  writeStage({ ...parseStage(location.search), view });
+                  setStage({ view });
                 }}
               />
               <InfoHelp
@@ -813,7 +813,7 @@ export default function VideoResultsClips({
                       against: choice?.kind,
                       gpu: choice?.point?.hardwareKey ?? null,
                     });
-                    // Only the default every screen shares stays out of the URL.
+                    // Only the default every screen shares stays out of a link.
                     onAgainstChange(
                       value === next.fallback && next.opened === next.fallback ? null : value,
                     );
@@ -841,7 +841,7 @@ export default function VideoResultsClips({
                 }
                 loadedFrames={loadedFrames}
                 swapped={stage.swap}
-                onSwappedChange={(swap) => writeStage({ ...parseStage(location.search), swap })}
+                onSwappedChange={(swap) => setStage({ swap })}
                 caption={
                   other &&
                   option?.kind === 'hardware' &&
@@ -870,7 +870,7 @@ export default function VideoResultsClips({
                     poster,
                     source: 'strip',
                   });
-                  writeStage({ ...parseStage(location.search), prompt: promptKey(item) });
+                  setStage({ prompt: promptKey(item) });
                 }}
               />
             )}

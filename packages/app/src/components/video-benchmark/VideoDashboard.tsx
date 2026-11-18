@@ -82,11 +82,11 @@ import {
   defaultPairing,
   isStageParam,
   officialCounterpart,
-  parseStage,
+  setStage,
   stagePointKey,
-  writeStage,
   type StagePair,
 } from './clip-stage';
+import { setVideoSearch, videoSearch } from './page-search';
 import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
@@ -253,7 +253,6 @@ function MetricSelect({
   );
 }
 
-/** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
 /**
  * `ChartSection`'s markup with wrappers a phone dissolves (results.module.css), so the chart and
  * the clip blocks join the page column and each draws its own card. The first child, the chart,
@@ -282,9 +281,21 @@ function LiftedChartSection({
   );
 }
 
+/** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
+
+/** The address bar as the link wrote it, naming the open deployment and without a dismissed run. */
+function addressSearch(state: ResultsState): URLSearchParams {
+  const params = new URLSearchParams(
+    [...new URLSearchParams(location.search)].filter(
+      ([key]) => key !== 'r_point' && (state.unofficialRun || !isUnofficialRunParam(key)),
+    ),
+  );
+  if (state.point) params.set('r_point', state.point);
+  return params;
+}
 
 export default function VideoDashboard({
   initialData,
@@ -302,6 +313,12 @@ export default function VideoDashboard({
   const touch = useIsCoarsePointer();
   const phone = useMediaQuery(MOBILE_VIEWPORT_QUERY, phoneGuess);
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
+  // The link is read in render, so the stage's first read already has it.
+  const [opened] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    setVideoSearch(new URLSearchParams(location.search));
+    return location.search;
+  });
   const latest = useRef(state);
   const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
     state.unofficialRun,
@@ -328,7 +345,7 @@ export default function VideoDashboard({
   const peekAt = useCallback((key: string) => startTransition(() => setPeek(key)), []);
   const pickAgainst = useCallback((value: string | null) => {
     setPicked(true);
-    writeStage({ ...parseStage(location.search), vs: value });
+    setStage({ vs: value });
   }, []);
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
@@ -337,8 +354,7 @@ export default function VideoDashboard({
   const pickClip = useCallback(
     (key: string) => {
       setPicked(true);
-      const stage = parseStage(location.search);
-      writeStage({ ...stage, clip: key, vs: key === stagePair.playing ? stage.vs : null });
+      setStage(key === stagePair.playing ? { clip: key } : { clip: key, vs: null });
     },
     [stagePair.playing],
   );
@@ -361,28 +377,36 @@ export default function VideoDashboard({
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
-  useEffect(() => {
-    const read = () => {
-      const next = parseResultsState(location.search);
-      latest.current = next;
-      setState(next);
-    };
-    read();
-    window.addEventListener('popstate', read);
-    return () => window.removeEventListener('popstate', read);
-  }, []);
   const commit = useCallback((next: ResultsState, mode: 'replace' | 'push') => {
     latest.current = next;
     const params = new URLSearchParams(
-      [...new URLSearchParams(location.search)].filter(
+      [...new URLSearchParams(videoSearch())].filter(
         ([key]) => (!key.startsWith('r_') || isStageParam(key)) && !isUnofficialRunParam(key),
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
-    if (mode === 'push') pushClientSearch(params, { [DETAIL_ENTRY]: true });
-    else replaceClientSearch(params);
+    setVideoSearch(params);
+    const address = addressSearch(next);
+    if (mode === 'push') pushClientSearch(address, { [DETAIL_ENTRY]: true });
+    else if (`${address}` !== `${new URLSearchParams(location.search)}`)
+      replaceClientSearch(address);
     setState(next);
   }, []);
+  useEffect(() => {
+    // A client navigation renders before the address changes, so its link is read here.
+    if (location.search !== opened) setVideoSearch(new URLSearchParams(location.search));
+    const next = parseResultsState(videoSearch());
+    latest.current = next;
+    setState(next);
+    // Back and Forward move between the overview and a detail; the other settings stay as they are.
+    const onPopState = () =>
+      commit(
+        { ...latest.current, point: new URLSearchParams(location.search).get('r_point') || null },
+        'replace',
+      );
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [commit, opened]);
   const update = useCallback(
     (patch: Partial<ResultsState>) => {
       commit({ ...latest.current, ...patch }, 'replace');
@@ -593,11 +617,10 @@ export default function VideoDashboard({
       officialOpenings,
       state.unofficialRun ?? undefined,
     );
-    writeStage({
-      ...parseStage(location.search),
+    setStage({
       clip: stagePointKey(point),
       view: 'wipe',
-      // A default stays out of the URL, except on a phone, which opens on another pair.
+      // A default stays out of a link, except on a phone, which opens on another pair.
       vs: compare === defaultPairing(point, own) && !phone ? null : compare,
     });
     requestReveal();

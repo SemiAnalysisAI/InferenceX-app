@@ -3,6 +3,7 @@ import {
   pairedGroup,
   parseStage,
   promptKey,
+  setStage,
   speedVs,
   stagePrompt,
   stageSearch,
@@ -11,6 +12,7 @@ import {
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';
+import { setVideoSearch, subscribeVideoSearch, videoSearch } from './page-search';
 import { resultsClipGroups, type ResultsClipSide } from './results-clips';
 
 const record = (caseId: string, take = 1): CaseRecord => ({
@@ -74,6 +76,20 @@ describe('clip stage', () => {
       swap: false,
       sheet: null,
     });
+  });
+
+  it('changes its keys of the in-memory settings and tells readers once per change', () => {
+    setVideoSearch(new URLSearchParams('r_engine=sglang&r_view=side&utm=x'));
+    let changes = 0;
+    const unsubscribe = subscribeVideoSearch(() => (changes += 1));
+    setStage({ prompt: 'crane', view: 'wipe' });
+    expect(videoSearch()).toBe('r_engine=sglang&utm=x&r_prompt=crane');
+    setStage({ prompt: 'crane' });
+    expect(changes).toBe(1);
+    unsubscribe();
+    setStage({ swap: true });
+    expect(parseStage(videoSearch())).toMatchObject({ prompt: 'crane', swap: true });
+    expect(changes).toBe(1);
   });
 
   it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {

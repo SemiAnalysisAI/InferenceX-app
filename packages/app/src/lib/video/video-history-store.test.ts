@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after cost tier labels returned to title case; labels are not stored in entries.
-      sources: 'ed6de4a65a129a45ddcd7ee97b3f6647b0477206034c5f5ab2507d5ae7629d1e',
+      // Re-pinned after the clip stage's settings moved from the address bar to memory; entries are unchanged.
+      sources: '47312c44ba5e2a2f02316f9f58f7023d376f88ad3e7c3d21f5ec794c402fecec',
     });
   });
 });
