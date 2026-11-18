@@ -1,6 +1,13 @@
 'use client';
 
-import { curveLinear, select, timer, type ScaleContinuousNumeric, type Timer } from 'd3';
+import {
+  curveLinear,
+  curveMonotoneX,
+  select,
+  timer,
+  type ScaleContinuousNumeric,
+  type Timer,
+} from 'd3';
 import {
   useCallback,
   useEffect,
@@ -894,7 +901,8 @@ export default function VideoResultsChart({
           getColor: (key) => lineColors.get(key) ?? 'var(--foreground)',
           getStrokeDasharray: (key) => lineDashes.get(key) ?? 'none',
           strokeWidth: 2,
-          curve: curveLinear,
+          // The inference chart's curve; a history line joins runs in time order, so x can turn back.
+          curve: history ? curveLinear : curveMonotoneX,
         },
       },
       {
