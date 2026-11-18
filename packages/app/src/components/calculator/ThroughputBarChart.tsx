@@ -59,7 +59,7 @@ const OVERLAY_STRINGS = {
     inputOutputCost: 'Input · output cost',
     inputOutputPower: 'Input · output tok/s/MW',
     cacheHit: 'KV cache hit rate',
-    theoreticalCacheHit: 'Theoretical cache hit rate',
+    theoreticalCacheHit: 'Theoretical Cache Hit Rate',
     inputShare: 'Input token share',
   },
   zh: {
@@ -211,10 +211,10 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   }
   switch (provider) {
     case 'costh': {
-      return 'Owning at large hyperscaler volume';
+      return 'Owning at Large Hyperscaler Volume';
     }
     case 'costr': {
-      return 'Rent – 3-year commit';
+      return 'Rent – 3-Year Commit';
     }
   }
 }
@@ -237,20 +237,20 @@ export function getChartTitle(
     : '';
   const qualifier =
     mode === 'interactivity_to_throughput'
-      ? `at ${targetValue} tok/s/user ${percentilePrefix}interactivity`
-      : `at ${targetValue} tok/s/chip throughput`;
+      ? `at ${targetValue} tok/s/user ${percentilePrefix}Interactivity`
+      : `at ${targetValue} tok/s/chip Throughput`;
 
   const tokenTypeLabel =
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
     case 'power': {
-      return { title: `${tokenTypeLabel} tokens per provisioned all-in megawatt`, qualifier };
+      return { title: `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt`, qualifier };
     }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
       return {
-        title: `Cost per million ${tokenTypeLabel.toLowerCase()} tokens (${providerLabel})`,
+        title: `Cost per Million ${tokenTypeLabel} Tokens (${providerLabel})`,
         qualifier,
       };
     }
@@ -258,7 +258,7 @@ export function getChartTitle(
       return {
         title:
           mode === 'interactivity_to_throughput'
-            ? `${tokenTypeLabel} token throughput per chip`
+            ? `${tokenTypeLabel} Token Throughput per Chip`
             : 'Interactivity',
         qualifier,
       };

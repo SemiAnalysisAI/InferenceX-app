@@ -245,7 +245,7 @@ const engines = () =>
     ...new Set([...$groups].map((group) => group.dataset.engine)),
   ]);
 
-describe('VideoGenX results', () => {
+describe('VideoGenX Results', () => {
   it('shows the loading state without reading History while the server streams the cohort', () => {
     readOnlyVideoRequests();
     cy.intercept('GET', '/api/video-runs?format=history&page=*', {
@@ -564,7 +564,7 @@ describe('VideoGenX results', () => {
       .and('not.contain', 'MI355X');
     cy.get('[data-testid="results-tco-rate"]').first().should('have.text', '1.73');
     cy.get('[data-testid="results-cost-tier"]').click();
-    cy.contains('[data-select-option]', 'Rent – 3-year commit').click();
+    cy.contains('[data-select-option]', 'Rent – 3-Year Commit').click();
     searchParam('r_tier').should('equal', 'r');
     cy.get('[data-testid="results-tco-rate"]').first().should('have.text', '3.70');
   });
@@ -596,7 +596,7 @@ describe('VideoGenX results', () => {
     searchParam('r_configs').should('equal', 'b200:na:4g:tp2:u2');
     points().should('have.length', 1);
     points('[data-hardware="b200"]').should('contain', '2026-09-09');
-    cy.get('[data-testid="results-compare-history"]').should('contain', 'Comparison date range');
+    cy.get('[data-testid="results-compare-history"]').should('contain', 'Comparison Date Range');
     // Run 1/3 predates B200, so its history point lies outside the as-of cells yet still opens.
     cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
     cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
@@ -716,7 +716,7 @@ describe('VideoGenX results', () => {
       .and('contain', 'Concurrency')
       .and('contain', 'TP2 × Ulysses 2')
       .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
-      .should('contain', 'GitHub Actions run');
+      .should('contain', 'GitHub Actions Run');
     cy.get('[data-testid="point-details-panel"]')
       .should('not.contain', '? attention')
       .and('not.contain', 'replicas not recorded')
@@ -747,7 +747,7 @@ describe('VideoGenX results', () => {
             'href',
             'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789',
           )
-          .and('contain', 'GitHub Actions run');
+          .and('contain', 'GitHub Actions Run');
         cy.get('[data-action="artifact"]')
           .should('have.attr', 'href')
           .and('match', /\/actions\/runs\/34341996789\/artifacts\/\d+$/u);
@@ -767,7 +767,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-detail-actions"] [data-action="run"]').should(
       'have.attr',
       'aria-label',
-      'GitHub Actions run',
+      'GitHub Actions Run',
     );
     cy.viewport(1280, 900);
     cy.get('[data-testid="results-power-trace"] svg').should('exist');

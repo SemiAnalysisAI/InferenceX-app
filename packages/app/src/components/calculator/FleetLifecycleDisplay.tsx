@@ -61,41 +61,41 @@ const COST_PROVIDER_OPTIONS: {
 }[] = [
   {
     value: 'costh',
-    label: 'Owning at large hyperscaler volume',
+    label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent – 3-year commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
-  { value: 'total', label: 'Total tokens' },
-  { value: 'input', label: 'Input tokens' },
-  { value: 'output', label: 'Output tokens' },
+  { value: 'total', label: 'Total Tokens' },
+  { value: 'input', label: 'Input Tokens' },
+  { value: 'output', label: 'Output Tokens' },
 ];
 
 const STRINGS = {
   en: {
-    title: 'Fleet lifecycle',
+    title: 'Fleet Lifecycle',
     description:
       'Pick the model, workload, and target interactivity. The projection below sizes a fixed fleet of each chip against a facility power budget and reads the full run history at this operating point — see the section itself for what the lines mean.',
-    benchmarkGroup: 'Benchmark config',
-    chartGroup: 'Chart config',
-    costProviderLabel: 'Cost provider',
+    benchmarkGroup: 'Benchmark Config',
+    chartGroup: 'Chart Config',
+    costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token type',
+    tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
       'Whether the per-chip figures quoted in the table use total tokens, input tokens only, or output tokens only. Revenue always counts both streams.',
     tokenTypePlaceholder: 'Token type',
-    targetLabel: 'Target interactivity (tok/s/user)',
+    targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Each chip\u2019s fleet serves this speed; every run date is read at it.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Each chip\u2019s fleet serves this speed; every run date is read at it.`,
     errorLoading: 'Error loading data. Please try a different selection.',
-    highContrast: 'High contrast',
+    highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
   },
   zh: {
@@ -346,7 +346,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     () =>
       locale === 'zh'
         ? COST_TYPE_LABELS_ZH
-        : { total: 'Total tokens', input: 'Input tokens', output: 'Output tokens' },
+        : { total: 'Total Tokens', input: 'Input Tokens', output: 'Output Tokens' },
     [locale],
   );
 
@@ -501,7 +501,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                 {showsTcoBasis && (
                   <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                     <LabelWithTooltip
-                      label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
+                      label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
                       tooltip={
                         locale === 'zh'
                           ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'

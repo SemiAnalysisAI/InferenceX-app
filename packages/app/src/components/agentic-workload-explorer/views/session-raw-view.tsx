@@ -22,11 +22,11 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    title: 'Raw request trace',
+    title: 'Raw Request Trace',
     description: 'Click a request to expand its details',
-    requestHeaders: 'Request headers',
-    requestBody: 'Request body',
-    responseBody: 'Response body',
+    requestHeaders: 'Request Headers',
+    requestBody: 'Request Body',
+    responseBody: 'Response Body',
     error: 'Error',
     tokensIn: 'in',
     tokensOut: 'out',

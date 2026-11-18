@@ -12,21 +12,21 @@ export const COST_TIER_LABELS: Record<
   { option: string; optionZh: string; label: string; labelZh: string }
 > = {
   hyperscaler: {
-    option: 'Owning at large hyperscaler volume',
+    option: 'Owning at Large Hyperscaler Volume',
     optionZh: '自有 · 超大规模云厂商批量采购',
-    label: 'Owning at large hyperscaler volume',
+    label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
   rental: {
-    option: 'Rent – 3-year commit',
+    option: 'Rent – 3-Year Commit',
     optionZh: '租赁 - 3 年承诺',
-    label: 'Rent – 3-year commit',
+    label: 'Rent – 3-Year Commit',
     labelZh: '租赁 - 3 年承诺',
   },
   custom: {
-    option: 'Custom user values',
+    option: 'Custom User Values',
     optionZh: '自定义值',
-    label: 'Custom user values',
+    label: 'Custom User Values',
     labelZh: '自定义值',
   },
 };
@@ -240,7 +240,7 @@ export const METRIC_REGISTRY = {
     field: 'powerUser.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
     labelZh: '每全电源配置兆瓦 token 吞吐量（tok/s/MW）',
-    title: 'Token Throughput per All in Utility MW (Custom user values)',
+    title: 'Token Throughput per All in Utility MW (Custom User Values)',
     titleZh: '每全电源配置兆瓦 token 吞吐量（自定义值）',
     polarity: 'higher',
     source: 'custom',
@@ -789,7 +789,7 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     gated: true,
   },
   {
-    label: 'Custom user values',
+    label: 'Custom User Values',
     labelZh: '自定义值',
     metrics: ['y_tokensPerDollarUser', 'y_costUser', 'y_powerUser'],
   },

@@ -35,22 +35,22 @@ import {
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
-  inference: 'Inference performance',
+  inference: 'Inference Performance',
   powerx: 'PowerX',
-  evaluation: 'Accuracy evals',
-  historical: 'Historical trends',
-  calculator: 'TCO calculator',
-  fleet: 'Fleet lifecycle',
-  'first-token': 'First-token limits',
-  'cache-reuse': 'Prefix cache reuse',
-  'profit-estimator': 'Profit estimator',
-  'profit-estimator-per-gigawatt': 'Profit estimator per GW',
-  'gpu-specs': 'Chip specs',
+  evaluation: 'Accuracy Evals',
+  historical: 'Historical Trends',
+  calculator: 'TCO Calculator',
+  fleet: 'Fleet Lifecycle',
+  'first-token': 'First-Token Limits',
+  'cache-reuse': 'Prefix Cache Reuse',
+  'profit-estimator': 'Profit Estimator',
+  'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
+  'gpu-specs': 'Chip Specs',
   submissions: 'Submissions',
   operatorx: 'OperatorX',
   collectivex: 'CollectiveX',
-  'agentic-workload-explorer': 'Agentic workloads',
-  'ai-chart': 'AI chart',
+  'agentic-workload-explorer': 'Agentic Workloads',
+  'ai-chart': 'AI Chart',
   'current-inferencex-image': 'Images',
   video: 'Video',
   feedback: 'Feedback',
@@ -175,7 +175,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     <div className="mb-1 lg:mb-2">
       <div className="vt-dashboard-tabs" data-slot="dashboard-navigation">
         <MobileTabStrip
-          ariaLabel={locale === 'zh' ? '选择图表' : 'Select chart'}
+          ariaLabel={locale === 'zh' ? '选择图表' : 'Select Chart'}
           current={current}
           routes={stripTabs}
           showHidden={featureGateUnlocked}

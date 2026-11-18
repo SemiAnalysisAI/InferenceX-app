@@ -393,7 +393,7 @@ describe('Chart Selectors', () => {
           .should('have.length', 1)
           .and('contain.text', 'Llama 3.3 70B Instruct');
         cy.contains(locale === 'zh' ? '已弃用' : 'Deprecated').should('be.visible');
-        cy.contains(locale === 'zh' ? '维护模式' : 'Maintenance mode').should('not.exist');
+        cy.contains(locale === 'zh' ? '维护模式' : 'Maintenance Mode').should('not.exist');
         cy.get(`button[aria-label="${clearLabel}"]`).click();
         cy.get('[role="option"]').should('have.length', 5);
         cy.focused().should('have.attr', 'aria-label', searchLabel).type('no-such-model');
@@ -414,7 +414,7 @@ describe('Chart Selectors', () => {
     it('groups maintenance models separately from deprecated models', () => {
       cy.get('[data-testid="model-selector"]').click();
 
-      cy.contains('Maintenance mode').should('be.visible');
+      cy.contains('Maintenance Mode').should('be.visible');
       cy.contains('[role="option"]', 'DeepSeek R1 0528 671B').should('be.visible');
       cy.contains('[role="option"]', 'gpt-oss 120B').should('be.visible');
       cy.contains('Deprecated').should('be.visible');
@@ -441,7 +441,7 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('维护模式').should('be.visible');
       cy.contains('已弃用').should('be.visible');
-      cy.contains('Maintenance mode').should('not.exist');
+      cy.contains('Maintenance Mode').should('not.exist');
       cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
@@ -458,7 +458,7 @@ describe('Chart Selectors', () => {
         pointerType: 'mouse',
       });
 
-      cy.contains('Realistic long-context, multi-turn agentic workload with sub-agents').should(
+      cy.contains('Realistic Long-Context, Multi-Turn Agentic Workload with Sub-Agents').should(
         'be.visible',
       );
       cy.get('[data-testid="scenario-agentic-info-link"]')
@@ -586,8 +586,8 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="scenario-selector"]').click();
       cy.get('[data-slot="select-label"]')
         .should('have.length', 1)
-        .and('have.text', 'Fixed sequence length');
-      cy.contains('[data-slot="select-label"]', 'Fixed sequence length')
+        .and('have.text', 'Fixed Sequence Length');
+      cy.contains('[data-slot="select-label"]', 'Fixed Sequence Length')
         .closest('[role="rowgroup"]')
         .find('[data-select-option]')
         .first()
@@ -619,7 +619,7 @@ describe('Chart Selectors', () => {
           </PathnameContext.Provider>,
         );
         cy.get('[data-testid="scenario-selector"]').click('right');
-        const active = locale === 'zh' ? '固定序列长度' : 'Fixed sequence length';
+        const active = locale === 'zh' ? '固定序列长度' : 'Fixed Sequence Length';
         const deprecated = locale === 'zh' ? '1K / 1K（已弃用）' : '1K / 1K (deprecated)';
         const deprecatedEightK = locale === 'zh' ? '8K / 1K（已弃用）' : '8K / 1K (deprecated)';
         cy.get('[data-slot="select-label"]').should('have.length', 1);

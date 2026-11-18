@@ -57,12 +57,12 @@ const SEVERITY_META: Record<Severity, { fill: string; badge: string }> = {
 
 const STRINGS = {
   en: {
-    title: 'Hourly incident signals',
+    title: 'Hourly Incident Signals',
     noSignals: 'No hourly error signals are available for this trace version.',
     baselineNote: (hours: number, anomalyCount: number) =>
       `Median + MAD baseline over the prior ${hours} hours · ${anomalyCount} anomalous ${anomalyCount === 1 ? 'hour' : 'hours'}`,
     exportLabel: 'Export hourly incident signal rail as PNG',
-    exportTitle: 'Hourly incident signals',
+    exportTitle: 'Hourly Incident Signals',
     requests: 'requests',
     errorRate: 'Error rate',
     volume: 'Volume',

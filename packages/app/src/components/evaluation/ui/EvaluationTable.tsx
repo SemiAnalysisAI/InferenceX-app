@@ -37,7 +37,7 @@ export const EVALUATION_TABLE_STRINGS = {
     aggregated: 'aggregated',
     workers: (n: number) => `${n} ${n === 1 ? 'worker' : 'workers'}`,
     chip: 'Chip',
-    physicalChips: 'Physical chips',
+    physicalChips: 'Physical Chips',
   },
   zh: {
     promptsTitle: '查看逐样本提示词与模型响应',

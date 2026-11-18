@@ -312,7 +312,7 @@ describe('Profit Estimator — responsive control panels', () => {
         chart().should('exist');
         if (width < 768) cy.get('[data-testid="profit-secondary-controls"] > button').click();
         cy.get('[data-testid="profit-benchmark-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Benchmark config');
+          cy.get('legend').should('have.text', 'Benchmark Config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');
           cy.get('#profit-target').should('have.value', '60');
         });
@@ -344,7 +344,7 @@ describe('Profit Estimator — responsive control panels', () => {
           expect(history.right - chip.right, 'no empty history column').to.be.lessThan(24);
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Pricing config');
+          cy.get('legend').should('have.text', 'Pricing Config');
           cy.get('#profit-price-source').click();
         });
         cy.get('[data-testid="result-context-utilization"] #profit-utilization').should(

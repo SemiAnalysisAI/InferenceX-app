@@ -52,7 +52,7 @@ const STRINGS = {
     caption:
       'Sortable all-time model impact matrix showing request volume, errors, error rate, and explicit severity for every model.',
     severityBands:
-      'Severity bands: critical ≥10% · elevated ≥5% · watch ≥1% · nominal <1% error rate.',
+      'Severity bands: Critical ≥10% · Elevated ≥5% · Watch ≥1% · Nominal <1% error rate.',
     sortByLabel: (col: string, dir?: string) => `Sort by ${col}${dir ? `, currently ${dir}` : ''}`,
     columns: {
       model: 'Model',

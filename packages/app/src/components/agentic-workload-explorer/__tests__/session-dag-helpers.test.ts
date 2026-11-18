@@ -140,9 +140,9 @@ describe('messageNodeSummary', () => {
     expect(messageNodeSummary(node)).toBe('Read');
   });
 
-  it('shows the tool call label when no toolName', () => {
+  it('shows the Tool Call label when no toolName', () => {
     const node = makeNode({ type: 'tool_use', content: '', toolName: undefined });
-    expect(messageNodeSummary(node)).toBe('Tool call');
+    expect(messageNodeSummary(node)).toBe('Tool Call');
   });
 
   it('shows Result for tool_result', () => {

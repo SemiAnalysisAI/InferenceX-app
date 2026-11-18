@@ -212,7 +212,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .should('be.visible')
       .and('have.attr', 'aria-modal', 'true')
       .and('contain.text', 'TPUv7 preliminary results across multiple models')
-      .and('contain.text', 'AgentX preview submissions')
+      .and('contain.text', 'AgentX Preview Submissions')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
         const root = $modal[0].ownerDocument.documentElement;
@@ -327,8 +327,8 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
-      .should('contain.text', 'Huawei Ascend 950PR microbenchmarks')
-      .and('contain.text', 'Cycle-level core memory-access microbenchmarks (beta)')
+      .should('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
+      .and('contain.text', 'Cycle-Level Core memory-access microbenchmarks (Beta)')
       .and('have.css', 'white-space', 'normal')
       .should(($paragraphs) => {
         for (const text of $paragraphs) {
@@ -339,7 +339,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-new-badge="launch-banner"]')
       .parent()
       .should('have.css', 'white-space', 'nowrap')
-      .and('contain.text', 'microbenchmarks');
+      .and('contain.text', 'Microbenchmarks');
     cy.get('[data-testid="launch-banner"] > svg').should('have.css', 'align-self', 'flex-start');
   });
 

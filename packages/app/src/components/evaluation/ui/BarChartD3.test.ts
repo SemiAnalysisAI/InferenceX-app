@@ -106,7 +106,7 @@ describe('evaluation chart locale presentation', () => {
     const html = generateEvaluationTooltipContent(makeDatum('B200 SGLang', 0.9), '#000');
     expect(html).toContain('0.9000');
     expect(html).toContain('2026-01-01');
-    expect(html).not.toContain('Min score');
+    expect(html).not.toContain('Min Score');
     expect(html).not.toContain('Click elsewhere');
   });
 
@@ -158,7 +158,7 @@ describe('evaluation chart locale presentation', () => {
       label: 'GitHub Actions 运行记录',
       href: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     });
-    expect(JSON.stringify(details)).not.toContain('Mean score');
+    expect(JSON.stringify(details)).not.toContain('Mean Score');
     expect(JSON.stringify(details)).not.toContain('Concurrency');
   });
 });

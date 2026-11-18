@@ -15,6 +15,7 @@ describe('video hardware mapping', () => {
     expect(hardwareKey('MI355X')).toBe('mi355x');
     expect(hardwareKey('AMD Instinct MI355X OAM')).toBe('mi355x');
     expect(hardwareKey('NVIDIA GB200')).toBe('gb200');
+    expect(hardwareKey('A100')).toBe('a100');
     expect(hardwareKey('')).toBeNull();
     expect(hardwareKey('Synthetic GPU')).toBeNull();
   });

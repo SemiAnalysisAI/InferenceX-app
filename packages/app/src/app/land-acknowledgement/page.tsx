@@ -48,7 +48,7 @@ export default function LandAcknowledgementPage() {
     <main data-testid="land-acknowledgement-page" className="relative">
       <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10')}>
         <header className="max-w-3xl">
-          <p className="mb-3 text-xs font-medium text-muted-foreground">Land acknowledgement</p>
+          <p className="mb-3 text-xs font-medium text-muted-foreground">Land Acknowledgement</p>
           <Heading as="h1" level="reading">
             We recognize the Indigenous homelands connected to our US infrastructure
           </Heading>

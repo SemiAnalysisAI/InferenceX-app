@@ -26,7 +26,7 @@ const CHART_ID = 'submissions-chart';
 
 const STRINGS = {
   en: {
-    heading: 'Benchmark submissions',
+    heading: 'Benchmark Submissions',
     description:
       'All benchmark configurations submitted to InferenceX, with submission history, activity trends and datapoint volumes',
     modeWeekly: 'Weekly',
@@ -37,14 +37,14 @@ const STRINGS = {
     noChartData: 'No submission activity data is available',
     noTableData: 'No submission records are available',
     chartModeAria: 'Chart mode',
-    chartCaption: 'Submission activity',
-    qualifierWeekly: 'Weekly datapoints by vendor',
-    qualifierCumulative: 'Cumulative datapoints by vendor',
+    chartCaption: 'Submission Activity',
+    qualifierWeekly: 'Weekly Datapoints by vendor',
+    qualifierCumulative: 'Cumulative Datapoints by vendor',
     chartSource: 'SemiAnalysis InferenceX™',
-    statDatapoints: 'Datapoints generated',
-    statConfigs: 'Distinct configurations',
-    statModels: 'Unique models',
-    statHardware: 'Unique hardware',
+    statDatapoints: 'Datapoints Generated',
+    statConfigs: 'Distinct Configurations',
+    statModels: 'Unique Models',
+    statHardware: 'Unique Hardware',
     subtitleResults: 'results',
     subtitleTested: 'tested',
     subtitleLLMs: 'LLMs',

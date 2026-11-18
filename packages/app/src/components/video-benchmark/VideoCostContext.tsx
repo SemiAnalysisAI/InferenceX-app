@@ -18,7 +18,7 @@ const TCO_TABLE = 'results-tco-table';
 
 const STRINGS = {
   en: {
-    tier: 'Cost tier',
+    tier: 'Cost Tier',
     tierHelp:
       'The $/GPU/hr pricing basis behind every cost and per-dollar value on this page, from the SemiAnalysis AI Cloud TCO Model.',
     basis: 'GPU basis',

@@ -104,7 +104,7 @@ export default async function ComparePerDollarIndexPage() {
       <section>
         <Card>
           <Heading as="h1" level="page">
-            Chip performance per dollar
+            Chip Performance per Dollar
           </Heading>
           <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} head-to-head cost-per-million-tokens comparisons across{' '}

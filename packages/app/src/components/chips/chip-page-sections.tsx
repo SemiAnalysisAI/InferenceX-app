@@ -45,7 +45,7 @@ const STRINGS = {
   en: {
     breadcrumbRoot: 'AI Chips',
     backToIndex: 'All AI inference chips',
-    indexTitle: 'AI chips for LLM inference',
+    indexTitle: 'AI Chips for LLM Inference',
     indexIntro:
       'Specs, cloud pricing and continuously measured inference benchmarks for every chip InferenceX covers. Each page joins the hardware data used by the live dashboard with the SemiAnalysis AI Cloud TCO rates.',
     chipPages: 'Chip pages',
@@ -87,7 +87,7 @@ const STRINGS = {
       nic: 'NIC',
       tdp: 'TDP per chip',
       allInPower: 'All-in power per chip',
-      costHyperscaler: 'Owning at large hyperscaler volume $/chip/hr',
+      costHyperscaler: 'Owning at Large Hyperscaler Volume $/chip/hr',
       costRetail: 'Retail $/chip/hr',
     },
     notSupported: 'Not supported',

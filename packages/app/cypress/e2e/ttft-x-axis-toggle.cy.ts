@@ -249,7 +249,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
 
   it('defaults offloading labels off and restores the opt-in from share links', () => {
     expandLegendAdvanced();
-    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading label');
+    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading Label');
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked');
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
     cy.scatterPoints('#chart-0').should((points) => {

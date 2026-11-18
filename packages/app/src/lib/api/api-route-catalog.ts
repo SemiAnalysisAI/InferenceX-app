@@ -1260,7 +1260,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: 'f10297b86f7b29d2e88241344f02af488ecc1db43e096bb1913c4dcaab1531f9',
+    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1544,7 +1544,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/types.ts',
-    sourceSha256: '5df5b1fade9479c4f844590da7f8002d3faf608ec639ec856e77d9fa5beae45e',
+    sourceSha256: '7c5bd549fa5c55ca906d08ecd6521ad5b06f1c95599d4f32d84c3fbfb7e3c0c1',
     reviewArea: {
       en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
       zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '44a1c9bde8bbb865d7f74bab6172647d5c2c36e0640fe053fe4cbe530eebc3e4',
+    sourceSha256: '4613a53a5ed33d7a0e54bb8f125eb9734653c6db925de3490a7c09b709eca03a',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission and dual GPU cost bases.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入及两种 GPU 成本口径。',
@@ -1696,7 +1696,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: 'df07ac3fbb5cc7e0ff5e5a0c5d8706795dffdda6d9104b1e7b7f5c85b1739863',
+    sourceSha256: 'bd8afa93f0fc002edc2f43fada8c0696440ff738717f04510d92f5dc68ff5870',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

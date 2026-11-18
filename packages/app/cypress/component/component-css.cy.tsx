@@ -313,7 +313,7 @@ describe('component CSS harness', () => {
           onValueChange={cy.stub().as('chooseMetric')}
           options={[
             { value: 'cost', label: 'Cost' },
-            { value: 'throughput', label: 'Token throughput' },
+            { value: 'throughput', label: 'Token Throughput' },
           ]}
         />
       </form>,
@@ -326,7 +326,7 @@ describe('component CSS harness', () => {
       expect(style.boxShadow).to.equal('none');
     });
     cy.contains('button', 'Cost').should('have.attr', 'aria-pressed', 'true');
-    cy.contains('button', 'Token throughput')
+    cy.contains('button', 'Token Throughput')
       .should('have.css', 'min-height', '44px')
       .and('have.attr', 'type', 'button')
       .focus()
@@ -416,7 +416,7 @@ describe('component CSS harness', () => {
           ariaLabel="Fleet metric"
           onValueChange={cy.stub().as('metricChange')}
           options={[
-            { value: 'throughput', label: 'Token throughput' },
+            { value: 'throughput', label: 'Token Throughput' },
             { value: 'revenue', label: 'Revenue per day' },
             { value: 'cost', label: 'Cumulative cost' },
             { value: 'margin', label: 'Operating margin' },

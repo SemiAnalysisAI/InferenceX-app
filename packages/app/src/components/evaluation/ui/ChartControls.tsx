@@ -17,7 +17,7 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 
 const STRINGS = {
   en: {
-    benchmarkGroup: 'Benchmark config',
+    benchmarkGroup: 'Benchmark Config',
     runGroup: 'Run context',
     benchmarkLabel: 'Benchmark',
     benchmarkTooltip:

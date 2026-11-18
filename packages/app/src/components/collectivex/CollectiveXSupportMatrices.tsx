@@ -30,7 +30,7 @@ const STRINGS = {
       normal: 'Throughput kernels',
       'low-latency': 'Low-latency kernels',
     },
-    axes: 'SKU / library',
+    axes: 'SKU / Library',
     works: 'Works',
     broken: 'Known not to work',
     na: 'Not applicable',

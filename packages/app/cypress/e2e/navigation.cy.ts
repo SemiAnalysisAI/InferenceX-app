@@ -249,13 +249,13 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
         .and('have.attr', 'href', `${locale}/opx`)
         .and(
           'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR microbenchmarks',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
         )
         .and(
           'contain.text',
           locale
             ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
-            : '950PR GEMM FLOPs and max FLOPS utilization',
+            : '950PR GEMM FLOPs and Max FLOPS utilization',
         )
         .click();
       cy.location('pathname').should('eq', `${locale}/opx`);

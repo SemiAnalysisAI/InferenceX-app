@@ -42,7 +42,7 @@ const STRINGS = {
     pick: 'Pick at least one chip.',
     tableTitle: 'Gain by interactivity',
     chip: 'Chip',
-    since: 'First run',
+    since: 'First Run',
     average: 'Average',
   },
   zh: {

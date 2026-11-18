@@ -126,7 +126,7 @@ describe('Profit Estimator per GW', () => {
     cy.contains('[role="option"]', 'OpenRouter').click();
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.6')
-      .and('contain.text', 'Cached input: $0.1')
+      .and('contain.text', 'Cached Input: $0.1')
       .and('contain.text', 'Output: $2.5')
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
@@ -181,7 +181,7 @@ describe('Profit Estimator per GW', () => {
     );
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
-      'Owning at large hyperscaler volume',
+      'Owning at Large Hyperscaler Volume',
     );
   });
 
@@ -189,7 +189,7 @@ describe('Profit Estimator per GW', () => {
     cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
-      'Owning at large hyperscaler volume',
+      'Owning at Large Hyperscaler Volume',
     );
     expectTcoCost('mi355x', 'MI355X', '1.50');
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
@@ -232,12 +232,12 @@ describe('Profit Estimator per GW — compare history', () => {
   it('offers the agentic chip configs and shows the range picker once one is chosen', () => {
     cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip config');
+    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip Config');
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     bars()
       .its('length')
       .then((allBars) => {
-        chipTrigger().should('contain.text', 'Select chip config');
+        chipTrigger().should('contain.text', 'Select Chip Config');
         chipTrigger().click({ force: true });
         cy.get('[role="option"]').should('have.length', 5).and('contain.text', 'GB300');
         cy.get('[role="option"]').should('contain.text', 'H200');
@@ -250,7 +250,7 @@ describe('Profit Estimator per GW — compare history', () => {
         cy.get('[role="option"]').contains('GB300').click();
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
-        chipTrigger().should('contain.text', 'Select chip config');
+        chipTrigger().should('contain.text', 'Select Chip Config');
       });
   });
 
@@ -260,7 +260,7 @@ describe('Profit Estimator per GW — compare history', () => {
     pickChip('GB300');
     pickChip('B200');
     cy.contains('button', 'Select date range').click();
-    cy.contains('button', 'Max range').click();
+    cy.contains('button', 'Max Range').click();
     cy.contains('button', 'Apply').click();
 
     cy.contains('button', 'Jul 15, 2026').should('be.visible');
@@ -295,7 +295,7 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     cy.get('[data-testid="profit-history-note"]').should('not.exist');
     chart().find('rect.bar-tco').should('have.length', 4);
-    chipTrigger().should('contain.text', 'Select chip config');
+    chipTrigger().should('contain.text', 'Select Chip Config');
     changelog().should('not.exist');
   });
 
@@ -305,13 +305,13 @@ describe('Profit Estimator per GW — compare history', () => {
     changelog().should('not.exist');
     pickChip('GB300');
     changelog()
-      .contains('button', 'Config changelog (3 dates with changes)')
+      .contains('button', 'Config Changelog (3 dates with changes)')
       .should('have.attr', 'aria-expanded', 'true');
     changelog()
       .should('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_HISTORY_DATE])
       .and('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_DATE])
-      .and('contain.text', 'Git commit')
-      .and('contain.text', 'Workflow run')
+      .and('contain.text', 'Git Commit')
+      .and('contain.text', 'Workflow Run')
       .and('contain.text', 'Add all to chart');
     changelog().find('span:contains("On chart")').should('have.length', 0);
     changelog()
@@ -445,7 +445,7 @@ describe('VR publication economics', () => {
         });
       cy.get('[data-testid="profit-cache-hit-selector"]').should(
         'contain.text',
-        'Theoretical roofline',
+        'Theoretical Roofline',
       );
       assertCachePricing(0.97);
       cy.get('[data-testid="profit-cache-hit-selector"]').click();

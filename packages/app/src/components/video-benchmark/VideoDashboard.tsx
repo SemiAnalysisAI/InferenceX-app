@@ -105,16 +105,16 @@ const STRINGS = {
     // A phone shows the cohort line right above this and names View telemetry on its button.
     descriptionPhone:
       'Serving latency, cost and energy across hardware. Tap a point for its clip and measurements; hollow points have no clips.',
-    benchmarkConfig: 'Benchmark config',
+    benchmarkConfig: 'Benchmark Config',
     model: 'Model',
     chartConfig: 'Chart config',
     runContext: 'Run context',
     compareHistory: 'Compare history',
-    chipConfig: 'Chip config',
+    chipConfig: 'Chip Config',
     chipConfigHelp:
       'Select up to 4 chip configurations to compare their runs over time. This shows how software updates affect a specific deployment.',
-    chipConfigPlaceholder: 'Select chip config',
-    compareRange: 'Comparison date range',
+    chipConfigPlaceholder: 'Select Chip Config',
+    compareRange: 'Comparison Date Range',
     compareRangeHelp:
       'The start and end execution dates of the runs plotted for the selected chip configs.',
     compareRangePlaceholder: 'Select date range',

@@ -13,7 +13,7 @@ import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug
 import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 const title = 'GPU Rankings for LLM Inference';
-const heading = 'GPU rankings for LLM inference';
+const heading = 'GPU Rankings for LLM Inference';
 const description =
   'Live leaderboards of the fastest and cheapest GPUs for open LLMs like DeepSeek, Kimi, GLM and Qwen, ranked by measured tokens/s per GPU and $ per M tokens.';
 

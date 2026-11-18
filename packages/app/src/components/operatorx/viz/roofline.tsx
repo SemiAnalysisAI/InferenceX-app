@@ -38,7 +38,7 @@ const STRINGS = {
     empty: 'No case has FLOP and byte counts',
     precision: 'Compute precision',
     normalized: 'Normalized',
-    logScale: 'Log scale',
+    logScale: 'Log Scale',
     intensityAxis: 'Arithmetic intensity',
     shareAxis: 'Share of peak compute (%)',
     tflopsAxis: 'Achieved TFLOPS',

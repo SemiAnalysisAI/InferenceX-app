@@ -107,7 +107,7 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
 1. The header card (`DashboardSectionHeader` with the page title, cohort help and Share)
    holds one line naming the fixed model, workload and engine, and `ControlPanel`s for
    Chart config (X and Y metrics), Compare history and Run
-   context. Compare history's Chip config
+   context. Compare history's Chip Config
    picks up to four deployments and an optional date range; the chart then plots each one's
    runs in time order, labelled by run date, plus a named overlay run's matching
    deployment as its own series, while the clips and cost caption keep

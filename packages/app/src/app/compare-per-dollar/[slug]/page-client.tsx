@@ -28,7 +28,7 @@ const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
 const PER_DOLLAR_LABEL_OVERRIDES = {
   en: {
-    'Cost ($/M tok)': 'Dollars per million tokens',
+    'Cost ($/M tok)': 'Dollars per Million Tokens',
   },
   zh: {
     'Cost ($/M tok)': '每百万 token 成本（美元）',
@@ -39,8 +39,8 @@ const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 const STRINGS = {
   en: {
-    eyebrowSuffix: 'Performance per dollar',
-    h1Suffix: 'performance per dollar',
+    eyebrowSuffix: 'Performance per Dollar',
+    h1Suffix: 'Performance per Dollar',
     mainChartLinkText: 'the main inference chart',
     fullComparisonLinkText: 'View full latency and throughput comparison →',
     caveatSeqFallback: 'sequence',

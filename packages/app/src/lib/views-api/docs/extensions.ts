@@ -235,7 +235,7 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'data.recipes 中的方案键，对应仪表板 c_recipe。省略或未知键按缓存层级数据行数、总行数和标签依次选择默认方案；仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
   ],
   cacheHitMode: [
-    'actual or theoretical (default, displayed as Theoretical roofline). Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace, falling back to the measured rate when unavailable.',
+    'actual or theoretical (default, displayed as Theoretical Roofline). Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace, falling back to the measured rate when unavailable.',
     'actual 或 theoretical（默认，界面显示为“理论上限”）。Actual 使用基准测试中服务端实测的 cache 命中率；theoretical 使用 trace 计算的无限缓存理论命中率，缺失时回退到实测值。',
   ],
   customCosts: [
@@ -809,9 +809,9 @@ const NEW_VIEWS = {
       roster: {
         ...strings,
         description:
-          'Default GB200, B200, MI355X and H200 slots, plus H100 when qualified approved or exact named diagnostic evidence is available.',
+          'Default GB200, B200, MI355X and H200 slots, plus H100, B300 or A100 when qualified approved or exact named diagnostic evidence is available.',
         'x-description-zh':
-          '默认包含 GB200、B200、MI355X 和 H200；存在符合门槛的已批准 H100 结果或明确指定的诊断运行时增加 H100。',
+          '默认包含 GB200、B200、MI355X 和 H200；存在符合门槛的已批准 H100、B300 或 A100 结果或明确指定的诊断运行时增加相应硬件。',
       },
       metricDefinitions: object,
       plot: object,

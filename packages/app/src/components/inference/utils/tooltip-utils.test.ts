@@ -475,7 +475,7 @@ describe('buildPointDetails', () => {
   });
 
   it.each([
-    [{ spec_decoding: 'draft_model' }, 'Draft model'],
+    [{ spec_decoding: 'draft_model' }, 'Draft Model'],
     [
       {
         spec_decoding: 'draft_model',
@@ -493,7 +493,7 @@ describe('buildPointDetails', () => {
     const text = detailsText(
       tooltipConfig({ data: pt({ id: 3, benchmark_type: 'agentic_traces', ...fields }) }),
     );
-    expect(text).toContain(`Speculative decoding: ${label}`);
+    expect(text).toContain(`Speculative Decoding: ${label}`);
   });
 
   it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
@@ -544,7 +544,7 @@ describe('buildPointDetails', () => {
     expect(html).toContain('生成 token 678');
     expect(html).toContain('GitHub Actions 运行记录');
     expect(html).not.toContain('Requests:');
-    expect(html).not.toContain('GitHub Actions run');
+    expect(html).not.toContain('GitHub Actions Run');
   });
 
   it('localizes dates, DPA flags, and worker labels for Chinese disaggregated tooltips', () => {
@@ -656,7 +656,7 @@ describe('buildPointDetails', () => {
   });
 
   it('omits image section when no image', () => {
-    expect(detailsHtml(tooltipConfig())).not.toContain('pinned-image');
+    expect(detailsHtml(tooltipConfig())).not.toContain('pinned-Image');
   });
 
   it('includes output throughput when metric is y_tpPerGpu and field exists', () => {
@@ -706,8 +706,8 @@ describe('buildPointDetails', () => {
         }),
       }),
     );
-    expect(html).toContain('Offload type: DRAM');
-    expect(html).toContain('KV offload engine: Mooncake 0.3.11.post1');
+    expect(html).toContain('Offload Type: DRAM');
+    expect(html).toContain('KV Offload Engine: Mooncake 0.3.11.post1');
     expect(html).not.toContain('Offload Mode');
   });
 
@@ -732,7 +732,7 @@ describe('buildPointDetails', () => {
       }),
     );
 
-    expect(enabled).toContain('Offload type: Enabled (legacy data)');
+    expect(enabled).toContain('Offload Type: Enabled (legacy data)');
     expect(disabledZh).toContain('offload 类型： 已禁用（旧版数据）');
   });
 
@@ -747,7 +747,7 @@ describe('buildPointDetails', () => {
       }),
     );
 
-    expect(html).not.toContain('Offload type');
+    expect(html).not.toContain('Offload Type');
     expect(html).not.toContain('legacy data');
   });
 
@@ -762,7 +762,7 @@ describe('buildPointDetails', () => {
         }),
       }),
     );
-    expect(html).toContain('KV transfer engine: NIXL');
+    expect(html).toContain('KV Transfer Engine: NIXL');
     expect(html).toContain('Chip 87.5%');
   });
 
@@ -804,8 +804,8 @@ describe('buildPointDetails', () => {
       }),
     );
 
-    expect(disabled).not.toContain('CPU cache hit rate');
-    expect(enabled).toContain('CPU cache hit rate: 42.0%');
+    expect(disabled).not.toContain('CPU Cache Hit Rate');
+    expect(enabled).toContain('CPU Cache Hit Rate: 42.0%');
   });
 
   it('labels TRTLLM offload cache hits as a combined chip and CPU rate', () => {
@@ -821,7 +821,7 @@ describe('buildPointDetails', () => {
     );
 
     expect(html).toContain('Chip + CPU 97.8%');
-    expect(html).not.toContain('CPU cache hit rate');
+    expect(html).not.toContain('CPU Cache Hit Rate');
   });
 
   it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
@@ -845,7 +845,7 @@ describe('buildPointDetails', () => {
     const en = detailsText(tooltipConfig({ data: pt({ kv_offloading: 'none' }) }));
     const zh = detailsText(tooltipConfig({ locale: 'zh', data: pt({ kv_offloading: 'none' }) }));
 
-    expect(en).not.toContain('Offload type');
+    expect(en).not.toContain('Offload Type');
     expect(zh).not.toContain('offload 类型');
   });
 
@@ -1008,11 +1008,11 @@ describe('buildPointDetails for unofficial overlays', () => {
         }),
       }),
     );
-    expect(html).toContain('Offload type: DRAM');
-    expect(html).toContain('KV offload engine: HiCache');
-    expect(html).toContain('KV transfer engine: NIXL');
+    expect(html).toContain('Offload Type: DRAM');
+    expect(html).toContain('KV Offload Engine: HiCache');
+    expect(html).toContain('KV Transfer Engine: NIXL');
     expect(html).toContain('Router: SGLang Router 0.3.2');
-    expect(html).toContain('CPU cache hit rate: 42.0%');
+    expect(html).toContain('CPU Cache Hit Rate: 42.0%');
   });
 
   it('shows DCP and PCP for unofficial-run points', () => {
@@ -1038,7 +1038,7 @@ describe('buildPointDetails for unofficial overlays', () => {
       }),
     );
 
-    expect(mtp).toContain('Speculative decoding: MTP');
+    expect(mtp).toContain('Speculative Decoding: MTP');
     expect(standardZh).toContain('投机解码： 关闭');
   });
 
@@ -1053,8 +1053,8 @@ describe('buildPointDetails for unofficial overlays', () => {
       }),
     );
 
-    expect(html).toContain('Speculative decoding: DSpark');
-    expect(html).not.toContain('Speculative decoding: MTP');
+    expect(html).toContain('Speculative Decoding: DSpark');
+    expect(html).not.toContain('Speculative Decoding: MTP');
   });
 
   it('hides stale CPU cache hits for unofficial overlays without offload', () => {
@@ -1069,8 +1069,8 @@ describe('buildPointDetails for unofficial overlays', () => {
       }),
     );
 
-    expect(html).not.toContain('Offload type');
-    expect(html).not.toContain('CPU cache hit rate');
+    expect(html).not.toContain('Offload Type');
+    expect(html).not.toContain('CPU Cache Hit Rate');
   });
 });
 
@@ -1258,7 +1258,7 @@ describe('worker power drilldown', () => {
     ];
     for (const html of outputs) {
       expect(html).toContain('data-testid="tooltip-worker-power"');
-      expect(html).toContain('Measured worker power');
+      expect(html).toContain('Measured Worker Power');
       expect(html).toContain('<strong>prefill[0]</strong>');
       expect(html).toContain('612.3 W');
       expect(html).toContain('<strong>decode[0]</strong>');
@@ -1342,14 +1342,14 @@ describe('power tier tooltip line', () => {
         data: pt({ power_tier: 'certified' }),
       }),
     );
-    expect(html).toContain('Power measurement: Validated (current PowerX method)');
+    expect(html).toContain('Power Measurement: Validated (current PowerX method)');
   });
 
   it('omits the tier line when the point carries no tier', () => {
     const html = detailsText(
       tooltipConfig({ selectedYAxisMetric: 'y_measuredAvgPower', data: pt() }),
     );
-    expect(html).not.toContain('Power measurement');
+    expect(html).not.toContain('Power Measurement');
   });
 
   it('renders the ZH strings under the zh locale', () => {
@@ -1398,13 +1398,13 @@ describe('power tier tooltip line', () => {
     );
 
     expect(overlay).toContain(
-      'Power measurement: Historical (not validated under the current method)',
+      'Power Measurement: Historical (not validated under the current method)',
     );
     expect(gpuGraph).toContain(
-      'Power measurement: Historical (not validated under the current method)',
+      'Power Measurement: Historical (not validated under the current method)',
     );
     expect(gpuGraphOffAxis).toContain(
-      'Power measurement: Historical (not validated under the current method)',
+      'Power Measurement: Historical (not validated under the current method)',
     );
   });
 });

@@ -40,23 +40,23 @@ interface CostTargetPanelProps {
 
 const STRINGS = {
   en: {
-    costCapTitle: 'Interactivity within a cost target',
+    costCapTitle: 'Interactivity Within a Cost Target',
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each chip can serve without exceeding it.',
-    costCapLabel: 'Cost target ($/M tok)',
+    costCapLabel: 'Cost Target ($/M tok)',
     costCapShortLabel: 'Cost ($/M tok)',
     costCapTooltip:
       'Maximum acceptable cost per million tokens (at the selected pricing tier and token type). The answer is the highest interactivity whose interpolated cost stays at or below this ceiling.',
     costCapPlaceholder: 'e.g. 0.50',
-    mwLabel: 'Facility power (MW)',
+    mwLabel: 'Facility Power (MW)',
     mwShortLabel: 'Power (MW)',
     mwTooltip:
       'Optional facility power budget in megawatts. When set, the answer is also expressed as concurrent users on a fleet sized to this budget, using all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
     colGpu: 'Chip',
-    colMaxInteractivity: 'Max interactivity (tok/s/user)',
+    colMaxInteractivity: 'Max Interactivity (tok/s/user)',
     colTputAtIv: 'Throughput (tok/s/chip)',
-    colUsers: 'Concurrent users',
+    colUsers: 'Concurrent Users',
     notReachable: 'Not reachable',
     costCapNoGpus: 'No chips are visible to evaluate. Enable hardware in the chart legend.',
     note: 'Note:',

@@ -124,7 +124,7 @@ async function CompareCatalog() {
           </p>
           <CompareCatalogLinks>
             <CompareCatalogLink testId="compare-index-per-dollar-link" href="/compare-per-dollar">
-              Compare chip performance per dollar
+              Compare Chip performance per dollar
             </CompareCatalogLink>
             <CompareCatalogLink testId="compare-index-precision-link" href="/compare-precision">
               Compare precisions (FP4, FP8, BF16)
