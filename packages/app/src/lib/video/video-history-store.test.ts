@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after a comment in stored.ts stopped naming Difference; entries are unchanged.
-      sources: '5e220ee0779fb1d2db11d782e2dbbef1284d6f44b8ccbe9021a043e72c9dade6',
+      // Re-pinned after hardware.ts began naming A100; no stored entry comes from an A100 cluster.
+      sources: 'c9a22928463a1a3bb23d387e59ff88c64e858789c0224a5dc62c0db58afa3f68',
     });
   });
 });

@@ -1046,8 +1046,8 @@ they add no API selectors and change no metrics or official/unofficial membershi
 qualified approved evidence or the exact named diagnostic run is available; the
 same canonical workload and sample floor apply. `r_hidden=h100` hides its results
 and clips. Dismissing an unapproved H100 run removes its slot unless approved H100
-evidence remains. An older H100 workload does not qualify a newer workload. B300 has
-no default slot; it appears only with qualified evidence or the named run.
+evidence remains. An older H100 workload does not qualify a newer workload. B300 and
+A100 have no default slot; each appears only with qualified evidence or the named run.
 
 | UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
