@@ -8,6 +8,12 @@ import type { InferenceData } from '@/components/inference/types';
 import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
+import {
+  CompareAtProbe,
+  compareAt,
+  resetCompareAt,
+  setCompareAt,
+} from '@/test/powerx-compare-at-probe';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777/attempts/1';
 
@@ -209,6 +215,7 @@ let root: Root;
 beforeEach(() => {
   env.locale = 'en';
   env.coarsePointer = false;
+  resetCompareAt();
   // jsdom has no media queries (pointer type) or canvas text (the cursor label's width).
   window.matchMedia = ((query: string) => ({
     matches: env.coarsePointer && query === COARSE_POINTER_QUERY,
@@ -272,25 +279,9 @@ const marker = () =>
 const partsHeading = () =>
   container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
 
-const moveSlider = (step: number) => {
-  const slider = container.querySelector<HTMLInputElement>(
-    '[data-testid="power-chip-compare-target"]',
-  )!;
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
-      slider,
-      String(step),
-    );
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-};
-
 const chipRows = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
 ];
-
-const sliderValue = () =>
-  container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
 
 const chipRow = (name: string) =>
   chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
@@ -298,6 +289,7 @@ const chipRow = (name: string) =>
 const renderPanelInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
   render(
     <PowerXSurfaceProvider>
+      <CompareAtProbe />
       <PowerAnalysisPanels
         data={data}
         overlayData={overlayData}
@@ -312,9 +304,25 @@ const renderPanelInline = (data: InferenceData[], overlayData: InferenceData[] =
 describe('PowerAnalysisPanels per-chip compared point', () => {
   beforeEach(() => track.mockClear());
 
+  it('compares every chip at Compare at (80 tok/s/user by default), not the middle of the sweeps', () => {
+    renderPanelInline([...sglang, ...vllm]);
+    // The sweeps' geometric middle is 60 (vLLM c16); Compare at 80 is SGLang c4 exactly.
+    expect(compareAt.value).toBe(80);
+    expect(drilldownTitle()).toBe('B200 (SGLang) FP8 across load');
+    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe('c4 · 80 tok/s/user');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    expect(partsHeading()).toBe('B200 (SGLang) FP8 · c4 · 80 tok/s/user');
+    // A new Compare at (the shell's control) moves every row and the drill-down with it.
+    setCompareAt(25);
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe('c64 · 20 tok/s/user');
+  });
+
   it('pins the clicked column for that chip only and keeps the drill-down on it', () => {
     renderPanelInline([...sglang, ...vllm]);
-    // The slider lands on vLLM c16 at 60 tok/s/user; the SGLang row reads its own nearest point.
+    // Compare at 60 lands on vLLM c16; the SGLang row reads its own nearest point.
+    setCompareAt(60);
     expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
     expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
     const sglangBefore = rowPoint(chipRow('B200 (SGLang) FP8'));
@@ -330,10 +338,10 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
       chipRow('B200 (vLLM) FP8')
         .querySelector('[data-testid="power-chip-compare-unpin"]')
         ?.getAttribute('title'),
-    ).toBe('Pinned to c64 · click to follow the slider');
+    ).toBe('Pinned to c64 · click to follow Compare at');
     expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe(sglangBefore);
     expect(chipRow('B200 (SGLang) FP8').dataset.pinned).toBeUndefined();
-    expect(sliderValue()).toBe('60 tok/s/user');
+    expect(compareAt.value).toBe(60);
     // The drill-down stays on the clicked chip; its outline and list move to the column.
     expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
     expect(marker()!.getAttribute('x')).not.toBe(markerBefore);
@@ -349,8 +357,9 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(1);
   });
 
-  it('keeps the pin through opening another chip and collapsing, drops it when the slider moves', () => {
+  it('keeps the pin through opening another chip and collapsing, drops it when Compare at moves', () => {
     renderPanelInline([...sglang, ...vllm]);
+    setCompareAt(60);
     const order = chipRows().map(
       (row) => row.querySelector('span span span.truncate')?.textContent,
     );
@@ -373,9 +382,8 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
     expect(partsHeading()).toBe('B200 (vLLM) FP8 · c4 · 100 tok/s/user');
     expect(marker()).not.toBeNull();
-    // The slider is the global control: every pin goes, the rows keep their order.
-    moveSlider(0);
-    expect(sliderValue()).toBe('20 tok/s/user');
+    // Compare at is the global control: every pin goes, the rows keep their order.
+    setCompareAt(20);
     expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
     expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
     expect(
@@ -506,9 +514,9 @@ describe('PowerChipCompare legend highlight', () => {
     expect(item.getAttribute('aria-pressed')).toBe('false');
     for (const segment of segments('gpu')) expect(segment.dataset.emphasis).toBe('plain');
     expect(area('gpu').dataset.emphasis).toBe('plain');
-    // The drill-down's list follows the slider's chip and point: vLLM c16 at 60 tok/s/user.
+    // The drill-down's list follows Compare at's chip and point: SGLang c4 at 80 tok/s/user.
     expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toBe(
-      'B200 (vLLM) FP8 · c16 · 60 tok/s/user',
+      'B200 (SGLang) FP8 · c4 · 80 tok/s/user',
     );
     // A part row hovered in the list raises its layer on every chip bar too.
     mouse(partRow('fans'), 'mouseover');
@@ -558,6 +566,7 @@ const compareButton = () =>
 const renderTouchInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
   render(
     <PowerXSurfaceProvider>
+      <CompareAtProbe />
       <PowerAnalysisPanels
         data={data}
         overlayData={overlayData}
@@ -587,8 +596,10 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     env.coarsePointer = true;
   });
 
-  it('scrubs the nearest column into the readout, moves the slider from the button', () => {
+  it('scrubs the nearest column into the readout, moves Compare at from the button', () => {
     renderTouchInline([...sglang, ...vllm]);
+    // Compare at 60: the drill-down opens on vLLM, whose columns the finger reads.
+    setCompareAt(60);
     const columns = touchHits();
     expect(columns).toHaveLength(4);
     // A finger on the plot reads the column nearest its x, wherever the hit band is.
@@ -607,17 +618,17 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     pointer(columns[1], 'pointermove', { clientX: AT.c4, clientY: 180 });
     expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
     expect(rule()?.dataset.index).toBe('2');
-    // The scrub keeps the slider and every row where they were.
-    expect(sliderValue()).toBe('60 tok/s/user');
+    // The scrub keeps Compare at and every row where they were.
+    expect(compareAt.value).toBe(60);
     expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
     pointer(columns[1], 'pointerup', { clientX: AT.c4, clientY: 180 });
     expect(panelReadout()?.dataset.source).toBe('scrub');
     expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
-    // The explicit action: the slider moves to the scrubbed interactivity.
+    // The explicit action: Compare at moves to the scrubbed interactivity.
     expect(compareButton()?.textContent).toBe('Compare chips at 100 tok/s/user');
     expect(compareButton()?.disabled).toBe(false);
     act(() => compareButton()!.click());
-    expect(sliderValue()).toBe('100 tok/s/user');
+    expect(compareAt.value).toBe(100);
     expect(track).toHaveBeenCalledWith('powerx_compare_at_scrub', {
       gpu: 'b200_vllm',
       concurrency: 4,
@@ -658,6 +669,8 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
   const renderInline = () =>
     render(
       <PowerXSurfaceProvider>
+        {/* ChartDisplay publishes the covered range: the default Compare at clamps into it. */}
+        <CompareAtProbe range={[INTERACTIVITY[0], INTERACTIVITY.at(-1)!]} />
         <PowerAnalysisPanels
           data={sweep}
           xField="mean_tpot_intvty"
@@ -681,11 +694,11 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
     }
   });
 
-  it('keeps the slider guide value above the plot, clear of the reference labels', () => {
+  it('keeps the Compare at guide value above the plot, clear of the reference labels', () => {
     env.coarsePointer = true;
     renderInline();
     const hits = drilldown().querySelectorAll('[data-testid="power-breakdown-hit"]');
-    // Hold the lowest-interactivity column, so the slider guide sits off it and is labelled.
+    // Hold the lowest-interactivity column, so the Compare at guide sits off it and is labelled.
     act(() =>
       (hits[0] as SVGRectElement).dispatchEvent(new MouseEvent('click', { bubbles: true })),
     );
@@ -693,14 +706,14 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
       '[data-testid="power-breakdown-guide-label"]',
     );
     expect(label).not.toBeNull();
-    expect(label!.textContent).toMatch(/^Slider \d+\.\d tok\/s\/user$/);
+    expect(label!.textContent).toMatch(/^Compare at \d+\.\d tok\/s\/user$/);
     expect(label!.dataset.range).toBe('within');
     // In the margin above the plot, outside the clipped plot group the reference labels use.
     expect(Number(label!.getAttribute('y'))).toBeLessThan(0);
     expect(label!.closest('g.zoom')).toBeNull();
   });
 
-  it('reads the held point as an even grid of layer tiles and lets it follow the slider again', () => {
+  it('reads the held point as an even grid of layer tiles and lets it follow Compare at again', () => {
     env.coarsePointer = true;
     renderInline();
     const hits = drilldown().querySelectorAll('[data-testid="power-breakdown-hit"]');
@@ -738,11 +751,11 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
       tiles().map((_, index) => String(index === 1)),
     );
     expect(tiles()[0].dataset.emphasis).toBe('faded');
-    // The held point names itself and offers the way back to the slider.
+    // The held point names itself and offers the way back to Compare at.
     const follow = drilldown().querySelector<HTMLButtonElement>(
       '[data-testid="power-breakdown-readout-follow"]',
     );
-    expect(follow?.textContent).toBe('Follow slider');
+    expect(follow?.textContent).toBe('Follow Compare at');
     act(() => follow!.click());
     expect(drilldownReadout()?.dataset.source).toBe('compared');
     expect(drilldown().querySelector('[data-testid="power-breakdown-readout-follow"]')).toBeNull();

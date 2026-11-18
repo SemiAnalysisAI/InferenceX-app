@@ -2,7 +2,7 @@
 
 import * as d3 from 'd3';
 import { Pin } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -11,7 +11,6 @@ import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
-import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -52,22 +51,19 @@ import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
   usePowerXSurface,
-  useSetPowerXCompareTarget,
 } from './powerx-surface';
 
 const STRINGS = {
   en: {
-    target: 'Interactivity',
-    unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
     gpuShare: (pct: string) => `GPU ${pct}`,
     outOfRange: (labels: string) => `Not benchmarked near this interactivity: ${labels}`,
     measured: 'Measured',
     modeled: 'Modeled (hatched)',
     pinned: 'Pinned',
-    pinnedPoint: (conc: number) => `Pinned to c${conc} · click to follow the slider`,
-    comparedAt: (x: string, slider: string) =>
-      `Compared at ${x} tok/s/user · slider at ${slider} tok/s/user`,
+    pinnedPoint: (conc: number) => `Pinned to c${conc} · click to follow Compare at`,
+    comparedAt: (x: string, at: string) =>
+      `Pinned point at ${x} tok/s/user · Compare at ${at} tok/s/user`,
     legend: 'Power layers',
     ofTotal: 'of total',
     bands: {
@@ -91,7 +87,7 @@ const STRINGS = {
     perGpu: 'W per GPU, all-in',
     perGpuIt: 'W per GPU, IT (no PUE)',
     itSubtotal: (watts: string) => `IT ${watts} W`,
-    empty: 'No chip has a benchmark point near this interactivity',
+    empty: 'No GPU has a benchmark point near Compare at',
     noModel: (labels: string) =>
       `Not shown: ${labels}. Its GPU power is measured, but there is no whole-system model for this setup yet.`,
     categories: {
@@ -110,17 +106,14 @@ const STRINGS = {
     } satisfies Record<SystemPowerCategory, string>,
   },
   zh: {
-    target: '交互性',
-    unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
     gpuShare: (pct: string) => `GPU ${pct}`,
     outOfRange: (labels: string) => `未在该交互性附近测试：${labels}`,
     measured: '实测',
     modeled: '建模（斜线）',
     pinned: '已固定',
-    pinnedPoint: (conc: number) => `已固定在 c${conc} · 点击后跟随滑块`,
-    comparedAt: (x: string, slider: string) =>
-      `对比点 ${x} tok/s/user · 滑块位于 ${slider} tok/s/user`,
+    pinnedPoint: (conc: number) => `已固定在 c${conc} · 点击后跟随对比点`,
+    comparedAt: (x: string, at: string) => `固定点 ${x} tok/s/user · 对比点 ${at} tok/s/user`,
     legend: '功耗分层',
     ofTotal: '占总功耗',
     bands: {
@@ -142,7 +135,7 @@ const STRINGS = {
     perGpu: '每 GPU 整体功耗（W）',
     perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
     itSubtotal: (watts: string) => `IT ${watts} W`,
-    empty: '没有芯片在该交互性附近有基准测试点',
+    empty: '没有 GPU 在对比点附近有基准测试点',
     noModel: (labels: string) => `未显示：${labels}。其 GPU 功耗为实测，但该配置暂无整机功耗模型。`,
     categories: {
       gpu: 'GPU',
@@ -163,14 +156,13 @@ const STRINGS = {
 
 const watts = d3.format(',.0f');
 const pct = d3.format('.0%');
-/** The slider, the rows and the drill-down print interactivity alike. */
+/** The rows and the drill-down print interactivity alike. */
 const rate = formatInteractivity;
-const SLIDER_STEPS = 200;
 const MIN_LABEL_SHARE = 0.08;
 
 /** One hue for the shared legend: the stack's steps and hatches on the muted foreground. */
 const LEGEND_COLOR = 'var(--muted-foreground)';
-/** The slider's accent, on the pin glyph and the pinned row's point so both read as "off the slider". */
+/** The pin accent, on the pin glyph and the pinned row's point so both read as "off Compare at". */
 export const PIN_ACCENT_CLASS = 'text-secondary dark:text-primary';
 
 /**
@@ -216,16 +208,16 @@ export default function PowerChipCompare({
   /** Series whose drill-down renders inline under its bar. */
   expandedKey: string | null;
   renderExpanded: (key: string) => React.ReactNode;
-  /** Reports the chip whose point sits nearest the slider; the drill-down opens under it. */
+  /** Reports the chip whose point sits nearest Compare at; the drill-down opens under it. */
   onNearestKeyChange: (key: string | null) => void;
   /** Shared with the drill-down's plot on the Where view. */
   layerHighlight: PowerLayerHighlight | null;
   onLayerHighlight: (next: PowerLayerHighlight | null) => void;
-  /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
+  /** Chips compared at a pinned point (series key → concurrency) instead of Compare at. */
   comparedPoints?: PowerComparedPoints;
-  /** The row's pin marker was clicked: that chip follows the slider again. */
+  /** The row's pin marker was clicked: that chip follows Compare at again. */
   onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
-  /** The slider moved (the global control): the owner drops every pinned point. */
+  /** Compare at moved (the global control): the owner drops every pinned point. */
   onTargetChange?: () => void;
   /**
    * The PowerX GPU role. Off All GPUs, each disaggregated chip's measured GPU layer splits
@@ -238,7 +230,7 @@ export default function PowerChipCompare({
   const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
-  // PowerX phones: 44 px legend and chip rows, a 28 px slider thumb (globals.css).
+  // PowerX phones: 44 px legend and chip rows (globals.css).
   const powerX = usePowerXSurface();
   // PowerX under `md`: 56 px chip cards with an 8 px bar and no in-bar watt labels (the
   // readout and the parts rows carry the numbers); from `md` up the rows are unchanged.
@@ -277,17 +269,20 @@ export default function PowerChipCompare({
     activeKeys: hwKeys,
   });
 
-  const [lo, hi] = useMemo(() => {
-    const xs = series.flatMap((entry) => entry.points.map((point) => point.interactivity));
-    return xs.length > 0 ? [Math.min(...xs), Math.max(...xs)] : [1, 1];
-  }, [series]);
   const fallback = useMemo(() => defaultComparisonInteractivity(series), [series]);
-  // The target is shared with the drill-down and the main chart.
+  // Compare at (the shell's control) is shared with the drill-down and the other tabs; the
+  // geometric middle is only a fallback outside PowerX.
   const target = usePowerXCompareTarget();
-  const setTarget = useSetPowerXCompareTarget();
   const value = target ?? fallback;
+  // A new Compare at drops every pinned point, as the old slider did.
+  const previousTarget = useRef(target);
+  useEffect(() => {
+    if (previousTarget.current === target) return;
+    previousTarget.current = target;
+    onTargetChange?.();
+  }, [target, onTargetChange]);
 
-  // Rows keep the series order (registry order, overlays last) whatever the slider reads.
+  // Rows keep the series order (registry order, overlays last) whatever Compare at reads.
   const { rows, outOfRange } = useMemo(
     () =>
       value
@@ -295,8 +290,8 @@ export default function PowerChipCompare({
         : { rows: [], outOfRange: [] },
     [series, value, comparedPoints],
   );
-  // The compared chip: the one whose point is closest to the slider interactivity. A
-  // pinned chip counts by its slider-nearest point, not its pin, so pinning never moves
+  // The compared chip: the one whose point is closest to Compare at. A
+  // pinned chip counts by its point nearest Compare at, not its pin, so pinning never moves
   // the drill-down to another chip.
   const nearestKey = useMemo(() => {
     if (value === null) return null;
@@ -340,39 +335,8 @@ export default function PowerChipCompare({
     );
   }
 
-  const toStep = (x: number) =>
-    hi > lo ? Math.round((Math.log(x / lo) / Math.log(hi / lo)) * SLIDER_STEPS) : 0;
-  const fromStep = (step: number) => lo * (hi / lo) ** (step / SLIDER_STEPS);
-
   return (
     <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
-      <div className="no-export flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex min-w-0 flex-1 basis-72 items-center gap-3 text-sm">
-          <span className="shrink-0 font-medium text-muted-foreground">{t.target}</span>
-          <input
-            type="range"
-            min={0}
-            max={SLIDER_STEPS}
-            value={toStep(value)}
-            onChange={(event) => {
-              setTarget?.(fromStep(Number(event.target.value)));
-              onTargetChange?.();
-            }}
-            onPointerUp={() => track('inference_power_compare_target_changed')}
-            className={cn('range-slider h-4 min-w-0 flex-1', powerX && 'powerx-range text-brand')}
-            style={rangeProgressStyle(toStep(value), 0, SLIDER_STEPS)}
-            data-testid="power-chip-compare-target"
-            aria-valuetext={`${rate(value)} ${t.unit}`}
-          />
-          <span
-            className="shrink-0 tabular-nums font-medium"
-            data-testid="power-chip-compare-value"
-          >
-            {rate(value)} {t.unit}
-          </span>
-        </label>
-      </div>
-
       <ul
         className="flex flex-wrap gap-x-1 gap-y-0.5 text-xs text-muted-foreground"
         aria-label={t.legend}
@@ -474,8 +438,8 @@ export default function PowerChipCompare({
                 <span className="truncate">{entry.label}</span>
               </span>
             );
-            // A pinned row is off the slider: its point reads in the pin's accent and
-            // its title says where the slider is.
+            // A pinned row is off Compare at: its point reads in the pin's accent and
+            // its title says where Compare at is.
             const pointLine = (
               <span
                 className={`flex items-center gap-1 pl-4.5 text-xs ${
