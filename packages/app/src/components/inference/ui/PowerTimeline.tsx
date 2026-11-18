@@ -28,7 +28,9 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
+import { usePowerXCompareTarget, usePowerXSurface } from '@/components/inference/ui/powerx-surface';
+import { Switch } from '@/components/ui/switch';
+import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { ApiRequestError } from '@/lib/api/api-request-error';
 import { computeToggle } from '@/lib/shared/toggle-set';
@@ -51,7 +53,20 @@ import {
 import type { InferenceData, OverlayData } from '../types';
 import type { PowerXRole } from '../powerx/powerx-role';
 import { powerVariantDash } from '../utils/power-compare';
+import { powerBreakdownInteractivity } from '../utils/power-breakdown';
 import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwings';
+import { formatLoadSwingWatts, loadSwingRows } from '../powerx/load-swing-rows';
+import { POWERX_COMPARE_AT_DEFAULT } from '../powerx/powerx-compare-at';
+import {
+  POWERX_QUIET_BUTTON,
+  PowerXChartFrame,
+  PowerXMore,
+  PowerXMoreGroup,
+  PowerXSeg,
+  PowerXToolbarOption,
+} from '../powerx/PowerXShell';
+import { PowerXSwingRanking, type PowerXSwingRankingRowView } from '../powerx/PowerXSwingRanking';
+import { powerXSwingRanking } from '../powerx/swing-ranking';
 import PowerTimelineSummary from './PowerTimelineSummary';
 import {
   allGpuPool,
@@ -64,6 +79,8 @@ import {
   prioritizeRun,
   prioritizeRuns,
   POWER_TIMELINE_SMOOTH_SECONDS,
+  POWERX_TIMELINE_SMOOTH_SECONDS,
+  nearestTracePoints,
   powerTimelineStatus,
   rollingMean,
   spreadLabelYs,
@@ -187,6 +204,39 @@ const STRINGS = {
     precision: 'Precision',
     runDate: 'Run date',
     viewWorkflow: 'View workflow run',
+    trace: 'Trace',
+    traceNearest: (at: number) => `Each GPU · nearest ${at} tok/s/user`,
+    traceNearestShort: (at: number) => `Nearest ${at}`,
+    traceNamed: (name: string, conc: number, nearestAt: number | null) =>
+      `${name} · c${conc}${nearestAt === null ? '' : ` (nearest ${nearestAt} tok/s/user)`}`,
+    traceNamedShort: (name: string, conc: number, nearest: boolean) =>
+      `${name} · c${conc}${nearest ? ' · nearest' : ''}`,
+    traceEvery: (conc: number) => `Every GPU · c${conc}`,
+    traceAll: 'Every concurrency',
+    traceGroupAt: 'Compare at',
+    traceGroupConc: 'Every GPU at one concurrency',
+    traceGroupOne: 'Highlight one trace',
+    rack: `×${NVL72_GPUS_PER_RACK} per NVL72 rack`,
+    rackShort: `×${NVL72_GPUS_PER_RACK}`,
+    rackHelp: `Multiplies the per-GPU figures by ${NVL72_GPUS_PER_RACK} and shows kW per NVL72 rack. Assumes all ${NVL72_GPUS_PER_RACK} GPUs swing together, so it is an upper bound on rack-level swings.`,
+    rackPoolNote: 'Pool lines stay in W: a pool is not a per-GPU figure.',
+    lines: 'Lines',
+    smooth: `${POWERX_TIMELINE_SMOOTH_SECONDS} s smoothing`,
+    smoothHelp: `Draw a centred ${POWERX_TIMELINE_SMOOTH_SECONDS}-second rolling mean instead of the recorded 1 s samples. Off by default. Tooltips, the ranking and the load-swings table always use recorded values.`,
+    axisShort: {
+      wall: 'UTC',
+      elapsed: 'Since telemetry',
+      serving: 'Since serving start',
+    } satisfies Record<PowerTimelineAxis, string>,
+    swingUnit: (unit: string) => `Max 5 s swing (${unit})`,
+    swingUnitSplit: (unit: string) => `Max 5 s swing (${unit}), prefill / decode`,
+    unitGpu: 'W per GPU',
+    unitRack: 'kW per NVL72 rack',
+    perRack: (value: string) => `${value} per rack`,
+    perGpuValue: (value: string) => `${value} per GPU`,
+    swingsNote: (at: number) => `One trace per GPU nearest ${at} tok/s/user`,
+    yMeanRack: `Mean power per NVL72 rack (kW, ×${NVL72_GPUS_PER_RACK})`,
+    yGpuRack: `Power per GPU × ${NVL72_GPUS_PER_RACK} (kW)`,
   },
   zh: {
     timeAxis: '时间轴',
@@ -268,6 +318,39 @@ const STRINGS = {
     precision: '精度',
     runDate: '运行日期',
     viewWorkflow: '查看工作流运行',
+    trace: '曲线',
+    traceNearest: (at: number) => `每个 GPU · 最接近 ${at} tok/s/user`,
+    traceNearestShort: (at: number) => `最接近 ${at}`,
+    traceNamed: (name: string, conc: number, nearestAt: number | null) =>
+      `${name} · c${conc}${nearestAt === null ? '' : `（最接近 ${nearestAt} tok/s/user）`}`,
+    traceNamedShort: (name: string, conc: number, nearest: boolean) =>
+      `${name} · c${conc}${nearest ? ' · 最接近' : ''}`,
+    traceEvery: (conc: number) => `每个 GPU · c${conc}`,
+    traceAll: '全部并发',
+    traceGroupAt: '对比点',
+    traceGroupConc: '所有 GPU 取同一并发',
+    traceGroupOne: '突出显示一条曲线',
+    rack: `×${NVL72_GPUS_PER_RACK}（每 NVL72 机架）`,
+    rackShort: `×${NVL72_GPUS_PER_RACK}`,
+    rackHelp: `将每 GPU 数值乘以 ${NVL72_GPUS_PER_RACK}，以每 NVL72 机架 kW 显示。假设全部 ${NVL72_GPUS_PER_RACK} 颗 GPU 同步波动，因此是机架级波动的上限。`,
+    rackPoolNote: 'GPU 池曲线仍以 W 显示：池功耗不是每 GPU 数值。',
+    lines: '曲线',
+    smooth: `${POWERX_TIMELINE_SMOOTH_SECONDS} 秒平滑`,
+    smoothHelp: `以每点为中心的 ${POWERX_TIMELINE_SMOOTH_SECONDS} 秒滚动平均代替记录的 1 秒采样绘制曲线。默认关闭。提示框、排名和负载波动表始终使用记录值。`,
+    axisShort: {
+      wall: 'UTC',
+      elapsed: '距遥测起点',
+      serving: '距服务窗口起点',
+    } satisfies Record<PowerTimelineAxis, string>,
+    swingUnit: (unit: string) => `最大 5 秒波动（${unit}）`,
+    swingUnitSplit: (unit: string) => `最大 5 秒波动（${unit}），预填充 / 解码`,
+    unitGpu: '每 GPU W',
+    unitRack: '每 NVL72 机架 kW',
+    perRack: (value: string) => `每机架 ${value}`,
+    perGpuValue: (value: string) => `每 GPU ${value}`,
+    swingsNote: (at: number) => `每个 GPU 取最接近 ${at} tok/s/user 的一条曲线`,
+    yMeanRack: `每 NVL72 机架平均功耗（kW，×${NVL72_GPUS_PER_RACK}）`,
+    yGpuRack: `单 GPU 功耗 × ${NVL72_GPUS_PER_RACK}（kW）`,
   },
 } as const;
 
@@ -366,11 +449,27 @@ export interface PowerTimelineProps {
   /** PowerX GPU role: per-GPU mean lanes per worker pool instead of the all-GPU mean. */
   role?: PowerXRole;
   /**
-   * PowerX insight card, rendered under the caption from the traces the load-swings table
-   * reads (empty while runs are still loading), so its 5 s swing matches the table.
+   * PowerX layout: builds the chart header (toolbar and y-title row) from the timeline's own
+   * options. The timeline then reads one trace per GPU nearest Compare at by default, ranks
+   * the GPUs by their 5 s swing beside the plot and puts the load-swings table below it.
    */
-  insight?: (traces: readonly PowerTimelineTrace[]) => React.ReactNode;
+  powerXHeader?: (parts: PowerTimelineHeaderParts) => React.ReactNode;
+  /** Chart height in px (the PowerX plot heights); 600 by default. */
+  height?: number;
+  /** The chart's x field: which interactivity (tok/s/user) the trace nearest Compare at reads. */
+  xField?: string;
 }
+
+export interface PowerTimelineHeaderParts {
+  /** Toolbar options: Trace and the ×72 rack switch. */
+  options: React.ReactNode;
+  more: React.ReactNode;
+  /** The y title over the plot. */
+  title: string;
+}
+
+/** Trace: one per GPU nearest Compare at (PowerX layout), every load, or one concurrency. */
+type TraceMode = 'nearest' | 'all' | number;
 
 type TimelineStrings = (typeof STRINGS)[keyof typeof STRINGS];
 
@@ -650,12 +749,12 @@ function tracePaths(
   xMode: XMode,
   lineMode: DrawMode,
   windowOnly: boolean,
-  raw = false,
+  smoothSeconds = POWER_TIMELINE_SMOOTH_SECONDS,
   dense = false,
   role: PowerXRole = 'all',
 ): TracePath[] {
   const { series } = trace;
-  const span = raw ? 1 : smoothSpan(series);
+  const span = smoothSpan(series, smoothSeconds);
   const rows = traceRows(series, lineMode, role).map((row) => ({
     ...row,
     values: rollingMean(row.values, span),
@@ -711,9 +810,10 @@ function tracePaths(
   return paths;
 }
 
-function smoothSpan(series: Pick<GpuPowerSeries, 'bucketSeconds'>): number {
+/** Samples in a centred rolling mean of `seconds`; 1 (the recorded samples) for 0. */
+function smoothSpan(series: Pick<GpuPowerSeries, 'bucketSeconds'>, seconds: number): number {
   const bucket = series.bucketSeconds > 0 ? series.bucketSeconds : 1;
-  return Math.max(1, Math.round(POWER_TIMELINE_SMOOTH_SECONDS / bucket));
+  return Math.max(1, Math.round(seconds / bucket));
 }
 
 function traceSamples(
@@ -723,7 +823,7 @@ function traceSamples(
   xMode: XMode,
   lineMode: DrawMode,
   windowOnly: boolean,
-  raw = false,
+  smoothSeconds = POWER_TIMELINE_SMOOTH_SECONDS,
   role: PowerXRole = 'all',
 ): TimelineSample[] {
   const { series } = trace;
@@ -738,14 +838,23 @@ function traceSamples(
         windowOnly,
         lane.rows,
         undefined,
-        !raw && lineMode !== 'gpu',
+        lineMode === 'gpu' ? 0 : smoothSeconds,
         { role: lane.role, kind: lane.kind, gpuCount: lane.rows.length },
       ),
     );
   }
   if (lineMode !== 'pool') {
     const rows = series.power.map((_, row) => row);
-    return sampleRows(trace, color, overlayIndex, xMode, windowOnly, rows, undefined, !raw);
+    return sampleRows(
+      trace,
+      color,
+      overlayIndex,
+      xMode,
+      windowOnly,
+      rows,
+      undefined,
+      smoothSeconds,
+    );
   }
   return drawnPools(series).flatMap((pool) =>
     sampleRows(
@@ -756,7 +865,7 @@ function traceSamples(
       windowOnly,
       pool.rows,
       { role: pool.role, gpuCount: pool.rows.length },
-      !raw,
+      smoothSeconds,
     ),
   );
 }
@@ -769,7 +878,7 @@ function sampleRows(
   windowOnly: boolean,
   rows: readonly number[],
   pool: TimelineSample['pool'],
-  smoothY = false,
+  smoothSeconds = 0,
   lane?: LaneInfo,
 ): TimelineSample[] {
   const { series } = trace;
@@ -807,10 +916,10 @@ function sampleRows(
       lane,
     });
   }
-  if (smoothY) {
+  if (smoothSeconds > 0) {
     const smoothed = rollingMean(
       samples.map((sample) => sample.y),
-      smoothSpan(series),
+      smoothSpan(series, smoothSeconds),
     );
     samples.forEach((sample, index) => {
       sample.drawnY = smoothed[index] ?? sample.y;
@@ -1015,6 +1124,16 @@ function drawReferenceLines(
   });
 }
 
+function shortHardware(point: InferenceData): string {
+  const base = baseHardware(point.hwKey);
+  return HW_REGISTRY[base]?.label ?? base.toUpperCase();
+}
+
+/** W per GPU → kW per NVL72 rack (the ×72 per NVL72 rack option). */
+function toRackKw(watts: number): number {
+  return (watts * NVL72_GPUS_PER_RACK) / 1000;
+}
+
 export default function PowerTimeline({
   chartId,
   data,
@@ -1024,10 +1143,14 @@ export default function PowerTimeline({
   comparison = false,
   runNumbering: providedRunNumbering,
   role = 'all',
-  insight,
+  powerXHeader,
+  xField,
+  height = CHART_HEIGHT,
 }: PowerTimelineProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const layout = powerXHeader !== undefined;
+  const compareAt = usePowerXCompareTarget() ?? POWERX_COMPARE_AT_DEFAULT;
   const { hardwareConfig, hwTypesWithData } = useInferenceData();
   const { activeHwTypes, selectedPrecisions, quickFilters, activeDates } = useInferenceFilters();
   const { isLegendExpanded, highContrast } = useInferenceDisplay();
@@ -1052,6 +1175,7 @@ export default function PowerTimeline({
       i_ptutility: getUrlParam('i_ptutility'),
       i_ptconc: getUrlParam('i_ptconc'),
       i_ptraw: getUrlParam('i_ptraw'),
+      i_ptsmooth: getUrlParam('i_ptsmooth'),
     }),
   );
   const powerXSurface = usePowerXSurface();
@@ -1064,12 +1188,27 @@ export default function PowerTimeline({
   const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
   const [showUtility, setShowUtility] = useState(initialView.utility);
   const [raw, setRaw] = useState(initialView.raw);
+  // PowerX layout: recorded samples unless 5 s smoothing is on; elsewhere 30 s unless raw.
+  const [smooth, setSmooth] = useState(initialView.smooth);
+  const smoothSeconds = layout
+    ? smooth
+      ? POWERX_TIMELINE_SMOOTH_SECONDS
+      : 0
+    : raw
+      ? 0
+      : POWER_TIMELINE_SMOOTH_SECONDS;
+  const [rack, setRack] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
   const requestedFocusRef = useRequestedPowerTraceFocus();
-  const [concurrency, setConcurrency] = useState<number | null>(() =>
-    requestedFocusRef.current ? null : initialView.concurrency,
-  );
+  // An explicit concurrency in the URL wins; a shared or requested focus keeps every load so
+  // the focused trace stays drawn; otherwise the PowerX layout reads each GPU nearest Compare at.
+  const [concurrency, setConcurrency] = useState<TraceMode>(() => {
+    if (requestedFocusRef.current) return 'all';
+    if (initialView.concurrency !== null) return initialView.concurrency;
+    if (!layout || initialView.everyConcurrency || initialView.focus) return 'all';
+    return 'nearest';
+  });
 
   const plotsHere = useCallback(
     (point: InferenceData) =>
@@ -1091,10 +1230,11 @@ export default function PowerTimeline({
         .toSorted((a, b) => a - b),
     [measuredData, overlayPoints],
   );
-  // PowerX tab: first view compares chips at one shared load rather than every concurrency.
-  // A shared or requested focus keeps every load so the focused trace stays drawn.
+  // PowerX tab (old surface): first view compares chips at one shared load rather than every
+  // concurrency. A shared or requested focus keeps every load so the focused trace stays drawn.
   const autoConcurrencyRef = useRef(
     !powerXSurface ||
+      layout ||
       initialView.concurrency !== null ||
       Boolean(initialView.focus) ||
       Boolean(requestedFocusRef.current),
@@ -1102,14 +1242,42 @@ export default function PowerTimeline({
   useEffect(() => {
     if (autoConcurrencyRef.current || measuredData.length === 0) return;
     autoConcurrencyRef.current = true;
-    setConcurrency(mostCoveredConcurrency(measuredData));
+    setConcurrency(mostCoveredConcurrency(measuredData) ?? 'all');
   }, [measuredData]);
+  const comparisonSeriesOf = useCallback(
+    (point: InferenceData) =>
+      comparison && !overlayPointSet.has(point) ? `${point.date}_${point.hwKey}` : undefined,
+    [comparison, overlayPointSet],
+  );
+  /** The GPU series a point belongs to: one line colour, one ranking row. */
+  const gpuSeriesOf = useCallback(
+    (point: InferenceData) =>
+      overlayPointSet.has(point)
+        ? `${point.run_url ?? ''}|${point.hwKey}`
+        : (comparisonSeriesOf(point) ?? point.hwKey),
+    [overlayPointSet, comparisonSeriesOf],
+  );
+  // The same interactivity Breakdown reads, so Over time and Breakdown pick the same point.
+  const interactivity = useMemo(() => powerBreakdownInteractivity(xField).value, [xField]);
+  const nearestPoints = useMemo(
+    () =>
+      nearestTracePoints(
+        [...measuredData, ...overlayPoints],
+        compareAt,
+        gpuSeriesOf,
+        interactivity,
+      ),
+    [measuredData, overlayPoints, compareAt, gpuSeriesOf, interactivity],
+  );
+  const nearestPointSet = useMemo(() => new Set(nearestPoints), [nearestPoints]);
   const allPoints = useMemo(
     () =>
-      [...measuredData, ...overlayPoints].filter(
-        (point) => concurrency === null || point.conc === concurrency,
-      ),
-    [measuredData, overlayPoints, concurrency],
+      concurrency === 'nearest'
+        ? nearestPoints
+        : [...measuredData, ...overlayPoints].filter(
+            (point) => concurrency === 'all' || point.conc === concurrency,
+          ),
+    [measuredData, overlayPoints, concurrency, nearestPoints],
   );
 
   const hwKeysInData = useMemo(
@@ -1131,11 +1299,6 @@ export default function PowerTimeline({
   const requests = useMemo(() => planPowerTimelineRequests(allPoints), [allPoints]);
   const focusRun = traceKeyRunId(requestedFocusRef.current ?? focusKey);
   const officialHwTypes = localOfficialOverride ?? activeHwTypes;
-  const comparisonSeriesOf = useCallback(
-    (point: InferenceData) =>
-      comparison && !overlayPointSet.has(point) ? `${point.date}_${point.hwKey}` : undefined,
-    [comparison, overlayPointSet],
-  );
   const isShown = useCallback(
     (point: InferenceData) => {
       if (overlayPointSet.has(point)) return activeOverlayHwTypes.has(point.hwKey);
@@ -1287,10 +1450,27 @@ export default function PowerTimeline({
       i_ptwindow: windowOnly ? 'window' : '',
       i_ptfocus: focusKey ?? '',
       i_ptutility: showUtility ? '1' : '',
-      i_ptconc: concurrency === null ? '' : String(concurrency),
-      i_ptraw: raw ? '1' : '',
+      i_ptconc:
+        typeof concurrency === 'number'
+          ? String(concurrency)
+          : concurrency === 'all' && layout
+            ? 'all'
+            : '',
+      i_ptraw: raw && !layout ? '1' : '',
+      i_ptsmooth: smooth && layout ? '1' : '',
     });
-  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, concurrency, raw, setUrlParams]);
+  }, [
+    xModeChoice,
+    lineMode,
+    windowOnly,
+    focusKey,
+    showUtility,
+    concurrency,
+    raw,
+    smooth,
+    layout,
+    setUrlParams,
+  ]);
 
   const missingWindows =
     windowOnly || xMode === 'serving'
@@ -1344,7 +1524,7 @@ export default function PowerTimeline({
         xMode,
         drawMode,
         windowOnly,
-        raw,
+        smoothSeconds,
         visibleTraces.length > DENSE_TRACES,
         role,
       ).map((path) => ({ ...path, series }));
@@ -1409,7 +1589,7 @@ export default function PowerTimeline({
     drawMode,
     role,
     windowOnly,
-    raw,
+    smoothSeconds,
     t,
   ]);
 
@@ -1427,9 +1607,18 @@ export default function PowerTimeline({
     () =>
       visibleTraces.flatMap((trace) => {
         const { color, overlayIndex } = colorForTrace(trace);
-        return traceSamples(trace, color, overlayIndex, xMode, drawMode, windowOnly, raw, role);
+        return traceSamples(
+          trace,
+          color,
+          overlayIndex,
+          xMode,
+          drawMode,
+          windowOnly,
+          smoothSeconds,
+          role,
+        );
       }),
-    [visibleTraces, colorForTrace, xMode, drawMode, windowOnly, raw, role],
+    [visibleTraces, colorForTrace, xMode, drawMode, windowOnly, smoothSeconds, role],
   );
 
   const referenceLines = useMemo<ReferenceLine[]>(() => {
@@ -1856,16 +2045,27 @@ export default function PowerTimeline({
     });
   }
   switches.push(
-    {
-      id: 'power-timeline-raw',
-      label: t.raw,
-      checked: raw,
-      onCheckedChange: (checked) => {
-        setRaw(checked);
-        track('inference_power_timeline_raw_toggled', { enabled: checked });
-      },
-      infoTooltip: t.rawHelp,
-    },
+    layout
+      ? {
+          id: 'power-timeline-smooth',
+          label: t.smooth,
+          checked: smooth,
+          onCheckedChange: (checked) => {
+            setSmooth(checked);
+            track('powerx_timeline_smoothing_toggled', { enabled: checked });
+          },
+          infoTooltip: t.smoothHelp,
+        }
+      : {
+          id: 'power-timeline-raw',
+          label: t.raw,
+          checked: raw,
+          onCheckedChange: (checked) => {
+            setRaw(checked);
+            track('inference_power_timeline_raw_toggled', { enabled: checked });
+          },
+          infoTooltip: t.rawHelp,
+        },
     {
       id: 'power-timeline-window-only',
       label: t.windowOnly,
@@ -1943,15 +2143,15 @@ export default function PowerTimeline({
         <ToolbarSelect
           id={`${chartId}-power-timeline-concurrency`}
           testId="power-timeline-concurrency"
-          value={concurrency === null ? '' : String(concurrency)}
+          value={typeof concurrency === 'number' ? String(concurrency) : ''}
           onChange={(selected) => {
             const value = selected === '' ? null : Number(selected);
-            setConcurrency(value);
+            setConcurrency(value ?? 'all');
             track('inference_power_timeline_concurrency_changed', { concurrency: value });
           }}
         >
           <option value="">{t.allConcurrencies}</option>
-          {concurrency !== null && !concurrencyOptions.includes(concurrency) && (
+          {typeof concurrency === 'number' && !concurrencyOptions.includes(concurrency) && (
             <option value={concurrency}>{`c${concurrency}`}</option>
           )}
           {concurrencyOptions.map((conc) => (
@@ -2016,8 +2216,248 @@ export default function PowerTimeline({
       colorOf={(trace) => colorForTrace(trace).color}
       labelOf={seriesLabel}
       role={role}
+      rack={layout ? rack : undefined}
+      note={layout && concurrency === 'nearest' ? t.swingsNote(compareAt) : undefined}
     />
   );
+
+  // PowerX layout: the Trace control names whose trace is drawn, e.g. "GB300 NVL72 · c180
+  // (nearest 80 tok/s/user)"; one option per mode, then each drawn trace to highlight.
+  const traceName = (trace: PowerTimelineTrace) => {
+    const nearest = concurrency === 'nearest' || nearestPointSet.has(trace.point);
+    return isPhone
+      ? t.traceNamedShort(shortHardware(trace.point), trace.point.conc, nearest)
+      : t.traceNamed(seriesLabel(trace.point), trace.point.conc, nearest ? compareAt : null);
+  };
+  const namedTrace = focusedTrace ?? (visibleTraces.length === 1 ? visibleTraces[0] : null);
+  const traceValue = focusedTrace
+    ? `trace:${focusedTrace.key}`
+    : typeof concurrency === 'number'
+      ? `c${concurrency}`
+      : concurrency;
+  const traceSelect = layout && (
+    <PowerXToolbarOption label={isPhone ? undefined : t.trace}>
+      <div className="relative min-w-0">
+        <select
+          aria-label={t.trace}
+          data-testid="power-timeline-trace"
+          value={traceValue}
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value.startsWith('trace:')) {
+              setFocusKey(value.slice('trace:'.length));
+              track('powerx_timeline_trace_changed', { trace: 'one' });
+              return;
+            }
+            const next: TraceMode =
+              value === 'nearest' || value === 'all' ? value : Number(value.slice(1));
+            setFocusKey(null);
+            setConcurrency(next);
+            track('powerx_timeline_trace_changed', {
+              trace: typeof next === 'number' ? 'concurrency' : next,
+              concurrency: typeof next === 'number' ? next : null,
+            });
+          }}
+          className={cn(
+            POWERX_QUIET_BUTTON,
+            'max-w-[26rem] appearance-none truncate pr-7 font-medium max-md:h-11 max-md:w-[6.75rem] max-md:pr-5',
+          )}
+        >
+          <optgroup label={t.traceGroupAt}>
+            <option value="nearest">
+              {concurrency === 'nearest' && namedTrace && !focusedTrace
+                ? traceName(namedTrace)
+                : isPhone
+                  ? t.traceNearestShort(compareAt)
+                  : t.traceNearest(compareAt)}
+            </option>
+          </optgroup>
+          <optgroup label={t.traceGroupConc}>
+            <option value="all">{t.traceAll}</option>
+            {typeof concurrency === 'number' && !concurrencyOptions.includes(concurrency) && (
+              <option value={`c${concurrency}`}>{t.traceEvery(concurrency)}</option>
+            )}
+            {concurrencyOptions.map((conc) => (
+              <option key={conc} value={`c${conc}`}>
+                {t.traceEvery(conc)}
+              </option>
+            ))}
+          </optgroup>
+          {(visibleTraces.length > 1 || focusedTrace) && (
+            <optgroup label={t.traceGroupOne}>
+              {visibleTraces.map((trace) => (
+                <option key={trace.key} value={`trace:${trace.key}`}>
+                  {traceName(trace)}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 right-2 size-4 max-md:right-1 -translate-y-1/2 text-muted-foreground"
+        />
+      </div>
+    </PowerXToolbarOption>
+  );
+  const rackSwitch = layout && (
+    <PowerXToolbarOption>
+      <label
+        className="flex cursor-pointer items-center gap-2 text-sm whitespace-nowrap max-md:min-h-11"
+        title={drawMode === 'pool' ? `${t.rackHelp} ${t.rackPoolNote}` : t.rackHelp}
+      >
+        <Switch
+          checked={rack}
+          data-testid="power-timeline-rack"
+          onCheckedChange={(checked) => {
+            setRack(checked);
+            track('powerx_timeline_rack_toggled', { enabled: checked });
+          }}
+        />
+        <span className="max-md:hidden">{t.rack}</span>
+        <span className="md:hidden">{t.rackShort}</span>
+      </label>
+    </PowerXToolbarOption>
+  );
+  const defaultAxis: XMode = 'serving';
+  const moreChanged =
+    (xMode === defaultAxis ? 0 : 1) +
+    (lineMode === 'mean' ? 0 : 1) +
+    (smooth ? 1 : 0) +
+    (windowOnly ? 1 : 0) +
+    (showUtility ? 1 : 0);
+  const more = layout && (
+    <PowerXMore
+      tab="time"
+      changed={moreChanged}
+      onReset={() => {
+        setXModeChoice(defaultAxis);
+        setLineMode('mean');
+        setSmooth(false);
+        setWindowOnly(false);
+        setShowUtility(false);
+      }}
+    >
+      <PowerXMoreGroup label={t.timeAxis}>
+        <PowerXSeg<XMode>
+          value={xMode}
+          ariaLabel={t.timeAxis}
+          testId="power-timeline-axis"
+          className="flex-wrap"
+          options={(['serving', 'elapsed', 'wall'] as const).map((mode) => ({
+            value: mode,
+            label: t.axisShort[mode],
+            title: t[mode],
+            testId: `power-timeline-axis-${mode}`,
+          }))}
+          onValueChange={(mode) => {
+            setXModeChoice(mode);
+            track('inference_power_timeline_axis_changed', { mode });
+          }}
+        />
+      </PowerXMoreGroup>
+      <PowerXMoreGroup label={t.lines}>
+        {switches.map((entry) => (
+          <label key={entry.id} className="flex items-start justify-between gap-3 text-sm">
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span>{entry.label}</span>
+              {entry.infoTooltip && (
+                <span className="text-xs text-muted-foreground">{entry.infoTooltip}</span>
+              )}
+            </span>
+            <Switch
+              checked={entry.checked}
+              data-testid={entry.id}
+              onCheckedChange={entry.onCheckedChange}
+            />
+          </label>
+        ))}
+      </PowerXMoreGroup>
+    </PowerXMore>
+  );
+
+  // The ranking beside the plot: each GPU's Max 5 s swing at its trace nearest Compare at,
+  // read from the same rows as the load-swings table.
+  const swingRanking = useMemo(
+    () =>
+      layout && loadingRuns === 0
+        ? powerXSwingRanking(loadSwingRows(visibleTraces, role), role, {
+            at: compareAt,
+            seriesOf: gpuSeriesOf,
+            interactivityOf: interactivity,
+          })
+        : [],
+    [layout, loadingRuns, visibleTraces, role, compareAt, gpuSeriesOf, interactivity],
+  );
+  const rankingTraceKeys = new Map(swingRanking.map((row) => [row.key, row.trace.key]));
+  const rankingRows: PowerXSwingRankingRowView[] = swingRanking.map((row) => {
+    const { point } = row.trace;
+    const bare = (watts: number | null) => formatLoadSwingWatts(watts, rack).replace(/ k?W$/u, '');
+    return {
+      key: row.key,
+      label: overlayPointSet.has(point) ? `✕ ${seriesLabel(point)}` : seriesLabel(point),
+      color: colorForTrace(row.trace).color,
+      rank: row.rank,
+      valueText: row.pools
+        ? `${bare(row.pools.prefill)} / ${bare(row.pools.decode)}`
+        : row.value === null
+          ? null
+          : formatLoadSwingWatts(row.value, rack),
+      delta: row.delta,
+      hidden: false,
+      aggregated: row.aggregated,
+      conc: point.conc,
+      x: interactivity(point) ?? null,
+      detail:
+        row.value === null || row.pools
+          ? undefined
+          : rack
+            ? t.perGpuValue(formatLoadSwingWatts(row.value, false))
+            : t.perRack(formatLoadSwingWatts(row.value, true)),
+      highlighted: namedTrace?.key === row.trace.key,
+      locked: overlayPointSet.has(point),
+    };
+  });
+  for (const item of legendItems) {
+    if (item.hw.startsWith('overlay-run-') || rankingTraceKeys.has(item.hw)) continue;
+    rankingRows.push({
+      key: item.hw,
+      label: comparison ? `${item.title} · ${item.label}` : item.label,
+      color: comparison ? item.color : getCssColor(item.color),
+      rank: null,
+      valueText: null,
+      delta: null,
+      hidden: !item.isActive,
+      aggregated: false,
+      conc: null,
+      x: null,
+      loading: item.isActive && loadingRuns > 0,
+    });
+  }
+  rankingRows.sort((a, b) => Number(a.hidden) - Number(b.hidden));
+  const rankingElement = layout && (
+    <PowerXSwingRanking
+      at={compareAt}
+      unit={
+        role === 'split'
+          ? t.swingUnitSplit(rack ? t.unitRack : t.unitGpu)
+          : t.swingUnit(rack ? t.unitRack : t.unitGpu)
+      }
+      rows={rankingRows}
+      onToggle={(key) => legendItems.find((item) => item.hw === key)?.onClick()}
+      onHover={(key) => setHighlight(key === null ? null : (rankingTraceKeys.get(key) ?? key))}
+    />
+  );
+  const rackAxis = layout && rack && drawMode !== 'pool';
+  const yLabel = rackAxis
+    ? drawMode === 'gpu'
+      ? t.yGpuRack
+      : t.yMeanRack
+    : drawMode === 'pool'
+      ? t.yPool
+      : drawMode === 'gpu'
+        ? t.yGpu
+        : t.yMean;
 
   const status = powerTimelineStatus({
     loadingRuns,
@@ -2030,6 +2470,198 @@ export default function PowerTimeline({
   });
   const blocked = status?.blocking === true;
 
+  // PowerX layout: the ranking names the GPUs; phones still key the dashed pool lanes.
+  const phoneKeyNeeded = drawMode === 'pool' || role === 'split';
+  const chartElement = (
+    <D3Chart<TimelineSample>
+      key={`${chartId}-${xMode}-${drawMode}-${role}-${windowOnly}-${rackAxis}`}
+      chartId={chartId}
+      data={samples}
+      height={height}
+      margin={margin}
+      watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
+      testId="power-timeline-chart-svg"
+      grabCursor
+      instructions={powerXSurface || blocked ? '' : t.instructions}
+      xScale={
+        xMode === 'wall'
+          ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
+          : { type: 'linear', domain: xDomain }
+      }
+      yScale={{ type: 'linear', domain: yDomain, nice: true }}
+      xAxis={{
+        label: xMode === 'wall' ? t.xWall : xMode === 'serving' ? t.xServing : t.xElapsed,
+        tickValues: (scale) => {
+          const timeScale = scale as d3.ScaleTime<number, number> | d3.ScaleLinear<number, number>;
+          const [left, right] = timeScale.range();
+          const spacing = isPhone ? X_TICK_SPACING.phone : X_TICK_SPACING.desktop;
+          return timeScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / spacing))));
+        },
+        tickFormat: xTickFormat,
+      }}
+      yAxis={{
+        label: yLabel,
+        tickCount: 8,
+        // ×72 per NVL72 rack: the data stays in W per GPU; ticks fall on round kW.
+        ...(rackAxis && {
+          tickValues: (scale) => {
+            const [low, high] = (scale as AnyContinuousScale).domain();
+            return d3
+              .ticks(toRackKw(low), toRackKw(high), 8)
+              .map((kw) => (kw * 1000) / NVL72_GPUS_PER_RACK);
+          },
+          tickFormat: (value) => d3.format('~g')(Number(toRackKw(Number(value)).toPrecision(6))),
+        }),
+      }}
+      layers={layers}
+      displayIdentity={activeHighlight ?? ''}
+      onDisplayUpdate={onDisplayUpdate}
+      zoom={{
+        enabled: true,
+        axes: 'x',
+        scaleExtent: [1, 60],
+        resetEventName: `power_timeline_zoom_reset_${chartId}`,
+      }}
+      tooltip={{
+        rulerType: 'crosshair',
+        content: tooltipContent,
+        details: tooltipDetails,
+        getRulerX: (sample, xScale) => (xScale as AnyContinuousScale)(sample.x),
+        getRulerY: (sample, yScale) => yScale(sample.drawnY ?? sample.y),
+        onHoverStart: (selection) => {
+          selection
+            .attr('r', 5)
+            .attr('stroke', 'white')
+            .attr('stroke-width', 1)
+            .style('fill-opacity', 1);
+        },
+        onHoverEnd: (selection) => {
+          selection.attr('r', 2).attr('stroke', 'none').style('fill-opacity', null);
+        },
+        attachToLayer: 2,
+      }}
+      legendElement={layout ? rankingElement : legendElement}
+      footer={footer}
+      caption={
+        <>
+          {layout
+            ? powerXHeader({
+                options: (
+                  <>
+                    {traceSelect}
+                    {rackSwitch}
+                  </>
+                ),
+                more,
+                title: yLabel,
+              })
+            : caption}
+          {!layout && toolbar}
+          {!layout && !isPhone && loadSwings}
+          {isPhone && model.labels.length > 0 && (!layout || phoneKeyNeeded) && (
+            <ul
+              className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
+              aria-label={t.traceKey}
+              data-testid="power-timeline-key"
+            >
+              {model.labels.map((label) => (
+                <li
+                  key={label.id}
+                  className="flex items-center gap-1.5 font-medium whitespace-nowrap"
+                  style={{ opacity: labelOpacity(label, activeHighlight) }}
+                  data-hw={label.hwKey}
+                >
+                  <svg aria-hidden="true" width="14" height="6" className="shrink-0">
+                    <line
+                      x1="0"
+                      x2="14"
+                      y1="3"
+                      y2="3"
+                      stroke={label.color}
+                      strokeWidth="3"
+                      strokeDasharray={(label.pool && poolDash(label.pool)) || undefined}
+                    />
+                  </svg>
+                  {label.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      }
+      noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
+    />
+  );
+  const statusElement = (
+    <div
+      className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
+      data-testid="power-timeline-status"
+    >
+      {focusedTrace && (
+        <p
+          className="inline-flex items-center gap-2 self-start rounded-md border border-border/30 px-2 py-0.5"
+          data-testid="power-timeline-focus"
+        >
+          <span>
+            {t.focused(
+              `${seriesLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
+            )}
+          </span>
+          <button
+            type="button"
+            className="underline decoration-dotted hover:text-foreground"
+            data-testid="power-timeline-focus-clear"
+            onClick={() => {
+              setFocusKey(null);
+              track('inference_power_timeline_focus_cleared');
+            }}
+          >
+            {t.showAll}
+          </button>
+        </p>
+      )}
+      {focusKey && !focusedTrace && loadingRuns === 0 && (
+        <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
+      )}
+      {errors.map(({ request, error }) => (
+        <p key={request.runId} className="text-destructive" role="alert">
+          {t.loadError(request.runId, error.message)}
+        </p>
+      ))}
+      {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
+      {hasAggregatedLane && <p data-testid="power-timeline-aggregated">{t.aggregatedNote}</p>}
+      {runInfos.length > 0 && (
+        <p data-testid="power-timeline-source">
+          {t.telemetry}:{' '}
+          {runInfos.map((info, index) => (
+            <React.Fragment key={info.id}>
+              {index > 0 && ' · '}
+              <a
+                href={info.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-dotted"
+              >
+                {`run ${info.id}`}
+              </a>
+              {info.createdAt ? ` (${formatUtcDate(new Date(info.createdAt))})` : ''}
+            </React.Fragment>
+          ))}
+        </p>
+      )}
+    </div>
+  );
+  const summaryElement = loadingRuns === 0 && visibleTraces.length > 0 && (
+    <PowerTimelineSummary
+      traces={visibleTraces}
+      responses={responses}
+      colorOf={(trace) => colorForTrace(trace).color}
+      hardwareLabel={seriesLabel}
+      isOverlay={(point) => overlayPointSet.has(point)}
+      role={role}
+    />
+  );
+
   return (
     <div
       className={cn(
@@ -2041,175 +2673,28 @@ export default function PowerTimeline({
       data-testid="power-timeline"
       data-status={status?.kind ?? 'ready'}
     >
-      <D3Chart<TimelineSample>
-        key={`${chartId}-${xMode}-${drawMode}-${role}-${windowOnly}`}
-        chartId={chartId}
-        data={samples}
-        height={CHART_HEIGHT}
-        margin={margin}
-        watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
-        testId="power-timeline-chart-svg"
-        grabCursor
-        instructions={powerXSurface || blocked ? '' : t.instructions}
-        xScale={
-          xMode === 'wall'
-            ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
-            : { type: 'linear', domain: xDomain }
-        }
-        yScale={{ type: 'linear', domain: yDomain, nice: true }}
-        xAxis={{
-          label: xMode === 'wall' ? t.xWall : xMode === 'serving' ? t.xServing : t.xElapsed,
-          tickValues: (scale) => {
-            const timeScale = scale as
-              | d3.ScaleTime<number, number>
-              | d3.ScaleLinear<number, number>;
-            const [left, right] = timeScale.range();
-            const spacing = isPhone ? X_TICK_SPACING.phone : X_TICK_SPACING.desktop;
-            return timeScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / spacing))));
-          },
-          tickFormat: xTickFormat,
-        }}
-        yAxis={{
-          label: drawMode === 'pool' ? t.yPool : drawMode === 'gpu' ? t.yGpu : t.yMean,
-          tickCount: 8,
-        }}
-        layers={layers}
-        displayIdentity={activeHighlight ?? ''}
-        onDisplayUpdate={onDisplayUpdate}
-        zoom={{
-          enabled: true,
-          axes: 'x',
-          scaleExtent: [1, 60],
-          resetEventName: `power_timeline_zoom_reset_${chartId}`,
-        }}
-        tooltip={{
-          rulerType: 'crosshair',
-          content: tooltipContent,
-          details: tooltipDetails,
-          getRulerX: (sample, xScale) => (xScale as AnyContinuousScale)(sample.x),
-          getRulerY: (sample, yScale) => yScale(sample.drawnY ?? sample.y),
-          onHoverStart: (selection) => {
-            selection
-              .attr('r', 5)
-              .attr('stroke', 'white')
-              .attr('stroke-width', 1)
-              .style('fill-opacity', 1);
-          },
-          onHoverEnd: (selection) => {
-            selection.attr('r', 2).attr('stroke', 'none').style('fill-opacity', null);
-          },
-          attachToLayer: 2,
-        }}
-        legendElement={legendElement}
-        footer={footer}
-        caption={
-          <>
-            {caption}
-            {insight?.(swingTraces)}
-            {toolbar}
-            {!isPhone && loadSwings}
-            {isPhone && model.labels.length > 0 && (
-              <ul
-                className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
-                aria-label={t.traceKey}
-                data-testid="power-timeline-key"
-              >
-                {model.labels.map((label) => (
-                  <li
-                    key={label.id}
-                    className="flex items-center gap-1.5 font-medium whitespace-nowrap"
-                    style={{ opacity: labelOpacity(label, activeHighlight) }}
-                    data-hw={label.hwKey}
-                  >
-                    <svg aria-hidden="true" width="14" height="6" className="shrink-0">
-                      <line
-                        x1="0"
-                        x2="14"
-                        y1="3"
-                        y2="3"
-                        stroke={label.color}
-                        strokeWidth="3"
-                        strokeDasharray={(label.pool && poolDash(label.pool)) || undefined}
-                      />
-                    </svg>
-                    {label.text}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        }
-        noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
-      />
-      {powerXSurface && <PowerLoadSwingsCaveat />}
-      {/* On phones the per-trace stat cards follow the chart so the plot stays near the top. */}
-      {isPhone && loadSwings}
-      <div
-        className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
-        data-testid="power-timeline-status"
-      >
-        {focusedTrace && (
-          <p
-            className="inline-flex items-center gap-2 self-start rounded-md border border-border/30 px-2 py-0.5"
-            data-testid="power-timeline-focus"
-          >
-            <span>
-              {t.focused(
-                `${seriesLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
-              )}
-            </span>
-            <button
-              type="button"
-              className="underline decoration-dotted hover:text-foreground"
-              data-testid="power-timeline-focus-clear"
-              onClick={() => {
-                setFocusKey(null);
-                track('inference_power_timeline_focus_cleared');
-              }}
-            >
-              {t.showAll}
-            </button>
-          </p>
-        )}
-        {focusKey && !focusedTrace && loadingRuns === 0 && (
-          <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
-        )}
-        {errors.map(({ request, error }) => (
-          <p key={request.runId} className="text-destructive" role="alert">
-            {t.loadError(request.runId, error.message)}
-          </p>
-        ))}
-        {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
-        {hasAggregatedLane && <p data-testid="power-timeline-aggregated">{t.aggregatedNote}</p>}
-        {runInfos.length > 0 && (
-          <p data-testid="power-timeline-source">
-            {t.telemetry}:{' '}
-            {runInfos.map((info, index) => (
-              <React.Fragment key={info.id}>
-                {index > 0 && ' · '}
-                <a
-                  href={info.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline decoration-dotted"
-                >
-                  {`run ${info.id}`}
-                </a>
-                {info.createdAt ? ` (${formatUtcDate(new Date(info.createdAt))})` : ''}
-              </React.Fragment>
-            ))}
-          </p>
-        )}
-      </div>
-      {loadingRuns === 0 && visibleTraces.length > 0 && (
-        <PowerTimelineSummary
-          traces={visibleTraces}
-          responses={responses}
-          colorOf={(trace) => colorForTrace(trace).color}
-          hardwareLabel={seriesLabel}
-          isOverlay={(point) => overlayPointSet.has(point)}
-          role={role}
+      {layout ? (
+        <PowerXChartFrame
+          toolbar={null}
+          chart={chartElement}
+          below={
+            <div className="mt-2 flex flex-col gap-3">
+              {statusElement}
+              {loadSwings}
+              <PowerLoadSwingsCaveat />
+              {summaryElement}
+            </div>
+          }
         />
+      ) : (
+        <>
+          {chartElement}
+          {powerXSurface && <PowerLoadSwingsCaveat />}
+          {/* On phones the per-trace stat cards follow the chart so the plot stays near the top. */}
+          {isPhone && loadSwings}
+          {statusElement}
+          {summaryElement}
+        </>
       )}
     </div>
   );

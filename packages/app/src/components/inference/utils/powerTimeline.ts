@@ -5,6 +5,7 @@ import {
   type GpuPowerSeries,
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
+import { nearestByInteractivity } from '@/components/inference/powerx/powerx-compare-at';
 import { powerXRolePools, type PowerXRole } from '@/components/inference/powerx/powerx-role';
 import type { InferenceData } from '@/components/inference/types';
 
@@ -129,6 +130,7 @@ export function parsePowerTimelineParams(params: {
   i_ptutility?: string;
   i_ptconc?: string;
   i_ptraw?: string;
+  i_ptsmooth?: string;
 }) {
   return {
     axis: (['wall', 'elapsed', 'serving'].includes(params.i_ptaxis ?? '')
@@ -142,7 +144,10 @@ export function parsePowerTimelineParams(params: {
       params.i_ptfocus && /^[1-9]\d*:[\w.-]+$/u.test(params.i_ptfocus) ? params.i_ptfocus : null,
     utility: params.i_ptutility === '1',
     raw: params.i_ptraw === '1',
+    smooth: params.i_ptsmooth === '1',
     concurrency: /^[1-9]\d{0,5}$/u.test(params.i_ptconc ?? '') ? Number(params.i_ptconc) : null,
+    /** PowerX layout: `i_ptconc=all` draws every load instead of the trace nearest Compare at. */
+    everyConcurrency: params.i_ptconc === 'all',
   };
 }
 
@@ -292,6 +297,8 @@ export function groupPoolsBySize(
 
 /** Seconds of the centered rolling mean the timeline draws unless raw samples are requested. */
 export const POWER_TIMELINE_SMOOTH_SECONDS = 30;
+/** PowerX layout: raw samples by default; the 5 s smoothing option draws this centred mean. */
+export const POWERX_TIMELINE_SMOOTH_SECONDS = 5;
 
 /**
  * Centered rolling mean over `window` samples. Nulls are skipped inside a window and stay null
@@ -501,6 +508,29 @@ export function mostCoveredConcurrency(
     }
   }
   return best;
+}
+
+/**
+ * PowerX Over time: one point per GPU series (`seriesOf`), the one whose interactivity is
+ * nearest Compare at on a log scale. Points without a positive interactivity are skipped.
+ */
+export function nearestTracePoints<T>(
+  points: readonly T[],
+  at: number,
+  seriesOf: (point: T) => string,
+  interactivityOf: (point: T) => number | null | undefined,
+): T[] {
+  const bySeries = new Map<string, T[]>();
+  for (const point of points) {
+    const key = seriesOf(point);
+    const list = bySeries.get(key);
+    if (list) list.push(point);
+    else bySeries.set(key, [point]);
+  }
+  return [...bySeries.values()].flatMap((list) => {
+    const nearest = nearestByInteractivity(list, at, (point) => interactivityOf(point) ?? 0);
+    return nearest ? [nearest] : [];
+  });
 }
 
 /** What the timeline shows in place of (or on top of) its plot. */
