@@ -1087,7 +1087,9 @@ describe('buildShareUrl on the video dashboard', () => {
 
   it('shares the in-memory v_ and r_ settings, not the address bar', async () => {
     setupWindow('?r_engine=sglang&history-hardware=H200&i_metric=y_x', '/vgx');
-    const { setVideoSearch } = await import('@/components/video-benchmark/page-search');
+    const { readVideoLink, setVideoSearch } =
+      await import('@/components/video-benchmark/page-search');
+    readVideoLink();
     setVideoSearch(
       new URLSearchParams('v_y=kjPerVideo&v_optimal=0&r_engine=vllm-omni&r_prompt=crane&utm=x'),
     );
@@ -1104,7 +1106,9 @@ describe('buildShareUrl on the video dashboard', () => {
 
   it('keeps video settings out of inference share links', async () => {
     setupWindow('?v_y=kjPerVideo', '/infx/inference');
-    const { setVideoSearch } = await import('@/components/video-benchmark/page-search');
+    const { readVideoLink, setVideoSearch } =
+      await import('@/components/video-benchmark/page-search');
+    readVideoLink();
     setVideoSearch(new URLSearchParams('v_y=kjPerVideo&r_engine=sglang'));
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     const url = buildShareUrl();
@@ -1118,9 +1122,11 @@ describe('VideoGenX results share state', () => {
     vi.resetModules();
     const { location } = setupWindow('?r_range=last-month', '/infx/reliability');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
-    const { setVideoSearch } = await import('@/components/video-benchmark/page-search');
+    const { readVideoLink, setVideoSearch } =
+      await import('@/components/video-benchmark/page-search');
     location.pathname = '/zh/vgx';
     location.search = '?unofficialrun=123';
+    readVideoLink();
     setVideoSearch(
       new URLSearchParams('r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08'),
     );

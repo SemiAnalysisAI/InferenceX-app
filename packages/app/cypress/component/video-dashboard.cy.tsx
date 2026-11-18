@@ -5,7 +5,7 @@ import type {
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
-import { videoSearch } from '@/components/video-benchmark/page-search';
+import { readVideoLink, videoSearch } from '@/components/video-benchmark/page-search';
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
@@ -35,7 +35,7 @@ function assertResultsFit() {
 }
 
 let remount = () => {};
-/** Opens `search` as a link: the page reads the address bar once, when it mounts. */
+/** Opens `search` as a link: the page reads the address bar when it mounts. */
 const openLink = (search: string) =>
   cy.window().then((win) => {
     win.history.replaceState(null, '', `${win.location.pathname}${search}`);
@@ -61,9 +61,12 @@ function mount({
     editPage?.(page);
     cy.intercept('GET', '/api/video-runs?format=history&page=1*', page).as('history');
   });
-  cy.window().then((win) =>
-    win.history.replaceState(null, '', `${win.location.pathname}${search}`),
-  );
+  cy.window().then((win) => {
+    // Settings outlive a mount, so another link is read first and each test's link is new.
+    win.history.replaceState(null, '', `${win.location.pathname}?previous-test`);
+    readVideoLink();
+    win.history.replaceState(null, '', `${win.location.pathname}${search}`);
+  });
   const dashboard = (
     <PathnameContext.Provider value={pathname}>
       <VideoDashboard />

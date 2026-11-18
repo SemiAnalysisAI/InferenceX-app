@@ -357,7 +357,7 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // Re-pinned after the clip stage's settings moved from the address bar to memory; entries are unchanged.
-      sources: '47312c44ba5e2a2f02316f9f58f7023d376f88ad3e7c3d21f5ec794c402fecec',
+      sources: '6c7800596efebc759e89f0fd3245062c4b7db2240fbd6156eee43a3ee089a2ea',
     });
   });
 });
