@@ -24,9 +24,9 @@ export const POWERX_VIEW_ANALYTICS_ID = {
   time: 'time',
 } as const satisfies Record<PowerXView, string>;
 
-/** The three measured boundaries the Count toggle names: GPU only, IT (no PUE), Facility. */
+/** The three measured boundaries the Boundary toggle names: GPU only, IT (no PUE), Facility. */
 type PowerXBoundary = 'gpu' | 'it' | 'system';
-/** Count on the Energy view: one boundary, or all three on one chart. */
+/** Boundary on the Energy view: one boundary, or all three on one chart. */
 export type PowerXCount = PowerXBoundary | 'both';
 /** What one unit of energy is charged to on the Energy view. */
 export type EnergyPer = 'output' | 'input' | 'total' | 'query';
@@ -34,7 +34,7 @@ export type EnergyPer = 'output' | 'input' | 'total' | 'query';
 type BoundaryMetrics = Record<PowerXBoundary, string>;
 
 /**
- * The Energy view's metric for each Per unit and boundary. Total and output tokens have
+ * The Energy view's metric for each Energy per unit and boundary. Total and output tokens have
  * IT and facility boundaries; input tokens and queries are GPU-only readings.
  */
 const ENERGY_METRICS = {
@@ -100,7 +100,7 @@ export function energyPerFor(metric: string): EnergyPer {
 export function powerXViewFor(metric: string, compare: PowerCompare): PowerXView | null {
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
-  // The breakdown stacks are the Where view; a boundary overlay (Count: All, the rated
+  // The breakdown stacks are the Breakdown view; a boundary overlay (Boundary: All, the rated
   // pair, or a share link's five lines) and the per-role lines a GPU role draws stay on
   // the metric's own view. Old `i_pcompare=roles` links are rewritten onto `i_role`.
   if (compare === 'breakdown') return 'breakdown';
@@ -134,7 +134,7 @@ export function powerXCountFor(metric: string, compare: PowerCompare): PowerXCou
 }
 
 /**
- * The Count toggle (GPU only | IT (no PUE) | Facility | All) on the Energy and Power draw
+ * The Boundary toggle (GPU only | IT (no PUE) | Facility | All) on the Energy and Power draw
  * views. All overlays the three measured boundaries on the view's own chart: GPU only solid,
  * IT dashed and Facility dash-dot per chip.
  */
@@ -156,7 +156,7 @@ export function selectPowerXCount(next: PowerXCount, current: PowerXSelection): 
 
 /**
  * True when the all-in provisioned line exists for the metric: it is a J per output or
- * total token series, so W per chip has no rated pair to draw.
+ * total token series, so W per GPU has no rated pair to draw.
  */
 export function powerXRatedAvailable(metric: string): boolean {
   return powerCompareVariants(metric, 'provisioned').some(
@@ -170,7 +170,7 @@ export function powerXRatedOn(compare: PowerCompare): boolean {
 }
 
 /**
- * The Rated boundaries toggle in Chart Config. On draws exactly two lines per chip,
+ * The Provisioned bound toggle in Chart Config. On draws exactly two lines per GPU config,
  * measured GPU power (solid) and the all-in provisioned bound (dashed), on the view's
  * GPU-only metric (`i_pcompare=provisioned`); the five-line `all` stays reachable from
  * share links only. Off returns to the single GPU-only series, or to the three measured
@@ -194,7 +194,7 @@ export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerX
   };
 }
 
-/** The Per toggle on the Energy view; only output and total tokens keep an IT or facility basis. */
+/** The Energy per toggle on the Energy view; only output and total tokens keep an IT or facility basis. */
 export function selectPowerXPer(next: EnergyPer, current: PowerXSelection): PowerXSelection {
   if (next === energyPerFor(current.metric)) return current;
   const keepsBoundaries = energyPerHasBoundaries(next);
@@ -223,8 +223,8 @@ export function powerXShowsHeadroom(metric: string, compare: PowerCompare): bool
 
 /**
  * How many PowerX Chart Config controls are off their default, for the mobile
- * "More chart controls (N changed)" fold: Count (GPU only), Per (all tokens),
- * Show as (W per chip), Scope (all GPUs), Power statistic (average) and Rated
+ * "More chart controls (N changed)" fold: Boundary (GPU only), Energy per (all tokens),
+ * Show as (W per GPU), Scope (all GPUs), Power statistic (average) and Rated
  * boundaries (off). The Where and Over time views keep their controls in the card.
  */
 export function powerXChangedCount(selection: PowerXSelection): number {
@@ -245,8 +245,8 @@ export function powerXChangedCount(selection: PowerXSelection): number {
 
 /**
  * How many of the controls behind the phone "More" row are off their default:
- * Scope (all GPUs), Power statistic (average) and Rated boundaries (off). Count,
- * Per and Show as stay in front of the row, so they are not counted here; the
+ * Scope (all GPUs), Power statistic (average) and Provisioned bound (off). Boundary,
+ * Energy per and Show as stay in front of the row, so they are not counted here; the
  * X-Axis Metric, which the row also holds, is counted by its owner.
  */
 export function powerXSecondaryChangedCount(selection: PowerXSelection): number {

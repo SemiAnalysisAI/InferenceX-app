@@ -1796,9 +1796,9 @@ export default function ChartDisplay({
                         </div>
                       );
                       const scatter = renderScatter(chartCaption);
-                      // Where view: the caption stays at the top of the card and the chip
+                      // Breakdown view: the caption stays at the top of the card and the GPU
                       // comparison is the visual; the boundary curves live on Power draw
-                      // under Count: All.
+                      // under Boundary: All.
                       if (powerXWherePanelsOnly) {
                         // Breakdown: the caption, the chip comparison, then the same footer as
                         // the other tabs (run context and one ATOM note).

@@ -32,8 +32,7 @@ const STRINGS = {
     download: 'Download CSV',
     note: 'Interpolated along each GPU’s optimal points (monotone, in log interactivity). "—" means outside the measured range; nothing is extrapolated. Headroom = 1 − P90 / TDP.',
     key: 'Shaded band on the chart: headroom from each GPU’s P90 draw (dotted) up to its TDP.',
-    empty:
-      'No GPU in this view has measured average and P90 power at two or more interactivities.',
+    empty: 'No GPU in this view has measured average and P90 power at two or more interactivities.',
     example: (
       chip: string,
       hi: string,
@@ -77,8 +76,8 @@ const int = (value: number) => Math.round(value).toLocaleString('en-US');
 const pct = (value: number) => `${Math.round(value)}%`;
 
 /**
- * The per-chip summary under the Power draw chart shown as % of TDP: average
- * and P90 W per chip, % of TDP and headroom at 25 / 50 / 100 / 300 tok/s/user,
+ * The per-GPU summary under the Power draw chart shown as % of TDP: average
+ * and P90 W per GPU, % of TDP and headroom at 25 / 50 / 100 / 300 tok/s/user,
  * read along each chip's frontier with the chart's own interpolation.
  */
 export function PowerXHeadroomTable({

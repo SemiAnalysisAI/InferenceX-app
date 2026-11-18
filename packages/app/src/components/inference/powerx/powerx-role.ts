@@ -40,7 +40,7 @@ export interface PowerXRoleParams {
 
 /**
  * Old share links that encoded a GPU role in `i_metric` or `i_pcompare`, rewritten onto
- * `i_role` with the role-free metric. `i_pcompare=roles` was the Where view's Split by
+ * `i_role` with the role-free metric. `i_pcompare=roles` was the Breakdown view's Split by
  * role, so it keeps that view (`breakdown`) split by role. Params that carry no role pass
  * through unchanged; an explicit `i_role` wins over the role an old metric implied.
  */
@@ -76,7 +76,7 @@ export function hasLegacyPowerRoleParams(params: PowerXRoleParams): boolean {
  * The metric + compare pair the chart draws under a role. The user's stored choice stays
  * untouched so it comes back with All GPUs:
  * - Energy: GPU only, J per output token (the denominator prefill and decode share), or
- *   J per input token for the prefill GPUs when Per is Input; rated boundaries off.
+ *   J per input token for the prefill GPUs when Energy per is Input; Provisioned bound off.
  * - Power draw: GPU only, average W per GPU (or % of TDP per pool); percentiles need the
  *   whole fleet, so P75 / P90 fall back to the average.
  * - Where and Over time keep their own selection and split their layers or lanes.
@@ -116,7 +116,7 @@ export function powerXPinnedControls(
   return [];
 }
 
-/** Per units a role allows on the Energy view: prefill adds its role-local Input. */
+/** Energy per units a role allows on the Energy view: prefill adds its role-local Input. */
 export function powerXRoleEnergyPers(role: PowerXRole): readonly ('output' | 'input')[] {
   return role === 'prefill' ? ['output', 'input'] : ['output'];
 }
