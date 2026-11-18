@@ -97,7 +97,7 @@ link still opens that view for locked visitors.
 
 - Header card (`DashboardSectionHeader` + `ChartControls`, as on `/infx/inference`): title and
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
-  draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +
+  draw, Breakdown, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
   Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
   Metric beside `PowerXChartConfig`: Count, Per or Show as, then Scope and Power statistic
@@ -117,7 +117,7 @@ link still opens that view for locked visitors.
   `/infx/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
   line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
   the footer notes. On phones the plot height is capped at 55 % of the viewport.
-- Where the power goes (`i_pcompare=breakdown`): the caption stays at the top of the card and
+- Breakdown (`i_pcompare=breakdown`): the caption stays at the top of the card and
   the chip comparison is the visual. The compared chip's drill-down (the "across load"
   stacked bars / stacked area, with its Hardware select, Stacked bars | Stacked area toggle
   (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
@@ -202,7 +202,7 @@ link still opens that view for locked visitors.
   (`yMetric`, formatted as the tooltip would) for it (`source: 'scrub'`, which replaces a
   pinned point and survives the compat hover end a tap synthesises); a tap on a point still
   opens the point sheet as before.
-- **Where the power goes** stacks IT only by default; the Include facility switch
+- **Breakdown** stacks IT only by default; the Include facility switch
   (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
   gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip
   comparison, the drill-down and the tooltips agree; `FACILITY_PUE_NOTE` ("Facility =
@@ -273,7 +273,7 @@ metric without changing it. `boundaries` draws GPU Level Measured, All in Measur
 and All in Measured; `provisioned` (the PowerX Rated boundaries toggle) draws GPU Level
 Measured and All in Provisioned only; `all` (share links only) adds both provisioned bounds
 to the measured three. `i_pcompare=breakdown` is the PowerX
-Where the power goes view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and
+Breakdown view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and
 the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
 `expandPowerCompareSeries`, which appends one clone per sibling to every base point — same
 `x`, `y` taken from the sibling's field, `powerVariant` set — and leaves the base points
@@ -308,7 +308,7 @@ the `/infx/inference` → `/pwx` redirect (`lib/routing/powerx-redirect.ts`); an
 
 | Old link                                   | Rewritten to                                       |
 | ------------------------------------------ | -------------------------------------------------- |
-| `i_pcompare=roles`                         | `i_role=split` (Where the power goes)              |
+| `i_pcompare=roles`                         | `i_role=split` (Breakdown)                         |
 | `i_metric=y_measuredPrefillAvgPower`       | `i_metric=y_measuredAvgPower&i_role=prefill`       |
 | `i_metric=y_measuredDecodeAvgPower`        | `i_metric=y_measuredAvgPower&i_role=decode`        |
 | `i_metric=y_measuredPrefillJPerInputToken` | `i_metric=y_measuredJPerInputToken&i_role=prefill` |
@@ -363,7 +363,7 @@ config is `display: 'timeline'`.
 
 ## Analysis panels
 
-The role and system power breakdown panels on the PowerX tab's Where the power goes view live in
+The role and system power breakdown panels on the PowerX tab's Breakdown view live in
 `ui/PowerAnalysisPanels.tsx`. Their read-only API fields (`rolePoints`, `powerBreakdowns`), the
 API-only power fit (`powerFits`) and the API-only equal-service comparisons are described in the
 [dashboard views reference](../packages/skills/skills/inferencex-api/references/dashboard-views.md).

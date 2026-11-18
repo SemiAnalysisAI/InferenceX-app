@@ -71,7 +71,7 @@ function boundaryEnergyPer(metric: string): EnergyPer {
   return energyPerHasBoundaries(per) ? per : DEFAULT_ENERGY_PER;
 }
 
-/** The compare mode behind the Where the power goes view (`i_pcompare=breakdown`). */
+/** The compare mode behind the Breakdown view (`i_pcompare=breakdown`). */
 export const WHERE_COMPARE = 'breakdown' satisfies PowerCompare;
 
 const POWER_TIMELINE_METRIC = 'y_measuredPowerTimeline';
