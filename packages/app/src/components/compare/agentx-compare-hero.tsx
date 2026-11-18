@@ -461,7 +461,7 @@ function ledgerSubtitle(label: string, locale: 'en' | 'zh'): string {
 
 const STRINGS = {
   en: {
-    title: 'Compare Realistic Agentic Inference performance',
+    title: 'Compare Realistic Agentic Inference Performance',
     description:
       'Long-Context, Multi-Turn Inference Performance on Google TPUv7 Ironwood, OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100 and RTX Pro. TPUv8i, SambaNova SN50, Rubin NVL72 and MI455X UALoE72 are next.',
     revenueCalculator: 'Token Revenue Calculator',
