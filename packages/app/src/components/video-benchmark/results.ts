@@ -14,7 +14,15 @@ import {
   type ResultsYMetric,
 } from './results-chart';
 
-export const RESULTS_HARDWARE = ['gb200', 'b300', 'b200', 'mi355x', 'h200', 'h100'] as const;
+export const RESULTS_HARDWARE = [
+  'gb200',
+  'b300',
+  'b200',
+  'mi355x',
+  'h200',
+  'h100',
+  'a100',
+] as const;
 
 /** Listed before its first matched run so readers see it is coming; other hardware appears with data. */
 const PLANNED_HARDWARE: readonly string[] = ['mi355x'];

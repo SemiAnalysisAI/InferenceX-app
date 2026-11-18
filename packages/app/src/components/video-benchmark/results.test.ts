@@ -64,6 +64,11 @@ describe('VideoGenX results contract', () => {
       { workloadKey: 'unverified-label' },
     ])
       expect(resultProjection([{ ...eligible, ...change }], state()).cells).toEqual([]);
+    expect(
+      resultProjection([{ ...eligible, hardwareKey: 'a100' }], state()).cells.map(
+        (c) => c.point.hardwareKey,
+      ),
+    ).toEqual(['a100']);
     expect(resultProjection([], state()).cells).toEqual([]);
   });
 
