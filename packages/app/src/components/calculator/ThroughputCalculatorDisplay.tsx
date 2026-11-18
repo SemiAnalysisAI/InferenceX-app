@@ -1068,6 +1068,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title}
               description={t.description}
               actions={<ChartShareActions />}

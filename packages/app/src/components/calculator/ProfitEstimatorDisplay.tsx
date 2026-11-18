@@ -1600,6 +1600,7 @@ function ProfitEstimatorInner({
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title[basis]}
               qualifier={t.betaQualifier}
               description={t.description}

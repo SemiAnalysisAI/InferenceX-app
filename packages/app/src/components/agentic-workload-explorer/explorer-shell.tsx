@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { Suspense, type ReactNode } from 'react';
 
 import { SectionNav } from '@/components/agentic-workload-explorer/section-nav';
@@ -10,7 +9,6 @@ import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
-import { explorerRelativePath } from '@/lib/agentic-workload-explorer/paths';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
@@ -28,8 +26,6 @@ const STRINGS = {
 
 export function ExplorerShell({ children }: { children: ReactNode }) {
   const strings = STRINGS[useLocale()];
-  // The overview page's TabIntro carries its h1; every section page uses this title as its h1.
-  const isOverview = explorerRelativePath(usePathname() ?? '') === '/';
   const isMobile = useIsMobileViewport();
   const actions = (
     <>
@@ -45,7 +41,7 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
         <div className="flex flex-col gap-2">
           <DashboardSectionHeader
             title={strings.title}
-            headingAs={isOverview ? 'h2' : 'h1'}
+            headingAs="h1"
             description={strings.description}
             actions={isMobile ? undefined : actions}
           />

@@ -3,8 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
 import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
-import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
-import { TabIntro } from '@/components/dashboard/tab-intro';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -28,14 +27,5 @@ export default async function CalculatorModelPage({ params }: Props) {
   if (resolved.isAlias) {
     permanentRedirect(modelRoutePath('calculator', resolved.route.slug));
   }
-  return (
-    <>
-      <ThroughputCalculatorDisplay routeModel={resolved.route.model} />
-      <TabIntro
-        tab="calculator"
-        title={MODEL_TAB_META.calculator.heading(resolved.route.seoName)}
-        intro={MODEL_TAB_META.calculator.intro(resolved.route.seoName)}
-      />
-    </>
-  );
+  return <ThroughputCalculatorDisplay routeModel={resolved.route.model} />;
 }
