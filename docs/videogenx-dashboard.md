@@ -51,8 +51,7 @@ workload under any filter. Any other workload uses a compact source point identi
 old links with one still resolve. Canonical workload JSON stays inside the projection. Share includes the `r_`
 registry scope. `?unofficialrun=<id>` (the key matches in any case, so the PR visualizer's
 `?unofficialRun=` link works) reads only that run through
-`namedRunPoints`. A stored run keeps its actual approval status. A run absent from
-the History pages is read live from its GitHub artifacts through
+`namedRunPoints`. A stored run keeps its actual approval status. When the cohort has more pages, the server and browser look up the selected run across its own stored pages. Partial reads preserve the deep link and offer a retry. A confirmed storage miss is read live from its GitHub artifacts through
 `/api/video-runs?run=<id>&format=live`: the newest attempt of each native
 `h3-results` configuration, JSON documents only, fetched by explicit byte ranges and
 verified against `SHA256SUMS` and the manifest identity. Its entries are unapproved,
@@ -608,7 +607,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 以及已移除的利润估算器参数（`r_api`、`r_price_t2v`、`r_price_i2v`、`r_price_r2v`、`r_utilization`）会被忽略。分享和导出链接不写入取默认值的参数。`r_workload` 使用模型 slug（如 `minimax-h3`），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载；其他工作负载使用数据点 ID，旧链接中的数据点 ID 仍可解析。视频秒吞吐量和每视频秒成本使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。
-页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs`（配对）、`r_swap`（互换两侧）和 `r_sheet`（触屏设备上打开的数据点面板）只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
+页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs`（配对）、`r_swap`（互换两侧）和 `r_sheet`（触屏设备上打开的数据点面板）只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。全局 History 有后续页时，先查该运行自己的所有存储页。读取不完整时保留详情链接，可以原位重试。
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。

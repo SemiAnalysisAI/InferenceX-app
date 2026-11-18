@@ -1,3 +1,4 @@
+import { readUnofficialRunParam } from '@/lib/routing/unofficial-runs';
 import { at, generationDuration, number, rows, text, type Json } from './bundle';
 import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
@@ -127,16 +128,9 @@ export const RESULTS_QUERY_PARAMS = [
   'unofficialruns',
 ] as const;
 
-/** Matches the overlay param in any case, as the other dashboards do (`?unofficialRun=` in PR links). */
-export const isUnofficialRunParam = (key: string) => /^unofficialruns?$/iu.test(key);
-
 export function parseResultsState(search: string | URLSearchParams): ResultsState {
   const s = typeof search === 'string' ? new URLSearchParams(search) : search;
-  const overlay =
-    s.get('unofficialruns') ??
-    s.get('unofficialrun') ??
-    [...s].find(([key, value]) => isUnofficialRunParam(key) && value)?.[1] ??
-    null;
+  const overlay = s.get('unofficialruns') ?? s.get('unofficialrun') ?? readUnofficialRunParam(s);
   const x = s.get('r_x'),
     y = s.get('r_y');
   const numeric = (key: string, fallback: number | null) => {
@@ -430,19 +424,24 @@ function byCoverage(cohort: VideoPoint[]): string[] {
 export function resultProjection(
   points: VideoPoint[],
   state: ResultsState,
-  namedPoints: VideoPoint[] = [],
+  namedPoints?: VideoPoint[],
 ) {
-  const qualified = points.filter(qualifies);
+  const eligible = points.filter(qualifies);
+  const qualified = eligible.filter((point) => point.runId !== state.unofficialRun);
   const named =
     state.unofficialRun === null
       ? []
       : [
           ...new Map(
-            [...qualified, ...namedPoints]
+            (namedPoints ?? eligible)
               .filter((point) => point.runId === state.unofficialRun && qualifies(point))
               .map((point) => [point.id, point]),
           ).values(),
         ];
+  const approvedCandidates =
+    namedPoints === undefined
+      ? eligible
+      : [...qualified, ...named.filter((p) => p.approved === true)];
   const approvedIds = new Set(qualified.map((point) => point.id));
   const available = [...qualified, ...named.filter((point) => !approvedIds.has(point.id))];
   const metadata = available.map(resultMetadata);
@@ -471,11 +470,13 @@ export function resultProjection(
   };
   const matches = qualified.filter(matchesFilters);
   const namedMatches = named.filter(matchesFilters);
-  const preferred = byCoverage(matches.length > 0 ? matches : namedMatches)[0] ?? null;
+  const approvedMatches = approvedCandidates.filter(matchesFilters);
+  const preferred =
+    byCoverage(approvedMatches.length > 0 ? approvedMatches : namedMatches)[0] ?? null;
   // A model slug is the readable selector of that model's best-covered official workload. It
   // ignores the filters, so a link keeps its workload when they change. Every other workload,
   // including one only a named run publishes, shares a point ID.
-  const ranked = byCoverage(qualified);
+  const ranked = byCoverage(approvedCandidates);
   const slugged = (slug: string) => ranked.find((key) => workloads.get(key)!.slug === slug) ?? null;
   const workloadKey =
     state.workload === null
@@ -592,7 +593,7 @@ export function resultProjection(
           ...(slug && slugged(slug) === canonical ? { slug } : {}),
         })),
     },
-    excludedCount: points.length - qualified.length,
+    excludedCount: points.length - eligible.length,
     sampleFloor: DASHBOARD_SAMPLE_FLOOR,
     scheduledClips: 20,
     roster: resultsHardwareRoster(available),

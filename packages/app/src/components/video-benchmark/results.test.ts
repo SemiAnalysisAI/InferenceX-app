@@ -136,6 +136,14 @@ describe('VideoGenX results contract', () => {
       1,
     );
     expect(resultProjection([official], selection).overlayCells).toEqual([]);
+    // A fresh exact lookup can remove an observation still present in the bounded cohort.
+    expect(resultProjection([official, overlay], selection, []).overlayCells).toEqual([]);
+    const approvedOverlay = { ...overlay, approved: true };
+    const bySlug = resultProjection([overlay], { ...selection, workload: 'minimax-h3' }, [
+      approvedOverlay,
+    ]);
+    expect(bySlug.overlayCells.map((c) => c.point.id)).toEqual([overlay.id]);
+    expect(bySlug.cells).toEqual([]);
     expect(resultProjection([official, overlay], { ...selection, hidden: ['h200'] }).cells).toEqual(
       [],
     );

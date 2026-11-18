@@ -1,5 +1,6 @@
 'use client';
 
+import { deleteUnofficialRunParams, parseUnofficialRunIds } from '@/lib/routing/unofficial-runs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type ReactNode,
@@ -46,15 +47,6 @@ interface UnofficialRunResponse {
 }
 
 const EMPTY_UNOFFICIAL_RUN_INFOS: UnofficialRunInfo[] = [];
-
-const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
-function deleteUnofficialRunParams(searchParams: URLSearchParams): void {
-  const keysToDelete: string[] = [];
-  for (const key of searchParams.keys()) {
-    if (UNOFFICIAL_RUN_PARAM_RE.test(key)) keysToDelete.push(key);
-  }
-  for (const key of keysToDelete) searchParams.delete(key);
-}
 
 export interface AvailableModelSequence {
   model: Model;
@@ -148,23 +140,6 @@ export function parseAvailableModelsAndSequences(
     }
   }
   return result;
-}
-
-export function parseUnofficialRunIds(search: string): string[] {
-  const params = new URLSearchParams(search);
-  for (const [key, value] of params) {
-    if (!UNOFFICIAL_RUN_PARAM_RE.test(key) || !value) continue;
-    return [
-      ...new Set(
-        value
-          .split(',')
-          .map((id) => id.trim())
-          .filter(Boolean)
-          .map((id) => (/^\d+$/u.test(id) ? id.replace(/^0+(?=\d)/u, '') : id)),
-      ),
-    ];
-  }
-  return [];
 }
 
 export interface OverlaySelectionState {

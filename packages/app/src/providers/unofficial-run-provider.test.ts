@@ -1,3 +1,4 @@
+import { parseUnofficialRunIds } from '@/lib/routing/unofficial-runs';
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -9,7 +10,6 @@ import { buildChartData } from './unofficial-chart-data';
 import {
   overlaySelectionReducer,
   parseAvailableModelsAndSequences,
-  parseUnofficialRunIds,
   type OverlaySelectionState,
 } from './unofficial-run-provider';
 

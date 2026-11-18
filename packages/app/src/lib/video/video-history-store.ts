@@ -47,10 +47,11 @@ async function listAll(prefix: string) {
   return blobs;
 }
 
-async function historyState() {
+async function historyState(runId?: string) {
+  // A named run has its own Blob prefix. Its entries read their receipts directly in projectIndex.
   const [runs, approvals] = await Promise.all([
-    listAll(`${PREFIX}/runs/`),
-    listAll(`${PREFIX}/approvals/`),
+    listAll(runId ? `${PREFIX}/runs/${runId}/` : `${PREFIX}/runs/`),
+    runId ? [] : listAll(`${PREFIX}/approvals/`),
   ]);
   const indexes: StoredIndex[] = [];
   const snapshots: ListBlobResultBlob[] = [];
@@ -159,10 +160,11 @@ export interface PublishedVideoHistory {
 export async function publishedVideoHistory(
   page: number,
   pages = 1,
+  runId?: string,
 ): Promise<PublishedVideoHistory> {
   if (!videoStorageEnabled())
     return { page: { schemaVersion: 1, entries: [], nextPage: null }, complete: false };
-  const { indexes, receipts, latest } = await historyState();
+  const { indexes, receipts, latest } = await historyState(runId);
   const records = await readRecords(latest).catch(() => new Map<string, HistoryRecord>());
   const end = (page - 1 + pages) * VIDEO_HISTORY_PAGE_SIZE;
   const projected = await Promise.all(

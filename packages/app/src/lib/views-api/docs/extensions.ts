@@ -635,8 +635,8 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
         ]
       : view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
         ? [
-            'Single run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells and overlayDeploymentCells. A stored run keeps its actual approval. A run absent from the five History pages is read live from the JSON documents of its public native h3-results artifacts and is always unapproved, with publishedAt null and no media. The selected run is excluded from official cells. Unknown, unreadable or ineligible runs return no overlay. No storage or publication is triggered.',
-            '单个运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行只放入 overview 中独立的 overlayCells 和 overlayDeploymentCells，并从正式结果中排除。已存储的运行保留实际批准状态；不在前五页 History 中的运行，会从其公开的原生 h3-results 产物实时读取 JSON 文档，始终视为未批准，publishedAt 为 null，且不附带媒体。未知、无法读取或未达准入要求的运行不返回叠加结果。该参数不会触发存储或发布。',
+            'Single run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells and overlayDeploymentCells. A stored run keeps its actual approval. When the cohort is truncated, all stored entries for the run are read directly. A complete storage miss falls back to public native h3-results JSON, with approved false, publishedAt null and no media. Incomplete reads return available points with X-VideoGenX-Incomplete: 1 in JSON and CSV responses. The selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No storage or publication is triggered.',
+            '单个运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行只放入 overview 中独立的 overlayCells 和 overlayDeploymentCells，并从正式结果中排除。已存储的运行保留实际批准状态；全局 History 被截断时按该运行读完所有存储条目，确认未存储后才实时读取公开的 h3-results，批准状态为 false，publishedAt 为 null，且不附带媒体。读取不完整时，JSON 和 CSV 返回已有结果及 X-VideoGenX-Incomplete: 1 响应头。未知或未达准入要求的运行不返回叠加结果。该参数不会触发存储或发布。',
           ]
         : view === 'current-inferencex-image' && name === 'sequence'
           ? ([

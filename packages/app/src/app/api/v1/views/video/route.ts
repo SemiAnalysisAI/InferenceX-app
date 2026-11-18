@@ -11,7 +11,8 @@ import {
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
-import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import { cachedNamedVideoRun, resolveNamedVideoRun } from '@/components/video-benchmark/named-run';
+import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { chartedCells } from '@/components/video-benchmark/results-chart';
 import { RESULT_CSV_COLUMNS, resultCsvRows } from '@/components/video-benchmark/results-csv';
@@ -42,15 +43,17 @@ export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
 
 async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare' | 'overview') {
-  const history = await readResponse<VideoHistoryPage>(
-    await videoRuns(
-      sourceRequest(request, '/api/video-runs', {
-        format: 'history',
-        page: '1',
-        pages: String(VIDEO_HISTORY_MAX_PAGES),
-      }),
-    ),
-  );
+  const readPage = (params: Record<string, string>) =>
+    videoRuns(sourceRequest(request, '/api/video-runs', params));
+  const cohortResponse = await readPage({
+    format: 'history',
+    page: '1',
+    pages: String(VIDEO_HISTORY_MAX_PAGES),
+  });
+  const history = await readResponse<VideoHistoryPage>(cohortResponse);
+  const viewHeaders: Record<string, string> = { ...headers };
+  if (cohortResponse.headers.get('x-videogenx-incomplete') === '1')
+    viewHeaders['X-VideoGenX-Incomplete'] = '1';
   if (history.schemaVersion !== 1 || !Array.isArray(history.entries))
     throw new Error('Unsupported published history projection');
   const { nextPage } = history;
@@ -60,23 +63,17 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
       : nextPage - 1;
   if (view === 'overview') {
     const state = parseResultsState(request.nextUrl.search);
-    let named = namedRunPoints([history], state.unofficialRun);
-    if (named.length === 0 && state.unofficialRun) {
-      // Like the UI, an unstored run is read live from its artifacts; a failed read is no overlay.
-      const live = await videoRuns(
-        sourceRequest(request, '/api/video-runs', { run: state.unofficialRun, format: 'live' }),
-      );
-      if (live.ok)
-        named = namedRunPoints(
-          [history, await readResponse<VideoHistoryPage>(live)],
-          state.unofficialRun,
-        );
-    }
-    const projection = resultProjection(videoPoints([history]), state, named);
+    let named = null;
+    if (state.unofficialRun)
+      named = viewHeaders['X-VideoGenX-Incomplete']
+        ? cachedNamedVideoRun([history], state.unofficialRun, false)
+        : await resolveNamedVideoRun([history], state.unofficialRun, readPage);
+    if (named?.source === 'incomplete') viewHeaders['X-VideoGenX-Incomplete'] = '1';
+    const projection = resultProjection(videoPoints([history]), state, named?.points);
     if (request.nextUrl.searchParams.get('format') === 'csv')
       return new Response(toCsv(resultCsvRows(projection), RESULT_CSV_COLUMNS), {
         headers: {
-          ...headers,
+          ...viewHeaders,
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename="videogenx-results.csv"',
         },
@@ -131,7 +128,7 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
           truncated: nextPage !== null,
         },
       },
-      { headers },
+      { headers: viewHeaders },
     );
   }
   const projection = videoDashboardProjection([history], request.nextUrl.search);
@@ -204,7 +201,7 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
       },
       comparison: { ...projection.comparison, cases },
     },
-    { headers },
+    { headers: viewHeaders },
   );
 }
 

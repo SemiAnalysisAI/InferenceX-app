@@ -197,6 +197,17 @@ describe('published video history', () => {
     expect(page.nextPage).toBe(2);
     expect(artifactReads()).toBe(10);
     expect(put).not.toHaveBeenCalled();
+    // Run 100 is outside page 1. Only its own index and receipt should determine this read.
+    vi.mocked(list).mockClear();
+    const named = await publishedVideoHistoryRead(1, 1, '100');
+    expect(named.complete).toBe(true);
+    expect(named.page.entries.map(({ runId, approved }) => [runId, approved])).toEqual([
+      ['100', false],
+    ]);
+    expect(named.page.nextPage).toBeNull();
+    expect(vi.mocked(list).mock.calls.map(([options]) => options?.prefix)).toEqual([
+      'h3-video-media/v1/runs/100/',
+    ]);
   });
 
   it('reads several pages in one call exactly as consecutive single pages', async () => {
@@ -356,8 +367,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after cost tier labels returned to title case; labels are not stored in entries.
-      sources: 'ed6de4a65a129a45ddcd7ee97b3f6647b0477206034c5f5ab2507d5ae7629d1e',
+      // Run-filtered pagination changes index discovery but preserves each projected entry.
+      sources: '189a4601aa147aa4f3ce6b9ad57b14d1488a3be41b954da884f5f0205700d1a0',
     });
   });
 });

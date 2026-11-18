@@ -1,3 +1,4 @@
+import { deleteUnofficialRunParams } from './unofficial-runs';
 import type { Model } from '@/lib/catalog/data-mappings';
 import { getDashboardRoute } from './dashboard-routes';
 import {
@@ -99,12 +100,10 @@ export function profitRouteForTab(pathname: string, tab: ProfitRouteTab): string
 
 export function setProfitRouteUnofficialRuns(url: URL, runIds: readonly string[]): void {
   const params = profitRouteSearch(url.pathname, url.search);
-  const oldKeys = [...params.keys()].filter((key) => /^unofficialruns?$/iu.test(key));
-  for (const key of oldKeys) params.delete(key);
+  deleteUnofficialRunParams(params);
   if (runIds.length > 0) params.set('unofficialruns', runIds.join(','));
   const pathname = profitRoutePathname(url.pathname, params);
   if (pathname === null) return;
   url.pathname = pathname;
-  const queryKeys = [...url.searchParams.keys()].filter((key) => /^unofficialruns?$/iu.test(key));
-  for (const key of queryKeys) url.searchParams.delete(key);
+  deleteUnofficialRunParams(url.searchParams);
 }

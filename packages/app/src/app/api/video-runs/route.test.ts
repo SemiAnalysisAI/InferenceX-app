@@ -89,7 +89,7 @@ describe('H3 CI artifact access', () => {
     expect(hit.headers.get('cache-control')).toBe('private, no-store');
     expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
     await GET(request('?format=history&page=1&pages=5'));
-    expect(publishedVideoHistory).toHaveBeenLastCalledWith(1, 5);
+    expect(publishedVideoHistory).toHaveBeenLastCalledWith(1, 5, undefined);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -120,7 +120,7 @@ describe('H3 CI artifact access', () => {
     const result = await GET(request('?format=history&page=1'));
     expect(result.headers.get('x-videogenx-replay')).toBeNull();
     expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
-    expect(publishedVideoHistory).toHaveBeenCalledWith(1, 1);
+    expect(publishedVideoHistory).toHaveBeenCalledWith(1, 1, undefined);
   });
 
   it('serves synthetic History only in development fixture mode', async () => {
@@ -128,14 +128,18 @@ describe('H3 CI artifact access', () => {
     vi.stubEnv('E2E_FIXTURES', '1');
     const result = await GET(request('?format=history&page=1'));
     expect(result.headers.get('x-videogenx-replay')).toBe('1');
-    const data = await result.json();
+    const data: VideoHistoryPage = await result.json();
     expect(data.entries.length).toBeGreaterThan(0);
+    const runId = data.entries[0].runId;
+    const named = await GET(request(`?format=history&run=${runId}`));
+    const namedPage: VideoHistoryPage = await named.json();
+    expect(namedPage.entries).toEqual(data.entries.filter((entry) => entry.runId === runId));
   });
 
   it('discovers old published results without scanning unrelated recent Actions or publishing', async () => {
-    const result = await GET(request('?format=history&page=2'));
+    const result = await GET(request('?format=history&run=10&page=2'));
     expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
-    expect(publishedVideoHistory).toHaveBeenCalledWith(2, 1);
+    expect(publishedVideoHistory).toHaveBeenCalledWith(2, 1, '10');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(storeVideoArtifact).not.toHaveBeenCalled();
     expect(recordVideoHistory).not.toHaveBeenCalled();
@@ -144,7 +148,7 @@ describe('H3 CI artifact access', () => {
   it('reads up to five History pages in one request and rejects any other page count', async () => {
     const result = await GET(request('?format=history&page=1&pages=5'));
     expect(result.status).toBe(200);
-    expect(publishedVideoHistory).toHaveBeenCalledWith(1, 5);
+    expect(publishedVideoHistory).toHaveBeenCalledWith(1, 5, undefined);
     const invalid = await Promise.all(
       [
         '?format=history&pages=6',
@@ -405,6 +409,11 @@ describe('H3 published results in development', () => {
   it.each([
     ['?run=10', { run: { id: 10 }, artifacts: [saved.artifact] }, '?run=10'],
     ['?page=2', { runs: [{ id: 10 }], nextPage: 3 }, '?page=2'],
+    [
+      '?format=history&run=10&page=2&pages=5',
+      { schemaVersion: 1, entries: [{ runId: '10' }], nextPage: null },
+      '?format=history&run=10&page=2&pages=5',
+    ],
     [
       '?format=history&pages=5',
       { schemaVersion: 1, entries: [], nextPage: null },

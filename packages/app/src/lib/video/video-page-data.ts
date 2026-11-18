@@ -9,7 +9,8 @@ import {
   videoClipSourceKey,
   type VideoInitialData,
 } from '@/components/video-benchmark/initial-data';
-import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import { cachedNamedVideoRun } from '@/components/video-benchmark/named-run';
+import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { chartedCells, stageOpenings } from '@/components/video-benchmark/results-chart';
 import {
@@ -60,11 +61,9 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
       throw new Error('Unsupported published history projection');
     const pages = [data];
     initial.history = { pages, replay: historyResponse.headers.get('x-videogenx-replay') === '1' };
-    const projection = resultProjection(
-      videoPoints(pages),
-      state,
-      namedRunPoints(pages, state.unofficialRun),
-    );
+    // Let the initial cohort paint before a named run requires another storage or GitHub read.
+    const named = state.unofficialRun ? cachedNamedVideoRun(pages, state.unofficialRun) : null;
+    const projection = resultProjection(videoPoints(pages), state, named?.points ?? []);
     const leads = resultsClipPoints(chartedCells(projection, state), { tier: state.costTier });
     // The stage opens on its own deployment, which the first render must not fetch again.
     const points = [...new Set([...leads, ...stageOpenings(projection, state, leads)])];

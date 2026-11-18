@@ -61,10 +61,13 @@ function retained<T, Args extends unknown[]>(
  */
 export const cachedVideoHistory = retained(
   'video:history:v3',
-  async (page: number, pages: number) => {
-    const value = await publishedVideoHistory(page, pages);
-    // A page past the end is empty for any number; keeping it would let requests grow the cache.
-    return { value, retain: value.complete && (page === 1 || value.page.entries.length > 0) };
+  async (page: number, pages: number, runId?: string) => {
+    const value = await publishedVideoHistory(page, pages, runId);
+    // Missing runs and pages past the end must stay visible to a later publication.
+    return {
+      value,
+      retain: value.complete && (value.page.entries.length > 0 || (!runId && page === 1)),
+    };
   },
 );
 

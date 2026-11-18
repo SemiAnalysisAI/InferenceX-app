@@ -1,3 +1,8 @@
+import {
+  deleteUnofficialRunParams,
+  isUnofficialRunParam,
+  readUnofficialRunParam,
+} from './unofficial-runs';
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import {
   dashboardRouteForPathname,
@@ -312,7 +317,7 @@ function syncProfitRoute(): void {
     ...URL_STATE_KEYS,
     'percentile',
     ...[...new URLSearchParams(window.location.search).keys()].filter((key) =>
-      UNOFFICIAL_RUN_PARAM_RE.test(key),
+      isUnofficialRunParam(key),
     ),
   ]);
 }
@@ -336,8 +341,6 @@ function flushPendingParams(): void {
   pendingParams = {};
   writeTimer = null;
 }
-
-const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
 function collectTabParams(): URLSearchParams {
   flushPendingParams();
@@ -383,16 +386,8 @@ function collectTabParams(): URLSearchParams {
     if (value) filtered.set(key, value);
   }
 
-  // Carry over any unofficial-run IDs currently reflected in the address bar.
-  // Only the first match is forwarded and it's always emitted under the plural
-  // `unofficialruns` key — the canonical form the app writes on dismiss/load
-  // and the one we want shared links to use going forward.
-  for (const [key, value] of liveParams) {
-    if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
-      filtered.set('unofficialruns', value);
-      break;
-    }
-  }
+  const run = readUnofficialRunParam(liveParams);
+  if (run) filtered.set('unofficialruns', run);
 
   return filtered;
 }
@@ -423,11 +418,7 @@ export function rememberChartStateInUrl(): string {
 
   const merged = new URLSearchParams(liveSearch);
   for (const key of URL_STATE_KEYS) merged.delete(key);
-  const unofficialKeys: string[] = [];
-  for (const key of merged.keys()) {
-    if (UNOFFICIAL_RUN_PARAM_RE.test(key)) unofficialKeys.push(key);
-  }
-  for (const key of unofficialKeys) merged.delete(key);
+  deleteUnofficialRunParams(merged);
   for (const [key, value] of chartParams) merged.set(key, value);
 
   const search = merged.toString();
@@ -443,8 +434,7 @@ export function chartStateHref(overrides: Record<string, string>): string {
   const { origin, pathname, hash, search } = window.location;
   const merged = new URLSearchParams(search);
   for (const key of URL_STATE_KEYS) merged.delete(key);
-  const staleRunKeys = [...merged.keys()].filter((key) => UNOFFICIAL_RUN_PARAM_RE.test(key));
-  for (const key of staleRunKeys) merged.delete(key);
+  deleteUnofficialRunParams(merged);
   for (const [key, value] of collectTabParams()) merged.set(key, value);
   for (const [key, value] of Object.entries(overrides)) merged.set(key, value);
   const query = merged.toString();

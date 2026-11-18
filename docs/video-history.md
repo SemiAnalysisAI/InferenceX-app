@@ -8,6 +8,8 @@
 
 Reads do not call GitHub: the H3 source repository is public, and only the authorized publication POST confirms its visibility, on every call.
 
+For an exact stored run, add `run=<run_id>` to `format=history`. Page numbers and `nextPage` then apply to that run's artifacts in publication order. The reader lists only the run's index prefix and verifies the stored sources and their approval receipts. An empty page for a named run is returned without caching, so a later publication is discoverable.
+
 ### History snapshot
 
 A snapshot is one immutable JSON object at `h3-video-media/v1/runs/history/v<projection>/<milliseconds>-<suffix>.json` that maps each index pathname to its projected entry and the receipt upload time it was verified against (null without a receipt). Readers use the newest snapshot of the current `VIDEO_HISTORY_PROJECTION` (`src/lib/video/video-history-store.ts`). After the authorized POST approves an artifact, it writes a new snapshot that keeps every still-current record and adds that artifact's entry, then deletes all older snapshots except the one it replaced. `POST /api/video-runs` with the body `{"history":"backfill"}` and the same bearer secret projects every index without a current record. The Warm After Deploy workflow calls it after each production promotion, and it writes nothing when every record is current. A receipt that cannot be read during a build leaves that index out of the snapshot rather than recording it as unapproved. The projection version is part of the path. A test pins a digest of the sources that produce entries, so a change that could alter them bumps the version, and the next backfill rebuilds the snapshot. Two writers racing can drop each other's new record. Reads then project that index directly until the next publication or backfill, so the output never changes.
@@ -50,7 +52,7 @@ without a retry. A page past the end is empty for any page number,
 so only page 1 is retained when empty. Unapproved entries are retained, because
 an approval only appears through publication. A publication or backfill expires
 the tag at once, also when it fails after a write, and
-`POST /api/v1/invalidate?scope=video` does the same by hand. History is keyed by its first page and page count, and the dashboard, the view
+`POST /api/v1/invalidate?scope=video` does the same by hand. History is keyed by its first page, page count and optional run ID, and the dashboard, the view
 API and the browser retry read the bounded cohort in one request. HTTP responses remain `private, no-store`. Replay keeps its existing
 verified, read-only snapshot and bypasses this cache.
 
@@ -60,7 +62,7 @@ verified, read-only snapshot and bypasses this cache.
 每份条目仍跨请求、跨实例共享，标签失效会同时清除两者。这些读取不调用 GitHub。
 索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；这样的 History 页带有 `X-VideoGenX-Incomplete: 1`：页面骨架不用它预填数据，改由浏览器读取 History；浏览器保留已收到的条目，但显示读取失败提示和重试按钮，否则缺失的条目只会表现为一张没有重试入口的空图表；
 超出末页的页对任何页码都为空，因此只有第 1 页在为空时也会保留；未批准条目会保留，因为批准只会通过发布产生。发布或历史补建会立即让该标签失效，即使在写入后失败也是如此；
-`POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页与页数分别缓存，
+`POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页、页数和可选的运行 ID 分别缓存，
 仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
 本地回放继续复用原有的已校验只读快照，不经过此缓存。
 
@@ -289,6 +291,8 @@ GitHub 产物元数据和预期 plan SHA256。读取器校验原始字节摘要�
 `publish-video-results` repository dispatch 明确传入 `source_run_id` 与 `merge_run_id`；手动 `workflow_dispatch` 必须指定来源 `run_id`，不再定时扫描全部运行。任务只列举指定运行的 GitHub 产物及其后续分页，对每个产物以现有失效密钥调用受 Bearer 保护的 `POST /api/video-runs`。已存索引仍会重试，以补写可能缺失的批准回执；某个产物失败后继续尝试后续产物，但任务最终报告失败。此授权只批准指定来源的发布，不代表 benchmark 通过质量验收。
 
 原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。授权 POST 先写已校验的不可变对象与索引，并确认索引可读，再写绑定产物身份、来源哈希和 checkout 的独立不可变批准回执，最后把该产物写入新的历史快照。相同身份的重复请求，或未提供 merge 运行 ID 的手动重新发布，都会沿用已有回执；merge 运行 ID 不同的回执不授权该来源。所有公开 GET（包括 `format=media` 未命中）都不写入；缺少媒体时返回 204。旧索引、失败或低样本来源仍在历史中；只有回执验证通过的观测进入默认图表，原有样本门槛继续适用。
+
+指定已存储运行时，在 `format=history` 后加上 `run=<run_id>`。页码和 `nextPage` 只在该运行内部生效。读取端只列出该运行的索引前缀，并核对其来源和批准回执。指定运行的空页不缓存，稍后发布的结果可在下次读取时获取。
 
 历史快照是 `h3-video-media/v1/runs/history/v<projection>/<毫秒>-<后缀>.json` 下的一个不可变 JSON，按索引路径保存投影条目，以及构建时验证的批准回执上传时间（无回执时为 null）。读取只使用当前 `VIDEO_HISTORY_PROJECTION` 的最新快照。授权 POST 批准产物后写入新快照，保留仍然有效的记录并加入该产物，然后删除除被替换快照以外的旧快照。以同一 Bearer 密钥向 `POST /api/video-runs` 发送 `{"history":"backfill"}` 会为所有缺少有效记录的索引补建条目。Warm After Deploy 工作流在每次生产发布后调用它，所有记录有效时不写入。构建时读不到回执的索引不进快照，不会被记成未批准。投影版本写在路径中，测试固定生成条目的源码摘要，可能改变条目的修改须提升版本，下一次补建会重建快照。并发写入可能丢掉对方新增的记录，此后读取会直接投影该索引，直到下次发布或补建，输出不变。
 

@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { readVideoReplay } from '@/components/video-benchmark/replay';
-import { videoHistoryEntry } from '@/components/video-benchmark/history';
+import {
+  VIDEO_HISTORY_PAGE_SIZE,
+  videoHistoryEntry,
+  type VideoHistoryEntry,
+  type VideoHistoryPage,
+} from '@/components/video-benchmark/history';
 import { withQuality, type StoredArtifact } from '@/components/video-benchmark/stored';
 import { readLocalVideoDiagnostics, readLocalVideoQuality } from './video-quality';
 import type { Json } from '@/components/video-benchmark/bundle';
@@ -233,6 +238,23 @@ function assetResponse(request: NextRequest, replay: Snapshot): Response {
   });
 }
 
+/** Project the metadata fixture or a local replay onto the same run-scoped pages as Blob. */
+export function fixtureHistoryPage(
+  entries: VideoHistoryEntry[],
+  page: number,
+  pages: number,
+  runId: string | null,
+): VideoHistoryPage {
+  const matching = runId ? entries.filter((entry) => entry.runId === runId) : entries;
+  const start = (page - 1) * VIDEO_HISTORY_PAGE_SIZE;
+  const end = start + pages * VIDEO_HISTORY_PAGE_SIZE;
+  return {
+    schemaVersion: 1,
+    entries: matching.slice(start, end),
+    nextPage: end < matching.length ? page + pages : null,
+  };
+}
+
 /** Null means the fixture adapter is disabled; active reads never reach an external source. */
 export async function localVideoReplayResponse(request: NextRequest): Promise<Response | null> {
   if (!active()) return null;
@@ -249,11 +271,14 @@ export async function localVideoReplayResponse(request: NextRequest): Promise<Re
   }
   const q = request.nextUrl.searchParams;
   const format = q.get('format');
-  if (format === 'history' && !q.has('run') && !q.has('artifact')) {
+  if (format === 'history' && !q.has('artifact')) {
     return Response.json(
-      Number(q.get('page') ?? '1') === 1
-        ? { schemaVersion: 1, entries: snapshots.map((replay) => replay.history), nextPage: null }
-        : { schemaVersion: 1, entries: [], nextPage: null },
+      fixtureHistoryPage(
+        snapshots.map((replay) => replay.history),
+        Number(q.get('page') ?? '1'),
+        Number(q.get('pages') ?? '1'),
+        q.get('run'),
+      ),
       { headers: privateHeaders },
     );
   }
