@@ -176,7 +176,7 @@ type InferenceViewMode = 'chart' | 'table';
 
 const STRINGS = {
   en: {
-    inferencePerformance: 'Inference performance',
+    inferencePerformance: 'Inference Performance',
     inferencePerformanceDesc:
       'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters',
     chart: 'Chart',

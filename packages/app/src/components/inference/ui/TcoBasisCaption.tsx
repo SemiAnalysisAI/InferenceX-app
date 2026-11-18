@@ -11,7 +11,7 @@ import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 const STRINGS = {
   en: {
-    label: 'TCO basis',
+    label: 'TCO Basis',
     external: 'External',
     internal: 'Internal',
     tooltip:

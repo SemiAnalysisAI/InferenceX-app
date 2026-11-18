@@ -5,7 +5,7 @@ describe('AI chart workspace', () => {
     cy.viewport(1280, 720);
     cy.visit('/infx/ai-chart');
     cy.get('#ai-chart-prompt').should('have.attr', 'aria-describedby', 'ai-chart-prompt-hint');
-    cy.contains('button', 'Generate chart').should('be.disabled');
+    cy.contains('button', 'Generate Chart').should('be.disabled');
     cy.get('[data-testid="ai-chart-examples"] button')
       .first()
       .then(($example) => {
@@ -16,7 +16,7 @@ describe('AI chart workspace', () => {
     cy.get('#ai-chart-key')
       .type('test-openai-key', { log: false })
       .should('have.attr', 'type', 'password');
-    cy.contains('button', 'Generate chart').should('be.enabled');
+    cy.contains('button', 'Generate Chart').should('be.enabled');
     cy.get('#ai-chart-provider').click();
     cy.contains('[role="option"]', 'Anthropic').click();
     cy.get('#ai-chart-key').should('have.value', '').type('test-anthropic-key', { log: false });
@@ -96,9 +96,9 @@ function interceptGeneration(spec: Record<string, unknown>, rows: FixtureRow[]):
 }
 
 function generateChart(): void {
-  cy.get('input[placeholder="OpenAI API key"]').type('test-api-key', { log: false });
+  cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
   cy.get('textarea').type('Generate the requested chart');
-  cy.contains('button', 'Generate chart').click();
+  cy.contains('button', 'Generate Chart').click();
   cy.wait('@benchmarks');
 }
 

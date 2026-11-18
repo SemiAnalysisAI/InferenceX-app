@@ -14,7 +14,7 @@ function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
       <InferenceChartControls showXAxisMode />
       <ResultContext
         locale="en"
-        costTier="Owning at large hyperscaler volume"
+        costTier="Owning at Large Hyperscaler Volume"
         tcoBasis={
           <TcoBasisCaption
             hardwareKeys={new Set(showTcoBasis ? ['tpuv7_vllm'] : ['b200_sglang'])}
@@ -76,13 +76,13 @@ describe('Inference ChartControls', () => {
       expect(
         labels.filter((label) => label.startsWith('Cost per Million Total Tokens')),
       ).to.deep.equal(['Cost per Million Total Tokens']);
-      expect(labels.filter((label) => label.includes('(Custom user values)'))).to.deep.equal([
-        'Token Throughput per All in Utility MW (Custom user values)',
+      expect(labels.filter((label) => label.includes('(Custom User Values)'))).to.deep.equal([
+        'Token Throughput per All in Utility MW (Custom User Values)',
       ]);
-      expect(labels.some((label) => label.includes('Owning at large hyperscaler volume'))).to.equal(
+      expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
         false,
       );
-      expect(labels.some((label) => label.includes('Rent – 3-year commit'))).to.equal(false);
+      expect(labels.some((label) => label.includes('Rent – 3-Year Commit'))).to.equal(false);
     });
     cy.get('[data-testid="locked-tier-badge"]').should('not.exist');
   });
@@ -425,7 +425,7 @@ describe('Inference ChartControls with GPUs selected', () => {
       },
     });
 
-    cy.contains('Comparison date range').should('be.visible');
+    cy.contains('Comparison Date Range').should('be.visible');
   });
 
   it('leaves the optional date range unflagged for a selected current config', () => {

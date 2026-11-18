@@ -24,7 +24,7 @@ import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
 
 const STRINGS = {
   en: {
-    heatmapTitle: 'SM-SM L2 latency difference',
+    heatmapTitle: 'SM-SM L2 Latency Difference',
     colorBarLabel: 'mean |diff| per address (clock64 cycles)',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',

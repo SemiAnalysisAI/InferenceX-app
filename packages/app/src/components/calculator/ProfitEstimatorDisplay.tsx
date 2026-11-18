@@ -197,13 +197,13 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & profit estimator per gigawatt',
-      'chip-hour': 'Revenue & profit estimator',
+      'gw-year': 'Revenue & Profit Estimator per gigawatt',
+      'chip-hour': 'Revenue & Profit Estimator',
     },
     betaQualifier: 'Beta',
     description:
       'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour or per gigawatt-year',
-    chartGroup: 'Chart config',
+    chartGroup: 'Chart Config',
     basisLabel: 'Estimate basis',
     basisTooltip:
       'Per GPU-hour shows what one chip earns and costs in an hour. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
@@ -211,10 +211,10 @@ const STRINGS = {
       'chip-hour': 'Per GPU-hour',
       'gw-year': 'Per gigawatt',
     } satisfies Record<ProfitBasis, string>,
-    benchmarkGroup: 'Benchmark config',
+    benchmarkGroup: 'Benchmark Config',
     secondaryControls: 'More chart controls',
     changed: 'changed',
-    powerLabel: 'Power estimation',
+    powerLabel: 'Power Estimation',
     powerTooltip:
       'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
@@ -230,51 +230,51 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails: `GPU power is interpolated between the same throughput points. Includes PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled chassis) or ${LIQUID_COOLED_RACK_PUE} (liquid-cooled NVL72) and 10% headroom. Aggregate multinode hosts use the measured deployment mean. NVL72 trays share one modeled rack equally and use measured Grace-socket power when the run has validated socket telemetry (otherwise modeled Grace power); the two are not interpolated together. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.`,
     csvPowerHeaders: ['Power basis', 'Power model revision'],
-    pricingGroup: 'Pricing config',
-    costProviderLabel: 'Cost provider',
+    pricingGroup: 'Pricing Config',
+    costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip. Locked rental terms (on demand through 2 year commit) are published in the TCO model.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: 'Cost provider',
-    priceSourceLabel: 'Token price',
+    priceSourceLabel: 'Token Price',
     priceSourceTooltip:
       "Where the sale price per million tokens comes from. OpenRouter reads the public catalog price for this model; the lab's list price is its published API rate, offered where third-party hosts undercut it; Custom lets you type your own input and output prices.",
     priceSourcePlaceholder: 'Token price',
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
     cachedPriceLabel: 'Cached input $/M tok',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
-    cacheHitLabel: 'Cache hit rates',
+    cacheHitLabel: 'Cache Hit Rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical roofline',
+      theoretical: 'Theoretical Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
-    labCutLabel: 'Model license fee (%)',
+    labCutLabel: 'Model License Fee (%)',
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
     utilizationShort: 'Utilization',
     labCutShort: 'License fee',
-    highContrast: 'High contrast',
+    highContrast: 'High Contrast',
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
-        ? `OpenRouter has no price for ${modelId}. Switch Token price to Custom to enter one.`
-        : 'This model has no OpenRouter listing. Switch Token price to Custom to enter a price.',
-    sellingPriceLabel: 'Selling price per million tokens',
+        ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
+        : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
+    sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
+      `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
     sourceLabel: 'Source:',
     formulaTitle: {
-      'gw-year': 'Revenue per gigawatt formula',
-      'chip-hour': 'Revenue per chip-hour formula',
+      'gw-year': 'Revenue per gigawatt Formula',
+      'chip-hour': 'Revenue per Chip-Hour Formula',
     },
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
@@ -308,10 +308,10 @@ const STRINGS = {
       ],
     },
     compareHistory: 'Compare history',
-    gpuConfig: 'Chip config',
+    gpuConfig: 'Chip Config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
-    gpuConfigPlaceholder: 'Select chip config',
-    comparisonDateRange: 'Comparison date range',
+    gpuConfigPlaceholder: 'Select Chip Config',
+    comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above. Dates in between can be added one at a time from the Config Changelog.',
     dateRangePlaceholder: 'Select date range',

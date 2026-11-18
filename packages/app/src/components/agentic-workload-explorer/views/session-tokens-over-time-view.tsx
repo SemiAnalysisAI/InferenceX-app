@@ -27,13 +27,13 @@ import {
 
 const STRINGS = {
   en: {
-    cachedVsUncached: 'Cached vs uncached',
-    contextTrajectories: 'Context trajectories',
-    apiCache: 'API cache',
-    hashBlocks: 'Hash blocks',
+    cachedVsUncached: 'Cached vs Uncached',
+    contextTrajectories: 'Context Trajectories',
+    apiCache: 'API Cache',
+    hashBlocks: 'Hash Blocks',
     agentLabel: 'Agent',
-    mainAgent: 'Main agent',
-    tokensOverTimeTitle: 'Tokens over time',
+    mainAgent: 'Main Agent',
+    tokensOverTimeTitle: 'Tokens Over Time',
     viewLabel: 'Chart',
     modeLabel: 'Cache view',
   },

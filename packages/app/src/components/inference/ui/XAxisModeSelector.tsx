@@ -28,8 +28,8 @@ const X_AXIS_OPTIONS: { value: XAxisMode; kind: XAxisKind; label: string; labelZ
 
 const STRINGS = {
   en: {
-    label: 'X-axis metric',
-    statistic: 'Service statistic',
+    label: 'X-Axis Metric',
+    statistic: 'Service Statistic',
     mean: 'Mean',
     median: 'Median',
     statisticHelp:

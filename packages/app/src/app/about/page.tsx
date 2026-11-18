@@ -48,8 +48,8 @@ export default function AboutPage() {
         <section>
           <Eyebrow as="p">About InferenceX</Eyebrow>
           <Heading as="h1" level="reading" className="mt-3">
-            Open-source continuous agentic inference benchmark trusted by operators of
-            trillion-dollar, gigawatt-scale token factories
+            Open-Source Continuous Agentic Inference Benchmark Trusted by Operators of
+            Trillion-Dollar, GigaWatt-Scale Token Factories
           </Heading>
           <div className="mt-4 flex flex-col gap-4 leading-reading text-foreground">
             <p className={READING_DEK_CLASS}>
@@ -65,7 +65,7 @@ export default function AboutPage() {
             </p>
             <p>
               Our open data and insights are widely adopted by the ML community, capacity planning
-              strategy teams at trillion dollar token factories and AI labs, and at multiple billion
+              strategy teams at trillion dollar token factories and AI Labs, and at multiple billion
               dollar NeoClouds. Learn more in our articles:{' '}
               <IntentPrefetchLink
                 href="/blog/inferencemax-open-source-inference-benchmarking"
@@ -162,7 +162,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <FaqList title="Frequently asked questions" items={FAQ_ITEMS} />
+        <FaqList title="Frequently Asked Questions" items={FAQ_ITEMS} />
       </div>
     </main>
   );

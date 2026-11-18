@@ -109,7 +109,7 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-multiselect"] [role="combobox"]').click({ force: true });
     cy.get('[role="option"]').first().click();
-    cy.contains('Comparison date range').should('be.visible');
+    cy.contains('Comparison Date Range').should('be.visible');
     cy.contains('button', 'Select date range')
       .should('not.have.class', 'animate-pulse')
       .and('not.have.class', 'border-red-500');
@@ -118,7 +118,7 @@ describe('GPU comparison agentic point detail', () => {
       if ($body.text().includes('View anyway')) {
         cy.contains('button', 'View anyway').click();
       } else {
-        cy.contains('button', 'Max range').click();
+        cy.contains('button', 'Max Range').click();
         cy.contains('button', 'Apply').click();
       }
     });

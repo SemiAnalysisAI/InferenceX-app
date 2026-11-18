@@ -179,13 +179,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Palette,
-      title: 'Try gradient labels',
+      title: 'Try Gradient Labels',
       titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
       descriptionZh: '渐变标签按并行度对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
-        label: 'Enable gradient labels',
+        label: 'Enable Gradient Labels',
         labelZh: '启用渐变标签',
         onClick: (eventDetail?: unknown) => {
           const detail = eventDetail as { enableGradient?: () => void } | undefined;
@@ -249,7 +249,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: "See the model's actual answers",
       titleZh: '查看模型的实际回答',
       description:
-        'Click the prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
+        'Click the Prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
       descriptionZh: '点击任意行末尾的提示词图标，对比每条提示、预期答案和模型的实际回复。',
       testId: 'eval-samples-nudge',
       slot: NUDGE_SLOTS.evaluationTable,
@@ -272,7 +272,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: GoogleIcon,
       title: 'TPUv7 preliminary results across multiple models',
       titleZh: 'TPUv7 多模型初步结果',
-      description: 'AgentX preview submissions',
+      description: 'AgentX Preview Submissions',
       descriptionZh: 'AgentX 预览版提交结果',
       testId: 'launch-modal',
       centered: true,
@@ -338,9 +338,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     variant: 'ubenchx',
     content: {
       icon: Cpu,
-      title: 'Huawei Ascend 950PR microbenchmarks',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
       titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: 'Cycle-level core memory-access microbenchmarks (beta)',
+      description: 'Cycle-Level Core memory-access microbenchmarks (Beta)',
       descriptionZh: '周期级核心访存微基准测试（Beta）',
       testId: 'launch-banner',
       badge: 'New',
@@ -374,9 +374,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     variant: 'operatorx',
     content: {
       icon: Cpu,
-      title: 'Huawei Ascend 950PR microbenchmarks',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
       titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: '950PR GEMM FLOPs and max FLOPS utilization',
+      description: '950PR GEMM FLOPs and Max FLOPS utilization',
       descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
       testId: 'launch-banner',
       badge: 'New',

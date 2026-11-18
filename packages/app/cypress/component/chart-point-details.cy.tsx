@@ -33,7 +33,7 @@ describe('ChartPointDetails', () => {
           metrics={[{ value: '47.47M', label: 'Total Tokens per $1 TCO' }]}
           rows={rows}
           links={[
-            { action: 'run', label: 'GitHub Actions run', href: 'https://example.com' },
+            { action: 'run', label: 'GitHub Actions Run', href: 'https://example.com' },
             { action: 'view-charts', label: 'View charts', href: '/charts' },
             { action: 'view-logs', label: 'View logs', href: '/logs' },
           ]}

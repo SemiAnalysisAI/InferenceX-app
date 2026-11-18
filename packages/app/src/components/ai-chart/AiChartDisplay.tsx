@@ -29,15 +29,15 @@ import AiChartResult from './AiChartResult';
 
 const STRINGS = {
   en: {
-    title: 'AI chart generation',
+    title: 'AI Chart Generation',
     description:
       'Turn a benchmark question into a chart. Choose an example or describe your own comparison.',
     placeholder: 'Describe the chart you want',
     enterToGenerate: '+Enter to generate',
     generating: 'Generating…',
-    generateChart: 'Generate chart',
+    generateChart: 'Generate Chart',
     error: 'Error',
-    tryAgain: 'Try again',
+    tryAgain: 'Try Again',
     examplePrompts: 'Example prompts',
     hideKey: 'Hide API key',
     showKey: 'Show API key',
@@ -45,6 +45,7 @@ const STRINGS = {
     promptHint: 'Describe a model, workload and metric, or start with an example',
     provider: 'AI provider',
     apiKey: 'API key',
+    apiKeyPlaceholder: 'API Key',
     connection: 'Provider access',
     keyHint:
       'Required to generate. The key stays in this page’s memory and is sent only to your selected provider.',
@@ -69,6 +70,7 @@ const STRINGS = {
     promptHint: '描述模型、工作负载和指标，或从示例开始',
     provider: 'AI 服务商',
     apiKey: 'API 密钥',
+    apiKeyPlaceholder: 'API 密钥',
     connection: '服务商配置',
     keyHint: '生成图表需要 API 密钥。密钥仅保存在当前页面的内存中，并只发送给所选服务商。',
     needsBoth: '填写图表描述和服务商 API 密钥后即可生成图表',
@@ -182,7 +184,7 @@ export default function AiChartDisplay() {
                     aria-describedby="ai-chart-key-hint"
                     className="pr-12"
                     type={showKey ? 'text' : 'password'}
-                    placeholder={`${getProviderLabel(provider)} ${t.apiKey}`}
+                    placeholder={`${getProviderLabel(provider)} ${t.apiKeyPlaceholder}`}
                     value={apiKey}
                     onChange={(e) =>
                       setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))

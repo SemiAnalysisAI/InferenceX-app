@@ -56,7 +56,7 @@ export function inferenceTableHeaderLabels(
     chip: locale === 'zh' ? '芯片' : 'Chip',
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
-    physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical chips',
+    physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     series: locale === 'zh' ? '系列' : 'Series',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),

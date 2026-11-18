@@ -108,16 +108,16 @@ const COST_PROVIDER_OPTIONS: {
 }[] = [
   {
     value: 'costh',
-    label: 'Owning at large hyperscaler volume',
+    label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent – 3-year commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
-  { value: 'total', label: 'Total tokens' },
-  { value: 'input', label: 'Input tokens' },
-  { value: 'output', label: 'Output tokens' },
+  { value: 'total', label: 'Total Tokens' },
+  { value: 'input', label: 'Input Tokens' },
+  { value: 'output', label: 'Output Tokens' },
 ];
 
 const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
@@ -190,32 +190,32 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 
 const STRINGS = {
   en: {
-    title: 'TCO calculator',
-    benchmarkGroup: 'Benchmark config',
-    pricingGroup: 'Pricing config',
+    title: 'TCO Calculator',
+    benchmarkGroup: 'Benchmark Config',
+    pricingGroup: 'Pricing Config',
     comparisonGroup: 'Comparison target',
     secondaryControls: 'More chart controls',
     changed: 'changed',
     description:
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
-    costProviderLabel: 'Cost provider',
+    costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token type',
+    tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
       'Whether to show costs for total tokens, input tokens only, or output tokens only.',
     tokenTypePlaceholder: 'Token type',
-    tcoBasisLabel: 'TCO basis',
+    tcoBasisLabel: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal only changes hardware with a separate owner cost, currently TPUv7.',
     metricLabel: 'Metric',
     metricTooltip:
       'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
-    targetLabel: 'Target interactivity (tok/s/user)',
+    targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
@@ -226,11 +226,11 @@ const STRINGS = {
     errorLoading: 'Error loading data. Please try a different selection.',
     clickToCompare: 'selected. Click another bar to compare.',
     clearSelection: 'Clear selection',
-    highContrast: 'High contrast',
-    totalTokens: 'Total tokens',
-    inputTokens: 'Input tokens',
-    outputTokens: 'Output tokens',
-    allInPower: 'All in power/chip',
+    highContrast: 'High Contrast',
+    totalTokens: 'Total Tokens',
+    inputTokens: 'Input Tokens',
+    outputTokens: 'Output Tokens',
+    allInPower: 'All in Power/Chip',
     source: 'Source: ',
     note: 'Note:',
     disaggCost:
@@ -243,7 +243,7 @@ const STRINGS = {
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     fleetMoved:
       'Fleet Lifecycle has its own page: a fixed fleet sized against a power budget, projected across its life with every measured config improvement.',
-    fleetMovedLink: 'Open fleet lifecycle',
+    fleetMovedLink: 'Open Fleet Lifecycle',
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',

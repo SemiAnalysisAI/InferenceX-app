@@ -10,7 +10,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {
-    title: 'Page not found',
+    title: 'Page Not Found',
     description: 'The page you are looking for does not exist',
     home: 'Go back home',
   },

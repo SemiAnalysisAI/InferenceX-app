@@ -122,22 +122,22 @@ const STRINGS = {
     frontierLoadError: 'Frontier history could not be loaded',
     frontierEmpty: 'No frontier history for the selected configurations',
     memes: 'Memes',
-    heading: 'Historical trends',
+    heading: 'Historical Trends',
     description:
       'Interpolated performance metrics over time at a fixed interactivity operating point',
-    targetLabel: 'Target interactivity (tok/s/user)',
-    agenticTargetLabel: 'Target P90 interactivity (tok/s/user)',
+    targetLabel: 'Target Interactivity (tok/s/user)',
+    agenticTargetLabel: 'Target P90 Interactivity (tok/s/user)',
     agenticTargetTooltip:
       'AgentX uses 1 / P90 full-response ITL in seconds, not P90 of token rates. Legacy ITL is used only when full-response mean/percentile ITL fields are absent. Missing or invalid P90 latency is omitted.',
     targetTooltip:
       "The interactivity operating point used for interpolation. Move the slider to see how each chip's performance changes at different interactivity levels.",
     captionTitle: (yTitle: string) => `${yTitle} over time`,
     captionQualifier: (target: number, isAgentic: boolean) =>
-      `at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}interactivity`,
+      `at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}Interactivity`,
     source: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
-    logScale: 'Log scale',
-    highContrast: 'High contrast',
+    logScale: 'Log Scale',
+    highContrast: 'High Contrast',
     noData: 'No interactivity chart data available for the selected model and sequence',
     loadError: 'Historical benchmark data could not be loaded',
     retry: 'Reload page',

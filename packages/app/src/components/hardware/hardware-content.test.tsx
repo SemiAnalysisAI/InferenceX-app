@@ -145,7 +145,7 @@ describe('HardwarePageContent', () => {
       'hrefLang="en"',
     );
     expect(html).not.toContain('min read');
-    expect(html).not.toContain('Hardware results');
+    expect(html).not.toContain('Hardware Results');
   });
 });
 
@@ -155,7 +155,7 @@ describe('HardwareIndexContent', () => {
 
     expect(html).toContain('data-testid="hardware-index-page"');
     expect(html).toContain('<h1');
-    expect(html).toContain('Hardware results');
+    expect(html).toContain('Hardware Results');
     expect(count(html, 'data-testid="hardware-card"')).toBe(2);
     expect(html).toContain(`href="/hardware/${VR}"`);
     expect(html).toContain(`href="/hardware/${TPU}"`);

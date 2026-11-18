@@ -33,7 +33,7 @@ const CLIENT_LABELS: Record<string, string> = {
 
 const STRINGS = {
   en: {
-    title: 'Explicit tool-result error rate by OS',
+    title: 'Explicit Tool-Result Error Rate by OS',
     comparableResults: (n: string) => `${n} comparable results`,
     description:
       'Error rate uses matched Anthropic results because that protocol carries an explicit error signal. OpenAI and Codex remain in all-call volume and traffic mix, but are not silently counted as successes. OS describes the request sender, not necessarily the tool execution host. Coverage is matched/comparable calls; Signal Share is comparable/all matched results.',
@@ -41,14 +41,14 @@ const STRINGS = {
       'Explicit Anthropic tool-result error counts and percentages grouped by request sender operating system, with all-provider traffic composition.',
     emptyState: 'No OS result data',
     colOs: 'OS',
-    colAllCalls: 'All calls',
+    colAllCalls: 'All Calls',
     colComparable: 'Comparable',
     colMatched: 'Matched',
     colCoverage: 'Coverage',
-    colSignalShare: 'Signal share',
+    colSignalShare: 'Signal Share',
     colErrors: 'Errors',
-    colErrorRate: 'Error rate',
-    colTrafficMix: 'Traffic mix',
+    colErrorRate: 'Error Rate',
+    colTrafficMix: 'Traffic Mix',
     signalShareTitle: 'Share of all matched provider results included in the explicit error rate',
     unknownOs: 'Unknown',
     providerTitle: (calls: string, matched: string, explicit: boolean) =>

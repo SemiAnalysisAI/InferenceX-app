@@ -62,13 +62,13 @@ const STRINGS = {
   en: {
     protocolNote:
       'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
-    latencyTitle: 'Latency vs message size',
+    latencyTitle: 'Latency vs Message Size',
     latencyY: 'Latency (ms)',
-    mbuTitle: 'Memory bandwidth utilization (MBU) vs message size',
+    mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
     mbuY: 'MBU (%)',
-    bwTitle: 'Bandwidth vs message size',
+    bwTitle: 'Bandwidth vs Message Size',
     bwY: 'Bandwidth (TB/s)',
-    xAxis: 'Message size',
+    xAxis: 'Message Size',
     yMetric: 'Y-axis',
     yMetricTooltip:
       'The measurement plotted on the Y-axis, either memory bandwidth utilization, copy bandwidth or latency.',

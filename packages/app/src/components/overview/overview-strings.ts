@@ -4,23 +4,23 @@ export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
   en: {
-    title: 'Agentic inference costs',
+    title: 'Agentic Inference Costs',
     scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
     sourceLinkText: TCO_SOURCE_TITLE,
-    controlsGroup: 'Benchmark config',
+    controlsGroup: 'Benchmark Config',
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
     engineScopeOptions: {
-      all: 'All platforms',
-      community: 'Open-source community engines (vLLM/SGLang)',
+      all: 'All Platforms',
+      community: 'Open-Source Community Engines (vLLM/SGLang)',
     },
     engineScopeShortOptions: {
-      all: 'All platforms',
-      community: 'Open-source (vLLM/SGLang)',
+      all: 'All Platforms',
+      community: 'Open-Source (vLLM/SGLang)',
     },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
@@ -39,10 +39,10 @@ export const OVERVIEW_STRINGS = {
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
     historyCaption: (days: number) =>
       `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
-    modelHeader: 'Model · scenario',
+    modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
-      agentx: 'Long-context multi-turn realistic agentic scenario (AgentX)',
+      agentx: 'Long-Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
     scenarioLabelsShort: {
       single_turn_8k1k: '8K/1K',

@@ -32,7 +32,7 @@ import {
 
 const STRINGS = {
   en: {
-    empty: 'No chip metrics data to display',
+    empty: 'No Chip metrics data to display',
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     seconds: 'Time (s)',
     chip: 'Chip',

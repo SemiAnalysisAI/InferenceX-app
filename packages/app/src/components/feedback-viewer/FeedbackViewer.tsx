@@ -72,7 +72,7 @@ function decryptRow(cipher: Cipher, row: FeedbackListRow): DecryptedRow {
 
 const STRINGS = {
   en: {
-    title: 'User feedback',
+    title: 'User Feedback',
     explanation: 'All user-supplied columns are encrypted server-side. Paste the',
     explanationSuffix: 'to decrypt in your browser. The key never leaves this page.',
     keySecurity: 'Browser-only key handling · never persisted or sent to the server',

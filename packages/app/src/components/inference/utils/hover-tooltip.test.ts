@@ -136,18 +136,18 @@ describe('generateHoverTooltipContent', () => {
 
   it('keeps every field in the details panel', () => {
     const details = detailsText(config(agenticPoint()));
-    expect(details).toContain('Prompt tokens');
+    expect(details).toContain('Prompt Tokens');
     expect(details).toContain('theoretical 97.3%');
     expect(details).toContain('DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
   });
 
   it('shows the speculative row in the details panel for non-agentic points that use it', () => {
     const details = detailsText(config(agenticPoint({ benchmark_type: 'single_turn' })));
-    expect(details).toContain('Speculative decoding: DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
+    expect(details).toContain('Speculative Decoding: DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
     const off = detailsText(
       config(agenticPoint({ benchmark_type: 'single_turn', spec_decoding: 'none' })),
     );
-    expect(off).not.toContain('Speculative decoding');
+    expect(off).not.toContain('Speculative Decoding');
   });
 
   it('keeps comparison dates and carried-forward source dates in compact hover', () => {

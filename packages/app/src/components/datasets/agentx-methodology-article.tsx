@@ -92,7 +92,7 @@ const FIGURE_ASSETS = {
 const CONTENT = {
   en: {
     eyebrow: 'Field guide / AI infrastructure',
-    title: 'AgentX methodology',
+    title: 'AgentX Methodology',
     lead: 'AgentX converts opt-in Claude Code proxy traces into deterministic AIPerf workloads. This page documents how collection metadata becomes a replay and which controls define a valid benchmark result.',
     facts: [
       { value: '393', label: 'published sessions' },
@@ -144,7 +144,7 @@ const CONTENT = {
       { label: 'AgentX v1.0 full dataset', target: 'dataset-full' },
       { label: 'AgentX v1.0 256k dataset', target: 'dataset-256k' },
       { label: 'AIPerf WEKA trace replay guide', target: 'aiperf-weka' },
-      { label: 'SPEED-bench paper', target: 'speed-bench' },
+      { label: 'SPEED-Bench paper', target: 'speed-bench' },
       { label: 'SGLang forced acceptance control', target: 'sglang-pr' },
       { label: 'TensorRT-LLM forced acceptance control', target: 'trtllm-pr' },
       { label: 'vLLM synthetic acceptance control', target: 'vllm-pr' },

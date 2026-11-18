@@ -74,18 +74,18 @@ const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number, locale
 
 const EVALUATION_TOOLTIP_STRINGS = {
   en: {
-    runLink: 'GitHub Actions run',
+    runLink: 'GitHub Actions Run',
     unofficial: 'Unofficial run',
     date: 'Date',
-    meanScore: 'Mean score',
-    minScore: 'Min score',
-    maxScore: 'Max score',
+    meanScore: 'Mean Score',
+    minScore: 'Min Score',
+    maxScore: 'Max Score',
     concurrency: 'Concurrency',
     errorBar: 'Error bar',
     precision: 'Precision',
-    tensorParallelism: 'Tensor parallelism',
-    expertParallelism: 'Expert parallelism',
-    dataParallelAttention: 'Data parallel attention',
+    tensorParallelism: 'Tensor Parallelism',
+    expertParallelism: 'Expert Parallelism',
+    dataParallelAttention: 'Data Parallel Attention',
     multinode: 'Multinode',
     prefill: 'Prefill',
     decode: 'Decode',
@@ -315,8 +315,8 @@ function updateUnofficialScoreLabels(
 
 const EVAL_STRINGS = {
   en: {
-    showLabels: 'Show labels',
-    highContrast: 'High contrast',
+    showLabels: 'Show Labels',
+    highContrast: 'High Contrast',
     score: 'Score',
     unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
     unofficialRun: 'Unofficial run',

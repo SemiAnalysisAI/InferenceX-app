@@ -10,7 +10,7 @@ const MODEL_LABELS = [
 ];
 
 const PLATFORM_HEADERS = [
-  'Model · scenario',
+  'Model · Scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
@@ -22,10 +22,10 @@ const PLATFORM_HEADERS = [
 const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
-const AGENTX_LABEL = 'Long-context multi-turn realistic agentic scenario (AgentX)';
+const AGENTX_LABEL = 'Long-Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Agentic inference costs';
+const PAGE_TITLE = 'Agentic Inference Costs';
 const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
@@ -571,7 +571,7 @@ describe('Overview page', () => {
         cy.visit(href);
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
-        cy.contains('Comparison date range').should('be.visible');
+        cy.contains('Comparison Date Range').should('be.visible');
         cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
         cy.get('[data-testid="model-selector"]').click();
         cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
@@ -600,7 +600,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison date range').should('be.visible');
+        cy.contains('Comparison Date Range').should('be.visible');
         cy.contains('button', 'Select date range')
           .should('not.have.class', 'animate-pulse')
           .and('not.have.class', 'border-red-500');
@@ -622,7 +622,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison date range').should('not.exist');
+        cy.contains('Comparison Date Range').should('not.exist');
       });
   });
 
@@ -726,16 +726,16 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Open-source community engines (vLLM/SGLang)')
+          .and('have.text', 'Open-Source Community Engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?tier=50&engine=all&compare=hardware')
-          .and('have.text', 'All platforms');
+          .and('have.text', 'All Platforms');
       });
 
     cy.get('[data-testid="overview-controls-panel"]')
       .should('match', 'fieldset')
-      .and('contain.text', 'Benchmark config')
+      .and('contain.text', 'Benchmark Config')
       .within(() => {
         cy.get('label').should('contain.text', 'SLO (tok/s/user)');
         cy.get('label').should('contain.text', 'Engine scope');

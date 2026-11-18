@@ -17,7 +17,7 @@ const STRINGS = {
     product: 'Product',
     gpcs: 'Measured # of GPCs',
     sms: 'Measured # of SMs',
-    grouping: 'Measured TPC groupings',
+    grouping: 'Measured TPC Groupings',
     methodology: 'Methodology',
     methodologyText:
       'gpc_query launches thread-block clusters of every size from 2 up to the hardware maximum and records the SM each block runs on. A cluster always runs within one GPC, so SMs that share a cluster are merged into the same GPC. Each list gives TPCs (two SMs each) per GPC, sorted descending; positions are not physical GPC indices.',

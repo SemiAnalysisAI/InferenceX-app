@@ -96,41 +96,41 @@ const COST_PROVIDER_OPTIONS: {
 }[] = [
   {
     value: 'costh',
-    label: 'Owning at large hyperscaler volume',
+    label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent – 3-year commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string; labelZh: string }[] = [
-  { value: 'total', label: 'Total tokens', labelZh: '总 Token' },
-  { value: 'input', label: 'Input tokens', labelZh: '输入 Token' },
-  { value: 'output', label: 'Output tokens', labelZh: '输出 Token' },
+  { value: 'total', label: 'Total Tokens', labelZh: '总 Token' },
+  { value: 'input', label: 'Input Tokens', labelZh: '输入 Token' },
+  { value: 'output', label: 'Output Tokens', labelZh: '输出 Token' },
 ];
 
 const STRINGS = {
   en: {
-    title: 'First-token limits',
+    title: 'First-Token Limits',
     description:
       'Which chip wins depends on how long a user may wait for the first token. For each cap on time to first token, this reads the measured configurations that also clear the interactivity floor and keeps the cheapest one per vendor. Measured rows only: no interpolation, and every bar links to the run behind it.',
-    benchmarkGroup: 'Benchmark config',
-    chartGroup: 'Chart config',
-    costProviderLabel: 'Cost provider',
+    benchmarkGroup: 'Benchmark Config',
+    chartGroup: 'Chart Config',
+    costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The pricing tier the bars are costed at. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token type',
+    tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
       'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip unless the note below the chart switches them to every chip, so by default their input- and output-basis costs are not per chip overall.',
     tokenTypePlaceholder: 'Token type',
-    minInteractivityLabel: (stat: string) => `Minimum ${stat} interactivity (tok/s/user)`,
+    minInteractivityLabel: (stat: string) => `Minimum ${stat} Interactivity (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
       `Only rows whose ${stat} interactivity is at or above this floor are eligible. Set it to the streaming speed the workload needs; a cap on first-token wait is then applied on top.`,
-    capsLabel: 'TTFT caps (s, comma-separated)',
+    capsLabel: 'TTFT Caps (s, comma-separated)',
     capsTooltip:
       'The ladder of maximum first-token waits to compare, in seconds. Each cap gets its own group of bars. Up to eight values.',
     capsPlaceholder: formatFirstTokenCaps(DEFAULT_FIRST_TOKEN_CAPS),
-    highContrast: 'High contrast',
+    highContrast: 'High Contrast',
     errorLoading: 'Error loading data. Please try a different selection.',
     noData:
       'No measured data for the current selection. Try another model, workload, or precision.',
@@ -965,7 +965,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 {showsTcoBasis && (
                   <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                     <LabelWithTooltip
-                      label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
+                      label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
                       tooltip={
                         locale === 'zh'
                           ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'

@@ -15,7 +15,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     ['', 'profit-estimator'],
     ['/zh', 'profit-estimator-per-gigawatt'],
   ] as const) {
-    const roofline = prefix ? '理论上限' : 'Theoretical roofline';
+    const roofline = prefix ? '理论上限' : 'Theoretical Roofline';
     const actual = prefix ? '实测' : 'Actual';
     it(`defaults to roofline and preserves explicit Actual in ${prefix}/${tab}`, () => {
       const base = `${prefix}/infx/${tab}/deepseek-v4`;

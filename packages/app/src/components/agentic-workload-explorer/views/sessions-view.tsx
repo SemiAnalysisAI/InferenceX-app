@@ -37,22 +37,22 @@ const STRINGS = {
     sessions: 'Sessions',
     total: 'total',
     searchPlaceholder: 'Search sessions',
-    minReqs: { '20': '> 20 reqs', '100': '> 100 reqs', '0': 'All' } as Record<string, string>,
-    allVersions: 'All versions',
-    allHarnesses: 'All harnesses',
+    minReqs: { '20': '> 20 Reqs', '100': '> 100 Reqs', '0': 'All' } as Record<string, string>,
+    allVersions: 'All Versions',
+    allHarnesses: 'All Harnesses',
     noMatch: 'No sessions match these filters',
     colSession: 'Session',
     colUser: 'User',
     colReqs: 'Reqs',
     colCost: 'Cost',
-    colApiHit: 'API hit',
-    colHashUpper: 'Hash upper bound',
+    colApiHit: 'API Hit',
+    colHashUpper: 'Hash Upper Bound',
     colStarted: 'Started (UTC)',
     colActive: 'Active (UTC)',
     apiHitTitle:
-      'API cache hit rate — cache_read / (cache_read + cache_write + input) across every request in the session.',
+      'API Cache Hit Rate — cache_read / (cache_read + cache_write + input) across every request in the session.',
     hashUpperTitle:
-      'Theoretical upper-bound cache hit rate — assuming infinite cache TTL and an infinitely large cache. Walks a chain-hash trie over every request to find the longest prefix match against any prior chain in the session.',
+      'Theoretical Upper-Bound Cache Hit Rate — Assuming Infinite Cache TTL and an Infinitely Large Cache. Walks a chain-hash trie over every request to find the longest prefix match against any prior chain in the session.',
     computeHashTitle: 'Compute the exact theoretical hash-cache upper bound for this session.',
     hashLoad: 'Compute',
     hashRetry: 'Retry',
@@ -60,7 +60,7 @@ const STRINGS = {
     colVersion: 'Version',
     resetSort: 'Reset sort',
     minReqsFilterLabel: 'Minimum requests',
-    versionFilterLabel: 'Trace version',
+    versionFilterLabel: 'Trace Version',
     harnessFilterLabel: 'Harness',
     openSession: (id: string) => `Open session ${id}`,
   },
@@ -158,8 +158,8 @@ type VersionFilter = 'all' | string;
 const PAGE_SIZE = 50;
 
 const MIN_REQS_FILTERS: { value: MinReqsFilter; label: string }[] = [
-  { value: '20', label: '> 20 reqs' },
-  { value: '100', label: '> 100 reqs' },
+  { value: '20', label: '> 20 Reqs' },
+  { value: '100', label: '> 100 Reqs' },
   { value: '0', label: 'All' },
 ];
 
@@ -168,7 +168,7 @@ const HARNESS_FILTERS: readonly HarnessFilter[] = ['all', ...HARNESSES];
 const VERSIONED_HARNESSES: readonly HarnessFilter[] = ['claude-code', 'codex', 'omp'];
 
 const VERSION_FILTERS: { value: VersionFilter; label: string }[] = [
-  { value: 'all', label: 'All versions' },
+  { value: 'all', label: 'All Versions' },
   { value: String(CURRENT_TRACE_VERSION), label: `v${CURRENT_TRACE_VERSION}` },
 ];
 

@@ -54,8 +54,8 @@ describe('tooltip parallelism — old data (no ep field)', () => {
   it('shows GPU count when ep and prefill_ep are absent', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4 }) }));
     expect(html).toContain('Single-node aggregate · 4 chips · conc 64');
-    expect(html).not.toContain('Tensor parallelism');
-    expect(html).not.toContain('Expert parallelism');
+    expect(html).not.toContain('Tensor Parallelism');
+    expect(html).not.toContain('Expert Parallelism');
   });
 
   it('pluralizes chips for tp > 1', () => {
@@ -127,14 +127,14 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     expect(html).toContain('DPAEP8');
   });
 
-  it('shows pipeline parallelism when pp > 1', () => {
+  it('shows Pipeline Parallelism when pp > 1', () => {
     const html = detailsText(
       tooltipConfig({ data: pt({ tp: 16, decode_tp: 8, ep: 1, pp: 2, dp_attention: false }) }),
     );
     expect(html).toContain('TP8PP2');
   });
 
-  it('hides pipeline parallelism when pp is 1, 0, or absent', () => {
+  it('hides Pipeline Parallelism when pp is 1, 0, or absent', () => {
     for (const pp of [1, 0, undefined]) {
       const html = detailsText(
         tooltipConfig({ data: pt({ tp: 8, ep: 1, pp, dp_attention: false }) }),
@@ -180,7 +180,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     expect(html).toContain('DCP 1 · PCP 1');
   });
 
-  it('keeps an unknown expert width unknown when ep is null', () => {
+  it('keeps an unknown Expert width unknown when ep is null', () => {
     const d = pt({ tp: 4 });
     (d as any).ep = null;
     (d as any).prefill_ep = 2;

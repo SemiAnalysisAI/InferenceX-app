@@ -182,22 +182,22 @@ function labelTextFor(
 
 const GPU_STRINGS = {
   en: {
-    logScale: 'Log scale',
-    highContrast: 'High contrast',
-    optimalOnly: 'Optimal only',
+    logScale: 'Log Scale',
+    highContrast: 'High Contrast',
+    optimalOnly: 'Optimal Only',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    parallelismLabels: 'Parallelism labels',
+    parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
-    lineLabels: 'Line labels',
-    frameworkLabel: 'Framework line label',
-    offloadingLabel: 'Offloading label',
-    perfRuler: 'Perf ruler',
+    lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
+    perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
     noRoleEnergyDataHint:

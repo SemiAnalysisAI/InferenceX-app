@@ -129,7 +129,7 @@ it('redirects a legacy ?op= link to the category path', () => {
   cy.visit('/opx?op=model');
   cy.location('pathname').should('eq', '/opx/model');
   cy.location('search').should('eq', '');
-  cy.contains('[data-testid="operatorx-page"] nav a', 'Model view').should(
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Model View').should(
     'have.attr',
     'aria-current',
     'page',

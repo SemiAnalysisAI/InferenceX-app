@@ -68,9 +68,9 @@ import { useThroughputData, useWarmThroughputChange, type GroupMeta } from './us
 
 const STRINGS = {
   en: {
-    title: 'Prefix cache reuse',
-    benchmarkGroup: 'Benchmark config',
-    chartGroup: 'Chart config',
+    title: 'Prefix Cache Reuse',
+    benchmarkGroup: 'Benchmark Config',
+    chartGroup: 'Chart Config',
     configLabel: 'Configuration',
     configTooltip:
       'The chip and serving framework whose sweep is plotted. Configurations that reported no cache tier for this selection are listed but draw no bars.',

@@ -41,7 +41,7 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
     ]),
   ),
   mtp: 'MTP',
-  draft_model: 'Draft model',
+  draft_model: 'Draft Model',
   aiperf: 'AIPerf',
 };
 
