@@ -429,7 +429,6 @@ export default function VideoResultsClips({
   useEffect(() => {
     if (!nextReady) return;
     const ahead = [
-      ...nextFrames,
       ...(next.subject?.groups ?? []).flatMap((item) => framesOf(next, promptKey(item))),
       ...next.options.flatMap((item) => framesOf(pairFor(stage.clip, item.value), stage.prompt)),
       ...configs.flatMap((p) => framesOf(pairFor(stagePointKey(p), null), stage.prompt)),
