@@ -398,24 +398,27 @@ export default function VideoResultsClips({
     if (live.vs === null && matchMedia(MOBILE_VIEWPORT_QUERY).matches)
       writeStage({ ...live, vs: openedPair });
   }, [openedPair]);
-  /** The first frames a pair shows for a prompt. */
-  const framesOf = (
+  /** The clips a pair shows for a prompt. */
+  const clipsOf = (
     { subject: shown, option: choice, other: paired }: Pair,
     prompt: string | null,
   ) => {
     const shownGroup = stagePrompt(shown?.groups ?? [], prompt);
-    const own = shown?.side ? shownGroup?.clips.get(shown.side.hardwareKey)?.posterUrl : undefined;
+    const own = shown?.side ? shownGroup?.clips.get(shown.side.hardwareKey) : undefined;
     const pairedSide = paired ? sideOf(paired) : null;
     const pairs =
       !choice || choice.kind === 'reference'
-        ? resultsClipReference(shownGroup, new Set())?.posterUrl
+        ? resultsClipReference(shownGroup, new Set())
         : pairedSide
           ? pairedGroup(resultsClipGroups([pairedSide]), shownGroup)?.clips.get(
               pairedSide.hardwareKey,
-            )?.posterUrl
+            )
           : undefined;
-    return [own, pairs].filter((url): url is string => Boolean(url));
+    return [own, pairs].flatMap((clip) => (clip ? [clip] : []));
   };
+  /** The first frames a pair shows for a prompt. */
+  const framesOf = (pair: Pair, prompt: string | null) =>
+    clipsOf(pair, prompt).flatMap((clip) => (clip.posterUrl ? [clip.posterUrl] : []));
   const nextFrames = nextReady ? framesOf(next, stage.prompt) : [];
   /** First frames that loaded or failed; the stage waits for no others. */
   const [settledFrames, setSettledFrames] = useState<ReadonlySet<string>>(new Set());
@@ -479,7 +482,8 @@ export default function VideoResultsClips({
   );
   const holding = heldPair !== null && ready(heldPair);
   const stale = holding && (switching || !nextReady);
-  const { subject, option, other } = holding ? heldPair : next;
+  const shownPair = holding ? heldPair : next;
+  const { subject, option, other } = shownPair;
   const shownPrompt = holding && held ? held.prompt : stage.prompt;
   const wantedPoints = [
     ...new Set([
@@ -555,6 +559,15 @@ export default function VideoResultsClips({
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());
   const groups = subject?.groups ?? [];
   const group = stagePrompt(groups, shownPrompt);
+  // The shown pair's web renditions for the prompts either side of the shown one in the strip.
+  const neighbours = group ? [groups.indexOf(group) - 1, groups.indexOf(group) + 1] : [];
+  const ahead = neighbours.flatMap((index) =>
+    groups[index]
+      ? clipsOf(shownPair, promptKey(groups[index])).flatMap((clip) =>
+          clip.previewUrl ? [clip.previewUrl] : [],
+        )
+      : [],
+  );
   const diagnostic = group?.scope === 'matched-noise-diagnostic';
   const playing = next.subject ? stagePointKey(next.subject.point) : null;
   const baseline = next.other ? stagePointKey(next.other) : null;
@@ -836,6 +849,7 @@ export default function VideoResultsClips({
                   setFailedPreviews((previous) => new Set([...previous, url]))
                 }
                 loadedFrames={loadedFrames}
+                ahead={ahead}
                 swapped={stage.swap}
                 onSwappedChange={(swap) => writeStage({ ...parseStage(location.search), swap })}
                 caption={
