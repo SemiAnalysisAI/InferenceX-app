@@ -4,7 +4,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 export const HARDWARE_COPY = {
   en: {
-    indexEyebrow: 'InferenceX research',
+    indexEyebrow: 'InferenceX Research',
     /** SEO title, social title and JSON-LD name. Kept in Title Case. */
     indexTitle: 'Hardware Results',
     /** On-page heading and breadcrumb link, in sentence case. */

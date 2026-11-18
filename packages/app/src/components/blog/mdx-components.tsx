@@ -221,7 +221,7 @@ export function createMdxComponents(
           ? 'https://inferencex.semianalysis.com/zh'
           : 'https://inferencex.semianalysis.com';
       const defaultLabel =
-        locale === 'zh' ? '查看完整 InferenceX 仪表板' : 'See full InferenceX dashboard';
+        locale === 'zh' ? '查看完整 InferenceX 仪表板' : 'See full InferenceX Dashboard';
       const href = props.href ?? defaultHref;
       return (
         <div className="not-prose my-8 flex justify-center">

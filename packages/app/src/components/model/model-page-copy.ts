@@ -10,9 +10,9 @@ const INDEX_DESCRIPTION_EN =
 
 export const MODEL_PAGE_COPY = {
   en: {
-    indexTitle: 'Model architectures',
+    indexTitle: 'Model Architectures',
     indexDescription: INDEX_DESCRIPTION_EN,
-    inferenceDashboard: 'Inference dashboard',
+    inferenceDashboard: 'Inference Dashboard',
     modelBreadcrumb: 'Model',
     released: 'Released',
     detailTitle: (model: string) => `${model} — Architecture, Evals & Inference Performance`,

@@ -86,7 +86,7 @@ const STRINGS = {
     collapse: 'Collapse',
     bars: 'Stacked bars',
     area: 'Stacked area',
-    xAxis: 'Median interactivity (tok/s/user)',
+    xAxis: 'Median Interactivity (tok/s/user)',
     yAxis: 'Power (W/GPU)',
     total: 'All in Measured',
     totalIt: 'IT (no PUE)',

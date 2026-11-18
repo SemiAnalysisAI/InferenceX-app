@@ -18,7 +18,7 @@ type Locale = 'en' | 'zh';
 const CONTENT = {
   en: {
     eyebrow: 'AgentX v1.0 methodology',
-    title: 'AgentX benchmark datasets',
+    title: 'AgentX Benchmark Datasets',
     intro:
       'AgentX derives replay workloads from opt-in Claude Code sessions. The published traces remove prompt, code, and tool payloads while retaining request lengths, prefix reuse, subagent branches, and timing.',
     processTitle: 'How an AgentX run is built',
@@ -97,7 +97,7 @@ const CONTENT = {
       },
     ],
     methodologyCta: 'Read the full methodology',
-    resultsCta: 'View AgentX performance results',
+    resultsCta: 'View AgentX Performance Results',
   },
   zh: {
     eyebrow: 'AgentX v1.0 测试方法',

@@ -153,7 +153,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     expect(modal?.content.title).toBe('TPUv7 preliminary results across multiple models');
     expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
-    expect(modal?.content.description).toBe('AgentX preview submissions');
+    expect(modal?.content.description).toBe('AgentX Preview Submissions');
     expect(modal?.content.descriptionZh).toBe('AgentX 预览版提交结果');
     expect(modal?.content.primaryAction?.label).toBe('Qwen3.5');
     modal?.content.primaryAction?.onClick();

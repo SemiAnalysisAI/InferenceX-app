@@ -31,12 +31,12 @@ const COLORS = {
 
 const STRINGS = {
   en: {
-    latencyDecomposition: 'Latency decomposition',
+    latencyDecomposition: 'Latency Decomposition',
     prefill: 'Prefill (TTFT)',
     decode: 'Decode',
     undecomposed: 'Undecomposed',
-    expandAll: 'Expand all',
-    collapseAll: 'Collapse all',
+    expandAll: 'Expand All',
+    collapseAll: 'Collapse All',
     noData: 'No request data available',
     e2e: 'E2E',
     outputTokens: 'output tokens',

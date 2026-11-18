@@ -32,12 +32,12 @@ const CONNECTOR_WIDTH = 32;
 
 const STRINGS = {
   en: {
-    flowGraph: 'Flow graph',
+    flowGraph: 'Flow Graph',
     noData: 'No conversation data to display',
     nodes: (n: number) => `${n} nodes`,
     subAgents: (n: number) => `${n} sub-agent${n === 1 ? '' : 's'}`,
-    expandAll: 'Expand all',
-    collapseAll: 'Collapse all',
+    expandAll: 'Expand All',
+    collapseAll: 'Collapse All',
     nodeLabels: {
       user: 'User',
       assistant: 'Response',
@@ -48,7 +48,7 @@ const STRINGS = {
     },
     response: (tok: number) => `Response · ${formatNumber(tok)} tok`,
     responseNoTok: 'Response',
-    toolCall: 'Tool call',
+    toolCall: 'Tool Call',
     thinkingLabel: (chars: number) => `Thinking · ${formatNumber(chars)} chars`,
     resultLabel: 'Result',
     resultError: 'Result (error)',

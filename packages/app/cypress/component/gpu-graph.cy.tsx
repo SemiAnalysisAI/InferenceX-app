@@ -223,7 +223,7 @@ describe('GPUGraph', () => {
     cy.get(labels).filter(':visible').first().should('have.text', '4');
     cy.get('#gpu-point-labels').click();
     cy.get(`${labels}:visible`).should('not.exist');
-    cy.get('label[for="gpu-offloading-label"]').should('have.text', 'Offloading label');
+    cy.get('label[for="gpu-offloading-label"]').should('have.text', 'Offloading Label');
     cy.get('#gpu-offloading-label').should('have.attr', 'data-state', 'checked').click();
     cy.get('@setShowOffloadingLabel').should('have.been.calledWith', false);
   });

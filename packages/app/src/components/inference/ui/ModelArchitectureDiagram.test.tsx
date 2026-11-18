@@ -149,7 +149,7 @@ describe('ModelArchitectureDiagram rendering', () => {
     act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
 
     expect(container.textContent).toContain('模型架构');
-    expect(container.textContent).not.toContain('Model architecture');
+    expect(container.textContent).not.toContain('Model Architecture');
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
   });
 

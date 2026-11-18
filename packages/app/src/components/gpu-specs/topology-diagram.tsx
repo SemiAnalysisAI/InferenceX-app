@@ -26,9 +26,9 @@ import { useLocale } from '@/lib/i18n/use-locale';
 const STRINGS = {
   en: {
     expandHint: 'Click to expand',
-    previous: 'Previous chip',
-    next: 'Next chip',
-    title: 'Scale-out topology',
+    previous: 'Previous Chip',
+    next: 'Next Chip',
+    title: 'Scale-Out Topology',
     diagram: 'scale-out topology diagram',
     leafSwitch: 'Leaf switch:',
     spineSwitch: 'Spine switch:',
@@ -36,7 +36,7 @@ const STRINGS = {
     servers: 'servers',
     chip: 'Chip',
     pod: 'Pod',
-    railPod: 'Rail pod',
+    railPod: 'Rail Pod',
     spine: 'Spine',
     leaf: 'Leaf',
   },

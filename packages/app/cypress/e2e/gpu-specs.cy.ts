@@ -203,12 +203,12 @@ describe('GPU Specs Navigation', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
     cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
     cy.url().should('include', '/infx/gpu-specs');
-    cy.get('h1').should('contain.text', 'Chip specifications');
+    cy.get('h1').should('contain.text', 'Chip Specifications');
     cy.get('[data-testid="chart-section-tabs"] [data-tab-active="true"]')
       .should('have.length', 1)
       .and('have.attr', 'data-testid', 'tab-trigger-gpu-specs')
       .and('have.attr', 'href', '/infx/gpu-specs')
-      .and('have.text', 'Chip specs');
+      .and('have.text', 'Chip Specs');
   });
 });
 
@@ -225,9 +225,9 @@ describe('Topology Dialog Navigation', () => {
     cy.get('table').scrollIntoView();
     cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-out topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Out Topology');
     cy.get('[data-testid="topology-nav-next"]').click({ force: true });
-    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-out topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-Out Topology');
     cy.get('[role="dialog"]').should('contain.text', '2 / 7');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
@@ -238,7 +238,7 @@ describe('Topology Dialog Navigation', () => {
     cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
     cy.get('[data-testid="topology-nav-prev"]').click({ force: true });
-    cy.get('[role="dialog"]').should('contain.text', 'MI355X Scale-out topology');
+    cy.get('[role="dialog"]').should('contain.text', 'MI355X Scale-Out Topology');
     cy.get('[role="dialog"]').should('contain.text', '7 / 7');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
@@ -248,11 +248,11 @@ describe('Topology Dialog Navigation', () => {
     cy.get('table').scrollIntoView();
     cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-out topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Out Topology');
     cy.get('body').type('{rightArrow}');
-    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-out topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-Out Topology');
     cy.get('body').type('{leftArrow}');
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-out topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Out Topology');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
   });
@@ -261,9 +261,9 @@ describe('Topology Dialog Navigation', () => {
     cy.get('table').scrollIntoView();
     cy.get('table').contains('button', 'Switched 4-rail Optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Up Topology');
     cy.get('[data-testid="scaleup-topology-nav-next"]').click({ force: true });
-    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-Up Topology');
     cy.get('[role="dialog"]').should('contain.text', '2 / 9');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
@@ -273,11 +273,11 @@ describe('Topology Dialog Navigation', () => {
     cy.get('table').scrollIntoView();
     cy.get('table').contains('button', 'Switched 4-rail Optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Up Topology');
     cy.get('body').type('{rightArrow}');
-    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-Up Topology');
     cy.get('body').type('{leftArrow}');
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Up Topology');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
   });
@@ -287,10 +287,10 @@ describe('Topology Dialog Navigation', () => {
     cy.get('table').contains('button', 'Switched 4-rail Optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
     cy.get('[data-testid="scaleup-topology-nav-prev"]').click({ force: true });
-    cy.get('[role="dialog"]').should('contain.text', 'MI355X Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'MI355X Scale-Up Topology');
     cy.get('[role="dialog"]').should('contain.text', '9 / 9');
     cy.get('[data-testid="scaleup-topology-nav-next"]').click({ force: true });
-    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-up topology');
+    cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Up Topology');
     cy.get('[role="dialog"]').should('contain.text', '1 / 9');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');

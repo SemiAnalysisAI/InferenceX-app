@@ -356,8 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after hardware.ts began naming A100; no stored entry comes from an A100 cluster.
-      sources: 'c9a22928463a1a3bb23d387e59ff88c64e858789c0224a5dc62c0db58afa3f68',
+      // Re-pinned after cost tier labels returned to title case; labels are not stored in entries.
+      sources: 'ed6de4a65a129a45ddcd7ee97b3f6647b0477206034c5f5ab2507d5ae7629d1e',
     });
   });
 });

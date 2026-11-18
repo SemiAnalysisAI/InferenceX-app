@@ -155,7 +155,7 @@ const InferenceActionsContext = createContext<InferenceActionsContextType | unde
 
 export const INFERENCE_CONTEXT_STRINGS = {
   en: {
-    dateRangeResetTitle: 'Date range reset',
+    dateRangeResetTitle: 'Date Range Reset',
     dateRangeResetDescription:
       'The chip configs are not available in the selected date range. The date range will be reset.',
     ok: 'OK',

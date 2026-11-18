@@ -285,8 +285,8 @@ const KNOWN_SOURCE_COLORS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, Record<string, string>> = {
   en: {
     local_compute: 'Prefill',
-    local_cache_hit: 'HBM cache hit',
-    external_kv_transfer: 'Offload cache hit',
+    local_cache_hit: 'HBM Cache Hit',
+    external_kv_transfer: 'Offload Cache Hit',
     miss: 'Miss',
   },
   zh: {

@@ -332,7 +332,7 @@ describe('proxy matcher', () => {
     '/profit-estimator/kimi-k3/target/30',
     '/zh/profit-estimator-per-gigawatt',
     '/evaluation',
-    '/historical/kimi-k3',
+    '/historical/Kimi-k3',
     '/calculator',
     '/fleet',
     '/first-token',

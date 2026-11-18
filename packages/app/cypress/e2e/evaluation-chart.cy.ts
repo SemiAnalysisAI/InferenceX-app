@@ -17,7 +17,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.get('#evaluation-chart')
       .closest('figure')
       .find('.sidebar-legend')
-      .contains('label', 'Show labels')
+      .contains('label', 'Show Labels')
       .should('exist');
 
     cy.get('#eval-show-labels').then(($switch) => {

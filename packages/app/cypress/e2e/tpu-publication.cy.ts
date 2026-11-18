@@ -105,8 +105,8 @@ describe('TPU publication preview', () => {
       cy.visit(`/infx/inference?${query}`);
       cy.wait('@tpuPreview');
       openChartControls();
-      cy.contains('legend', 'Benchmark config').should('be.visible');
-      cy.contains('legend', 'Chart config').should('be.visible');
+      cy.contains('legend', 'Benchmark Config').should('be.visible');
+      cy.contains('legend', 'Chart Config').should('be.visible');
       cy.get('[data-testid="fixed-sequence-statistic-selector"]').then(($statistic) => {
         cy.get('[data-testid="x-axis-mode-selector"]').should(($axis) => {
           expect($axis[0].getBoundingClientRect().width).to.be.closeTo(

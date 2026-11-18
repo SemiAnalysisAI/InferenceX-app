@@ -67,7 +67,7 @@ export default async function ComparePrecisionIndexPage() {
       <section>
         <Card>
           <Heading as="h1" level="page">
-            Chip precision comparisons
+            Chip Precision Comparisons
           </Heading>
           <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} head-to-head precision comparisons across{' '}
@@ -76,7 +76,7 @@ export default async function ComparePrecisionIndexPage() {
             inference chart and an interpolated comparison table.
           </p>
           <CompareCatalogLinks testId="compare-precision-index-links">
-            <CompareCatalogLink href="/compare">Chip vs chip comparisons</CompareCatalogLink>
+            <CompareCatalogLink href="/compare">Chip vs Chip comparisons</CompareCatalogLink>
             <CompareCatalogLink href="/compare-per-dollar">
               Performance per dollar
             </CompareCatalogLink>

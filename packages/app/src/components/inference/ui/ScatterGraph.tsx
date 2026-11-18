@@ -489,23 +489,23 @@ const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'poi
 
 const SCATTER_STRINGS = {
   en: {
-    logScale: 'Log scale',
-    optimalOnly: 'Optimal only',
-    paretoFrontier: 'Pareto frontier',
+    logScale: 'Log Scale',
+    optimalOnly: 'Optimal Only',
+    paretoFrontier: 'Pareto Frontier',
     paretoFrontierInfo:
       'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    highContrast: 'High contrast',
-    parallelismLabels: 'Parallelism labels',
+    highContrast: 'High Contrast',
+    parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
-    gradientLabels: 'Gradient labels',
-    lineLabels: 'Line labels',
-    frameworkLabel: 'Framework line label',
-    offloadingLabel: 'Offloading label',
-    perfRuler: 'Perf ruler',
+    gradientLabels: 'Gradient Labels',
+    lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
+    perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,

@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 
 const STRINGS = {
   en: {
-    title: 'Quick filters',
+    title: 'Quick Filters',
     description:
       'Narrow the chart by chip vendor, serving framework, deployment mode, speculative decoding, and power-measurement status. Selecting none in a group shows all.',
     agenticDescription:
@@ -53,10 +53,10 @@ const STRINGS = {
     singleNode: 'Single-node',
     multiNode: 'Multi-node',
     disaggregated: 'Disaggregated',
-    specDecoding: 'Spec decoding',
+    specDecoding: 'Spec Decoding',
     specHelp:
       'MTP groups runs with speculative decoding enabled, including methods such as EAGLE. STP groups standard decoding without speculative decoding. Available only for fixed-sequence benchmarks.',
-    power: 'Measured power',
+    power: 'Measured Power',
     topology: 'Topology',
     topologyHelp:
       'Keep one GPU allocation and parallelism configuration across its observed concurrency sweep. This does not match software versions or fill missing measurements.',

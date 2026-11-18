@@ -27,8 +27,8 @@ import {
 
 const STRINGS = {
   en: {
-    eyebrowSuffix: 'Speculative decoding',
-    h1Suffix: 'speculative decoding',
+    eyebrowSuffix: 'Speculative Decoding',
+    h1Suffix: 'speculative Decoding',
     mainChartLinkText: 'the main inference chart',
     indexLinkText: 'View all speculative decoding comparisons',
     dashboardLinkText: 'View on dashboard',

@@ -14,10 +14,10 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
     });
   });
 
-  it('shows only the dollars-per-million-tokens and Concurrency metric rows', () => {
+  it('shows only the dollars-per-Million-Tokens and Concurrency metric rows', () => {
     cy.get('[data-testid="compare-interpolated-table"] tbody').should(
       'contain.text',
-      'Dollars per million tokens',
+      'Dollars per Million Tokens',
     );
     cy.get('[data-testid="compare-interpolated-table"] tbody').should(
       'contain.text',

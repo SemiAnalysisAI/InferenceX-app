@@ -33,22 +33,22 @@ export const PRIMARY_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/trends', label: { en: 'Trends', zh: '趋势' } },
   { path: '/latency', label: { en: 'Latency', zh: '延迟' } },
   { path: '/graphs', label: { en: 'Graphs', zh: '图表' } },
-  { path: '/session-reuse', label: { en: 'Session reuse', zh: '会话复用' } },
+  { path: '/session-reuse', label: { en: 'Session Reuse', zh: '会话复用' } },
   { path: '/tool-analytics', label: { en: 'Tools', zh: '工具' } },
   { path: '/costs', label: { en: 'Costs', zh: '成本' } },
-  { path: '/fast-mode', label: { en: 'Fast mode', zh: 'Fast Mode' } },
+  { path: '/fast-mode', label: { en: 'Fast Mode', zh: 'Fast Mode' } },
   { path: '/harnesses', label: { en: 'Harnesses', zh: 'Harness' } },
 ];
 
 export const MORE_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/models', label: { en: 'Models', zh: '模型' } },
   { path: '/traffic', label: { en: 'Traffic', zh: '流量' } },
-  { path: '/session-insights', label: { en: 'Session insights', zh: '会话洞察' } },
+  { path: '/session-insights', label: { en: 'Session Insights', zh: '会话洞察' } },
   { path: '/errors', label: { en: 'Errors', zh: '错误' } },
   { path: '/platform', label: { en: 'Platform', zh: '平台' } },
   { path: '/cache', label: { en: 'Cache', zh: '缓存' } },
   { path: '/streaming', label: { en: 'Streaming', zh: '流式输出' } },
-  { path: '/web-search', label: { en: 'Web search', zh: 'Web 搜索' } },
+  { path: '/web-search', label: { en: 'Web Search', zh: 'Web 搜索' } },
   { path: '/proxy-health', label: { en: 'Endpoints', zh: '端点' } },
 ];
 

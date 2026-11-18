@@ -158,9 +158,9 @@ export function ResultContext({
           range: 'Date range',
           source: 'Source',
           cost: 'Cost basis',
-          costTier: 'Cost tier',
+          costTier: 'Cost Tier',
           utilization: 'Utilization',
-          licenseFee: 'Model license fee assumption',
+          licenseFee: 'Model License Fee Assumption',
         };
   const hasRange = Boolean(dateRange?.start && dateRange.end);
   const selectedDates =

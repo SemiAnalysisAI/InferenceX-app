@@ -46,7 +46,7 @@ describe('DatePicker', () => {
   it('"Go to Latest" button navigates to latest available date', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     cy.contains('Nov 15, 2025').click();
-    cy.contains('Go to latest').click();
+    cy.contains('Go to Latest').click();
     cy.contains('Apply').click();
     cy.contains('Dec 10, 2025').should('be.visible');
   });
@@ -64,7 +64,7 @@ describe('DatePicker', () => {
     cy.contains('Nov 15, 2025').click();
     cy.get('.grid-cols-7 button').contains('10').click();
     cy.contains('Apply').click();
-    cy.contains('Select a run date').should('not.exist');
+    cy.contains('Select a Run Date').should('not.exist');
     cy.contains('Nov 10, 2025').should('be.visible');
   });
 

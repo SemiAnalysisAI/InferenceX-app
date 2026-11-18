@@ -54,7 +54,7 @@ interface DiagramRenderState {
 
 const ARCHITECTURE_STRINGS = {
   en: {
-    heading: 'Model architecture',
+    heading: 'Model Architecture',
     features: 'Features:',
     source: 'Source',
     releasedBy: 'Released by',

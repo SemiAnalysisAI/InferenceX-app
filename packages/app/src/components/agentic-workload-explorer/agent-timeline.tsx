@@ -31,16 +31,16 @@ const BAR_LABEL_PAD = 4;
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Agent timeline',
+    sectionTitle: 'Agent Timeline',
     noData: 'No requests to display',
-    resetZoom: 'Reset zoom',
+    resetZoom: 'Reset Zoom',
     rows: (n: number) => `${n} row${n === 1 ? '' : 's'}`,
     agentHeader: 'Agent',
     duration: 'Duration',
     input: 'Input',
     output: 'Output',
-    cacheRead: 'Cache read',
-    cacheWrite: 'Cache write',
+    cacheRead: 'Cache Read',
+    cacheWrite: 'Cache Write',
     cost: 'Cost',
     requests: (n: number) => `${n} request${n === 1 ? '' : 's'}`,
     subAgentInstances: (n: number) => `${n} sub-agent instance${n === 1 ? '' : 's'}`,

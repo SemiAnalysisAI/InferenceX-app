@@ -12,17 +12,17 @@ describe('uBenchX hub and test routes', () => {
   it('opens /ubx on the mem-bw view with the Beta title badge and test selector', () => {
     cy.visit('/ubx', dismissModal);
     cy.url().should('include', '/ubx/mem-bw');
-    cy.contains('h1', 'uBenchX microbenchmarks').should('be.visible');
+    cy.contains('h1', 'uBenchX Microbenchmarks').should('be.visible');
     cy.get('h1 [data-slot="badge"]').should('have.text', 'Beta');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubx/mem-bw');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
-    cy.contains('h2', 'Memory bandwidth utilization').should('be.visible');
+    cy.contains('h2', 'Memory Bandwidth Utilization').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
@@ -62,7 +62,7 @@ describe('uBenchX hub and test routes', () => {
         'Product',
         'Measured # of GPCs',
         'Measured # of SMs',
-        'Measured TPC groupings',
+        'Measured TPC Groupings',
       ]);
     });
     cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
@@ -244,7 +244,7 @@ describe('Huawei copy-bandwidth evidence', () => {
       .should('have.length', 9);
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
     cy.visit('/zh/ubx/mem-bw', dismiss);
     cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');

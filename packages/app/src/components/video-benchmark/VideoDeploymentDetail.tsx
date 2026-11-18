@@ -96,7 +96,7 @@ const STRINGS = {
     integrity: 'Integrity',
     sealed: 'SHA256SUMS',
     verified: 'Verified',
-    psnr: 'Per-clip PSNR → comparison clips',
+    psnr: 'Per-clip PSNR → Comparison clips',
     model: 'Model',
     run: 'Run ID',
     artifact: 'Artifact ID',

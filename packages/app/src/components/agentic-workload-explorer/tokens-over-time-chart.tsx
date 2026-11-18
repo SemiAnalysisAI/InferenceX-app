@@ -25,19 +25,19 @@ import { CURSOR_LINE_PROPS } from '@/lib/d3-chart/cursor';
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Tokens over time',
+    sectionTitle: 'Tokens Over Time',
     noData: 'No request data available',
     requests: (n: number) => `${n} request${n === 1 ? '' : 's'}`,
-    cachedTokens: 'Cached tokens',
-    uncachedTokens: 'Uncached tokens',
-    apiHitRateLabel: 'API cache hit rate',
+    cachedTokens: 'Cached Tokens',
+    uncachedTokens: 'Uncached Tokens',
+    apiHitRateLabel: 'API Cache Hit Rate',
     apiHitRateTooltip:
       'Cache hits as reported by the API, summed across every request in this view.',
-    hashHitRateLabel: 'Theoretical upper bound cache hit rate',
-    hashHitRateSubLabel: 'Assuming infinite cache TTL & infinitely large cache',
+    hashHitRateLabel: 'Theoretical Upper Bound Cache Hit Rate',
+    hashHitRateSubLabel: 'Assuming Infinite Cache TTL & Infinitely Large Cache',
     hashHitRateTooltip:
       "Hash-block prefix matches against the whole session's chain — the highest hit rate achievable with no eviction and unlimited capacity.",
-    resetZoom: 'Reset zoom',
+    resetZoom: 'Reset Zoom',
     turnLabel: (n: number) => `turn ${n}`,
     cached: 'cached',
     uncached: 'uncached',

@@ -56,7 +56,7 @@ const STRINGS = {
     compareHelp:
       'Compare power boundaries or prefill and decode on the same benchmark points. Boundaries are available for average W/chip and for J per output token or all tokens. Prefill vs decode uses a common output-token denominator, so it is available for average W/chip and J per output token.',
     compareNone: 'Off',
-    compareBoundaries: 'GPU only + whole system',
+    compareBoundaries: 'GPU only + Whole system',
     compareAll: 'All five boundaries (incl. rated)',
     compareRoles: 'Prefill vs decode',
   },

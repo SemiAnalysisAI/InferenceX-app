@@ -275,7 +275,7 @@ describe('Chinese (/zh) pages', () => {
         const homeLinks = [...document.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
 
         expect(status).to.eq(404);
-        expect(document.querySelector('h1')?.textContent).to.eq('Page not found');
+        expect(document.querySelector('h1')?.textContent).to.eq('Page Not Found');
         expect(homeLinks.some((link) => link.textContent === 'Go back home')).to.eq(true);
         expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).to.include(
           'noindex',

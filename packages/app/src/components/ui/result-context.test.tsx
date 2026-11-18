@@ -87,7 +87,7 @@ describe('ResultContext', () => {
         <ResultContext
           locale="en"
           precision="FP8"
-          costTier="Owning at large hyperscaler volume"
+          costTier="Owning at Large Hyperscaler Volume"
           date="2026-09-01"
           source="SemiAnalysis InferenceX™"
         />,
@@ -95,14 +95,14 @@ describe('ResultContext', () => {
     });
     const text = container.textContent ?? '';
     expect(text).toContain('Precision: FP8');
-    expect(text).toContain('Cost tier: Owning at large hyperscaler volume');
+    expect(text).toContain('Cost Tier: Owning at Large Hyperscaler Volume');
     expect(text).toContain('Updated: Sep 1, 2026');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
     expect(text).not.toContain('Workload:');
     expect(text).not.toContain('Metric:');
     expect(container.querySelector('[data-testid="result-context-cost-tier"]')?.textContent).toBe(
-      'Owning at large hyperscaler volume',
+      'Owning at Large Hyperscaler Volume',
     );
   });
 
@@ -112,16 +112,16 @@ describe('ResultContext', () => {
       createRoot(container).render(
         <ResultContext
           locale="en"
-          costTier="Rent – 3-year commit"
-          costTierControl={<button data-testid="tier-control">Rent – 3-year commit</button>}
+          costTier="Rent – 3-Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-Year Commit</button>}
           date="2026-09-01"
         />,
       );
     });
     const dd = container.querySelector('[data-testid="result-context-cost-tier"]');
-    expect(container.textContent).toContain('Cost tier:');
+    expect(container.textContent).toContain('Cost Tier:');
     expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
-    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent – 3-year commit');
+    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent – 3-Year Commit');
     expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
     expect(container.textContent).toContain('Updated: Sep 1, 2026');
   });
@@ -133,8 +133,8 @@ describe('ResultContext', () => {
         <ResultContext
           locale="en"
           layout="footer"
-          costTier="Rent – 3-year commit"
-          costTierControl={<button data-testid="tier-control">Rent – 3-year commit</button>}
+          costTier="Rent – 3-Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-Year Commit</button>}
           tcoBasis={<div data-testid="tco-slot" />}
           date="2026-09-01"
           source="SemiAnalysis InferenceX™"
@@ -157,7 +157,7 @@ describe('ResultContext', () => {
     expect(tiers[0].parentElement).toBe(rowHeader);
     expect(rowHeader?.textContent).not.toContain('TCO');
     expect(tiers[0].querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
-    expect(tiers[0].querySelector('.export-only.hidden')?.textContent).toBe('Rent – 3-year commit');
+    expect(tiers[0].querySelector('.export-only.hidden')?.textContent).toBe('Rent – 3-Year Commit');
     const table = container.querySelector('[data-testid="prices"]');
     const source = container.querySelector('[data-testid="prices-source"]');
     expect(container.querySelectorAll('[data-testid="prices-source"]')).toHaveLength(1);
@@ -179,8 +179,8 @@ describe('ResultContext', () => {
         <ResultContext
           locale="en"
           layout="footer"
-          costTier="Rent – 3-year commit"
-          costTierControl={<button data-testid="tier-control">Rent – 3-year commit</button>}
+          costTier="Rent – 3-Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-Year Commit</button>}
           date="2026-09-01"
           metaEnd={<span data-testid="prices-source">Prices: model</span>}
         />,
@@ -189,8 +189,8 @@ describe('ResultContext', () => {
     const tier = container.querySelector('[data-testid="result-context-cost-tier"]');
     expect(tier?.tagName).toBe('DD');
     const dt = tier?.previousSibling?.previousSibling as HTMLElement;
-    expect(dt.querySelector('.sr-only')?.textContent).toBe('Cost tier');
-    expect(dt.querySelector('.export-only.hidden')?.textContent).toBe('Cost tier:');
+    expect(dt.querySelector('.sr-only')?.textContent).toBe('Cost Tier');
+    expect(dt.querySelector('.export-only.hidden')?.textContent).toBe('Cost Tier:');
     expect(
       container.querySelector('[data-testid="prices-source"]')?.parentElement?.parentElement
         ?.textContent,
@@ -224,7 +224,7 @@ describe('ResultContext', () => {
       createRoot(en).render(<ResultContext locale="en" utilization="60%" licenseFee="30%" />);
     });
     expect(en.textContent).toContain('Utilization: 60%');
-    expect(en.textContent).toContain('Model license fee assumption: 30%');
+    expect(en.textContent).toContain('Model License Fee Assumption: 30%');
     expect(en.querySelector('[data-testid="result-context-license-fee"]')?.textContent).toBe('30%');
     const zh = document.createElement('div');
     act(() => {
@@ -251,7 +251,7 @@ describe('ResultContext', () => {
     });
     expect(container.querySelector('label[for="util"]')?.textContent).toBe('Utilization:');
     expect(container.querySelector('label[for="fee"]')?.textContent).toBe(
-      'Model license fee assumption:',
+      'Model License Fee Assumption:',
     );
     const util = container.querySelector('[data-testid="result-context-utilization"]');
     expect(util?.querySelector('.no-export [data-testid="util-control"]')).not.toBeNull();

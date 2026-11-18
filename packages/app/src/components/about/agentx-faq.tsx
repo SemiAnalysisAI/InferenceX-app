@@ -42,7 +42,7 @@ const CONTENT: Record<
   }
 > = {
   en: {
-    title: 'How the AgentX benchmark works',
+    title: 'How the AgentX Benchmark Works',
     intro: [
       'AgentX measures inference the way a coding agent actually uses a model: long, multi-turn sessions with shared prefixes, pauses between turns, parallel subagents, and repeated KV-cache reuse. It is a scenario in AIPerf built around public agentic-coding traces and a fixed replay recipe, so results from different serving stacks can be compared on the same workload.',
       "This FAQ explains the benchmark's operating model, the settings that protect comparability, and the deployment details most likely to affect a run.",

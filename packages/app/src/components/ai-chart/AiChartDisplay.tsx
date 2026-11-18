@@ -29,15 +29,15 @@ import AiChartResult from './AiChartResult';
 
 const STRINGS = {
   en: {
-    title: 'AI chart generation',
+    title: 'AI Chart Generation',
     description:
       'Turn a benchmark question into a chart. Choose an example or describe your own comparison.',
     placeholder: 'Describe the chart you want',
     enterToGenerate: '+Enter to generate',
     generating: 'Generating…',
-    generateChart: 'Generate chart',
+    generateChart: 'Generate Chart',
     error: 'Error',
-    tryAgain: 'Try again',
+    tryAgain: 'Try Again',
     examplePrompts: 'Example prompts',
     hideKey: 'Hide API key',
     showKey: 'Show API key',

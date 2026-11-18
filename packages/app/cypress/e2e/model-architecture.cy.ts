@@ -46,7 +46,7 @@ describe('Model Architecture Diagram', () => {
     it('expands dense transformer block on click', () => {
       cy.get('[data-testid="model-architecture-inline"]').should(
         'contain.text',
-        'Model architecture',
+        'Model Architecture',
       );
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
@@ -261,7 +261,7 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('lists every model page with architecture badges', () => {
-      cy.get('h1').should('contain.text', 'Model architectures');
+      cy.get('h1').should('contain.text', 'Model Architectures');
       cy.get('[data-testid="model-index-list"] a').should('have.length.at.least', 11);
       cy.get('[data-testid="model-index-link-kimi-k3"]')
         .should('contain.text', 'Kimi K3')
@@ -281,7 +281,7 @@ describe('Model Architecture Diagram', () => {
     it('is linked from the footer', () => {
       cy.get('[data-testid="footer-link-model-architectures"]')
         .should('have.attr', 'href', '/model')
-        .and('contain.text', 'Model architectures');
+        .and('contain.text', 'Model Architectures');
     });
   });
 
@@ -390,12 +390,12 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('can still be expanded manually', () => {
-      cy.contains('button', 'Config changelog')
+      cy.contains('button', 'Config Changelog')
         .should('be.visible')
         .and('have.attr', 'aria-expanded', 'false');
 
-      cy.contains('button', 'Config changelog').click();
-      cy.contains('button', 'Config changelog').should('have.attr', 'aria-expanded', 'true');
+      cy.contains('button', 'Config Changelog').click();
+      cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
     });
 
     it('retains the axis selector even though the full filter panel is hidden', () => {

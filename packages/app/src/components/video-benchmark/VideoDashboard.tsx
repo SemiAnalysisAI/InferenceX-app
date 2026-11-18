@@ -110,11 +110,11 @@ const STRINGS = {
     chartConfig: 'Chart config',
     runContext: 'Run context',
     compareHistory: 'Compare history',
-    chipConfig: 'Chip config',
+    chipConfig: 'Chip Config',
     chipConfigHelp:
       'Select up to 4 chip configurations to compare their runs over time. This shows how software updates affect a specific deployment.',
-    chipConfigPlaceholder: 'Select chip config',
-    compareRange: 'Comparison date range',
+    chipConfigPlaceholder: 'Select Chip Config',
+    compareRange: 'Comparison Date Range',
     compareRangeHelp:
       'The start and end execution dates of the runs plotted for the selected chip configs.',
     compareRangePlaceholder: 'Select date range',

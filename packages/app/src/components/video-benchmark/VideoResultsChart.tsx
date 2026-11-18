@@ -74,7 +74,7 @@ const STRINGS = {
     gpus: (count: number | null) => (count === null ? 'GPU count not recorded' : `${count} GPU`),
     noMatchedRun: 'no matched run',
     noMatchedRunHelp: 'No qualifying run for this workload on this hardware.',
-    optimal: 'Optimal only',
+    optimal: 'Optimal Only',
     optimalHelp:
       "On: each hardware's Pareto-optimal deployments only. Off: dominated deployments are shown faded.",
     labels: 'Deployment labels',
