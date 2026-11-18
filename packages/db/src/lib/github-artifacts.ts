@@ -88,10 +88,10 @@ function run(command: string, args: string[], stdout: number | 'inherit'): Promi
   return promise;
 }
 
-const ZIP_SIGNATURES = [
-  Buffer.from([0x50, 0x4B, 0x03, 0x04]),
-  Buffer.from([0x50, 0x4B, 0x05, 0x06]),
-] as const;
+// Local file header, or end-of-central-directory for an empty zip.
+const ZIP_SIGNATURES = ['PK\u0003\u0004', 'PK\u0005\u0006'].map((magic) =>
+  Buffer.from(magic, 'latin1'),
+);
 
 function isZipArchive(filePath: string): boolean {
   const fd = fs.openSync(filePath, 'r');
