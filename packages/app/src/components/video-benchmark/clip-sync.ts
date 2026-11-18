@@ -43,6 +43,12 @@ export interface ClipGroup {
   loop: boolean;
   /** Seconds since the group last started playing. */
   sinceStart: number;
+  /**
+   * Whether drift is closed with playbackRate. WebKit freezes a playing clip for about half a
+   * second when its rate changes, which costs more than the drift, so there the clips keep one
+   * speed and those ahead wait only for a clip that lacks data or is too far behind to catch up.
+   */
+  nudge: boolean;
 }
 
 export type ClipAction =
@@ -254,7 +260,11 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
       // waited for at once; two that both play are, only when the start has had time to settle.
       const times = clips.map((clip) => clip.currentTime);
       const front = Math.max(...times);
-      const behind = clips.filter((clip) => front - clip.currentTime > HOLD_SECONDS);
+      // Without nudges nothing closes a small gap, and a wait for it would recur after every start,
+      // so a clip that has data is waited for only once it is too far behind to play through.
+      const hold = (clip: ClipSnapshot) =>
+        group.nudge || starved(clip, duration) ? HOLD_SECONDS : CATCH_UP_SECONDS;
+      const behind = clips.filter((clip) => front - clip.currentTime > hold(clip));
       if (
         behind.length > 0 &&
         (group.sinceStart >= REST_SECONDS || behind.some((clip) => starved(clip, duration)))
@@ -272,7 +282,8 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
         const drift = clip.currentTime - leader.currentTime;
         const size = Math.abs(drift);
         const rate =
-          size > NUDGE_SECONDS || (clip.playbackRate !== speed && size > SETTLE_SECONDS)
+          group.nudge &&
+          (size > NUDGE_SECONDS || (clip.playbackRate !== speed && size > SETTLE_SECONDS))
             ? speed * (drift > 0 ? 1 - NUDGE_RATE : 1 + NUDGE_RATE)
             : speed;
         if (clip.playbackRate !== rate) actions.push({ type: 'rate', key: clip.key, rate });

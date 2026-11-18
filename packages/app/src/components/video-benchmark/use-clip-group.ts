@@ -14,6 +14,8 @@ import {
 
 /** Display refresh cap for the transport time and buffering share. */
 const DISPLAY_INTERVAL_MS = 100;
+/** Every browser on an iPhone, and Safari on a Mac, plays media through WebKit (`ClipGroup.nudge`). */
+const webkit = () => navigator.vendor === 'Apple Computer, Inc.';
 
 function clipSnapshot(key: string, video: HTMLVideoElement): ClipSnapshot {
   const time = video.currentTime;
@@ -101,6 +103,7 @@ export function useClipGroup(
         duration: current.duration,
         ...current.playback,
         sinceStart: (performance.now() - startedAt.current) / 1000,
+        nudge: !webkit(),
       },
       event,
     );

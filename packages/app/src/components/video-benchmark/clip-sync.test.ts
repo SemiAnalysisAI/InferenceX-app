@@ -29,6 +29,7 @@ const group = (clips: ClipSnapshot[], changes: Partial<ClipGroup> = {}): ClipGro
   speed: 1,
   loop: false,
   sinceStart: 10,
+  nudge: true,
   ...changes,
 });
 const ofType = (step: ClipGroupStep, type: ClipAction['type']) =>
@@ -36,6 +37,8 @@ const ofType = (step: ClipGroupStep, type: ClipAction['type']) =>
 
 /** One frame of a wait mid-play. */
 const wait = (clips: ClipSnapshot[]) => stepClipGroup(group(clips, { phase: 'buffering' }), 'tick');
+/** One frame of play where a rate change stalls a clip, so none is nudged. */
+const unnudged = (clips: ClipSnapshot[]) => stepClipGroup(group(clips, { nudge: false }), 'tick');
 
 describe('stepClipGroup', () => {
   it('waits for a clip that falls a quarter second behind, at once when it lacks data', () => {
@@ -136,6 +139,24 @@ describe('stepClipGroup', () => {
       'tick',
     );
     expect(steady.actions).toEqual([]);
+  });
+
+  it('where a rate change stalls a clip, keeps one speed and waits only for a clip without data or too far behind', () => {
+    const drifting = unnudged([
+      clip('b200'),
+      clip('h100', { currentTime: 0.6, playbackRate: 1.1 }),
+    ]);
+    expect(drifting).toMatchObject({
+      phase: 'playing',
+      actions: [{ type: 'rate', key: 'h100', rate: 1 }],
+    });
+    const short = { currentTime: 0.6, readyState: 2, bufferedEnd: 0.6 };
+    expect(unnudged([clip('b200'), clip('h100', short)])).toMatchObject({
+      phase: 'buffering',
+      actions: [{ type: 'pause', key: 'b200' }],
+    });
+    const far = unnudged([clip('b200', { currentTime: 1 + CATCH_UP_SECONDS + 0.1 }), clip('h100')]);
+    expect(far).toMatchObject({ phase: 'buffering', actions: [{ type: 'pause', key: 'b200' }] });
   });
 
   it('ends at the shared duration and restarts every clip from zero through buffering', () => {
