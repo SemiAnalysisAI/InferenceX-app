@@ -775,6 +775,19 @@ export const showsPowerTraceAction = (
   getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
   traceKeyForPoint(point) !== null;
 
+/**
+ * The View power trace link: Over time focused on the point's trace. It keeps the current
+ * chart state (the GPU role among it) and drops a stale trace concurrency.
+ */
+export const powerTraceHref = (point: Pick<InferenceData, 'power_audit' | 'run_url'>): string =>
+  typeof window === 'undefined'
+    ? '#'
+    : chartStateHref({
+        i_metric: POWER_TIMELINE_METRIC_KEY,
+        i_ptfocus: traceKeyForPoint(point) ?? '',
+        i_ptconc: '',
+      });
+
 interface PointLinksInput {
   point: InferenceData;
   runUrl?: string;
@@ -838,14 +851,7 @@ const pointLinks = ({
     links.push({
       action: 'view-power-trace',
       label: t.powerTrace,
-      href:
-        typeof window === 'undefined'
-          ? '#'
-          : chartStateHref({
-              i_metric: POWER_TIMELINE_METRIC_KEY,
-              i_ptfocus: traceKeyForPoint(point) ?? '',
-              i_ptconc: '',
-            }),
+      href: powerTraceHref(point),
     });
   }
   links.push({ action: 'reproduce', label: t.reproduce });

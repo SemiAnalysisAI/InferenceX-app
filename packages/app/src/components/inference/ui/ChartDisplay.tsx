@@ -78,8 +78,10 @@ import {
   POWERX_DEFAULT_METRIC,
   powerXShowsHeadroom,
   powerXViewFor,
+  selectPowerXView,
   type PowerXSelection,
 } from '@/components/inference/powerx/powerx-views';
+import { PowerXPinnedStrip } from '@/components/inference/powerx/PowerXPinnedStrip';
 import {
   hasPowerRoleData,
   powerRoleTableRows,
@@ -1619,18 +1621,33 @@ export default function ChartDisplay({
                         <div className="mt-3">
                           {powerXLayout && powerXMounted && powerXReadoutPoints && (
                             <PowerXPinnedSlot>
-                              <PowerXReadout
-                                role={powerRole}
-                                points={powerXReadoutPoints}
-                                yMetric={{
-                                  label: metricLabel(
-                                    graph.chartDefinition,
-                                    selectedYAxisMetric,
-                                    locale,
-                                  ),
-                                  value: (point) => formatMetricValue(point.y, selectedYAxisMetric),
-                                }}
-                              />
+                              {powerXEnergyOrPower ? (
+                                <PowerXPinnedStrip
+                                  tab={powerXTab}
+                                  role={powerRole}
+                                  metric={selectedYAxisMetric}
+                                  formatValue={(point) =>
+                                    formatMetricValue(point.y, selectedYAxisMetric)
+                                  }
+                                  onSeeBreakdown={() =>
+                                    setPowerXSelection(selectPowerXView('where', powerXSelection))
+                                  }
+                                />
+                              ) : (
+                                <PowerXReadout
+                                  role={powerRole}
+                                  points={powerXReadoutPoints}
+                                  yMetric={{
+                                    label: metricLabel(
+                                      graph.chartDefinition,
+                                      selectedYAxisMetric,
+                                      locale,
+                                    ),
+                                    value: (point) =>
+                                      formatMetricValue(point.y, selectedYAxisMetric),
+                                  }}
+                                />
+                              )}
                             </PowerXPinnedSlot>
                           )}
                           {(!powerXSurface || powerXLayout) && chartContext}
@@ -1742,6 +1759,14 @@ export default function ChartDisplay({
                               overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                             }
                             plotHeight={powerXChartHeight}
+                            ranking={
+                              powerXLayout &&
+                              powerXMounted &&
+                              powerXEnergyOrPower &&
+                              selectedXAxisMode === 'interactivity'
+                                ? metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)
+                                : undefined
+                            }
                           />
                         </div>
                       );

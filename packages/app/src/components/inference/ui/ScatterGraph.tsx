@@ -6,11 +6,11 @@ import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
+import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
-import { CHART_TYPE } from '@/lib/d3-chart/typography';
+import { CHART_TYPE, px as typePx } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -42,7 +42,7 @@ import {
   labelOpacityForActiveState,
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
-import ChartLegend from '@/components/ui/chart-legend';
+import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
 import {
@@ -151,6 +151,7 @@ import type {
 } from '@/components/inference/types';
 import {
   buildPointDetails,
+  formatMetricValue,
   generateHoverTooltipContent,
   type PointDetailAction,
 } from '@/components/inference/utils/tooltipUtils';
@@ -220,10 +221,31 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import {
+  usePowerXCompareTarget,
   usePowerXSurface,
   useSetPowerXActivePoint,
+  useSetPowerXCompareTarget,
   type PowerXActivePointUpdate,
 } from '@/components/inference/ui/powerx-surface';
+import { POWERX_COMPARE_AT_DEFAULT } from '@/components/inference/powerx/powerx-compare-at';
+import {
+  nudgePowerXLabels,
+  powerXDirectLabelTexts,
+  powerXFrameworkName,
+  powerXFrameworkTag,
+  powerXRankingRows,
+  powerXRankingToggle,
+  powerXShowFor,
+  powerXShowState,
+  type PowerXShow,
+} from '@/components/inference/powerx/powerx-ranking';
+import {
+  PowerXAdvancedSwitches,
+  PowerXRanking,
+  type PowerXRankingRowView,
+} from '@/components/inference/powerx/PowerXRanking';
+import { drawPowerXReadingLine } from '@/components/inference/powerx/powerx-reading-line';
+import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
 import {
   buildFrontierContinuations,
@@ -489,8 +511,22 @@ const lineLabelText = (
 
 const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'points'}`;
 
+/**
+ * Legend switches the PowerX ranking does not repeat under Filter: Show covers Optimal
+ * Only, the tab's More holds log scale and the parallelism and gradient labels, and the
+ * direct line labels never show the framework.
+ */
+const POWERX_RANKING_ELSEWHERE_SWITCHES: ReadonlySet<string> = new Set([
+  'scatter-log-scale',
+  'scatter-hide-non-optimal',
+  'scatter-parallelism-labels',
+  'scatter-gradient-labels',
+  'scatter-framework-label',
+]);
+
 const SCATTER_STRINGS = {
   en: {
+    compareAtTag: (at: number) => `${at} tok/s/user`,
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     paretoFrontier: 'Pareto Frontier',
@@ -530,6 +566,7 @@ const SCATTER_STRINGS = {
     viewWorkflow: 'View workflow run',
   },
   zh: {
+    compareAtTag: (at: number) => `${at} tok/s/user`,
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     paretoFrontier: 'Pareto 前沿',
@@ -593,6 +630,8 @@ const ScatterGraph = React.memo(
     plotHeight,
     ranking,
   }: ScatterGraphProps) => {
+    const rankingUnit = ranking ?? null;
+    const rankingOn = rankingUnit !== null;
     const {
       hardwareConfig: contextHardwareConfig,
       hwTypesWithData,
@@ -1917,6 +1956,118 @@ const ScatterGraph = React.memo(
       );
     }, [powerXSurface, powerRole, pointsData, processedOverlayData]);
 
+    // PowerX ranking (Energy and Power): the legend becomes a ranking at Compare at. Each
+    // GPU config reads its drawn line (All GPUs, or the role's pool) at the point nearest
+    // Compare at; aggregated configs under a role stay listed, dimmed, never valued.
+    const compareTarget = usePowerXCompareTarget();
+    const setCompareTarget = useSetPowerXCompareTarget();
+    const compareAt = compareTarget ?? POWERX_COMPARE_AT_DEFAULT;
+    const phone = useIsMobileViewport();
+    const rankingSeries = useMemo(() => {
+      if (!rankingOn) return null;
+      const byHw = new Map<
+        string,
+        { base: InferenceData[]; prefill: InferenceData[]; decode: InferenceData[] }
+      >();
+      for (const [key, points] of Object.entries(displayedRooflines)) {
+        const { hw, precision } = parseScatterSeriesKey(key);
+        if (!selectedPrecisions.includes(precision) || points.length === 0) continue;
+        const variant = points[0].powerVariant;
+        const slot =
+          variant === undefined
+            ? 'base'
+            : variant.kind === 'role' && (variant.id === 'prefill' || variant.id === 'decode')
+              ? variant.id
+              : null;
+        if (slot === null) continue;
+        const entry = byHw.get(hw) ?? { base: [], prefill: [], decode: [] };
+        for (const segment of groupDisplayedPoints(points).values()) entry[slot].push(...segment);
+        byHw.set(hw, entry);
+      }
+      return byHw;
+    }, [rankingOn, displayedRooflines, selectedPrecisions, groupDisplayedPoints]);
+
+    const rankingRows = useMemo((): PowerXRankingRowView[] => {
+      if (!rankingSeries) return [];
+      const keys = Object.keys(hardwareConfig)
+        .filter((key) => hwTypesWithData.has(key))
+        .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+      const pool = powerRole === 'prefill' || powerRole === 'decode' ? powerRole : null;
+      const rows = powerXRankingRows(
+        keys.map((key) => {
+          const series = rankingSeries.get(key) ?? { base: [], prefill: [], decode: [] };
+          const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
+          return {
+            key,
+            hidden: !effectiveOfficialHwTypes.has(key),
+            aggregated,
+            points: pool && !aggregated ? series[pool] : series.base,
+            pools:
+              powerRole === 'split'
+                ? { prefill: series.prefill, decode: series.decode }
+                : undefined,
+          };
+        }),
+        compareAt,
+      );
+      const visible = rows.filter((row) => !row.hidden).length;
+      return rows.map((row) => {
+        const hwConfig = hardwareConfig[row.key];
+        const series = rankingSeries.get(row.key);
+        const format = (point: InferenceData | null) =>
+          point ? formatMetricValue(point.y, selectedYAxisMetric) : '–';
+        const valueText =
+          row.value === null
+            ? null
+            : row.pools
+              ? `${format(row.pools.prefill)} / ${format(row.pools.decode)}`
+              : formatMetricValue(row.value, selectedYAxisMetric);
+        return {
+          key: row.key,
+          label: hwConfig?.label ?? row.key,
+          color: getCssColor(resolveColor(row.key)),
+          pd: powerRole === 'all' && Boolean(series?.base.some((point) => point.disagg)),
+          framework: hwConfig?.suffix ? powerXFrameworkName(hwConfig.suffix) : '',
+          rank: row.rank,
+          valueText,
+          delta: row.delta,
+          hidden: row.hidden,
+          aggregated: row.aggregated,
+          conc: row.point?.conc ?? null,
+          x: row.point?.x ?? null,
+          locked: !row.hidden && visible <= 1,
+        };
+      });
+    }, [
+      rankingSeries,
+      hardwareConfig,
+      hwTypesWithData,
+      powerRole,
+      roleSplitHwKeys,
+      effectiveOfficialHwTypes,
+      compareAt,
+      selectedYAxisMetric,
+      getCssColor,
+      resolveColor,
+    ]);
+
+    const handleRankingToggle = useCallback(
+      (key: string) => {
+        const { action } = powerXRankingToggle(effectiveOfficialHwTypes, key);
+        if (action === 'hide') handleRemoveHwType(key);
+        else if (action === 'show') handleToggleHwType(key);
+      },
+      [effectiveOfficialHwTypes, handleRemoveHwType, handleToggleHwType],
+    );
+    const handleRankingShowChange = useCallback(
+      (next: PowerXShow) => {
+        const state = powerXShowState(next);
+        if (state.optimalOnly !== hideNonOptimal) setHideNonOptimal(state.optimalOnly);
+        if (state.bestPerSku !== bestPerSku) handleBestPerSkuChange(state.bestPerSku);
+      },
+      [hideNonOptimal, bestPerSku, setHideNonOptimal, handleBestPerSkuChange],
+    );
+
     const isRooflineVisible = useCallback(
       (el: SVGElement) => {
         const hw = el.dataset.hwKey;
@@ -2515,7 +2666,7 @@ const ScatterGraph = React.memo(
           activePointRef.current?.(null);
         },
         onPointClick: (d: InferenceData) => {
-          activePointRef.current?.({ point: d, source: 'pinned' });
+          activePointRef.current?.({ point: d, source: 'pinned', color: pointColor(d, false) });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
@@ -2533,6 +2684,8 @@ const ScatterGraph = React.memo(
       };
     }, [pointDetails, pointColor, hoverCard, openPowerTrace]);
 
+    // PowerX ranking: the lines carry short direct labels instead of the label pills.
+    const pillLineLabels = showLineLabels && !rankingOn;
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
       const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
       const lineLabelIdentity = (hw: string, points: readonly InferenceData[]) => {
@@ -2599,7 +2752,7 @@ const ScatterGraph = React.memo(
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'rooflines',
-        displayIdentity: `${showGradientLabels}:${showLineLabels}:${showFrameworkLabel}`,
+        displayIdentity: `${showGradientLabels}:${pillLineLabels}:${showFrameworkLabel}`,
         render: (zoomGroup, ctx) => {
           const ir = interactionRef.current;
           const xScale = ctx.xScale as ContinuousScale;
@@ -2839,7 +2992,7 @@ const ScatterGraph = React.memo(
             string,
             { variantId: string; suffix: string; runTag: string }
           >();
-          if (showLineLabels) {
+          if (pillLineLabels) {
             const multiPrecision = ir.selectedPrecisions.length > 1;
             const officialByGroup = new Map<string, (typeof entries)[number]>();
             for (const entry of entries) {
@@ -2952,7 +3105,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
-            occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
+            occluders: pillLineLabels ? pillOccluders(xScale, yScale) : [],
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -3145,7 +3298,7 @@ const ScatterGraph = React.memo(
             });
           }
 
-          if (showLineLabels) {
+          if (pillLineLabels) {
             const multiPrecision = ir.selectedPrecisions.length > 1;
             const bestByGroup = new Map<
               string,
@@ -3971,6 +4124,7 @@ const ScatterGraph = React.memo(
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      pillLineLabels,
       pinLineLabels,
       gradientColorByPoint,
       overlayGradientLabelPoints,
@@ -4018,6 +4172,188 @@ const ScatterGraph = React.memo(
 
     const layersRef = useRef(layers);
     layersRef.current = layers;
+
+    // PowerX ranking: short direct labels at the line ends (no pill) and the orange
+    // Compare-at reading line with its drag grip. Compare at itself is read through a ref
+    // and redrawn by an effect, so a drag never re-renders the plot.
+    const readingRef = useRef({ at: compareAt, set: setCompareTarget });
+    readingRef.current = { at: compareAt, set: setCompareTarget };
+    const readingLineText = legendT.compareAtTag;
+    const powerXLayers = useMemo((): LayerConfig<InferenceData>[] => {
+      if (!rankingOn) return [];
+      const split = powerRole === 'split';
+      const drawDirectLabels = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        width: number,
+        height: number,
+      ) => {
+        let group = zoomGroup.select<SVGGElement>('g.powerx-direct-labels');
+        if (group.empty()) {
+          group = zoomGroup
+            .append('g')
+            .attr('class', 'powerx-direct-labels')
+            .attr('pointer-events', 'none');
+        }
+        group.raise();
+        if (!showLineLabels) {
+          group.selectAll('*').remove();
+          return;
+        }
+        const ir = interactionRef.current;
+        const ends = new Map<string, { hwKey: string; poolTag: string; end: InferenceData }>();
+        const lengths = new Map<string, number>();
+        for (const [key, points] of Object.entries(displayedRooflines)) {
+          const { hw, precision, variant } = parseScatterSeriesKey(key);
+          if (
+            !ir.effectiveActiveHwTypes.has(hw) ||
+            !ir.selectedPrecisions.includes(precision) ||
+            ir.hiddenPowerVariants.has(variant ?? '') ||
+            points.length === 0
+          ) {
+            continue;
+          }
+          const kind = points[0].powerVariant;
+          const pool =
+            kind === undefined
+              ? ''
+              : kind.kind === 'role' && (kind.id === 'prefill' || kind.id === 'decode')
+                ? kind.id
+                : null;
+          if (pool === null) continue;
+          const drawn = [...groupDisplayedPoints(points).values()].flat();
+          const end = drawn.reduce<InferenceData | null>(
+            (best, point) => (best === null || point.x > best.x ? point : best),
+            null,
+          );
+          if (!end) continue;
+          const id = `${hw}|${pool}`;
+          if ((lengths.get(id) ?? 0) >= drawn.length) continue;
+          lengths.set(id, drawn.length);
+          const poolTag = split && pool ? (phone ? ` ${pool[0].toUpperCase()}` : ` ${pool}`) : '';
+          ends.set(id, { hwKey: hw, poolTag, end });
+        }
+        const texts = powerXDirectLabelTexts(
+          [...ends].map(([key, entry]) => ({
+            key,
+            hwKey: entry.hwKey,
+            poolTag: entry.poolTag,
+            frameworkTag: powerXFrameworkTag(hardwareConfig[entry.hwKey]?.suffix ?? ''),
+          })),
+        );
+        const font = chartFont(CHART_TYPE.axisLabel, 600);
+        const boxes = [...ends].flatMap(([key, entry]) => {
+          const cx = xScale(entry.end.x);
+          const cy = yScale(entry.end.y);
+          if (!(cx >= 0 && cx <= width && cy >= 0 && cy <= height)) return [];
+          const text = texts.get(key) ?? '';
+          const textWidth = measureTextWidth(text, font);
+          const flip = cx + 8 + textWidth > width;
+          const color = ir.getCssColor(ir.resolveColor(entry.hwKey));
+          return [
+            {
+              key,
+              text,
+              x: flip ? cx - 8 - textWidth : cx + 8,
+              y: flip ? cy - 8 : cy + 4,
+              width: textWidth,
+              fill: `color-mix(in oklab, ${color} 74%, var(--foreground))`,
+            },
+          ];
+        });
+        const placed = nudgePowerXLabels(boxes, { gap: 15, minY: 12, maxY: height - 4 });
+        group
+          .selectAll<SVGTextElement, (typeof placed)[number]>('text')
+          .data(placed, (d) => d.key)
+          .join('text')
+          .attr('data-testid', 'powerx-direct-label')
+          .attr('data-series', (d) => d.key)
+          .attr('x', (d) => d.x)
+          .attr('y', (d) => d.y)
+          .attr('fill', (d) => d.fill)
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 4)
+          .attr('stroke-linejoin', 'round')
+          .attr('paint-order', 'stroke')
+          .style('font-size', typePx(CHART_TYPE.axisLabel))
+          .style('font-weight', 600)
+          .text((d) => d.text);
+      };
+      const labelsLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'powerx-direct-labels',
+        render: (zoomGroup, ctx) =>
+          drawDirectLabels(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawDirectLabels(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+      };
+      const readingLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'powerx-at-line',
+        render: (zoomGroup, ctx) =>
+          drawPowerXReadingLine(zoomGroup, {
+            xScale: (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            width: ctx.width,
+            height: ctx.height,
+            reading: readingRef,
+            tag: readingLineText,
+          }),
+        onZoom: (zoomGroup, ctx) =>
+          drawPowerXReadingLine(zoomGroup, {
+            xScale: ctx.newXScale as ContinuousScale,
+            width: ctx.width,
+            height: ctx.height,
+            reading: readingRef,
+            tag: readingLineText,
+          }),
+      };
+      return [readingLayer, labelsLayer];
+    }, [
+      rankingOn,
+      powerRole,
+      phone,
+      showLineLabels,
+      displayedRooflines,
+      groupDisplayedPoints,
+      hardwareConfig,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hiddenPowerVariants,
+      getCssColor,
+      resolveColor,
+      readingLineText,
+    ]);
+    const chartLayers = useMemo(
+      () => (powerXLayers.length === 0 ? layers : [...layers, ...powerXLayers]),
+      [layers, powerXLayers],
+    );
+    // Compare at moved (picker, preset or drag): redraw only the reading line.
+    useLayoutEffect(() => {
+      if (!rankingOn) return;
+      const display = getDisplaySelection();
+      if (!display) return;
+      const zoomed = currentZoomRenderContext(display.svg, display.ctx);
+      drawPowerXReadingLine(display.zoomGroup, {
+        xScale: zoomed.xScale as ContinuousScale,
+        width: display.ctx.width,
+        height: display.ctx.height,
+        reading: readingRef,
+        tag: readingLineText,
+      });
+    }, [rankingOn, compareAt, getDisplaySelection, readingLineText]);
 
     const syncOffloadHalos = useCallback(
       (zoomGroup: RenderContext['layout']['zoomGroup']) => {
@@ -4416,6 +4752,162 @@ const ScatterGraph = React.memo(
       );
     }
 
+    const legendSwitches: LegendSwitchConfig[] = [
+      ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+        ? []
+        : [
+            {
+              id: 'scatter-log-scale',
+              label: legendT.logScale,
+              checked: logScale,
+              onCheckedChange: (checked: boolean) => {
+                setLogScale(checked);
+                track('latency_log_scale_toggled', { enabled: checked });
+              },
+            },
+          ]),
+      ...(paretoDirection
+        ? [
+            {
+              id: 'scatter-hide-non-optimal',
+              label: legendT.optimalOnly,
+              checked: hideNonOptimal,
+              onCheckedChange: (checked: boolean) => {
+                setHideNonOptimal(checked);
+                track('latency_hide_non_optimal_toggled', { enabled: checked });
+              },
+              ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
+                ? {
+                    infoTooltip: showPowerEnvelope
+                      ? legendT.powerBoundaryInfo
+                      : legendT.optimalInfo,
+                  }
+                : {}),
+            },
+            {
+              id: `${chartId}-pareto-frontier`,
+              label: legendT.paretoFrontier,
+              advanced: true,
+              checked: showParetoFrontier,
+              infoTooltip: legendT.paretoFrontierInfo,
+              onCheckedChange: (checked: boolean) => {
+                setShowParetoFrontier(checked);
+                track('inference_pareto_frontier_toggled', { enabled: checked });
+              },
+            },
+          ]
+        : []),
+      {
+        id: 'scatter-point-labels',
+        label: legendT.labels,
+        advanced: true,
+        checked: showPointLabels,
+        onCheckedChange: (checked: boolean) => {
+          setShowPointLabels(checked);
+          track('latency_point_labels_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-high-contrast',
+        label: legendT.highContrast,
+        advanced: true,
+        checked: highContrast,
+        onCheckedChange: (checked: boolean) => {
+          setHighContrast(checked);
+          track('latency_high_contrast_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-parallelism-labels',
+        label: legendT.parallelismLabels,
+        checked: useAdvancedLabels,
+        onCheckedChange: (checked: boolean) => {
+          setUseAdvancedLabels(checked);
+          track('latency_advanced_labels_toggled', { enabled: checked });
+          if (checked && !showGradientLabels) {
+            window.dispatchEvent(
+              new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                detail: {
+                  enableGradient: () => {
+                    setShowGradientLabels(true);
+                    setUseAdvancedLabels(false);
+                    track('latency_gradient_labels_toggled', {
+                      enabled: true,
+                      source: 'nudge',
+                    });
+                  },
+                },
+              }),
+            );
+          }
+        },
+      },
+      {
+        id: 'scatter-gradient-labels',
+        label: legendT.gradientLabels,
+        checked: showGradientLabels,
+        onCheckedChange: (checked: boolean) => {
+          setShowGradientLabels(checked);
+          track('latency_gradient_labels_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-line-labels',
+        label: legendT.lineLabels,
+        advanced: true,
+        checked: showLineLabels,
+        onCheckedChange: (checked: boolean) => {
+          setShowLineLabels(checked);
+          track('latency_line_labels_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-framework-label',
+        label: legendT.frameworkLabel,
+        advanced: true,
+        checked: showFrameworkLabel,
+        onCheckedChange: (checked: boolean) => {
+          setShowFrameworkLabel(checked);
+          track('latency_framework_label_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-offloading-label',
+        label: legendT.offloadingLabel,
+        advanced: true,
+        checked: showOffloadingLabel,
+        onCheckedChange: (checked: boolean) => {
+          setShowOffloadingLabel(checked);
+          track('latency_offloading_label_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-perf-ruler',
+        label: legendT.perfRuler,
+        advanced: true,
+        checked: perfRulerMode,
+        infoTooltip: legendT.perfRulerInfo,
+        onCheckedChange: (checked: boolean) => {
+          setPerfRulerMode(checked);
+          if (!checked) {
+            setPerfRulerState(clearPerfRulers);
+            persistedRulers?.discardPending();
+          }
+          track('latency_perf_ruler_toggled', { enabled: checked });
+        },
+      },
+      {
+        id: 'scatter-concurrency-labels',
+        label: legendT.concurrencyLabels,
+        advanced: true,
+        checked: showConcurrencyLabels,
+        onCheckedChange: (checked: boolean) => {
+          setShowConcurrencyLabels(checked);
+          track('latency_concurrency_labels_toggled', { enabled: checked });
+        },
+      },
+    ];
+
     return (
       <div
         className="contents"
@@ -4442,7 +4934,7 @@ const ScatterGraph = React.memo(
           yScale={yScaleConfig}
           xAxis={xAxisConfig}
           yAxis={yAxisConfig}
-          layers={layers}
+          layers={chartLayers}
           zoom={zoomConfig}
           tooltip={tooltipConfig}
           transitionDuration={transitionDuration}
@@ -4459,7 +4951,19 @@ const ScatterGraph = React.memo(
             ) : undefined
           }
           legendElement={
-            ranking ?? (
+            rankingOn ? (
+              <PowerXRanking
+                at={compareAt}
+                unit={rankingUnit ?? ''}
+                show={powerXShowFor(hideNonOptimal, bestPerSku)}
+                onShowChange={handleRankingShowChange}
+                filterCount={quickFilterCount}
+                onFilterOpen={() => setQuickFiltersOpen(true)}
+                filterChips={<ActiveQuickFilters compact />}
+                rows={rankingRows}
+                onToggle={handleRankingToggle}
+              />
+            ) : (
               <>
                 {!minimalChrome && (
                   <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
@@ -4604,161 +5108,7 @@ const ScatterGraph = React.memo(
                     setIsLegendExpanded(expanded);
                     track('latency_legend_expanded', { enabled: expanded });
                   }}
-                  switches={[
-                    ...(selectedYAxisMetric === 'y_inputTputPerGpu'
-                      ? []
-                      : [
-                          {
-                            id: 'scatter-log-scale',
-                            label: legendT.logScale,
-                            checked: logScale,
-                            onCheckedChange: (checked: boolean) => {
-                              setLogScale(checked);
-                              track('latency_log_scale_toggled', { enabled: checked });
-                            },
-                          },
-                        ]),
-                    ...(paretoDirection
-                      ? [
-                          {
-                            id: 'scatter-hide-non-optimal',
-                            label: legendT.optimalOnly,
-                            checked: hideNonOptimal,
-                            onCheckedChange: (checked: boolean) => {
-                              setHideNonOptimal(checked);
-                              track('latency_hide_non_optimal_toggled', { enabled: checked });
-                            },
-                            ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
-                              ? {
-                                  infoTooltip: showPowerEnvelope
-                                    ? legendT.powerBoundaryInfo
-                                    : legendT.optimalInfo,
-                                }
-                              : {}),
-                          },
-                          {
-                            id: `${chartId}-pareto-frontier`,
-                            label: legendT.paretoFrontier,
-                            advanced: true,
-                            checked: showParetoFrontier,
-                            infoTooltip: legendT.paretoFrontierInfo,
-                            onCheckedChange: (checked: boolean) => {
-                              setShowParetoFrontier(checked);
-                              track('inference_pareto_frontier_toggled', { enabled: checked });
-                            },
-                          },
-                        ]
-                      : []),
-                    {
-                      id: 'scatter-point-labels',
-                      label: legendT.labels,
-                      advanced: true,
-                      checked: showPointLabels,
-                      onCheckedChange: (checked: boolean) => {
-                        setShowPointLabels(checked);
-                        track('latency_point_labels_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-high-contrast',
-                      label: legendT.highContrast,
-                      advanced: true,
-                      checked: highContrast,
-                      onCheckedChange: (checked: boolean) => {
-                        setHighContrast(checked);
-                        track('latency_high_contrast_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-parallelism-labels',
-                      label: legendT.parallelismLabels,
-                      checked: useAdvancedLabels,
-                      onCheckedChange: (checked: boolean) => {
-                        setUseAdvancedLabels(checked);
-                        track('latency_advanced_labels_toggled', { enabled: checked });
-                        if (checked && !showGradientLabels) {
-                          window.dispatchEvent(
-                            new CustomEvent(GRADIENT_NUDGE_EVENT, {
-                              detail: {
-                                enableGradient: () => {
-                                  setShowGradientLabels(true);
-                                  setUseAdvancedLabels(false);
-                                  track('latency_gradient_labels_toggled', {
-                                    enabled: true,
-                                    source: 'nudge',
-                                  });
-                                },
-                              },
-                            }),
-                          );
-                        }
-                      },
-                    },
-                    {
-                      id: 'scatter-gradient-labels',
-                      label: legendT.gradientLabels,
-                      checked: showGradientLabels,
-                      onCheckedChange: (checked: boolean) => {
-                        setShowGradientLabels(checked);
-                        track('latency_gradient_labels_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-line-labels',
-                      label: legendT.lineLabels,
-                      advanced: true,
-                      checked: showLineLabels,
-                      onCheckedChange: (checked: boolean) => {
-                        setShowLineLabels(checked);
-                        track('latency_line_labels_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-framework-label',
-                      label: legendT.frameworkLabel,
-                      advanced: true,
-                      checked: showFrameworkLabel,
-                      onCheckedChange: (checked: boolean) => {
-                        setShowFrameworkLabel(checked);
-                        track('latency_framework_label_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-offloading-label',
-                      label: legendT.offloadingLabel,
-                      advanced: true,
-                      checked: showOffloadingLabel,
-                      onCheckedChange: (checked: boolean) => {
-                        setShowOffloadingLabel(checked);
-                        track('latency_offloading_label_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-perf-ruler',
-                      label: legendT.perfRuler,
-                      advanced: true,
-                      checked: perfRulerMode,
-                      infoTooltip: legendT.perfRulerInfo,
-                      onCheckedChange: (checked: boolean) => {
-                        setPerfRulerMode(checked);
-                        if (!checked) {
-                          setPerfRulerState(clearPerfRulers);
-                          persistedRulers?.discardPending();
-                        }
-                        track('latency_perf_ruler_toggled', { enabled: checked });
-                      },
-                    },
-                    {
-                      id: 'scatter-concurrency-labels',
-                      label: legendT.concurrencyLabels,
-                      advanced: true,
-                      checked: showConcurrencyLabels,
-                      onCheckedChange: (checked: boolean) => {
-                        setShowConcurrencyLabels(checked);
-                        track('latency_concurrency_labels_toggled', { enabled: checked });
-                      },
-                    },
-                  ]}
+                  switches={legendSwitches}
                   onAdvancedExpandedChange={(expanded) => {
                     track('latency_advanced_controls_toggled', { enabled: expanded });
                   }}
@@ -4813,7 +5163,18 @@ const ScatterGraph = React.memo(
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}
-          bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+          bestPerSku={
+            rankingOn ? undefined : { checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }
+          }
+          advanced={
+            rankingOn ? (
+              <PowerXAdvancedSwitches
+                switches={legendSwitches.filter(
+                  (item) => !POWERX_RANKING_ELSEWHERE_SWITCHES.has(item.id),
+                )}
+              />
+            ) : undefined
+          }
         />
         {pointsTable && (
           <LegendPointsDialog

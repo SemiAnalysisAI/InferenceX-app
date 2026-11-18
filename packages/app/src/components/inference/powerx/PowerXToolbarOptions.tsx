@@ -82,6 +82,10 @@ const STRINGS = {
     statistic: 'Statistic',
     statistics: { average: 'Avg', p75: 'P75', p90: 'P90' } satisfies Record<Statistic, string>,
     xAxis: 'X axis',
+    chart: 'Chart',
+    logScale: 'Log scale',
+    parallelismLabels: 'Parallelism labels',
+    gradientLabels: 'Gradient labels',
     provisioned: 'Provisioned bound',
     provisionedHelp: 'Adds a dashed all-in provisioned bound per GPU beside the measured GPU line.',
     provisionedPinned: 'Off under a GPU role: the all-in provisioned bound is per deployment.',
@@ -136,6 +140,10 @@ const STRINGS = {
     statistic: '统计量',
     statistics: { average: '平均', p75: 'P75', p90: 'P90' } satisfies Record<Statistic, string>,
     xAxis: 'X 轴',
+    chart: '图表',
+    logScale: '对数刻度',
+    parallelismLabels: '并行策略标签',
+    gradientLabels: '渐变标签',
     provisioned: '预配上限',
     provisionedHelp: '在实测 GPU 曲线旁为每块 GPU 增加一条虚线表示的整体预配上限。',
     provisionedPinned: '选择 GPU 角色时关闭：整体预配上限按整个部署计算。',
@@ -434,15 +442,55 @@ export function PowerXEnergyPowerMore({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { selectedXAxisMode, defaultXAxisMode } = useInferenceDisplay();
-  const { setSelectedXAxisMode } = useInferenceActions();
+  const {
+    selectedXAxisMode,
+    defaultXAxisMode,
+    selectedYAxisMetric,
+    logScale,
+    useAdvancedLabels,
+    showGradientLabels,
+  } = useInferenceDisplay();
+  const { setSelectedXAxisMode, setLogScale, setUseAdvancedLabels, setShowGradientLabels } =
+    useInferenceActions();
   const view = powerXViewFor(selection.metric, selection.compare);
   if (view !== 'energy' && view !== 'draw') return null;
   const ratedPinned = powerXPinnedControls(view, role).includes('rated');
   const ratedAvailable = view === 'energy' && powerXRatedAvailable(selection.metric);
   const ratedOn = !ratedPinned && powerXRatedOn(selection.compare);
   const xChanged = selectedXAxisMode !== defaultXAxisMode;
-  const changed = (xChanged ? 1 : 0) + (ratedAvailable && ratedOn ? 1 : 0);
+  // The old legend's chart switches (the ranking replaced the legend); all default off.
+  const logAvailable = selectedYAxisMetric !== 'y_inputTputPerGpu';
+  const chartSwitches = [
+    ...(logAvailable
+      ? [
+          {
+            id: 'powerx-log-scale',
+            label: t.logScale,
+            checked: logScale,
+            set: setLogScale,
+            event: 'powerx_log_scale_toggled',
+          },
+        ]
+      : []),
+    {
+      id: 'powerx-parallelism-labels',
+      label: t.parallelismLabels,
+      checked: useAdvancedLabels,
+      set: setUseAdvancedLabels,
+      event: 'powerx_parallelism_labels_toggled',
+    },
+    {
+      id: 'powerx-gradient-labels',
+      label: t.gradientLabels,
+      checked: showGradientLabels,
+      set: setShowGradientLabels,
+      event: 'powerx_gradient_labels_toggled',
+    },
+  ];
+  const changed =
+    (xChanged ? 1 : 0) +
+    (ratedAvailable && ratedOn ? 1 : 0) +
+    chartSwitches.filter((item) => item.checked).length;
   return (
     <PowerXMore
       tab={view}
@@ -450,10 +498,26 @@ export function PowerXEnergyPowerMore({
       onReset={() => {
         if (xChanged) setSelectedXAxisMode(defaultXAxisMode);
         if (ratedOn) onSelectionChange(selectPowerXRated(false, selection));
+        for (const item of chartSwitches) if (item.checked) item.set(false);
       }}
     >
       <PowerXMoreGroup label={t.xAxis}>
         <XAxisModeSelector />
+      </PowerXMoreGroup>
+      <PowerXMoreGroup label={t.chart}>
+        {chartSwitches.map((item) => (
+          <label key={item.id} className="flex items-center justify-between gap-3 text-sm">
+            <span>{item.label}</span>
+            <Switch
+              checked={item.checked}
+              data-testid={item.id}
+              onCheckedChange={(on) => {
+                item.set(on);
+                track(item.event, { enabled: on });
+              }}
+            />
+          </label>
+        ))}
       </PowerXMoreGroup>
       {ratedAvailable && (
         <PowerXMoreGroup label={t.provisioned}>
