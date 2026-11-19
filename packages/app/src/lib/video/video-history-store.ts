@@ -177,8 +177,17 @@ export async function publishedVideoHistory(
       }),
     );
   const end = (page - 1 + pages) * VIDEO_HISTORY_PAGE_SIZE;
-  const projected = await project(indexes.slice((page - 1) * VIDEO_HISTORY_PAGE_SIZE, end));
-  const older = page === 1 ? await project(indexes.slice(end)) : [];
+  // Only an index with an approval receipt can hold a dashboard cell.
+  const [projected, older] = await Promise.all([
+    project(indexes.slice((page - 1) * VIDEO_HISTORY_PAGE_SIZE, end)),
+    page === 1
+      ? project(
+          indexes
+            .slice(end)
+            .filter((index) => receipts.has(approvalPath(index.runId, index.artifact))),
+        )
+      : [],
+  ]);
   const entries = projected.map(({ entry }) => entry);
   return {
     page: {

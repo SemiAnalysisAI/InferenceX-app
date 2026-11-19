@@ -191,10 +191,13 @@ describe('published video history', () => {
     ).toEqual(new Set(['h100', 'h200']));
   });
 
-  it('lists every index page, orders by publication date, and reads only its own indexes past the first page', async () => {
+  it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
+    // An unreadable unapproved index past the window neither costs a read nor blocks retention.
+    save(indexPath(servingArtifact(99, 999)), 'not json');
     for (let i = 0; i < 12; i++) await publish(i, false);
     vi.mocked(fetch).mockClear();
-    const page = await publishedVideoHistory(1);
+    const { page, complete } = await publishedVideoHistoryRead(1);
+    expect(complete).toBe(true);
     expect(page.entries.map((entry) => entry.runId)).toEqual([
       '111',
       '110',
@@ -208,11 +211,7 @@ describe('published video history', () => {
       '102',
     ]);
     expect(page.nextPage).toBe(2);
-    // The first page also reads the older indexes, for deployments outside its window.
-    expect(artifactReads()).toBe(12);
-    vi.mocked(fetch).mockClear();
-    await publishedVideoHistory(2);
-    expect(artifactReads()).toBe(2);
+    expect(artifactReads()).toBe(10);
     expect(put).not.toHaveBeenCalled();
   });
 
@@ -374,7 +373,7 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // Re-pinned after the first page began carrying older deployments; entries are unchanged.
-      sources: 'b78dcc7c9a32c328a7c1308540bd62354ca9613816057971e32778a239ecbc2a',
+      sources: 'ffa72941ccd41231488583876e830337fd5d094ceb3413e5489382480118e2f9',
     });
   });
 });
