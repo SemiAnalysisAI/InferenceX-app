@@ -74,6 +74,10 @@ import {
   groupPoolsBySize,
   hasPowerTimelineWindow,
   parsePowerTimelineParams,
+  powerXTimelineSmoothChoice,
+  powerXTimelineSmoothDefault,
+  powerXTimelineSmoothParam,
+  resolvePowerXTimelineSmooth,
   powerTimelineSampleX,
   joinPowerTimeline,
   planPowerTimelineRequests,
@@ -227,7 +231,7 @@ const STRINGS = {
     rackPoolNote: 'Pool lines stay in W: a pool is not a per-GPU figure.',
     lines: 'Lines',
     smooth: `${POWERX_TIMELINE_SMOOTH_SECONDS} s smoothing`,
-    smoothHelp: `Draw a centred ${POWERX_TIMELINE_SMOOTH_SECONDS}-second rolling mean instead of the recorded 1 s samples. Off by default. Tooltips, the ranking and the load-swings table always use recorded values.`,
+    smoothHelp: `Draw a centred ${POWERX_TIMELINE_SMOOTH_SECONDS}-second rolling mean instead of the recorded 1 s samples. On by default on phones, off on larger screens. Tooltips, the ranking and the load-swings table always use recorded values.`,
     axisShort: {
       wall: 'UTC',
       elapsed: 'Since telemetry',
@@ -342,7 +346,7 @@ const STRINGS = {
     rackPoolNote: 'GPU 池曲线仍以 W 显示：池功耗不是每 GPU 数值。',
     lines: '曲线',
     smooth: `${POWERX_TIMELINE_SMOOTH_SECONDS} 秒平滑`,
-    smoothHelp: `以每点为中心的 ${POWERX_TIMELINE_SMOOTH_SECONDS} 秒滚动平均代替记录的 1 秒采样绘制曲线。默认关闭。提示框、排名和负载波动表始终使用记录值。`,
+    smoothHelp: `以每点为中心的 ${POWERX_TIMELINE_SMOOTH_SECONDS} 秒滚动平均代替记录的 1 秒采样绘制曲线。手机上默认开启，较大屏幕上默认关闭。提示框、排名和负载波动表始终使用记录值。`,
     axisShort: {
       wall: 'UTC',
       elapsed: '距遥测起点',
@@ -1225,8 +1229,9 @@ export default function PowerTimeline({
   const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
   const [showUtility, setShowUtility] = useState(initialView.utility);
   const [raw, setRaw] = useState(initialView.raw);
-  // PowerX layout: recorded samples unless 5 s smoothing is on; elsewhere 30 s unless raw.
-  const [smooth, setSmooth] = useState(initialView.smooth);
+  // PowerX layout: 5 s smoothing per breakpoint unless the URL picks it; elsewhere 30 s unless raw.
+  const [smoothChoice, setSmoothChoice] = useState(initialView.smooth);
+  const smooth = resolvePowerXTimelineSmooth(smoothChoice, isPhone);
   const smoothSeconds = layout
     ? smooth
       ? POWERX_TIMELINE_SMOOTH_SECONDS
@@ -1494,7 +1499,7 @@ export default function PowerTimeline({
             ? 'all'
             : '',
       i_ptraw: raw && !layout ? '1' : '',
-      i_ptsmooth: smooth && layout ? '1' : '',
+      i_ptsmooth: layout ? powerXTimelineSmoothParam(smoothChoice) : '',
     });
   }, [
     xModeChoice,
@@ -1504,7 +1509,7 @@ export default function PowerTimeline({
     showUtility,
     concurrency,
     raw,
-    smooth,
+    smoothChoice,
     layout,
     setUrlParams,
   ]);
@@ -2090,7 +2095,7 @@ export default function PowerTimeline({
           label: t.smooth,
           checked: smooth,
           onCheckedChange: (checked) => {
-            setSmooth(checked);
+            setSmoothChoice(powerXTimelineSmoothChoice(checked, isPhone));
             track('powerx_timeline_smoothing_toggled', { enabled: checked });
           },
           infoTooltip: t.smoothHelp,
@@ -2362,7 +2367,7 @@ export default function PowerTimeline({
   const moreChanged =
     (xMode === defaultAxis ? 0 : 1) +
     (lineMode === 'mean' ? 0 : 1) +
-    (smooth ? 1 : 0) +
+    (smooth === powerXTimelineSmoothDefault(isPhone) ? 0 : 1) +
     (windowOnly ? 1 : 0) +
     (showUtility ? 1 : 0);
   const more = layout && (
@@ -2372,7 +2377,7 @@ export default function PowerTimeline({
       onReset={() => {
         setXModeChoice(defaultAxis);
         setLineMode('mean');
-        setSmooth(false);
+        setSmoothChoice(null);
         setWindowOnly(false);
         setShowUtility(false);
       }}

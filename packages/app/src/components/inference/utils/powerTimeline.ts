@@ -144,7 +144,8 @@ export function parsePowerTimelineParams(params: {
       params.i_ptfocus && /^[1-9]\d*:[\w.-]+$/u.test(params.i_ptfocus) ? params.i_ptfocus : null,
     utility: params.i_ptutility === '1',
     raw: params.i_ptraw === '1',
-    smooth: params.i_ptsmooth === '1',
+    /** PowerX layout: `1` or `0` when the URL picks smoothing, null to follow the breakpoint. */
+    smooth: params.i_ptsmooth === '1' ? true : params.i_ptsmooth === '0' ? false : null,
     concurrency: /^[1-9]\d{0,5}$/u.test(params.i_ptconc ?? '') ? Number(params.i_ptconc) : null,
     /** PowerX layout: `i_ptconc=all` draws every load instead of the trace nearest Compare at. */
     everyConcurrency: params.i_ptconc === 'all',
@@ -297,8 +298,31 @@ export function groupPoolsBySize(
 
 /** Seconds of the centered rolling mean the timeline draws unless raw samples are requested. */
 export const POWER_TIMELINE_SMOOTH_SECONDS = 30;
-/** PowerX layout: raw samples by default; the 5 s smoothing option draws this centred mean. */
+/** PowerX layout: the 5 s smoothing option draws this centred mean. */
 export const POWERX_TIMELINE_SMOOTH_SECONDS = 5;
+
+/**
+ * PowerX layout default for 5 s smoothing: on below md, where 1 s samples of a long run blur
+ * into a solid band, and off on desktop. Tooltips, the ranking and load swings stay raw.
+ */
+export function powerXTimelineSmoothDefault(isPhone: boolean): boolean {
+  return isPhone;
+}
+
+/** Whether PowerX smooths the trace: an explicit `i_ptsmooth` wins, else the breakpoint default. */
+export function resolvePowerXTimelineSmooth(choice: boolean | null, isPhone: boolean): boolean {
+  return choice ?? powerXTimelineSmoothDefault(isPhone);
+}
+
+/** The choice a toggle stores: null when it lands on the breakpoint default, so the URL stays clean. */
+export function powerXTimelineSmoothChoice(checked: boolean, isPhone: boolean): boolean | null {
+  return checked === powerXTimelineSmoothDefault(isPhone) ? null : checked;
+}
+
+/** The `i_ptsmooth` value for a choice: empty while the breakpoint default applies. */
+export function powerXTimelineSmoothParam(choice: boolean | null): string {
+  return choice === null ? '' : choice ? '1' : '0';
+}
 
 /**
  * Centered rolling mean over `window` samples. Nulls are skipped inside a window and stay null
