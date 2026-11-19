@@ -18,6 +18,8 @@ import {
   fetchRunAttempt,
 } from './github-artifacts.js';
 
+const ZIP_MAGIC = 'PK\u0003\u0004';
+
 const art = (name: string, created_at: string) => ({
   name,
   archive_download_url: `https://api.github.com/${name}`,
@@ -87,9 +89,10 @@ describe('downloadArtifact', () => {
       (command: string, args: string[], { stdio }: { stdio: (number | string)[] }) => {
         const listeners = new Map<string, (code: number, signal: null) => void>();
         const out = stdio[1];
-        if (command === 'gh' && typeof out === 'number') fs.writeSync(out, args[1]);
+        if (command === 'gh' && typeof out === 'number')
+          fs.writeSync(out, `${ZIP_MAGIC}${args[1]}`);
         if (command === 'unzip') {
-          fs.writeFileSync(path.join(args[3], 'body.txt'), fs.readFileSync(args[1]));
+          fs.writeFileSync(path.join(args[3], 'body.txt'), fs.readFileSync(args[1]).subarray(4));
         }
         setImmediate(() => listeners.get('close')?.(0, null));
         return {
@@ -108,6 +111,37 @@ describe('downloadArtifact', () => {
         'https://api.github.com/bmk_b',
       ]);
       expect(fs.readdirSync(root).toSorted()).toEqual(['bmk_a', 'bmk_b']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('downloadArtifact raw (archive: false) artifacts', () => {
+  it('writes a non-zip download as the named file instead of unzipping it', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-download-'));
+    const facts = '{"version":1,"jobs":{}}';
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(
+      (command: string, _args: string[], { stdio }: { stdio: (number | string)[] }) => {
+        const listeners = new Map<string, (code: number, signal: null) => void>();
+        const out = stdio[1];
+        if (command === 'gh' && typeof out === 'number') fs.writeSync(out, facts);
+        setImmediate(() => listeners.get('close')?.(command === 'unzip' ? 9 : 0, null));
+        return {
+          once: (event: string, listener: (code: number, signal: null) => void) =>
+            listeners.set(event, listener),
+        };
+      },
+    );
+    try {
+      const dir = await downloadArtifact(
+        art('scheduling-facts.json', '2026-11-18T00:00:00Z'),
+        root,
+      );
+      expect(mockSpawn.mock.calls.map(([command]) => command)).toEqual(['gh']);
+      expect(fs.readdirSync(dir)).toEqual(['scheduling-facts.json']);
+      expect(fs.readFileSync(path.join(dir, 'scheduling-facts.json'), 'utf8')).toBe(facts);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -141,9 +175,10 @@ describe('downloadArtifact tool failures and cleanup', () => {
         const listeners = new Map<string, (...values: unknown[]) => void>();
         const exit = exits[command] ?? { code: 0 };
         const out = stdio[1];
-        if (command === 'gh' && typeof out === 'number') fs.writeSync(out, args[1]);
+        if (command === 'gh' && typeof out === 'number')
+          fs.writeSync(out, `${ZIP_MAGIC}${args[1]}`);
         if (command === 'unzip' && 'code' in exit && exit.code === 0) {
-          fs.writeFileSync(path.join(args[3], 'body.txt'), fs.readFileSync(args[1]));
+          fs.writeFileSync(path.join(args[3], 'body.txt'), fs.readFileSync(args[1]).subarray(4));
         }
         setImmediate(() => {
           if ('error' in exit) listeners.get('error')?.(exit.error);

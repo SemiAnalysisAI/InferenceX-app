@@ -88,6 +88,22 @@ function run(command: string, args: string[], stdout: number | 'inherit'): Promi
   return promise;
 }
 
+// Local file header, or end-of-central-directory for an empty zip.
+const ZIP_SIGNATURES = ['PK\u0003\u0004', 'PK\u0005\u0006'].map((magic) =>
+  Buffer.from(magic, 'latin1'),
+);
+
+function isZipArchive(filePath: string): boolean {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const head = Buffer.alloc(4);
+    const read = fs.readSync(fd, head, 0, head.length, 0);
+    return read === head.length && ZIP_SIGNATURES.some((signature) => head.equals(signature));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export async function downloadArtifact(artifact: ArtifactMeta, destRoot: string): Promise<string> {
   const zipDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-artifact-'));
   const zipPath = path.join(zipDir, 'artifact.zip');
@@ -100,7 +116,12 @@ export async function downloadArtifact(artifact: ArtifactMeta, destRoot: string)
       fs.closeSync(zip);
     }
     fs.mkdirSync(destDir, { recursive: true });
-    await run('unzip', ['-oq', zipPath, '-d', destDir], 'inherit');
+    if (isZipArchive(zipPath)) {
+      await run('unzip', ['-oq', zipPath, '-d', destDir], 'inherit');
+    } else {
+      // Artifacts uploaded with `archive: false` are served as the raw file, not a zip.
+      fs.copyFileSync(zipPath, path.join(destDir, path.basename(artifact.name)));
+    }
   } finally {
     fs.rmSync(zipDir, { recursive: true, force: true });
   }
