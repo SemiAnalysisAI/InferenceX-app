@@ -3,8 +3,12 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { track } from '@/lib/analytics/analytics';
+
 import { hardwareStore } from './hardware-store';
 import { LoadWidget } from './load-widget';
+
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -68,6 +72,12 @@ function drag(input: HTMLInputElement, watts: number) {
   });
 }
 
+function release(input: HTMLInputElement) {
+  act(() => {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 describe('LoadWidget', () => {
   it('keeps the readout and track markers on the thumb while dragging', () => {
     const view = renderWidget();
@@ -80,6 +90,26 @@ describe('LoadWidget', () => {
     expect(slider(view).getAttribute('aria-valuetext')).toMatch(/^720 W/u);
     expect(Number(marker())).toBeGreaterThan(Number(before));
     expect(Number(marker())).toBeCloseTo((720 / 1000) * 136, 1);
+  });
+
+  it('writes the URL and analytics once the drag is released, not on every step', () => {
+    const view = renderWidget();
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    vi.mocked(track).mockClear();
+
+    for (const watts of [600, 650, 720]) drag(slider(view), watts);
+
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalled();
+    expect(window.location.hash).toContain('ld=570');
+
+    release(slider(view));
+
+    expect(replaceState).toHaveBeenCalledTimes(1);
+    expect(window.location.hash).toContain('ld=720');
+    expect(window.location.hash).toContain('hw=b200');
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith('powerx_tutorial_load_watts', { value: 720 });
   });
 
   it('still eases a chip switch', () => {
