@@ -65,12 +65,18 @@ export function useBuildClock<T extends Element>(
 }
 
 /**
- * Eases each number from what is on screen to its new target, so a chip switch or a slider drag
- * moves the drawing instead of jumping it. The first render and reduced motion show the target.
+ * Eases each number from what is on screen to its new target, so a chip switch moves the drawing
+ * instead of jumping it. The first render and reduced motion show the target.
+ *
+ * Pass `easeKey` when only some changes should ease: the values ease when `easeKey` changes and
+ * snap to the target otherwise. A slider drag fires a new target on every input event; easing
+ * each one restarts the animation from a value that is still catching up, so the drawing trails
+ * the thumb for as long as it moves.
  */
 export function useEasedValues<K extends string>(
   target: Record<K, number>,
   durationMs = 350,
+  easeKey?: string,
 ): Record<K, number> {
   const reduced = useReducedMotion();
   const [shown, setShown] = useState<Partial<Record<K, number>>>(target);
@@ -78,18 +84,25 @@ export function useEasedValues<K extends string>(
   const keys = Object.keys(target) as K[];
   // The entries stand in for `target`, whose identity changes every render.
   const signature = Object.entries(target).join(';');
+  // What the last effect ran for: a new target under the same `easeKey` snaps.
+  const appliedRef = useRef({ signature, easeKey });
+  const applied = appliedRef.current;
+  const snap =
+    reduced ||
+    (easeKey !== undefined && easeKey === applied.easeKey && signature !== applied.signature);
 
   useEffect(() => {
+    appliedRef.current = { signature, easeKey };
     const from = shownRef.current;
     const show = (values: Partial<Record<K, number>>) => {
       shownRef.current = values;
       setShown(values);
     };
-    if (reduced) {
+    if (keys.every((key) => from[key] === target[key])) return undefined;
+    if (snap) {
       show(target);
       return undefined;
     }
-    if (keys.every((key) => from[key] === target[key])) return undefined;
     const start = performance.now();
     let frame = 0;
     const tick = (now: number) => {
@@ -105,9 +118,9 @@ export function useEasedValues<K extends string>(
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, reduced, durationMs]);
+  }, [signature, easeKey, reduced, durationMs]);
 
-  if (reduced) return target;
+  if (snap) return target;
   const out = {} as Record<K, number>;
   for (const key of keys) out[key] = shown[key] ?? target[key];
   return out;
