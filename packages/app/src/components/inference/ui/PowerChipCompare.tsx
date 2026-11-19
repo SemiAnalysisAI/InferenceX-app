@@ -210,7 +210,7 @@ export default function PowerChipCompare({
   renderExpanded: (key: string) => React.ReactNode;
   /** Reports the chip whose point sits nearest Compare at; the drill-down opens under it. */
   onNearestKeyChange: (key: string | null) => void;
-  /** Shared with the drill-down's plot on the Where view. */
+  /** Shared with the drill-down's plot on the Breakdown view. */
   layerHighlight: PowerLayerHighlight | null;
   onLayerHighlight: (next: PowerLayerHighlight | null) => void;
   /** Chips compared at a pinned point (series key → concurrency) instead of Compare at. */

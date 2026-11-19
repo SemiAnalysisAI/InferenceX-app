@@ -32,7 +32,7 @@ const SetCompareRangeContext = createContext<
 >(null);
 
 /**
- * Whether the Where view counts the facility (PUE) overhead. On by default so
+ * Whether the Breakdown view counts the facility (PUE) overhead. On by default so
  * PowerX shows facility power like the rest of the site; switch it off for IT only.
  */
 const IncludeFacilityContext = createContext(true);

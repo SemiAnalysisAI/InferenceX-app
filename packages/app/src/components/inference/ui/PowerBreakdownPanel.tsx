@@ -105,7 +105,7 @@ const STRINGS = {
     graceModeled: 'Grace sockets are modeled (no validated socket telemetry).',
     clickToCompare: (label: string) => `Click to compare at ${label}`,
     comparedHere: 'Compared here',
-    compareAt: (x: string) => `Compare chips at ${x} tok/s/user`,
+    compareAt: (x: string) => `Compare GPUs at ${x} tok/s/user`,
     sliderAt: (x: string) => `Compare at ${x} tok/s/user`,
     sliderAbove: (x: string) => `Compare at ${x} tok/s/user →`,
     sliderBelow: (x: string) => `← Compare at ${x} tok/s/user`,
@@ -159,7 +159,7 @@ const STRINGS = {
     graceModeled: 'Grace 插槽功耗为建模值（无有效插槽遥测）。',
     clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
     comparedHere: '当前对比点',
-    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各芯片`,
+    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各 GPU`,
     sliderAt: (x: string) => `对比点 ${x} tok/s/user`,
     sliderAbove: (x: string) => `对比点 ${x} tok/s/user →`,
     sliderBelow: (x: string) => `← 对比点 ${x} tok/s/user`,
@@ -1614,7 +1614,7 @@ export default function PowerBreakdownPanel({
   /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
   xField?: keyof AggDataEntry;
   xLabel?: string;
-  /** Shared with the chip comparison's legend on the Where view. */
+  /** Shared with the chip comparison's legend on the Breakdown view. */
   layerHighlight: PowerLayerHighlight | null;
   onLayerHighlight: (next: PowerLayerHighlight | null) => void;
   /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */

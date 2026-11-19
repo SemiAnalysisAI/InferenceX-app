@@ -1,0 +1,173 @@
+import { availabilityBody, interceptBenchmarkPresence, unlockAgenticGate } from '../support/e2e';
+
+const MODEL = 'dsv4';
+const DATE = '2026-09-01';
+
+// Three disaggregated configs per GPU, with prefill and decode power, so every GPU role draws.
+const CONFIGS: [number, number, number, number, number, number, number, number][] = [
+  [16, 90, 200, 500, 800, 400, 2.4, 1.6],
+  [64, 60, 400, 600, 820, 450, 1.6, 1],
+  [256, 30, 800, 700, 840, 500, 1, 0.6],
+];
+
+let rowId = 995000;
+const rows = (hardware: 'b200' | 'h200') =>
+  CONFIGS.map(([conc, intvty, outputTput, watts, prefillWatts, decodeWatts, jOut, decodeJOut]) => ({
+    id: rowId++,
+    hardware,
+    framework: 'dynamo-sglang',
+    model: MODEL,
+    precision: 'fp4',
+    spec_method: 'none',
+    disagg: true,
+    is_multinode: true,
+    prefill_tp: 4,
+    decode_tp: 4,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+    isl: 8192,
+    osl: 1024,
+    conc,
+    offload_mode: 'off',
+    benchmark_type: 'single_turn',
+    image: 'dynamo:test',
+    metrics: {
+      median_intvty: intvty,
+      median_itl: 1 / intvty,
+      median_e2el: 20,
+      median_ttft: 0.5,
+      tput_per_gpu: outputTput * 9,
+      output_tput_per_gpu: outputTput,
+      input_tput_per_gpu: outputTput * 8,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: watts,
+      avg_total_gpu_power_w: watts * 8,
+      prefill_avg_power_w: prefillWatts,
+      decode_avg_power_w: decodeWatts,
+      joules_per_output_token: jOut,
+      joules_per_input_token: jOut / 8,
+      prefill_joules_per_input_token: (jOut - decodeJOut) / 8,
+      decode_joules_per_output_token: decodeJOut,
+    },
+    workers: null,
+    date: DATE,
+    run_url: null,
+  }));
+
+const benchmarkRows = [...rows('b200'), ...rows('h200')];
+const TABS = ['energy', 'power', 'breakdown', 'time'] as const;
+const ROLES = ['all', 'prefill', 'decode', 'split'] as const;
+
+function interceptPowerX() {
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(benchmarkRows),
+  }).as('layoutAvailability');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarkRows }).as('layoutBenchmarks');
+  cy.intercept('GET', '/api/v1/workflow-info*', {
+    body: { runs: [], changelogs: [], configs: [] },
+  });
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
+  cy.intercept('GET', '/api/v1/resident-sequence-lengths*', { body: {} });
+  interceptBenchmarkPresence();
+}
+
+const pwx = (params: Record<string, string> = {}) =>
+  `/pwx?${new URLSearchParams({
+    g_model: 'DeepSeek-V4-Pro',
+    i_seq: '8k/1k',
+    i_prec: 'fp4',
+    ...params,
+  })}`;
+
+function visit(url: string) {
+  cy.visit(url, {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      unlockAgenticGate(win);
+    },
+  });
+  cy.wait(['@layoutAvailability', '@layoutBenchmarks']);
+}
+
+const tab = (value: (typeof TABS)[number]) => cy.get(`[data-testid="powerx-tab-${value}"]`);
+const expectTab = (value: (typeof TABS)[number]) =>
+  tab(value).should('have.attr', 'aria-selected', 'true');
+
+describe('PowerX layout', () => {
+  beforeEach(() => {
+    cy.viewport(1360, 900);
+    interceptPowerX();
+  });
+
+  it('keeps the active tab in the address bar, so a reload or copied address reopens it', () => {
+    visit(pwx());
+    expectTab('energy');
+    for (const value of ['power', 'breakdown', 'time', 'energy'] as const) {
+      tab(value).click();
+      expectTab(value);
+      // The live address bar follows the tab without a history entry.
+      cy.location('search').should((search) => {
+        const params = new URLSearchParams(search);
+        if (value === 'breakdown') expect(params.get('i_pcompare')).to.eq('breakdown');
+        if (value === 'time') expect(params.get('i_metric')).to.eq('y_measuredPowerTimeline');
+        if (value === 'power') expect(params.get('i_metric')).to.match(/Power|Watts/u);
+      });
+      cy.reload();
+      expectTab(value);
+    }
+  });
+
+  it('opens old Where and power-timeline links on the matching tab', () => {
+    visit(pwx({ i_metric: 'y_measuredAvgPower', i_pcompare: 'breakdown' }));
+    expectTab('breakdown');
+    visit(pwx({ i_metric: 'y_measuredPowerTimeline' }));
+    expectTab('time');
+    visit(pwx({ i_metric: 'y_measuredAvgPower', i_pcompare: 'roles' }));
+    expectTab('breakdown');
+  });
+
+  it('reads Compare at from i_at, defaults to 80 and writes a preset back', () => {
+    visit(pwx());
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '80');
+    cy.location('search').should('not.contain', 'i_at=');
+    visit(pwx({ i_at: '30' }));
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '30').click();
+    cy.get('[data-testid="powerx-compare-at-preset-50"]').click();
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '50');
+    cy.location('search').should('contain', 'i_at=50');
+    cy.reload();
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '50');
+  });
+
+  for (const [width, height] of [
+    [1360, 900],
+    [390, 844],
+  ] as const) {
+    it(`keeps the chart header one height on every tab and GPU role at ${width}px`, () => {
+      cy.viewport(width, height);
+      const heights: string[] = [];
+      for (const role of ROLES) {
+        visit(pwx({ i_role: role }));
+        for (const value of TABS) {
+          tab(value).click();
+          expectTab(value);
+          cy.get('[data-testid="powerx-chart-header"]')
+            .should('be.visible')
+            .then(($header) => {
+              heights.push(
+                `${role}/${value}:${Math.round($header[0].getBoundingClientRect().height)}`,
+              );
+            });
+        }
+        cy.document().then((doc) => {
+          expect(doc.documentElement.scrollWidth, 'no horizontal overflow').to.be.at.most(width);
+        });
+      }
+      cy.then(() => {
+        const distinct = new Set(heights.map((entry) => entry.split(':')[1]));
+        expect(distinct.size, heights.join(', ')).to.eq(1);
+      });
+    });
+  }
+});

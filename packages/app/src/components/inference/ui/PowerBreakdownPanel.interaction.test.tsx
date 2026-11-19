@@ -625,7 +625,7 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     expect(panelReadout()?.dataset.source).toBe('scrub');
     expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
     // The explicit action: Compare at moves to the scrubbed interactivity.
-    expect(compareButton()?.textContent).toBe('Compare chips at 100 tok/s/user');
+    expect(compareButton()?.textContent).toBe('Compare GPUs at 100 tok/s/user');
     expect(compareButton()?.disabled).toBe(false);
     act(() => compareButton()!.click());
     expect(compareAt.value).toBe(100);

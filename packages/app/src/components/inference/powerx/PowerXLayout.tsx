@@ -54,7 +54,6 @@ const STRINGS = {
     includeFacility: (pue: string) => `Include facility (PUE ${pue})`,
     includeFacilityHelp:
       'Appends the PUE overhead after the IT stack; on by default. Turn off for IT only.',
-    per: 'Per',
   },
   zh: {
     title: 'PowerX 功耗',
@@ -83,7 +82,6 @@ const STRINGS = {
     },
     includeFacility: (pue: string) => `计入数据中心开销（PUE ${pue}）`,
     includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；默认开启，关闭后仅显示 IT。',
-    per: '计量单位',
   },
 } as const;
 
@@ -252,7 +250,7 @@ export function PowerXReadout({
 }
 
 /**
- * The Where view's Include facility switch. `pues` are the PUEs of the visible chips;
+ * The Breakdown view's Include facility switch. `pues` are the PUEs of the visible chips;
  * the label shows their range, since air- and liquid-cooled systems differ.
  */
 export function PowerXFacilitySwitch({

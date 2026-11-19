@@ -106,7 +106,7 @@ function boundaryQuantity(metric: string, basis: PowerBasis): PowerQuantity | nu
 
 export function powerCompareBase(metric: string, mode: PowerCompare): PowerVariant | null {
   const config = getMeasuredMetricConfig(metric);
-  // The Where view's breakdown stacks are panels, not sibling series on the chart.
+  // The Breakdown view's breakdown stacks are panels, not sibling series on the chart.
   if (!config || mode === 'none' || mode === 'breakdown') return null;
   if (mode === 'boundaries' || mode === 'provisioned' || mode === 'all') {
     return boundaryQuantity(metric, config.basis) ? { kind: 'basis', id: config.basis } : null;

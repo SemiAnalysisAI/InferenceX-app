@@ -106,6 +106,16 @@ const assertChartTitle = (title: string) => {
   cy.get('[data-testid="chart-figure"] h2').should('contain.text', title);
 };
 
+// PowerX: the ranking's Filter (n) opens the quick filters and its Show menu replaces the
+// legend's Optimal Only switch (All configs = optimal only, All points = every point).
+const openQuickFilters = () => cy.get('[data-testid="powerx-filter"]').click();
+const expectShow = (label: 'All configs' | 'All points') =>
+  cy.get('[data-testid="powerx-show"]').should('have.attr', 'aria-label', `Show: ${label}`);
+const pickShow = (option: 'configs' | 'points') => {
+  cy.get('[data-testid="powerx-show"]').click();
+  cy.get(`[data-testid="powerx-show-${option}"]`).click();
+};
+
 const expectVisiblePowerPoints = (count: number) =>
   cy.scatterPoints().should((points) => expect(visiblePoints(points)).to.have.length(count));
 
@@ -130,7 +140,7 @@ describe('Validated vs historical measured power', () => {
     expectHwKeyPoints('b200', true);
     expectHwKeyPoints('mi300x', true);
 
-    cy.get('[data-testid="scatter-quick-filters"]').click();
+    openQuickFilters();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
     cy.get('[data-testid="quick-filter-power-legacy"]').should('be.enabled');
@@ -158,7 +168,7 @@ describe('Validated vs historical measured power', () => {
     expectHwKeyPoints('mi300x', true);
     expectHwKeyPoints('b200', false);
 
-    cy.get('[data-testid="scatter-quick-filters"]').click();
+    openQuickFilters();
     cy.get('[data-testid="quick-filter-power-certified"]').should(
       'have.attr',
       'aria-pressed',
@@ -190,7 +200,7 @@ describe('Validated vs historical measured power', () => {
     }));
     const powerView = '&i_metric=y_measuredAvgPower&i_best=0';
     visitCertifiedPowerChart(`${powerView}&i_optimal=1`, curveBenchmarks);
-    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    expectShow('All configs');
     expectVisiblePowerPoints(4);
 
     cy.get<SVGSVGElement>('[data-testid="d3-chart-svg"]').should(($svg) => {
@@ -215,14 +225,14 @@ describe('Validated vs historical measured power', () => {
         const geometry = Array.from($curves, (curve) => curve.getAttribute('d'));
         expect(geometry.every((path) => path && !path.includes('NaN'))).to.equal(true);
 
-        cy.get('#scatter-hide-non-optimal').click();
+        pickShow('points');
         expectVisiblePowerPoints(6);
-        cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+        expectShow('All points');
         cy.get<SVGPathElement>('.roofline-path').should(($current) => {
           expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
         });
 
-        cy.get('#scatter-hide-non-optimal').click();
+        pickShow('configs');
         expectVisiblePowerPoints(4);
         cy.get<SVGPathElement>('.roofline-path').should(($current) => {
           expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
@@ -230,7 +240,7 @@ describe('Validated vs historical measured power', () => {
       });
 
     visitCertifiedPowerChart(`${powerView}&i_optimal=0`, curveBenchmarks);
-    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+    expectShow('All points');
     expectVisiblePowerPoints(6);
   });
 });
