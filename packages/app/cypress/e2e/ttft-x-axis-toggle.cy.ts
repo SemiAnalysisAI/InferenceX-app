@@ -558,7 +558,9 @@ const selectPowerXAxisMode = (mode: 'interactivity' | 'ttft', label: string) => 
   cy.get('[data-testid="x-axis-mode-selector"]')
     .should('have.attr', 'data-value', mode)
     .and('contain.text', label);
-  cy.get('body').type('{esc}');
+  // Let the listbox unmount first, or Escape lands on its closing layer and More stays open.
+  cy.get(`[data-testid="x-axis-mode-${mode}"]`).should('not.exist');
+  cy.get('[data-testid="powerx-more"]').type('{esc}');
   cy.get('[data-testid="powerx-more-content"]').should('not.exist');
 };
 

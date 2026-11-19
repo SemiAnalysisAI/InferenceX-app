@@ -7,6 +7,15 @@ import { registerScatterPointsQuery } from './scatter-points';
 
 registerScatterPointsQuery();
 
+// Chromium reports "ResizeObserver loop completed with undelivered notifications" when a
+// ResizeObserver callback (Floating UI's autoUpdate, under every Radix popover) changes layout
+// that is observed in the same frame. It is a benign notice, not a page error, and it fires
+// nondeterministically when a select opens inside another popover. Ignore only that message.
+Cypress.on('uncaught:exception', (error) => {
+  if (/ResizeObserver loop/.test(error.message)) return false;
+  return undefined;
+});
+
 let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
 
