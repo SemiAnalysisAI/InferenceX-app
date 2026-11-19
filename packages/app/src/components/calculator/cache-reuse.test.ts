@@ -401,6 +401,14 @@ describe('recipe identity', () => {
     ).toBe(true);
   });
 
+  it('labels each disaggregated role with its own parallel widths', () => {
+    const point = makePoint(
+      { decode_pp: 2, decode_dcp_size: 8 },
+      { ...dep8, disagg: true, recipe_fingerprint: null },
+    );
+    expect(cacheReuseRecipes([point])[0].label).toContain('4xDPAEP32+4xDPAEP32PP2/DCP8');
+  });
+
   it('preserves existing fingerprinted links when parallel widths exceed one', () => {
     const point = makePoint(
       { server_gpu_cache_hit_rate: 0.6, prefill_pp: 2, decode_pp: 2 },

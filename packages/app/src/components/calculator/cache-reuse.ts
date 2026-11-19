@@ -165,10 +165,13 @@ export function recipeLabelOf(point: GPUDataPoint): string {
   if (!row) return `TP${point.tp}`;
   const decodeOnly = !row.disagg && row.decode_tp > 0;
   const m = row.metrics;
-  const prefillDcp = m.prefill_dcp_size ?? m.dcp_size;
-  const decodeDcp = m.decode_dcp_size ?? m.dcp_size;
-  const prefillPcp = m.prefill_pcp_size ?? m.pcp_size;
-  const decodePcp = m.decode_pcp_size ?? m.pcp_size;
+  // Default each role to 1 so a role without a width never borrows the other role's.
+  const prefillPp = m.prefill_pp ?? 1;
+  const decodePp = m.decode_pp ?? 1;
+  const prefillDcp = m.prefill_dcp_size ?? m.dcp_size ?? 1;
+  const decodeDcp = m.decode_dcp_size ?? m.dcp_size ?? 1;
+  const prefillPcp = m.prefill_pcp_size ?? m.pcp_size ?? 1;
+  const decodePcp = m.decode_pcp_size ?? m.pcp_size ?? 1;
   const parallel = parallelismLabel({
     tp: decodeOnly ? row.decode_tp : row.prefill_tp,
     ep: decodeOnly ? row.decode_ep : row.prefill_ep,
@@ -184,11 +187,11 @@ export function recipeLabelOf(point: GPUDataPoint): string {
     decodeEp: row.decode_ep,
     decodeDpAttention: row.decode_dp_attention,
     decodeNumWorkers: row.decode_num_workers,
-    pp: Math.max(m.prefill_pp ?? 1, m.decode_pp ?? 1),
-    dcp: Math.max(prefillDcp ?? 1, decodeDcp ?? 1),
-    pcp: Math.max(prefillPcp ?? 1, decodePcp ?? 1),
-    prefillPp: m.prefill_pp,
-    decodePp: m.decode_pp,
+    pp: Math.max(prefillPp, decodePp),
+    dcp: Math.max(prefillDcp, decodeDcp),
+    pcp: Math.max(prefillPcp, decodePcp),
+    prefillPp,
+    decodePp,
     prefillDcp,
     decodeDcp,
     prefillPcp,

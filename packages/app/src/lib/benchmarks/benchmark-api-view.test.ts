@@ -142,6 +142,7 @@ describe('cache-reuse recipe projection', () => {
             decode_pcp_size: 2,
             dcp_size: 8,
             pcp_size: 4,
+            prefill_dwdp_size: 8,
             debug: 999,
           },
         },
@@ -157,6 +158,7 @@ describe('cache-reuse recipe projection', () => {
       decode_pcp_size: 2,
       dcp_size: 8,
       pcp_size: 4,
+      prefill_dwdp_size: 8,
     });
   });
 });

@@ -66,7 +66,7 @@ export interface PointMeta {
   num_prefill_gpu: number;
   num_decode_gpu: number;
   recipe_fingerprint: string | null;
-  /** PP/DCP/PCP metrics needed to identify legacy recipes without fingerprints. */
+  /** Parallelism widths (PP/DCP/PCP, DWDP) that the cache-reuse recipe key reads. */
   metrics?: Record<string, number>;
   conc: number;
   offload_mode: string | null;
@@ -225,7 +225,8 @@ export async function getTraceServerMetrics(
         'dcp_size', br.metrics -> 'dcp_size',
         'prefill_pcp_size', br.metrics -> 'prefill_pcp_size',
         'decode_pcp_size', br.metrics -> 'decode_pcp_size',
-        'pcp_size', br.metrics -> 'pcp_size'
+        'pcp_size', br.metrics -> 'pcp_size',
+        'prefill_dwdp_size', br.metrics -> 'prefill_dwdp_size'
       )) as metrics,
       br.conc, br.offload_mode, br.isl, br.osl, br.benchmark_type,
       br.date::text,

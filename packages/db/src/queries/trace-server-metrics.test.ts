@@ -132,6 +132,7 @@ describe('getTraceServerMetrics', () => {
     expect(calls[0]).toContain("atr.chart_series - 'metricSources'");
     expect(calls[0]).toContain("metric_source->'kvCacheUsageByEngine'");
     expect(calls[0]).toContain("br.metrics ->> 'kv_offload_backend'");
+    expect(calls[0]).toContain("'prefill_dwdp_size', br.metrics -> 'prefill_dwdp_size'");
   });
 
   it('fetches and computes the raw blob only when chart_series is stale', async () => {

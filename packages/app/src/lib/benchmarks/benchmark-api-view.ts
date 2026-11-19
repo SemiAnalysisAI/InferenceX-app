@@ -12,6 +12,7 @@ const CALCULATOR_METRIC_KEYS = new Set([
   'prefill_pcp_size',
   'decode_pcp_size',
   'pcp_size',
+  'prefill_dwdp_size',
   'server_gpu_cache_hit_rate',
   'server_external_cache_hit_rate',
   'server_cpu_cache_hit_rate',
