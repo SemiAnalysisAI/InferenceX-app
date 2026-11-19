@@ -103,6 +103,7 @@ import {
   useSetPowerXCompareRange,
 } from '@/components/inference/ui/powerx-surface';
 import { powerXCoveredRange } from '@/components/inference/powerx/powerx-compare-at';
+import { surfaceMetricText } from '@/components/inference/powerx/powerx-gpu-wording';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -454,6 +455,13 @@ export default function ChartDisplay({
   const powerXTab = powerXViewFor(selectedYAxisMetric, powerCompare);
   // PowerX v2 owns the page frame; embeds and minimal chrome keep the shared layout.
   const powerXLayout = powerXSurface && !embedded && !minimalChrome;
+  // PowerX says GPU where the shared metric labels say Chip; /infx keeps the shared label.
+  const yMetricLabel = (chartDefinition: ChartDefinition) =>
+    surfaceMetricText(
+      metricLabel(chartDefinition, selectedYAxisMetric, locale),
+      powerXSurface,
+      locale,
+    );
   // PowerX keeps the address bar current (tab, options, Compare at) so links share state.
   useEffect(() => {
     if (!powerXLayout) return;
@@ -1343,9 +1351,13 @@ export default function ChartDisplay({
                               )}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {powerXRoleTitle(
-                                metricChartTitle(
-                                  graph.chartDefinition,
-                                  selectedYAxisMetric,
+                                surfaceMetricText(
+                                  metricChartTitle(
+                                    graph.chartDefinition,
+                                    selectedYAxisMetric,
+                                    locale,
+                                  ),
+                                  powerXSurface,
                                   locale,
                                 ),
                                 powerXSurface ? powerRole : 'all',
@@ -1650,11 +1662,7 @@ export default function ChartDisplay({
                                 powerXTab === 'time' || powerXTab === 'breakdown'
                                   ? undefined
                                   : powerXRoleTitle(
-                                      metricLabel(
-                                        graph.chartDefinition,
-                                        selectedYAxisMetric,
-                                        locale,
-                                      ),
+                                      yMetricLabel(graph.chartDefinition),
                                       powerRole,
                                       locale,
                                     ),
@@ -1689,11 +1697,7 @@ export default function ChartDisplay({
                                   role={powerRole}
                                   points={powerXReadoutPoints}
                                   yMetric={{
-                                    label: metricLabel(
-                                      graph.chartDefinition,
-                                      selectedYAxisMetric,
-                                      locale,
-                                    ),
+                                    label: yMetricLabel(graph.chartDefinition),
                                     value: (point) =>
                                       formatMetricValue(point.y, selectedYAxisMetric),
                                   }}
@@ -1776,7 +1780,7 @@ export default function ChartDisplay({
                             modelLabel={graph.model}
                             data={graph.data.filter((point) => !point.powerVariant)}
                             xLabel={resolvedXLabel}
-                            yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                            yLabel={yMetricLabel(graph.chartDefinition)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
                             footer={chartFooter}
@@ -1793,7 +1797,7 @@ export default function ChartDisplay({
                             clippedData={graph.clippedData}
                             onShowTable={() => handleViewModeChange(graphIndex, 'table')}
                             xLabel={resolvedXLabel}
-                            yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                            yLabel={yMetricLabel(graph.chartDefinition)}
                             chartDefinition={graph.chartDefinition}
                             caption={caption}
                             footer={chartFooter}
@@ -1806,7 +1810,7 @@ export default function ChartDisplay({
                               powerXMounted &&
                               powerXEnergyOrPower &&
                               selectedXAxisMode === 'interactivity'
-                                ? metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)
+                                ? yMetricLabel(graph.chartDefinition)
                                 : undefined
                             }
                           />
@@ -1909,7 +1913,7 @@ export default function ChartDisplay({
                         }}
                         parentChartId={`chart-${graphIndex}`}
                         chartDefinition={graph.chartDefinition}
-                        yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                        yLabel={yMetricLabel(graph.chartDefinition)}
                         xLabel={resolvedXLabel}
                       />
                     )}

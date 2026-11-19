@@ -29,6 +29,7 @@ import {
 } from '../utils/power-breakdown';
 import { formatInteractivity } from '../utils/interactivity-format';
 import { usePowerXSurface } from './powerx-surface';
+import { surfaceMetricText } from '../powerx/powerx-gpu-wording';
 
 const STRINGS = {
   en: {
@@ -150,6 +151,7 @@ export default function PowerPartsList({
   const powerX = usePowerXSurface();
   const mobile = useIsMobileViewport();
   const phone = powerX && mobile;
+  const acrossLoad = surfaceMetricText(t.acrossLoad, powerX, locale);
   const folded = phone && rows.length > PHONE_VISIBLE_PARTS;
   const [expanded, setExpanded] = useState(false);
   const restId = useId();
@@ -221,9 +223,9 @@ export default function PowerPartsList({
         data-testid="power-part-sparkline"
         data-max={row.max}
         role="img"
-        aria-label={t.acrossLoad}
+        aria-label={acrossLoad}
       >
-        <title>{t.acrossLoad}</title>
+        <title>{acrossLoad}</title>
         <path d={spark.area} fill={color} fillOpacity={emphasis === 'highlighted' ? 0.45 : 0.2} />
         <path
           d={spark.line}
