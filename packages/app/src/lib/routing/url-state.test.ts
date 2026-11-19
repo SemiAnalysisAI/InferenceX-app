@@ -1085,21 +1085,35 @@ describe('buildShareUrl on the video dashboard', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shares the live v_ params and nothing else', async () => {
-    setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/vgx');
+  it('shares the in-memory v_ and r_ settings, not the address bar', async () => {
+    setupWindow('?r_engine=sglang&history-hardware=H200&i_metric=y_x', '/vgx');
+    const { readVideoLink, setVideoSearch } =
+      await import('@/components/video-benchmark/page-search');
+    readVideoLink();
+    setVideoSearch(
+      new URLSearchParams('v_y=kjPerVideo&v_optimal=0&r_engine=vllm-omni&r_prompt=crane&utm=x'),
+    );
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     const url = new URL(buildShareUrl());
     expect(url.pathname).toBe('/vgx');
-    expect(url.searchParams.get('v_y')).toBe('kjPerVideo');
-    expect(url.searchParams.get('v_optimal')).toBe('0');
-    expect(url.searchParams.has('history-hardware')).toBe(false);
-    expect(url.searchParams.has('i_metric')).toBe(false);
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      v_y: 'kjPerVideo',
+      v_optimal: '0',
+      r_engine: 'vllm-omni',
+      r_prompt: 'crane',
+    });
   });
 
-  it('keeps live v_ params out of inference share links', async () => {
+  it('keeps video settings out of inference share links', async () => {
     setupWindow('?v_y=kjPerVideo', '/infx/inference');
+    const { readVideoLink, setVideoSearch } =
+      await import('@/components/video-benchmark/page-search');
+    readVideoLink();
+    setVideoSearch(new URLSearchParams('v_y=kjPerVideo&r_engine=sglang'));
     const { buildShareUrl } = await import('@/lib/routing/url-state');
-    expect(buildShareUrl()).not.toContain('v_y');
+    const url = buildShareUrl();
+    expect(url).not.toContain('v_y');
+    expect(url).not.toContain('r_engine');
   });
 });
 
@@ -1108,9 +1122,14 @@ describe('VideoGenX results share state', () => {
     vi.resetModules();
     const { location } = setupWindow('?r_range=last-month', '/infx/reliability');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
+    const { readVideoLink, setVideoSearch } =
+      await import('@/components/video-benchmark/page-search');
     location.pathname = '/zh/vgx';
-    location.search =
-      '?r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08&unofficialrun=123';
+    location.search = '?unofficialrun=123';
+    readVideoLink();
+    setVideoSearch(
+      new URLSearchParams('r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08'),
+    );
     const url = new URL(buildShareUrl());
     expect(url.pathname).toBe('/zh/vgx');
     expect(url.searchParams.get('r_workload')).toBe('source:c1');

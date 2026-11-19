@@ -5,6 +5,7 @@ import type {
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
+import { readVideoLink, videoSearch } from '@/components/video-benchmark/page-search';
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
@@ -33,6 +34,14 @@ function assertResultsFit() {
   });
 }
 
+let remount = () => {};
+/** Opens `search` as a link: the page reads the address bar when it mounts. */
+const openLink = (search: string) =>
+  cy.window().then((win) => {
+    win.history.replaceState(null, '', `${win.location.pathname}${search}`);
+    remount();
+  });
+
 function mount({
   pathname = '/vgx',
   search = '?r_y=videosPerGpuHour',
@@ -52,28 +61,33 @@ function mount({
     editPage?.(page);
     cy.intercept('GET', '/api/video-runs?format=history&page=1*', page).as('history');
   });
-  cy.window().then((win) =>
-    win.history.replaceState(null, '', `${win.location.pathname}${search}`),
-  );
+  cy.window().then((win) => {
+    // Settings outlive a mount, so another link is read first and each test's link is new.
+    win.history.replaceState(null, '', `${win.location.pathname}?previous-test`);
+    readVideoLink();
+    win.history.replaceState(null, '', `${win.location.pathname}${search}`);
+  });
   const dashboard = (
     <PathnameContext.Provider value={pathname}>
       <VideoDashboard />
     </PathnameContext.Provider>
   );
-  mountWithProviders(
-    theme ? (
-      <ThemeProvider
-        attribute="class"
-        defaultTheme={theme}
-        enableSystem={false}
-        themes={APP_THEMES}
-      >
-        {dashboard}
-      </ThemeProvider>
-    ) : (
-      dashboard
-    ),
-  );
+  remount = () =>
+    mountWithProviders(
+      theme ? (
+        <ThemeProvider
+          attribute="class"
+          defaultTheme={theme}
+          enableSystem={false}
+          themes={APP_THEMES}
+        >
+          {dashboard}
+        </ThemeProvider>
+      ) : (
+        dashboard
+      ),
+    );
+  remount();
   cy.wait('@history');
   cy.get('[data-testid="video-results"]').should('be.visible');
 }
@@ -119,8 +133,9 @@ const stageInView = () =>
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const chooseEngine = (label: string) =>
   cy.get('[data-testid="results-engine"]').contains('button', label).click();
+/** A key of the page's in-memory settings, which Share turns into a link. */
 const searchParam = (key: string) =>
-  cy.location('search').then((search) => new URLSearchParams(search).get(key));
+  cy.wrap({ read: () => new URLSearchParams(videoSearch()).get(key) }).invoke('read');
 const plottedY = (hardware: string) =>
   points(`[data-hardware="${hardware}"][data-overlay="false"]`).then(
     ($group) => ($group[0] as unknown as { __data__: { y: number } }).__data__.y,
@@ -413,7 +428,7 @@ describe('VideoGenX Results', () => {
     searchParam('r_workload').should('match', /:c1$/u);
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     hardwarePoints('h200').should('have.attr', 'data-overlay', 'false');
-    cy.location('search').should('not.contain', 'r_workload=');
+    searchParam('r_workload').should('equal', null);
   });
 
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
@@ -423,20 +438,16 @@ describe('VideoGenX Results', () => {
       editPage: namedOnlyWorkload,
     });
     hardwarePoints('h200').should('exist');
-    cy.get<string>('@namedWorkload').then((sourceId) => {
-      cy.window().then((win) => {
-        const params = new URLSearchParams(win.location.search);
-        params.set('r_workload', sourceId);
-        win.history.pushState(null, '', `${win.location.pathname}?${params}`);
-        win.dispatchEvent(new PopStateEvent('popstate'));
-      });
-    });
+    cy.get<string>('@namedWorkload').then((sourceId) =>
+      openLink(`?unofficialrun=34341996789&r_y=videosPerGpuHour&r_workload=${sourceId}`),
+    );
     hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
     hardwarePoints('h200').should('not.exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     hardwarePoints('h200').should('have.attr', 'data-overlay', 'false');
     hardwarePoints('b200').should('not.exist');
-    cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
+    searchParam('r_workload').should('equal', null);
+    cy.location('search').should('not.contain', 'unofficialrun');
   });
 
   it('switches between approved models from the benchmark config', () => {
@@ -500,14 +511,7 @@ describe('VideoGenX Results', () => {
     });
     cy.wait('@approvedMedia');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
-    cy.window().then((win) => {
-      win.history.replaceState(
-        null,
-        '',
-        `${win.location.pathname}?unofficialrun=${namedRun}&r_y=videosPerGpuHour`,
-      );
-      win.dispatchEvent(new win.PopStateEvent('popstate'));
-    });
+    openLink(`?unofficialrun=${namedRun}&r_y=videosPerGpuHour`);
     hardwarePoints('b200').should('have.length', 2);
     cy.wait('@namedMedia');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('not.exist');
@@ -531,9 +535,11 @@ describe('VideoGenX Results', () => {
     hardwarePoints('b200').should('not.exist');
     toggleHardware('b200');
     hardwarePoints('b200').should('have.length', 2);
+    // One read per mount: `openLink` mounted the page again. Dismiss reads no more.
+    cy.get('@approvedMedia.all').should('have.length', 2);
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
-    cy.get('@approvedMedia.all').should('have.length', 1);
+    cy.get('@approvedMedia.all').should('have.length', 2);
     hardwarePoints('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
   });
 
@@ -1154,29 +1160,17 @@ describe('VideoGenX Results', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     points().should('have.length', 3);
     searchParam('r_point').should('equal', null);
+    cy.location('search').should('equal', '?r_y=videosPerGpuHour');
     hardwarePoints('b200')
       .then(($points) => ($points[0] as unknown as { __data__: { key: string } }).__data__.key)
       .then((point) => {
-        cy.window().then((win) => {
-          win.history.replaceState(
-            null,
-            '',
-            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}&r_y=videosPerGpuHour`,
-          );
-          win.dispatchEvent(new win.PopStateEvent('popstate'));
-        });
+        openLink(`?r_point=${encodeURIComponent(point!)}&r_y=videosPerGpuHour`);
         cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
-        cy.window().then((win) => {
-          win.history.replaceState(
-            null,
-            '',
-            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}&r_hidden=b200&r_y=videosPerGpuHour`,
-          );
-          win.dispatchEvent(new win.PopStateEvent('popstate'));
-        });
+        openLink(`?r_point=${encodeURIComponent(point!)}&r_hidden=b200&r_y=videosPerGpuHour`);
         cy.get('[data-testid="video-results-detail"]').should('not.exist');
         hardwarePoints('b200').should('not.exist');
         searchParam('r_point').should('equal', null);
+        cy.location('search').should('equal', '?r_hidden=b200&r_y=videosPerGpuHour');
         toggleHardware('b200');
         hardwarePoints('b200').should('exist');
         cy.get('[data-testid="video-results-detail"]').should('not.exist');

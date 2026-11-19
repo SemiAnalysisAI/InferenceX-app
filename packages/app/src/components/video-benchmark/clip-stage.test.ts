@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   pairedGroup,
   parseStage,
   promptKey,
+  setStage,
   speedVs,
   stagePrompt,
   stageSearch,
@@ -11,6 +12,7 @@ import {
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';
+import { setVideoSearch, subscribeVideoSearch, videoSearch } from './page-search';
 import { resultsClipGroups, type ResultsClipSide } from './results-clips';
 
 const record = (caseId: string, take = 1): CaseRecord => ({
@@ -41,6 +43,8 @@ const point = (hardwareKey: string, runId = 'official') =>
   ({ id: hardwareKey, hardwareKey, runId }) as VideoPoint;
 
 describe('clip stage', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
     const search = stageSearch(
       { prompt: 'crane', view: 'wipe', clip: null, vs: null, swap: false, sheet: null },
@@ -74,6 +78,40 @@ describe('clip stage', () => {
       swap: false,
       sheet: null,
     });
+  });
+
+  it('changes its keys of the in-memory settings and tells readers once per change', () => {
+    setVideoSearch(new URLSearchParams('r_engine=sglang&r_view=side&utm=x'));
+    let changes = 0;
+    const unsubscribe = subscribeVideoSearch(() => (changes += 1));
+    setStage({ prompt: 'crane', view: 'wipe' });
+    expect(videoSearch()).toBe('r_engine=sglang&utm=x&r_prompt=crane');
+    setStage({ prompt: 'crane' });
+    expect(changes).toBe(1);
+    unsubscribe();
+    setStage({ swap: true });
+    expect(parseStage(videoSearch())).toMatchObject({ prompt: 'crane', swap: true });
+    expect(changes).toBe(1);
+  });
+
+  it('keeps the settings across a remount and replaces them only for a new link', async () => {
+    vi.resetModules();
+    const location = { search: '?r_engine=sglang&unofficialRun=7' };
+    vi.stubGlobal('window', { location });
+    const page = await import('./page-search');
+    // The document's first read takes the link.
+    expect(page.videoSearch()).toBe('r_engine=sglang&unofficialRun=7');
+    page.setVideoSearch(new URLSearchParams('r_engine=vllm-omni&r_prompt=crane'));
+    // A language switch carries the same link; an open detail and a dismissed run do not make it new.
+    location.search = '?r_engine=sglang&r_point=1:a:c1';
+    page.readVideoLink();
+    // Another tab and back arrives without a link.
+    location.search = '';
+    page.readVideoLink();
+    expect(page.videoSearch()).toBe('r_engine=vllm-omni&r_prompt=crane');
+    location.search = '?r_view=side';
+    page.readVideoLink();
+    expect(page.videoSearch()).toBe('r_view=side');
   });
 
   it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {

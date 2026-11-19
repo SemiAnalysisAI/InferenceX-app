@@ -36,10 +36,15 @@ it; older runs selected through Run context still show it. The overview includes
 GPU counts for the same workload, with no GPU-count selector. Workload-mix rows preserve each
 cohort separately rather than averaging across resolutions, durations or modes.
 
-`r_*` URL parameters record filters, hidden hardware, the X and Y metrics (`r_x`, `r_y`),
+`r_*` link parameters record filters, hidden hardware, the X and Y metrics (`r_x`, `r_y`),
 Optimal only (`r_optimal`), the open deployment
-(`r_point`), deadline and cost tier. The clip stage's
-`r_view`, `r_prompt`, `r_clip`, `r_vs`, `r_swap` and `r_sheet` stay in the page URL and are not API
+(`r_point`), deadline and cost tier. The page reads them from the link it opens on and then keeps
+its settings in memory (`page-search.ts`), as the inference charts do (`url-state.ts`): a control
+does not rewrite the address bar, Share builds the link from the current settings, and a reload
+returns to the link the page opened on. The settings live as long as the document: the language
+switch and a visit to another tab keep them, and only a new link replaces them. Only the open deployment (`r_point`) is written to the
+address bar, and a dismissed `?unofficialrun=` is taken out of it. The clip stage's
+`r_view`, `r_prompt`, `r_clip`, `r_vs`, `r_swap` and `r_sheet` are page settings only and are not API
 parameters; the overview API rejects them as unknown.
 The retired `r_gpus` and `r_basis` parameters are accepted but ignored by the
 UI and overview API: all GPU counts and participating GPUs
@@ -72,7 +77,7 @@ cannot trigger publication, storage writes or GPU work.
 Approved evidence determines the preferred cohort. A workload available only in
 the named run requires explicit selection, or becomes the fallback when no approved
 cohort matches. The browser retains one bounded History read and rederives both
-lists when the URL changes. Legacy dashboard/compare APIs remain approved-only.
+lists when the selection changes. Legacy dashboard/compare APIs remain approved-only.
 The overview API returns JSON by default. `format=csv` downloads the same selected official and named cells with exact source/workload/run/artifact identities, approval state, units and both GPU cost bases. `duration_s` retains the requested plan duration; `video_seconds_per_s` reports validated decoded output seconds per wall second. Missing values remain empty cells; CSV is private and no-store.
 
 The Workload menu shows compact summaries derived from recorded model and generation
@@ -94,7 +99,7 @@ not rank there either. Point labels name GPU counts, so that axis hides them. It
 card shows median latency in place of the GPU count already in the summary, and the
 details panel lists the median latency. Chip config history fixes every deployment's
 GPU count, so it offers only the latency axis and plots median latency while
-`r_x=gpus` stays in the URL. Quality loss against lossless output (LPIPS) and peak GPU
+`r_x=gpus` stays in the settings. Quality loss against lossless output (LPIPS) and peak GPU
 memory appear under "Not measured yet" and cannot be selected until that data exists.
 Named-run overlays use the same series and axes.
 
@@ -209,10 +214,11 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
 `r_point` opens one deployment detail. Opening pushes a history entry marked in
 `history.state` through the `client-navigation` helpers, so the in-page Back button
 pops that entry even after reload or Forward. Browser Back also returns to the
-overview at its previous scroll position. The overview stays mounted but hidden
+overview at its previous scroll position; Back and Forward change only the open deployment, and
+the other settings stay as they are. The overview stays mounted but hidden
 under React `Activity`, so clip media, the selected clip group
 and chart state survive the visit. An unknown, filtered or hidden `r_point` falls
-back to the overview. Once results load, the URL drops that key, so showing the
+back to the overview. Once results load, the address bar and the settings drop that key, so showing the
 hardware again or Share cannot reopen it. Overlay deployments open the same way.
 
 The detail header (`DashboardSectionHeader` with Share) names hardware, model, engine,
@@ -271,7 +277,7 @@ deployment (`compareConfigs`). A pick sets `r_clip` as a chart click does. The s
 official cell of the same deployment on its GPU, else that GPU's official opening
 (`officialCounterpart`); otherwise the subject's sealed Diffusers reference. It also offers each other visible
 hardware's opening, the deployment the first select plays for it. The pair plays its own clip of the subject's prompt, seed and take; a
-missing twin says so in place of the clip. That choice is the page URL's `r_vs` (`reference`,
+missing twin says so in place of the clip. That choice is the link key `r_vs` (`reference`,
 `twin` or a hardware key), omitted while it is the subject's default pairing, so a shared link
 reopens the same comparison. A new subject, from the row or the chart, returns it to the default;
 a choice the subject lacks shows that default. Pills name each side (hardware and engine, then the GPU
@@ -301,15 +307,15 @@ on a poster tile for 250 ms, or keeping keyboard focus on it that long (a click 
 and the preview, so picking a prompt fetches no preview beside the clips the stage loads),
 loops the poster clip's muted web
 rendition over the frame, faded in once it plays; the rendition is requested only then. A
-touch only picks the prompt, and `prefers-reduced-motion` keeps the still frame. `clip-stage.ts` owns the stage's URL keys:
+touch only picks the prompt, and `prefers-reduced-motion` keeps the still frame. `clip-stage.ts` owns the stage's link keys:
 `r_prompt` (case id, `~take` after the first take, `diag:` for the matched-noise rerun),
 `r_view` (omitted for Wipe), `r_clip` (the subject's `resultsPointKey`), `r_vs` (the pair,
 omitted for the default pairing), `r_swap` (`1` while Swap is on) and `r_sheet` (the chart point
-whose sheet a touch screen has open). Its writer
-replaces only those keys, and the dashboard's `commit` keeps them while it rewrites the
+whose sheet a touch screen has open). Its writer (`setStage`)
+replaces only those keys of the in-memory settings, and the dashboard's `commit` keeps them while it rewrites the
 results keys. They are page state only: the overview API request is built from the results
 keys and never carries them. An unknown prompt shows the first prompt, and an unknown,
-hidden or undrawn `r_clip` plays the default subject; both stay in the URL. Changing the
+hidden or undrawn `r_clip` plays the default subject; both stay in the settings. Changing the
 prompt, the subject or the pair pauses and rewinds both sides; the view, the split lock and
 the audio source stay.
 
@@ -620,7 +626,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 以及已移除的利润估算器参数（`r_api`、`r_price_t2v`、`r_price_i2v`、`r_price_r2v`、`r_utilization`）会被忽略。分享和导出链接不写入取默认值的参数。`r_workload` 使用模型 slug（如 `minimax-h3`），无论筛选条件如何，都指向该模型硬件覆盖最多的工作负载；其他工作负载使用数据点 ID，旧链接中的数据点 ID 仍可解析。视频秒吞吐量和每视频秒成本使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。
-页面与只读 API 以一次请求最多读取五页 History，并补充更早部署各自的最新来源，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs`（配对）、`r_swap`（互换两侧）和 `r_sheet`（触屏设备上打开的数据点面板）只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
+页面与只读 API 以一次请求最多读取五页 History，并补充更早部署各自的最新来源，共用选择和计算逻辑，页面打开时读取链接中的 `r_*` 参数，之后把设置保存在内存中（`page-search.ts`，做法与推理图表的 `url-state.ts` 一致）：操作控件不会改写地址栏，“分享”按当前设置生成链接，刷新则回到打开时的链接；切换语言或去其他标签页再回来时设置仍然保留，只有打开新的链接才会替换；地址栏只写入打开的部署详情（`r_point`），移除指定运行时会去掉其中的 `?unofficialrun=`，浏览器后退和前进也只切换部署详情。其中对比区的 `r_view`、`r_prompt`、`r_clip`、`r_vs`（配对）、`r_swap`（互换两侧）和 `r_sheet`（触屏设备上打开的数据点面板）只是页面设置，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。
