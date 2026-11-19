@@ -134,7 +134,10 @@ metrics for those points.
 ### AgentX Curve Replacement Scope
 
 AgentX ingestion selects one measurement per complete point identity across the
-whole run before metric or attachment writes. Identical raw copies collapse to
+whole run before metric or attachment writes. Selection runs on what retry handling
+leaves: preparation has already removed superseded retry copies, and `results_*`
+aggregate rows of a point that a per-job file holds are not candidates (see
+[Required Power Publication](#required-power-publication)). Identical raw copies collapse to
 their per-job source when available; a unique legacy measurement remains valid.
 Explicit failed outcomes are excluded from selection and retained as publication
 warnings. New attempt outcomes require a nonempty attempt ID and a boolean
