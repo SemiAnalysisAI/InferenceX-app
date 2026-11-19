@@ -10,9 +10,11 @@ import {
   baseOverlayState,
   inferenceState,
   legendState,
+  HARDWARE_CONFIG,
   mountChart,
   overlayState,
   point,
+  scatterPoints,
 } from './ScatterGraph.test-harness';
 
 vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
@@ -42,6 +44,25 @@ const aggregated = (x: number): InferenceData => ({
   ...point('h100', 'fp8', x, 500, 8),
   measuredAvgPower: metric(500),
 });
+
+// One disaggregated row per x, expanded the way the roles compare draws it: the base
+// all-GPU row plus a prefill and a flat decode clone.
+const rolePoint = (x: number, run_url?: string): InferenceData[] => {
+  const base = {
+    ...point('b200', 'fp8', x, 600 + x, 8),
+    disagg: true,
+    ...(run_url ? { run_url } : {}),
+    measuredAvgPower: metric(600 + x),
+    measuredPrefillAvgPower: metric(500 + x),
+    measuredDecodeAvgPower: metric(701.5),
+  };
+  return [
+    base,
+    { ...base, y: 500 + x, powerVariant: { kind: 'role', id: 'prefill' } },
+    { ...base, y: 701.5, powerVariant: { kind: 'role', id: 'decode' } },
+  ];
+};
+const variantOf = (d: InferenceData) => d.powerVariant?.id ?? '';
 
 interface LegendItem {
   hw: string;
@@ -79,6 +100,44 @@ describe('PowerX GPU role on the main chart', () => {
       (item) => item.hw.includes('decode') || item.hw.includes('prefill'),
     );
     expect(roleKey.map((item) => item.label)).toEqual(['Decode GPUs']);
+    unmount();
+  });
+
+  it('draws only the pool the role reads: no hidden all-GPU or decode points', () => {
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedYAxisMetric: 'y_measuredAvgPower',
+      powerCompare: 'roles',
+      powerRole: 'prefill',
+      hideNonOptimal: false,
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['b200']),
+      allOverlayHwTypes: new Set(['b200']),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'powerx', url: runUrl }],
+    };
+    const { container, unmount } = mountChart({
+      chartDefinition: chartDefinitions[0],
+      data: [10, 20, 40].flatMap((x) => rolePoint(x)),
+      overlayData: {
+        data: [15, 30].flatMap((x) => rolePoint(x, runUrl)),
+        hardwareConfig: { b200: { ...HARDWARE_CONFIG.b200, suffix: '' } },
+        label: 'prefill role',
+      },
+    });
+    const official = scatterPoints(container).map(({ datum }) => datum as InferenceData);
+    expect(official.map(variantOf)).toEqual(['prefill', 'prefill', 'prefill']);
+    expect(official.map((d) => d.y).toSorted((a, b) => a - b)).toEqual([510, 520, 540]);
+    const overlay = [
+      ...container.querySelectorAll<SVGGElement & { __data__: InferenceData }>(
+        '.unofficial-overlay-pt',
+      ),
+    ].map((element) => element.__data__);
+    expect(overlay.map(variantOf)).toEqual(['prefill', 'prefill']);
     unmount();
   });
 });

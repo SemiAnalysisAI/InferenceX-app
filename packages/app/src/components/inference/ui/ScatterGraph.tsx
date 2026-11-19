@@ -948,7 +948,17 @@ const ScatterGraph = React.memo(
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
-    const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
+    // Series the GPU role leaves out are never drawn: no curve, point or label, not even a
+    // transparent one. The rows stay in `pointsData` for the legend's points table.
+    const displayedRooflines = useMemo(() => {
+      const curves = showPowerEnvelope ? groupedData : rooflines;
+      if (roleHiddenVariants.size === 0) return curves;
+      return Object.fromEntries(
+        Object.entries(curves).filter(
+          ([key]) => !roleHiddenVariants.has(parseScatterSeriesKey(key).variant ?? ''),
+        ),
+      );
+    }, [showPowerEnvelope, groupedData, rooflines, roleHiddenVariants]);
 
     const powerEnvelopePointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -1022,6 +1032,15 @@ const ScatterGraph = React.memo(
           activeOverlayHwTypes.has(String(point.hwKey)),
       );
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
+    const drawnOverlayData = useMemo(
+      () =>
+        roleHiddenVariants.size === 0
+          ? processedOverlayData
+          : processedOverlayData.filter(
+              (point) => !roleHiddenVariants.has(powerVariantId(point.powerVariant)),
+            ),
+      [processedOverlayData, roleHiddenVariants],
+    );
 
     const processedOverlayClippedData = useMemo(() => {
       if (!overlayData?.clippedData) return EMPTY_CLIPPED_DATA;
@@ -1195,8 +1214,8 @@ const ScatterGraph = React.memo(
         variant: string | null;
         points: InferenceData[];
       }
-      if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
-      const grouped = processedOverlayData.reduce(
+      if (drawnOverlayData.length === 0) return {} as Record<string, Entry>;
+      const grouped = drawnOverlayData.reduce(
         (acc, p) => {
           const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
           const key = `${scatterSeriesKey(p)}_run${runIndex}`;
@@ -1214,7 +1233,7 @@ const ScatterGraph = React.memo(
         {} as Record<string, Entry>,
       );
       return grouped;
-    }, [processedOverlayData, runIndexByUrl]);
+    }, [drawnOverlayData, runIndexByUrl]);
 
     const overlayRooflines = useMemo(
       () =>
@@ -1277,6 +1296,13 @@ const ScatterGraph = React.memo(
     );
 
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
+    const drawnPointsData = useMemo(
+      () =>
+        roleHiddenVariants.size === 0
+          ? pointsData
+          : pointsData.filter((d) => !roleHiddenVariants.has(powerVariantId(d.powerVariant))),
+      [pointsData, roleHiddenVariants],
+    );
     const hasPersistedPoint = useMemo(
       () => pointsData.some((point) => isPersistedBenchmarkId(point.id)),
       [pointsData],
@@ -1411,15 +1437,13 @@ const ScatterGraph = React.memo(
       if (hideNonOptimal && !showPowerEnvelope) {
         pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
-      const overlayPts = processedOverlayData.filter(
-        (point) =>
-          !roleHiddenVariants.has(powerVariantId(point.powerVariant)) &&
-          (!hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point)),
+      const overlayPts = drawnOverlayData.filter(
+        (point) => !hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point),
       );
       return overlayPts.length > 0 ? [...pts, ...overlayPts] : pts;
     }, [
       filteredData,
-      processedOverlayData,
+      drawnOverlayData,
       hideNonOptimal,
       optimalPointKeys,
       overlayOptimalPoints,
@@ -1511,12 +1535,12 @@ const ScatterGraph = React.memo(
     const dataIdentity = useMemo(
       () =>
         [
-          ...pointsData.map((point) => `official:${buildPointId(point)}`),
-          ...processedOverlayData.map((point) => `overlay:${scatterPointConfigId(point)}`),
+          ...drawnPointsData.map((point) => `official:${buildPointId(point)}`),
+          ...drawnOverlayData.map((point) => `overlay:${scatterPointConfigId(point)}`),
         ]
           .toSorted()
           .join('|'),
-      [pointsData, processedOverlayData, buildPointId],
+      [drawnPointsData, drawnOverlayData, buildPointId],
     );
     const metricIdentity = useMemo(
       () =>
@@ -1527,11 +1551,11 @@ const ScatterGraph = React.memo(
           selectedYAxisMetric,
           `${xScaleConfig.type}:${xScaleConfig.domain.join(',')}`,
           `${yScaleConfig.type}:${yScaleConfig.domain.join(',')}`,
-          ...pointsData.map(
+          ...drawnPointsData.map(
             (point) =>
               `${buildPointId(point)}:${point.date ?? ''}:${point.id ?? ''}:${point.run_url ?? ''}:${point.x}:${point.y}`,
           ),
-          ...processedOverlayData.map(
+          ...drawnOverlayData.map(
             (point) =>
               `overlay:${scatterPointConfigId(point)}:${point.date ?? ''}:${point.id ?? ''}:${point.run_url ?? ''}:${point.x}:${point.y}`,
           ),
@@ -1545,8 +1569,8 @@ const ScatterGraph = React.memo(
         showConcurrencyLabels,
         xScaleConfig,
         yScaleConfig,
-        pointsData,
-        processedOverlayData,
+        drawnPointsData,
+        drawnOverlayData,
         buildPointId,
       ],
     );
@@ -3199,7 +3223,7 @@ const ScatterGraph = React.memo(
       const scatterLayer: LayerConfig<InferenceData> = {
         type: 'scatter',
         key: 'points',
-        data: pointsData,
+        data: drawnPointsData,
         config: {
           getColor: (d) =>
             (showGradientLabels && gradientColorByPoint.get(d)) ||
@@ -3350,7 +3374,7 @@ const ScatterGraph = React.memo(
 
               const overlayPoints = zoomGroup
                 .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
-                .data(processedOverlayData, (_d, i) => String(i))
+                .data(drawnOverlayData, (_d, i) => String(i))
                 .join((enter) => {
                   const g = enter.append('g').attr('class', 'unofficial-overlay-pt');
                   g.append('circle')
@@ -3961,6 +3985,7 @@ const ScatterGraph = React.memo(
       overlayGradientLabelPoints,
       chartId,
       pointsData,
+      drawnPointsData,
       showPointLabels,
       pointLabelsVisible,
       useAdvancedLabels,
@@ -3970,6 +3995,7 @@ const ScatterGraph = React.memo(
       buildPointId,
       overlayData,
       processedOverlayData,
+      drawnOverlayData,
       displayedOverlayRooflines,
       officialOverflowContinuations,
       overlayOverflowContinuations,
@@ -4412,7 +4438,7 @@ const ScatterGraph = React.memo(
           instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
           height={plotHeight}
-          data={pointsData}
+          data={drawnPointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
           margin={chartMargin}
