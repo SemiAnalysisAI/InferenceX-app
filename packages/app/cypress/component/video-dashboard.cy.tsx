@@ -431,6 +431,33 @@ describe('VideoGenX Results', () => {
     searchParam('r_workload').should('equal', null);
   });
 
+  it('keeps a workload picked after a run link opened it, when the served page mounts again', () => {
+    const search = '?unofficialRun=34341996789&r_y=videosPerGpuHour';
+    mount({ search, editPage: namedOnlyWorkload });
+    hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
+    cy.get('#results-workload').click();
+    cy.get('[role="option"]').not('[aria-selected="true"]').click();
+    hardwarePoints('h200').should('exist');
+    hardwarePoints('b200').should('not.exist');
+    // A language switch mounts the page again, and the server hands it the link's settings and
+    // History, so the run is known on the first render.
+    cy.get<{ response: { body: VideoHistoryPage } }>('@history').then(({ response }) =>
+      mountWithProviders(
+        <PathnameContext.Provider value="/zh/vgx">
+          <VideoDashboard
+            initialData={{
+              state: parseResultsState(search),
+              history: { pages: [response.body], replay: false },
+              sides: {},
+            }}
+          />
+        </PathnameContext.Provider>,
+      ),
+    );
+    hardwarePoints('h200').should('exist');
+    hardwarePoints('b200').should('not.exist');
+  });
+
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
     mount({
       // The link's own workload wins over the one the named run measured.

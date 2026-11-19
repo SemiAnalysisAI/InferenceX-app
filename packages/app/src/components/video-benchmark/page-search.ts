@@ -8,6 +8,8 @@
 let search = '';
 /** The link the settings were read from; null until the document's first read. */
 let link: string | null = null;
+/** The unofficial run whose workload the settings already opened on; a new link forgets it. */
+let openedRun: string | null = null;
 const listeners = new Set<() => void>();
 
 /** Keys the page itself puts in or takes out of the address bar; they do not make a link new. */
@@ -22,7 +24,18 @@ export function readVideoLink() {
   const next = `${new URLSearchParams([...params].filter(([key]) => !OWN_KEY.test(key)))}`;
   if (link !== null && (next === '' || next === link)) return;
   link = next;
+  openedRun = null;
   setVideoSearch(params);
+}
+
+/**
+ * Whether the settings may still open on the workload `run` measured: once per run and link, so a
+ * workload picked afterwards stays when the page mounts again.
+ */
+export function claimRunWorkload(run: string) {
+  if (openedRun === run) return false;
+  openedRun = run;
+  return true;
 }
 
 export function videoSearch() {
