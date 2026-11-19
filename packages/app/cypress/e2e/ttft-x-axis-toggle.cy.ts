@@ -550,6 +550,18 @@ const expectInteractivity = () => {
   expectCoordinates('.unofficial-overlay-pt', [60, 30]);
 };
 
+// The PowerX layout keeps the x-axis mode in More.
+const selectPowerXAxisMode = (mode: 'interactivity' | 'ttft', label: string) => {
+  cy.get('[data-testid="powerx-more"]').click();
+  cy.get('[data-testid="x-axis-mode-selector"]').click('right');
+  cy.get(`[data-testid="x-axis-mode-${mode}"]`).click();
+  cy.get('[data-testid="x-axis-mode-selector"]')
+    .should('have.attr', 'data-value', mode)
+    .and('contain.text', label);
+  cy.get('body').type('{esc}');
+  cy.get('[data-testid="powerx-more-content"]').should('not.exist');
+};
+
 describe('Measured prefill metrics preserve the selected x-axis', () => {
   it('keeps real interactivity and median TTFT coordinates for official and overlay points', () => {
     const powerRows = fixedSequenceBenchmarks.slice(0, 3).map((row, index) => ({
@@ -613,15 +625,16 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
     expectInteractivity();
     cy.get('[data-testid="powerx-tab-energy"]').click();
     cy.contains('[data-testid="powerx-energy-per"] button', 'Input').click();
-    // The legacy prefill metric opened on the Prefill GPU role, which Energy keeps.
+    // The legacy prefill metric opened on the Prefill GPU role, which Energy keeps, and the
+    // title names the pool the chart draws.
     cy.get('[data-testid="powerx-role-prefill"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
-      'Measured Joules per Input Token',
+      'Measured Prefill Joules per Input Token',
     );
     expectInteractivity();
 
-    selectXAxisMode('ttft', 'TTFT');
+    selectPowerXAxisMode('ttft', 'TTFT');
     cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Time To First Token (s)');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
@@ -630,7 +643,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
     expectCoordinates('scatter', [0.5, 2, 8]);
     expectCoordinates('.unofficial-overlay-pt', [1, 4]);
 
-    selectXAxisMode('interactivity', 'Interactivity');
+    selectPowerXAxisMode('interactivity', 'Interactivity');
     expectInteractivity();
 
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [] }).as('emptyOfficialBenchmarks');
