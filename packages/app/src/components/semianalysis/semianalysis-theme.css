@@ -1,0 +1,274 @@
+/* SemiAnalysis theme, after the SemiAnalysis Offsite 2026 slide template. Loaded only while
+   the `semianalysis` theme is active. Cream canvas, square panels, SemiAnalysis yellow
+   (#f7b041) and blue (#0b86d1) with navy (#0b1e2e) ink, Anton headlines and Outfit text.
+   Only styling changes; layout and behavior are untouched. */
+
+@font-face {
+  font-family: 'SA Anton';
+  src: url('../../app/fonts/Anton-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SA Outfit';
+  src: url('../../app/fonts/Outfit-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The body's next/font class defines --font-dm-sans; this selector outranks it so every
+   sans-serif surface, D3 chart labels included, uses Outfit. */
+.semianalysis body {
+  --font-dm-sans: 'SA Outfit', var(--font-dm-sans-base, sans-serif);
+  --sa-display: 'SA Anton', Impact, 'Arial Narrow', sans-serif;
+  --sa-yellow: #f7b041;
+  --sa-blue: #0b86d1;
+  --sa-blue-dark: #0a4f8c;
+  --sa-navy: #0b1e2e;
+  --sa-line: #dcd9d0;
+  --sa-cream: #fafaf6;
+  --sa-sand: #f4f1e8;
+  background-color: var(--sa-cream);
+}
+
+.semianalysis ::selection {
+  background: rgba(247, 176, 65, 0.45);
+  color: var(--sa-navy);
+}
+
+/* Headlines: Anton, like the slide titles. Page titles are uppercase SemiAnalysis blue;
+   section and card titles keep their case in navy, like the slide card headings. */
+.semianalysis :is(h1, h2, h3, [data-slot='card-title']):not(.text-xs, .text-sm) {
+  font-family: var(--sa-display);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+
+.semianalysis h1:not(.text-xs, .text-sm) {
+  color: var(--sa-blue);
+  text-transform: uppercase;
+  line-height: 1.02;
+}
+
+.semianalysis :is(h2, h3, [data-slot='card-title']):not(.text-xs, .text-sm) {
+  color: var(--sa-navy);
+}
+
+/* Header: cream bar sitting on a yellow rule, active link as a yellow eyebrow tag. */
+.semianalysis header[data-testid='header'] {
+  background-color: rgba(250, 250, 246, 0.96);
+  border-bottom: 4px solid var(--sa-yellow);
+}
+
+.semianalysis .inferencex-wave-wordmark {
+  --wordmark-blue: var(--sa-blue);
+  font-family: var(--sa-display);
+  font-weight: 400;
+  font-size: 1.35rem;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.semianalysis header nav a {
+  border-radius: 0;
+  font-weight: 600;
+  color: var(--sa-navy);
+}
+
+.semianalysis header nav a[aria-current='page'] {
+  background-color: var(--sa-yellow);
+  color: var(--sa-navy);
+}
+
+.semianalysis header nav a:not([aria-current='page']):hover {
+  background-color: var(--sa-sand);
+}
+
+/* Dashboard tabs: uppercase, tracked labels with a thick blue indicator. */
+.semianalysis [data-slot='dashboard-navigation'] :is(a, button) {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.semianalysis [data-slot='dashboard-navigation'] .tab-indicator {
+  height: 4px;
+  background-color: var(--sa-blue);
+}
+
+/* Panels: square, flat and hairline-bordered, like the slide content boxes. */
+.semianalysis [data-slot='card'] {
+  border-color: var(--sa-line);
+  border-radius: 0;
+  background-color: #ffffff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Control group legends become the slide eyebrow: a yellow tag with tracked navy caps. */
+.semianalysis [data-slot='control-panel'] {
+  border-color: var(--sa-line);
+  background-color: var(--sa-cream);
+}
+
+.semianalysis [data-slot='control-panel'] > legend {
+  padding: 0.2rem 0.55rem;
+  background-color: var(--sa-yellow);
+  color: var(--sa-navy);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Primary actions: yellow block, navy label. Outlined controls keep square corners. */
+.semianalysis [data-slot='button'][class*='bg-primary'] {
+  background-color: var(--sa-yellow);
+  color: var(--sa-navy);
+  font-weight: 700;
+}
+
+.semianalysis [data-slot='button'][class*='bg-primary']:hover {
+  background-color: #f2a12a;
+}
+
+.semianalysis
+  :is(
+    [data-slot='button'][class*='border'],
+    [role='combobox'],
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea
+  ) {
+  border-color: #c9c5ba;
+}
+
+.semianalysis
+  :is(
+    [data-slot='popover-content'],
+    [data-slot='select-content'],
+    [data-slot='dialog-content'],
+    [role='dialog'],
+    [role='listbox'],
+    [role='menu']
+  ) {
+  border-color: var(--sa-line);
+  border-radius: 0;
+  box-shadow: 0 12px 32px rgba(11, 30, 46, 0.14);
+}
+
+/* Table headers follow the slide table: blue band with tracked white caps. */
+.semianalysis thead tr {
+  background-color: var(--sa-blue);
+}
+
+.semianalysis thead th {
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.semianalysis tbody tr:nth-child(even) {
+  background-color: var(--sa-sand);
+}
+
+.semianalysis :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
+  outline: 2px solid var(--sa-blue);
+  outline-offset: 2px;
+}
+
+.semianalysis a:not([data-slot='button']):hover {
+  text-decoration-color: var(--sa-yellow);
+}
+
+.semianalysis :is(pre, code) {
+  font-family: var(--font-mono);
+}
+
+/* Footer: navy closing slide. */
+.semianalysis body > footer,
+.semianalysis footer[data-analytics-placement='footer'] {
+  border-top: 4px solid var(--sa-yellow);
+  background-color: var(--sa-navy);
+  color: #e6e9ec;
+  --foreground: #ffffff;
+  --muted-foreground: #b7c1ca;
+  --border: #3c4a57;
+  --border-alt: #3c4a57;
+}
+
+/* Banner: the cover slide, cut down to a strip. Yellow copy panel, poster art on the right. */
+.semianalysis-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 34%);
+  min-height: 9rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  background-color: var(--sa-yellow);
+}
+
+.semianalysis-banner-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem 2rem;
+}
+
+.semianalysis-eyebrow {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.25rem 0.6rem;
+  background-color: var(--sa-navy);
+  color: var(--sa-yellow);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.semianalysis-banner-title {
+  margin: 0;
+  color: var(--sa-blue);
+  font-family: var(--sa-display);
+  font-size: clamp(1.9rem, 3.6vw, 3rem);
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+
+.semianalysis-banner-description {
+  margin: 0;
+  color: var(--sa-navy);
+  font-size: 1rem;
+}
+
+.semianalysis-banner-poster {
+  width: 100%;
+  height: 100%;
+  min-height: 9rem;
+  max-height: 10.5rem;
+  object-fit: cover;
+}
+
+@media (max-width: 640px) {
+  .semianalysis-banner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .semianalysis-banner-copy {
+    padding: 1.25rem;
+  }
+
+  .semianalysis-banner-poster {
+    display: none;
+  }
+}
+
+html[data-inferencex-embed] [data-testid='semianalysis-theme-banner'] {
+  display: none;
+}

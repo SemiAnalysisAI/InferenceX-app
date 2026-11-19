@@ -546,6 +546,42 @@ html[data-inferencex-embed] .autumn-leaves {
   --radius: 0.5rem;
 }
 
+.semianalysis {
+  color-scheme: light;
+  --background: #fafaf6;
+  --foreground: #0b1e2e;
+  --card: #ffffff;
+  --card-foreground: #0b1e2e;
+  --popover: #ffffff;
+  --popover-foreground: #0b1e2e;
+  --primary: #f7b041;
+  --primary-foreground: #0b1e2e;
+  --secondary: #0b86d1;
+  --secondary-foreground: #ffffff;
+  --brand: var(--secondary);
+  --brand-fill: #0a75b8;
+  --muted: #f4f1e8;
+  --muted-foreground: #4f5d69;
+  --accent: #f4f1e8;
+  --accent-foreground: #0b1e2e;
+  --destructive: #e06347;
+  --success: #2ead8e;
+  --border: #b9b5aa;
+  --border-alt: #dcd9d0;
+  --chart-grid: #e8e5dc;
+  --input: #b9b5aa;
+  --ring: #0b86d1;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b1e2e;
+  --sidebar-primary: #0b86d1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f1e8;
+  --sidebar-accent-foreground: #0b1e2e;
+  --sidebar-border: #dcd9d0;
+  --sidebar-ring: #0b86d1;
+  --radius: 0px;
+}
+
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,

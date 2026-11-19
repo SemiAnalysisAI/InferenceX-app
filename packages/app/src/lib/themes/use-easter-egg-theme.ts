@@ -10,7 +10,8 @@ export type EasterEggTheme =
   | 'doom'
   | 'halo'
   | 'orange-chicken'
-  | 'excalidraw';
+  | 'excalidraw'
+  | 'semianalysis';
 const themes: EasterEggTheme[] = [
   'minecraft',
   'csgo',
@@ -19,6 +20,7 @@ const themes: EasterEggTheme[] = [
   'halo',
   'orange-chicken',
   'excalidraw',
+  'semianalysis',
 ];
 const listeners = new Set<() => void>();
 let observer: MutationObserver | undefined;
