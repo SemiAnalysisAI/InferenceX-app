@@ -6,15 +6,17 @@ import { useSyncExternalStore } from 'react';
  * Layout experiments for the SemiAnalysis theme. Each variant restructures the page chrome
  * differently; `?layout=<id>` picks one and remembers it, so a single preview can compare them.
  */
-export const SA_LAYOUTS = ['cover', 'rail', 'poster'] as const;
+export const SA_LAYOUTS = ['keynote', 'split', 'zine', 'billboard', 'bento'] as const;
 export type SaLayout = (typeof SA_LAYOUTS)[number];
-export const DEFAULT_SA_LAYOUT: SaLayout = 'cover';
+export const DEFAULT_SA_LAYOUT: SaLayout = 'keynote';
 const STORAGE_KEY = 'inferencex-sa-layout';
 
 export const SA_LAYOUT_LABELS: Record<SaLayout, { en: string; zh: string }> = {
-  cover: { en: 'A · Cover deck', zh: 'A · 封面' },
-  rail: { en: 'B · Side rail', zh: 'B · 侧栏' },
-  poster: { en: 'C · Poster wall', zh: 'C · 海报墙' },
+  keynote: { en: 'Keynote', zh: '演示' },
+  split: { en: 'Split', zh: '分屏' },
+  zine: { en: 'Zine', zh: '拼贴' },
+  billboard: { en: 'Billboard', zh: '广告牌' },
+  bento: { en: 'Bento', zh: '便当' },
 };
 
 /** Runs before paint so the chosen layout never flashes the default one. */

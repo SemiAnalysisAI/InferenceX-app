@@ -33,7 +33,7 @@ interface NavLink {
   event: string;
 }
 
-const NAV_LINKS: readonly NavLink[] = [
+export const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
     href: '/overview',
@@ -63,7 +63,7 @@ const NAV_LINKS: readonly NavLink[] = [
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
 
-function isActive(pathname: string, href: string): boolean {
+export function isActive(pathname: string, href: string): boolean {
   const enPathname = isZhPathname(pathname)
     ? pathname === ZH_PREFIX
       ? '/'
