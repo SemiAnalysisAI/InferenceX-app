@@ -24,6 +24,7 @@ import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/con
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
+import { MethodologyFold } from './MethodologyFold';
 
 const STRINGS = {
   en: {
@@ -329,9 +330,10 @@ function AscendCoreProfiles({ note }: { note?: string }) {
             <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
             {note && <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{note}</p>}
             <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
-              <h3 className="font-medium text-foreground">{t.methodology}</h3>
-              <p>{t.method}</p>
-              <p>{t.concurrentLimit}</p>
+              <MethodologyFold title={t.methodology} testId="core-profile">
+                <p>{t.method}</p>
+                <p>{t.concurrentLimit}</p>
+              </MethodologyFold>
             </div>
             <div className="mt-3 overflow-x-auto" data-testid="core-profile-device-specs">
               <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
