@@ -63,7 +63,9 @@ leaves official cells, deployment cells and workload mix. `overlayCells` and
 `overlayDeploymentCells` retain all
 matching GPU counts for the chart and deployment detail. Clearing the selection cannot promote an
 unapproved source. Dismissal clears a workload selection absent from the approved
-choices and preserves valid approved selections. All comparison filters and sample requirements still apply.
+choices and preserves valid approved selections. A link that names a run but no `r_workload` opens the page on
+the workload that run measured when the run has no cell in the default one, once per run and written to
+`r_workload` like a manual pick (`VideoDashboard.tsx`); the overview API keeps the default workload. All comparison filters and sample requirements still apply.
 Unknown runs and runs without readable native artifacts remain unavailable; the URL
 cannot trigger publication, storage writes or GPU work.
 
@@ -614,8 +616,8 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。
-`?unofficialrun=` 参数名不区分大小写，PR 可视化评论中的 `?unofficialRun=` 链接同样有效。指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。两者均保留所有匹配的 GPU 数，不再按 GPU 数量筛选。
-默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
+`?unofficialrun=` 参数名不区分大小写，PR 可视化评论中的 `?unofficialRun=` 链接同样有效。指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。两者均保留所有匹配的 GPU 数，不再按 GPU 数量筛选。链接指定了运行但没有 `r_workload` 时，如果该运行在默认工作负载下没有数据点，页面会切换到该运行所测的工作负载（每个运行只切换一次，并像手动选择一样写入 `r_workload`）；overview API 仍使用默认工作负载。
+投影和 API 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。
 移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；`format=csv` 下载当前筛选的正式及指定运行数据点，保留来源、工作负载、运行、产物和批准状态，标明单位及两种 GPU 成本口径。`duration_s` 保留计划请求时长，`video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。缺失值保留为空单元格，CSV 不缓存。
