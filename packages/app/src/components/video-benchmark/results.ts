@@ -445,20 +445,25 @@ export function resultProjection(
         // The plan's model, as the workload selector names it.
         slug: modelSlug(resultMetadata(point).model),
       });
-  const matchesFilters = (p: VideoPoint) => {
+  const matchesWorkload = (p: VideoPoint) => {
     const m = resultMetadata(p);
     return (
       (!state.model || m.model === state.model) &&
       (!state.resolution || m.resolution === state.resolution) &&
       (state.duration === null || m.duration === state.duration) &&
       (!state.mode || m.mode === state.mode) &&
-      (state.steps === null || m.steps === state.steps) &&
-      (!state.engine || m.engine === state.engine)
+      (state.steps === null || m.steps === state.steps)
     );
   };
-  const matches = qualified.filter(matchesFilters);
-  const namedMatches = named.filter(matchesFilters);
-  const preferred = byCoverage(matches.length > 0 ? matches : namedMatches)[0] ?? null;
+  const matchesEngine = (p: VideoPoint) =>
+    !state.engine || resultMetadata(p).engine === state.engine;
+  // The engine has no say in which workload is selected; it only narrows that workload's
+  // cells. Otherwise picking an engine could move the page to a workload that lacks the others.
+  const candidates = qualified.filter(matchesWorkload);
+  const namedCandidates = named.filter(matchesWorkload);
+  const preferred = byCoverage(candidates.length > 0 ? candidates : namedCandidates)[0] ?? null;
+  const matches = candidates.filter(matchesEngine);
+  const namedMatches = namedCandidates.filter(matchesEngine);
   // A model slug is the readable selector of that model's best-covered official workload. It
   // ignores the filters, so a link keeps its workload when they change. Every other workload,
   // including one only a named run publishes, shares a point ID.
