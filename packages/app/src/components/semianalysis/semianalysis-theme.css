@@ -47,13 +47,14 @@
   letter-spacing: 0.005em;
 }
 
-.semianalysis h1:not(.text-xs, .text-sm) {
+/* Dashboard section titles are the slide title of each tab, so they get the same treatment. */
+.semianalysis :is(h1:not(.text-xs, .text-sm), h2[class*='text-title']) {
   color: var(--sa-blue);
   text-transform: uppercase;
   line-height: 1.02;
 }
 
-.semianalysis :is(h2, h3, [data-slot='card-title']):not(.text-xs, .text-sm) {
+.semianalysis :is(h2, h3, [data-slot='card-title']):not(.text-xs, .text-sm, [class*='text-title']) {
   color: var(--sa-navy);
 }
 
