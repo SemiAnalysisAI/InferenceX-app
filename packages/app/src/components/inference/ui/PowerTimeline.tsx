@@ -188,6 +188,10 @@ const STRINGS = {
       'prefill' | 'decode',
       string
     >,
+    laneShort: { prefill: 'Prefill', decode: 'Decode' } satisfies Record<
+      'prefill' | 'decode',
+      string
+    >,
     laneAll: (count: number) => `All ${count} GPU${count === 1 ? '' : 's'}`,
     aggregated: 'aggregated',
     aggregatedNote: 'Aggregated runs stay dimmed: every GPU does both prefill and decode.',
@@ -302,6 +306,7 @@ const STRINGS = {
       'prefill' | 'decode',
       string
     >,
+    laneShort: { prefill: '预填充', decode: '解码' } satisfies Record<'prefill' | 'decode', string>,
     laneAll: (count: number) => `全部 ${count} 个 GPU`,
     aggregated: '聚合',
     aggregatedNote: '聚合运行以淡色显示：每个 GPU 同时承担预填充和解码。',
@@ -680,6 +685,17 @@ function laneLabel(
   return role === 'all' ? t.laneAll(gpuCount) : t.laneName[role];
 }
 
+/** The lane as a direct label: the GPU and concurrency already lead it, so the pool name is enough. */
+function laneDirectLabel(
+  role: PowerPoolRole,
+  kind: PowerLaneKind,
+  gpuCount: number,
+  t: TimelineStrings,
+): string {
+  if (kind === 'aggregated' || role === 'all') return laneLabel(role, kind, gpuCount, t);
+  return t.laneShort[role];
+}
+
 interface TraceRow {
   id: string;
   pool?: PowerPoolRole;
@@ -1013,6 +1029,7 @@ function drawLabels(
   plotHeight: number,
   highlight: string | null,
   inGutter: boolean,
+  gutterWidth: number,
 ): void {
   plotGroup.selectAll('text.power-trace-label').remove();
   if (!inGutter) {
@@ -1064,7 +1081,7 @@ function drawLabels(
           : `M${plotWidth + 2},${y}L${labelX - 3},${y}`,
       );
     item
-      .select('text.power-trace-label')
+      .select<SVGTextElement>('text.power-trace-label')
       .attr('data-hw', label.hwKey)
       .attr('data-pool', label.pool ?? null)
       .attr('data-lane', label.lane ?? null)
@@ -1073,8 +1090,27 @@ function drawLabels(
       .attr('text-anchor', 'start')
       .attr('x', labelX)
       .attr('y', y)
-      .text(label.text);
+      .attr('data-full-text', label.text)
+      .text(label.text)
+      .each(function () {
+        fitLabelToGutter(this, label.text, gutterWidth - GUTTER_GAP - 2);
+      });
   });
+}
+
+/** The gutter is capped, so a name longer than it ends in an ellipsis instead of leaving the SVG. */
+function fitLabelToGutter(node: SVGTextElement, text: string, room: number): void {
+  if (typeof node.getComputedTextLength !== 'function' || room <= 0) return;
+  if (node.getComputedTextLength() <= room) return;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    node.textContent = `${text.slice(0, mid).trimEnd()}…`;
+    if (node.getComputedTextLength() <= room) low = mid;
+    else high = mid - 1;
+  }
+  node.textContent = `${text.slice(0, low).trimEnd()}…`;
 }
 
 function drawReferenceLines(
@@ -1562,7 +1598,7 @@ export default function PowerTimeline({
         const last = anchor?.points.filter((point) => point.y !== null).at(-1);
         if (!last || last.y === null) continue;
         const suffix = group.lane
-          ? ` · ${laneLabel(group.lane.role, group.lane.kind, group.lane.rows.length, t)}`
+          ? ` · ${laneDirectLabel(group.lane.role, group.lane.kind, group.lane.rows.length, t)}`
           : group.pool
             ? ` · ${t.poolShort[group.pool]}`
             : '';
@@ -1774,6 +1810,7 @@ export default function PowerTimeline({
             ctx.height,
             highlightRef.current,
             !isPhone,
+            margin.right,
           );
         },
         onZoom: (group, ctx: ZoomContext) => {
@@ -1787,11 +1824,12 @@ export default function PowerTimeline({
             ctx.height,
             highlightRef.current,
             !isPhone,
+            margin.right,
           );
         },
       },
     ],
-    [referenceLines, model, samples, isPhone],
+    [referenceLines, model, samples, isPhone, margin.right],
   );
 
   const onDisplayUpdate = useCallback(
