@@ -40,11 +40,21 @@ async function renderSavedTheme(theme: string) {
   });
 }
 
-describe('saved standard theme preferences', () => {
-  it.each(['light', 'dark', 'system'])('preserves the saved %s preference', async (theme) => {
-    await renderSavedTheme(theme);
-    expect(container.querySelector('span')?.textContent).toBe(theme);
-    expect(localStorage.getItem('theme')).toBe(theme);
-    expect(document.documentElement.classList.contains('test-font')).toBe(true);
+describe('site theme', () => {
+  it.each(['light', 'dark', 'system'])(
+    'replaces a saved %s preference with the SemiAnalysis theme',
+    async (theme) => {
+      await renderSavedTheme(theme);
+      expect(container.querySelector('span')?.textContent).toBe('semianalysis');
+      expect(localStorage.getItem('theme')).toBe('semianalysis');
+      expect(document.documentElement.classList.contains('semianalysis')).toBe(true);
+      expect(document.documentElement.classList.contains('test-font')).toBe(true);
+    },
+  );
+
+  it('replaces a saved retired theme', async () => {
+    await renderSavedTheme('minecraft');
+    expect(localStorage.getItem('theme')).toBe('semianalysis');
+    expect(document.documentElement.classList.contains('semianalysis')).toBe(true);
   });
 });

@@ -6,7 +6,7 @@ For detailed subsystem docs, see [docs/index.md](./docs/index.md). **MUST ALWAYS
 
 - Pareto logic changes must update both InferenceX and InferenceX-app with matching regression tests and cross-linked PRs.
 - Changes under `packages/app/src/lib/power/power_model/` need a companion InferenceX `power_model/` PR, cross-linked both ways. See [Power Model — TS Port and Upstream Python MUST Stay in Sync](#power-model--ts-port-and-upstream-python-must-stay-in-sync).
-- **Easter egg themes and games are just for fun.** They get no feature tests or compatibility guarantees and may be deleted at any time. See the [easter egg policy](./docs/testing.md#easter-egg-themes-and-games) for the two main-site isolation checks that stay.
+- The site has one theme, SemiAnalysis. Do not add a theme toggle or easter egg themes. See [Site theme](./docs/testing.md#site-theme).
 - Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. See [Read-only coverage for public views](#read-only-coverage-for-public-views).
 
 ## PR descriptions
@@ -83,7 +83,7 @@ See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE
 
 ## Testing
 
-See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory**, and missing or low-quality tests are 🔴 BLOCKING on PR review. Easter egg features are the exception (see the top of this file).
+See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory**, and missing or low-quality tests are 🔴 BLOCKING on PR review.
 
 ## Analytics Requirement
 

@@ -72,18 +72,14 @@ describe('Page Load & Navigation', () => {
   });
 });
 
-describe('Theme Toggle', () => {
-  it('theme persists across page reload (localStorage)', () => {
+describe('Site theme', () => {
+  it('renders the SemiAnalysis theme even when an older theme is saved', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('theme', 'light');
+      win.localStorage.setItem('theme', 'dark');
     });
     cy.visit('/');
-    cy.get('[data-testid="theme-toggle"]')
-      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
-      .click();
-    cy.get('html').should('have.class', 'dark');
-    cy.reload();
-    cy.get('html').should('have.class', 'dark');
+    cy.get('html').should('have.class', 'semianalysis').and('not.have.class', 'dark');
+    cy.get('[data-testid="theme-toggle"]').should('not.exist');
   });
 });

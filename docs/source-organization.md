@@ -10,10 +10,6 @@ Existing feature directories continue to own their components. A component share
 several features belongs with its shared responsibility, rather than whichever feature
 first imported it.
 
-`optional-theme-imports.test.ts` deliberately remains at the `src/lib/` root: the
-[easter-egg policy](./testing.md#easter-egg-themes-and-games) names that exact
-main-site isolation check.
-
 ## Import and refactor conventions
 
 - Import the owning module directly. Folder membership does not imply that its

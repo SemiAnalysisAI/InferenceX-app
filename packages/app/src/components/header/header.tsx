@@ -8,10 +8,7 @@ import { track } from '@/lib/analytics/analytics';
 import { analyticsPlacement, placementFor } from '@/lib/analytics/placement';
 
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
-import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
-import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
-import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/routing/client-navigation';
 import { AGENTX_ROUTE, DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
@@ -230,11 +227,6 @@ export const Header = () => {
             </span>
             <SiteSearchButton />
             <LanguageToggle pathname={pathname} router={router} />
-            <span className="hidden items-center gap-2 sm:flex">
-              <MinecraftTogglesLazy />
-              <HaloTogglesLazy />
-            </span>
-            <ModeToggle />
 
             <div ref={menuRef} className="relative min-[1120px]:hidden">
               <button
@@ -345,10 +337,6 @@ export const Header = () => {
                       <span>{label}</span>
                     </IntentPrefetchLink>
                   ))}
-                  <span className="mt-1 flex items-center gap-2 border-t border-border/30 px-3 pt-2 pb-1 empty:hidden sm:hidden">
-                    <MinecraftTogglesLazy />
-                    <HaloTogglesLazy />
-                  </span>
                 </div>
               )}
             </div>

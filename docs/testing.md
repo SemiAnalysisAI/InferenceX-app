@@ -19,21 +19,9 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 4. Bug fixes → regression test at the narrowest layer that reproduces the bug
 5. Run `bun run test:unit` and the local smoke suite, `bun run test:e2e`, before considering a task complete. The full E2E suite runs in CI and is available locally as `bun run test:e2e:full`.
 
-## Easter egg themes and games
+## Site theme
 
-Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, Excalidraw, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
-
-- Do not add unit, Cypress component, Cypress E2E, or CI checks for easter egg features. The only exceptions are the two main-site isolation checks listed below.
-- The mandatory test requirements above do not apply to them. Reviewers, including `@pr-claude`, must not flag missing tests on easter egg code as blocking or request them.
-- When an existing easter egg feature test fails or slows CI, delete it. Do not fix or extend it. This does not apply to the two retained isolation checks.
-- Do not add CI jobs, shards, fixtures, or infrastructure for them.
-
-Retain and maintain exactly these two checks:
-
-- `packages/app/src/lib/optional-theme-imports.test.ts`: prevents eager optional code, engine, asset, and font imports into normal pages.
-- `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: checks normal light/dark pages, embeds, resource loading, and SEO, including theme activation/cleanup needed to verify isolation.
-
-Keep their existing support helper and E2E browser setup. Do not expand these checks into gameplay, decorative styling, or visual-fidelity tests. Ordinary light/dark UI, dashboard, export, and announcement tests remain required; those are not easter egg tests.
+The site renders one theme, SemiAnalysis (`packages/app/src/components/semianalysis/`), based on the SemiAnalysis Offsite 2026 slide template. `ThemeProvider` forces it on every non-embed route, so there is no theme toggle. `light` and `dark` remain only for embeds that request them with `?theme=`. Chart palettes resolve the site theme to `light` through `chartPaletteTheme`.
 
 ## Pre-commit Checklist
 

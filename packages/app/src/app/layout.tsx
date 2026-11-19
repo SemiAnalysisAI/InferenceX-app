@@ -1,5 +1,6 @@
 import '@/lib/runtime/polyfills';
 import './globals.css';
+import '@/components/semianalysis/semianalysis-theme.css';
 
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
@@ -12,8 +13,8 @@ import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
-import { APP_THEMES } from '@/lib/themes/themes';
+import { SemiAnalysisThemeBanner } from '@/components/semianalysis/semianalysis-banner';
+import { APP_THEMES, SITE_THEME } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -199,15 +200,15 @@ export default function RootLayout({
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="light"
+              defaultTheme={SITE_THEME}
               themes={APP_THEMES}
-              enableSystem
+              enableSystem={false}
               disableTransitionOnChange
             >
               <PostHogPageView />
               <Header />
               <UnofficialDomainNotice />
-              <EasterEggThemeLazy />
+              <SemiAnalysisThemeBanner />
               <div className="grow flex flex-col">
                 <ModelFeatureBoundary>
                   <RouteTransition>{children}</RouteTransition>

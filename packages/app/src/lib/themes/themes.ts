@@ -1,37 +1,21 @@
-export const APP_THEMES = [
-  'light',
-  'dark',
-  'minecraft',
-  'csgo',
-  'gta',
-  'doom',
-  'halo',
-  'orange-chicken',
-  'excalidraw',
-  'semianalysis',
-];
+/** `semianalysis` is the site theme; `light` and `dark` remain only for embeds that request them. */
+export const SITE_THEME = 'semianalysis';
 
-export function nextTheme(theme: string | undefined): string {
-  return APP_THEMES[(APP_THEMES.indexOf(theme ?? '') + 1) % APP_THEMES.length];
-}
+export const APP_THEMES = ['light', 'dark', SITE_THEME];
 
-const DARK_THEMES = new Set(['dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo']);
+const DARK_THEMES = new Set(['dark']);
 
-const DARK_CHART_ALIASES = new Set(['csgo', 'gta', 'doom', 'halo']);
-
-const LIGHT_CHART_ALIASES = new Set(['excalidraw', 'orange-chicken', 'semianalysis']);
+const LIGHT_CHART_ALIASES = new Set([SITE_THEME]);
 
 /** Themes that render on a light canvas, for pre-hydration checks that only see `<html>` classes. */
-export const LIGHT_THEMES = ['light', 'excalidraw', 'orange-chicken', 'semianalysis'];
+export const LIGHT_THEMES = ['light', SITE_THEME];
 
 export function isDarkTheme(theme: string | undefined): boolean {
   return theme !== undefined && DARK_THEMES.has(theme);
 }
 
 export function chartPaletteTheme(theme: string): string {
-  if (DARK_CHART_ALIASES.has(theme)) return 'dark';
-  if (LIGHT_CHART_ALIASES.has(theme)) return 'light';
-  return theme;
+  return LIGHT_CHART_ALIASES.has(theme) ? 'light' : theme;
 }
 
 export function hasDarkTheme(element: Element): boolean {

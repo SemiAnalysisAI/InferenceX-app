@@ -18,7 +18,7 @@ const OVERVIEW_ROUTES = [
   { name: 'historical comparison', path: '/overview', comparison: '30d', tier: '100' },
 ] as const;
 
-const OVERVIEW_THEMES = ['light', 'dark'] as const;
+const OVERVIEW_THEMES = ['semianalysis'] as const;
 
 const WCAG_AA_RULES = {
   runOnly: {
@@ -46,7 +46,7 @@ describe('Overview accessibility', () => {
             win.localStorage.setItem('theme', theme);
           },
         });
-        cy.get('html').should(theme === 'dark' ? 'have.class' : 'not.have.class', 'dark');
+        cy.get('html').should('have.class', theme);
         cy.get(OVERVIEW_SURFACE).should('be.visible');
         // The page is prerendered with the default controls and loads a shared URL's controls
         // after hydration, dimming the matrix meanwhile. Audit the settled matrix, not the fade.
