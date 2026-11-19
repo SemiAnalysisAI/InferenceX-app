@@ -586,6 +586,293 @@ function BentoHome({ locale }: { locale: Locale }) {
   );
 }
 
+const EXTRA = {
+  en: {
+    nextStops: 'Next stops',
+    nextStopsTitle: 'The road to the next accelerators',
+    nextStopsNote: 'Hardware the benchmark is adding next, as listed on the home page.',
+    youAreHere: 'You are here',
+    line: 'InferenceX line',
+    edition: 'SemiAnalysis edition',
+    everyRun: 'Every point a public run',
+    leadKicker: 'Benchmarks',
+    leadHeadline: 'Every major accelerator, measured in the open',
+    leadBody: [
+      'InferenceX replays long-context, multi-turn agentic traces against every major accelerator and serving framework, then publishes every data point with a link to the GitHub Actions run that produced it.',
+      'Results refresh nightly. Throughput, interactivity, cost per million tokens and time to first token sit side by side, so a chip, a framework and a price can be compared on the same workload.',
+    ],
+    caption: 'Lombard Street, San Francisco. SemiAnalysis Offsite 2026.',
+    brief: 'In brief',
+    command: 'compare --agentic --all-accelerators',
+    terminalReady: 'Ready. Type a function key or click one.',
+    status: ['Live', 'Public runs', 'Nightly refresh'],
+    dock: 'Dock',
+  },
+  zh: {
+    nextStops: '下一站',
+    nextStopsTitle: '通往下一代加速器之路',
+    nextStopsNote: '首页列出的即将加入基准测试的硬件。',
+    youAreHere: '当前位置',
+    line: 'InferenceX 线',
+    edition: 'SemiAnalysis 版',
+    everyRun: '每个数据点都是一次公开运行',
+    leadKicker: '基准测试',
+    leadHeadline: '公开测量每一款主流加速器',
+    leadBody: [
+      'InferenceX 在每一款主流加速器和推理框架上回放长上下文、多轮智能体轨迹，并公开每个数据点及其对应的 GitHub Actions 运行链接。',
+      '结果每晚更新。吞吐、交互性、每百万 token 成本和首 token 时间并列呈现，同一工作负载下可以直接比较芯片、框架和价格。',
+    ],
+    caption: '旧金山九曲花街。SemiAnalysis Offsite 2026。',
+    brief: '简讯',
+    command: 'compare --agentic --all-accelerators',
+    terminalReady: '就绪。按功能键或直接点击。',
+    status: ['实时', '公开运行', '每晚更新'],
+    dock: '程序坞',
+  },
+} as const;
+
+const NEXT_STOPS = ['TPUv8i', 'SambaNova SN50', 'Rubin NVL72', 'MI455X UALoE72'] as const;
+
+/** Metro: the site navigation drawn as a transit line with stations. */
+function MetroLine({ pathname, locale }: { pathname: string; locale: Locale }) {
+  const { links, index } = useSiteSections(pathname, locale);
+  const e = EXTRA[locale];
+  return (
+    <div className="sa-metro" data-testid="sa-metro-line">
+      <div className="container mx-auto px-4 lg:px-8">
+        <p className="sa-metro-name">
+          <span className="sa-metro-badge">X</span>
+          {e.line}
+        </p>
+        <ol className="sa-metro-stops">
+          {links.map((link, i) => (
+            <li
+              key={link.href}
+              className={cn(i < index && 'sa-metro-passed', link.active && 'sa-metro-current')}
+            >
+              <Link href={link.displayHref} aria-current={link.active ? 'page' : undefined}>
+                <span className="sa-metro-dot" aria-hidden="true" />
+                <span className="sa-metro-label">{link.label}</span>
+                {link.active && <span className="sa-metro-here">{e.youAreHere}</span>}
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function MetroHero({ locale }: { locale: Locale }) {
+  const e = EXTRA[locale];
+  return (
+    <section className="sa-metro-hero" data-testid="sa-metro-hero">
+      <div className="sa-metro-hero-copy">
+        <p className="sa-eyebrow">{e.nextStops}</p>
+        <p className="sa-metro-hero-title">{e.nextStopsTitle}</p>
+        <p className="sa-metro-hero-note">{e.nextStopsNote}</p>
+      </div>
+      <ol className="sa-metro-timeline">
+        {NEXT_STOPS.map((stop, i) => (
+          <li key={stop}>
+            <span className="sa-metro-timeline-index">{pad(i + 1)}</span>
+            <span className="sa-metro-dot" aria-hidden="true" />
+            <span className="sa-metro-timeline-label">{stop}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return now;
+}
+
+/** Terminal: function-key navigation and a status line, like a market data terminal. */
+function TerminalChrome({ pathname, locale }: { pathname: string; locale: Locale }) {
+  const { links, title } = useSiteSections(pathname, locale);
+  const e = EXTRA[locale];
+  const now = useClock();
+  const stamp = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(now);
+  return (
+    <>
+      <nav className="sa-terminal-keys" data-testid="sa-terminal-keys">
+        <div className="container mx-auto px-4 lg:px-8">
+          {links.map((link, i) => (
+            <Link
+              key={link.href}
+              href={link.displayHref}
+              aria-current={link.active ? 'page' : undefined}
+            >
+              <kbd>F{i + 1}</kbd>
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </nav>
+      <div className="sa-terminal-status" data-testid="sa-terminal-status">
+        <span className="sa-terminal-live">● {e.status[0]}</span>
+        <span>INFX &lt;GO&gt; {title}</span>
+        <span>{e.status[1]}</span>
+        <span>{e.status[2]}</span>
+        <span className="sa-terminal-clock">{stamp}</span>
+      </div>
+    </>
+  );
+}
+
+function TerminalHero({ locale }: { locale: Locale }) {
+  const e = EXTRA[locale];
+  const t = STRINGS[locale];
+  const rows = [
+    [t.weekly, '1,000+'],
+    [t.models, String(FEATURED_AGENTX_MODELS.length)],
+    [t.chips, String(GPU_SPECS.length)],
+  ];
+  return (
+    <section className="sa-terminal-hero" data-testid="sa-terminal-hero">
+      <div className="sa-terminal-screen">
+        <p className="sa-terminal-prompt">
+          <span>infx&gt;</span> {e.command}
+          <span className="sa-terminal-cursor" aria-hidden="true" />
+        </p>
+        <p className="sa-terminal-title">{t.coverTitle}</p>
+        <p className="sa-terminal-ready">{e.terminalReady}</p>
+      </div>
+      <table className="sa-terminal-board">
+        <tbody>
+          {rows.map(([label, value]) => (
+            <tr key={label}>
+              <th scope="row">{label}</th>
+              <td>{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+/** Newspaper: a broadsheet masthead with section links between rules. */
+function NewspaperMasthead({ pathname, locale }: { pathname: string; locale: Locale }) {
+  const { links } = useSiteSections(pathname, locale);
+  const e = EXTRA[locale];
+  const now = useClock();
+  const date = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(now);
+  return (
+    <div className="container mx-auto px-4 lg:px-8" data-testid="sa-newspaper-masthead">
+      <div className="sa-paper-masthead">
+        <div className="sa-paper-dateline">
+          <span>{date}</span>
+          <span>{e.edition}</span>
+          <span>{e.everyRun}</span>
+        </div>
+        <Link href={locale === 'zh' ? '/zh' : '/'} className="sa-paper-title">
+          InferenceX
+        </Link>
+        <nav className="sa-paper-sections">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.displayHref}
+              aria-current={link.active ? 'page' : undefined}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+function NewspaperFront({ locale }: { locale: Locale }) {
+  const e = EXTRA[locale];
+  const t = STRINGS[locale];
+  const briefs = [
+    [t.weekly, '1,000+'],
+    [t.models, String(FEATURED_AGENTX_MODELS.length)],
+    [t.chips, String(GPU_SPECS.length)],
+  ];
+  return (
+    <section className="sa-paper-front" data-testid="sa-newspaper-front">
+      <article className="sa-paper-lead">
+        <p className="sa-paper-kicker">{e.leadKicker}</p>
+        <h2 className="sa-paper-headline">{e.leadHeadline}</h2>
+        <p className="sa-paper-deck">{t.coverDescription}</p>
+        <div className="sa-paper-columns">
+          {e.leadBody.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
+      </article>
+      <figure className="sa-paper-photo">
+        <Poster poster={POSTERS.lombardStreet} eager />
+        <figcaption>{e.caption}</figcaption>
+      </figure>
+      <aside className="sa-paper-briefs">
+        <p className="sa-paper-kicker">{e.brief}</p>
+        {briefs.map(([label, value]) => (
+          <div key={label} className="sa-paper-brief">
+            <p className="sa-paper-brief-value">{value}</p>
+            <p>{label}</p>
+          </div>
+        ))}
+        <blockquote className="sa-paper-pull">
+          &ldquo;{t.quote}&rdquo;
+          <cite>{t.quoteBy}</cite>
+        </blockquote>
+      </aside>
+    </section>
+  );
+}
+
+/** Dock: a fixed bottom app dock on top of a poster wallpaper. */
+function DockChrome({ pathname, locale }: { pathname: string; locale: Locale }) {
+  const { links, index } = useSiteSections(pathname, locale);
+  const enPath = pathname.replace(/^\/zh(?=\/|$)/u, '') || '/';
+  const poster = index === 0 ? POSTERS.paintedLadies : posterForPath(enPath);
+  return (
+    <>
+      <div
+        className="sa-dock-wallpaper"
+        aria-hidden="true"
+        style={{ backgroundImage: `url(${poster.src})` }}
+      />
+      <nav className="sa-dock" aria-label={EXTRA[locale].dock} data-testid="sa-dock">
+        {links.map((link, i) => (
+          <Link
+            key={link.href}
+            href={link.displayHref}
+            aria-current={link.active ? 'page' : undefined}
+            className="sa-dock-item"
+          >
+            <span className={cn('sa-dock-icon', `sa-tone-${TONES[i]}`)}>{pad(i + 1)}</span>
+            <span className="sa-dock-label">{link.label}</span>
+          </Link>
+        ))}
+      </nav>
+    </>
+  );
+}
+
 /** Zine: a strip of packing tape across the top carrying the slogans. */
 export function TickerStrip({ locale }: { locale: Locale }) {
   const items = STRINGS[locale].ticker;
@@ -629,6 +916,10 @@ export function SemiAnalysisChrome() {
   if (!mounted || isEmbedPathname(pathname)) return null;
   if (layout === 'keynote') return <KeynoteChrome pathname={pathname} locale={locale} />;
   if (layout === 'split') return <SplitPanel pathname={pathname} locale={locale} />;
+  if (layout === 'metro') return <MetroLine pathname={pathname} locale={locale} />;
+  if (layout === 'terminal') return <TerminalChrome pathname={pathname} locale={locale} />;
+  if (layout === 'newspaper') return <NewspaperMasthead pathname={pathname} locale={locale} />;
+  if (layout === 'dock') return <DockChrome pathname={pathname} locale={locale} />;
   if (layout === 'billboard') {
     return (
       <>
@@ -668,6 +959,9 @@ export function SemiAnalysisLandingSlides({
     if (layout === 'zine') return <ZineHero locale={locale} />;
     if (layout === 'billboard') return <BillboardHero locale={locale} />;
     if (layout === 'bento') return <BentoHome locale={locale} />;
+    if (layout === 'metro') return <MetroHero locale={locale} />;
+    if (layout === 'terminal') return <TerminalHero locale={locale} />;
+    if (layout === 'newspaper') return <NewspaperFront locale={locale} />;
     return null;
   }
   if (slot === 'after-hero') {
