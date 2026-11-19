@@ -370,7 +370,7 @@ export default function PowerChipCompare({
           onClick={() => {
             const open = !keyOpen;
             setKeyOpen(open);
-            track('powerx_breakdown_key_toggled', { open });
+            track('powerx_breakdown_key_toggled', { enabled: open });
           }}
           className="-mx-1.5 flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
         >
