@@ -83,6 +83,29 @@ describe('uBenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });
 
+  it('collapses methodology notes by default on every uBenchX test and expands them on click', () => {
+    const cases = [
+      ['/ubx/mem-bw', 'ubenchx', 'triton.testing.do_bench'],
+      ['/ubx/tpc-skyline', 'tpc-skyline', null],
+      ['/ubx/core-memory-profiles', 'sm-l2', null],
+      ['/ubx/core-memory-profiles', 'core-profile', 'Six passes are averaged'],
+    ] as const;
+    for (const [path, testId, text] of cases) {
+      cy.visit(path, dismissModal);
+      const toggle = `[data-testid="${testId}-methodology-toggle"]`;
+      cy.get(toggle)
+        .first()
+        .should('have.attr', 'aria-expanded', 'false')
+        .and('contain', 'Methodology');
+      cy.get(`[data-testid="${testId}-methodology"]`).first().find('p').should('not.exist');
+      if (text) cy.contains(text).should('not.exist');
+      cy.get(toggle).first().click();
+      cy.get(toggle).first().should('have.attr', 'aria-expanded', 'true');
+      cy.get(`[data-testid="${testId}-methodology"]`).first().find('p').should('be.visible');
+      if (text) cy.contains(text).should('be.visible');
+    }
+  });
+
   it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
     cy.visit('/ubx/sm-l2-distance', dismissModal);
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
@@ -168,7 +191,9 @@ it('omits idle selection controls from all core-profile panels on /', () => {
     .each(($output) => {
       cy.wrap($output).should('be.empty').and('not.be.visible');
     });
-  cy.get('[data-testid="ascend-core-profiles"] button').should('not.exist');
+  cy.get('[data-testid="ascend-core-profiles"] button')
+    .not('[data-testid="core-profile-methodology-toggle"]')
+    .should('not.exist');
   cy.contains('Hover or focus a heatmap').should('not.exist');
 });
 

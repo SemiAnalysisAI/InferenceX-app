@@ -29,6 +29,7 @@ import {
   hardwareLabel,
   operatorXColors,
   measuredHardware,
+  removeHardwareSelection,
   toggleHardwareSelection,
 } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
@@ -292,10 +293,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   // Charts, legend, GPU control and case detail all read this same live state.
   const model = useMemo(() => {
     if (!view) return null;
+    const pick = (next: string[]) => {
+      if (next === hardware) return;
+      setPickedHardware(next.length === available.length ? null : next);
+    };
     const toggle = (hw: string) => {
       track('operatorx_gpu_toggled', { op, gpu: hw, placement: 'chart' });
-      const next = toggleHardwareSelection(hardware, hw);
-      if (next !== hardware) setPickedHardware(next);
+      pick(toggleHardwareSelection(hardware, hw, available));
+    };
+    const remove = (hw: string) => {
+      track('operatorx_gpu_removed', { op, gpu: hw, placement: 'chart' });
+      pick(removeHardwareSelection(hardware, hw));
     };
     const reset = () => {
       track('operatorx_legend_filter_reset', { op });
@@ -311,10 +319,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         op,
         caseRefs(view, hardware, i).map((r) => r.ref),
       );
-    return buildModel(view, metric, { hardware, available, toggle, reset }, colors, baseline, {
-      inspect,
-      preview,
-    });
+    return buildModel(
+      view,
+      metric,
+      { hardware, available, toggle, remove, reset },
+      colors,
+      baseline,
+      {
+        inspect,
+        preview,
+      },
+    );
   }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
 
   if (error)

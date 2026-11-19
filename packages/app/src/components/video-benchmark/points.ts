@@ -153,6 +153,32 @@ export function workloadGroup(point: Pick<VideoPoint, 'workloadKey' | 'id'>): st
   return point.workloadKey || `unknown:${point.id.split(':')[0]}`;
 }
 
+/** Qualified approved cells, keyed by workload, hardware, deployment and concurrency. */
+const qualifiedCells = (entries: VideoHistoryEntry[]) =>
+  historyPoints(entries.filter((entry) => entry.approved === true))
+    .filter((p) => p.samples >= DASHBOARD_SAMPLE_FLOOR)
+    .map(
+      (p) =>
+        `${workloadGroup(p)}:${p.hardwareKey ?? p.hardwareName}:${deploymentKey(p)}:${p.concurrency ?? 'na'}`,
+    );
+
+/**
+ * Approved entries of `older` (newest first) holding a qualified cell that neither `window` nor a
+ * newer entry of `older` holds, so a deployment's latest source stays readable however many newer
+ * sources other deployments publish.
+ */
+export function latestOlderEntries(
+  window: VideoHistoryEntry[],
+  older: VideoHistoryEntry[],
+): VideoHistoryEntry[] {
+  const seen = new Set(qualifiedCells(window));
+  return older.filter((entry) => {
+    const unseen = qualifiedCells([entry]).filter((cell) => !seen.has(cell));
+    for (const cell of unseen) seen.add(cell);
+    return unseen.length > 0;
+  });
+}
+
 /**
  * Cells the dashboard reads. Published history also carries smoke runs (a few
  * clips of a shorter plan) and superseded exports, while the chart, cards,

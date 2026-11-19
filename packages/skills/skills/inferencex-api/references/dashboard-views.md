@@ -556,9 +556,11 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
 - Metrics use participating GPUs. API list price is USD/video-second multiplied
   by clip duration, not TCO, revenue or measured power. `metricDefinitions`
   declares units and optimization direction; missing values remain null.
-- The server reads the same first **five published history pages at most** as the
-  UI. `coverage.pagesRead`, `coverage.nextPage` and `coverage.truncated` describe
-  the inspected window; this is not all-history or date-range coverage. It applies
+- The server reads the same first **five published history pages** as the UI,
+  plus the latest source of every deployment older than them, so each deployment's
+  newest cell is present. `coverage.pagesRead`, `coverage.nextPage` and
+  `coverage.truncated` describe the paged window; this is not all-history or
+  date-range coverage. It applies
   the UI's canonical workload selection, sample floor and newest-cell rules.
 - Evidence rows share one known workload and deployment layout. Hardware without
   C1 keeps raw concurrency measurements only within that cohort, with null ratios.
@@ -1056,8 +1058,9 @@ API 在 `params` 中返回实际采用的参数，并在 `historicalWindow` 中�
 ### VideoGenX results overview
 
 `GET /api/v1/views/video?view=overview` returns the same nine-group projection as
-`/vgx` and `/zh/vgx`. It reads at most five stored history pages;
-`coverage.truncated` remains authoritative. It never triggers media publication.
+`/vgx` and `/zh/vgx`. It reads five stored history pages plus each older
+deployment's latest source; `coverage.truncated` describes the paged window. It
+never triggers media publication.
 The earlier dashboard/compare and run/artifact results views remain available.
 
 HTTP responses remain `private, no-store`. The underlying published History and

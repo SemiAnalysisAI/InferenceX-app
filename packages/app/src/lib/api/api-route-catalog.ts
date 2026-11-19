@@ -1600,7 +1600,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: '484f9d4a8d62b522c8132685bd4dd33786d7bc7a77b3ee31488e09c87dbfba19',
+    sourceSha256: 'e552aa8a58fdebdb15dd6d0c98ec2fbe3d693b8bce8c4deafc124d7d7dc5db2f',
     reviewArea: {
       en: 'VideoGenX published History, media with its stored quality, and the derived-media (rendition and poster) listing cache shared across instances under the video tag; the listing key is versioned by its value shape.',
       zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及派生媒体（转码版本与封面）回执列表以 video 标签跨实例共享的缓存；列表缓存键随值结构变化而升级版本。',
@@ -1704,7 +1704,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: 'cb66f84c892a2ff2cd4bc5a0cb1af8fbb1c1abec5088b5d5fdba381cffe0f8b2',
+    sourceSha256: 'de3c22c5a2aca4a8696155e7a2843c74b719eef6f99ead968aa66b6070e8251a',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
