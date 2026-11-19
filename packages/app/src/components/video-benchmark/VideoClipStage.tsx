@@ -25,6 +25,7 @@ import {
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
+import { saveDataRequested } from '@/components/ui/pointer-intent';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
@@ -160,6 +161,8 @@ export interface VideoClipStageProps {
   onPreviewError: (previewUrl: string) => void;
   /** First frames the caller already loaded, so a swap to them never paints the idle frame. */
   loadedFrames?: ReadonlySet<string>;
+  /** Clips one pick away, whose starts are read ahead once the shown pair has loaded in full. */
+  ahead?: readonly string[];
   /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
   swapped: boolean;
   onSwappedChange: (swapped: boolean) => void;
@@ -195,6 +198,8 @@ export const STAGE_FIT_WIDTH = {
   overlay: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 16 / 9))',
   side: 'max(20rem, calc((100dvh - var(--stage-reserve, 18rem)) * 32 / 9 + 0.75rem))',
 };
+/** The start of a clip read ahead: its header, its one keyframe and about the first second. */
+const AHEAD_RANGE = 'bytes=0-262143';
 const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;
 
@@ -222,6 +227,7 @@ export default function VideoClipStage({
   frames,
   onPreviewError,
   loadedFrames,
+  ahead = [],
   swapped,
   onSwappedChange,
   caption,
@@ -433,6 +439,22 @@ export default function VideoClipStage({
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
   }, [view, both, src.a, src.b]);
+
+  // A pair is fully buffered only after the first Play, so nothing is read ahead before it, nor
+  // beside clips still loading. The starts go into the HTTP cache, where a switch to them finds
+  // its first frames. A touch device or a Save-Data reader fetches only what it asks for.
+  const requestedAhead = useRef(new Set<string>());
+  const aheadKey = ahead.join('\n');
+  useEffect(() => {
+    if (buffered < 1 || touch || saveDataRequested()) return;
+    for (const url of aheadKey.split('\n')) {
+      if (!url || requestedAhead.current.has(url)) continue;
+      requestedAhead.current.add(url);
+      void fetch(url, { headers: { Range: AHEAD_RANGE } })
+        .then((response) => response.arrayBuffer())
+        .catch(() => {});
+    }
+  }, [buffered, touch, aheadKey]);
 
   const active = clipGroupActive(phase);
   const togglePlay = () => {
