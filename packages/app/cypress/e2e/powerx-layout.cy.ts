@@ -159,6 +159,13 @@ describe('PowerX layout', () => {
                 `${role}/${value}:${Math.round($header[0].getBoundingClientRect().height)}`,
               );
             });
+          // The options scroller must fit: an overflow clips the last control (More read "M").
+          cy.get('[data-testid="powerx-toolbar-options"]').should(($options) => {
+            expect(
+              $options[0].scrollWidth,
+              `${role}/${value} toolbar ${$options[0].scrollWidth}/${$options[0].clientWidth}`,
+            ).to.be.at.most($options[0].clientWidth);
+          });
         }
         cy.document().then((doc) => {
           expect(doc.documentElement.scrollWidth, 'no horizontal overflow').to.be.at.most(width);

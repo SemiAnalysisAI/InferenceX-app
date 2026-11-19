@@ -74,6 +74,13 @@ describe('PowerX ranking beside the main chart', () => {
       measured('h100', 40, 500),
       measured('b200', 40, 400),
     ]);
+    // A hidden GPU folds into "+1 hidden · Show"; Show lists it again to bring it back.
+    expect(row(hidden.container, 'b200')).toBeNull();
+    const fold = hidden.container.querySelector<HTMLButtonElement>(
+      '[data-testid="powerx-ranking-hidden"]',
+    )!;
+    expect(fold.textContent).toContain('+1 hidden');
+    act(() => fold.click());
     const b200 = row(hidden.container, 'b200')!;
     expect(b200.dataset.hidden).toBeDefined();
     act(() => b200.click());

@@ -11,12 +11,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { getDisplayLabel } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 
-import {
-  roleSplitRows,
-  roleSplitScaleMax,
-  type RoleSplitRow,
-  type RoleSplitUnsplitChip,
-} from './powerx-role-split';
+import { roleSplitRows, type RoleSplitRow, type RoleSplitUnsplitChip } from './powerx-role-split';
 
 const STRINGS = {
   en: {
@@ -101,7 +96,6 @@ export default function PowerXRoleSplitBars({
     identifiers: hwKeys,
     activeKeys: hwKeys,
   });
-  const scaleMax = roleSplitScaleMax(groups);
   const colorOf = (overlay: boolean, hwKey: string, runUrl?: string) =>
     overlay ? overlayRunColor(overlayRunIndex(runUrl, runIndexByUrl)) : resolveColor(hwKey);
   const chipName = (point: InferenceData, overlay: boolean) =>
@@ -166,7 +160,6 @@ export default function PowerXRoleSplitBars({
                   key={`${row.point.x}-${row.point.conc}-${index}`}
                   row={row}
                   color={color}
-                  scaleMax={scaleMax}
                   label={t.rowLabel(
                     formatX(row.point.x),
                     xUnit,
@@ -207,19 +200,19 @@ export default function PowerXRoleSplitBars({
 function RoleSplitBar({
   row,
   color,
-  scaleMax,
   label,
   share,
 }: {
   row: RoleSplitRow;
   color: string;
-  scaleMax: number;
   label: string;
   share: (pct: number, role: 'prefill' | 'decode') => string;
 }) {
   const prefillPct = Math.round(row.prefillShare * 100);
   const decodePct = 100 - prefillPct;
-  const width = (value: number) => (scaleMax > 0 ? `${(value / scaleMax) * 100}%` : '0%');
+  // Each bar is its own 100%: the split is the reading, the absolute J is the label above.
+  // One shared scale let a single outlier shrink every other bar to a few pixels.
+  const prefillWidth = `${Math.min(1, Math.max(0, row.prefillShare)) * 100}%`;
   const totals = `${formatRoleJoules(row.measuredJ)} J / ${formatRoleJoules(row.prefillJ)} + ${formatRoleJoules(row.decodeJ)} J`;
   const prefillLabel = share(prefillPct, 'prefill');
   const decodeLabel = share(decodePct, 'decode');
@@ -238,7 +231,7 @@ function RoleSplitBar({
           data-role="prefill"
           className="h-full shrink-0 rounded-l-sm border-2"
           style={{
-            width: width(row.prefillJ),
+            width: prefillWidth,
             borderColor: color,
             borderStyle: PREFILL_BORDER,
             background: `repeating-linear-gradient(135deg, color-mix(in srgb, ${color} 45%, transparent) 0 3px, transparent 3px 6px)`,
@@ -246,9 +239,8 @@ function RoleSplitBar({
         />
         <div
           data-role="decode"
-          className="h-full shrink-0 rounded-r-sm border-2 border-l-0"
+          className="h-full min-w-0 flex-1 rounded-r-sm border-2 border-l-0"
           style={{
-            width: width(row.decodeJ),
             borderColor: color,
             borderStyle: DECODE_BORDER,
             background: `color-mix(in srgb, ${color} 40%, transparent)`,

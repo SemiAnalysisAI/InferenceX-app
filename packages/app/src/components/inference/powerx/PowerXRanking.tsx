@@ -9,7 +9,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
-import { POWERX_SHOWS, type PowerXShow } from './powerx-ranking';
+import { POWERX_SHOWS, powerXFrameworkTag, type PowerXShow } from './powerx-ranking';
 
 const STRINGS = {
   en: {
@@ -33,6 +33,9 @@ const STRINGS = {
     lastVisible: (name: string) => `${name} is the only GPU shown`,
     empty: 'No GPUs match the filters.',
     best: 'best',
+    hiddenCount: (n: number) => `+${n} hidden`,
+    showHidden: 'Show',
+    collapseHidden: 'Collapse',
   },
   zh: {
     ranking: '排名',
@@ -55,6 +58,9 @@ const STRINGS = {
     lastVisible: (name: string) => `${name} 是唯一显示的 GPU`,
     empty: '没有符合筛选条件的 GPU。',
     best: '最佳',
+    hiddenCount: (n: number) => `另有 ${n} 个已隐藏`,
+    showHidden: '显示',
+    collapseHidden: '收起',
   },
 } as const;
 
@@ -62,6 +68,8 @@ export interface PowerXRankingRowView {
   key: string;
   /** The GPU config name, e.g. "GB300 NVL72". */
   label: string;
+  /** The full name with its framework, e.g. "GB300 NVL72 (Dynamo TRT)": the row's tooltip. */
+  fullLabel?: string;
   color: string;
   /** All GPUs: the config runs disaggregated (prefill and decode pools). */
   pd: boolean;
@@ -167,6 +175,12 @@ export function PowerXRanking({
   onToggle,
 }: PowerXRankingProps) {
   const t = STRINGS[useLocale()];
+  const [hiddenOpen, setHiddenOpen] = useState(false);
+  const hiddenRows = rows.filter((row) => row.hidden);
+  // Hidden GPUs fold into one quiet row; Show lists them (struck through) to bring one back.
+  const listed = hiddenOpen
+    ? [...rows.filter((row) => !row.hidden), ...hiddenRows]
+    : rows.filter((row) => !row.hidden);
   return (
     <aside
       aria-label={t.ranking}
@@ -214,8 +228,9 @@ export function PowerXRanking({
       {filterChips}
       <ol className="m-0 list-none p-0" data-testid="powerx-ranking-rows">
         {rows.length === 0 && <li className="py-3 text-sm text-muted-foreground">{t.empty}</li>}
-        {rows.map((row) => {
+        {listed.map((row) => {
           const aggregatedEmpty = row.aggregated && row.valueText === null;
+          const name = row.fullLabel ?? row.label;
           const sub = [
             row.framework,
             row.conc !== null && row.x !== null ? `c${row.conc} · ${Math.round(row.x)} tok/s` : '',
@@ -224,12 +239,12 @@ export function PowerXRanking({
             .filter(Boolean)
             .join(' · ');
           const title = row.aggregated
-            ? t.aggregatedTitle(row.label)
+            ? t.aggregatedTitle(name)
             : row.hidden
-              ? t.clickToShow(row.label)
+              ? t.clickToShow(name)
               : row.locked
-                ? t.lastVisible(row.label)
-                : t.clickToHide(row.label);
+                ? t.lastVisible(name)
+                : t.clickToHide(name);
           return (
             <li
               key={row.key}
@@ -271,6 +286,7 @@ export function PowerXRanking({
                 />
                 <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
                   <span
+                    title={name}
                     className={cn(
                       'truncate underline-offset-3 group-hover:underline group-hover:decoration-border',
                       row.hidden && 'line-through group-hover:line-through',
@@ -278,6 +294,12 @@ export function PowerXRanking({
                   >
                     {row.label}
                   </span>
+                  {row.framework && (
+                    // Phones drop the sub line, so the framework rides on the name line there.
+                    <span className="shrink-0 text-xs font-normal text-muted-foreground md:hidden">
+                      {powerXFrameworkTag(row.framework)}
+                    </span>
+                  )}
                   {row.pd && (
                     <span
                       className="inline-flex h-4 shrink-0 items-center rounded-sm border border-border px-1 text-2xs font-semibold text-muted-foreground"
@@ -311,8 +333,60 @@ export function PowerXRanking({
             </li>
           );
         })}
+        {hiddenRows.length > 0 && (
+          <PowerXHiddenRowsToggle
+            testId="powerx-ranking-hidden"
+            count={hiddenRows.length}
+            open={hiddenOpen}
+            labels={t}
+            onToggle={() => {
+              setHiddenOpen(!hiddenOpen);
+              track('powerx_ranking_hidden_toggled', {
+                action: hiddenOpen ? 'collapse' : 'show',
+                count: hiddenRows.length,
+              });
+            }}
+          />
+        )}
       </ol>
     </aside>
+  );
+}
+
+/** The one quiet "+4 hidden · Show" row both rankings fold their hidden GPUs into. */
+export function PowerXHiddenRowsToggle({
+  testId,
+  count,
+  open,
+  labels,
+  onToggle,
+}: {
+  testId: string;
+  count: number;
+  open: boolean;
+  labels: {
+    hiddenCount: (n: number) => string;
+    showHidden: string;
+    collapseHidden: string;
+  };
+  onToggle: () => void;
+}) {
+  return (
+    <li className="border-b border-border">
+      <button
+        type="button"
+        aria-expanded={open}
+        data-testid={testId}
+        onClick={onToggle}
+        className="flex w-full cursor-pointer items-center gap-1.5 py-2.5 pl-[30px] text-left text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+      >
+        <span className="tabular-nums">{labels.hiddenCount(count)}</span>
+        <span aria-hidden>·</span>
+        <span className="underline decoration-border underline-offset-2">
+          {open ? labels.collapseHidden : labels.showHidden}
+        </span>
+      </button>
+    </li>
   );
 }
 

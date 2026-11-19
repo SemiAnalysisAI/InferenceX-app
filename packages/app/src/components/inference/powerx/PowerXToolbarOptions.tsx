@@ -217,7 +217,7 @@ function PhoneOption<T extends string>({
   return (
     <label
       className={cn(
-        'relative inline-flex h-11 shrink-0 items-center gap-1 rounded-md px-2 text-sm whitespace-nowrap',
+        'relative inline-flex h-11 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm whitespace-nowrap',
         locked ? 'outline-1 -outline-offset-1 outline-border outline-dashed' : 'hover:bg-muted',
       )}
       data-testid={testId}
@@ -225,7 +225,8 @@ function PhoneOption<T extends string>({
     >
       {locked && <Lock aria-hidden className="size-3.5 text-muted-foreground" />}
       <span>{typeof current?.label === 'string' ? current.label : value}</span>
-      <ChevronDown aria-hidden className="size-3.5 text-muted-foreground" />
+      {/* A locked option cannot open, so it shows the lock and no dropdown chevron. */}
+      {!locked && <ChevronDown aria-hidden className="size-3.5 text-muted-foreground" />}
       <select
         aria-label={ariaLabel}
         value={value}

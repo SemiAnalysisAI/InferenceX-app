@@ -57,6 +57,7 @@ import { powerBreakdownInteractivity } from '../utils/power-breakdown';
 import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwings';
 import { formatLoadSwingWatts, loadSwingRows } from '../powerx/load-swing-rows';
 import { POWERX_COMPARE_AT_DEFAULT } from '../powerx/powerx-compare-at';
+import { powerXFrameworkName } from '../powerx/powerx-ranking';
 import {
   POWERX_QUIET_BUTTON,
   PowerXChartFrame,
@@ -2390,12 +2391,25 @@ export default function PowerTimeline({
     [layout, loadingRuns, visibleTraces, role, compareAt, gpuSeriesOf, interactivity],
   );
   const rankingTraceKeys = new Map(swingRanking.map((row) => [row.key, row.trace.key]));
+  // The ranking's name line is the GPU, the framework moves to the sub line: two GB300 NVL72
+  // configs no longer both truncate to "GB300 NVL7…".
+  const rankingNames = (point: InferenceData) => {
+    const overlay = overlayPointSet.has(point);
+    const config = overlay ? overlayData?.hardwareConfig[point.hwKey] : hardwareConfig[point.hwKey];
+    const entry = comparisonSeriesOf(point) ? ` · ${entryLabel(point)}` : '';
+    const mark = overlay ? '✕ ' : '';
+    return {
+      label: `${mark}${config?.label ?? point.hwKey}${entry}`,
+      framework: config?.suffix ? powerXFrameworkName(config.suffix) : undefined,
+      fullLabel: `${mark}${seriesLabel(point)}`,
+    };
+  };
   const rankingRows: PowerXSwingRankingRowView[] = swingRanking.map((row) => {
     const { point } = row.trace;
     const bare = (watts: number | null) => formatLoadSwingWatts(watts, rack).replace(/ k?W$/u, '');
     return {
       key: row.key,
-      label: overlayPointSet.has(point) ? `✕ ${seriesLabel(point)}` : seriesLabel(point),
+      ...rankingNames(point),
       color: colorForTrace(row.trace).color,
       rank: row.rank,
       valueText: row.pools
@@ -2420,9 +2434,12 @@ export default function PowerTimeline({
   });
   for (const item of legendItems) {
     if (item.hw.startsWith('overlay-run-') || rankingTraceKeys.has(item.hw)) continue;
+    const config = comparison ? undefined : hardwareConfig[item.hw];
     rankingRows.push({
       key: item.hw,
-      label: comparison ? `${item.title} · ${item.label}` : item.label,
+      label: comparison ? `${item.title} · ${item.label}` : (config?.label ?? item.label),
+      framework: config?.suffix ? powerXFrameworkName(config.suffix) : undefined,
+      fullLabel: comparison ? undefined : item.label,
       color: comparison ? item.color : getCssColor(item.color),
       rank: null,
       valueText: null,

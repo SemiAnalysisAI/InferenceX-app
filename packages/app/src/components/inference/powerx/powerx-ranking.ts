@@ -35,8 +35,16 @@ export interface PowerXRankingInput<P extends PowerXRankingPoint> {
   aggregated: boolean;
   /** The line the row reads (All GPUs, or the role's pool). */
   points: readonly P[];
-  /** Prefill vs decode: each pool's line, shown beside the all-GPU value. */
-  pools?: { prefill: readonly P[]; decode: readonly P[] };
+  /**
+   * Prefill vs decode: each pool's line. With `combine`, the row reads the prefill and decode
+   * points of one config (same interactivity and concurrency) nearest Compare at and ranks
+   * their combined value, e.g. the all-GPU total; the all-GPU line itself is not drawn.
+   */
+  pools?: {
+    prefill: readonly P[];
+    decode: readonly P[];
+    combine?: (prefill: P, decode: P) => number;
+  };
 }
 
 export interface PowerXRankingRow<P extends PowerXRankingPoint> {
@@ -63,11 +71,38 @@ export function powerXDeltaVsBest(value: number, best: number): string {
 const nearest = <P extends PowerXRankingPoint>(points: readonly P[], at: number) =>
   nearestByInteractivity(points, at, (point) => point.x);
 
+/** The prefill and decode points of one benchmark row (same x and concurrency) nearest `at`. */
+function nearestPoolPair<P extends PowerXRankingPoint>(
+  prefill: readonly P[],
+  decode: readonly P[],
+  at: number,
+): { prefill: P; decode: P; x: number } | null {
+  const keyOf = (point: P) => `${point.x}|${(point as { conc?: unknown }).conc ?? ''}`;
+  const decodeByKey = new Map(decode.map((point) => [keyOf(point), point]));
+  const pairs = prefill.flatMap((point) => {
+    const match = decodeByKey.get(keyOf(point));
+    return match ? [{ prefill: point, decode: match, x: point.x }] : [];
+  });
+  return nearestByInteractivity(pairs, at, (pair) => pair.x);
+}
+
 export function powerXRankingRows<P extends PowerXRankingPoint>(
   inputs: readonly PowerXRankingInput<P>[],
   at: number,
 ): PowerXRankingRow<P>[] {
   const rows = inputs.map((input, order) => {
+    const combine = input.pools?.combine;
+    if (input.pools && combine && !input.aggregated) {
+      const pair = nearestPoolPair(input.pools.prefill, input.pools.decode, at);
+      const total = pair ? combine(pair.prefill, pair.decode) : null;
+      return {
+        input,
+        order,
+        point: pair?.prefill ?? null,
+        value: total !== null && Number.isFinite(total) ? total : null,
+        pools: { prefill: pair?.prefill ?? null, decode: pair?.decode ?? null },
+      };
+    }
     const point = nearest(input.points, at);
     const value =
       input.aggregated || !point || !Number.isFinite(point.y) ? null : (point.y as number);
@@ -201,4 +236,22 @@ export function nudgePowerXLabels<T extends PowerXLabelBox>(
   }
   for (const label of placed) label.y = Math.max(minY, label.y);
   return placed;
+}
+
+/** Prefill vs decode energy per output token: the two pools add up to the measured total. */
+export function sumPools(prefill: PowerXRankingPoint, decode: PowerXRankingPoint): number {
+  return prefill.y + decode.y;
+}
+
+/**
+ * Prefill vs decode power per GPU: the all-GPU value is the mean over every GPU, so each
+ * pool weighs by its GPU count (an even mean when a count is missing).
+ */
+export function gpuWeightedPools(
+  prefill: PowerXRankingPoint & { num_prefill_gpu?: number },
+  decode: PowerXRankingPoint & { num_decode_gpu?: number },
+): number {
+  const p = prefill.num_prefill_gpu ?? 0;
+  const d = decode.num_decode_gpu ?? 0;
+  return p > 0 && d > 0 ? (prefill.y * p + decode.y * d) / (p + d) : (prefill.y + decode.y) / 2;
 }

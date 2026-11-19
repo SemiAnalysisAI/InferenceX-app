@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   powerRoleHiddenVariants,
   powerRoleTableRows,
+  powerXRoleTitle,
   resolvePowerXRole,
   rewriteLegacyPowerRoleParams,
 } from './powerx-role';
@@ -83,5 +84,31 @@ describe('aggregated rows under a role', () => {
   it('hides the base line and the unread pool on the chart', () => {
     expect([...powerRoleHiddenVariants('prefill')].sort()).toEqual(['', 'all', 'decode']);
     expect(powerRoleHiddenVariants('all').size).toBe(0);
+  });
+});
+
+describe('powerXRoleTitle', () => {
+  it('puts the pool back in the role-free title, worded like the old role metrics', () => {
+    expect(powerXRoleTitle('Measured Joules per Input Token', 'prefill', 'en')).toBe(
+      'Measured Prefill Joules per Input Token',
+    );
+    expect(powerXRoleTitle('Measured J per Output Token (J/tok)', 'decode', 'en')).toBe(
+      'Measured Decode J per Output Token (J/tok)',
+    );
+    expect(powerXRoleTitle('每输入 token 实测焦耳能耗', 'prefill', 'zh')).toBe(
+      '每输入 token 实测 Prefill 焦耳能耗',
+    );
+    expect(powerXRoleTitle('Measured Joules per Output Token', 'split', 'en')).toBe(
+      'Measured Prefill vs Decode Joules per Output Token',
+    );
+  });
+
+  it('leaves All GPUs alone and prefixes a title without Measured', () => {
+    expect(powerXRoleTitle('Measured Joules per Output Token', 'all', 'en')).toBe(
+      'Measured Joules per Output Token',
+    );
+    expect(powerXRoleTitle('Throughput per GPU', 'decode', 'en')).toBe(
+      'Decode · Throughput per GPU',
+    );
   });
 });

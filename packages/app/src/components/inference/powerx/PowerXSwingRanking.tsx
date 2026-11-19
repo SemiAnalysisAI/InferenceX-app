@@ -1,8 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
+
+import { PowerXHiddenRowsToggle } from './PowerXRanking';
+import { powerXFrameworkTag } from './powerx-ranking';
 
 const STRINGS = {
   en: {
@@ -20,6 +25,9 @@ const STRINGS = {
     clickToShow: (name: string) => `Click to show ${name}`,
     empty: 'No GPU telemetry to rank.',
     best: 'best',
+    hiddenCount: (n: number) => `+${n} hidden`,
+    showHidden: 'Show',
+    collapseHidden: 'Collapse',
   },
   zh: {
     ranking: '排名',
@@ -36,13 +44,20 @@ const STRINGS = {
     clickToShow: (name: string) => `点击显示 ${name}`,
     empty: '没有可排名的 GPU 遥测数据。',
     best: '最佳',
+    hiddenCount: (n: number) => `另有 ${n} 个已隐藏`,
+    showHidden: '显示',
+    collapseHidden: '收起',
   },
 } as const;
 
 export interface PowerXSwingRankingRowView {
   key: string;
-  /** The GPU config name, e.g. "GB300 NVL72 (Dynamo SGLang)". */
+  /** The GPU name, e.g. "GB300 NVL72" (plus " · Run 2" when comparing runs). */
   label: string;
+  /** The framework, e.g. "Dynamo SGLang": the sub line, so two GB300 NVL72 rows differ. */
+  framework?: string;
+  /** The full name, e.g. "GB300 NVL72 (Dynamo SGLang)": tooltips and screen readers. */
+  fullLabel?: string;
   color: string;
   rank: number | null;
   /** The Max 5 s swing, formatted like the load-swings table; null when there is none. */
@@ -83,6 +98,11 @@ export function PowerXSwingRanking({
   onHover?: (key: string | null) => void;
 }) {
   const t = STRINGS[useLocale()];
+  const [hiddenOpen, setHiddenOpen] = useState(false);
+  const hiddenRows = rows.filter((row) => row.hidden);
+  const listed = hiddenOpen
+    ? [...rows.filter((row) => !row.hidden), ...hiddenRows]
+    : rows.filter((row) => !row.hidden);
   return (
     <aside
       aria-label={t.ranking}
@@ -105,9 +125,11 @@ export function PowerXSwingRanking({
       </div>
       <ol className="m-0 list-none p-0" data-testid="powerx-swing-ranking-rows">
         {rows.length === 0 && <li className="py-3 text-sm text-muted-foreground">{t.empty}</li>}
-        {rows.map((row) => {
+        {listed.map((row) => {
           const aggregatedEmpty = row.aggregated && row.valueText === null;
+          const name = row.fullLabel ?? row.label;
           const sub = [
+            row.framework ?? '',
             row.conc !== null && row.x !== null ? `c${row.conc} · ${Math.round(row.x)} tok/s` : '',
             row.hidden ? t.hidden : row.loading ? t.loading : '',
             row.hidden || aggregatedEmpty ? '' : (row.detail ?? ''),
@@ -115,10 +137,10 @@ export function PowerXSwingRanking({
             .filter(Boolean)
             .join(' · ');
           const title = row.aggregated
-            ? t.aggregatedTitle(row.label)
+            ? t.aggregatedTitle(name)
             : row.hidden
-              ? t.clickToShow(row.label)
-              : t.clickToHide(row.label);
+              ? t.clickToShow(name)
+              : t.clickToHide(name);
           return (
             <li
               key={row.key}
@@ -162,13 +184,22 @@ export function PowerXSwingRanking({
                   className="size-2 rounded-full"
                   style={{ backgroundColor: row.color }}
                 />
-                <span
-                  className={cn(
-                    'truncate text-sm font-semibold underline-offset-3 group-hover:underline group-hover:decoration-border',
-                    row.hidden && 'line-through group-hover:line-through',
+                <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+                  <span
+                    title={name}
+                    className={cn(
+                      'truncate underline-offset-3 group-hover:underline group-hover:decoration-border',
+                      row.hidden && 'line-through group-hover:line-through',
+                    )}
+                  >
+                    {row.label}
+                  </span>
+                  {row.framework && (
+                    // Phones drop the sub line, so the framework rides on the name line there.
+                    <span className="shrink-0 text-xs font-normal text-muted-foreground md:hidden">
+                      {powerXFrameworkTag(row.framework)}
+                    </span>
                   )}
-                >
-                  {row.label}
                 </span>
                 <span
                   className={cn(
@@ -198,6 +229,21 @@ export function PowerXSwingRanking({
             </li>
           );
         })}
+        {hiddenRows.length > 0 && (
+          <PowerXHiddenRowsToggle
+            testId="powerx-swing-ranking-hidden"
+            count={hiddenRows.length}
+            open={hiddenOpen}
+            labels={t}
+            onToggle={() => {
+              setHiddenOpen(!hiddenOpen);
+              track('powerx_swing_ranking_hidden_toggled', {
+                action: hiddenOpen ? 'collapse' : 'show',
+                count: hiddenRows.length,
+              });
+            }}
+          />
+        )}
       </ol>
     </aside>
   );

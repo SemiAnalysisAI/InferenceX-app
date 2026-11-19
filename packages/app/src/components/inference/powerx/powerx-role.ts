@@ -1,3 +1,5 @@
+import type { Locale } from '@/lib/i18n/i18n';
+
 import type { PowerCompare } from '../types';
 import {
   energyPerFor,
@@ -101,6 +103,31 @@ export function resolvePowerXRole(selection: PowerXSelection, role: PowerXRole):
     };
   }
   return selection;
+}
+
+const ROLE_TITLE_POOL: Record<Exclude<PowerXRole, 'all'>, Record<Locale, string>> = {
+  prefill: { en: 'Prefill', zh: 'Prefill' },
+  decode: { en: 'Decode', zh: 'Decode' },
+  split: { en: 'Prefill vs Decode', zh: 'Prefill 与 Decode' },
+};
+
+/**
+ * A role draws the role-free metric, so its title says which pool it reads, worded like
+ * the old role metrics: "Measured Joules per Input Token" under Prefill GPUs reads
+ * "Measured Prefill Joules per Input Token" (zh: "每输入 token 实测 Prefill 焦耳能耗").
+ * A title without "Measured" gets the pool as a prefix.
+ */
+export function powerXRoleTitle(title: string, role: PowerXRole, locale: Locale): string {
+  if (role === 'all' || !title) return title;
+  const pool = ROLE_TITLE_POOL[role][locale];
+  if (locale === 'zh') {
+    return title.includes('实测')
+      ? title.replace(/实测\s*/u, `实测 ${pool} `)
+      : `${pool} · ${title}`;
+  }
+  return /\bMeasured\s/u.test(title)
+    ? title.replace(/\bMeasured\s+/u, `Measured ${pool} `)
+    : `${pool} · ${title}`;
 }
 
 /** Controls a GPU role pins, so the view can say why each one cannot change. */

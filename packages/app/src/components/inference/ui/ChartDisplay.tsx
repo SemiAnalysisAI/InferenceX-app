@@ -92,6 +92,7 @@ import { PowerXPinnedStrip } from '@/components/inference/powerx/PowerXPinnedStr
 import {
   hasPowerRoleData,
   powerRoleTableRows,
+  powerXRoleTitle,
   type PowerXRole,
 } from '@/components/inference/powerx/powerx-role';
 import PowerXRoleSplitBars from '@/components/inference/powerx/PowerXRoleSplitBars';
@@ -1341,7 +1342,15 @@ export default function ChartDisplay({
                                 </span>
                               )}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
-                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}
+                              {powerXRoleTitle(
+                                metricChartTitle(
+                                  graph.chartDefinition,
+                                  selectedYAxisMetric,
+                                  locale,
+                                ),
+                                powerXSurface ? powerRole : 'all',
+                                locale,
+                              )}
                               <HeadingQualifier>
                                 {(() => {
                                   if (isPowerTimeline) return null;
@@ -1640,7 +1649,15 @@ export default function ChartDisplay({
                               title:
                                 powerXTab === 'time' || powerXTab === 'breakdown'
                                   ? undefined
-                                  : metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
+                                  : powerXRoleTitle(
+                                      metricLabel(
+                                        graph.chartDefinition,
+                                        selectedYAxisMetric,
+                                        locale,
+                                      ),
+                                      powerRole,
+                                      locale,
+                                    ),
                             })
                           : null;
                       const chartCaption = powerXCaption ?? (

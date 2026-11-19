@@ -235,6 +235,8 @@ import {
   powerXFrameworkName,
   powerXFrameworkTag,
   powerXRankingRows,
+  gpuWeightedPools,
+  sumPools,
   powerXRankingToggle,
   powerXShowFor,
   powerXShowState,
@@ -2008,6 +2010,7 @@ const ScatterGraph = React.memo(
         .filter((key) => hwTypesWithData.has(key))
         .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
       const pool = powerRole === 'prefill' || powerRole === 'decode' ? powerRole : null;
+      const splitEnergy = selectedYAxisMetric.startsWith('y_measuredJ');
       const rows = powerXRankingRows(
         keys.map((key) => {
           const series = rankingSeries.get(key) ?? { base: [], prefill: [], decode: [] };
@@ -2017,9 +2020,16 @@ const ScatterGraph = React.memo(
             hidden: !effectiveOfficialHwTypes.has(key),
             aggregated,
             points: pool && !aggregated ? series[pool] : series.base,
+            // Prefill vs decode draws only the two pools, so the row ranks them combined
+            // into the config's all-GPU value: energy per output token adds up, power per
+            // GPU is the GPU-weighted mean.
             pools:
               powerRole === 'split'
-                ? { prefill: series.prefill, decode: series.decode }
+                ? {
+                    prefill: series.prefill,
+                    decode: series.decode,
+                    combine: splitEnergy ? sumPools : gpuWeightedPools,
+                  }
                 : undefined,
           };
         }),
@@ -2040,6 +2050,7 @@ const ScatterGraph = React.memo(
         return {
           key: row.key,
           label: hwConfig?.label ?? row.key,
+          fullLabel: hwConfig ? getDisplayLabel(hwConfig) : row.key,
           color: getCssColor(resolveColor(row.key)),
           pd: powerRole === 'all' && Boolean(series?.base.some((point) => point.disagg)),
           framework: hwConfig?.suffix ? powerXFrameworkName(hwConfig.suffix) : '',

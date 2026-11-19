@@ -357,9 +357,10 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // Re-pinned after the PowerX layout added the i_at and i_ptsmooth URL keys, the live
-      // address bar, a ranking slot on the shared scatter props and renamed the PowerX view ids;
-      // no video entry reads any of them, so recorded entries are unchanged.
-      sources: '2aa9ca4aa71260d10323201f084ff0035353fe1a3d0f1e79287dd65a2ed68d63',
+      // address bar, a ranking slot on the shared scatter props, renamed the PowerX view ids and
+      // added the GPU role chart title; no video entry reads any of them, so recorded entries
+      // are unchanged.
+      sources: '1b5207de751025eddf5e07f3342f5b4ddb07b8fa3dfe9dbf513744727b14f98e',
     });
   });
 });

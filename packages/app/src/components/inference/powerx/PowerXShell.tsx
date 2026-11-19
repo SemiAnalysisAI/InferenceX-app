@@ -899,7 +899,8 @@ export function PowerXMore({ tab, changed, onReset, children }: PowerXMoreProps)
       onClick={phone ? () => onOpenChange(true) : undefined}
     >
       <SlidersHorizontal aria-hidden className="size-4 text-muted-foreground" />
-      {t.more}
+      {/* Below md the toolbar has no room for the word: the icon stays, the name is read out. */}
+      <span className="max-md:sr-only">{t.more}</span>
       {changed > 0 && (
         <span
           className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-white tabular-nums"
@@ -1005,7 +1006,10 @@ export function PowerXToolbar({
       className="flex h-14 min-w-0 items-center gap-4 max-md:h-12 max-md:gap-1"
       data-testid="powerx-chart-header"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-6 overflow-x-auto [scrollbar-width:none] max-md:gap-1">
+      <div
+        className="flex min-w-0 flex-1 items-center gap-6 overflow-x-auto [scrollbar-width:none] max-md:gap-1"
+        data-testid="powerx-toolbar-options"
+      >
         {options}
         {more}
       </div>
@@ -1037,7 +1041,7 @@ export function PowerXPinLine({ pin }: { pin: PowerXPin }) {
       <span className="min-w-0 truncate max-md:hidden">
         {t.pinned(pin.by, pin.what)} <span className="text-muted-foreground">{t.picksReturn}</span>
       </span>
-      <span className="md:hidden">{t.setBy(pin.by)}</span>
+      <span className="whitespace-nowrap max-[430px]:sr-only md:hidden">{t.setBy(pin.by)}</span>
       <Popover>
         <PopoverTrigger asChild>
           <button
@@ -1070,7 +1074,15 @@ export function PowerXYTitleRow({ title, pin }: { title?: ReactNode; pin?: Power
       className="mb-1.5 flex h-5 min-w-0 items-center gap-4 text-xs whitespace-nowrap text-muted-foreground max-md:mb-1"
       data-testid="powerx-y-title"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">{title}</div>
+      <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
+        {typeof title === 'string' ? (
+          <span className="min-w-0 truncate" title={title}>
+            {title}
+          </span>
+        ) : (
+          title
+        )}
+      </div>
       {pin && <PowerXPinLine pin={pin} />}
     </div>
   );

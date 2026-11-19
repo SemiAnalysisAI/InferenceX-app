@@ -2,7 +2,7 @@
 
 import * as d3 from 'd3';
 import { Pin } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -308,6 +308,24 @@ export default function PowerChipCompare({
   }, [series, value]);
   useEffect(() => onNearestKeyChange(nearestKey), [nearestKey, onNearestKeyChange]);
   const maxTotal = Math.max(1, ...rows.map((row) => row.entry.totalWattsPerGpu));
+  // The right readout's second line: IT subtotal (facility basis), then the GPU share, or
+  // the prefill / decode shares when the GPU layer splits by pool.
+  const readoutLine = (point: (typeof rows)[number]['entry']) => {
+    const poolSegments = splitByRole ? gpuPoolSegments(point) : null;
+    const share = poolSegments
+      ? t.poolShare(
+          pct(poolSegments[0].layerWatts / point.totalWattsPerGpu),
+          pct(poolSegments[1].layerWatts / point.totalWattsPerGpu),
+        )
+      : t.gpuShare(pct(point.wattsPerGpu.gpu / point.totalWattsPerGpu));
+    return includeFacility
+      ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · ${share}`
+      : share;
+  };
+  // ~0.45rem per character of text-xs tabular figures, never under the old 5.5rem.
+  const readoutWidth = `max(5.5rem, ${(
+    Math.max(0, ...rows.map((row) => readoutLine(row.entry).length)) * 0.45
+  ).toFixed(2)}rem)`;
   const bands = POWER_BANDS.filter((band) =>
     rows.some((row) => bandWattsPerGpu(row.entry, band) > 0),
   );
@@ -407,7 +425,13 @@ export default function PowerChipCompare({
       {rows.length === 0 ? (
         <p className="py-4 text-sm text-muted-foreground">{t.empty}</p>
       ) : (
-        <ol className="space-y-1.5" data-testid="power-chip-compare-rows">
+        <ol
+          className="space-y-1.5"
+          data-testid="power-chip-compare-rows"
+          // One readout column for every row, as wide as the longest line, so no row wraps
+          // and every bar spans the same track.
+          style={{ '--power-readout-w': readoutWidth } as CSSProperties}
+        >
           {rows.map(({ series: entry, entry: point, pinned: pinnedPoint }) => {
             const color =
               entry.overlayRunIndex === undefined
@@ -417,17 +441,11 @@ export default function PowerChipCompare({
             const expanded = entry.key === expandedKey;
             // The bar whose drill-down is open is the active one.
             const active = entry.key === (expandedKey ?? selectedKey);
-            const gpuShare = point.wattsPerGpu.gpu / point.totalWattsPerGpu;
             // Off All GPUs the GPU layer splits by pool; a chip that cannot split (aggregated,
             // or no per-pool telemetry) stays listed with its layer whole, dimmed.
             const poolSegments = splitByRole ? gpuPoolSegments(point) : null;
             const unsplit = splitByRole && poolSegments === null;
-            const shareLine = poolSegments
-              ? t.poolShare(
-                  pct(poolSegments[0].layerWatts / point.totalWattsPerGpu),
-                  pct(poolSegments[1].layerWatts / point.totalWattsPerGpu),
-                )
-              : t.gpuShare(pct(gpuShare));
+            const shareLine = readoutLine(point);
             const chipName = (
               <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
                 <span
@@ -605,7 +623,7 @@ export default function PowerChipCompare({
                   className={cn(
                     compactRows
                       ? 'grid min-h-14 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 rounded-md px-2 py-1 text-left transition-colors'
-                      : 'grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem]',
+                      : 'grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_var(--power-readout-w)]',
                     powerX && !compactRows && 'max-md:min-h-11',
                     active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40',
                   )}
@@ -618,10 +636,7 @@ export default function PowerChipCompare({
                         <PowerBasisPill tag={includeFacility ? 'facility' : 'it'} />
                       </span>
                       {pointLine}
-                      <span className="text-right text-xs tabular-nums text-muted-foreground">
-                        {includeFacility
-                          ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
-                          : ''}
+                      <span className="text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground">
                         {shareLine}
                       </span>
                       <span className="col-span-2 flex h-2 min-w-0 items-stretch overflow-hidden rounded-sm">
@@ -656,10 +671,7 @@ export default function PowerChipCompare({
                           {watts(point.totalWattsPerGpu)} W
                           <PowerBasisPill tag={includeFacility ? 'facility' : 'it'} />
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {includeFacility
-                            ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
-                            : ''}
+                        <span className="text-xs whitespace-nowrap tabular-nums text-muted-foreground">
                           {shareLine}
                         </span>
                       </span>
