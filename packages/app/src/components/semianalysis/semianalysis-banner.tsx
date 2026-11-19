@@ -9,10 +9,10 @@ import { useLocale } from '@/lib/i18n/use-locale';
 // tagline, so the crop keeps the lettered part of the photo in view.
 const POSTERS = [
   { src: '/decorative/semianalysis/golden-gate.webp', position: '50% 62%' },
-  { src: '/decorative/semianalysis/coit-tower.webp', position: '50% 40%' },
-  { src: '/decorative/semianalysis/painted-ladies.webp', position: '50% 45%' },
-  { src: '/decorative/semianalysis/fishing-boat.webp', position: '50% 55%' },
-  { src: '/decorative/semianalysis/lombard-street.webp', position: '50% 70%' },
+  { src: '/decorative/semianalysis/coit-tower.webp', position: '50% 76%' },
+  { src: '/decorative/semianalysis/painted-ladies.webp', position: '50% 58%' },
+  { src: '/decorative/semianalysis/fishing-boat.webp', position: '50% 70%' },
+  { src: '/decorative/semianalysis/lombard-street.webp', position: '50% 92%' },
 ] as const;
 
 const STRINGS = {
