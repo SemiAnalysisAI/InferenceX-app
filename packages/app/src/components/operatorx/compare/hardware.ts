@@ -47,6 +47,14 @@ export function toggleHardwareSelection(
   return all.length > 1 ? [...all] : selected;
 }
 
+/**
+ * Whether a legend click on `key` restores every GPU: it is the only GPU that legend shows. Charts
+ * that show a subset of the selected GPUs check their own subset, not the page selection.
+ */
+export function restoresAllHardware(shown: readonly string[], key: string): boolean {
+  return shown.length === 1 && shown[0] === key;
+}
+
 /** Legend hide (x) button: removes `key`, keeping the last selected GPU selected. */
 export function removeHardwareSelection(selected: string[], key: string): string[] {
   if (!selected.includes(key) || selected.length <= 1) return selected;

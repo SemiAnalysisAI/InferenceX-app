@@ -10,6 +10,7 @@ import {
   peakBandwidthTBs,
   peakTflops,
   removeHardwareSelection,
+  restoresAllHardware,
   toggleHardwareSelection,
 } from './hardware';
 import { metricById } from './metrics';
@@ -172,5 +173,16 @@ describe('removeHardwareSelection', () => {
     const only = ['b200'];
     expect(removeHardwareSelection(only, 'b200')).toBe(only);
     expect(removeHardwareSelection(only, 'h200')).toBe(only);
+  });
+});
+
+describe('restoresAllHardware', () => {
+  it('restores when the clicked GPU is the only one the legend shows', () => {
+    expect(restoresAllHardware(['h200'], 'h200')).toBe(true);
+  });
+
+  it('isolates or adds otherwise', () => {
+    expect(restoresAllHardware(['h200', 'b200'], 'h200')).toBe(false);
+    expect(restoresAllHardware(['b200'], 'h200')).toBe(false);
   });
 });

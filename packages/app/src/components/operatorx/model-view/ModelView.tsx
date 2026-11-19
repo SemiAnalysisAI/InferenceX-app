@@ -54,6 +54,7 @@ import {
   measuredHardware,
   operatorXColors,
   removeHardwareSelection,
+  restoresAllHardware,
   toggleHardwareSelection,
 } from '../compare/hardware';
 import { METRICS, metricById } from '../compare/metrics';
@@ -980,16 +981,17 @@ const SlotDetail = memo(
       const view = subView(model.view, familyIndices);
       const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
       const op = slot.op as ComparisonOp;
+      // only the GPUs that measured this op's shapes
+      const hardware = model.hardware.filter((hw) => measured.includes(hw));
       return {
         op,
         model: buildModel(
           view,
           model.metric,
           {
-            // only the GPUs that measured this op's shapes
-            hardware: model.hardware.filter((hw) => measured.includes(hw)),
+            hardware,
             available: measured,
-            toggle: model.toggle,
+            toggle: (hw) => (restoresAllHardware(hardware, hw) ? model.reset() : model.toggle(hw)),
             remove: model.remove,
             reset: model.reset,
           },
