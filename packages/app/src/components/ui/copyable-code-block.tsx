@@ -3,8 +3,9 @@
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
@@ -12,26 +13,27 @@ const STRINGS = {
     copy: 'Copy',
     copied: 'Copied',
     failed: 'Could not copy. Select the code to copy it manually.',
-    scroll: 'Scroll to inspect the full example.',
+    scroll: 'Scroll to inspect the full example',
   },
   zh: {
     code: '代码',
     copy: '复制',
     copied: '已复制',
     failed: '复制失败。请选中代码后手动复制。',
-    scroll: '滚动查看完整示例。',
+    scroll: '滚动查看完整示例',
   },
 } as const;
 
-/** A bounded reader, not a truncated preview: copy always includes every byte. */
 export function CopyableCodeBlock({
   children,
   locale,
   label,
+  className,
 }: {
   children: string;
   locale: Locale;
   label?: string;
+  className?: string;
 }) {
   const t = STRINGS[locale];
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -51,9 +53,12 @@ export function CopyableCodeBlock({
   return (
     <div
       data-testid="copyable-code-block"
-      className="min-w-0 overflow-hidden rounded-lg border border-border/60 bg-muted/30"
+      className={cn(
+        'w-full min-w-0 max-w-measure overflow-hidden rounded-lg border border-border/60 bg-card',
+        className,
+      )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border/50 px-3 py-1">
+      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border/50 bg-muted/50 px-3 py-1">
         <span className="min-w-0 break-words text-xs font-medium text-muted-foreground">
           {title}
         </span>

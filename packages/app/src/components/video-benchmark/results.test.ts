@@ -1,0 +1,469 @@
+import { describe, expect, it } from 'vitest';
+import fixture from '../../../cypress/fixtures/api/video-history.json';
+import type { VideoHistoryPage } from './history';
+import type { VideoPoint } from './metrics';
+import { videoPoints } from './points';
+import {
+  DEFAULT_RESULTS_STATE,
+  parseResultsState,
+  resultProjection,
+  resultsSearch,
+  type ResultCell,
+  type ResultsState,
+  workloadSummary,
+} from './results';
+import type { ResultsEvidence } from './results-evidence';
+
+const points = videoPoints([fixture as unknown as VideoHistoryPage]);
+const state = (): ResultsState => structuredClone(DEFAULT_RESULTS_STATE);
+const eligible = points.find(
+  (p) => p.hardwareKey === 'h200' && p.concurrency === 1 && p.scheduled === 20,
+)!;
+const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => ({
+  workloadHash: 'a'.repeat(64),
+  manifestHash: 'b'.repeat(64),
+  verified: true,
+  engine: 'sglang',
+  mode: 't2v',
+  attempted: 20,
+  notStarted: 0,
+  latencies: Array.from({ length: 20 }, (_, i) => i + 1),
+  clientP50: 10.5,
+  powerValid: true,
+  powerSamples: 0,
+  peakPowerW: 1500,
+  gpuMemoryMiB: null,
+  warmupSeconds: null,
+  failures: null,
+  ...overrides,
+});
+
+const ids = (cells: ResultCell[]) => cells.map((c) => c.point.id).sort();
+
+const run = (id: string, runId: string, observedAt: string, hardwareKey = 'h200') => ({
+  ...eligible,
+  id,
+  runId,
+  observedAt,
+  hardwareKey,
+});
+
+describe('VideoGenX results contract', () => {
+  it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
+    const result = resultProjection(points, state());
+    expect(result.cells.map((c) => c.point.hardwareKey).sort()).toEqual(['b200', 'h100', 'h200']);
+    expect(new Set(result.cells.map((c) => c.point.workloadKey)).size).toBe(1);
+    expect(result.cells.every((c) => c.point.scheduled === 20 && c.point.concurrency === 1)).toBe(
+      true,
+    );
+    for (const change of [
+      { samples: 9 },
+      { scheduled: 4 },
+      { concurrency: 2 },
+      { workloadKey: null },
+      { workloadKey: 'unverified-label' },
+    ])
+      expect(resultProjection([{ ...eligible, ...change }], state()).cells).toEqual([]);
+    expect(
+      resultProjection([{ ...eligible, hardwareKey: 'a100' }], state()).cells.map(
+        (c) => c.point.hardwareKey,
+      ),
+    ).toEqual(['a100']);
+    expect(resultProjection([], state()).cells).toEqual([]);
+  });
+
+  it('preserves unknown allocation and planned measures rather than synthesizing values', () => {
+    const point: VideoPoint = { ...eligible, allocated: null, energyKj: null };
+    const row = resultProjection([point], state()).cells[0];
+    expect(row.cost.participating).not.toBeNull();
+    expect(row.cost.allocated).toBeNull();
+    expect(row.joulesPerClip).toBeNull();
+    expect(row.p95).toBeNull();
+    expect(row.deadlineAttainment).toBeNull();
+    expect(row.metadata.mode).toBeNull();
+    expect(row.videoSecondsPerSecond).toBeNull();
+    expect(row.cost.participating!.perVideoSecond).toBeNull();
+  });
+
+  it('computes both cost bases from measured throughput', () => {
+    const point = {
+      ...eligible,
+      participating: 2,
+      allocated: 8,
+      valid: 20,
+      wallSeconds: 200,
+      videoSecondsPerHour: 1860,
+      results: evidence(),
+    };
+    const row = resultProjection([point], state()).cells[0];
+    expect(row.cost.allocated!.perVideo).toBeCloseTo(row.cost.participating!.perVideo * 4);
+    expect(row.cost.participating!.perVideoSecond).toBeCloseTo(
+      row.cost.participating!.perHour / 1860,
+    );
+    expect(row.videoSecondsPerSecond).toBeCloseTo(31 / 60);
+    expect(row.metadata.duration).toBe(eligible.durationSeconds);
+  });
+
+  it('uses complete per-request populations for P95 and deadline metrics without treating late clips as failures', () => {
+    const point = { ...eligible, valid: 20, scheduled: 20, wallSeconds: 200, results: evidence() };
+    const row = resultProjection([point], { ...state(), deadlineSeconds: 10 }).cells[0];
+    expect(row.p95).toBe(19);
+    expect(row.deadlineAttainment).toBe(0.5);
+    expect(row.deadlineGoodput).toBe(0.05);
+    expect(row.point.failed).toBe(point.failed);
+    const partial = { ...point, results: evidence({ latencies: [1, 2] }) };
+    expect(resultProjection([partial], state()).cells[0].deadlineAttainment).toBeNull();
+    expect(resultProjection([partial], state()).cells[0].p95).toBeNull();
+  });
+
+  it('keeps official and already-published overlay rows separate and respects every data selector', () => {
+    const official = {
+      ...eligible,
+      id: 'official:c1',
+      runId: '100',
+      participating: 2,
+      results: evidence(),
+    };
+    const overlay = { ...official, id: 'overlay:c1', runId: '200', participating: 4 };
+    const selection = { ...state(), unofficialRun: '200' };
+    const result = resultProjection([official, overlay], selection);
+    expect(result.cells.map((c) => c.point.id)).toEqual(['official:c1']);
+    expect(result.overlayCells.map((c) => c.point.id)).toEqual(['overlay:c1']);
+    expect(result.overlayCells[0].overlay).toBe(true);
+    expect(result.deploymentCells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.workloadMix.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(resultProjection([official, overlay], selection, [overlay]).overlayCells).toHaveLength(
+      1,
+    );
+    expect(resultProjection([official], selection).overlayCells).toEqual([]);
+    expect(resultProjection([official, overlay], { ...selection, hidden: ['h200'] }).cells).toEqual(
+      [],
+    );
+    expect(resultProjection([official], { ...state(), engine: 'different' }).cells).toEqual([]);
+    expect(resultProjection([official], { ...state(), mode: 'i2v' }).cells).toEqual([]);
+    expect(
+      resultProjection([official, overlay], { ...state(), gpuCount: 2 }).deploymentCells,
+    ).toHaveLength(2);
+  });
+
+  it('keeps an exact unapproved overlay out of official cells, options for other runs and aggregates', () => {
+    const official = { ...eligible, id: 'official:c1', runId: '100', results: evidence() };
+    const named = {
+      ...official,
+      id: 'named:c1',
+      runId: '200',
+      hardwareKey: 'b200',
+      approved: false,
+      allocated: null,
+    };
+    const other = { ...named, id: 'other:c1', runId: '300', model: 'Other model' };
+    const selection = { ...state(), unofficialRun: '200' };
+    const result = resultProjection([official], selection, [named, other]);
+    expect(result.cells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.deploymentCells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.workloadMix.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.overlayCells).toHaveLength(1);
+    expect(result.overlayCells[0].point).toMatchObject({ id: 'named:c1', approved: false });
+    expect(result.overlayCells[0].cost.participating).not.toBeNull();
+    expect(result.overlayCells[0].cost.allocated).toBeNull();
+    expect(JSON.stringify(result)).not.toContain('other:c1');
+    for (const filter of [
+      { hidden: ['b200'] },
+      { gpuCount: 2 },
+      { engine: 'other' },
+      { model: 'other' },
+      { resolution: '1×1' },
+      { duration: 1 },
+      { mode: 'i2v' },
+      { steps: 1 },
+    ])
+      expect(
+        resultProjection([official], { ...selection, ...filter }, [named]).overlayCells,
+      ).toEqual([]);
+    expect(result.roster).toContain('b200');
+    const cleared = resultProjection([official], state(), [named, other]);
+    expect(cleared.roster).not.toContain('b200');
+    expect(cleared.overlayCells).toEqual([]);
+    expect(cleared.cells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+  });
+
+  it('retains every named-run GPU count for deployment charts while filtering cards and tables', () => {
+    const official = { ...eligible, id: 'official:c1', runId: '100', results: evidence() };
+    const named = [2, 4].map((participating) => ({
+      ...official,
+      id: `named:${participating}g`,
+      runId: '200',
+      hardwareKey: 'b200',
+      approved: false,
+      participating,
+    }));
+    const selection = { ...state(), unofficialRun: '200', gpuCount: 4 };
+    const result = resultProjection([official], selection, named);
+    expect(result.overlayCells.map((cell) => cell.point.id)).toEqual(['named:4g']);
+    expect(result.overlayDeploymentCells).toEqual(
+      resultProjection([official], { ...selection, gpuCount: null }, named).overlayCells,
+    );
+    expect(result.overlayDeploymentCells.map((cell) => cell.point.participating)).toEqual([2, 4]);
+    expect(result.overlayDeploymentCells.every((cell) => cell.overlay)).toBe(true);
+    expect(result.deploymentCells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.workloadMix.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.options.gpuCounts.toSorted()).toEqual([2, 4]);
+    for (const change of [
+      { hidden: ['b200'] },
+      { unofficialRun: null },
+      { engine: 'different' },
+      { workload: 'missing' },
+    ])
+      expect(
+        resultProjection([official], { ...selection, ...change }, named).overlayDeploymentCells,
+      ).toEqual([]);
+  });
+
+  it('prefers an approved cohort but permits explicit or fallback diagnostic-only selection', () => {
+    const identity = JSON.parse(eligible.workloadKey!);
+    identity.plan.generation.frame_count = 124;
+    const named = {
+      ...eligible,
+      id: 'diagnostic:c1',
+      runId: '200',
+      hardwareKey: 'h100',
+      approved: false,
+      workloadKey: JSON.stringify(identity),
+    };
+    const selection = { ...state(), unofficialRun: '200' };
+    const preferred = resultProjection([eligible], selection, [named]);
+    expect(preferred.workloadKey).toBe(eligible.workloadKey);
+    expect(preferred.overlayCells).toEqual([]);
+    const explicit = resultProjection([eligible], { ...selection, workload: named.id }, [named]);
+    expect(explicit.cells).toEqual([]);
+    expect(explicit.overlayCells[0].point.id).toBe(named.id);
+    expect(explicit.options.workloads.map((workload) => workload.key)).toContain(named.id);
+    expect(explicit.workloadKey).toBe(named.workloadKey);
+    expect(new URLSearchParams(resultsSearch(explicit.state)).get('r_workload')).toBe(named.id);
+    // A model slug shares the model's best-covered workload under any filter; the rest keep a point ID.
+    expect(explicit.options.workloads.map((workload) => workload.slug)).toEqual([
+      'minimax-h3',
+      undefined,
+    ]);
+    expect(
+      resultProjection([eligible], { ...state(), workload: 'minimax-h3', engine: 'other' })
+        .workloadKey,
+    ).toBe(eligible.workloadKey);
+    expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
+    // A shared link keeps its workload after another point of it becomes the representative.
+    const republished = { ...eligible, id: 'republished:c1', hardwareKey: 'h200' };
+    const shared = resultProjection([republished, eligible], { ...state(), workload: eligible.id });
+    expect(shared.workloadKey).toBe(eligible.workloadKey);
+    expect(shared.state.workload).toBe(republished.id);
+    expect(explicit.workloadMix.every((cell) => cell.point.approved === true)).toBe(true);
+    const fallback = resultProjection([], selection, [named]);
+    expect(fallback.cells).toEqual([]);
+    expect(fallback.deploymentCells).toEqual([]);
+    expect(fallback.workloadMix).toEqual([]);
+    expect(fallback.overlayCells[0].point.id).toBe(named.id);
+    expect(fallback.state.workload).toBe(named.id);
+    // Official data arriving later would take the slug, so a named-only workload never gets one.
+    expect(fallback.options.workloads[0].slug).toBeUndefined();
+    expect(resultProjection([], state(), [named]).options.workloads).toEqual([]);
+    for (const change of [
+      { samples: 9 },
+      { scheduled: 4 },
+      { concurrency: 2 },
+      { workloadKey: null },
+    ])
+      expect(resultProjection([], selection, [{ ...named, ...change }]).overlayCells).toEqual([]);
+  });
+
+  it('offers a second approved model as a selectable workload and names it by its derived duration', () => {
+    const identity = JSON.parse(eligible.workloadKey!);
+    identity.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+    Object.assign(identity.plan.generation, { width: 832, height: 480, frame_count: 81, fps: 16 });
+    delete identity.plan.generation.duration_seconds;
+    const wan = {
+      ...eligible,
+      id: 'wan:c1',
+      runId: '300',
+      hardwareKey: 'b200',
+      workloadKey: JSON.stringify(identity),
+    };
+    const offered = resultProjection([eligible, wan], state());
+    expect(offered.options.workloads.map((workload) => workload.key).sort()).toEqual(
+      [eligible.id, wan.id].sort(),
+    );
+    const selected = resultProjection([eligible, wan], { ...state(), workload: wan.id });
+    expect(selected.cells.map((cell) => cell.point.id)).toEqual([wan.id]);
+    expect(workloadSummary(wan, 'steps')).toContain(
+      'Wan-AI/Wan2.2-T2V-A14B-Diffusers · 832×480 · 5.06 s · 16 fps',
+    );
+  });
+
+  it('shows each deployment as of the selected run date and run', () => {
+    // Newest publication first, as the history pages deliver them.
+    const rerun = run('h200:new', '300', '2026-11-03T05:00:00Z');
+    const republished = run('h200:stale', '300', '2026-11-03T05:00:00Z');
+    const b200 = run('b200', '200', '2026-11-03T01:00:00Z', 'b200');
+    const first = run('h200:old', '100', '2026-11-01T06:00:00Z');
+    const input = [rerun, republished, b200, first];
+    const shown = (selection: Partial<ResultsState>) => {
+      const result = resultProjection(input, { ...state(), ...selection });
+      return [result.run?.id, ids(result.cells), ids(result.workloadMix)];
+    };
+    const latest = resultProjection(input, state());
+    expect(latest.runs.map((r) => r.id)).toEqual(['100', '200', '300']);
+    expect(latest.options.dates).toEqual(['2026-11-01', '2026-11-03']);
+    expect(shown({})).toEqual(['300', ['b200', 'h200:new'], ['b200', 'h200:new']]);
+    expect(shown({ date: '2026-11-03', run: '200' })).toEqual([
+      '200',
+      ['b200', 'h200:old'],
+      ['b200', 'h200:old'],
+    ]);
+    expect(shown({ date: '2026-11-01' })).toEqual(['100', ['h200:old'], ['h200:old']]);
+    expect(shown({ date: '2026-11-02', run: '300' })).toEqual(['100', ['h200:old'], ['h200:old']]);
+    const h200 = latest.chipConfigs.find(({ point }) => point.hardwareKey === 'h200')!.key;
+    expect(latest.chipConfigs.map(({ point }) => point.hardwareKey)).toEqual(['b200', 'h200']);
+    const history = (selection: Partial<ResultsState>) =>
+      ids(resultProjection(input, { ...state(), configs: [h200], ...selection }).history);
+    expect(history({})).toEqual(['h200:new', 'h200:old']);
+    expect(history({ compareFrom: '2026-11-02' })).toEqual(['h200:new']);
+    expect(history({ compareTo: '2026-11-02' })).toEqual(['h200:old']);
+    const named = run('h200:named', '400', '2026-11-04T00:00:00Z');
+    const overlaid = resultProjection(
+      input,
+      { ...state(), configs: [h200], unofficialRun: '400' },
+      [named],
+    ).history;
+    expect(overlaid.filter((c) => c.overlay).map((c) => c.point.id)).toEqual(['h200:named']);
+  });
+
+  it('parses public control keys and preserves explicit zero prices', () => {
+    const selection: ResultsState = {
+      ...state(),
+      model: 'MiniMaxAI/MiniMax-H3',
+      workload: 'selected-source:c1',
+      resolution: '1344×768',
+      duration: 8,
+      mode: 't2v',
+      steps: 50,
+      gpuCount: null,
+      engine: 'sglang',
+      date: '2026-10-18',
+      run: '456',
+      configs: ['b200:4g:tp2:u2'],
+      compareFrom: '2026-09-01',
+      compareTo: '2026-10-18',
+      hidden: ['mi355x'],
+      deadlineSeconds: 60,
+      costTier: 'r',
+      unofficialRun: '123',
+      xMetric: 'gpus',
+      yMetric: 'kjPerClip',
+      costBasis: 'participating',
+      optimal: false,
+      point: '123:selected-source:c1',
+    };
+    expect(
+      parseResultsState(
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_configs=b200%3A4g%3Atp2%3Au2&r_from=2026-09-01&r_to=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=gpus&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
+      ),
+    ).toEqual(selection);
+    expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
+    expect(parseResultsState(resultsSearch(state()))).toEqual(state());
+    expect(resultsSearch(state())).toBe('');
+    const shared = new URLSearchParams(resultsSearch(selection));
+    expect(shared.get('unofficialruns')).toBe('123');
+    expect(shared.has('unofficialrun')).toBe(false);
+    for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
+    // PR visualizer links spell the overlay `unofficialRun`, as the other dashboards accept.
+    expect(parseResultsState('unofficialRun=43653414377').unofficialRun).toBe('43653414377');
+    expect(parseResultsState('UnofficialRuns=7').unofficialRun).toBe('7');
+    // Retired engine comparison: an old link still plots the best engine per GPU.
+    expect(parseResultsState('r_compare=1&r_lossy=1')).toEqual({ ...state(), lossy: true });
+    expect(
+      parseResultsState(
+        'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',
+      ),
+    ).toMatchObject({
+      deadlineSeconds: 120,
+      xMetric: 'p50',
+      yMetric: 'videoSecondsPerDollar',
+      costBasis: 'participating',
+      optimal: true,
+      point: null,
+    });
+  });
+  it('keeps engines and workload-mix cohorts distinct rather than overwriting or pooling them', () => {
+    const a = {
+      ...eligible,
+      id: 'first:c1',
+      videoSecondsPerHour: 200,
+      results: evidence({ engine: 'sglang' }),
+    };
+    const b = { ...eligible, id: 'second:c1', results: evidence({ engine: 'vllm-omni' }) };
+    const plan = JSON.parse(eligible.workloadKey!);
+    plan.plan.generation.height = 512;
+    const c = { ...a, id: 'third:c1', workloadKey: JSON.stringify(plan) };
+    const result = resultProjection([a, b, c], state());
+    expect(result.cells).toHaveLength(2);
+    expect(result.workloadMix).toHaveLength(3);
+    expect(new Set(result.workloadMix.map((row) => row.point.workloadKey)).size).toBe(2);
+    // An engine only another workload measured is no choice for this cohort.
+    const sol = { ...c, id: 'fourth:c1', results: evidence({ engine: 'sol-engine' }) };
+    expect(resultProjection([a, b, c, sol], state()).options.engines).toEqual([
+      'sglang',
+      'vllm-omni',
+    ]);
+  });
+  const b200Entry = (id: string, engine: string) => ({
+    ...eligible,
+    id,
+    hardwareKey: 'b200',
+    results: evidence({ engine }),
+  });
+
+  it('offers each engine as its own chip config and ignores a key from before engines', () => {
+    const input = [b200Entry('vllm:c1', 'vllm-omni'), b200Entry('sglang:c1', 'sglang')];
+    const offered = resultProjection(input, state()).chipConfigs;
+    expect(offered.map(({ point }) => point.id)).toEqual(['sglang:c1', 'vllm:c1']);
+    // A share link from before engines named the same B200 4-GPU TP2 × Ulysses 2 deployment.
+    const stale = resultProjection(input, { ...state(), configs: ['b200:4g:tp2:u2'] });
+    expect(stale.state.configs).toEqual([]);
+    expect(stale.history).toEqual([]);
+    const chosen = resultProjection(input, { ...state(), configs: [offered[1].key] });
+    expect(ids(chosen.history)).toEqual(['vllm:c1']);
+  });
+  it.each([
+    ['recorded results without an engine', evidence({ engine: null })],
+    ['legacy results without engine metadata', undefined],
+  ] as const)('keeps only the latest deployment across runtime revisions for %s', (_, results) => {
+    const newest = { ...eligible, id: 'newest:c1', runtime: 'b'.repeat(40), results };
+    const previous = { ...newest, id: 'previous:c1', runtime: 'a'.repeat(40) };
+    const recorded = { ...newest, id: 'recorded:c1', results: evidence({ engine: 'sglang' }) };
+    const projection = resultProjection([newest, previous, recorded], state());
+    expect(projection.cells.map((cell) => cell.point.id)).toEqual(['newest:c1', 'recorded:c1']);
+    expect(projection.workloadMix.map((cell) => cell.point.id)).toEqual([
+      'newest:c1',
+      'recorded:c1',
+    ]);
+    expect(projection.cells[0].metadata.engine).toBeNull();
+    expect(projection.options.engines).toEqual(['sglang']);
+    expect(
+      resultProjection([newest, previous], { ...state(), engine: newest.runtime }).cells,
+    ).toEqual([]);
+  });
+  it('uses the legacy P50 only when its complete identity explicitly records client delivery timing', () => {
+    const old = resultProjection([eligible], state()).cells[0];
+    expect(old.deliveryP50).toBe(eligible.p50);
+    const native = { ...eligible, results: evidence({ clientP50: 42 }) };
+    expect(resultProjection([native], state()).cells[0].deliveryP50).toBe(42);
+    expect(
+      resultProjection([{ ...native, results: evidence({ clientP50: null }) }], state()).cells[0]
+        .deliveryP50,
+    ).toBeNull();
+    const identity = JSON.parse(eligible.workloadKey!);
+    identity.semantics.boundary = 'harness_seconds';
+    expect(
+      resultProjection([{ ...eligible, workloadKey: JSON.stringify(identity) }], state()).cells[0]
+        .deliveryP50,
+    ).toBeNull();
+  });
+});

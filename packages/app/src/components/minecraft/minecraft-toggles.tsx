@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Music, Volume2, VolumeOff } from 'lucide-react';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
 const toggleClasses = cn(
   'inline-flex items-center justify-center rounded-md size-11',
@@ -12,10 +12,6 @@ const toggleClasses = cn(
   'focus-visible:outline-none',
 );
 
-/**
- * Header toggles for Minecraft audio — both the click-sound and music
- * toggles only render when the minecraft theme is active.
- */
 export function MinecraftToggles() {
   const [isMinecraft, setIsMinecraft] = useState(false);
   const [musicOn, setMusicOn] = useState(true);

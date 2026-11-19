@@ -9,16 +9,28 @@ Use this skill for the user's InferenceX task and related follow-up questions.
 Choose the relevant CLI command or documented public-view recipe on the user's
 behalf; they can describe the result they want in natural language.
 
+For AgentX interactivity comparisons, historical trends, or efficiency-gain charts,
+read [the P90 definition](../inferencex-api/references/agentic-interactivity.md).
+Use reciprocal P90 full-response ITL, not median interactivity or P90 token rate.
+
 Read [the shared workflow guide](../inferencex-api/SKILL.md), then only the
 cookbook relevant to the task. It covers every existing CLI workflow and utility,
 as well as dashboard views, Pareto boundary queries, and chart/table templates.
 Resolve its relative paths from `../inferencex-api/`; the executable is
-`../inferencex-api/scripts/inferencex.mjs` relative to this skill directory. Run
-it with Node.js 24 or later. No global binary or API key is required.
+`../inferencex-api/scripts/inferencex.mjs` relative to this skill directory.
+Offline summary helpers (`tco-summary.mjs`, `trace-summary.mjs`) and the
+raw-response capture helper (`capture-response.mjs`) also live under
+`../inferencex-api/scripts/`; use their cookbook interfaces rather than inventing
+parallel analysis. Run it with Node.js 24 or later. No global binary or API key is
+required.
 
 For direct AgentX presentation requests, [inferencex-to-chart](../inferencex-to-chart/SKILL.md)
 defaults to a chart and [inferencex-to-table](../inferencex-to-table/SKILL.md) defaults
 to tables and CSV. Both use the same shared template and CLI.
+
+For historical throughput gains or modeled cost reductions with source PR/run
+links, use [inferencex-pr-improvements](../inferencex-pr-improvements/SKILL.md).
+It renders the API's baseline-to-best records at fixed interactivity.
 
 If invoked without a task, briefly offer benchmark lookup, token-cost comparison,
 power/AgentX analysis, Pareto frontier/hinterland queries, result provenance,

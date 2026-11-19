@@ -6,9 +6,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { track } from '@/lib/analytics';
-import { getHardwareConfig } from '@/lib/constants';
-import { getChartWatermark } from '@/lib/data-mappings';
+import {
+  ChartPointDetails,
+  type ChartPointDetailsProps,
+} from '@/components/ui/chart-point-details';
+import { track } from '@/lib/analytics/analytics';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { widthTickCount } from '@/lib/d3-chart/chart-update';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   D3ChartHandle,
@@ -16,22 +22,24 @@ import type {
   RenderContext,
   ScaleConfig,
 } from '@/lib/d3-chart/D3Chart/types';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/utils';
-import { getAxisVendorIcon } from '@/lib/vendor-logos';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
+import { getAxisVendorIcon } from '@/lib/catalog/vendor-logos';
 
 import {
   formatProfitUsd,
+  formatUsdPerChipHour,
   type ProfitBasis,
   type ProfitEstimatorAssumptions,
   type ProfitEstimatorRow,
 } from './profit-estimator';
+import type { ProfitPowerSource } from './profit-power';
 
 export type ProfitSegmentKind = 'tco' | 'labCut' | 'profit' | 'loss';
 
-/** One rectangle of the stack. `y0`/`y1` are $ per basis; loss segments run below zero. */
 export interface ProfitSegment {
   key: string;
   kind: ProfitSegmentKind;
@@ -40,46 +48,31 @@ export interface ProfitSegment {
   y1: number;
 }
 
-/**
- * Base margins for slanted x labels. The bottom is only a floor for the
- * shortest labels (tick, one line of text and a little air); `slantedMargins`
- * grows both the bottom and the left from the actual label set, so a short
- * label set does not leave a band of dead space between the axis and the
- * formula note under the chart. The longest SKU label (≈32 chars, ≈190px at
- * the sub-label size) rotated 50° needs ≈146px of drop and ≈122px of reach.
- */
 const CHART_MARGIN = { top: 12, right: 24, bottom: 40, left: 116 };
-/** Bottom margin when the x labels stand upright on two lines (name / framework). */
 const X_LABEL_STACKED_BOTTOM = 64;
-/** Extra bottom margin for the third stacked line a compare-history date adds. */
 const X_LABEL_HISTORY_LINE_PX = 16;
-/** Tallest the chart gets, on a viewport with room to spare. */
 export const CHART_HEIGHT = 720;
-/** Shortest the chart gets; below this the in-bar labels start colliding. */
 export const CHART_HEIGHT_MIN = 440;
-/**
- * Viewport height not available to the chart: the sticky site nav (~56px),
- * the card header above the plot (title, subtitle, TCO badges and selling
- * price, ~170px) and card padding. The chart shrinks to fit what is left so
- * the title and the x labels share one laptop screen without scrolling.
- */
 export const CHART_VIEWPORT_RESERVE = 260;
-/** Below this container width the chart uses the compact margins and height. */
 export const COMPACT_CHART_MAX_WIDTH = 640;
-const CHART_MARGIN_COMPACT = { top: 12, right: 8, bottom: 40, left: 64 };
-export const CHART_HEIGHT_COMPACT = 560;
+const ROW_MARGIN = { top: 8, right: 8 };
+const ROW_STEP_MIN_PX = 52;
+const ROW_STEP_PAD_PX = 12;
+const ROW_LABEL_SHARE = 0.36;
+const ROW_LABEL_GAP = 10;
+const ROW_NAME_LINE_PX = 14;
+const ROW_SUB_LINE_PX = 12;
+const ROW_VALUE_GAP = 6;
+const ROW_TICKS_PX = 22;
+const ROW_AXIS_LINE_PX = 15;
+const ROW_ORIGIN_MERGE_PX = 8;
 
-/** Chart height for a viewport: as tall as `maxHeight`, but never taller than the space under the card header. */
-export function chartHeightForViewport(
-  viewportHeightPx: number | undefined,
-  maxHeight: number = CHART_HEIGHT,
-): number {
-  if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return maxHeight;
+export function chartHeightForViewport(viewportHeightPx: number | undefined): number {
+  if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return CHART_HEIGHT;
   const available = Math.floor((viewportHeightPx as number) - CHART_VIEWPORT_RESERVE);
-  return Math.min(maxHeight, Math.max(CHART_HEIGHT_MIN, available));
+  return Math.min(CHART_HEIGHT, Math.max(CHART_HEIGHT_MIN, available));
 }
 
-/** Window inner height, tracked across resizes; undefined before mount so SSR and first paint agree. */
 function useViewportHeight(): number | undefined {
   const [height, setHeight] = useState<number | undefined>(undefined);
   useEffect(() => {
@@ -90,63 +83,83 @@ function useViewportHeight(): number | undefined {
   }, []);
   return height;
 }
-/** Average glyph advance as a share of font size; used to test whether a label fits a bar. */
 const GLYPH_WIDTH_EM = 0.55;
-/** Horizontal breathing room a label needs inside its bar, in px. */
 const LABEL_SIDE_PAD_PX = 4;
-/** The labels above a bar may borrow this much of the gap to each neighbour, in px. */
 const X_GAP_ALLOWANCE = 12;
+const MIN_BAR_STEP_PX = 96;
 
-/**
- * Horizontal room the labels above a bar may use, in px. A label may overhang
- * its bar by up to `X_GAP_ALLOWANCE`, but never so far that two neighbours of
- * similar height touch: on a phone the gap between bars is narrower than the
- * allowance, so the band step, less a little air, is the real limit.
- */
 export function barLabelSlotPx(bandwidthPx: number, stepPx: number): number {
   if (!Number.isFinite(bandwidthPx) || bandwidthPx <= 0) return 0;
   const step = Number.isFinite(stepPx) && stepPx > bandwidthPx ? stepPx : bandwidthPx;
   return Math.max(0, Math.min(bandwidthPx + X_GAP_ALLOWANCE, step - LABEL_SIDE_PAD_PX));
 }
 
-/** Rough rendered width of `text` at `fontPx`, for fit tests before anything is drawn. */
 export function estimateTextWidth(text: string, fontPx: number): number {
   return text.length * GLYPH_WIDTH_EM * fontPx;
+}
+
+export function wrapWords(text: string, maxPx: number, fontPx: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && estimateTextWidth(next, fontPx) > maxPx) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 const X_LABEL_ROTATION = -50;
 
 export type XLabelLayout = 'stacked' | 'slanted';
 
-/**
- * Split "GB300 NVL72 (Dynamo vLLM) (FP4)" into ["GB300 NVL72", "(Dynamo vLLM) (FP4)"]
- * so the SKU name and its framework can sit on two lines under the tick.
- * A label with no parenthesis stays on one line.
- */
 export function splitAxisLabel(label: string): [string, string] {
   const at = label.indexOf(' (');
   if (at === -1) return [label, ''];
   return [label.slice(0, at), label.slice(at + 1)];
 }
 
-/** Separator between a compare-history label and its run date; matches the `/inference` legend. */
 export const HISTORY_LABEL_SEP = ' • ';
 
-/**
- * Split a compare-history label "B200 (FP4) • 2026-06-14" into its config and
- * date so the date can sit on its own axis line. A label without a date has
- * an empty second half.
- */
 export function splitHistoryLabel(label: string): [string, string] {
   const at = label.lastIndexOf(HISTORY_LABEL_SEP);
   if (at === -1) return [label, ''];
   return [label.slice(0, at), label.slice(at + HISTORY_LABEL_SEP.length)];
 }
 
-/**
- * Upright two-line labels when every SKU fits in its own slot; otherwise the
- * classic slanted single line. `slotPx` is the horizontal room per tick,
- * `fontPx` the label size.
- */
+export interface RowLabelLine {
+  text: string;
+  sub: boolean;
+}
+
+export function wrapRowLabel(label: string, maxPx: number): RowLabelLine[] {
+  const [config, date] = splitHistoryLabel(label);
+  const [name, detail] = splitAxisLabel(config);
+  return [
+    ...wrapWords(name, maxPx, CHART_TYPE.axisLabel).map((text) => ({ text, sub: false })),
+    ...[detail, date]
+      .filter(Boolean)
+      .flatMap((part) =>
+        wrapWords(part, maxPx, CHART_TYPE.axisLabelSub).map((text) => ({ text, sub: true })),
+      ),
+  ];
+}
+
+function rowLabelHeightPx(lines: readonly RowLabelLine[]): number {
+  return lines.reduce((sum, line) => sum + (line.sub ? ROW_SUB_LINE_PX : ROW_NAME_LINE_PX), 0);
+}
+
+export function rowStepPx(labels: readonly (readonly RowLabelLine[])[]): number {
+  return Math.max(
+    ROW_STEP_MIN_PX,
+    ...labels.map((lines) => rowLabelHeightPx(lines) + ROW_STEP_PAD_PX),
+  );
+}
+
 export function xLabelLayout(labels: string[], slotPx: number, fontPx: number): XLabelLayout {
   if (labels.length === 0 || slotPx <= 0) return 'slanted';
   const widest = Math.max(
@@ -163,15 +176,8 @@ export function xLabelLayout(labels: string[], slotPx: number, fontPx: number): 
   return widest + LABEL_SIDE_PAD_PX * 2 <= slotPx ? 'stacked' : 'slanted';
 }
 
-/** Tick length plus padding: where d3 starts the label text below the axis, px. */
 const X_TICK_TEXT_OFFSET = 9;
 
-/**
- * Margins a slanted label set needs so no glyph leaves the SVG. The widest
- * label projects `cos` of its length left of the first tick and `sin` below
- * the axis; `slotPx / 2` of the reach is already inside the plot because the
- * first tick sits half a slot in. Never smaller than `base`.
- */
 export function slantedMargins(
   labels: string[],
   slotPx: number,
@@ -191,22 +197,14 @@ export function slantedMargins(
     bottom: Math.max(base.bottom, Math.ceil(drop)),
   };
 }
-/** Distance from the tick to the label's end, in em (the d3 default is 0). */
 const X_LABEL_DX_EM = 0.4;
-/** Band-scale padding between bars; also drives the vendor-mark size above each bar. */
 const BAND_PADDING = 0.3;
-/** Gap between the top of the stack and the revenue figure's baseline, in px. */
 const REVENUE_LABEL_GAP = 20;
-/** Smallest vendor mark above a bar, in px; what a phone-width bar gets. */
 export const BAR_ICON_MIN_HEIGHT = 14;
-/** Largest vendor mark above a bar, in px, however wide the bar gets. */
 export const BAR_ICON_MAX_HEIGHT = 48;
-/** Share of the bar width the mark grows to between those bounds. */
 const BAR_ICON_WIDTH_SHARE = 0.3;
-/** Gap between the vendor mark and the top of the revenue figure, in px. */
 const BAR_ICON_GAP = 4;
 
-/** Vendor mark height for a bar `bandwidthPx` wide: as big as the bar allows, within bounds. */
 export function barMarkHeight(bandwidthPx: number): number {
   if (!Number.isFinite(bandwidthPx) || bandwidthPx <= 0) return BAR_ICON_MIN_HEIGHT;
   return Math.min(
@@ -222,20 +220,13 @@ function barMarkWidth(
   return icon ? (icon.width / icon.height) * heightPx : 0;
 }
 
-/** Opacity of the license-fee segment relative to the SKU's profit colour. */
-/**
- * Every segment is drawn in its SKU's colour at a different weight so a bar
- * reads as one chip: TCO is the palest tint, the license fee a mid tint, profit
- * the solid colour. Loss is a hatch in the same colour below the axis.
- */
 const TCO_OPACITY = 0.22;
 const LAB_CUT_OPACITY = 0.5;
+const PROFIT_OPACITY = 0.9;
 const LOSS_FILL = 'var(--destructive)';
-/** Segment heights below which the in-bar label drops to one line, then disappears. */
 const SEGMENT_TWO_LINE_MIN_PX = 34;
 const SEGMENT_ONE_LINE_MIN_PX = 17;
 
-/** Stable SVG pattern id for a loss hatch in the SKU's colour. */
 export function lossPatternId(resultKey: string): string {
   return `profit-loss-hatch-${resultKey.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}`;
 }
@@ -253,6 +244,7 @@ const STRINGS = {
     },
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
+    gpuHoursPerGwYear: 'GPU-hours per GW-year',
     tco: 'Compute Expense',
     grossMargin: 'Gross Margin',
     labCut: 'Model License Fee',
@@ -263,9 +255,17 @@ const STRINGS = {
     utilization: 'Utilization',
     labCutShare: 'License fee share',
     ofRevenue: 'of revenue',
-    dismiss: 'Click anywhere to dismiss',
     runDate: 'Run date',
-    noData: 'No SKU can be priced for the current selection.',
+    powerBasis: 'Power basis',
+    powerBasisLabels: {
+      chassis: 'measured GPU board; CPU, DRAM, networking, storage, board, fans and PSU modeled',
+      'nvl72-tray':
+        'measured GPU board and Grace socket; tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
+      'nvl72-tray-modeled-cpu':
+        'measured GPU board; Grace CPU and memory, tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
+    },
+    noData: 'No SKU can be priced for the current selection',
+    scrollHint: 'Scroll horizontally to view the full chart',
   },
   zh: {
     yAxisModeled: '每吉瓦设施总功耗对应的年收入（美元）',
@@ -279,6 +279,7 @@ const STRINGS = {
     },
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
+    gpuHoursPerGwYear: '每吉瓦年 GPU 小时数',
     tco: '算力支出',
     grossMargin: '毛利',
     labCut: '模型许可费',
@@ -289,9 +290,17 @@ const STRINGS = {
     utilization: '利用率',
     labCutShare: '许可费比例',
     ofRevenue: '（占收入）',
-    dismiss: '点击任意位置关闭',
     runDate: '运行日期',
-    noData: '当前选择下没有可定价的 SKU。',
+    powerBasis: '功耗口径',
+    powerBasisLabels: {
+      chassis: '实测 GPU 板卡功耗；CPU、DRAM、网络、存储、主板、风扇和 PSU 由模型估算',
+      'nvl72-tray':
+        '实测 GPU 板卡和 Grace socket 功耗；tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
+      'nvl72-tray-modeled-cpu':
+        '实测 GPU 板卡功耗；Grace CPU 和内存、tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
+    },
+    noData: '当前选择下没有可定价的 SKU',
+    scrollHint: '横向滚动查看完整图表',
   },
 } as const;
 
@@ -299,7 +308,14 @@ export function profitEstimatorChartStrings(locale: Locale) {
   return STRINGS[locale];
 }
 
-/** Segment label lines that fit a given pixel height: name and amount, amount only, or none. */
+export function powerBasisLabel(source: ProfitPowerSource, locale: Locale): string {
+  const labels = STRINGS[locale].powerBasisLabels;
+  if (source.topology === 'nvl72-tray' && source.cpu === 'modeled') {
+    return labels['nvl72-tray-modeled-cpu'];
+  }
+  return labels[source.topology];
+}
+
 export function segmentLabelLines(
   kind: ProfitSegmentKind,
   row: ProfitEstimatorRow,
@@ -308,51 +324,23 @@ export function segmentLabelLines(
   widthPx: number = Number.POSITIVE_INFINITY,
   basis: ProfitBasis = 'gw-year',
 ): string[] {
-  // Profit and loss both read `row.profit`; the loss kind only changes the word.
   const amount = kind === 'tco' ? row.tco : kind === 'labCut' ? row.labCut : row.profit;
   const name =
     kind === 'tco' ? t.tco : kind === 'labCut' ? t.labCut : kind === 'profit' ? t.profit : t.loss;
   const amountText = formatProfitUsd(amount, basis);
   const fits = (text: string) =>
     estimateTextWidth(text, CHART_TYPE.annotation) + LABEL_SIDE_PAD_PX <= widthPx;
-  // A narrow bar (phones) drops the name first, then the amount, so text
-  // never spills into the neighbouring bar.
   if (!fits(amountText)) return [];
   if (heightPx >= SEGMENT_TWO_LINE_MIN_PX && fits(name)) return [name, amountText];
   if (heightPx >= SEGMENT_ONE_LINE_MIN_PX) return [amountText];
   return [];
 }
 
-/**
- * Text colour that reads on a solid SKU fill. Palette colours are hex, so
- * relative luminance is available; anything unparseable gets white.
- */
-function linearChannel(c: number): number {
-  const v = c / 255;
-  return v <= 0.039_28 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-}
-
-export function contrastingTextColor(fill: string): string {
-  const parsed = d3.color(fill)?.rgb();
-  if (!parsed) return '#ffffff';
-  const channel = linearChannel;
-  const luminance =
-    0.2126 * channel(parsed.r) + 0.7152 * channel(parsed.g) + 0.0722 * channel(parsed.b);
-  return luminance > 0.45 ? '#111111' : '#ffffff';
-}
-
-/** How the revenue figure above every bar is set: compact-unit decimals and font size. */
 export interface RevenueLabelStyle {
   digits: number;
   fontPx: number;
 }
 
-/**
- * Ways to set the revenue figure, richest first. The figure shrinks one step
- * before it loses its decimal and loses the decimal before it shrinks again:
- * "$110B" next to "$109B" still ranks the bars and the tooltip keeps the
- * exact figure, while a figure wider than its slot runs into its neighbour.
- */
 const REVENUE_LABEL_FULL: RevenueLabelStyle = { digits: 1, fontPx: CHART_TYPE.axisLabel };
 const REVENUE_LABEL_SMALLEST: RevenueLabelStyle = { digits: 0, fontPx: CHART_TYPE.annotation };
 const REVENUE_LABEL_LADDER: readonly RevenueLabelStyle[] = [
@@ -361,19 +349,11 @@ const REVENUE_LABEL_LADDER: readonly RevenueLabelStyle[] = [
   { digits: 0, fontPx: CHART_TYPE.axisLabel },
   REVENUE_LABEL_SMALLEST,
 ];
-/** Bold glyphs run wider than the regular estimate; the revenue figure is weight 700. */
 const BOLD_WIDTH_FACTOR = 1.1;
-/** Rough rendered width of bold `text` at `fontPx`. */
 function boldWidth(text: string, fontPx: number): number {
   return estimateTextWidth(text, fontPx) * BOLD_WIDTH_FACTOR;
 }
 
-/**
- * One style for every revenue figure in the chart: the richest rung of the
- * ladder at which the widest figure still fits `slotPx`. Chosen per chart, not
- * per bar, so neighbouring figures share a size. Falls back to the last rung
- * when nothing fits, which only happens below any sensible bar width.
- */
 export function revenueLabelStyle(
   rows: readonly Pick<ProfitEstimatorRow, 'revenue'>[],
   basis: ProfitBasis,
@@ -391,18 +371,11 @@ export function revenueLabelStyle(
   return REVENUE_LABEL_SMALLEST;
 }
 
-/** How the loss figure under a losing bar is set: whether the word stays, and the compact-unit decimals. */
 export interface LossLabelStyle {
   word: boolean;
   digits: number;
 }
 
-/**
- * Ways to set the loss figure, richest first. The word goes before the figure
- * loses precision entirely: the hatch below the axis and the red fill already
- * say "loss", while "Loss -$561.2M" under a phone-width bar ran into both
- * neighbours and "Loss -$4.9B" under the last bar ran off the plot.
- */
 const LOSS_LABEL_FULL: LossLabelStyle = { word: true, digits: 1 };
 const LOSS_LABEL_SMALLEST: LossLabelStyle = { word: false, digits: 0 };
 const LOSS_LABEL_LADDER: readonly LossLabelStyle[] = [
@@ -412,14 +385,6 @@ const LOSS_LABEL_LADDER: readonly LossLabelStyle[] = [
   LOSS_LABEL_SMALLEST,
 ];
 
-/**
- * The loss figure for one bar in `style`: "Loss -$561.2M", "Loss -$561M",
- * "-$561.2M" or "-$561M". When the chart had to drop the decimal for its
- * widest figure, a bar whose own figure still fits `slotPx` keeps it: loss
- * figures hang at different depths, so they never compete for one line the
- * way the revenue figures do, and "-$4.9B" says more than "-$5B". With no
- * `slotPx` the style is applied as given.
- */
 export function lossLabelText(
   profit: number,
   lossWord: string,
@@ -434,7 +399,6 @@ export function lossLabelText(
   return lossTextIn(profit, lossWord, basis, style);
 }
 
-/** The loss figure set exactly in `style`, with no fit test. */
 function lossTextIn(
   profit: number,
   lossWord: string,
@@ -445,18 +409,10 @@ function lossTextIn(
   return style.word ? `${lossWord} ${amount}` : amount;
 }
 
-/** Budgeted width of a loss figure: annotation size, weight 600, so measured like the bold revenue figure. */
 function lossTextWidth(text: string): number {
   return boldWidth(text, CHART_TYPE.annotation);
 }
 
-/**
- * One style for every loss figure in the chart: the richest rung of the ladder
- * at which the widest figure still fits `slotPx`. Chosen per chart, as the
- * revenue style is, so two losing bars read the same way. The figure is set
- * at the annotation size in weight 600, so it is budgeted like the bold
- * revenue figure.
- */
 export function lossLabelStyle(
   rows: readonly Pick<ProfitEstimatorRow, 'profit'>[],
   lossWord: string,
@@ -474,10 +430,6 @@ export function lossLabelStyle(
   return LOSS_LABEL_SMALLEST;
 }
 
-/**
- * Margin as a share of revenue, formatted for the label above the bar. When
- * the bar is too narrow for the word, only the percentage is shown.
- */
 export function operatorMarginLabel(
   row: ProfitEstimatorRow,
   marginWord: string,
@@ -489,7 +441,6 @@ export function operatorMarginLabel(
   return estimateTextWidth(full, CHART_TYPE.annotation) <= widthPx ? full : pct;
 }
 
-/** Turn a priced row into its stacked rectangles. Pure, so it is unit-tested. */
 export function buildProfitSegments(rows: readonly ProfitEstimatorRow[]): ProfitSegment[] {
   const segments: ProfitSegment[] = [];
   for (const row of rows) {
@@ -519,61 +470,65 @@ export function buildProfitSegments(rows: readonly ProfitEstimatorRow[]): Profit
   return segments;
 }
 
-/**
- * Top of a bar's positive stack in data units. A profitable bar tops out at
- * revenue (TCO + license fee + profit); a loss bar still draws TCO and the
- * license fee above the axis, and that sum exceeds revenue, so the labels
- * above the bar must clear it rather than the revenue figure.
- */
 export function stackTopValue(row: ProfitEstimatorRow): number {
   return Math.max(row.revenue, row.tco + row.labCut);
 }
 
-/**
- * Pixels the tallest stack needs above it: the revenue figure and margin line
- * (REVENUE_LABEL_GAP covers both), then a vendor mark `iconHeightPx` tall and its gap.
- */
 export function stackHeadroomPx(iconHeightPx = BAR_ICON_MIN_HEIGHT): number {
   return REVENUE_LABEL_GAP + CHART_TYPE.axisLabel + BAR_ICON_GAP + iconHeightPx + 8;
 }
 
-/** Headroom with the smallest vendor mark; what a phone-width chart reserves. */
 export const STACK_HEADROOM_PX = stackHeadroomPx();
 
-/** Baseline of the loss figure below the bottom of its hatch, in px. */
 const LOSS_LABEL_DY = 14;
-/**
- * Pixels the deepest loss needs below it: the loss figure's baseline offset
- * plus a text line of clearance before the axis line. Without this the figure
- * of a loss that reaches the domain floor sat on top of the x axis.
- */
 export const LOSS_FOOTROOM_PX = LOSS_LABEL_DY + CHART_TYPE.annotation;
 
-/**
- * Y domain for the bars. The top is the tallest positive stack plus exactly the
- * pixel headroom its labels need (`headroomPx`); the bottom is the deepest loss
- * plus the pixel footroom its figure needs (`LOSS_FOOTROOM_PX`, none when nothing
- * loses money). Both are converted to data units through `plotHeightPx`, with a
- * proportional fallback (30% above, 12% below) when the plot has not been measured yet.
- */
 export function profitYDomain(
   rows: readonly ProfitEstimatorRow[],
   plotHeightPx = 0,
   headroomPx = STACK_HEADROOM_PX,
+  lossFootroomPx = LOSS_FOOTROOM_PX,
 ): [number, number] {
   if (rows.length === 0) return [0, 1];
-  // A loss bar stacks TCO and the license fee above the axis, and that sum can
-  // exceed both revenue and TCO, so size the top to the tallest positive stack.
   const top = Math.max(0, ...rows.map(stackTopValue));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
   const span = top - bottom;
-  const footroomPx = bottom < 0 ? LOSS_FOOTROOM_PX : 0;
+  const footroomPx = bottom < 0 ? lossFootroomPx : 0;
   const reservedPx = headroomPx + footroomPx;
   if (plotHeightPx > reservedPx * 2) {
     const unitsPerPx = span / (plotHeightPx - reservedPx);
     return [bottom - unitsPerPx * footroomPx, top === 0 ? 1 : top + unitsPerPx * headroomPx];
   }
   return [bottom * 1.12, top === 0 ? 1 : top + span * 0.3];
+}
+
+export function rowValueRoomPx(rows: readonly ProfitEstimatorRow[], basis: ProfitBasis): number {
+  const widest = Math.max(
+    0,
+    ...rows.map((row) =>
+      Math.max(
+        boldWidth(
+          formatProfitUsd(row.revenue, basis, REVENUE_LABEL_FULL.digits),
+          REVENUE_LABEL_FULL.fontPx,
+        ),
+        estimateTextWidth(operatorMarginLabel(row, '', 0), CHART_TYPE.annotation),
+      ),
+    ),
+  );
+  return widest + ROW_VALUE_GAP;
+}
+
+const PROFIT_Y_TICK_COUNT = 8;
+
+export function profitAxisTickFormat(
+  basis: ProfitBasis,
+  domain: readonly [number, number],
+  tickCount = PROFIT_Y_TICK_COUNT,
+): (value: number) => string {
+  if (basis !== 'chip-hour') return (value) => formatProfitUsd(value, basis, 0);
+  const [start, stop] = d3.scaleLinear().domain(domain).nice().domain();
+  const digits = Number.isInteger(d3.tickStep(start, stop, tickCount)) ? 0 : 2;
+  return (value) => formatUsdPerChipHour(value, digits);
 }
 
 export function rowLabel(
@@ -584,9 +539,6 @@ export function rowLabel(
   const base = config ? getDisplayLabel(config) : row.hwKey;
   const precisionLabel = row.precision ? `${base} (${row.precision.toUpperCase()})` : base;
   const withPrecision = row.powerLabel ? `${precisionLabel} (${row.powerLabel})` : precisionLabel;
-  // A compare-history bar names the run date (and run number, when the day had
-  // several) it was priced on, as the `/inference` legend does for its
-  // "config • date" series.
   const dateLabel = row.dateLabel ?? row.date;
   return dateLabel ? `${withPrecision}${HISTORY_LABEL_SEP}${dateLabel}` : withPrecision;
 }
@@ -595,69 +547,87 @@ function formatPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+export function profitPointDetails(
+  row: ProfitEstimatorRow,
+  hardwareConfig: HardwareConfig,
+  assumptions: ProfitEstimatorAssumptions,
+  locale: Locale,
+): Omit<ChartPointDetailsProps, 'onClose'> & { summary: string } {
+  const t = STRINGS[locale];
+  const usd = (value: number) => formatProfitUsd(value, assumptions.basis);
+  const config = hardwareConfig[row.hwKey] || getHardwareConfig(row.hwKey);
+  const operatorMargin = row.revenue > 0 ? row.profit / row.revenue : Number.NaN;
+  const date = row.dateLabel ?? row.date;
+  return {
+    title: config ? getDisplayLabel(config) : row.hwKey,
+    subtitle: [row.precision?.toUpperCase(), row.powerLabel].filter(Boolean).join(' · '),
+    date: date ? `${t.runDate} ${date}` : undefined,
+    metrics: [
+      { value: usd(row.profit), label: row.profit >= 0 ? t.profit : t.loss },
+      {
+        value: Number.isFinite(operatorMargin) ? formatPct(operatorMargin) : '—',
+        label: t.marginPct,
+      },
+    ],
+    summary: `${t.revenue} ${usd(row.revenue)} · ${t.tco} ${usd(row.tco)}`,
+    rows: [
+      ...(row.powerSource
+        ? [
+            {
+              label: t.powerBasis,
+              value: powerBasisLabel(row.powerSource, locale),
+              wide: true,
+            },
+          ]
+        : []),
+      {
+        label: `${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`,
+        value: usd(row.revenue),
+      },
+      { label: t.tco, value: usd(row.tco) },
+      { label: t.grossMargin, value: usd(row.grossMargin) },
+      {
+        label: `${t.labCut} (${assumptions.labCutPct}% ${t.ofRevenue})`,
+        value: usd(row.labCut),
+      },
+      { label: t.revenuePerGpuHour, value: `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr` },
+      ...(assumptions.basis === 'gw-year'
+        ? [{ label: t.gpuHoursPerGwYear, value: Math.round(row.gpuHours).toLocaleString('en-US') }]
+        : []),
+    ],
+  };
+}
+
 export function generateProfitTooltipHTML(
   row: ProfitEstimatorRow,
   hardwareConfig: HardwareConfig,
   assumptions: ProfitEstimatorAssumptions,
   locale: Locale,
-  isPinned: boolean,
-  skuColor = 'var(--foreground)',
+  skuColor?: string,
 ): string {
-  const t = STRINGS[locale];
-  const usd = (value: number) => formatProfitUsd(value, assumptions.basis);
-  const colon = locale === 'zh' ? '：' : ':';
-  const label = escapeHtml(splitHistoryLabel(rowLabel(row, hardwareConfig))[0]);
-  const line = (name: string, value: string, color?: string, opacity = 1) =>
-    `<div style="display:flex; justify-content:space-between; gap:16px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><span>${
-      color
-        ? `<span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${color}; opacity:${opacity}; box-shadow: inset 0 0 0 1px ${color}; margin-right:6px; vertical-align:middle;"></span>`
-        : ''
-    }${name}${colon}</span><strong style="color: var(--foreground); font-variant-numeric: tabular-nums;">${value}</strong></div>`;
-
-  const operatorMargin = row.revenue > 0 ? row.profit / row.revenue : Number.NaN;
-  const profitLine =
-    row.profit >= 0
-      ? line(t.profit, usd(row.profit), skuColor)
-      : line(t.loss, usd(row.profit), LOSS_FILL);
-  const labCutLine = line(
-    `${t.labCut} (${assumptions.labCutPct}% ${t.ofRevenue})`,
-    usd(row.labCut),
-    skuColor,
-    LAB_CUT_OPACITY,
+  const { title, subtitle, date, metrics, summary } = profitPointDetails(
+    row,
+    hardwareConfig,
+    assumptions,
+    locale,
   );
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 260px; max-width: 340px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
-      ${row.date ? line(t.runDate, escapeHtml(row.dateLabel ?? row.date)) : ''}
-      ${line(`${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`, usd(row.revenue))}
-      ${line(t.tco, usd(row.tco), skuColor, TCO_OPACITY)}
-      ${line(t.grossMargin, usd(row.grossMargin))}
-      ${labCutLine}
-      ${profitLine}
-      ${line(t.marginPct, Number.isFinite(operatorMargin) ? formatPct(operatorMargin) : '—')}
-      ${
-        // Per chip-hour the bar already is the $/GPU/hr figure.
-        assumptions.basis === 'gw-year'
-          ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
-        ${line(t.revenuePerGpuHour, `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr`)}
-      </div>`
-          : ''
-      }
-    </div>`;
+  return chartHoverCard({
+    title,
+    subtitle: [subtitle, date].filter(Boolean).join(' · '),
+    color: skuColor,
+    metrics: [...metrics],
+    summary,
+  });
 }
 
 interface ProfitEstimatorChartProps {
   rows: ProfitEstimatorRow[];
   hardwareConfig: HardwareConfig;
-  /**
-   * Colour of a row's bar. Keyed by the whole row, not just the hwKey, so a
-   * compare-history view can shade a chip's older dates lighter than today's.
-   */
   colorResolver: (row: ProfitEstimatorRow) => string;
   assumptions: ProfitEstimatorAssumptions;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 export default function ProfitEstimatorChart({
@@ -667,15 +637,12 @@ export default function ProfitEstimatorChart({
   assumptions,
   legendElement,
   caption,
+  footer,
 }: ProfitEstimatorChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
-  const compact = dimensions.width > 0 && dimensions.width < COMPACT_CHART_MAX_WIDTH;
+  const horizontal = dimensions.width > 0 && dimensions.width < COMPACT_CHART_MAX_WIDTH;
   const viewportHeight = useViewportHeight();
-  const chartHeight = chartHeightForViewport(
-    viewportHeight,
-    compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT,
-  );
   const locale = useLocale();
   const t = STRINGS[locale];
   const strings = t;
@@ -683,14 +650,19 @@ export default function ProfitEstimatorChart({
 
   const segments = useMemo(() => buildProfitSegments(rows), [rows]);
 
-  const xScaleConfig = useMemo<ScaleConfig>(
-    () => ({ type: 'band', domain: rows.map((row) => row.resultKey), padding: BAND_PADDING }),
-    [rows],
-  );
+  const bandScaleConfig = useMemo<ScaleConfig>(() => {
+    const domain = rows.map((row) => row.resultKey);
+    return {
+      type: 'band',
+      domain: horizontal ? domain.toReversed() : domain,
+      padding: BAND_PADDING,
+    };
+  }, [rows, horizontal]);
   const labelMap = useMemo(
     () => new Map(rows.map((row) => [row.resultKey, rowLabel(row, hardwareConfig)])),
     [rows, hardwareConfig],
   );
+  const valueRoom = useMemo(() => rowValueRoomPx(rows, basis), [rows, basis]);
 
   const fillFor = useCallback(
     (segment: ProfitSegment): string => {
@@ -700,40 +672,37 @@ export default function ProfitEstimatorChart({
     [colorResolver],
   );
 
-  /** Resting stroke: the tinted segments (TCO, license fee) and loss are outlined in the SKU colour. */
   const outlineFor = useCallback(
     (segment: ProfitSegment): string =>
       segment.kind === 'profit' ? 'none' : colorResolver(segment.row),
     [colorResolver],
   );
 
-  /** In-segment text colour: neutral on the muted and translucent fills, luminance-picked on solid SKU fills. */
   const labelColorFor = useCallback(
     (segment: ProfitSegment): string => {
-      if (segment.kind === 'profit') return contrastingTextColor(colorResolver(segment.row));
+      if (segment.kind === 'profit')
+        return readableTextColor(colorResolver(segment.row), PROFIT_OPACITY);
       return 'var(--foreground)';
     },
     [colorResolver],
   );
 
-  // Refs so the tooltip closure never goes stale without re-binding handlers.
   const tooltipStateRef = useRef({ hardwareConfig, assumptions, locale });
   tooltipStateRef.current = { hardwareConfig, assumptions, locale };
-  const hoveredBarXRef = useRef(0);
 
   const layers = useMemo<LayerConfig<ProfitSegment>[]>(() => {
     const stackLayer: LayerConfig<ProfitSegment> = {
       type: 'custom',
       key: 'profit-stack',
       render: (group, ctx) => {
-        const xScale = ctx.xScale as d3.ScaleBand<string>;
-        const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-        const bandwidth = xScale.bandwidth();
-        // Widest a label above a bar may be without meeting its neighbour's.
-        const labelSlot = barLabelSlotPx(bandwidth, xScale.step());
+        const band = (horizontal ? ctx.yScale : ctx.xScale) as d3.ScaleBand<string>;
+        const value = (horizontal ? ctx.xScale : ctx.yScale) as d3.ScaleLinear<number, number>;
+        const bandwidth = band.bandwidth();
+        const labelSlot = barLabelSlotPx(bandwidth, band.step());
+        const bandStart = (row: ProfitEstimatorRow) => band(row.resultKey) ?? 0;
+        const bandMid = (row: ProfitEstimatorRow) => bandStart(row) + bandwidth / 2;
+        const span = (d: ProfitSegment) => Math.abs(value(d.y1) - value(d.y0));
 
-        // One diagonal-hatch pattern per losing SKU, in that SKU's colour, so a
-        // loss reads as "same chip, below the line" rather than as a new colour.
         const lossRows = segments.filter((d) => d.kind === 'loss').map((d) => d.row);
         const defs = group
           .selectAll<SVGDefsElement, number>('defs.loss-patterns')
@@ -768,16 +737,15 @@ export default function ProfitEstimatorChart({
           .attr('fill-opacity', 0.18);
         patterns.select('.hatch-line').attr('stroke', (d) => colorResolver(d));
 
-        // Zero line, drawn before the bars so loss segments sit on top of it.
         group
           .selectAll<SVGLineElement, number>('.zero-line')
           .data([0])
           .join('line')
           .attr('class', 'zero-line')
-          .attr('x1', 0)
-          .attr('x2', ctx.width)
-          .attr('y1', yScale(0))
-          .attr('y2', yScale(0))
+          .attr('x1', horizontal ? value(0) : 0)
+          .attr('x2', horizontal ? value(0) : ctx.width)
+          .attr('y1', horizontal ? 0 : value(0))
+          .attr('y2', horizontal ? ctx.height : value(0))
           .attr('stroke', 'var(--foreground)')
           .attr('stroke-opacity', 0.6)
           .attr('stroke-width', 1);
@@ -788,10 +756,10 @@ export default function ProfitEstimatorChart({
           .join('rect')
           .attr('class', (d) => `bar bar-${d.kind}`)
           .attr('data-kind', (d) => d.kind)
-          .attr('x', (d) => xScale(d.row.resultKey) ?? 0)
-          .attr('width', bandwidth)
-          .attr('y', (d) => yScale(d.y1))
-          .attr('height', (d) => Math.max(0, yScale(d.y0) - yScale(d.y1)))
+          .attr('x', (d) => (horizontal ? value(d.y0) : bandStart(d.row)))
+          .attr('width', (d) => (horizontal ? span(d) : bandwidth))
+          .attr('y', (d) => (horizontal ? bandStart(d.row) : value(d.y1)))
+          .attr('height', (d) => (horizontal ? bandwidth : span(d)))
           .attr('fill', (d) => fillFor(d))
           .attr('fill-opacity', (d) =>
             d.kind === 'tco'
@@ -800,36 +768,37 @@ export default function ProfitEstimatorChart({
                 ? LAB_CUT_OPACITY
                 : d.kind === 'loss'
                   ? 1
-                  : 0.9,
+                  : PROFIT_OPACITY,
           )
           .attr('stroke', (d) => outlineFor(d))
           .attr('stroke-width', (d) => (d.kind === 'profit' ? 0 : 1))
           .attr('rx', 1)
           .attr('cursor', 'pointer');
 
-        // Name and amount inside every segment tall enough to hold them.
         const labelText = {
           tco: strings.tco,
           labCut: strings.labCut,
           profit: strings.profit,
           loss: strings.loss,
         };
-        const segmentLabels = segments.map((d) => {
-          const height = Math.max(0, yScale(d.y0) - yScale(d.y1));
-          return {
-            segment: d,
-            lines: segmentLabelLines(d.kind, d.row, height, labelText, bandwidth, basis),
-            height,
-          };
-        });
+        const segmentLabels = segments.map((d) => ({
+          segment: d,
+          lines: horizontal
+            ? segmentLabelLines(d.kind, d.row, bandwidth, labelText, span(d), basis)
+            : segmentLabelLines(d.kind, d.row, span(d), labelText, bandwidth, basis),
+        }));
         const segmentText = group
           .selectAll<SVGTextElement, (typeof segmentLabels)[number]>('.segment-label')
           .data(segmentLabels, (d) => d.segment.key)
           .join('text')
           .attr('class', (d) => `segment-label segment-label-${d.segment.kind}`)
-          .attr('x', (d) => (xScale(d.segment.row.resultKey) ?? 0) + bandwidth / 2)
+          .attr('x', (d) =>
+            horizontal ? (value(d.segment.y0) + value(d.segment.y1)) / 2 : bandMid(d.segment.row),
+          )
           .attr('y', (d) => {
-            const mid = (yScale(d.segment.y0) + yScale(d.segment.y1)) / 2;
+            const mid = horizontal
+              ? bandMid(d.segment.row)
+              : (value(d.segment.y0) + value(d.segment.y1)) / 2;
             return d.lines.length === 2 ? mid - CHART_TYPE.annotation * 0.15 : mid;
           })
           .attr('text-anchor', 'middle')
@@ -848,29 +817,22 @@ export default function ProfitEstimatorChart({
           .attr('font-weight', (d) => (d.count === 2 && d.index === 1 ? '600' : '400'))
           .text((d) => d.line);
 
-        // Revenue above the stack with the margin under it; the loss figure
-        // sits below the bar when the stack dips under zero. The vendor's
-        // full-color mark sits above the revenue figure.
         const labelData = segments.filter((d) => d.kind === 'tco');
-        // Anchor to the drawn stack, not `max(revenue, tco)`: a loss bar's
-        // license-fee segment sits above both, and the revenue figure and
-        // margin line used to land inside it, on top of its in-bar label.
-        const stackTopPx = (d: ProfitSegment) => yScale(stackTopValue(d.row));
+        const slot = horizontal ? Number.POSITIVE_INFINITY : labelSlot;
+        const stackTopPx = (d: ProfitSegment) => value(stackTopValue(d.row));
         const revenueBaselineY = (d: ProfitSegment) => stackTopPx(d) - REVENUE_LABEL_GAP;
-        // Same size the y domain reserved headroom for (both derive from the band width).
+        const revenueX = (row: ProfitEstimatorRow) =>
+          horizontal ? value(stackTopValue(row)) + ROW_VALUE_GAP : bandMid(row);
         const iconHeight = barMarkHeight(bandwidth);
-        // One format and size for every revenue figure, chosen so the widest
-        // fits its slot: on a phone two bars of similar height used to print
-        // "$110.3B" and "$108.7B" over each other.
         const revenueStyle = revenueLabelStyle(
           labelData.map((d) => d.row),
           basis,
-          labelSlot,
+          slot,
         );
         group
           .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
           .data(
-            labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
+            horizontal ? [] : labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
             (d) => d.row.resultKey,
           )
           .join('image')
@@ -885,7 +847,7 @@ export default function ProfitEstimatorChart({
           .attr('height', iconHeight)
           .attr('x', (d) => {
             const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight);
-            return (xScale(d.row.resultKey) ?? 0) + bandwidth / 2 - w / 2;
+            return bandMid(d.row) - w / 2;
           })
           .attr('y', (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight)
           .attr('pointer-events', 'none');
@@ -894,11 +856,11 @@ export default function ProfitEstimatorChart({
           .data(labelData, (d) => d.row.resultKey)
           .join('text')
           .attr('class', 'revenue-label')
-          .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('y', revenueBaselineY)
-          .attr('text-anchor', 'middle')
+          .attr('x', (d) => revenueX(d.row))
+          .attr('y', (d) => (horizontal ? bandMid(d.row) : revenueBaselineY(d)))
+          .attr('text-anchor', horizontal ? 'start' : 'middle')
           .attr('font-size', px(revenueStyle.fontPx))
-          .attr('font-weight', '700')
+          .attr('font-weight', '600')
           .style('fill', 'var(--foreground)');
         revenueText
           .selectAll<SVGTSpanElement, ProfitSegment>('tspan')
@@ -910,16 +872,24 @@ export default function ProfitEstimatorChart({
             },
             {
               row: d.row,
-              text: operatorMarginLabel(d.row, strings.marginShort, labelSlot),
+              text: operatorMarginLabel(
+                d.row,
+                strings.marginShort,
+                horizontal ? valueRoom - ROW_VALUE_GAP : labelSlot,
+              ),
               sub: true,
             },
           ])
           .join('tspan')
           .attr('class', (d) => (d.sub ? 'revenue-margin' : 'revenue-amount'))
-          .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('dy', (d) => (d.sub ? '1.2em' : '0'))
+          .attr('x', (d) => revenueX(d.row))
+          .attr('dy', (d) => {
+            if (d.sub) return '1.2em';
+            if (horizontal) return d.row.profit < 0 ? '-1em' : '-0.35em';
+            return '0';
+          })
           .attr('font-size', (d) => (d.sub ? px(CHART_TYPE.annotation) : null))
-          .attr('font-weight', (d) => (d.sub ? '500' : '700'))
+          .attr('font-weight', (d) => (d.sub ? '500' : '600'))
           .style('fill', (d) =>
             d.sub
               ? d.row.profit < 0
@@ -929,14 +899,12 @@ export default function ProfitEstimatorChart({
           )
           .text((d) => d.text);
 
-        // The loss figure is fitted to the same slot as the revenue figure:
-        // unfitted, "Loss -$561.2M" under a phone-width bar overran both
-        // neighbours' bands.
+        const lossSlot = horizontal ? valueRoom - ROW_VALUE_GAP : labelSlot;
         const lossStyle = lossLabelStyle(
           labelData.map((d) => d.row),
           strings.loss,
           basis,
-          labelSlot,
+          lossSlot,
         );
         group
           .selectAll<SVGTextElement, ProfitSegment>('.loss-label')
@@ -946,42 +914,73 @@ export default function ProfitEstimatorChart({
           )
           .join('text')
           .attr('class', 'loss-label')
-          .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('y', (d) => yScale(d.row.profit) + LOSS_LABEL_DY)
-          .attr('text-anchor', 'middle')
+          .attr('x', (d) => revenueX(d.row))
+          .attr('y', (d) =>
+            horizontal
+              ? bandMid(d.row) - revenueStyle.fontPx + 2.4 * CHART_TYPE.annotation
+              : value(d.row.profit) + LOSS_LABEL_DY,
+          )
+          .attr('text-anchor', horizontal ? 'start' : 'middle')
           .attr('font-size', px(CHART_TYPE.annotation))
           .attr('font-weight', '600')
           .style('fill', LOSS_FILL)
-          .text((d) => lossLabelText(d.row.profit, strings.loss, basis, lossStyle, labelSlot));
+          .text((d) => lossLabelText(d.row.profit, strings.loss, basis, lossStyle, lossSlot));
 
         return bars;
       },
     };
     return [stackLayer];
-  }, [segments, fillFor, outlineFor, labelColorFor, colorResolver, strings, basis]);
+  }, [
+    segments,
+    fillFor,
+    outlineFor,
+    labelColorFor,
+    colorResolver,
+    strings,
+    basis,
+    horizontal,
+    valueRoom,
+  ]);
 
   const tooltip = useMemo(
     () => ({
-      rulerType: 'vertical' as const,
-      content: (segment: ProfitSegment, isPinned: boolean) => {
+      rulerType: horizontal ? ('horizontal' as const) : ('vertical' as const),
+      content: (segment: ProfitSegment) => {
         const state = tooltipStateRef.current;
         return generateProfitTooltipHTML(
           segment.row,
           state.hardwareConfig,
           state.assumptions,
           state.locale,
-          isPinned,
           colorResolver(segment.row),
         );
       },
-      getRulerX: () => hoveredBarXRef.current,
+      details: (segment: ProfitSegment, _isOverlay: boolean, close: () => void) => {
+        const state = tooltipStateRef.current;
+        const { summary: _summary, ...details } = profitPointDetails(
+          segment.row,
+          state.hardwareConfig,
+          state.assumptions,
+          state.locale,
+        );
+        return (
+          <ChartPointDetails {...details} color={colorResolver(segment.row)} onClose={close} />
+        );
+      },
+      getRulerX: (segment: ProfitSegment, xScale: unknown) => {
+        if (horizontal) return (xScale as d3.ScaleLinear<number, number>)(segment.y1);
+        const band = xScale as d3.ScaleBand<string>;
+        return (band(segment.row.resultKey) ?? 0) + band.bandwidth() / 2;
+      },
+      getRulerY: (segment: ProfitSegment, yScale: unknown) => {
+        if (!horizontal) return (yScale as d3.ScaleLinear<number, number>)(segment.y1);
+        const band = yScale as d3.ScaleBand<string>;
+        return (band(segment.row.resultKey) ?? 0) + band.bandwidth() / 2;
+      },
       onHoverStart: (
-        selection: d3.Selection<SVGRectElement, ProfitSegment, SVGGElement, unknown>,
+        _selection: d3.Selection<SVGRectElement, ProfitSegment, SVGGElement, unknown>,
         segment: ProfitSegment,
       ) => {
-        hoveredBarXRef.current =
-          Number.parseFloat(selection.attr('x') || '0') +
-          Number.parseFloat(selection.attr('width') || '0') / 2;
         const svgEl = chartRef.current?.getSvgElement();
         if (!svgEl) return;
         d3.select(svgEl)
@@ -1006,33 +1005,88 @@ export default function ProfitEstimatorChart({
       },
       attachToLayer: 0,
     }),
-    [outlineFor, colorResolver],
+    [outlineFor, colorResolver, horizontal],
   );
 
-  const baseMargin = compact ? CHART_MARGIN_COMPACT : CHART_MARGIN;
-  // Upright two-line labels when each SKU has room for them; slanted otherwise.
+  const valueAxisLabel =
+    basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
+      ? t.yAxisModeled
+      : horizontal
+        ? t.yAxisCompact[basis]
+        : t.yAxis[basis];
+  const rowLabels = useMemo(() => {
+    if (!horizontal) return new Map<string, RowLabelLine[]>();
+    const maxPx = Math.floor(dimensions.width * ROW_LABEL_SHARE) - ROW_LABEL_GAP;
+    return new Map([...labelMap].map(([key, label]) => [key, wrapRowLabel(label, maxPx)]));
+  }, [horizontal, dimensions.width, labelMap]);
+  const rowLabelWidth = Math.ceil(
+    Math.max(
+      0,
+      ...[...rowLabels.values()]
+        .flat()
+        .map((line) =>
+          estimateTextWidth(line.text, line.sub ? CHART_TYPE.axisLabelSub : CHART_TYPE.axisLabel),
+        ),
+    ),
+  );
+  const rowPlotWidth = dimensions.width - ROW_MARGIN.right - rowLabelWidth - ROW_LABEL_GAP;
+  const valueLabelLines = useMemo(
+    () => (horizontal ? wrapWords(valueAxisLabel, rowPlotWidth, CHART_TYPE.axisLabel) : []),
+    [horizontal, valueAxisLabel, rowPlotWidth],
+  );
+
+  const minimumMargin = slantedMargins(
+    [...labelMap.values()],
+    MIN_BAR_STEP_PX,
+    CHART_TYPE.axisLabelSub,
+    CHART_MARGIN,
+  );
+  const chartWidth = horizontal
+    ? dimensions.width
+    : Math.max(
+        dimensions.width,
+        rows.length * MIN_BAR_STEP_PX + minimumMargin.left + minimumMargin.right,
+      );
   const labelLayout = useMemo<XLabelLayout>(() => {
-    const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
+    const plotWidth = chartWidth - CHART_MARGIN.left - CHART_MARGIN.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return xLabelLayout([...labelMap.values()], slot, CHART_TYPE.axisLabelSub);
-  }, [dimensions.width, baseMargin, rows.length, labelMap]);
+  }, [chartWidth, rows.length, labelMap]);
   const margin = useMemo(() => {
+    if (horizontal) {
+      return {
+        ...ROW_MARGIN,
+        left: rowLabelWidth + ROW_LABEL_GAP,
+        bottom: ROW_TICKS_PX + valueLabelLines.length * ROW_AXIS_LINE_PX,
+      };
+    }
     if (labelLayout === 'stacked') {
       const dated = [...labelMap.values()].some((label) => splitHistoryLabel(label)[1] !== '');
       return {
-        ...baseMargin,
+        ...CHART_MARGIN,
         bottom: X_LABEL_STACKED_BOTTOM + (dated ? X_LABEL_HISTORY_LINE_PX : 0),
       };
     }
-    const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
+    const plotWidth = chartWidth - CHART_MARGIN.left - CHART_MARGIN.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
-    return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
-  }, [baseMargin, labelLayout, dimensions.width, rows.length, labelMap]);
+    return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, CHART_MARGIN);
+  }, [
+    horizontal,
+    rowLabelWidth,
+    valueLabelLines.length,
+    labelLayout,
+    chartWidth,
+    rows.length,
+    labelMap,
+  ]);
+  const chartHeight = horizontal
+    ? margin.top +
+      margin.bottom +
+      Math.ceil(rowStepPx([...rowLabels.values()]) * (rows.length + BAND_PADDING))
+    : chartHeightForViewport(viewportHeight);
+  const plotWidth = chartWidth - margin.left - margin.right;
   const plotHeight = chartHeight - margin.top - margin.bottom;
-  // The vendor mark grows with the bar, so the headroom above the tallest stack
-  // has to be sized from the same band width the renderer will see.
   const bandwidth = useMemo(() => {
-    const plotWidth = dimensions.width - margin.left - margin.right;
     if (plotWidth <= 0 || rows.length === 0) return 0;
     return d3
       .scaleBand<string>()
@@ -1040,20 +1094,54 @@ export default function ProfitEstimatorChart({
       .range([0, plotWidth])
       .padding(BAND_PADDING)
       .bandwidth();
-  }, [dimensions.width, margin, rows]);
-  const yDomain = useMemo(
-    () => profitYDomain(rows, plotHeight, stackHeadroomPx(barMarkHeight(bandwidth))),
-    [rows, plotHeight, bandwidth],
+  }, [plotWidth, rows]);
+  const valueDomain = useMemo(
+    () =>
+      horizontal
+        ? profitYDomain(rows, plotWidth, valueRoom, 0)
+        : profitYDomain(rows, plotHeight, stackHeadroomPx(barMarkHeight(bandwidth))),
+    [horizontal, rows, plotWidth, plotHeight, valueRoom, bandwidth],
   );
-  const yScaleConfig = useMemo<ScaleConfig>(
-    () => ({ type: 'linear', domain: yDomain, nice: true }),
-    [yDomain],
+  const valueScaleConfig = useMemo<ScaleConfig>(
+    () => ({ type: 'linear', domain: valueDomain, nice: !horizontal }),
+    [valueDomain, horizontal],
   );
 
-  const xAxisConfig = useMemo(
+  const rowAxisConfig = useMemo(
     () => ({
-      // Categorical bars: a vertical line through each bar centre adds nothing,
-      // so only the horizontal $ grid lines are drawn.
+      grid: false,
+      tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
+      customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        axisGroup.selectAll<SVGGElement, d3.AxisDomain>('.tick').each(function (d) {
+          const lines = rowLabels.get(String(d)) ?? [];
+          const text = d3
+            .select(this)
+            .select<SVGTextElement>('text')
+            .attr('dy', null)
+            .attr('text-anchor', 'end')
+            .text(null);
+          const x = text.attr('x');
+          let top = -rowLabelHeightPx(lines) / 2;
+          for (const line of lines) {
+            const lineHeight = line.sub ? ROW_SUB_LINE_PX : ROW_NAME_LINE_PX;
+            text
+              .append('tspan')
+              .attr('x', x)
+              .attr('y', top + lineHeight * 0.76)
+              .attr('font-size', px(line.sub ? CHART_TYPE.axisLabelSub : CHART_TYPE.axisLabel))
+              .attr('font-weight', line.sub ? null : '500')
+              .style('fill', line.sub ? 'var(--muted-foreground)' : 'var(--foreground)')
+              .text(line.text);
+            top += lineHeight;
+          }
+        });
+      },
+    }),
+    [labelMap, rowLabels],
+  );
+
+  const columnAxisConfig = useMemo(
+    () => ({
       grid: false,
       tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
       customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
@@ -1065,8 +1153,6 @@ export default function ProfitEstimatorChart({
             .attr('font-size', px(fontPx))
             .style('fill', 'var(--foreground)');
           if (labelLayout === 'stacked') {
-            // Two upright lines centred on the tick: SKU name, then the
-            // framework and precision in parentheses.
             const [config, date] = splitHistoryLabel(labelMap.get(String(d)) ?? String(d));
             const [name, detail] = splitAxisLabel(config);
             text
@@ -1077,7 +1163,6 @@ export default function ProfitEstimatorChart({
               .text(null);
             text.append('tspan').attr('x', 0).text(name);
             if (detail) text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(detail);
-            // Compare-history bars carry their run date on a third, muted line.
             if (date) {
               text
                 .append('tspan')
@@ -1089,8 +1174,6 @@ export default function ProfitEstimatorChart({
             }
             return;
           }
-          // One line rotated about the tick and anchored at its end, so the
-          // text runs away from the axis towards the lower left.
           text
             .attr('transform', `rotate(${X_LABEL_ROTATION})`)
             .attr('text-anchor', 'end')
@@ -1102,28 +1185,49 @@ export default function ProfitEstimatorChart({
     [labelMap, labelLayout],
   );
 
-  // The full axis label is longer than a phone-height plot; the compact
-  // chart uses the short form.
-  const yAxisConfig = useMemo(
-    () => ({
-      label:
-        basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
-          ? t.yAxisModeled
-          : compact
-            ? t.yAxisCompact[basis]
-            : t.yAxis[basis],
-      tickFormat: (d: d3.AxisDomain) => formatProfitUsd(Number(d), basis, 0),
-      tickCount: 8,
-    }),
-    [compact, basis, assumptions.powerBasis, t.yAxis, t.yAxisCompact, t.yAxisModeled],
-  );
+  const valueAxisConfig = useMemo(() => {
+    const formatTick = profitAxisTickFormat(
+      basis,
+      valueDomain,
+      horizontal ? widthTickCount(plotWidth, PROFIT_Y_TICK_COUNT) : PROFIT_Y_TICK_COUNT,
+    );
+    return {
+      label: horizontal ? undefined : valueAxisLabel,
+      tickFormat: (d: d3.AxisDomain) => formatTick(Number(d)),
+      tickCount: PROFIT_Y_TICK_COUNT,
+    };
+  }, [horizontal, basis, valueDomain, plotWidth, valueAxisLabel]);
 
   const onRender = useMemo(
     () => (ctx: RenderContext) => {
-      // The y-axis title is set by the shared renderer; keep tick text tabular.
-      ctx.layout.yAxisGroup.selectAll('text').style('font-variant-numeric', 'tabular-nums');
+      const { layout } = ctx;
+      (horizontal ? layout.xAxisGroup : layout.yAxisGroup)
+        .selectAll('text')
+        .style('font-variant-numeric', 'tabular-nums');
+      layout.yAxisGroup
+        .select('.domain')
+        .attr(
+          'visibility',
+          horizontal && (ctx.xScale as d3.ScaleLinear<number, number>)(0) < ROW_ORIGIN_MERGE_PX
+            ? 'hidden'
+            : null,
+        );
+      layout.g
+        .selectAll<SVGTextElement, string[]>('text.profit-value-label')
+        .data(horizontal ? [valueLabelLines] : [])
+        .join('text')
+        .attr('class', 'profit-value-label')
+        .attr('text-anchor', 'middle')
+        .attr('font-size', px(CHART_TYPE.axisLabel))
+        .style('fill', 'var(--foreground)')
+        .selectAll<SVGTSpanElement, string>('tspan')
+        .data((lines) => lines)
+        .join('tspan')
+        .attr('x', ctx.width / 2)
+        .attr('y', (_, index) => ctx.height + ROW_TICKS_PX + (index + 1) * ROW_AXIS_LINE_PX - 3)
+        .text((line) => line);
     },
-    [],
+    [horizontal, valueLabelLines],
   );
 
   const dataIdentity = useMemo(() => rows.map((row) => row.resultKey).join('|'), [rows]);
@@ -1146,6 +1250,7 @@ export default function ProfitEstimatorChart({
   return (
     <div className="w-full" ref={setContainerRef}>
       <D3Chart<ProfitSegment>
+        key={horizontal ? 'rows' : 'columns'}
         ref={chartRef}
         chartId="profit-estimator-chart"
         data={segments}
@@ -1156,17 +1261,23 @@ export default function ProfitEstimatorChart({
         watermark={getChartWatermark()}
         testId="profit-estimator-chart"
         clipContent={false}
-        xScale={xScaleConfig}
-        yScale={yScaleConfig}
-        xAxis={xAxisConfig}
-        yAxis={yAxisConfig}
+        xScale={horizontal ? valueScaleConfig : bandScaleConfig}
+        yScale={horizontal ? bandScaleConfig : valueScaleConfig}
+        xAxis={horizontal ? valueAxisConfig : columnAxisConfig}
+        yAxis={horizontal ? rowAxisConfig : valueAxisConfig}
         layers={layers}
         tooltip={tooltip}
         onRender={onRender}
-        // No hover hint: the bars carry their own labels and the tooltip is discoverable.
+        onExportRender={onRender}
         instructions=""
         legendElement={legendElement}
         caption={caption}
+        footer={footer}
+        scrollablePlot={{
+          minWidth: chartWidth,
+          label: t.scrollHint,
+          enabled: chartWidth > dimensions.width,
+        }}
       />
     </div>
   );

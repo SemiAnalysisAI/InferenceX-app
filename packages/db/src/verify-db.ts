@@ -1,15 +1,3 @@
-/**
- * Verify database contents after ingest:
- *   - Row counts for all tables
- *   - Distinct enum values for key text columns
- *   - Date ranges and coverage
- *   - Metrics completeness (null rates)
- *   - Sample rows
- *
- * Usage:
- *   bun run admin:db:verify
- */
-
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
@@ -39,7 +27,6 @@ function sub(title: string) {
 async function verify(): Promise<void> {
   console.log('=== db:verify ===');
 
-  // ── Row counts ──────────────────────────────────────────────────────────────
   section('Row Counts');
   const tables = [
     TABLE_NAMES.schemaMigrations,
@@ -50,13 +37,15 @@ async function verify(): Promise<void> {
     TABLE_NAMES.evalResults,
     TABLE_NAMES.evalSamples,
     TABLE_NAMES.changelogEntries,
+    TABLE_NAMES.gpuMetricSeries,
+    TABLE_NAMES.gpuMetricSamples,
+    TABLE_NAMES.benchmarkResultGpuMetrics,
   ];
   for (const t of tables) {
     const [{ n }] = await sql`select count(*)::int as n from ${sql(t)}`;
     console.log(`  ${t.padEnd(24)} ${String(n).padStart(8)}`);
   }
 
-  // ── Configs: distinct enum values ───────────────────────────────────────────
   section('Configs — Distinct Values');
 
   sub('hardware');
@@ -170,7 +159,6 @@ async function verify(): Promise<void> {
     ),
   );
 
-  // ── Benchmark results ────────────────────────────────────────────────────────
   section('Benchmark Results');
 
   const [bmkStats] = await sql`
@@ -239,7 +227,6 @@ async function verify(): Promise<void> {
     `  median_intvty         ${nullRates.has_median_intvty}/${total} (${pct(nullRates.has_median_intvty)})`,
   );
 
-  // ── Run stats ────────────────────────────────────────────────────────────────
   section('Run Stats (Reliability)');
 
   const [statsInfo] = await sql`
@@ -263,7 +250,6 @@ async function verify(): Promise<void> {
     ),
   );
 
-  // ── Workflow runs ────────────────────────────────────────────────────────────
   section('Workflow Runs');
 
   const [wrInfo] = await sql`
@@ -311,7 +297,6 @@ async function verify(): Promise<void> {
     ),
   );
 
-  // ── Sample rows ──────────────────────────────────────────────────────────────
   section('Sample Rows');
 
   sub('configs (5 most recent)');

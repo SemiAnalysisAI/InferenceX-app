@@ -1,13 +1,14 @@
 'use client';
 
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { ServerLogViewer } from '@/components/inference/agentic-point/server-log-viewer';
-import { track } from '@/lib/analytics';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -28,10 +29,12 @@ export function BenchmarkLogDetail({ id }: { id: number }) {
   const router = useRouter();
   const pathname = usePathname();
   const t = STRINGS[useLocale()];
-  const inferenceHref = isZhPathname(pathname) ? `${ZH_PREFIX}/inference` : '/inference';
+  const inferenceHref = isZhPathname(pathname)
+    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}`
+    : getDashboardRoute('inference').path;
 
   return (
-    <main className="container mx-auto flex flex-col gap-4 px-4 py-6 lg:px-8">
+    <main className="flex flex-col gap-4 py-6">
       <nav className="flex items-center gap-2" aria-label={t.title}>
         <button
           type="button"
@@ -46,17 +49,17 @@ export function BenchmarkLogDetail({ id }: { id: number }) {
         <span className="text-sm text-muted-foreground" aria-hidden="true">
           ·
         </span>
-        <Link
+        <IntentPrefetchLink
           href={inferenceHref}
           className="text-sm text-muted-foreground hover:text-foreground"
           onClick={() => track('inference_fixed_seq_logs_chart_clicked', { id })}
         >
           {t.inferenceChart}
-        </Link>
+        </IntentPrefetchLink>
       </nav>
 
       <header>
-        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs font-medium text-muted-foreground">
           {t.eyebrow} · #{id}
         </p>
         <h1 className="mt-1 text-xl font-semibold text-foreground">{t.title}</h1>

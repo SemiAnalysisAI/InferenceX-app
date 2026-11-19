@@ -89,14 +89,14 @@ function stubDatasetJourney(): void {
 
 function runClickJourney(prefix: '' | '/zh'): void {
   stubDatasetJourney();
-  cy.visit(`${prefix}/agentx`, { onBeforeLoad: unlockAgenticGate });
+  cy.visit(`${prefix}/infx/agentx`, { onBeforeLoad: unlockAgenticGate });
 
-  cy.get(`a[href="${prefix}/agentx/${SLUG}"]`).should('be.visible').click();
-  cy.location('pathname').should('eq', `${prefix}/agentx/${SLUG}`);
+  cy.get(`a[href="${prefix}/infx/agentx/${SLUG}"]`).should('be.visible').click();
+  cy.location('pathname').should('eq', `${prefix}/infx/agentx/${SLUG}`);
   cy.get('h1').should('have.text', DATASET.label);
   expectNoPageOverflow();
 
-  const conversationHref = `${prefix}/agentx/${SLUG}/conversations/${CONVERSATION_ID}`;
+  const conversationHref = `${prefix}/infx/agentx/${SLUG}/conversations/${CONVERSATION_ID}`;
   cy.get(`[data-testid="dataset-conversations-table-scroll"] a[href="${conversationHref}"]`)
     .should('be.visible')
     .click();

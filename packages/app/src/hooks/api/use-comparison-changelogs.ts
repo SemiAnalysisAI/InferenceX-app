@@ -1,8 +1,12 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { type ChangelogRow, type RunConfigRow, type WorkflowInfoResponse } from '@/lib/api';
-import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
+import {
+  type ChangelogRow,
+  type RunConfigRow,
+  type WorkflowChangelogDate,
+  fetchWorkflowChangelogs,
+} from '@/lib/api/api';
 
 export interface ComparisonChangelogEntry {
   config_keys: string[];
@@ -10,29 +14,42 @@ export interface ComparisonChangelogEntry {
   pr_link: string | null;
 }
 
-/** One workflow run on a date, with its own changelog entries. */
 export interface ComparisonRun {
-  /** GitHub run id (string). */
   runId: string;
   headRef?: string;
   runUrl?: string;
-  /** Changelog entries attributed to this specific run. */
   entries: ComparisonChangelogEntry[];
 }
 
 export interface ComparisonChangelog {
   date: string;
-  /** All of the date's changelog entries (flattened across runs). */
   entries: ComparisonChangelogEntry[];
-  /** Individual runs on this date, in chronological order (earliest first). */
   runs: ComparisonRun[];
-  /**
-   * Per-(run, config) coverage from the benchmark data itself. Used to enumerate
-   * every run that produced data on this date — including runs without a changelog
-   * entry, which `runs` omits. The comparison UI keys run series off this so the
-   * newest run never silently vanishes just because it lacked changelog notes.
-   */
   runConfigs: RunConfigRow[];
+}
+
+/**
+ * An embedded dashboard shows the changelog collapsed, so it requests
+ * `/api/v1/workflow-changelogs` only once the reader opens it, or once a date
+ * comparison needs per-date run configs.
+ */
+export function shouldFetchComparisonChangelogs({
+  embedded,
+  changelogOpened,
+  selectedDateRange,
+  selectedDates,
+}: {
+  embedded: boolean;
+  changelogOpened: boolean;
+  selectedDateRange: { startDate: string; endDate: string };
+  selectedDates: readonly string[];
+}): boolean {
+  return (
+    !embedded ||
+    changelogOpened ||
+    (Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate)) ||
+    selectedDates.length > 0
+  );
 }
 
 export function useComparisonChangelogs(
@@ -40,44 +57,50 @@ export function useComparisonChangelogs(
   selectedDateRange: { startDate: string; endDate: string },
   availableDates: string[],
   benchmarkType?: 'agentic_traces',
+  enabled = true,
 ) {
   const hasGPUs = selectedGPUs.length > 0;
   const hasDateRange = Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate);
 
-  // When GPUs selected: fetch all available dates. When date range also set: limit to range.
   const datesToQuery = useMemo(() => {
-    if (!hasGPUs) return [];
+    if (!hasGPUs || !enabled) return [];
     if (!hasDateRange) return availableDates;
     return availableDates.filter(
       (d) => d >= selectedDateRange.startDate && d <= selectedDateRange.endDate,
     );
   }, [
     hasGPUs,
+    enabled,
     hasDateRange,
     availableDates,
     selectedDateRange.startDate,
     selectedDateRange.endDate,
   ]);
 
-  const queries = useQueries({
-    queries: datesToQuery.map((date) => workflowInfoQueryOptions(date, benchmarkType, hasGPUs)),
+  const from = datesToQuery.reduce((min, d) => (d < min ? d : min), datesToQuery[0] ?? '');
+  const to = datesToQuery.reduce((max, d) => (d > max ? d : max), datesToQuery[0] ?? '');
+
+  const query = useQuery({
+    queryKey: benchmarkType
+      ? (['workflow-changelogs', from, to, benchmarkType] as const)
+      : (['workflow-changelogs', from, to] as const),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchWorkflowChangelogs(from, to, signal, benchmarkType),
+    enabled: hasGPUs && datesToQuery.length > 0,
   });
+  const rangeData = query.data;
 
   const changelogs = useMemo(() => {
     if (!hasGPUs) return [];
 
+    const byDate = new Map<string, WorkflowChangelogDate>(rangeData?.dates.map((d) => [d.date, d]));
     const results: ComparisonChangelog[] = [];
 
-    for (let i = 0; i < datesToQuery.length; i++) {
-      const query = queries[i];
-      if (!query.data) continue;
-
-      const data = query.data as WorkflowInfoResponse;
+    for (const date of datesToQuery) {
+      const data = byDate.get(date);
+      if (!data) continue;
       if (!data.changelogs || data.changelogs.length === 0) continue;
 
-      // Group changelog entries by the run that produced them. In the API
-      // response, changelog.workflow_run_id is the GitHub run id (see
-      // getChangelogByDate's `wr.github_run_id as workflow_run_id`).
       const entriesByRun = new Map<number, ChangelogRow[]>();
       for (const c of data.changelogs) {
         const list = entriesByRun.get(c.workflow_run_id) ?? [];
@@ -85,8 +108,6 @@ export function useComparisonChangelogs(
         entriesByRun.set(c.workflow_run_id, list);
       }
 
-      // Order runs chronologically (earliest first) so the #1/#2/#3 indices the
-      // UI assigns read in the order the runs actually happened.
       const orderedRuns = [...data.runs].toSorted((a, b) =>
         a.created_at.localeCompare(b.created_at),
       );
@@ -107,7 +128,7 @@ export function useComparisonChangelogs(
         .filter((r) => r.entries.length > 0);
 
       results.push({
-        date: datesToQuery[i],
+        date,
         entries: data.changelogs.map((c: ChangelogRow) => ({
           config_keys: c.config_keys,
           description: c.description,
@@ -119,9 +140,9 @@ export function useComparisonChangelogs(
     }
 
     return results;
-  }, [hasGPUs, datesToQuery, queries]);
+  }, [hasGPUs, datesToQuery, rangeData]);
 
-  const loading = queries.some((q) => q.isLoading);
+  const loading = query.isLoading;
 
   return { changelogs, loading, totalDatesQueried: datesToQuery.length };
 }

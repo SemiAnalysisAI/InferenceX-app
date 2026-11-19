@@ -1,21 +1,25 @@
-/**
- * Compact per-request data used by the default agentic point charts.
- *
- * The full request timeline contains source-trace metadata and Gantt-only
- * timing fields. Large runs can make that document tens of megabytes, even
- * though the summary charts need only nine values per request. This query
- * projects those values once in Postgres and dictionary-encodes repeated
- * strings before the response crosses the network.
- */
-
 import {
   REQUEST_TIMELINE_VERSION,
   type RequestRecord,
   type RequestTimeline,
 } from '../etl/compute-request-timeline';
+import { decodeRequestChartColumns } from '../etl/request-chart-columns';
+import {
+  scanRequestTimelineGz,
+  scanRequestTimelineText,
+  type RequestTimelineHeader,
+  type ScannedRequest,
+} from '../etl/request-timeline-codec';
 
 import type { DbClient } from '../connection.js';
-import { getRequestTimeline } from './request-timeline';
+import {
+  REQUEST_TIMELINE_GZ_SLICE_BYTES,
+  getRequestTimeline,
+  legacyRequestTimelineText,
+  logRequestTimelineReadFailure,
+  readBase64Slices,
+  readRequestTimelineGz,
+} from './request-timeline';
 
 const REQUEST_CHART_SHAPE_VERSION = 2;
 export const REQUEST_CHART_DATA_VERSION =
@@ -44,10 +48,53 @@ export interface RequestChartDataWire {
   requests: RequestChartTuple[];
 }
 
-interface RawChartRow {
+interface RawChartMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
+  gz_bytes: number | null;
   timeline_version: number | null;
+  legacy_request_count: number | null;
+  columns_bytes: number | null;
+  columns_inline: string | null;
+}
+
+export const INLINE_CHART_COLUMNS_BYTES = REQUEST_TIMELINE_GZ_SLICE_BYTES;
+
+export async function readRequestChartColumns(
+  sql: DbClient,
+  traceReplayId: number,
+  byteLength: number,
+  inline: string | null,
+): Promise<Buffer> {
+  if (inline !== null) return Buffer.from(inline, 'base64');
+  const slices: Buffer[] = [];
+  const reads = readBase64Slices(
+    byteLength,
+    REQUEST_TIMELINE_GZ_SLICE_BYTES,
+    async (from, length) => {
+      const [row] = await sql`
+      select encode(substring(request_chart_data_gz from ${from}::int for ${length}::int), 'base64') as slice
+      from agentic_trace_replay
+      where id = ${traceReplayId}
+        and request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+        and octet_length(request_chart_data_gz) = ${byteLength}
+    `;
+      return row;
+    },
+  );
+  for await (const slice of reads) slices.push(slice);
+  return Buffer.concat(slices, byteLength);
+}
+
+export function logRequestChartColumnsReadFailure(traceReplayId: number, error: unknown): void {
+  console.error(
+    `[request chart data] could not read the precomputed columns for trace_replay_id=${traceReplayId}: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
+}
+
+interface RawProjectedChartRow {
   start_ns: number | null;
   end_ns: number | null;
   duration_s: number | null;
@@ -64,10 +111,24 @@ interface RawChartRow {
   ][];
 }
 
+export const LEGACY_PROJECTION_MAX_REQUESTS = 250_000;
+
 type ChartRecord = Pick<
   RequestRecord,
   'cid' | 'phase' | 'start' | 'end' | 'ttftMs' | 'tpotMs' | 'isl' | 'osl' | 'cancelled'
 >;
+
+const CHART_REQUEST_FIELDS: ReadonlySet<string> = new Set<keyof ChartRecord>([
+  'cid',
+  'phase',
+  'start',
+  'end',
+  'ttftMs',
+  'tpotMs',
+  'isl',
+  'osl',
+  'cancelled',
+]);
 
 function dictionaryIndex(value: string, values: string[], indices: Map<string, number>): number {
   const existing = indices.get(value);
@@ -81,52 +142,64 @@ function dictionaryIndex(value: string, values: string[], indices: Map<string, n
 const nanosecondsToMicroseconds = (value: number): number => Math.round(value / 1_000);
 const roundMilliseconds = (value: number | null): number | null =>
   value === null ? null : Math.round(value * 1_000) / 1_000;
+const nullableNumber = (value: unknown): number | null =>
+  typeof value === 'number' ? value : null;
 
-export function encodeRequestChartData(
-  timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
-  records: readonly ChartRecord[],
-): RequestChartDataWire {
+function createRequestChartEncoder(): {
+  add: (record: ChartRecord) => void;
+  finish: (
+    timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
+  ) => RequestChartDataWire;
+} {
   const cids: string[] = [];
   const phases: string[] = [];
   const cidIndices = new Map<string, number>();
   const phaseIndices = new Map<string, number>();
   const requests: RequestChartTuple[] = [];
-
-  for (const record of records) {
-    requests.push([
-      dictionaryIndex(record.cid, cids, cidIndices),
-      dictionaryIndex(record.phase, phases, phaseIndices),
-      nanosecondsToMicroseconds(record.start),
-      nanosecondsToMicroseconds(record.end),
-      roundMilliseconds(record.ttftMs),
-      roundMilliseconds(record.tpotMs),
-      record.isl,
-      record.osl,
-      record.cancelled ? 1 : 0,
-    ]);
-  }
-
   return {
-    version: REQUEST_CHART_DATA_VERSION,
-    timelineVersion: timeline.version,
-    startNs: timeline.startNs,
-    endNs: timeline.endNs,
-    durationS: timeline.durationS,
-    cids,
-    phases,
-    requests,
+    add(record) {
+      requests.push([
+        dictionaryIndex(record.cid, cids, cidIndices),
+        dictionaryIndex(record.phase, phases, phaseIndices),
+        nanosecondsToMicroseconds(record.start),
+        nanosecondsToMicroseconds(record.end),
+        roundMilliseconds(record.ttftMs),
+        roundMilliseconds(record.tpotMs),
+        record.isl,
+        record.osl,
+        record.cancelled ? 1 : 0,
+      ]);
+    },
+    finish(timeline) {
+      return {
+        version: REQUEST_CHART_DATA_VERSION,
+        timelineVersion: timeline.version,
+        startNs: timeline.startNs,
+        endNs: timeline.endNs,
+        durationS: timeline.durationS,
+        cids,
+        phases,
+        requests,
+      };
+    },
   };
 }
 
-export async function getRequestChartData(
+export function encodeRequestChartData(
+  timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
+  records: Iterable<ChartRecord>,
+): RequestChartDataWire {
+  const encoder = createRequestChartEncoder();
+  for (const record of records) encoder.add(record);
+  return encoder.finish(timeline);
+}
+
+async function projectLegacyRequestChartData(
   sql: DbClient,
-  benchmarkResultId: number,
+  traceReplayId: number,
 ): Promise<RequestChartDataWire | null> {
   const rows = (await sql`
     select
-      atr.id as trace_replay_id,
-      (atr.profile_export_jsonl_gz is not null) as has_blob,
-      (atr.request_timeline->>'version')::int as timeline_version,
       (atr.request_timeline->>'startNs')::double precision as start_ns,
       (atr.request_timeline->>'endNs')::double precision as end_ns,
       (atr.request_timeline->>'durationS')::double precision as duration_s,
@@ -145,34 +218,149 @@ export async function getRequestChartData(
         from jsonb_array_elements(atr.request_timeline->'requests')
           with ordinality as expanded(request, ordinal)
       ), '[]'::jsonb) as requests
-    from benchmark_results br
-    join agentic_trace_replay atr on atr.id = br.trace_replay_id
-    where br.id = ${benchmarkResultId}
-  `) as unknown as RawChartRow[];
+    from agentic_trace_replay atr
+    where atr.id = ${traceReplayId}
+      and (atr.request_timeline->>'version')::int = ${REQUEST_TIMELINE_VERSION}
+  `) as unknown as RawProjectedChartRow[];
   const row = rows[0];
   if (!row) return null;
 
-  if (row.timeline_version !== null && Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
-    const records: ChartRecord[] = row.requests.map((request) => ({
-      cid: request[0],
-      phase: request[1],
-      start: Number(request[2]),
-      end: Number(request[3]),
-      ttftMs: request[4] === null ? null : Number(request[4]),
-      tpotMs: request[5] === null ? null : Number(request[5]),
-      isl: request[6] === null ? null : Number(request[6]),
-      osl: request[7] === null ? null : Number(request[7]),
-      cancelled: Boolean(request[8]),
-    }));
-    return encodeRequestChartData(
-      {
-        version: Number(row.timeline_version),
-        startNs: Number(row.start_ns ?? 0),
-        endNs: Number(row.end_ns ?? 0),
-        durationS: Number(row.duration_s ?? 0),
-      },
-      records,
-    );
+  const records: ChartRecord[] = row.requests.map((request) => ({
+    cid: request[0],
+    phase: request[1],
+    start: Number(request[2]),
+    end: Number(request[3]),
+    ttftMs: request[4] === null ? null : Number(request[4]),
+    tpotMs: request[5] === null ? null : Number(request[5]),
+    isl: request[6] === null ? null : Number(request[6]),
+    osl: request[7] === null ? null : Number(request[7]),
+    cancelled: Boolean(request[8]),
+  }));
+  return encodeRequestChartData(
+    {
+      version: REQUEST_TIMELINE_VERSION,
+      startNs: Number(row.start_ns ?? 0),
+      endNs: Number(row.end_ns ?? 0),
+      durationS: Number(row.duration_s ?? 0),
+    },
+    records,
+  );
+}
+
+async function scanRequestChartData(
+  scan: (onRequest: (request: ScannedRequest) => void) => Promise<RequestTimelineHeader>,
+): Promise<RequestChartDataWire> {
+  const encoder = createRequestChartEncoder();
+  const header = await scan((request) => {
+    encoder.add({
+      cid: String(request.cid),
+      phase: String(request.phase),
+      start: Number(request.start),
+      end: Number(request.end),
+      ttftMs: nullableNumber(request.ttftMs),
+      tpotMs: nullableNumber(request.tpotMs),
+      isl: nullableNumber(request.isl),
+      osl: nullableNumber(request.osl),
+      cancelled: request.cancelled === true,
+    });
+  });
+  return encoder.finish({
+    version: Number(header.version),
+    startNs: Number(header.startNs ?? 0),
+    endNs: Number(header.endNs ?? 0),
+    durationS: Number(header.durationS ?? 0),
+  });
+}
+
+export function requestChartDataFromTimelineGz(gz: Buffer): Promise<RequestChartDataWire> {
+  return scanRequestChartData((onRequest) =>
+    scanRequestTimelineGz(gz, CHART_REQUEST_FIELDS, onRequest),
+  );
+}
+
+async function scanStoredRequestChartData(
+  sql: DbClient,
+  traceReplayId: number,
+  gzBytes: number | null,
+): Promise<RequestChartDataWire | null> {
+  try {
+    return gzBytes === null
+      ? await scanRequestChartData((onRequest) =>
+          scanRequestTimelineText(
+            legacyRequestTimelineText(sql, traceReplayId),
+            CHART_REQUEST_FIELDS,
+            onRequest,
+          ),
+        )
+      : await requestChartDataFromTimelineGz(
+          await readRequestTimelineGz(sql, traceReplayId, gzBytes),
+        );
+  } catch (error) {
+    logRequestTimelineReadFailure(traceReplayId, error);
+    return null;
+  }
+}
+
+export async function getRequestChartData(
+  sql: DbClient,
+  benchmarkResultId: number,
+  legacyProjectionMaxRequests = LEGACY_PROJECTION_MAX_REQUESTS,
+): Promise<RequestChartDataWire | null> {
+  const rows = (await sql`
+    select
+      atr.id as trace_replay_id,
+      (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_blob,
+      octet_length(atr.request_timeline_gz) as gz_bytes,
+      case
+        when atr.request_timeline_gz is not null then atr.request_timeline_version::int
+        else (atr.request_timeline->>'version')::int
+      end as timeline_version,
+      case
+        when atr.request_timeline_gz is null
+          and jsonb_typeof(atr.request_timeline->'requests') = 'array'
+          then jsonb_array_length(atr.request_timeline->'requests')
+      end as legacy_request_count,
+      case
+        when atr.request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+          then octet_length(atr.request_chart_data_gz)
+      end as columns_bytes,
+      case
+        when atr.request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+          and octet_length(atr.request_chart_data_gz) <= ${INLINE_CHART_COLUMNS_BYTES}
+          then encode(atr.request_chart_data_gz, 'base64')
+      end as columns_inline
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = ${benchmarkResultId}
+  `) as unknown as RawChartMetaRow[];
+  const row = rows[0];
+  if (!row) return null;
+
+  if (row.columns_bytes !== null) {
+    try {
+      return decodeRequestChartColumns(
+        await readRequestChartColumns(
+          sql,
+          row.trace_replay_id,
+          Number(row.columns_bytes),
+          row.columns_inline,
+        ),
+      );
+    } catch (error) {
+      logRequestChartColumnsReadFailure(row.trace_replay_id, error);
+    }
+  }
+
+  if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
+    const gzBytes = row.gz_bytes === null ? null : Number(row.gz_bytes);
+    if (
+      gzBytes === null &&
+      row.legacy_request_count !== null &&
+      Number(row.legacy_request_count) <= legacyProjectionMaxRequests
+    ) {
+      return projectLegacyRequestChartData(sql, row.trace_replay_id);
+    }
+    return scanStoredRequestChartData(sql, row.trace_replay_id, gzBytes);
   }
 
   if (!row.has_blob) return null;

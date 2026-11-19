@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { Model } from '@/lib/data-mappings';
+import { Model } from '@/lib/catalog/data-mappings';
 
 import {
+  applyCacheHitMode,
   clampPercent,
   DEFAULT_LAB_CUT_PCT,
   DEFAULT_PROFIT_INTERACTIVITY,
@@ -22,7 +23,6 @@ import {
   type ProfitEstimatorRow,
 } from './profit-estimator';
 
-/** $1/M tok on both streams: revenue collapses to total throughput. */
 const FLAT_PRICING: TokenRevenuePricing = {
   source: 'normalized',
   inputPerMillion: 1,
@@ -30,7 +30,6 @@ const FLAT_PRICING: TokenRevenuePricing = {
   outputPerMillion: 1,
 };
 
-/** Asymmetric prices need the measured input share to split the streams. */
 const SPLIT_PRICING: TokenRevenuePricing = {
   source: 'openrouter',
   inputPerMillion: 0.5,
@@ -39,14 +38,13 @@ const SPLIT_PRICING: TokenRevenuePricing = {
   openRouterModelId: 'test/model',
 };
 
-// B200 figures from HW_REGISTRY: 1.71 kW all-in, $1.73/GPU/hr hyperscaler.
 const B200 = { powerKwPerGpu: 1.71, costPerGpuHour: 1.73 };
 const B200_GPU_HOURS = (1_000_000 / 1.71) * HOURS_PER_YEAR;
 
 const result = {
   hwKey: 'b200',
   resultKey: 'b200',
-  value: 1_000, // total tok/s/GPU -> $3.60/GPU/hr at $1/M flat
+  value: 1_000,
   inputTokenShare: 0.8,
   cacheHitRate: undefined,
 };
@@ -93,7 +91,6 @@ describe('estimateSkuProfit', () => {
     expect(r.grossMargin).toBeCloseTo((3.6 - 1.73) * B200_GPU_HOURS, 0);
     expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
     expect(r.profit).toBeCloseTo(r.revenue - r.tco - r.labCut, 3);
-    // The three segments are exactly the revenue bar.
     expect(r.tco + r.labCut + r.profit).toBeCloseTo(r.revenue, 3);
   });
 
@@ -143,7 +140,6 @@ describe('estimateSkuProfit', () => {
         basis: 'gw-year',
       }),
     );
-    // 1000 tok/s * 3600 / 1e6 * $0.2 = $0.72/GPU/hr, then 60% -> well below $1.73.
     expect(r.grossMargin).toBeLessThan(0);
     expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
     expect(r.profit).toBeCloseTo(r.grossMargin - r.labCut, 9);
@@ -181,7 +177,6 @@ describe('estimateSkuProfit', () => {
         basis: 'gw-year',
       }),
     );
-    // 800 input tok/s at $0.5/M + 200 output tok/s at $2/M, per hour.
     const expected = ((800 * 0.5 + 200 * 2) * 3_600) / 1_000_000;
     expect(r.revenuePerGpuHour).toBeCloseTo(expected, 9);
   });
@@ -251,8 +246,6 @@ describe('estimateProfitRows', () => {
     const specs: Record<string, { powerKwPerGpu: number; costPerGpuHour: number }> = {
       b200: B200,
       h200: { powerKwPerGpu: 1.37, costPerGpuHour: 1.22 },
-      // Same power as the B200 so it books less revenue per GW-year, but a
-      // fraction of the TCO, so it clears more P&L. Profit order must win.
       cheap: { powerKwPerGpu: 1.71, costPerGpuHour: 0.4 },
       ghost: { powerKwPerGpu: 0, costPerGpuHour: 1 },
     };
@@ -268,7 +261,6 @@ describe('estimateProfitRows', () => {
       { utilizationPct: 60, labCutPct: 30, basis: 'gw-year' },
     );
     expect(rows.map((r) => r.resultKey)).toEqual(['cheap', 'b200', 'h200']);
-    // Revenue alone would have put the B200 first.
     expect(rows.toSorted((a, b) => b.revenue - a.revenue).map((r) => r.resultKey)).toEqual([
       'b200',
       'cheap',
@@ -283,7 +275,7 @@ describe('estimateProfitRows', () => {
 describe('formatProfitUsd', () => {
   it('uses fixed cents per chip-hour and compact units per GW-year', () => {
     expect(formatProfitUsd(2.3, 'chip-hour')).toBe('$2.30');
-    expect(formatProfitUsd(-0.456, 'chip-hour')).toBe('-$0.46');
+    expect(formatProfitUsd(-0.456, 'chip-hour')).toBe('−$0.46');
     expect(formatProfitUsd(2.3, 'chip-hour', 0)).toBe('$2.30');
     expect(formatProfitUsd(135.2e9, 'gw-year')).toBe('$135.2B');
     expect(formatProfitUsd(135.2e9, 'gw-year', 0)).toBe('$135B');
@@ -294,7 +286,7 @@ describe('formatProfitUsd', () => {
 describe('formatUsdCompact', () => {
   it('picks a unit per magnitude and keeps the sign ahead of the currency', () => {
     expect(formatUsdCompact(12_345_678_901)).toBe('$12.3B');
-    expect(formatUsdCompact(-2_500_000_000)).toBe('-$2.5B');
+    expect(formatUsdCompact(-2_500_000_000)).toBe('−$2.5B');
     expect(formatUsdCompact(4_200_000)).toBe('$4.2M');
     expect(formatUsdCompact(950_000)).toBe('$950.0k');
     expect(formatUsdCompact(12.34)).toBe('$12.3');
@@ -341,9 +333,33 @@ describe('parseTokenPriceInput', () => {
 });
 
 describe('profitModelDefaults', () => {
-  it('opens Kimi K3 on 45 tok/s/user, the Moonshot list price, and a 30% license fee', () => {
+  it('prices Open measurements at the hosted Muse 1.3 rates with explicit scenario assumptions', () => {
+    expect(profitModelDefaults(Model.Muse_Spark_Open)).toEqual({
+      interactivity: 100,
+      labCutPct: DEFAULT_LAB_CUT_PCT,
+      listPricing: {
+        vendor: 'Meta (Vercel AI Gateway)',
+        inputPerMillion: 1.25,
+        cachedInputPerMillion: 0.15,
+        outputPerMillion: 4.25,
+        sourceUrl: 'https://vercel.com/ai-gateway/models/muse-spark-1.3',
+      },
+    });
+  });
+  it.each([
+    [Model.Kimi_K3, 60],
+    [Model.GLM_5_2, 135],
+    [Model.MiniMax_M3, 115],
+    [Model.DeepSeek_V4_Pro, 170],
+    [Model.DeepSeek_V4_1_Flash, 150],
+  ] as const)('opens %s at a 5-step target with the most priced SKUs', (model, target) => {
+    expect(profitModelDefaults(model).interactivity).toBe(target);
+    expect(target % 5).toBe(0);
+  });
+
+  it('opens Kimi K3 on 60 tok/s/user, the Moonshot list price, and a 30% license fee', () => {
     const defaults = profitModelDefaults(Model.Kimi_K3);
-    expect(defaults.interactivity).toBe(DEFAULT_PROFIT_INTERACTIVITY);
+    expect(defaults.interactivity).toBe(60);
     expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
     expect(defaults.listPricing).toEqual({
       vendor: 'Moonshot',
@@ -360,10 +376,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens GLM 5.2/5.3 on 100 tok/s/user, the Z.ai list price, and a 10% license fee', () => {
+  it('opens GLM 5.2/5.3 on 135 tok/s/user, the Z.ai list price, and a 20% license fee', () => {
     const defaults = profitModelDefaults(Model.GLM_5_2);
-    expect(defaults.interactivity).toBe(100);
-    expect(defaults.labCutPct).toBe(10);
+    expect(defaults.interactivity).toBe(135);
+    expect(defaults.labCutPct).toBe(20);
     expect(defaults.listPricing).toEqual({
       vendor: 'Z.ai',
       inputPerMillion: 1.4,
@@ -373,9 +389,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens MiniMax M3 on 83 tok/s/user, the MiniMax list price, and a 20% license fee', () => {
+  it('opens MiniMax M3 on 115 tok/s/user, the MiniMax list price, and a 20% license fee', () => {
     const defaults = profitModelDefaults(Model.MiniMax_M3);
-    expect(defaults.interactivity).toBe(83);
+    expect(defaults.interactivity).toBe(115);
     expect(defaults.labCutPct).toBe(20);
     expect(defaults.listPricing).toEqual({
       vendor: 'MiniMax',
@@ -392,9 +408,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
+  it('opens DeepSeek V4 Pro on 170 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
-    expect(defaults.interactivity).toBe(24);
+    expect(defaults.interactivity).toBe(170);
     expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',
@@ -411,9 +427,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4.1 Flash on 125 tok/s/user, the DeepSeek Flash peak list price, and a 0% (MIT) license fee', () => {
+  it('opens DeepSeek V4.1 Flash on 150 tok/s/user, the DeepSeek Flash peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_1_Flash);
-    expect(defaults.interactivity).toBe(125);
+    expect(defaults.interactivity).toBe(150);
     expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',
@@ -447,9 +463,6 @@ describe('profitModelDefaults', () => {
       cachedInputPerMillion: 0.26,
       outputPerMillion: 4.4,
     });
-    // The explicit cache price is honoured rather than the 10% default: a chip
-    // producing 1M tokens per hour at a 50/50 input/output split with every
-    // input token cached earns 0.5 x $0.26 + 0.5 x $4.40.
     const priced = row(
       estimateSkuProfit(
         {
@@ -465,5 +478,62 @@ describe('profitModelDefaults', () => {
       ),
     );
     expect(priced.revenue).toBeCloseTo(0.5 * 0.26 + 0.5 * 4.4, 9);
+  });
+});
+
+describe('applyCacheHitMode', () => {
+  const items = [
+    { cacheHitRate: 0.5, theoreticalCacheHitRate: 0.97, hwKey: 'a' },
+    { cacheHitRate: 0.3, theoreticalCacheHitRate: undefined, hwKey: 'b' },
+    { cacheHitRate: undefined, theoreticalCacheHitRate: 0.8, hwKey: 'c' },
+  ];
+
+  it('returns items unchanged in actual mode', () => {
+    const applied = applyCacheHitMode(items, 'actual');
+    expect(applied).toBe(items);
+  });
+
+  it('replaces cacheHitRate with theoreticalCacheHitRate in theoretical mode', () => {
+    const applied = applyCacheHitMode(items, 'theoretical');
+    expect(applied[0].cacheHitRate).toBe(0.97);
+    expect(applied[0].theoreticalCacheHitRate).toBe(0.97);
+  });
+
+  it('keeps measured cacheHitRate when theoretical is absent', () => {
+    const applied = applyCacheHitMode(items, 'theoretical');
+    expect(applied[1].cacheHitRate).toBe(0.3);
+  });
+
+  it('sets cacheHitRate from theoretical even when measured is absent', () => {
+    const applied = applyCacheHitMode(items, 'theoretical');
+    expect(applied[2].cacheHitRate).toBe(0.8);
+  });
+
+  it('uses the theoretical rate in the profit calculation for higher revenue', () => {
+    const actualResult = {
+      hwKey: 'b200',
+      resultKey: 'b200',
+      value: 1_000,
+      inputTokenShare: 0.8,
+      cacheHitRate: 0.5,
+      theoreticalCacheHitRate: 0.97,
+    };
+    const [actual] = applyCacheHitMode([actualResult], 'actual');
+    const [theoretical] = applyCacheHitMode([actualResult], 'theoretical');
+    expect(actual.cacheHitRate).toBe(0.5);
+    expect(theoretical.cacheHitRate).toBe(0.97);
+    const pricingWithDiscount: TokenRevenuePricing = {
+      source: 'normalized',
+      inputPerMillion: 2,
+      cachedInputPerMillion: 0.2,
+      outputPerMillion: 4,
+    };
+    const specs = { powerKwPerGpu: 2, costPerGpuHour: 1 };
+    const assumptions = { utilizationPct: 100, labCutPct: 0, basis: 'chip-hour' as const };
+    const actualRow = row(estimateSkuProfit(actual, specs, pricingWithDiscount, assumptions));
+    const theoreticalRow = row(
+      estimateSkuProfit(theoretical, specs, pricingWithDiscount, assumptions),
+    );
+    expect(theoreticalRow.revenue).toBeLessThan(actualRow.revenue);
   });
 });

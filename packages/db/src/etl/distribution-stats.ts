@@ -1,10 +1,3 @@
-/**
- * Generic distribution math shared by the dataset ETL: percentile summaries
- * and histogram binning for the dataset-detail cards. Pure functions, no DB
- * access. (The per-benchmark-row percentile bundle uses `percentilesOf` in
- * `queries/agentic-aggregates` — a different shape with its own version key.)
- */
-
 export interface HistogramBin {
   x0: number;
   x1: number;
@@ -22,7 +15,6 @@ export interface NumberSummary {
   p95: number;
 }
 
-/** Distribution summary with linear-interpolated percentiles. */
 export function summarizeValues(values: readonly number[]): NumberSummary {
   if (values.length === 0) {
     return { count: 0, min: 0, max: 0, mean: 0, median: 0, p75: 0, p90: 0, p95: 0 };
@@ -47,7 +39,6 @@ export function summarizeValues(values: readonly number[]): NumberSummary {
   };
 }
 
-/** Linear-width histogram over [0, max]. Empty input → []. */
 export function linearHistogram(values: readonly number[], bins = 40): HistogramBin[] {
   if (values.length === 0) return [];
   const max = Math.max(...values);
@@ -65,7 +56,6 @@ export function linearHistogram(values: readonly number[], bins = 40): Histogram
   return out;
 }
 
-/** Log-width histogram over positive values (values ≤ 0 are dropped). */
 export function logHistogram(values: readonly number[], bins = 40): HistogramBin[] {
   const pos = values.filter((v) => v > 0);
   if (pos.length === 0) return [];
@@ -87,7 +77,6 @@ export function logHistogram(values: readonly number[], bins = 40): HistogramBin
   return out;
 }
 
-/** Log-width histogram that preserves zero as a dedicated first bin. */
 export function logHistogramWithZero(values: readonly number[], bins = 40): HistogramBin[] {
   const zeroCount = values.filter((value) => value === 0).length;
   const positive = values.filter((value) => value > 0);

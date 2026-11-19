@@ -15,7 +15,6 @@ import {
   type QuickFilters,
 } from './quickFilters';
 
-/** Minimal InferenceData stub — only the fields the predicate reads. */
 function point(partial: Partial<InferenceData>): InferenceData {
   return { hwKey: 'h100', ...partial } as InferenceData;
 }
@@ -72,7 +71,7 @@ describe('computeAvailableQuickFilters', () => {
         power_tier: 'certified',
       }),
     ];
-    expect(computeAvailableQuickFilters(points)).toEqual({
+    expect(computeAvailableQuickFilters(points)).toMatchObject({
       vendors: ['NVIDIA', 'AMD'],
       frameworks: ['vllm', 'trt', 'atom'],
       deployment: ['single-node', 'multi-node', 'disagg'],
@@ -85,7 +84,7 @@ describe('computeAvailableQuickFilters', () => {
     const points = [
       point({ hwKey: 'h100_vllm', framework: 'vllm', disagg: false, spec_decoding: 'none' }),
     ];
-    expect(computeAvailableQuickFilters(points)).toEqual({
+    expect(computeAvailableQuickFilters(points)).toMatchObject({
       vendors: ['NVIDIA'],
       frameworks: ['vllm'],
       deployment: ['single-node'],
@@ -112,6 +111,7 @@ describe('computeAvailableQuickFilters', () => {
       deployment: [],
       spec: [],
       power: [],
+      topologies: [],
     });
   });
 });
@@ -181,7 +181,6 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(multi, filters({ deployment: ['single-node', 'disagg'] }))).toBe(
       false,
     );
-    // Missing flags retain the historical single-node aggregate fallback.
     expect(matchesQuickFilters(point({}), filters({ deployment: ['single-node'] }))).toBe(true);
   });
 
@@ -213,7 +212,6 @@ describe('matchesQuickFilters', () => {
 
   it('treats non-standard spec methods (e.g. eagle) as spec-on (MTP), never STP', () => {
     const eagle = point({ hwKey: 'h200_trt_eagle', spec_decoding: 'eagle' });
-    // Standard (STP) means `none` only — a speculative method groups under MTP.
     expect(matchesQuickFilters(eagle, filters({ spec: ['stp'] }))).toBe(false);
     expect(matchesQuickFilters(eagle, filters({ spec: ['mtp'] }))).toBe(true);
     expect(matchesQuickFilters(eagle, EMPTY_QUICK_FILTERS)).toBe(true);
@@ -228,11 +226,9 @@ describe('matchesQuickFilters', () => {
         f,
       ),
     ).toBe(true);
-    // Right vendor + disagg, wrong spec.
     expect(
       matchesQuickFilters(point({ hwKey: 'mi300x_sglang', disagg: true, spec_decoding: 'mtp' }), f),
     ).toBe(false);
-    // Wrong vendor.
     expect(
       matchesQuickFilters(point({ hwKey: 'h100_vllm', disagg: true, spec_decoding: 'none' }), f),
     ).toBe(false);
@@ -240,6 +236,23 @@ describe('matchesQuickFilters', () => {
 });
 
 describe('applyQuickFilters', () => {
+  it('offers TokenSpeed and filters both official and unofficial points by its family', () => {
+    const official = point({ id: 42, hwKey: 'gb300_tokenspeed_mtp', framework: 'tokenspeed' });
+    const overlay = point({
+      run_url: 'https://github.com/example/actions/runs/2',
+      hwKey: 'gb300_tokenspeed_mtp',
+      framework: 'tokenspeed',
+    });
+    const other = point({ hwKey: 'gb300_sglang_mtp', framework: 'sglang' });
+    const points = [official, overlay, other];
+
+    expect(computeAvailableQuickFilters(points).frameworks).toEqual(['sglang', 'tokenspeed']);
+    expect(applyQuickFilters(points, filters({ frameworks: ['tokenspeed'] }))).toEqual([
+      official,
+      overlay,
+    ]);
+  });
+
   const data = [
     point({ hwKey: 'h100_vllm', disagg: false, spec_decoding: 'none' }),
     point({ hwKey: 'h100_vllm_mtp', disagg: false, spec_decoding: 'mtp' }),

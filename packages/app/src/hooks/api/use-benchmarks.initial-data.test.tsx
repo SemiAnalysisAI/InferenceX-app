@@ -4,10 +4,10 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 const { mockFetchBenchmarks } = vi.hoisted(() => ({ mockFetchBenchmarks: vi.fn() }));
-vi.mock('@/lib/api', () => ({ fetchBenchmarks: mockFetchBenchmarks }));
+vi.mock('@/lib/api/api', () => ({ fetchBenchmarks: mockFetchBenchmarks }));
 
 import { useBenchmarks } from './use-benchmarks';
 
@@ -160,7 +160,7 @@ describe('useBenchmarks initial calculator data', () => {
           QueryClientProvider,
           { client },
           createElement(FullProbe, {
-            model: 'Overridden-Model',
+            model: 'Kimi-K3',
             date: '',
             initialData: undefined,
           }),
@@ -170,7 +170,7 @@ describe('useBenchmarks initial calculator data', () => {
 
     expect(mockFetchBenchmarks).toHaveBeenCalledTimes(1);
     expect(mockFetchBenchmarks).toHaveBeenCalledWith(
-      'Overridden-Model',
+      'Kimi-K3',
       '',
       undefined,
       expect.any(AbortSignal),

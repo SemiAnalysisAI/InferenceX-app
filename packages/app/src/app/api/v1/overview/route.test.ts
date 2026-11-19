@@ -3,14 +3,14 @@ import { NextRequest } from 'next/server';
 
 const { mockGetOverviewPageData, mockCachedJson } = vi.hoisted(() => ({
   mockGetOverviewPageData: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
 }));
 
-vi.mock('@/lib/overview-data.server', () => ({
+vi.mock('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
 }));
 
@@ -53,7 +53,7 @@ describe('GET /api/v1/overview', () => {
       'changed',
       'priced',
     );
-    expect(mockCachedJson).toHaveBeenCalledWith(data);
+    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), data);
   });
 
   it('normalizes unsupported query values to overview defaults', async () => {
@@ -66,9 +66,9 @@ describe('GET /api/v1/overview', () => {
     );
 
     expect(mockGetOverviewPageData).toHaveBeenCalledWith(
-      50,
+      100,
       'community',
-      'hardware',
+      '30d',
       'b200',
       'default',
       'all',

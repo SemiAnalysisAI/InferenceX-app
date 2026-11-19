@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, inflateSync } from 'node:zlib';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -100,8 +100,20 @@ function fingerprint(prepared: PreparedTraceReplay) {
       : null,
     serverMetricsJsonSize: prepared.serverMetricsJsonSize,
     aggregateStatsJson: sha256(prepared.aggregateStatsJson),
+    sequenceLengthSketchesRaw: prepared.sequenceLengthSketches
+      ? sha256(inflateSync(prepared.sequenceLengthSketches))
+      : null,
     chartSeriesJson: sha256(prepared.chartSeriesJson),
-    requestTimelineJson: sha256(prepared.requestTimelineJson),
+    chartSeriesSummaryRaw: prepared.chartSeriesSummaryGz
+      ? sha256(gunzipSync(prepared.chartSeriesSummaryGz))
+      : null,
+    requestTimelineGz: sha256(prepared.requestTimelineGz),
+    requestTimelineRaw: prepared.requestTimelineGz
+      ? sha256(gunzipSync(prepared.requestTimelineGz))
+      : null,
+    requestChartDataRaw: prepared.requestChartDataGz
+      ? sha256(gunzipSync(prepared.requestChartDataGz))
+      : null,
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
     cacheHitRates: prepared.cacheHitRates,
@@ -155,7 +167,7 @@ describe('AsyncSemaphore', () => {
 });
 
 describe('TraceReplayWorkerPool', () => {
-  it('transfers byte-identical payloads, bounds buffers, and recovers after a failed job', async () => {
+  it('frees workers before consume, bounds the backlog, and recovers from failures', async () => {
     const fixture = await traceFixture();
     const expected = await prepareTraceReplay(fixture.profile, fixture.csv, fixture.metrics);
     const smokeScript = fileURLToPath(new URL('trace-replay-worker-smoke.ts', import.meta.url));
@@ -170,19 +182,24 @@ describe('TraceReplayWorkerPool', () => {
       direct: ReturnType<typeof fingerprint>;
       results: ReturnType<typeof fingerprint>[];
       rejectedMissingInput: boolean;
+      consumeError: string | null;
       recoveredTimelineRequests: number;
     };
 
-    expect(result.consumersBeforeRelease).toBe(2);
-    expect(result.totalConsumers).toBe(3);
-    expect(result.results).toEqual([result.direct, result.direct, result.direct]);
+    // Two workers plus a backlog of one: three consumes start while the gate blocks them.
+    expect(result.consumersBeforeRelease).toBe(3);
+    expect(result.totalConsumers).toBe(5);
+    expect(result.results).toEqual(Array.from({ length: 5 }, () => result.direct));
     const expectedFingerprint = fingerprint(expected);
     expect(result.direct).toEqual({
       ...expectedFingerprint,
       profileGz: result.direct.profileGz,
       serverMetricsJsonGz: result.direct.serverMetricsJsonGz,
+      requestTimelineGz: result.direct.requestTimelineGz,
     });
+    expect(result.direct.requestTimelineRaw).not.toBeNull();
     expect(result.rejectedMissingInput).toBe(true);
+    expect(result.consumeError).toBe('persist failed');
     expect(result.recoveredTimelineRequests).toBe(1);
   }, 15_000);
 });

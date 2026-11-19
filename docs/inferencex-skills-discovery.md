@@ -98,25 +98,5 @@ Have a reviewer inspect the transcript and narrative independently. Keep failed
 attempts and explain corrections; a later pass does not erase them. If package
 bytes change, rerun discovery on the final archive. Do not label a prepared
 project, an explicit-use run, or unreviewed model prose as accepted discovery.
-
-## Version scope
-
-- 0.5.0: result provenance, implicit discovery acceptance, AgentX onboarding.
-- 0.6.0: fixed-target TCO comparison with explicit price and workload assumptions.
-- 0.7.0: framework-update investigation with matched observations and confounders.
-- 0.8.0: CollectiveX discovery, comparison and export cookbook.
-- 0.9.0: bounded response reads, PowerX file-output preservation and network-free
-  helper `--version` checks.
-- 0.10.0: structured CLI failures and supported installer process-crash recovery.
-- 0.11.0: offline PowerX/AgentX summary verification and deterministic Markdown reports.
-- 1.0.0 candidate: versioned discovery, six formal evidence-bundle families,
-  contract 1 schemas and CSV columns, offline bundle replay, coverage predicates,
-  and read-only installation diagnostics, with documented 1.x command, required-output,
-  and exit-code compatibility. Evidence format versions remain independent.
-
-Versions 0.5.0 through 0.11.0 are published releases; 0.11.0 includes these cumulative
-capabilities. The 1.0.0 entry remains a candidate until publication and public
-verification succeed. Accept live-query and offline discovery with tasks that exercise each
-workflow; one task does not establish discovery of every capability. For future
-candidates, validate the exact archive; local acceptance alone does not establish
-npm publication.
+Accept live-query and offline discovery with tasks that exercise each workflow;
+one task does not establish discovery of every capability.

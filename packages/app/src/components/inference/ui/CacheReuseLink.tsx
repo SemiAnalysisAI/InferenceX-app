@@ -1,20 +1,20 @@
 'use client';
 
-import Link from 'next/link';
 import { useContext } from 'react';
 
-import { GlobalFilterRunContext } from '@/components/GlobalFilterContext';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
+
+import { GlobalFilterRunContext } from '@/providers/GlobalFilterContext';
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
-import { track } from '@/lib/analytics';
-import { cacheReuseHref } from '@/lib/cache-reuse-link';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { cacheReuseHref } from '@/lib/calculator/cache-reuse-link';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: { chart: 'Prefix cache reuse →', point: 'Prefix cache reuse for this config →' },
   zh: { chart: '前缀缓存复用 →', point: '查看此配置的前缀缓存复用 →' },
 } as const;
 
-/** Agentic-only link into the Prefix Cache Reuse tab, from the chart footer or a point. */
 export function CacheReuseLink({ point, className }: { point?: PointMeta; className?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -22,7 +22,7 @@ export function CacheReuseLink({ point, className }: { point?: PointMeta; classN
   // current run intent instead of depending on the debounced URL-state store.
   const run = useContext(GlobalFilterRunContext);
   return (
-    <Link
+    <IntentPrefetchLink
       href={cacheReuseHref(
         locale,
         point,
@@ -40,6 +40,6 @@ export function CacheReuseLink({ point, className }: { point?: PointMeta; classN
       }
     >
       {point ? t.point : t.chart}
-    </Link>
+    </IntentPrefetchLink>
   );
 }

@@ -1,3 +1,5 @@
+import { RESULTS_QUERY_PARAMS } from '@/components/video-benchmark/results';
+
 /**
  * Public query allowlists shared by handlers, OpenAPI and coverage tests.
  * Update the matching view docs and skills reference with every selector change.
@@ -17,6 +19,7 @@ export const VIEW_QUERY_PARAMS = {
     'unofficialrun',
   ],
   calculator: [
+    'chipBasis',
     'costProvider',
     'costType',
     'costcap',
@@ -37,17 +40,11 @@ export const VIEW_QUERY_PARAMS = {
   ],
   collectivex: [
     'activeSeries',
-    'kvSeries',
     'swapSeries',
     'backend',
     'epSize',
-    'kvOp',
-    'kvX',
-    'kvY',
     'modes',
     'operation',
-    'overlapIsl',
-    'pageTokens',
     'percentile',
     'phase',
     'precision',
@@ -58,12 +55,14 @@ export const VIEW_QUERY_PARAMS = {
     'swapLayout',
     'swapMetric',
     'swapPercentile',
+    'swapView',
     'version',
     'yAxis',
   ],
   compare: ['format', 'gpus', 'model', 'scenario', 'slug', 'tiers', 'variant'],
   'current-inferencex-image': [
     'asOf',
+    'includeHistory',
     'frameworks',
     'hardware',
     'model',
@@ -74,6 +73,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   evaluation: ['unofficialrun', 'benchmark', 'date', 'format', 'gpus', 'model', 'precisions'],
   'first-token': [
+    'chipBasis',
     'caps',
     'costProvider',
     'costType',
@@ -123,12 +123,16 @@ export const VIEW_QUERY_PARAMS = {
   ],
   'gpu-specs': ['format', 'metric'],
   historical: [
+    'chipBasis',
+    'chart',
     'deployment',
     'end',
     'extendToDate',
     'format',
     'frameworks',
     'gpus',
+    'groupBy',
+    'compare',
     'metric',
     'model',
     'precisions',
@@ -140,6 +144,8 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
   ],
   inference: [
+    'chipBasis',
+    'topologies',
     'allPoints',
     'best',
     'date',
@@ -167,10 +173,33 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
     'xmetric',
     'xmode',
+    'xstat',
+    'serviceCompare',
+    'serviceBaseline',
+    'serviceComparator',
+    'serviceTarget',
+    'roleShare',
+    'powerFit',
+    'powerBreakdown',
+    'headroom',
+  ],
+  'model-architectures': ['model'],
+  operatorx: [
+    'bin',
+    'format',
+    'hardware',
+    'model',
+    'op',
+    'page',
+    'parallel',
+    'precision',
+    'status',
+    'workload',
   ],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
+    'cacheHitMode',
     'cachedInputPrice',
     'costProvider',
     'customCosts',
@@ -195,6 +224,7 @@ export const VIEW_QUERY_PARAMS = {
     'utilization',
   ],
   'profit-estimator-per-gigawatt': [
+    'cacheHitMode',
     'cachedInputPrice',
     'costProvider',
     'customCosts',
@@ -222,10 +252,12 @@ export const VIEW_QUERY_PARAMS = {
   reliability: ['asOf', 'format', 'gpus', 'range'],
   submissions: ['direction', 'limit', 'lines', 'mode', 'offset', 'onChangeOnly', 'search', 'sort'],
   video: [
+    ...RESULTS_QUERY_PARAMS,
     'artifact',
     'cell',
     'compare',
     'costs',
+    'format',
     'gpuBasis',
     'page',
     'phase',
@@ -233,11 +265,22 @@ export const VIEW_QUERY_PARAMS = {
     'selected',
     'slot',
     'source',
+    'v_x',
+    'v_y',
+    'v_tier',
+    'v_view',
+    'v_optimal',
+    'v_api',
+    'v_hidden',
+    'v_base',
+    'v_cand',
+    'v_case',
     'view',
     'workload',
     'xAxis',
     'yAxis',
   ],
+  ubenchx: ['gpu', 'test'],
 } as const;
 export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 
@@ -246,7 +289,7 @@ export const DASHBOARD_API_COVERAGE = {
   inference: {
     view: 'inference',
     exclusion:
-      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state.',
+      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state. GPU-count, parallelism, concurrency, line, gradient, and offloading labels are independent presentation settings with no API parameters. Framework Line Label defaults on in Advanced; i_frameworklabel=0 hides framework suffixes in existing line labels, including overlays, history comparisons and exports, without filtering data. Offloading Label hides the footer key and dotted point halos in charts and exports; plotted measurements, offload fields, and benchmark rows remain unchanged. Chart footers omit the optimization note and prefix-cache link; selected ATOM series retain their disclaimer in all PNG layouts. These presentation changes do not alter cache-reuse views or benchmark data.',
   },
   'profit-estimator-per-gigawatt': { view: 'profit-estimator-per-gigawatt' },
   'profit-estimator': { view: 'profit-estimator' },
@@ -256,15 +299,15 @@ export const DASHBOARD_API_COVERAGE = {
   fleet: { view: 'fleet' },
   'first-token': { view: 'first-token' },
   'cache-reuse': { view: 'cache-reuse' },
-  reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
-  operatorx: {
+  'agentic-workload-explorer': {
     exclusion:
-      'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
+      'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
+  powerx: { view: 'inference' },
+  operatorx: { view: 'operatorx' },
   collectivex: { view: 'collectivex' },
-  'gpu-metrics': { view: 'gpu-metrics' },
   'current-inferencex-image': { view: 'current-inferencex-image' },
   video: { view: 'video' },
   'ai-chart': {

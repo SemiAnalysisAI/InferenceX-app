@@ -3,13 +3,12 @@
 import { Calendar, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { Button } from '@/components/ui/button';
 import {
   CalendarMonthPanel,
   formatCalendarDate,
-  formatDisplayDate,
   getCalendarMonthNavState,
   isCalendarDateOutOfRange,
   resolveCalendarDateBounds,
@@ -25,8 +24,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/shared/utils';
+import { formatDisplayDate } from '@/lib/shared/display-date';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
@@ -36,10 +36,10 @@ const STRINGS = {
     selected: 'Selected:',
     startDate: 'Start date:',
     chooseEndDate: 'Choose an end date',
-    chooseRange: 'Choose a start and end date to define your date range.',
+    chooseRange: 'Choose a start and end date to define your date range',
     checking: 'Checking available dates...',
     noAvailableDates: 'No available dates',
-    noAvailableDatesDescription: 'Please change Model, ISL/OSL, or Chip to see available dates.',
+    noAvailableDatesDescription: 'Please change Model, ISL/OSL, or Chip to see available dates',
     oneDateAvailable: 'Only 1 date available',
     oneDateDescription:
       'Historical comparison requires at least 2 dates. Please change Model, ISL/OSL, or chip selection.',
@@ -58,10 +58,10 @@ const STRINGS = {
     selected: '已选择：',
     startDate: '开始日期：',
     chooseEndDate: '请选择结束日期',
-    chooseRange: '请选择开始和结束日期以定义日期范围。',
+    chooseRange: '请选择开始和结束日期以定义日期范围',
     checking: '正在检查可用日期...',
     noAvailableDates: '没有可用日期',
-    noAvailableDatesDescription: '请更改模型、ISL/OSL 或芯片以查看可用日期。',
+    noAvailableDatesDescription: '请更改模型、ISL/OSL 或芯片以查看可用日期',
     oneDateAvailable: '仅有 1 个可用日期',
     oneDateDescription: '历史对比至少需要 2 个日期。请更改模型、ISL/OSL 或芯片选择。',
     viewAnyway: '仍然查看',
@@ -90,10 +90,6 @@ export interface DateRangePickerProps {
   isCheckingAvailableDates?: boolean;
 }
 
-/**
- * Date range picker component that allows selecting a start and end date via a modal calendar.
- * Displays "Start - End" when both dates are selected.
- */
 export function DateRangePicker({
   dateRange,
   onChange,
@@ -114,7 +110,6 @@ export function DateRangePicker({
   const [isApplying, _setIsApplying] = useState(false);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
-  // Get display text for the input
   const getDisplayText = () => {
     if (!dateRange.startDate && !dateRange.endDate) {
       return resolvedPlaceholder;
@@ -131,7 +126,6 @@ export function DateRangePicker({
     return resolvedPlaceholder;
   };
 
-  // Handle date selection in calendar
   const handleDateClick = (date: Date) => {
     const dateStr = formatCalendarDate(date);
     track('date_range_picker_date_clicked', { date: dateStr });
@@ -151,7 +145,6 @@ export function DateRangePicker({
     }
   };
 
-  // Apply selection
   const handleApply = () => {
     if (tempRange.startDate && tempRange.endDate) {
       if (availableDates) {
@@ -168,8 +161,11 @@ export function DateRangePicker({
     }
   };
 
-  // Cancel selection
   const handleCancel = () => {
+    track('date_range_picker_cancelled', {
+      changed:
+        tempRange.startDate !== dateRange.startDate || tempRange.endDate !== dateRange.endDate,
+    });
     setTempRange(dateRange);
     setSelectingStart(true);
     setOpen(false);
@@ -239,7 +235,7 @@ export function DateRangePicker({
               isCheckingAvailableDates={isCheckingAvailableDates}
             />
             {isCheckingAvailableDates && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-md">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="size-6 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">{t.checking}</p>
@@ -249,7 +245,7 @@ export function DateRangePicker({
             {!isCheckingAvailableDates &&
               availableDates !== undefined &&
               availableDates.length === 0 && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-md">
                   <div className="flex flex-col items-center gap-2 text-center px-4">
                     <p className="text-sm font-medium text-foreground">{t.noAvailableDates}</p>
                     <p className="text-xs text-muted-foreground">{t.noAvailableDatesDescription}</p>
@@ -259,7 +255,7 @@ export function DateRangePicker({
             {!isCheckingAvailableDates &&
               availableDates !== undefined &&
               availableDates.length === 1 && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-md">
                   <div className="flex flex-col items-center gap-2 text-center px-4">
                     <p className="text-sm font-medium text-foreground">{t.oneDateAvailable}</p>
                     <p className="text-xs text-muted-foreground">{t.oneDateDescription}</p>
@@ -280,7 +276,7 @@ export function DateRangePicker({
                 </div>
               )}
           </div>
-          {error && <p className="text-md text-center text-red-500">{error}</p>}
+          {error && <p className="text-sm text-center text-destructive">{error}</p>}
           <DialogFooter className="flex-row justify-between sm:justify-between">
             {availableDates && availableDates.length >= 2 ? (
               <div className="flex flex-wrap gap-1.5">
@@ -398,19 +394,16 @@ function CalendarGrid({
     [dateRange.startDate, dateRange.endDate],
   );
 
-  // Get the effective range for highlighting (includes hover)
   const getEffectiveRange = () => {
     if (!dateRange.startDate) {
       return { start: null, end: null };
     }
 
-    // If hovering and first date is selected, show preview range in either direction
     if (hoveredDate && !dateRange.endDate && !selectingStart) {
       const [start, end] = [dateRange.startDate, hoveredDate].toSorted();
       return { start, end };
     }
 
-    // Otherwise use the actual range
     if (dateRange.startDate && dateRange.endDate) {
       return { start: dateRange.startDate, end: dateRange.endDate };
     }
@@ -426,7 +419,6 @@ function CalendarGrid({
     }
     const dateStr = formatCalendarDate(date);
 
-    // Don't highlight if it's the start or end date
     if (dateStr === effectiveRange.start || dateStr === effectiveRange.end) {
       return false;
     }
@@ -450,7 +442,6 @@ function CalendarGrid({
     };
   };
 
-  // Get second month (next month)
   const secondMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
   const { canGoPrevious, canGoNext } = getCalendarMonthNavState(
     currentMonth,
@@ -487,7 +478,6 @@ function CalendarGrid({
       return;
     }
 
-    // Only show hover effect when start date is selected and we're selecting end date
     if (!selectingStart && dateRange.startDate) {
       onDateHover(formatCalendarDate(date));
     } else {

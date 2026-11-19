@@ -22,17 +22,14 @@ describe('computeFleetStats', () => {
   it('sizes the fleet by facility power and scales throughput/cost', () => {
     const stats = computeFleetStats(base);
     expect(stats).not.toBeNull();
-    // 10 MW = 10,000 kW / 2 kW per GPU
     expect(stats!.gpus).toBe(5000);
     expect(stats!.fleetTokPerSec).toBe(5000 * 500);
-    // users stream output tokens: 5000 × 450 / 50
     expect(stats!.concurrentUsers).toBe(45_000);
     expect(stats!.costPerHour).toBe(5000 * 2.5);
     expect(stats!.costPerMonth).toBe(5000 * 2.5 * HOURS_PER_MONTH);
   });
 
   it('floors partial GPUs', () => {
-    // 10,000 kW / 2.17 kW = 4608.29... → 4608
     const stats = computeFleetStats({ ...base, powerKwPerGpu: 2.17 });
     expect(stats!.gpus).toBe(4608);
   });
@@ -98,7 +95,6 @@ describe('sizeFleetForResult', () => {
         powerKwPerGpu: 2,
         costPerGpuHour: 2.5,
         tputPerGpu: 500,
-        // outputTokPerChip(500, 0.1, 300) = 500 × (1 − 0.1)
         outputTputPerGpu: 450,
         interactivity: 50,
       }),

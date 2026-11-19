@@ -1,17 +1,37 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
+import { useId, useMemo, useState } from 'react';
 
+import ChartLegend from '@/components/ui/chart-legend';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { track } from '@/lib/analytics/analytics';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { OpxChart, hardwareLegend } from '../charts/kit';
 import { formatCompact, valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
-import { originRows, rankedSlices } from '../compare/slices';
+import { originText, rankedSlices } from '../compare/slices';
 import type { VizDefinition } from './types';
+
+const STRINGS = {
+  en: {
+    empty: 'No shape has more than one size',
+    tokens: 'Tokens',
+    shape: 'Shape',
+    axis: (label: string, unit: string) => `${label} (${unit})`,
+  },
+  zh: {
+    empty: '没有包含多个尺寸的形状',
+    tokens: 'Token 数',
+    shape: '形状',
+    axis: (label: string, unit: string) => `${label}（${unit}）`,
+  },
+};
 
 interface Point {
   hw: string;
@@ -21,13 +41,21 @@ interface Point {
 }
 
 function MetricVsSize({ model }: { model: ComparisonModel }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const { view, metric } = model;
   const groups = useMemo(
     () => rankedSlices(view.op, view.cases).filter(([, idx]) => idx.length > 1),
     [view],
   );
   const [slice, setSlice] = useState<string | null>(null);
-  const current = groups.find(([k]) => k === slice) ?? groups[0];
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const legendId = useId();
+  const defaults = view.defaults ?? comparisonDefaults(view);
+  const current =
+    groups.find(([k]) => k === slice) ??
+    groups.find(([k]) => k === defaults.metricVsSizeSlice) ??
+    groups[0];
   const points = useMemo<Point[]>(
     () =>
       current
@@ -41,29 +69,35 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         : [],
     [current, model, view],
   );
-  if (!current) return <EmptyChart>No shape has more than one size.</EmptyChart>;
+  if (!current) return <EmptyChart>{strings.empty}</EmptyChart>;
   const lines: Record<string, { x: number; y: number }[]> = {};
   for (const p of points) (lines[p.hw] ??= []).push({ x: p.x, y: p.y });
   for (const l of Object.values(lines)) l.sort((a, b) => a.x - b.x);
   const xs = [...new Set(current[1].map((i) => view.cases[i].x ?? 0))]
     .filter((x) => x > 0)
     .toSorted((a, b) => a - b);
-  const sizeLabel = view.op === 'gemm' ? 'M' : 'Tokens';
+  const sizeLabel = view.op === 'gemm' ? 'M' : strings.tokens;
   return (
     <div className="space-y-3">
-      <SearchableSelect
-        size="sm"
-        searchable
-        value={current[0]}
-        onValueChange={setSlice}
-        triggerAriaLabel="Shape"
-        groups={[
-          {
-            label: '',
-            options: groups.map(([k]) => ({ value: k, label: k })),
-          },
-        ]}
-      />
+      {/* One shape needs no picker; the Model View op detail picks it for both charts */}
+      {groups.length > 1 && (
+        <SearchableSelect
+          size="sm"
+          searchable
+          value={current[0]}
+          onValueChange={(value) => {
+            track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
+            setSlice(value);
+          }}
+          triggerAriaLabel={strings.shape}
+          groups={[
+            {
+              label: '',
+              options: groups.map(([k]) => ({ value: k, label: k })),
+            },
+          ]}
+        />
+      )}
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-metric-vs-size"
@@ -81,7 +115,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
           tickFormat: (v) => formatCompact(Number(v)),
         }}
         yAxis={{
-          label: `${metric.label} (${metric.unit})`,
+          label: strings.axis(metric.label[locale], metric.unit),
           tickCount: 5,
           tickFormat: (v) => metric.tick(Number(v)),
         }}
@@ -114,20 +148,27 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
           rulerType: 'crosshair',
           attachToLayer: 1,
           content: (p) =>
-            tooltipHtml({
+            chartHoverCard({
               title: hardwareLabel(p.hw),
+              subtitle: view.cases[p.i].shape,
               color: model.colors[p.hw],
-              rows: [
-                esc(view.cases[p.i].shape),
-                ...originRows(view, p.i),
-                `<strong>${metric.format(p.y)}</strong>`,
+              metrics: [
+                { value: metric.format(p.y), label: metric.label[locale] },
+                { value: formatCompact(p.x), label: sizeLabel },
               ],
-              footer: 'Click for kernel timeline',
+              summary: originText(view, p.i, locale),
             }),
           getRulerX: (p, s) => (s as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, s) => s(p.y),
         }}
-        legendElement={<HardwareLegend model={model} />}
+        legendElement={
+          <ChartLegend
+            variant="sidebar"
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={setLegendExpanded}
+            {...hardwareLegend(model, legendId, 'none')}
+          />
+        }
       />
     </div>
   );
@@ -135,8 +176,8 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
 
 export const metricVsSize: VizDefinition = {
   id: 'metric-vs-size',
-  title: 'Metric vs size',
+  title: { en: 'Metric vs size', zh: '指标随尺寸变化' },
   wide: true,
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   Component: MetricVsSize,
 };

@@ -2,6 +2,8 @@ import { mount } from 'cypress/react';
 
 import '@/app/globals.css';
 
+import { registerScatterPointsQuery } from './scatter-points';
+
 declare global {
   namespace Cypress {
     interface Chainable {
@@ -11,3 +13,4 @@ declare global {
 }
 
 Cypress.Commands.add('mount', mount);
+registerScatterPointsQuery();

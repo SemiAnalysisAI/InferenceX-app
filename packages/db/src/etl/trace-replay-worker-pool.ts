@@ -2,21 +2,17 @@ import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
 
 import type { PreparedTraceReplay } from './trace-replay-ingest';
-import type {
-  PreparedTraceReplayWire,
-  TraceReplayWorkerJob,
-  TraceReplayWorkerRequest,
-  TraceReplayWorkerResponse,
+import {
+  PREPARED_TRACE_REPLAY_BUFFER_FIELDS,
+  type PreparedTraceReplayWire,
+  type TraceReplayWorkerJob,
+  type TraceReplayWorkerRequest,
+  type TraceReplayWorkerResponse,
 } from './trace-replay-worker-protocol';
 
 const DEFAULT_MAX_WORKERS = 4;
 const OVERRIDE_MAX_WORKERS = 8;
 
-/**
- * Reserve roughly three quarters of the vCPUs for Bun, gzip, database IO, and
- * runner overhead. Four GiB-scale parser workers are enough to saturate the
- * current 16-vCPU ingest runner without multiplying memory use excessively.
- */
 export function resolveTraceReplayWorkerCount(
   vcpus = availableParallelism(),
   override = process.env.INGEST_TRACE_WORKERS,
@@ -44,18 +40,9 @@ interface WorkerSlot {
   task: PendingTask | null;
 }
 
-const BUFFER_FIELDS = [
-  'profileGz',
-  'serverMetricsCsv',
-  'serverMetricsJsonGz',
-  'aggregateStatsJson',
-  'chartSeriesJson',
-  'requestTimelineJson',
-] as const;
-
 function fromWire(wire: PreparedTraceReplayWire): PreparedTraceReplay {
   const prepared = { ...wire } as unknown as PreparedTraceReplay;
-  for (const field of BUFFER_FIELDS) {
+  for (const field of PREPARED_TRACE_REPLAY_BUFFER_FIELDS) {
     const value = wire[field];
     prepared[field] = value
       ? Buffer.from(value.buffer as ArrayBuffer, value.byteOffset, value.byteLength)
@@ -64,24 +51,25 @@ function fromWire(wire: PreparedTraceReplayWire): PreparedTraceReplay {
   return prepared;
 }
 
-/**
- * A fixed worker pool whose slot remains reserved until `consume` finishes.
- * This bounds prepared-buffer memory to the worker count even when Postgres is
- * slower than computation, instead of allowing completed GiB-scale jobs to
- * accumulate in an unbounded upload queue.
- */
 export class TraceReplayWorkerPool {
   private readonly queue: PendingTask[] = [];
   private readonly slots: WorkerSlot[] = [];
   private nextTaskId = 1;
+  private consuming = 0;
   private closing = false;
   readonly size: number;
+  readonly maxBacklog: number;
 
-  constructor(size: number) {
+  // Caps memory: at most size + maxBacklog jobs sit between dispatch and the end of consume.
+  constructor(size: number, maxBacklog = size) {
     if (!Number.isSafeInteger(size) || size < 1) {
       throw new Error(`Worker count must be a positive integer, received ${size}`);
     }
+    if (!Number.isSafeInteger(maxBacklog) || maxBacklog < 0) {
+      throw new Error(`Backlog must be a non-negative integer, received ${maxBacklog}`);
+    }
     this.size = size;
+    this.maxBacklog = maxBacklog;
   }
 
   run<T>(
@@ -130,11 +118,14 @@ export class TraceReplayWorkerPool {
   }
 
   private dispatch(): void {
+    let inFlight = this.consuming + this.slots.filter((slot) => slot.task).length;
     for (const slot of this.slots) {
+      if (inFlight >= this.size + this.maxBacklog) return;
       if (slot.task) continue;
       const task = this.queue.shift();
       if (!task) return;
       slot.task = task;
+      inFlight += 1;
       const request: TraceReplayWorkerRequest = { id: task.id, job: task.job };
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- node:worker_threads has no targetOrigin parameter
       slot.worker.postMessage(request);
@@ -151,6 +142,9 @@ export class TraceReplayWorkerPool {
       return;
     }
 
+    slot.task = null;
+    this.consuming += 1;
+    this.dispatch();
     try {
       if (!response.ok) {
         const error = new Error(response.error.message);
@@ -161,7 +155,7 @@ export class TraceReplayWorkerPool {
     } catch (error) {
       task.reject(error instanceof Error ? error : new Error(String(error)));
     } finally {
-      slot.task = null;
+      this.consuming -= 1;
       this.dispatch();
     }
   }

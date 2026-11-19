@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { CHART_SERIES_VERSION } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
 import {
   getTraceServerMetricSource,
   type MetricSourceSeries,
 } from '@semianalysisai/inferencex-db/queries/trace-server-metrics';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -16,8 +16,8 @@ export const maxDuration = 300;
 export const CACHE_KEY_PREFIX = `trace-server-metric-source-v${CHART_SERIES_VERSION}`;
 
 const getCachedMetricSource = cachedQuery(
-  (id: number, source: string): Promise<MetricSourceSeries | null> =>
-    getTraceServerMetricSource(getDb(), id, source),
+  async (id: number, source: string): Promise<MetricSourceSeries | null> =>
+    getTraceServerMetricSource(await getPayloadDb(id), id, source),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   try {
     const data = await getCachedMetricSource(id, source);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching trace server metric source:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -1,50 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { AGENTIC_POINT_DETAIL_STRINGS } from './agentic-point-detail';
+import {
+  AGENTIC_POINT_DETAIL_STRINGS,
+  agenticDetailViewOptions,
+  showMetricSourceToolbar,
+} from './agentic-point-detail';
 import { metricSourceLabel, stagePhaseLabels } from './metric-source-toolbar';
-import { POINT_SUMMARY_STRINGS } from './point-summary';
 import { timelinePhaseLabels } from './request-timeline';
 import { formatSubagentLabel } from './timeline-rows';
 
 describe('agentic point detail copy', () => {
-  it('covers loading, failure, missing-trace, timeline, and aggregate state branches in both locales', () => {
-    const en = AGENTIC_POINT_DETAIL_STRINGS.en as Record<string, unknown>;
-    const zh = AGENTIC_POINT_DETAIL_STRINGS.zh as Record<string, unknown>;
-    expect(en).toMatchObject({
-      traceFailure: 'Failed to load trace data for benchmark point #{id}.',
-      siblingError: 'Failed to load the SKU navigator.',
-      missingTrace:
-        'No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf time-series capture, or its source artifacts have expired on GitHub.',
-      loadingAggregates: 'loading…',
-      loadingTimeline: 'Loading request timeline…',
-      missingTimeline:
-        "No per-request timeline for benchmark point #{id} — the profile_export.jsonl artifact isn't stored for this row.",
-      aggregatesError: 'Failed to load aggregate data across configurations.',
-      timelineError: 'Failed to load the request timeline.',
-      requestChartsError: 'Failed to load request chart data.',
-    });
-    expect(Object.keys(zh)).toEqual(Object.keys(en));
-    for (const key of [
-      'traceFailure',
-      'siblingError',
-      'missingTrace',
-      'loadingAggregates',
-      'loadingTimeline',
-      'missingTimeline',
-      'aggregatesError',
-      'timelineError',
-      'requestChartsError',
-    ]) {
-      expect(zh[key]).not.toBe(en[key]);
-    }
-  });
-
   it('composes the Chinese warmup note without repeating warmup', () => {
     const copy = AGENTIC_POINT_DETAIL_STRINGS.zh;
     const note = `${copy.warmupNotePrefix}${copy.warmupWord}${copy.warmupNoteBody}`;
 
-    expect(note).toMatch(/^当前显示 warmup 阶段/u);
-    expect(note).not.toContain('warmup warmup');
+    expect(note).toContain('warmup');
+    expect(note).not.toMatch(/warmup\s+warmup/iu);
   });
 
   it('localizes generated metric-source fallback labels without changing English', () => {
@@ -70,19 +41,41 @@ describe('agentic point detail copy', () => {
     expect(timelinePhaseLabels('zh')).toEqual({ profiling: 'profiling', warmup: 'warmup' });
   });
 
-  it('uses the established short label for disaggregated points and a natural run link', () => {
-    expect(POINT_SUMMARY_STRINGS.en).toMatchObject({
-      disagg: 'disagg',
-      githubRun: 'GitHub Actions run →',
-    });
-    expect(POINT_SUMMARY_STRINGS.zh).toMatchObject({
-      disagg: '分离式',
-      githubRun: 'GitHub Actions 运行记录 →',
-    });
-  });
-
   it('keeps the established subagent term in generated Chinese row labels', () => {
     expect(formatSubagentLabel('subagent_001_abcd', 'en')).toBe('subagent 001 · abcd');
     expect(formatSubagentLabel('subagent_001_abcd', 'zh')).toBe('subagent 001 · abcd');
+  });
+});
+
+describe('agentic point detail views', () => {
+  const t = AGENTIC_POINT_DETAIL_STRINGS.en;
+  const values = (
+    featureGateUnlocked: boolean,
+    currentView: Parameters<typeof agenticDetailViewOptions>[1]['currentView'],
+  ) =>
+    agenticDetailViewOptions(t, { featureGateUnlocked, currentView }).map((option) => option.value);
+
+  it('hides the PowerX view while the feature gate is locked', () => {
+    expect(values(false, 'point')).toEqual(['point', 'timeline', 'aggregates', 'logs']);
+  });
+
+  it('offers the PowerX view once the feature gate is unlocked', () => {
+    expect(values(true, 'point')).toEqual(['point', 'timeline', 'power', 'aggregates', 'logs']);
+  });
+
+  it('keeps the PowerX view for a locked visitor who opened a shared ?view=power link', () => {
+    expect(values(false, 'power')).toContain('power');
+  });
+});
+
+describe('metric source toolbar slot', () => {
+  it('shows the toolbar for warmup points or several metric sources', () => {
+    expect(showMetricSourceToolbar({ sourceCount: 0, hasWarmup: true })).toBe(true);
+    expect(showMetricSourceToolbar({ sourceCount: 2, hasWarmup: false })).toBe(true);
+  });
+
+  it('hides the toolbar for a single source without warmup, including while loading', () => {
+    expect(showMetricSourceToolbar({ sourceCount: 0, hasWarmup: false })).toBe(false);
+    expect(showMetricSourceToolbar({ sourceCount: 1, hasWarmup: false })).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -41,16 +42,16 @@ import type {
   GPUDataPoint,
   InterpolatedResult,
 } from '@/components/calculator/types';
-import { cachedJson } from '@/lib/api-cache';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import {
   getCachedBenchmarksForRun,
   getCachedCalculatorBenchmarks,
-} from '@/lib/benchmark-query-cache.server';
-import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
-import { Percentile, Sequence } from '@/lib/data-mappings';
-import { loadFixture } from '@/lib/test-fixtures';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { loadFixture } from '@/lib/testing/test-fixtures';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
@@ -211,6 +212,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const runId = parseRunIdParam(search.get('runId'));
     const gpus = parseFreeListParam(search.get('gpus'));
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const hideSkuAboveConfigLimit = parseBoolParam(
       search.get('hideSkuAboveConfigLimit'),
       'hideSkuAboveConfigLimit',
@@ -235,6 +237,7 @@ export function GET(request: NextRequest): Promise<Response> {
         percentile,
         tokenType: costType,
         tcoBasis,
+        chipBasis,
         classify: (hwKey, row) => {
           const prefix = overlayRows.includes(row) ? `${row.run_url}|` : '';
           return multiPrecision
@@ -363,6 +366,7 @@ export function GET(request: NextRequest): Promise<Response> {
       costType,
       percentile,
       tcoBasis,
+      chipBasis,
       hideSkuAboveConfigLimit,
       ...(mw === undefined ? {} : { mw }),
       ...(costcap === undefined ? {} : { costcap }),
@@ -405,7 +409,7 @@ export function GET(request: NextRequest): Promise<Response> {
       );
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'calculator',
       apiVersion: 'v1',
       generatedAt,

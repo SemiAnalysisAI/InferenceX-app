@@ -12,13 +12,20 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 
 vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   searchServerLogs: mockSearchServerLogs,
+  ServerLogSearchTimeoutError: class ServerLogSearchTimeoutError extends Error {
+    constructor() {
+      super('Server log search exceeded its time budget');
+      this.name = 'ServerLogSearchTimeoutError';
+    }
+  },
 }));
 
-vi.mock('@/lib/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+vi.mock('@/lib/cache/api-cache', () => ({
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { NextRequest } from 'next/server';
+import { ServerLogSearchTimeoutError } from '@semianalysisai/inferencex-db/queries/server-logs';
 import { GET } from './route';
 
 function req(url: string): NextRequest {
@@ -71,6 +78,16 @@ describe('GET /api/v1/server-log-search', () => {
     const response = await GET(req(url));
     expect(response.status).toBe(400);
     expect(mockSearchServerLogs).not.toHaveBeenCalled();
+  });
+
+  it('returns an uncached 504 when the search runs out of time', async () => {
+    mockSearchServerLogs.mockRejectedValueOnce(new ServerLogSearchTimeoutError());
+    const response = await GET(req('/api/v1/server-log-search?id=42&q=ready'));
+    expect(response.status).toBe(504);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Search timed out. Try a more specific term.',
+    });
   });
 
   it('returns 500 when the database search fails', async () => {

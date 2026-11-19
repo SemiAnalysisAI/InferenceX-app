@@ -16,9 +16,19 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getBenchmarksForRun: mockGetBenchmarksForRun,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+const { mockCachedJson } = vi.hoisted(() => ({
+  mockCachedJson: vi.fn((_request: Request, data: unknown, _options?: unknown) =>
+    Response.json(data),
+  ),
+}));
+
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: mockCachedJson,
+  cachedJsonResponse:
+    (load: (...args: unknown[]) => Promise<unknown>, _keyPrefix: string, options?: unknown) =>
+    async (request: Request, ...args: unknown[]) =>
+      mockCachedJson(request, await load(...args), options),
 }));
 
 import { GET } from './route';
@@ -62,6 +72,13 @@ describe('GET /api/v1/benchmarks', () => {
       undefined,
       undefined,
     );
+  });
+
+  it('leaves compression to the CDN so every Accept-Encoding shares one cache entry', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+
+    await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
+    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), [], { compression: 'cdn' });
   });
 
   it('does not expose agentic run-selection metadata on fixed-sequence rows', async () => {
@@ -187,17 +204,54 @@ describe('GET /api/v1/benchmarks', () => {
     );
   });
 
-  it('ignores a non-numeric runId (treated as latest)', async () => {
+  it.each([
+    ['date=latest', 'Invalid date format (YYYY-MM-DD required)'],
+    ['date=bad', 'Invalid date format (YYYY-MM-DD required)'],
+    ['date=313296699', 'Invalid date format (YYYY-MM-DD required)'],
+    ['date=2026-02-30', 'Invalid date format (YYYY-MM-DD required)'],
+    ['date=2026-3-1', 'Invalid date format (YYYY-MM-DD required)'],
+    ['exact=1', 'exact must be true or false'],
+    ['runId=not-a-run', 'runId must be a positive integer GitHub Actions run ID'],
+    ['runId=0', 'runId must be a positive integer GitHub Actions run ID'],
+    ['runId=99999999999999999999', 'runId must be a positive integer GitHub Actions run ID'],
+    ['exactRun=yes&runId=27489075807', 'exactRun must be true or false'],
+    ['exactRun=true', 'exactRun=true requires runId'],
+    ['view=table', 'Unknown view'],
+  ])('rejects %s with 400 before querying', async (query, error) => {
+    const res = await GET(req(`/api/v1/benchmarks?model=DeepSeek-R1-0528&${query}`));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error });
+    expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+    expect(mockGetBenchmarksForRun).not.toHaveBeenCalled();
+  });
+
+  it('treats an empty date and explicit false flags as the defaults', async () => {
     mockGetLatestBenchmarks.mockResolvedValueOnce([]);
 
     const res = await GET(
-      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01&runId=not-a-run'),
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=&exact=false&exactRun=false'),
     );
     expect(res.status).toBe(200);
     expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
       'mock-sql',
       ['dsr1'],
-      '2026-03-01',
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
+  it('accepts a leap day and ignores unknown parameters', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2028-02-29&_=1793635919'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      '2028-02-29',
       undefined,
       undefined,
     );
@@ -214,15 +268,6 @@ describe('GET /api/v1/benchmarks', () => {
     expect(await res.json()).toEqual(runRows);
     expect(mockGetBenchmarksForRun).toHaveBeenCalledWith('mock-sql', ['dsr1'], '27489075807');
     expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
-  });
-
-  it('ignores exactRun without a runId (falls back to latest)', async () => {
-    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
-
-    const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&exactRun=true'));
-    expect(res.status).toBe(200);
-    expect(mockGetBenchmarksForRun).not.toHaveBeenCalled();
-    expect(mockGetLatestBenchmarks).toHaveBeenCalled();
   });
 
   it('returns 500 when query throws', async () => {

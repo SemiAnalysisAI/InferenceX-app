@@ -1,28 +1,17 @@
-/**
- * SVG renderer for known-issue warning annotations on the inference scatter
- * chart: a stacked column of warning boxes at the top of the plot, each with
- * an arrow pointing at its affected series. Drawn inside the chart SVG so PNG
- * exports carry the warnings; colors are passed in resolved because CSS
- * variables don't survive html-to-image.
- */
-
 import * as d3 from 'd3';
 
-import type { KnownConfigIssue } from '@/lib/known-issues';
+import type { KnownConfigIssue } from '@/lib/benchmarks/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
 interface AnnotationBase {
-  /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRTLLM, MTP)" */
   label: string;
-  /** Resolved stroke color of the affected series */
   color: string;
-  /** Data-space coordinates of the series' visible points (arrow targets) */
   points: { x: number; y: number }[];
 }
 
-/** A filed upstream issue or a non-interactive preview notice rendered inside a chart. */
 export type KnownIssueAnnotation = AnnotationBase &
   (
     | { issue: KnownConfigIssue; preview?: never }
@@ -46,20 +35,21 @@ export interface AnnotationRenderOptions {
   background: string;
   foreground: string;
   mutedForeground: string;
-  /**
-   * Horizontal space reserved at the plot's right edge (e.g. for a legend
-   * panel floating over the SVG). Boxes right-align against it.
-   */
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
+  /** When set, each box gets a close button that calls this with its annotation. */
+  onDismiss?: (annotation: KnownIssueAnnotation) => void;
+  /** Accessible label for the close button. */
+  dismissLabel?: string;
+  /** Group that holds the arrows, so they sit below its line labels. Defaults to the annotation layer. */
+  arrowParent?: d3.Selection<SVGGElement, unknown, null, undefined>;
 }
 
 export type KnownIssueLayerOptions = Omit<
   AnnotationRenderOptions,
-  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset'
+  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset' | 'arrowParent'
 >;
 
-/** Build the shared render/zoom lifecycle for chart-level known-issue callouts. */
 export function createKnownIssueLayer(
   resolveOptions: () => KnownIssueLayerOptions,
   displayIdentity?: string,
@@ -72,6 +62,7 @@ export function createKnownIssueLayer(
       height: ctx.height,
       xScale,
       yScale,
+      arrowParent: ctx.layout.zoomGroup,
       rightInset:
         options.annotations.length === 0
           ? 0
@@ -118,29 +109,33 @@ const SWATCH_R = 4;
 const SWATCH_SPACE = 14;
 const ARROW_STANDOFF = 9;
 const MIN_ARROW_LEN = 24;
+const DISMISS_SPACE = 16;
+const DISMISS_HALF = 3.5;
 
-/** getComputedTextLength with an estimate fallback for jsdom/test environments. */
-function measureTextWidth(node: SVGTextElement | null, chars: number, fontSize: number): number {
-  if (node && typeof node.getComputedTextLength === 'function') {
-    try {
-      const len = node.getComputedTextLength();
-      if (Number.isFinite(len) && len > 0) return len;
-    } catch {
-      // fall through to estimate
-    }
+function fitTextToWidth(
+  target:
+    | d3.Selection<SVGTextElement, unknown, null, undefined>
+    | d3.Selection<SVGTSpanElement, unknown, null, undefined>,
+  full: string,
+  maxWidth: number,
+  font: string,
+): number {
+  let chars = full.length;
+  let width = measureTextWidth(full, font);
+  while (chars > 1 && width > maxWidth) {
+    const ratio = maxWidth / width;
+    chars = Math.max(1, Math.min(chars - 1, Math.floor(chars * ratio)));
+    const text = `${full.slice(0, chars).trimEnd()}…`;
+    target.text(text);
+    width = measureTextWidth(text, font);
   }
-  return chars * fontSize * 0.58;
+  return Math.min(width, maxWidth);
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/**
- * Live overlap of the floating legend panel over the SVG's right edge, used
- * as `rightInset` so warning boxes sit beside the legend instead of under it.
- * Returns 0 when no legend is present (or outside the browser).
- */
 export function measureLegendRightInset(
   chartId: string,
   svgNode: SVGSVGElement | null,
@@ -163,28 +158,45 @@ export function renderKnownIssueAnnotations(
   const { chartId, width, height, xScale, yScale, annotations } = opts;
 
   g.selectAll('.known-issue-annotations').remove();
+  opts.arrowParent?.selectAll('.known-issue-arrows').remove();
   defs.selectAll(`[id^="known-issue-arrowhead-${chartId}"]`).remove();
   if (annotations.length === 0) return;
 
   const layer = g.append('g').attr('class', 'known-issue-annotations');
-  const arrowGroup = layer.append('g').attr('class', 'known-issue-arrows');
+  const arrowGroup = (opts.arrowParent ?? layer)
+    .insert('g', '.line-label')
+    .attr('class', 'known-issue-arrows');
 
   let yCursor = BOX_TOP;
   annotations.forEach((annotation, index) => {
     const { issue, preview, label, color, points } = annotation;
     const markerId = `known-issue-arrowhead-${chartId}-${index}`;
-    defs
-      .append('marker')
-      .attr('id', markerId)
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 7)
-      .attr('markerHeight', 7)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-      .attr('fill', color);
+    const outlineMarkerId = `${markerId}-outline`;
+    for (const [id, isOutline] of [
+      [markerId, false],
+      [outlineMarkerId, true],
+    ] as const) {
+      const head = defs
+        .append('marker')
+        .attr('id', id)
+        .attr('viewBox', '0 0 10 10')
+        .attr('refX', 8)
+        .attr('refY', 5)
+        .attr('markerUnits', 'userSpaceOnUse')
+        .attr('markerWidth', 12.25)
+        .attr('markerHeight', 12.25)
+        .attr('orient', 'auto')
+        .style('overflow', 'visible')
+        .append('path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+        .attr('fill', isOutline ? 'var(--background)' : color);
+      if (isOutline) {
+        head
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 1.65)
+          .attr('stroke-linejoin', 'round');
+      }
+    }
 
     const anchor = layer
       .append(issue === undefined ? 'g' : 'a')
@@ -227,15 +239,25 @@ export function renderKnownIssueAnnotations(
         .text(issue.issueRef);
     }
 
-    const w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
-    const w2 = measureTextWidth(
-      text2.node(),
-      detail.length + (issue?.issueRef.length ?? 0),
-      LINE2_SIZE,
-    );
-    const boxW = Math.max(w1, w2) + PAD_X * 2;
-    const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
     const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
+    const dismissSpace = opts.onDismiss ? DISMISS_SPACE : 0;
+    const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2 - dismissSpace);
+    const line1Font = chartFont(LINE1_SIZE, 600);
+    const line2Font = chartFont(LINE2_SIZE);
+    let w1 = measureTextWidth(label, line1Font) + SWATCH_SPACE;
+    if (w1 > maxTextW) {
+      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, line1Font) + SWATCH_SPACE;
+    }
+    let w2 = measureTextWidth(detail + (issue?.issueRef ?? ''), line2Font);
+    if (w2 > maxTextW && issue === undefined) {
+      const detailTspan = text2.select<SVGTSpanElement>('tspan');
+      const summary = preview!.summary;
+      detailTspan.text(summary);
+      w2 = measureTextWidth(summary, line2Font);
+      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, line2Font);
+    }
+    const boxW = Math.max(w1, w2) + PAD_X * 2 + dismissSpace;
+    const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
     const bx = Math.max(2, boxRight - boxW);
     const by = yCursor;
 
@@ -260,9 +282,51 @@ export function renderKnownIssueAnnotations(
     text1.attr('x', bx + PAD_X + SWATCH_SPACE).attr('y', by + PAD_Y + LINE1_H - 4);
     text2.attr('x', bx + PAD_X).attr('y', by + PAD_Y + LINE1_H + LINE2_H - 4);
 
-    // Arrow from the box's bottom edge to the nearest on-screen point of the
-    // affected series. Skipped when the series is panned/zoomed out of view or
-    // the target sits right under the box.
+    if (opts.onDismiss) {
+      const onDismiss = opts.onDismiss;
+      const cx = bx + boxW - PAD_X - DISMISS_HALF;
+      const cy = by + PAD_Y + LINE1_H / 2;
+      const button = layer
+        .append('g')
+        .attr('class', 'known-issue-dismiss')
+        .attr('data-testid', 'chart-notice-dismiss')
+        .attr('role', 'button')
+        .attr('tabindex', 0)
+        .attr('aria-label', opts.dismissLabel ?? 'Dismiss notice')
+        .attr('cursor', 'pointer')
+        .on('mousedown pointerdown touchstart dblclick', (event: Event) => event.stopPropagation())
+        .on('click', (event: MouseEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss(annotation);
+        })
+        .on('keydown', (event: KeyboardEvent) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss(annotation);
+        });
+      button.append('title').text(opts.dismissLabel ?? 'Dismiss notice');
+      button
+        .append('rect')
+        .attr('x', cx - 7)
+        .attr('y', cy - 7)
+        .attr('width', 14)
+        .attr('height', 14)
+        .attr('rx', 3)
+        .attr('fill', 'transparent');
+      button
+        .append('path')
+        .attr(
+          'd',
+          `M ${cx - DISMISS_HALF} ${cy - DISMISS_HALF} L ${cx + DISMISS_HALF} ${cy + DISMISS_HALF} M ${cx + DISMISS_HALF} ${cy - DISMISS_HALF} L ${cx - DISMISS_HALF} ${cy + DISMISS_HALF}`,
+        )
+        .attr('stroke', opts.mutedForeground)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-linecap', 'round')
+        .attr('pointer-events', 'none');
+    }
+
     const bottomY = by + boxH;
     const onScreen = points
       .map((p) => ({ px: xScale(p.x), py: yScale(p.y) }))
@@ -282,13 +346,23 @@ export function renderKnownIssueAnnotations(
       if (len >= MIN_ARROW_LEN) {
         const endX = target.px - (dx / len) * ARROW_STANDOFF;
         const endY = target.py - (dy / len) * ARROW_STANDOFF;
-        // Slight quadratic bend so stacked arrows don't read as one straight rule
         const midX = (startX + endX) / 2 + (dy > 0 ? -dx * 0.12 : dx * 0.12);
         const midY = (bottomY + endY) / 2;
+        const d = `M ${startX} ${bottomY + 2} Q ${midX} ${midY} ${endX} ${endY}`;
+        arrowGroup
+          .append('path')
+          .attr('class', 'known-issue-arrow-outline')
+          .attr('d', d)
+          .attr('fill', 'none')
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 3.75)
+          .attr('stroke-linecap', 'round')
+          .attr('marker-end', `url(#${outlineMarkerId})`)
+          .attr('pointer-events', 'none');
         arrowGroup
           .append('path')
           .attr('class', 'known-issue-arrow')
-          .attr('d', `M ${startX} ${bottomY + 2} Q ${midX} ${midY} ${endX} ${endY}`)
+          .attr('d', d)
           .attr('fill', 'none')
           .attr('stroke', color)
           .attr('stroke-width', 1.75)

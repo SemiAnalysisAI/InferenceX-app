@@ -1,10 +1,3 @@
-/**
- * Compute every derived trace-replay payload while parsing server metrics only
- * once. The standalone aggregate/chart helpers remain the compatibility path
- * for backfills; ingest uses this coordinator to avoid repeated GiB-scale
- * decompression and JSON tokenization.
- */
-
 import {
   AGGREGATE_SERVER_METRIC_KEYS,
   computeAggregateStats,
@@ -13,9 +6,10 @@ import {
 } from './compute-aggregate-stats.js';
 import {
   CHART_METRIC_KEYS,
-  computeChartSeriesFromMetricPhases,
+  computeChartDataFromMetricPhases,
   type ChartSeries,
   type MetricsMap,
+  type PromptTokenTotals,
   type RawMetric,
 } from './compute-chart-series.js';
 import { computeRequestTimeline, type RequestTimeline } from './compute-request-timeline.js';
@@ -26,12 +20,12 @@ import type { ServerMetricsContext } from './server-metrics-adapters.js';
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
   chartSeries: ChartSeries | null;
+  promptTokenTotals: PromptTokenTotals | null;
   requestTimeline: RequestTimeline | null;
   atomKvCacheBlocks: number | null;
 }
 
 export interface TraceDerivedComputeOptions {
-  /** Override the bounded fast-path threshold, primarily for streaming tests. */
   maxInMemoryBytes?: number;
 }
 
@@ -49,12 +43,6 @@ function selectMetrics(metrics: MetricsMap, wanted: ReadonlySet<string>): Metric
   return selected;
 }
 
-/**
- * Produce the same three JSON values previously computed independently in
- * `insertTraceReplay()`. Malformed inputs retain the old failure isolation:
- * profile stats/timeline can succeed without server metrics, and a chart
- * projection failure does not discard aggregate stats.
- */
 export async function computeTraceDerivedPayloads(
   profileBlob: Buffer | null,
   serverBlob: Buffer | null,
@@ -77,6 +65,7 @@ export async function computeTraceDerivedPayloads(
   ]);
   let aggregateStats = initialAggregateStats;
   let chartSeries: ChartSeries | null = null;
+  let promptTokenTotals: PromptTokenTotals | null = null;
 
   if (phases) {
     const aggregateMetrics = phases.complete
@@ -84,10 +73,6 @@ export async function computeTraceDerivedPayloads(
       : selectMetrics(phases.metrics, AGGREGATE_SERVER_METRIC_KEYS);
     aggregateStats = withServerMetricAggregateStats(aggregateStats, aggregateMetrics);
 
-    // The historical in-memory path builds chart timing metadata from every
-    // metric, while its oversized streaming fallback retains only chart keys.
-    // Preserve that distinction exactly even though the shared streaming pass
-    // also collects the aggregate-only GPU prefix-cache aliases.
     const profiling = phases.complete
       ? phases.metrics
       : selectMetrics(phases.metrics, CHART_METRIC_KEYS);
@@ -95,7 +80,9 @@ export async function computeTraceDerivedPayloads(
       ? phases.warmupMetrics
       : selectMetrics(phases.warmupMetrics, CHART_METRIC_KEYS);
     try {
-      chartSeries = computeChartSeriesFromMetricPhases(profiling, warmup, metricsContext);
+      const data = computeChartDataFromMetricPhases(profiling, warmup, metricsContext);
+      chartSeries = data.series;
+      promptTokenTotals = data.promptTokenTotals;
     } catch {
       chartSeries = null;
     }
@@ -104,6 +91,7 @@ export async function computeTraceDerivedPayloads(
   return {
     aggregateStats,
     chartSeries,
+    promptTokenTotals,
     requestTimeline,
     atomKvCacheBlocks: phases
       ? atomKvCacheBlocksFromMetricPhases(phases.metrics, phases.warmupMetrics)

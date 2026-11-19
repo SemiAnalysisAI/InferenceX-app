@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+vi.mock('@/lib/cache/api-cache', () => ({
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
@@ -18,6 +18,18 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/options', () => {
+  it('exposes A100 with the hyperscaler ownership assumption', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    expect(body.hardware.find((hw: { key: string }) => hw.key === 'a100')).toMatchObject({
+      label: 'A100',
+      vendor: 'NVIDIA',
+      arch: 'Ampere',
+      tdpW: 400,
+      costPerHour: { h: 0.78, r: 9.99 },
+    });
+  });
+
   it('returns every option domain with the envelope', async () => {
     const res = await GET(request('/api/v1/views/options'));
     expect(res.status).toBe(200);
@@ -55,8 +67,26 @@ describe('GET /api/v1/views/options', () => {
     const dsv4 = body.models.find((m: { name: string }) => m.name === 'DeepSeek-V4-Pro');
     expect(dsv4).toBeDefined();
     expect(dsv4.dbKeys).toContain('dsv4');
-    expect(typeof dsv4.category).toBe('string');
+    expect(dsv4.category).toBe('deprecated');
+    expect(body.models.find((m: { name: string }) => m.name === 'Kimi-K3')).toMatchObject({
+      dbKeys: ['kimik3'],
+      category: 'deprecated',
+      compareSlug: 'kimi-k3',
+    });
+    expect(body.models.find((m: { name: string }) => m.name === 'GLM-5.3-Flash')).toMatchObject({
+      dbKeys: ['glm5.3flash'],
+      releaseDate: null,
+    });
     expect(body.models.every((m: { dbKeys: string[] }) => m.dbKeys.length > 0)).toBe(true);
+    expect(body.models.find((m: { name: string }) => m.name === 'MiniMax-M3')).toMatchObject({
+      dbKeys: ['minimaxm3'],
+      category: 'deprecated',
+    });
+    expect(
+      body.models.find((m: { name: string }) => m.name === 'MiniMax-M3.1-Flash'),
+    ).toMatchObject({
+      category: 'default',
+    });
   });
 
   it('describes sequences with isl/osl and deprecation flags', async () => {
@@ -69,12 +99,66 @@ describe('GET /api/v1/views/options', () => {
     expect(agentic.isl).toBeNull();
   });
 
+  it('keeps 8K/1K active for both GLM-5.3-Flash and GLM-5.2', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    const flash = body.models.find((model: { name: string }) => model.name === 'GLM-5.3-Flash');
+    const nonFlash = body.models.find((model: { name: string }) => model.name === 'GLM-5.2');
+    expect(flash.deprecatedSequences).not.toContain('8k/1k');
+    expect(flash.deprecatedSequences).not.toContain('agentic-traces');
+    expect(flash.deprecatedSequences).toContain('1k/1k');
+    expect(nonFlash.deprecatedSequences).not.toContain('8k/1k');
+  });
+
+  it('returns default models in selector order without changing the selected default', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    expect(
+      body.models
+        .filter((model: { category: string }) => model.category === 'default')
+        .map((model: { name: string }) => model.name),
+    ).toEqual([
+      'Kimi-K3.1-Pro',
+      'DeepSeek-V4.1-Flash',
+      'GLM-5.2',
+      'GLM-5.3-Flash',
+      'MiniMax-M3.1-Flash',
+      'Muse-Spark-Open',
+      'Qwen-3.5-397B-A17B',
+      'Qwen3.8-Flash-Next',
+    ]);
+    expect(body.defaults.model).toBe('DeepSeek-V4-Pro');
+    expect(body.models.some((model: { category: string }) => model.category === 'hidden')).toBe(
+      false,
+    );
+  });
+
+  it('exposes model-specific sequence retirement without retiring Qwen3.5 or global 8K/1K', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    const qwen = body.models.find((model: { name: string }) => model.name === 'Qwen-3.5-397B-A17B');
+    expect(qwen.category).toBe('default');
+    expect(qwen.deprecatedSequences).toContain('8k/1k');
+    expect(qwen.deprecatedSequences).toContain('1k/1k');
+    expect(qwen.deprecatedSequences).not.toContain('agentic-traces');
+    expect(
+      body.sequences.find((sequence: { key: string }) => sequence.key === '8k/1k'),
+    ).toMatchObject({
+      deprecated: false,
+    });
+    const dsr1 = body.models.find((model: { name: string }) => model.name === 'DeepSeek-R1-0528');
+    expect(dsr1.deprecatedSequences).not.toContain('8k/1k');
+  });
+
   it('describes hardware and metrics from the registries', async () => {
     const bodyRes = await GET(request('/api/v1/views/options'));
     const body = await bodyRes.json();
     const h200 = body.hardware.find((h: { key: string }) => h.key === 'h200');
     expect(h200.vendor).toBe('NVIDIA');
     expect(h200.costPerHour.h).toBeGreaterThan(0);
+    expect(body.hardware.find((h: { key: string }) => h.key === 'b300')).toMatchObject({
+      tdpW: 1100,
+    });
 
     const metric = body.metrics.find((m: { configKey: string }) => m.configKey === 'y_tpPerGpu');
     expect(metric).toBeDefined();
@@ -93,7 +177,6 @@ describe('GET /api/v1/views/options', () => {
       percentile: 'p90',
       xmode: 'interactivity',
     });
-    // Same vendors, in the dashboard's quick-filter pill order.
     expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);
     expect(body.quickFilters.deployments).toEqual(['single-node', 'multi-node', 'disagg']);
     expect(body.fleet.defaults).toEqual({

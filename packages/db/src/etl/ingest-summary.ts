@@ -14,21 +14,22 @@ export interface IngestSummaryOptions {
   includeUnmappedPrecisions?: boolean;
 }
 
-/** Print the DB totals and shared skip/unmapped-value footer used by ingest scripts. */
 export function printIngestSummaryFooter(
-  totals: IngestDatabaseTotals,
+  totals: IngestDatabaseTotals | null,
   tracker: SkipTracker,
   options?: IngestSummaryOptions,
 ): void {
-  console.log(`\n  DB totals:`);
-  console.log(`    configs           ${totals.configs}`);
-  console.log(`    benchmark_results ${totals.benchmarkResults}`);
-  console.log(`    run_stats         ${totals.runStats}`);
-  console.log(`    eval_results      ${totals.evalResults}`);
-  console.log(`    eval_samples      ${totals.evalSamples}`);
-  console.log(`    changelog_entries ${totals.changelogEntries}`);
+  if (totals) {
+    console.log(`\n  DB totals:`);
+    console.log(`    configs           ${totals.configs}`);
+    console.log(`    benchmark_results ${totals.benchmarkResults}`);
+    console.log(`    run_stats         ${totals.runStats}`);
+    console.log(`    eval_results      ${totals.evalResults}`);
+    console.log(`    eval_samples      ${totals.evalSamples}`);
+    console.log(`    changelog_entries ${totals.changelogEntries}`);
+  }
 
-  const { skips, unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
+  const { skips, unmappedModels, unmappedHws, unmappedPrecisions, unexpectedMetrics } = tracker;
   const skipLines: [string, number][] = [['no isl/osl (old format)', skips.noIslOsl]];
   if (options?.includeFailedRuns) {
     skipLines.push(['failed run (0 successful)', skips.failedRun]);
@@ -38,6 +39,7 @@ export function printIngestSummaryFooter(
     ['unmapped hw', skips.unmappedHw],
     ['bad/empty zip', skips.badZip],
     ['DB errors', skips.dbError],
+    ['telemetry errors (non-fatal)', skips.telemetryError],
   );
 
   const nonzeroSkipLines = skipLines.filter(([, count]) => count > 0);
@@ -64,5 +66,12 @@ export function printIngestSummaryFooter(
   if (options?.includeUnmappedPrecisions && unmappedPrecisions.size > 0) {
     console.log(`\n  Unmapped precision values (add to PRECISION_KEYS to ingest):`);
     [...unmappedPrecisions].forEach((value) => console.log(`    ${value}`));
+  }
+
+  if (unexpectedMetrics.size > 0) {
+    console.log(
+      `\n  Auto-captured unexpected metrics (add to METRIC_KEYS in constants/src/metric-keys.ts or NON_METRIC_KEYS in benchmark-mapper.ts):`,
+    );
+    [...unexpectedMetrics].toSorted().forEach((value) => console.log(`    ${value}`));
   }
 }

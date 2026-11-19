@@ -1,9 +1,9 @@
 'use client';
 
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 export function BlogBackLink({
   href = '/blog',
@@ -14,14 +14,14 @@ export function BlogBackLink({
 } = {}) {
   return (
     <nav>
-      <Link
+      <IntentPrefetchLink
         href={href}
         className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => track('blog_back_clicked')}
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         {label}
-      </Link>
+      </IntentPrefetchLink>
     </nav>
   );
 }

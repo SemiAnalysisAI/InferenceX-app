@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   locale: { value: 'en' as 'en' | 'zh' },
 }));
 
-vi.mock('@/lib/analytics', () => ({ track: mocks.track }));
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => mocks.locale.value }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale.value }));
 
 import { MetricExplanation } from './MetricExplanation';
 import ChartNotices from './ChartNotices';

@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { WhitepaperDetailContent } from '@/components/whitepaper/whitepaper-detail-content';
-import { getAllWhitepapers, getWhitepaper, whitepaperDetailMetadata } from '@/lib/whitepapers';
+import {
+  getAllWhitepapers,
+  getWhitepaper,
+  whitepaperDetailMetadata,
+} from '@/lib/content/whitepapers';
 
 interface Props {
   params: Promise<{ slug: string }>;

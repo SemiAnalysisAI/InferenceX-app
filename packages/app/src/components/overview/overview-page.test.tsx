@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 import { OverviewPageContent } from './overview-page';
 import type { OverviewLocale } from './overview-strings';
@@ -54,8 +54,8 @@ afterEach(() => {
 
 describe('OverviewPageContent failure states', () => {
   it.each([
-    ['en', 'No overview results match this selection.'],
-    ['zh', '没有符合当前筛选条件的总览结果。'],
+    ['en', 'No overview results match this selection'],
+    ['zh', '没有符合当前筛选条件的总览结果'],
   ] as const)('renders the localized empty state for %s', (locale, message) => {
     renderPage(locale);
 
@@ -78,8 +78,6 @@ describe('OverviewPageContent failure states', () => {
       window.history.replaceState({}, '', locale === 'zh' ? '/zh/overview' : '/overview');
       renderPage(locale);
 
-      // The tier control is a slider, not a link, so the failed navigation is
-      // driven through the engine scope link instead.
       const scopeLink = container.querySelector<HTMLAnchorElement>(
         'a[data-overview-engine-scope="all"]',
       );

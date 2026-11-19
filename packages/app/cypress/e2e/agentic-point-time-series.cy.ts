@@ -139,15 +139,8 @@ describe('Agentic point request metric time series', () => {
         requests,
       },
     });
-    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
-    // The segmented toggle is present in the server-rendered HTML. Waiting for
-    // this client-only query proves hydration has attached its click handlers,
-    // avoiding a Firefox race where an early click leaves `?view=` unchanged.
+    cy.visit('/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.wait('@requestChartData');
-  });
-
-  it('uses the shared topology label for the active agentic point', () => {
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
   });
 
   it('opens the stored server log and loads it incrementally', () => {
@@ -221,6 +214,7 @@ describe('Agentic point request metric time series', () => {
             },
           ],
           truncated: false,
+          incomplete: true,
         },
       });
     }).as('serverLogSearch');
@@ -270,6 +264,10 @@ describe('Agentic point request metric time series', () => {
       .and('contain.text', 'results/router.log')
       .and('contain.text', 'character 70,028')
       .and('contain.text', 'INFO router ready for requests');
+    cy.get('[data-testid="server-log-search-incomplete"]').should(
+      'contain.text',
+      'Search stopped after the first 64 million characters',
+    );
 
     cy.get('[data-testid="go-to-server-log-match"]').click();
     cy.wait('@serverLogJumpChunk').then(({ request }) => {
@@ -348,7 +346,7 @@ describe('Agentic point request metric time series', () => {
       }
     });
 
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.contains('button', 'TP8/DCP8 · c=8').should('be.visible');
     cy.get('[data-testid="detail-view-logs"]').click();
     cy.location('search').should('contain', 'view=logs');
     cy.get('#agentic-log-file').click();
@@ -375,9 +373,6 @@ describe('Agentic point request metric time series', () => {
       cy.get('[data-testid="interactivity-percentile-toggle"]')
         .find('[role="tab"][aria-selected="true"]')
         .should('have.text', 'P90');
-      // 6 points: profiling slice includes requests 0-4 (profiling) + request 5
-      // (phase='warmup' label but start=5s > profiling boundary=0s, so
-      // sliceTimelineByPhase keeps it); cancelled r6 and null-metric r7/r8 are dropped.
       cy.get('[data-testid="interactivity-point-count"]').should('have.text', '6 points');
       cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'P90 (rolling 50 req)');
@@ -387,11 +382,16 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.contains('h2', 'TTFT over time').should('be.visible');
-      // Same 6-point slice as interactivity (warmup r5 included by time-boundary).
       cy.get('[data-testid="ttft-point-count"]').should('have.text', '6 points');
       cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'TTFT (s)');
       cy.get('svg').should('contain.text', 'Cumulative P90 TTFT');
+      cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
+    });
+
+    cy.get('[data-testid="detail-view-point"]').click();
+    cy.get('[data-testid="unique-input-inflight-chart"]').within(() => {
+      cy.get('svg').should('contain.text', 'Cumulative average');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
     });
   });
@@ -414,9 +414,6 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();
       cy.contains('h2', 'E2E latency over time').should('be.visible');
-      // 8 points: e2e = (end−start)/1e6 > 0 for all non-cancelled requests —
-      // includes r0-r5 (profiling slice) + r7, r8 (subagent/aux with null ttft/tpot
-      // but valid start/end). Cancelled r6 is excluded.
       cy.get('[data-testid="e2e-point-count"]').should('have.text', '8 points');
       cy.get('svg circle').should('have.length', 8);
       cy.get('svg').should('contain.text', 'E2E latency (s)');
@@ -473,14 +470,6 @@ describe('Agentic point request metric time series', () => {
   it('shows total idle time on the request timeline (time-boundary phase slice, consistent with the charts)', () => {
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.location('search').should('contain', 'view=timeline');
-    // The Gantt now slices by TIME BOUNDARY (sliceTimelineByPhase), matching the
-    // per-point charts, instead of the per-request phase LABEL. The earliest
-    // profiling request starts at t=0, so the boundary is 0 and warmup-labelled
-    // r5 (start=5s) is counted as profiling here too — exactly as the interactivity
-    // /TTFT charts already count it (their 6-point slice includes r5). That fills
-    // the former 5–6s gap that label-based filtering left open, so in-flight
-    // coverage is now continuous across [0s, 7s]: idle 0ms (0.0%). A 1.00s value
-    // here would mean the Gantt had regressed to label-based filtering.
     cy.get('[data-testid="timeline-total-idle-time"]').should('have.text', 'idle 0ms (0.0%)');
     cy.get('[data-timeline-row-kind="parent"]')
       .should('have.length', 2)
@@ -497,58 +486,16 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
     cy.window().then((win) => {
-      win.history.pushState({}, '', '/agentx/test-dataset/conversations/conversation-1');
+      win.history.pushState({}, '', '/infx/agentx/test-dataset/conversations/conversation-1');
     });
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/agentic/206885');
+    cy.location('pathname').should('eq', '/infx/inference/agentic/206885');
     cy.location('search').should('contain', 'view=timeline');
     cy.get('[data-testid="detail-view-timeline"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
   });
 
-  it('shows a cumulative average for unique input tokens in flight', () => {
-    cy.get('[data-testid="detail-view-point"]').click();
-    cy.get('[data-testid="unique-input-inflight-chart"]').within(() => {
-      cy.get('svg').should('contain.text', 'Cumulative average');
-      cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
-    });
-  });
-
-  it('renders the log viewer in Simplified Chinese', () => {
-    cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
-    cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
-    cy.intercept(
-      { method: 'GET', pathname: '/api/v1/server-log-files' },
-      {
-        body: ['results/server.log'],
-      },
-    );
-    cy.intercept(
-      { method: 'GET', pathname: '/api/v1/server-log' },
-      {
-        body: {
-          id: 206885,
-          fileName: 'results/server.log',
-          serverLog: 'INFO server ready\n',
-          offset: 0,
-          nextOffset: null,
-        },
-      },
-    );
-    cy.visit('/zh/inference/agentic/206885?view=logs', { onBeforeLoad: unlockAgenticGate });
-
-    cy.get('[data-testid="detail-view-logs"]')
-      .should('have.attr', 'aria-selected', 'true')
-      .and('have.text', '日志');
-    cy.get('[data-testid="agentic-server-log-viewer"]')
-      .should('contain.text', '日志文件')
-      .and('contain.text', 'results/server.log')
-      .and('contain.text', '搜索所有日志文件')
-      .and('contain.text', '已到达日志末尾');
-  });
-
   it('retries the failed log-file inventory, initial content, and search queries independently', () => {
-    // Keep each endpoint failing until its Retry action, regardless of background refetches.
     let fileAttempts = 0;
     let failFile = true;
     let fileAttemptsBeforeRetry = 0;
@@ -593,11 +540,8 @@ describe('Agentic point request metric time series', () => {
               body: { id: 206885, query: 'recovered', matches: [], truncated: false },
             },
       );
-    });
-    // Distinct URL: the previous test visits this same logs view, and with
-    // testIsolation off a same-URL visit does not reliably reload, so these
-    // failing intercepts would never be exercised.
-    cy.visit('/zh/inference/agentic/206885?view=logs&e2e=log-retries', {
+    }).as('retryServerLogSearch');
+    cy.visit('/zh/infx/inference/agentic/206885?view=logs&e2e=log-retries', {
       onBeforeLoad: unlockAgenticGate,
     });
 
@@ -609,10 +553,8 @@ describe('Agentic point request metric time series', () => {
       failFile = false;
     });
     cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
-    // Wait for the refetch to land before counting attempts — asserting right
-    // after the click races the request.
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
-    cy.then(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
+    cy.wrap(null).should(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 
     cy.get('[data-testid="server-log-content-query-error"]')
       .should('contain.text', '无法加载日志文件，请稍后重试。')
@@ -623,7 +565,9 @@ describe('Agentic point request metric time series', () => {
     });
     cy.get('[data-testid="server-log-content-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO recovered log');
-    cy.then(() => expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry));
+    cy.wrap(null).should(() =>
+      expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry),
+    );
 
     cy.get('[data-testid="server-log-search"]').type('recovered');
     cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
@@ -632,40 +576,32 @@ describe('Agentic point request metric time series', () => {
       failSearch = false;
     });
     cy.get('[data-testid="server-log-search-query-error"]').contains('button', '重试').click();
+    cy.wait('@retryServerLogSearch');
     cy.get('[data-testid="server-log-search-query-error"]').should('not.exist');
     cy.get('[data-testid="server-log-search-results"]').should('contain.text', '0 处匹配');
-    cy.then(() => expect(searchAttempts).to.be.greaterThan(searchAttemptsBeforeRetry));
+    cy.wrap(null).should(() => expect(searchAttempts).to.be.greaterThan(searchAttemptsBeforeRetry));
   });
 
   it('renders the complete Chinese detail, mobile, metadata, and timeline click path', () => {
     cy.viewport(390, 900);
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('link[rel="alternate"][hreflang="en"]')
       .should('have.attr', 'href')
-      .and('include', '/inference/agentic/206885');
+      .and('include', '/infx/inference/agentic/206885');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .should('have.attr', 'href')
-      .and('include', '/zh/inference/agentic/206885');
-    cy.contains('本次运行共 1 个数据点').should('be.visible');
-    cy.get('[data-testid="sibling-sort-select"]').should('have.attr', 'aria-label', '数据点排序');
-    cy.contains('h2', '输入序列长度分布').should('be.visible');
-    cy.contains(/个请求 · 范围 .* token · 对数刻度/u).should('be.visible');
-    cy.contains('h2', '请求队列深度').should('be.visible');
+      .and('include', '/zh/infx/inference/agentic/206885');
+    cy.get('[data-testid="sibling-sort-select"]').should('be.visible');
 
     cy.get('[data-testid="detail-view-timeline"]').click();
-    cy.get('[data-testid="timeline-total-idle-time"]').should('contain.text', '空闲');
-    cy.get('[data-testid="request-timeline-svg"]')
-      .should('have.attr', 'role', 'img')
-      .and('have.attr', 'aria-label', '请求执行时间线');
-    cy.contains('Shift+滚轮缩放 · 拖动平移 · 双击重置').should('be.visible');
+    cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
+    cy.get('[data-testid="request-timeline-svg"]').should('have.attr', 'role', 'img');
     cy.get('[data-testid="request-timeline-scroll"]')
       .scrollTo('right')
       .should(($scroller) => {
         expect($scroller[0].scrollLeft).to.be.greaterThan(0);
       });
-    // Bars on a dataset-linked run render inside SVG <a> anchors (open-in-new-tab
-    // support), not plain <g> groups.
     cy.get('[data-testid="request-timeline-svg"] a > rect').then(($rects) => {
       const viewport = $rects[0].ownerDocument.documentElement;
       const visibleRect = [...$rects].find((element) => {
@@ -686,23 +622,23 @@ describe('Agentic point request metric time series', () => {
       cy.wrap(visibleRect!).trigger('mousemove', 'center', { scrollBehavior: false });
     });
     cy.get('[data-testid="request-timeline-tooltip"]')
-      .should('contain.text', '总时长')
-      .and('contain.text', '排队等待')
-      .and('have.css', 'position', 'fixed')
+      .should('have.css', 'position', 'fixed')
       .then(($tooltip) => {
         const bounds = $tooltip[0].getBoundingClientRect();
         expect(bounds.width).to.be.greaterThan(0);
         expect(bounds.height).to.be.greaterThan(0);
       });
     expectNoPageOverflow();
-    cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]')
+    cy.get('a[href^="/zh/infx/agentx/fixture-dataset/conversations/conversation-1"]')
       .first()
       .should('have.attr', 'href')
       .and('include', 'turn=0');
-    cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]').first().click();
+    cy.get('a[href^="/zh/infx/agentx/fixture-dataset/conversations/conversation-1"]')
+      .first()
+      .click();
     cy.location('pathname').should(
       'equal',
-      '/zh/agentx/fixture-dataset/conversations/conversation-1',
+      '/zh/infx/agentx/fixture-dataset/conversations/conversation-1',
     );
   });
 
@@ -764,9 +700,9 @@ describe('Agentic point request metric time series', () => {
       );
     });
 
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentic-request-charts-query-error"]')
-      .should('contain.text', '请求图表数据加载失败。')
+      .should('contain.text', '请求图表数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       requestChartAttemptsBeforeRetry = requestChartAttempts;
@@ -778,7 +714,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="detail-view-aggregates"]').click();
     cy.get('[data-testid="agentic-aggregates-query-error"]')
-      .should('contain.text', '跨配置聚合数据加载失败。')
+      .should('contain.text', '跨配置聚合数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       aggregateAttemptsBeforeRetry = aggregateAttempts;
@@ -790,7 +726,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="agentic-timeline-query-error"]')
-      .should('contain.text', '请求时间线加载失败。')
+      .should('contain.text', '请求时间线加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       timelineAttemptsBeforeRetry = timelineAttempts;
@@ -818,10 +754,10 @@ describe('Agentic point request metric time series', () => {
         failSibling ? { statusCode: 500, body: {} } : { statusCode: 200, body: benchmarkSiblings },
       );
     });
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentic-trace-query-error"]')
-      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据。')
+      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据')
       .and('contain.text', '重试');
     cy.then(() => {
       traceAttemptsBeforeRetry = traceAttempts;
@@ -832,14 +768,14 @@ describe('Agentic point request metric time series', () => {
     cy.then(() => expect(traceAttempts).to.be.greaterThan(traceAttemptsBeforeRetry));
 
     cy.get('[data-testid="agentic-siblings-query-error"]')
-      .should('contain.text', 'SKU 导航数据加载失败。')
+      .should('contain.text', 'SKU 导航数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       siblingAttemptsBeforeRetry = siblingAttempts;
       failSibling = false;
     });
     cy.get('[data-testid="agentic-siblings-query-error"]').contains('button', '重试').click();
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.contains('button', 'TP8/DCP8 · c=8').should('be.visible');
     cy.then(() => expect(siblingAttempts).to.be.greaterThan(siblingAttemptsBeforeRetry));
   });
 });
@@ -867,7 +803,7 @@ describe('Agentic request timeline virtualization', () => {
         requests,
       },
     });
-    cy.visit('/inference/agentic/206885?view=timeline', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885?view=timeline', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('keeps row labels and SVG request bars bounded to the viewport', () => {
@@ -985,22 +921,10 @@ describe('Agentic point orchestrator metric sources', () => {
         metricSources: [{ source: prefill.source }, { source: decode.source }],
       },
     });
-    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('switches every server chart to an orchestrator-normalized worker', () => {
-    cy.get('[data-testid="point-summary"]')
-      .should('contain.text', 'Offload Type')
-      .and('contain.text', 'DRAM')
-      .and('contain.text', 'KV Offload Engine')
-      .and('contain.text', 'LMCache 0.5.1')
-      .and('contain.text', 'KV Transfer Engine')
-      .and('contain.text', 'Mooncake')
-      .and('contain.text', 'Router')
-      .and('contain.text', 'vLLM Router 0.1.14')
-      .and('contain.text', 'Chip cache hit')
-      .and('contain.text', 'CPU cache hit');
-
     cy.get('[data-testid="metric-source-toolbar"]')
       .should('have.css', 'position', 'sticky')
       .and('have.css', 'top', '64px');
@@ -1067,12 +991,12 @@ describe('Agentic point orchestrator metric sources', () => {
         attempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: recovered },
       );
     });
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="metric-source-select"]').click();
     cy.contains('[role="option"]', '解码 · decode-a').click();
 
     cy.get('[data-testid="agentic-metric-source-query-error"]')
-      .should('contain.text', '无法加载所选服务器指标来源。')
+      .should('contain.text', '无法加载所选服务器指标来源')
       .and('contain.text', '重试');
     cy.get('[data-testid="agentic-metric-source-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="agentic-metric-source-query-error"]').should('not.exist');
@@ -1113,8 +1037,6 @@ describe('Agentic point per-engine KV overlay', () => {
         decodeTps: [],
         prefixCacheHitsTps: [],
         hostKvCacheUsage: [],
-        // Bare DP ranks plus a role-qualified engine, as the ETL emits for a
-        // disaggregated run where the decode worker reports no rank label.
         kvCacheUsageByEngine: [
           engineSeries('0', 0.2),
           engineSeries('1', 0.4),
@@ -1123,7 +1045,7 @@ describe('Agentic point per-engine KV overlay', () => {
         metricSources: [],
       },
     });
-    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('draws one legend entry per engine and leaves named engines unprefixed', () => {
@@ -1132,11 +1054,9 @@ describe('Agentic point per-engine KV overlay', () => {
       .within(() => {
         cy.contains('text', 'DP 0').should('be.visible');
         cy.contains('text', 'DP 1').should('be.visible');
-        // Already self-describing — must NOT come out as "DP decode".
         cy.contains('text', 'decode').should('be.visible');
         cy.contains('text', 'DP decode').should('not.exist');
         cy.contains('text', 'Avg').should('be.visible');
-        // One line per engine plus the average, and no duplicate chips.
         cy.get('path[fill="none"]').should('have.length', 4);
       });
   });

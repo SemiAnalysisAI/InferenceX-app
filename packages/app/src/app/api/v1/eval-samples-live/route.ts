@@ -1,18 +1,17 @@
 /**
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
- * It fetches live GitHub Actions artifacts which change while a run is in progress —
- * same policy as `/api/unofficial-run`.
+ * It fetches live GitHub Actions artifacts which change while a run is in progress.
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { extractDemonstrations } from '@/lib/eval-sample-utils';
-import { parseEvalSampleWindow } from '@/lib/eval-sample-params';
+import { extractDemonstrations } from '@/lib/evaluation/eval-sample-utils';
+import { parseEvalSampleWindow } from '@/lib/evaluation/eval-sample-params';
 import {
   type EvalArtifactConfig,
   fetchAndParseSamples,
   findEvalSampleArtifact,
-} from '@/lib/eval-samples-live';
-import { fetchGithubRunArtifacts, getGithubToken } from '@/lib/github-artifacts';
+} from '@/lib/evaluation/eval-samples-live';
+import { fetchGithubRunArtifacts, getGithubToken } from '@/lib/github/github-artifacts';
 
 export const dynamic = 'force-dynamic';
 

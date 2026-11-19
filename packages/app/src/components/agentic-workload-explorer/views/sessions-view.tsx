@@ -1,0 +1,658 @@
+'use client';
+
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { formatCost } from '@/components/agentic-workload-explorer/session-dag';
+import { parseUserAgent } from '@/lib/agentic-workload-explorer/user-agent';
+import { useInfiniteList } from '@/hooks/agentic-workload-explorer/use-infinite-scroll';
+import { ArrowDown, ArrowUp, Loader2, Search, X } from 'lucide-react';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
+import {
+  HARNESSES,
+  harnessFromUserAgent,
+  isHarness,
+  type Harness,
+} from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { harnessLabel } from '@/lib/agentic-workload-explorer/harness-label';
+import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
+import type {
+  Session,
+  SessionHashStats,
+  SessionStats,
+} from '@/lib/agentic-workload-explorer/api-types';
+import { createTaskLimiter } from '@/lib/agentic-workload-explorer/task-limiter';
+import { formatSnapshotClock, formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
+import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { EmptyState } from '@/components/ui/empty-state';
+
+const STRINGS = {
+  en: {
+    sessions: 'Sessions',
+    total: 'total',
+    searchPlaceholder: 'Search sessions',
+    minReqs: { '20': '> 20 Reqs', '100': '> 100 Reqs', '0': 'All' } as Record<string, string>,
+    allVersions: 'All Versions',
+    allHarnesses: 'All Harnesses',
+    noMatch: 'No sessions match these filters',
+    colSession: 'Session',
+    colUser: 'User',
+    colReqs: 'Reqs',
+    colCost: 'Cost',
+    colApiHit: 'API Hit',
+    colHashUpper: 'Hash Upper Bound',
+    colStarted: 'Started (UTC)',
+    colActive: 'Active (UTC)',
+    apiHitTitle:
+      'API Cache Hit Rate — cache_read / (cache_read + cache_write + input) across every request in the session.',
+    hashUpperTitle:
+      'Theoretical Upper-Bound Cache Hit Rate — Assuming Infinite Cache TTL and an Infinitely Large Cache. Walks a chain-hash trie over every request to find the longest prefix match against any prior chain in the session.',
+    computeHashTitle: 'Compute the exact theoretical hash-cache upper bound for this session.',
+    hashLoad: 'Compute',
+    hashRetry: 'Retry',
+    hashNoData: 'No hash data — session has no recorded prompt blocks.',
+    colVersion: 'Version',
+    resetSort: 'Reset sort',
+    minReqsFilterLabel: 'Minimum requests',
+    versionFilterLabel: 'Trace Version',
+    harnessFilterLabel: 'Harness',
+    openSession: (id: string) => `Open session ${id}`,
+  },
+  zh: {
+    sessions: '会话列表',
+    total: '总计',
+    searchPlaceholder: '搜索会话',
+    minReqs: { '20': '> 20 请求', '100': '> 100 请求', '0': '全部' } as Record<string, string>,
+    allVersions: '所有版本',
+    allHarnesses: '全部 harness',
+    noMatch: '没有符合条件的会话',
+    colSession: '会话',
+    colUser: '用户',
+    colReqs: '请求',
+    colCost: '成本',
+    colApiHit: 'API 命中',
+    colHashUpper: 'Hash 上界',
+    colStarted: '开始 (UTC)',
+    colActive: '活跃 (UTC)',
+    apiHitTitle:
+      'API 缓存命中率 — 会话内所有请求的 cache_read / (cache_read + cache_write + input)',
+    hashUpperTitle:
+      '理论缓存命中上界 — 假设无限 Cache TTL 与无限大缓存。对每个请求遍历 chain-hash trie，查找与此前任意链的最长前缀匹配。',
+    computeHashTitle: '计算此会话的精确理论 hash-cache 命中上界',
+    hashLoad: '计算',
+    hashRetry: '重试',
+    hashNoData: '无 hash 数据 — 此会话没有记录 prompt 块',
+    colVersion: '版本',
+    resetSort: '重置排序',
+    minReqsFilterLabel: '最少请求数',
+    versionFilterLabel: 'Trace 版本',
+    harnessFilterLabel: 'Harness',
+    openSession: (id: string) => `打开会话 ${id}`,
+  },
+} as const;
+
+function apiCacheHitRate(session: Session): number | null {
+  const read = Number(session.totalCacheRead);
+  const write = Number(session.totalCacheWrite);
+  const input = Number(session.totalInput);
+  const denom = read + write + input;
+  if (denom <= 0) return null;
+  return (read / denom) * 100;
+}
+
+type HashStatsState =
+  | { status: 'pending' }
+  | { status: 'loading' }
+  | { status: 'loaded'; data: SessionHashStats }
+  | { status: 'error' };
+
+const runHashStatsRequest = createTaskLimiter(4);
+
+type SortKey = 'active' | 'started' | 'requests' | 'cost' | 'session' | 'version' | 'user';
+type SortDir = 'asc' | 'desc';
+
+function SortButton({
+  col,
+  children,
+  align,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  col: SortKey;
+  children: React.ReactNode;
+  align?: 'right';
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sortKey === col;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(col)}
+      className={`flex w-fit items-center gap-1 transition-colors ${
+        align === 'right' ? 'justify-self-end' : 'justify-self-start'
+      } ${active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+    >
+      {children}
+      {active &&
+        (sortDir === 'desc' ? (
+          <ArrowDown className="size-3 opacity-60" aria-hidden="true" />
+        ) : (
+          <ArrowUp className="size-3 opacity-60" aria-hidden="true" />
+        ))}
+    </button>
+  );
+}
+type MinReqsFilter = '20' | '100' | '0';
+type HarnessFilter = 'all' | Harness;
+type VersionFilter = 'all' | string;
+
+const PAGE_SIZE = 50;
+
+const MIN_REQS_FILTERS: { value: MinReqsFilter; label: string }[] = [
+  { value: '20', label: '> 20 Reqs' },
+  { value: '100', label: '> 100 Reqs' },
+  { value: '0', label: 'All' },
+];
+
+const HARNESS_FILTERS: readonly HarnessFilter[] = ['all', ...HARNESSES];
+
+const VERSIONED_HARNESSES: readonly HarnessFilter[] = ['claude-code', 'codex', 'omp'];
+
+const VERSION_FILTERS: { value: VersionFilter; label: string }[] = [
+  { value: 'all', label: 'All Versions' },
+  { value: String(CURRENT_TRACE_VERSION), label: `v${CURRENT_TRACE_VERSION}` },
+];
+
+function isMinReqsFilter(v: string | null): v is MinReqsFilter {
+  return v === '20' || v === '100' || v === '0';
+}
+
+function parseHarnessFilter(v: string | null): HarnessFilter {
+  return isHarness(v) ? v : 'all';
+}
+
+function parseVersionFilter(v: string | null): VersionFilter {
+  return v === 'all' ? 'all' : String(CURRENT_TRACE_VERSION);
+}
+
+function sessionUaInfo(session: Session): {
+  cliVersion: string | null;
+  os: string | null;
+} {
+  const m = session.metadata;
+  const parsed = parseUserAgent(typeof m?.userAgent === 'string' ? m.userAgent : null);
+  return {
+    cliVersion:
+      (typeof m?.cliVersion === 'string' ? m.cliVersion : null) ?? parsed.cliVersion ?? null,
+    os: (typeof m?.os === 'string' ? m.os : null) ?? parsed.os ?? null,
+  };
+}
+
+export default function SessionsPage() {
+  return (
+    <Suspense>
+      <SessionsPageContent />
+    </Suspense>
+  );
+}
+
+function SessionsPageContent() {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const isMobile = useIsMobileViewport();
+  const explorerHref = useExplorerHref();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [stats, setStats] = useState<SessionStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [statsRefreshing, setStatsRefreshing] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('active');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const minReqsFilter: MinReqsFilter = isMinReqsFilter(searchParams.get('minReqs'))
+    ? (searchParams.get('minReqs') as MinReqsFilter)
+    : '20';
+  const harnessFilter = parseHarnessFilter(searchParams.get('harness'));
+  const versionFilter = parseVersionFilter(searchParams.get('version'));
+  const versionSortable = VERSIONED_HARNESSES.includes(harnessFilter);
+  if (sortKey === 'version' && !versionSortable) {
+    setSortKey('active');
+    setSortDir('desc');
+  }
+
+  function setFilter(key: 'minReqs' | 'harness' | 'version', value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    const defaultValue =
+      key === 'minReqs' ? '20' : key === 'version' ? String(CURRENT_TRACE_VERSION) : 'all';
+    if (value === defaultValue) {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    const qs = params.toString();
+    router.replace(explorerHref(`/sessions${qs ? `?${qs}` : ''}`), { scroll: false });
+    track('agentic_workload_sessions_filter_changed', { key, value });
+  }
+
+  const activeSearchRef = useRef(activeSearch);
+  activeSearchRef.current = activeSearch;
+  const versionFilterRef = useRef(versionFilter);
+  versionFilterRef.current = versionFilter;
+  const harnessFilterRef = useRef(harnessFilter);
+  harnessFilterRef.current = harnessFilter;
+  const minReqsFilterRef = useRef(minReqsFilter);
+  minReqsFilterRef.current = minReqsFilter;
+  const sortRef = useRef({ sortKey, sortDir });
+  sortRef.current = { sortKey, sortDir };
+
+  const {
+    items: sessions,
+    reset: resetSessions,
+    loadingMore,
+    hasMore,
+    sentinelRef,
+  } = useInfiniteList<Session>({
+    fetchMore: async (offset) => {
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (activeSearchRef.current) params.set('search', activeSearchRef.current);
+      if (versionFilterRef.current !== 'all') params.set('version', versionFilterRef.current);
+      if (harnessFilterRef.current !== 'all') params.set('harness', harnessFilterRef.current);
+      if (minReqsFilterRef.current !== '0') params.set('minReqs', minReqsFilterRef.current);
+      params.set('sort', sortRef.current.sortKey);
+      params.set('dir', sortRef.current.sortDir);
+      const res = await fetch(`/api/v1/agentic-workload-explorer/sessions?${params}`);
+      const data: { sessions: Session[] } = await res.json();
+      return { items: data.sessions, hasMore: data.sessions.length >= PAGE_SIZE };
+    },
+    getKey: (s) => s.id,
+  });
+
+  const fetchSessions = useCallback(async () => {
+    setStatsRefreshing(true);
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: '0' });
+    if (activeSearch) params.set('search', activeSearch);
+    if (versionFilter !== 'all') params.set('version', versionFilter);
+    if (harnessFilter !== 'all') params.set('harness', harnessFilter);
+    if (minReqsFilter !== '0') params.set('minReqs', minReqsFilter);
+    params.set('sort', sortKey);
+    params.set('dir', sortDir);
+    const r = await fetch(`/api/v1/agentic-workload-explorer/sessions?${params}`);
+    const data: { sessions: Session[]; stats: SessionStats } = await r.json();
+    resetSessions(data.sessions, data.sessions.length >= PAGE_SIZE);
+    setStats(data.stats);
+  }, [activeSearch, versionFilter, harnessFilter, minReqsFilter, sortKey, sortDir]);
+
+  const initialLoad = useRef(true);
+
+  useEffect(() => {
+    if (initialLoad.current) setLoading(true);
+    fetchSessions()
+      .catch(console.error)
+      .finally(() => {
+        setLoading(false);
+        setStatsRefreshing(false);
+        initialLoad.current = false;
+      });
+  }, [fetchSessions]);
+
+  const sortChanged = sortKey !== 'active' || sortDir !== 'desc';
+  function resetSort() {
+    setSortKey('active');
+    setSortDir('desc');
+  }
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+    track('agentic_workload_sessions_sort_changed', { sort_key: key, sort_dir: sortDir });
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-medium text-muted-foreground">{t.sessions}</span>
+        <span className="flex-1 h-px bg-border/30" />
+        {statsRefreshing && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+        {loading || !stats ? (
+          <Skeleton className="h-3 w-10" />
+        ) : (
+          <span className="text-3xs text-muted-foreground tabular-nums">
+            {formatNumber(stats.total)} {t.total}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchQuery(value);
+              clearTimeout(searchDebounceRef.current);
+              searchDebounceRef.current = setTimeout(() => {
+                setActiveSearch(value.trim());
+                track('agentic_workload_sessions_search', { query_length: value.trim().length });
+              }, 300);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchQuery('');
+                setActiveSearch('');
+              }
+            }}
+            placeholder={t.searchPlaceholder}
+            className="h-11 md:h-8 pl-8 pr-7 w-56 rounded-md border border-input bg-background text-2xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setActiveSearch('');
+                track('agentic_workload_sessions_search_clear');
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        <SegmentedToggle
+          role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
+          ariaLabel={t.minReqsFilterLabel}
+          value={minReqsFilter}
+          onValueChange={(value) => setFilter('minReqs', value)}
+          options={MIN_REQS_FILTERS.map((f) => ({
+            value: f.value,
+            label: t.minReqs[f.value] ?? f.label,
+          }))}
+        />
+        <SegmentedToggle
+          role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
+          ariaLabel={t.versionFilterLabel}
+          value={versionFilter}
+          onValueChange={(value) => setFilter('version', value)}
+          options={VERSION_FILTERS.map((f) => ({
+            value: f.value,
+            label: f.value === 'all' ? t.allVersions : f.label,
+          }))}
+        />
+        <SegmentedToggle
+          role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
+          ariaLabel={t.harnessFilterLabel}
+          value={harnessFilter}
+          onValueChange={(value) => setFilter('harness', value)}
+          options={HARNESS_FILTERS.map((value) => ({
+            value,
+            label: value === 'all' ? t.allHarnesses : harnessLabel(value, locale),
+          }))}
+        />
+        {sortChanged && (
+          <Button type="button" variant="outline" size="xs" onClick={resetSort} className="ml-auto">
+            {t.resetSort}
+          </Button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : sessions.length === 0 ? (
+        <EmptyState className="py-16">{t.noMatch}</EmptyState>
+      ) : (
+        <div className="rounded-lg border border-border/30 sm:overflow-x-auto">
+          <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-card text-xs text-muted-foreground border-b border-border/20 grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px] font-medium max-sm:hidden">
+            <SortButton col="session" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+              {t.colSession}
+            </SortButton>
+            {versionSortable ? (
+              <SortButton col="version" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+                {t.colVersion}
+              </SortButton>
+            ) : (
+              <span className="normal-case">{t.colVersion}</span>
+            )}
+            <SortButton col="user" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+              {t.colUser}
+            </SortButton>
+            <SortButton
+              col="requests"
+              align="right"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              {t.colReqs}
+            </SortButton>
+            <SortButton
+              col="cost"
+              align="right"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              {t.colCost}
+            </SortButton>
+            <span className="text-right" title={t.apiHitTitle}>
+              {t.colApiHit}
+            </span>
+            <span className="text-right" title={t.hashUpperTitle}>
+              {t.colHashUpper}
+            </span>
+            <SortButton
+              col="started"
+              align="right"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              {t.colStarted}
+            </SortButton>
+            <SortButton
+              col="active"
+              align="right"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              {t.colActive}
+            </SortButton>
+          </div>
+
+          <div className="divide-y divide-border/20 sm:min-w-[1160px]">
+            {sessions.map((session) => (
+              <SessionRow key={session.id} session={session} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && hasMore && (
+        <div ref={sentinelRef} className="flex justify-center py-6">
+          {loadingMore && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SessionRow({ session }: { session: Session }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const explorerHref = useExplorerHref();
+  const [hashState, setHashState] = useState<HashStatsState>({ status: 'pending' });
+
+  const loadHashStats = (): void => {
+    if (hashState.status === 'loading' || hashState.status === 'loaded') return;
+    setHashState({ status: 'loading' });
+    track('agentic_workload_sessions_hash_stats_load', { session_id: session.id });
+    void runHashStatsRequest(async () => {
+      const response = await fetch(
+        `/api/v1/agentic-workload-explorer/sessions/${session.id}/hash-stats`,
+      );
+      if (!response.ok) throw new Error(`hash-stats ${response.status}`);
+      return (await response.json()) as SessionHashStats;
+    })
+      .then((data) => setHashState({ status: 'loaded', data }))
+      .catch(() => setHashState({ status: 'error' }));
+  };
+
+  const apiHit = apiCacheHitRate(session);
+  const { cliVersion, os } = sessionUaInfo(session);
+
+  return (
+    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center max-sm:grid-cols-1 max-sm:gap-1 sm:grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px]">
+      <IntentPrefetchLink
+        href={explorerHref(`/sessions/${session.id}`)}
+        aria-label={t.openSession(session.id)}
+        className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      />
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="min-w-0 truncate font-mono text-xs font-medium" title={session.id}>
+            {session.id}
+          </span>
+          {(() => {
+            const harness = harnessFromUserAgent(session.metadata?.userAgent);
+            return (
+              <span className="shrink-0 rounded-md border border-border/30 px-1.5 py-0.5 text-xs text-muted-foreground">
+                {harnessLabel(harness, locale)}
+              </span>
+            );
+          })()}
+        </div>
+        <div className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
+          <span className="sm:hidden">
+            {formatNumber(session.requestCount)} {t.colReqs}
+          </span>
+          {Number(session.totalCost) > 0 && (
+            <span className="text-foreground sm:hidden">
+              {formatCost(Number(session.totalCost))}
+            </span>
+          )}
+          {os && (
+            <>
+              <span className="text-border sm:hidden">·</span>
+              <span>{os}</span>
+            </>
+          )}
+          {session.totalOutput > 0 && (
+            <>
+              <span className={os ? 'text-border' : 'text-border sm:hidden'}>·</span>
+              <span className="text-muted-foreground">
+                {(session.totalCacheRead / session.totalOutput).toFixed(1)}:
+                {(session.totalCacheWrite / session.totalOutput).toFixed(1)}:1
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <span className="truncate text-xs tabular-nums max-sm:hidden" title={cliVersion ?? undefined}>
+        {cliVersion ? (
+          <span className="text-muted-foreground">v{cliVersion}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </span>
+
+      <span
+        className="truncate font-mono text-xs text-muted-foreground max-sm:hidden"
+        title={session.clientApiKeyHash}
+      >
+        {session.clientApiKeyHash}
+      </span>
+
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
+        {session.requestCount.toLocaleString(locale)}
+      </span>
+
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
+        {Number(session.totalCost) > 0 ? (
+          <span className="text-foreground">{formatCost(Number(session.totalCost))}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </span>
+
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
+        {apiHit === null ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <span className="text-foreground">{apiHit.toFixed(1)}%</span>
+        )}
+      </span>
+
+      <span className="relative z-20 justify-self-end text-right text-xs tabular-nums max-sm:hidden">
+        <HashHitRateCell state={hashState} onCompute={loadHashStats} />
+      </span>
+
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+        {formatSnapshotDate(session.startedAt, locale)} {formatSnapshotClock(session.startedAt)}
+      </span>
+
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+        {formatSnapshotDate(session.lastActiveAt, locale)}{' '}
+        {formatSnapshotClock(session.lastActiveAt)}
+      </span>
+    </div>
+  );
+}
+
+function HashHitRateCell({ state, onCompute }: { state: HashStatsState; onCompute: () => void }) {
+  const t = STRINGS[useLocale()];
+  if (state.status === 'pending' || state.status === 'error') {
+    return (
+      <Button
+        type="button"
+        variant="link"
+        size="2xs"
+        className="px-0"
+        title={t.computeHashTitle}
+        onClick={onCompute}
+      >
+        {state.status === 'pending' ? t.hashLoad : t.hashRetry}
+      </Button>
+    );
+  }
+  if (state.status === 'loading') return <span className="text-muted-foreground">···</span>;
+  if (state.data.hashTotal === 0) {
+    return (
+      <span className="text-muted-foreground" title={t.hashNoData}>
+        —
+      </span>
+    );
+  }
+  return <span className="text-foreground">{state.data.hitRate.toFixed(1)}%</span>;
+}

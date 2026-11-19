@@ -1,6 +1,6 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { getOpenRouterModelId, type Model, Sequence } from '@/lib/data-mappings';
+import { getOpenRouterModelId, type Model, Sequence } from '@/lib/catalog/data-mappings';
 import {
   validateParams as validateViewParams,
   matchesHardware,
@@ -15,6 +15,7 @@ import {
   parsePrecisionsParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
@@ -29,6 +30,7 @@ import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchma
 import {
   buildTrendLines,
   groupTrendRowsByDate,
+  historicalInteractivityAxis,
   trendMetricDependencies,
 } from '@/components/inference/hooks/interpolated-trend-core';
 import {
@@ -38,21 +40,51 @@ import {
 } from '@/components/inference/metric-registry';
 import type { YAxisMetricKey } from '@/components/inference/types';
 import { pointDeploymentMode, pointVendor } from '@/components/inference/utils/quickFilters';
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   getCachedAgenticBenchmarkHistory,
   getCachedBenchmarkHistory,
-} from '@/lib/benchmark-query-cache.server';
-import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { getHardwareKey } from '@/lib/chart-utils';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { getHardwareKey } from '@/lib/charts/chart-utils';
 
-import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
-import { frameworkFamily } from '@/lib/framework-family';
-import { loadFixture } from '@/lib/test-fixtures';
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import { hardwareLegendLabel } from '@/lib/views-api/legend';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import {
+  buildFrontierHistory,
+  comparisonBuckets,
+  frontierAreas,
+  frontierChapters,
+  frontierHistoryToCsv,
+  frontierRegressions,
+  FRONTIER_COMPARISON_BUCKETS,
+  leadMargins,
+  averageSoftwareGain,
+  commonSoftwareGainRate,
+  GAIN_RATE_WINDOWS,
+  softwareGainRates,
+  softwareGainByInteractivity,
+  softwareGains,
+  territoryShares,
+  vendorsAtOtherPrecisions,
+} from '@/components/trends/frontier-history-core';
+import { GET as getWorkflowInfo } from '@/app/api/v1/workflow-info/route';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import type { WorkflowInfoResponse } from '@/lib/api/api';
+import {
+  buildImprovementWaterfall,
+  matchingChanges,
+  pullRequestLinks,
+} from '@/components/inference/utils/improvement-waterfall';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,12 +128,34 @@ export function GET(request: NextRequest) {
     const start = parseDateParam(search.get('start'), 'start');
     const end = parseDateParam(search.get('end'), 'end');
     const format = parseFormatParam(search.get('format'));
+    const chart = parseEnumParam(
+      search.get('chart'),
+      'chart',
+      ['line', 'waterfall', 'frontier'],
+      'line',
+    );
+    const groupBy = parseEnumParam(
+      search.get('groupBy'),
+      'groupBy',
+      ['gpu', 'config', 'vendor'],
+      'gpu',
+    );
+    // Order is kept: with two keys the first is the reference the comparison reads from.
+    const compare = [
+      ...new Set(
+        (search.get('compare') ?? '')
+          .split(',')
+          .map((key) => key.trim())
+          .filter(Boolean),
+      ),
+    ];
     if (start && end && start > end)
       throw new ViewsApiParamError('end', 'end must not precede start');
     const extendToDate =
       parseDateParam(search.get('extendToDate'), 'extendToDate') ??
       new Date().toISOString().slice(0, 10);
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const priceSource = parseEnumParam(
       search.get('priceSource'),
       'priceSource',
@@ -117,6 +171,7 @@ export function GET(request: NextRequest) {
         : NORMALIZED_TOKEN_REVENUE_PRICING;
 
     const isAgentic = sequence === Sequence.AgenticTraces;
+    const interactivity = historicalInteractivityAxis(isAgentic);
     const islOsl = sequenceToIslOsl(sequence);
     const allRows: BenchmarkRow[] = FIXTURES_MODE
       ? loadFixture<BenchmarkRow[]>('benchmarks').filter((row) => rowToSequence(row) === sequence)
@@ -160,7 +215,7 @@ export function GET(request: NextRequest) {
             if (!family || !familySet.has(family)) return false;
           }
           if (gpus.length > 0 || vendorSet.size > 0) {
-            const hwKey = getHardwareKey(rowToAggDataEntry(row));
+            const hwKey = getHardwareKey(rowToAggDataEntry(row, { modelPower: false }));
             if (!matchesHardware(hwKey, gpus)) return false;
             if (vendorSet.size > 0) {
               const vendor = pointVendor(hwKey);
@@ -171,11 +226,148 @@ export function GET(request: NextRequest) {
         }
       : undefined;
 
+    if (chart === 'frontier') {
+      const frontierOptions = {
+        selectedPrecisions: resolvedPrecisions,
+        selectedYAxisMetric: metricConfigKey,
+        metricKey: trendMetricKey,
+        requestedMetrics: trendMetricDependencies(trendMetricKey),
+        higherIsBetter: registryEntry?.polarity !== 'lower',
+        tcoBasis,
+        chipBasis,
+        tokenRevenuePricing: pricing,
+        groupBy,
+        ...(rowFilter ? { rowFilter } : {}),
+      };
+      const history = buildFrontierHistory(allRows, frontierOptions);
+      const labelOf = (key: string) => {
+        const series = history.series.find((entry) => entry.key === key);
+        if (!series) return key;
+        if (groupBy === 'vendor') return series.key;
+        return groupBy === 'gpu'
+          ? getHardwareConfig(series.hwKey).label
+          : hardwareLegendLabel(series.hwKey);
+      };
+      const params = {
+        model: displayName,
+        sequence: sequence as string,
+        metric: metricConfigKey,
+        precisions: resolvedPrecisions,
+        gpus,
+        vendors,
+        frameworks,
+        deployment,
+        tcoBasis,
+        chipBasis,
+        priceSource,
+        start: start ?? null,
+        end: end ?? null,
+        format,
+        chart,
+        groupBy,
+        compare,
+      };
+      const areas = frontierAreas(history);
+      const gains = softwareGains(history);
+      const gainRates = GAIN_RATE_WINDOWS.map(
+        (days) => [days, softwareGainRates(history, days)] as const,
+      );
+      const keyByLowercase = new Map(
+        history.series.map((series) => [series.key.toLowerCase(), series.key]),
+      );
+      const compareKeys = [
+        ...new Set(compare.flatMap((key) => keyByLowercase.get(key.toLowerCase()) ?? [])),
+      ];
+      const buckets = comparisonBuckets(history, FRONTIER_COMPARISON_BUCKETS);
+      if (format === 'csv') {
+        const { headers, rows } = frontierHistoryToCsv(history, labelOf);
+        return csvResponse(
+          rows.map((row) => Object.fromEntries(headers.map((header, i) => [header, row[i]]))),
+        );
+      }
+      return cachedJson(request, {
+        view: 'historical',
+        apiVersion: 'v1',
+        params,
+        metric: {
+          key: trendMetricKey,
+          configKey: metricConfigKey,
+          label: registryEntry?.label ?? trendMetricKey,
+          labelZh:
+            registryEntry && 'labelZh' in registryEntry ? registryEntry.labelZh : trendMetricKey,
+        },
+        target,
+        interactivity,
+        hwKeysWithData: history.series.map((series) => series.hwKey),
+        series: [],
+        frontier: {
+          dates: history.dates,
+          levels: history.levels,
+          higherIsBetter: history.higherIsBetter,
+          series: history.series.map((series) => {
+            const byInteractivity = softwareGainByInteractivity(
+              history,
+              series.key,
+              history.dates.length - 1,
+              buckets,
+            );
+            return {
+              ...series,
+              label: labelOf(series.key),
+              areas: areas.get(series.key) ?? [],
+              softwareGain: gains.get(series.key) ?? [],
+              softwareGainByInteractivity: byInteractivity,
+              softwareGainAverage: averageSoftwareGain(byInteractivity),
+              softwareGainRate: Object.fromEntries(
+                gainRates.map(([days, rates]) => [days, rates.get(series.key) ?? []]),
+              ),
+            };
+          }),
+          commonSoftwareGainRate: Object.fromEntries(
+            gainRates.map(([days, rates]) => [
+              days,
+              commonSoftwareGainRate(rates, history.dates.length),
+            ]),
+          ),
+          overtakes: history.overtakes,
+          territory: history.dates.map((date, index) => ({
+            date,
+            shares: territoryShares(history, index),
+          })),
+          otherPrecisionVendors: vendorsAtOtherPrecisions(allRows, frontierOptions),
+          regressions: frontierRegressions(
+            history,
+            history.dates.length - 1,
+            history.series.map((series) => series.key),
+          ),
+          chapters: frontierChapters(
+            history,
+            history.series.map((series) => series.key),
+            true,
+          ),
+          comparison:
+            compareKeys.length > 0
+              ? {
+                  keys: compareKeys,
+                  chapters: frontierChapters(history, compareKeys, false),
+                  buckets,
+                  margins: history.dates.map((date, index) => ({
+                    date,
+                    margins: leadMargins(history, index, compareKeys, buckets),
+                  })),
+                }
+              : null,
+        },
+        count: history.overtakes.length,
+      });
+    }
+
     const dateGroupedData = groupTrendRowsByDate(allRows, {
       selectedPrecisions: resolvedPrecisions,
       selectedYAxisMetric: metricConfigKey,
       requestedMetrics: trendMetricDependencies(trendMetricKey),
       tcoBasis,
+      chipBasis,
       tokenRevenuePricing: pricing,
       ...(rowFilter ? { rowFilter } : {}),
     });
@@ -206,6 +398,58 @@ export function GET(request: NextRequest) {
       })
       .toSorted((a, b) => a.key.localeCompare(b.key));
 
+    const waterfall =
+      chart === 'waterfall'
+        ? series.map((entry) => ({
+            ...entry,
+            excludedPointCount: (trendLines.get(entry.key) ?? []).filter(
+              (point) => !point.synthetic && point.waterfallEligible === false,
+            ).length,
+            steps: buildImprovementWaterfall(
+              trendLines.get(entry.key) ?? [],
+              registryEntry?.polarity === 'lower',
+            ),
+          }))
+        : [];
+    const dates = [
+      ...new Set(
+        waterfall.flatMap((entry) =>
+          entry.steps.flatMap((step) => step.sources.map((source) => source.date)),
+        ),
+      ),
+    ];
+    const workflows: WorkflowInfoResponse[] = [];
+    const failedDates = new Set<string>();
+    // Bound database fan-out for long histories and many selected configurations.
+    for (let offset = 0; offset < dates.length; offset += 8) {
+      await Promise.all(
+        dates.slice(offset, offset + 8).map(async (date) => {
+          try {
+            workflows.push(
+              await readResponse<WorkflowInfoResponse>(
+                await getWorkflowInfo(
+                  sourceRequest(request, '/api/v1/workflow-info', {
+                    date,
+                    benchmarkType: isAgentic ? 'agentic_traces' : undefined,
+                  }),
+                ),
+              ),
+            );
+          } catch {
+            failedDates.add(date);
+          }
+        }),
+      );
+    }
+    const waterfallSeries = waterfall.map((entry) => ({
+      ...entry,
+      steps: entry.steps.map((step) => ({
+        ...step,
+        prLinks: pullRequestLinks(matchingChanges(step.sources, workflows)),
+        linksAvailable: !step.sources.some((source) => failedDates.has(source.date)),
+      })),
+    }));
+
     const resolvedParams = {
       model: displayName,
       sequence: sequence as string,
@@ -217,14 +461,38 @@ export function GET(request: NextRequest) {
       frameworks,
       deployment,
       tcoBasis,
+      chipBasis,
       priceSource,
       extendToDate,
       start: start ?? null,
       end: end ?? null,
       format,
+      chart,
     };
 
     if (format === 'csv') {
+      if (chart === 'waterfall') {
+        return csvResponse(
+          waterfallSeries.flatMap((entry) =>
+            entry.steps.map((step) => ({
+              key: entry.key,
+              hwKey: entry.hwKey,
+              precision: entry.precision ?? '',
+              kind: step.kind,
+              date: step.date,
+              from: step.from,
+              to: step.to,
+              delta: step.delta,
+              runUrls: JSON.stringify(step.sources.map((source) => source.runUrl)),
+              prLinks: JSON.stringify(step.prLinks),
+              linksAvailable: step.linksAvailable,
+              targetInteractivity: target,
+              interactivityStatistic: interactivity.statistic,
+              interactivityField: interactivity.field,
+            })),
+          ),
+        );
+      }
       return csvResponse(
         series.flatMap((entry) =>
           entry.points.map((point) => ({
@@ -236,12 +504,15 @@ export function GET(request: NextRequest) {
             date: point.date,
             value: point.value,
             synthetic: point.synthetic ?? false,
+            targetInteractivity: target,
+            interactivityStatistic: interactivity.statistic,
+            interactivityField: interactivity.field,
           })),
         ),
       );
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'historical',
       apiVersion: 'v1',
       params: resolvedParams,
@@ -254,7 +525,8 @@ export function GET(request: NextRequest) {
       },
       target,
       hwKeysWithData,
-      series,
+      interactivity,
+      series: chart === 'waterfall' ? waterfallSeries : series,
       count: series.reduce((total, entry) => total + entry.points.length, 0),
     });
   });

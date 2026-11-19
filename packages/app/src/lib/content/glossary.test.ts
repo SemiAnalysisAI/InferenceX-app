@@ -1,0 +1,382 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+import { acceleratorEntries } from './glossary-accelerators';
+
+import { getAllPosts, getPostBySlug } from '../blog/blog';
+import {
+  GLOSSARY_CATEGORIES,
+  getAdjacentGlossaryEntries,
+  getAllGlossaryEntries,
+  getGlossaryEntry,
+  getRelatedGlossaryEntries,
+  type GlossaryFigureImage,
+} from './glossary';
+import {
+  GLOSSARY_CATEGORY_LABELS_ZH,
+  compareZhGlossaryEntries,
+  getAdjacentZhGlossaryEntries,
+  getAllZhGlossaryEntries,
+  getRelatedZhGlossaryEntries,
+  getZhGlossaryEntry,
+} from './glossary-zh';
+
+describe('glossary content', () => {
+  it('connects all 30 accelerator terms to translated articles and reciprocal glossary links', () => {
+    expect(acceleratorEntries).toHaveLength(30);
+    for (const entry of acceleratorEntries) {
+      const zh = getZhGlossaryEntry(entry.slug)!;
+      expect(zh.articleSlugs).toEqual(entry.articleSlugs);
+      expect(zh.relatedTerms).toEqual(entry.relatedTerms);
+      for (const locale of ['en', 'zh'] as const) {
+        const articles = entry.articleSlugs.map((slug) => {
+          const folder = path.join(
+            import.meta.dirname,
+            '../../../content/blog',
+            locale === 'zh' ? 'zh' : '',
+          );
+          return readFileSync(path.join(folder, `${slug}.mdx`), 'utf8');
+        });
+        expect(
+          articles.some((raw) =>
+            raw.includes(`](${locale === 'zh' ? '/zh' : ''}/glossary/${entry.slug})`),
+          ),
+          entry.slug,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('keeps instruction ceilings, cache conditions, and profiler durations distinct', () => {
+    expect(getGlossaryEntry('roofline')!.benchmarkContext).toContain('empirical Pareto envelope');
+    expect(getGlossaryEntry('gpu-utilization')!.benchmarkContext).toContain(
+      'exclusive physical Cube',
+    );
+    expect(getGlossaryEntry('warm-cache-benchmark')!.benchmarkContext).toContain(
+      'does not establish end-to-end',
+    );
+    expect(getGlossaryEntry('tma-multicast')!.benchmarkContext).toContain(
+      'not automatically an application-speedup',
+    );
+    expect(getGlossaryEntry('two-sm-mma')!.significance).toContain('per-SM efficiency');
+    expect(getZhGlossaryEntry('gpu-utilization')!.benchmarkContext).toContain('独占利用率');
+  });
+  it('provides unique, indexable entries with substantive explanations', () => {
+    const entries = getAllGlossaryEntries();
+    const slugs = entries.map((entry) => entry.slug);
+
+    expect(entries.length).toBeGreaterThanOrEqual(40);
+    expect(new Set(slugs).size).toBe(entries.length);
+
+    for (const entry of entries) {
+      expect(entry.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u);
+      expect(GLOSSARY_CATEGORIES).toContain(entry.category);
+      expect(entry.relatedTerms.length).toBeGreaterThanOrEqual(3);
+      expect(entry.articleSlugs.length).toBeGreaterThanOrEqual(1);
+      const plainEnglishWords = entry.plainEnglish.split(/\s+/u);
+      expect(plainEnglishWords.length, entry.term).toBeGreaterThanOrEqual(8);
+      expect(plainEnglishWords.length, entry.term).toBeLessThanOrEqual(40);
+      expect(entry.plainEnglish).not.toBe(entry.definition);
+      expect(JSON.stringify(entry), entry.term).not.toMatch(/[—–]/u);
+
+      const renderedCopy = [
+        entry.definition,
+        entry.explanation,
+        entry.significance,
+        entry.benchmarkContext,
+      ].join(' ');
+      expect(renderedCopy.split(/\s+/u).length, entry.term).toBeGreaterThanOrEqual(90);
+    }
+  });
+
+  it('resolves every related term without self-links', () => {
+    for (const entry of getAllGlossaryEntries()) {
+      expect(entry.relatedTerms).not.toContain(entry.slug);
+      expect(getRelatedGlossaryEntries(entry).map((related) => related.slug)).toEqual(
+        entry.relatedTerms,
+      );
+    }
+  });
+
+  it('defines the AgentX workload and its agentic inference concepts', () => {
+    expect(GLOSSARY_CATEGORIES).toContain('Agentic inference');
+    expect(getGlossaryEntry('agentic-inference')?.category).toBe('Agentic inference');
+    expect(getGlossaryEntry('agentx')?.definition).toContain('agentic inference benchmark');
+    expect(getGlossaryEntry('agentic-coding-workload')?.relatedTerms).toContain('agentx');
+    expect(getGlossaryEntry('trace-replay')?.benchmarkContext).toContain('AIPerf');
+    expect(getGlossaryEntry('closed-loop-benchmark')?.benchmarkContext).toContain('agent clients');
+    expect(getGlossaryEntry('subagent')?.relatedTerms).toContain('trace-replay');
+  });
+
+  it.each([
+    'open-loop-benchmark',
+    'request-rate',
+    'request-throughput',
+    'request-queue-depth',
+    'queueing-latency',
+    'kv-working-set',
+    'kv-cache-eviction',
+    'preemption',
+    'acceptance-rate',
+    'inter-chunk-latency',
+  ])('publishes serving diagnostic term %s in both locales', (slug) => {
+    const english = getGlossaryEntry(slug)!;
+    const chinese = getZhGlossaryEntry(slug)!;
+    expect(english, slug).toBeDefined();
+    expect(chinese, slug).toBeDefined();
+    expect(chinese.definition).not.toBe(english.definition);
+    expect(chinese.relatedTerms).toEqual(english.relatedTerms);
+    expect(english.articleSlugs).toContain('agentx-inferencexv3-does-cuda-moat');
+  });
+
+  it('distinguishes draft acceptance fractions from per-step token counts', () => {
+    const rate = getGlossaryEntry('acceptance-rate')!;
+    const length = getGlossaryEntry('acceptance-length')!;
+    expect(rate.aliases).toContain('acceptance rate');
+    expect(length.aliases).not.toContain('acceptance rate');
+    expect(getZhGlossaryEntry(length.slug)?.aliases).not.toContain('接受率');
+    expect(rate.measurement?.value).toBe(
+      'draft acceptance rate = accepted draft tokens / proposed draft tokens',
+    );
+    expect(length.definition).toContain('bonus token');
+    expect(length.relatedTerms).toContain(rate.slug);
+    expect(rate.relatedTerms).toContain(length.slug);
+  });
+
+  it.each([
+    'decode-megakernel',
+    'kernel-launch-overhead',
+    'decode-context-parallelism',
+    'prefill-context-parallelism',
+    'attention-head-dimension',
+    'hicache',
+    'decode-admission-control',
+    'kv-cache-affinity',
+  ])('connects TPU AgentX term %s to its article in both languages', (slug) => {
+    const english = getGlossaryEntry(slug)!;
+    const chinese = getZhGlossaryEntry(slug)!;
+    expect(english, slug).toBeDefined();
+    expect(chinese, slug).toBeDefined();
+    expect(chinese.definition).not.toBe(english.definition);
+    expect(chinese.articleSlugs).toContain('tpu-strikes-the-king');
+    expect(getRelatedGlossaryEntries(english)).toHaveLength(english.relatedTerms.length);
+    expect(getRelatedZhGlossaryEntries(chinese)).toHaveLength(chinese.relatedTerms.length);
+  });
+
+  it('distinguishes context partitioning, native arithmetic, and cache ownership', () => {
+    expect(getGlossaryEntry('decode-context-parallelism')?.explanation).toContain('during prefill');
+    expect(getGlossaryEntry('context-parallelism')?.significance).toContain('can shard KV heads');
+    expect(getGlossaryEntry('tpuv7-ironwood')?.explanation).toContain(
+      'convert them for computation',
+    );
+    expect(getGlossaryEntry('hicache')?.explanation).toContain('private to an inference instance');
+    expect(getGlossaryEntry('decode-admission-control')?.relatedTerms).toContain(
+      'queueing-latency',
+    );
+  });
+
+  it.each(['context-parallelism', 'tpu', 'tpuv7-ironwood', 'torchtpu', 'tpu-sync', 'llm-d'])(
+    'updates %s with the published TPU AgentX follow-up',
+    (slug) => {
+      expect(getGlossaryEntry(slug)?.articleSlugs).toContain('tpu-strikes-the-king');
+      expect(getZhGlossaryEntry(slug)?.articleSlugs).toContain('tpu-strikes-the-king');
+    },
+  );
+
+  it('connects existing metrics to their distinct load and streaming concepts', () => {
+    expect(getGlossaryEntry('closed-loop-benchmark')?.relatedTerms).toContain(
+      'open-loop-benchmark',
+    );
+    expect(getGlossaryEntry('concurrency')?.relatedTerms).toContain('request-rate');
+    expect(getGlossaryEntry('request-rate')?.relatedTerms).toContain('request-throughput');
+    expect(getGlossaryEntry('request-queue-depth')?.relatedTerms).toContain('queueing-latency');
+    expect(getGlossaryEntry('time-per-output-token')?.relatedTerms).toContain(
+      'inter-chunk-latency',
+    );
+    expect(getGlossaryEntry('kv-cache-eviction')?.relatedTerms).toContain('preemption');
+  });
+
+  it('links every glossary source to a real article and covers the complete article library', () => {
+    const entries = getAllGlossaryEntries();
+    const referencedArticles = new Set(entries.flatMap((entry) => entry.articleSlugs));
+
+    for (const slug of referencedArticles) {
+      expect(getPostBySlug(slug), slug).not.toBeNull();
+    }
+
+    expect(referencedArticles).toEqual(new Set(getAllPosts().map((post) => post.slug)));
+  });
+
+  it.each([
+    'multi-turn-inference',
+    'subagent-bursts',
+    'p90-interactivity',
+    'end-to-end-latency',
+    'cached-input-tokens',
+    'billable-utilization',
+    'annual-revenue-per-gigawatt',
+    'modeled-profit-per-gigawatt',
+    'utility-power-budget',
+    'dsx-maxlps',
+    'vera-rubin',
+    'extreme-co-design',
+  ])(
+    'makes Rubin concept %s discoverable in both locales with its article and related terms',
+    (slug) => {
+      for (const entry of [getGlossaryEntry(slug), getZhGlossaryEntry(slug)]) {
+        expect(entry, slug).toBeDefined();
+        expect(entry?.articleSlugs).toContain('vera-rubin-nvl72-agentic-inference');
+        expect(entry?.relatedTerms.length).toBeGreaterThanOrEqual(3);
+      }
+      expect(getZhGlossaryEntry(slug)?.definition).not.toBe(getGlossaryEntry(slug)?.definition);
+    },
+  );
+
+  it('separates percentile streaming speed from response completion and normalized interactivity', () => {
+    const p90 = getGlossaryEntry('p90-interactivity')!;
+    expect(p90.measurement?.value).toContain('1000 / P90 full-response ITL (ms)');
+    expect(p90.relatedTerms).toContain('end-to-end-latency');
+    expect(getGlossaryEntry('interactivity')?.relatedTerms).toContain(p90.slug);
+    expect(getGlossaryEntry('end-to-end-latency')?.relatedTerms).toContain(
+      'e2e-normalized-interactivity',
+    );
+    expect(getZhGlossaryEntry(p90.slug)?.measurement?.value).toContain(
+      '1000 / P90 全响应 ITL（毫秒）',
+    );
+  });
+
+  it('keeps NVL72 platform generations and component versus facility power distinct', () => {
+    for (const lookup of [getGlossaryEntry, getZhGlossaryEntry]) {
+      const nvl72 = lookup('nvl72')!;
+      expect(nvl72.aliases).toContain('Vera Rubin NVL72');
+      expect(nvl72.explanation).toContain('NVLink 5');
+      expect(nvl72.explanation).toContain('NVLink 6');
+      expect(lookup('vera-rubin')?.relatedTerms).toContain(nvl72.slug);
+      expect(lookup('utility-power-budget')?.relatedTerms).toContain('tdp');
+    }
+    expect(getGlossaryEntry('tdp')?.aliases).not.toContain('all-in power');
+    expect(getZhGlossaryEntry('tdp')?.aliases).not.toContain('全部包含功耗');
+  });
+});
+
+describe('Chinese glossary content', () => {
+  it('provides a substantive translation for every English entry', () => {
+    const englishEntries = getAllGlossaryEntries();
+    const zhEntries = getAllZhGlossaryEntries();
+
+    expect(zhEntries.map((entry) => entry.slug)).toEqual(englishEntries.map((entry) => entry.slug));
+    expect(Object.keys(GLOSSARY_CATEGORY_LABELS_ZH)).toEqual([...GLOSSARY_CATEGORIES]);
+
+    for (const entry of zhEntries) {
+      const plainLanguageCharacters = entry.plainEnglish.match(/\p{Script=Han}/gu)?.length ?? 0;
+      expect(plainLanguageCharacters, entry.slug).toBeGreaterThanOrEqual(8);
+      expect(plainLanguageCharacters, entry.slug).toBeLessThanOrEqual(60);
+      expect(entry.plainEnglish).not.toBe(entry.definition);
+      expect(JSON.stringify(entry), entry.term).not.toMatch(/[—–]/u);
+      const englishMeasurement = getGlossaryEntry(entry.slug)?.measurement;
+      if (englishMeasurement) {
+        expect(entry.measurement, entry.term).toBeDefined();
+        expect(entry.measurement?.label, entry.term).not.toBe(englishMeasurement.label);
+        expect(entry.measurement?.value, entry.term).not.toBe(englishMeasurement.value);
+      }
+      const renderedCopy = [
+        entry.definition,
+        entry.explanation,
+        entry.significance,
+        entry.benchmarkContext,
+      ].join('');
+      expect(
+        renderedCopy.match(/\p{Script=Han}/gu)?.length ?? 0,
+        entry.slug,
+      ).toBeGreaterThanOrEqual(100);
+      expect(getRelatedZhGlossaryEntries(entry).map((related) => related.slug)).toEqual(
+        entry.relatedTerms,
+      );
+      for (const articleSlug of entry.articleSlugs) {
+        expect(getPostBySlug(articleSlug, 'zh'), articleSlug).not.toBeNull();
+      }
+    }
+  });
+
+  it('resolves canonical slugs and walks the Chinese term order without gaps', () => {
+    expect(GLOSSARY_CATEGORY_LABELS_ZH['Agentic inference']).toBe('智能体推理');
+    expect(getZhGlossaryEntry('agentic-inference')?.term).toBe('智能体推理');
+    expect(getZhGlossaryEntry('agentx')?.term).toBe('AgentX');
+    expect(getZhGlossaryEntry('trace-replay')?.term).toBe('轨迹回放');
+    expect(getZhGlossaryEntry('closed-loop-benchmark')?.term).toBe('闭环基准测试');
+    expect(getZhGlossaryEntry('subagent')?.term).toBe('子智能体');
+    expect(getZhGlossaryEntry('speculative-decoding')?.term).toBe('投机解码');
+    expect(getZhGlossaryEntry('multi-token-prediction')?.term).toBe('多 token 预测');
+    expect(getZhGlossaryEntry('not-a-real-term')).toBeUndefined();
+
+    const sorted = getAllZhGlossaryEntries().toSorted(compareZhGlossaryEntries);
+    for (const [index, entry] of sorted.entries()) {
+      expect(getAdjacentZhGlossaryEntries(entry.slug)).toEqual({
+        previous: sorted[index - 1] ?? null,
+        next: sorted[index + 1] ?? null,
+      });
+    }
+  });
+});
+
+describe('glossary navigation', () => {
+  it('returns entries by canonical slug', () => {
+    expect(getGlossaryEntry('multi-token-prediction')?.abbreviation).toBe('MTP');
+    expect(getGlossaryEntry('not-a-real-term')).toBeUndefined();
+  });
+
+  it('walks the complete alphabetized term list without gaps', () => {
+    const sorted = getAllGlossaryEntries().toSorted((a, b) => a.term.localeCompare(b.term));
+
+    for (const [index, entry] of sorted.entries()) {
+      expect(getAdjacentGlossaryEntries(entry.slug)).toEqual({
+        previous: sorted[index - 1] ?? null,
+        next: sorted[index + 1] ?? null,
+      });
+    }
+  });
+});
+
+/** Pixel size of a lossy (VP8) or extended (VP8X) WebP file. */
+function webpSize(file: Buffer): [number, number] {
+  expect(file.toString('ascii', 0, 4)).toBe('RIFF');
+  expect(file.toString('ascii', 8, 12)).toBe('WEBP');
+  const chunk = file.toString('ascii', 12, 16);
+  if (chunk === 'VP8X') return [file.readUIntLE(24, 3) + 1, file.readUIntLE(27, 3) + 1];
+  expect(chunk).toBe('VP8 ');
+  // The VP8 frame header keeps each dimension in the low 14 bits.
+  const dimension = (offset: number) => file.readUInt16LE(offset) % 2 ** 14;
+  return [dimension(26), dimension(28)];
+}
+
+const imageIdentity = ({ src, width, height }: GlossaryFigureImage) => [src, width, height];
+
+describe('glossary figures', () => {
+  it('points at WebPs in public/ whose sizes match the declared dimensions', () => {
+    const images = getAllGlossaryEntries().flatMap((entry) => entry.figure?.images ?? []);
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    for (const image of images) {
+      expect(image.src).toMatch(/^\/images\/glossary\/[a-z0-9-]+\.webp$/u);
+      const file = readFileSync(path.join(process.cwd(), 'public', image.src));
+      expect(webpSize(file), image.src).toEqual([image.width, image.height]);
+      expect(image.alt.length, image.src).toBeGreaterThan(40);
+    }
+  });
+
+  it('shows the same images on the Chinese page with translated alt text and caption', () => {
+    for (const entry of getAllGlossaryEntries()) {
+      const zh = getZhGlossaryEntry(entry.slug)?.figure;
+      if (!entry.figure) {
+        expect(zh, entry.slug).toBeUndefined();
+        continue;
+      }
+      expect(zh, entry.slug).toBeDefined();
+      expect(zh?.images.map(imageIdentity)).toEqual(entry.figure.images.map(imageIdentity));
+      entry.figure.images.forEach((image, index) => {
+        expect(zh?.images[index]?.alt, image.src).not.toBe(image.alt);
+      });
+      expect(zh?.caption).not.toBe(entry.figure.caption);
+    }
+  });
+});

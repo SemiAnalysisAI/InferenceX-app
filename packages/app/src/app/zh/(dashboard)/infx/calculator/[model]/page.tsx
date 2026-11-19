@@ -1,0 +1,37 @@
+import type { Metadata } from 'next';
+import { notFound, permanentRedirect } from 'next/navigation';
+
+import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
+
+import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
+import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
+import { modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
+
+interface Props {
+  params: Promise<{ model: string }>;
+}
+
+export function generateStaticParams() {
+  return MODEL_ROUTES.map((route) => ({ model: route.slug }));
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { model } = await params;
+  const resolved = resolveModelRouteSlug(model);
+  if (!resolved) return {};
+  return modelTabMetadataZh(
+    'calculator',
+    resolved.route,
+    modelTabCanonicalPath('calculator', resolved.route),
+  );
+}
+
+export default async function ZhCalculatorModelPage({ params }: Props) {
+  const { model } = await params;
+  const resolved = resolveModelRouteSlug(model);
+  if (!resolved) notFound();
+  if (resolved.isAlias) {
+    permanentRedirect(`/zh${modelRoutePath('calculator', resolved.route.slug)}`);
+  }
+  return <ThroughputCalculatorDisplay routeModel={resolved.route.model} />;
+}

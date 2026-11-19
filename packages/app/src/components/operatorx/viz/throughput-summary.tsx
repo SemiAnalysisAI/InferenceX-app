@@ -1,0 +1,14 @@
+import { Roofline } from './roofline';
+import type { ComparisonModel } from '../compare/model';
+import type { VizDefinition } from './types';
+
+function ThroughputSummary({ model }: { model: ComparisonModel }) {
+  return <Roofline model={model} summaryOnly />;
+}
+
+export const throughputSummary: VizDefinition = {
+  id: 'throughput-summary',
+  title: { en: 'Median and best throughput', zh: '吞吐量中位数与最佳值' },
+  ops: ['gemm', 'moe', 'attention'],
+  Component: ThroughputSummary,
+};

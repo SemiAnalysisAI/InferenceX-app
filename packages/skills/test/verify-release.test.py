@@ -271,7 +271,8 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(report['public_retry_policy']['total_deadline_seconds'], 300)
 
 class InstalledEntryTests(unittest.TestCase):
-    ENTRY_NAMES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table')
+    ENTRY_NAMES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table',
+                   'inferencex-pr-improvements')
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -280,14 +281,20 @@ class InstalledEntryTests(unittest.TestCase):
         self.files = {'SKILL.md': b'guide', 'scripts/inferencex.mjs': b'// fixture'}
         self.entries = {name: {'SKILL.md': name.encode(), 'integrity.json': b'{}'}
                         for name in self.ENTRY_NAMES}
+        self.entries['inferencex-pr-improvements'].update({
+            'scripts/waterfall.mjs': b'// waterfall helper',
+            'agents/openai.yaml': b'interface: {}',
+        })
 
-    def install(self, target, version='1.1.0'):
+    def install(self, target, version='1.2.0'):
         root = self.root / target / ('.agents' if target == 'codex' else '.claude') / 'skills'
         if root.exists():
             shutil.rmtree(root)
         skills = {'inferencex-api': self.files}
         if check.version_at_least(version, (1, 1, 0)):
             skills.update(self.entries)
+            if not check.version_at_least(version, (1, 2, 0)):
+                del skills['inferencex-pr-improvements']
         for skill, files in skills.items():
             folder = root / skill
             for name, body in files.items():
@@ -301,14 +308,14 @@ class InstalledEntryTests(unittest.TestCase):
     def test_new_releases_require_every_complete_archived_entry(self):
         for target in ('codex', 'claude'):
             runtime = self.install(target)
-            check.check_installed_package(runtime, self.files, self.entries, '1.1.0')
+            check.check_installed_package(runtime, self.files, self.entries, '1.2.0')
             for name in self.ENTRY_NAMES:
-                for missing in ('SKILL.md', 'integrity.json'):
+                for missing in self.entries[name]:
                     with self.subTest(target=target, entry=name, missing=missing):
                         entries = {key: dict(value) for key, value in self.entries.items()}
                         del entries[name][missing]
                         with self.assertRaisesRegex(ValueError, f'missing the {name} task entry'):
-                            check.check_installed_package(runtime, self.files, entries, '1.1.0')
+                            check.check_installed_package(runtime, self.files, entries, '1.2.0')
 
     def test_shortcuts_reject_missing_or_changed_files_receipts_and_layout(self):
         for target in ('codex', 'claude'):
@@ -317,17 +324,27 @@ class InstalledEntryTests(unittest.TestCase):
                     with self.subTest(target=target, entry=name, mutation=mutation):
                         runtime = self.install(target)
                         entry = runtime.with_name(name)
+                        managed = entry / ('scripts/waterfall.mjs'
+                                           if name == 'inferencex-pr-improvements' else 'SKILL.md')
                         if mutation == 'missing':
-                            (entry / 'SKILL.md').unlink()
+                            managed.unlink()
                         elif mutation == 'changed':
-                            (entry / 'SKILL.md').write_bytes(b'changed instructions')
+                            managed.write_bytes(b'changed instructions')
                         elif mutation == 'receipt':
                             check.save(entry / '.inferencex-skills.json',
                                        {'package': check.PACKAGE, 'version': '1.0.0'})
                         else:
                             (entry / 'unexpected.txt').write_text('unexpected')
                         with self.assertRaises(ValueError):
-                            check.check_installed_package(runtime, self.files, self.entries, '1.1.0')
+                            check.check_installed_package(runtime, self.files, self.entries, '1.2.0')
+
+    def test_11_releases_keep_the_original_task_entries(self):
+        for target in ('codex', 'claude'):
+            runtime = self.install(target, '1.1.0')
+            entries = {name: files for name, files in self.entries.items()
+                       if name != 'inferencex-pr-improvements'}
+            check.check_installed_package(runtime, self.files, entries, '1.1.0')
+            self.assertFalse(runtime.with_name('inferencex-pr-improvements').exists())
 
     def test_old_releases_still_require_only_the_shared_runtime(self):
         for target in ('codex', 'claude'):
@@ -345,7 +362,7 @@ class InstalledEntryTests(unittest.TestCase):
                     member.size = len(body)
                     packed.addfile(member, io.BytesIO(body))
         body = archive.read_bytes()
-        record = {'name': check.PACKAGE, 'version': '1.1.0', 'filename': archive.name,
+        record = {'name': check.PACKAGE, 'version': '1.2.0', 'filename': archive.name,
                   'sha256': hashlib.sha256(body).hexdigest(),
                   'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
         check.save(self.root / 'release.json', record)
@@ -361,7 +378,8 @@ class InstalledEntryTests(unittest.TestCase):
         def install(_root, target, *args):
             runtime = self.install(target)
             if corrupt and target == 'claude':
-                (runtime.with_name('inferencex-to-table') / 'SKILL.md').write_bytes(b'changed')
+                (runtime.with_name('inferencex-pr-improvements') /
+                 'scripts/waterfall.mjs').write_bytes(b'changed')
             return self.root / target, {}
 
         with patch.object(check.argparse.ArgumentParser, 'parse_args', return_value=args), \

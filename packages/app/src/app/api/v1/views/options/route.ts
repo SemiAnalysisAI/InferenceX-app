@@ -33,12 +33,13 @@ import {
 import { LIFECYCLE_DEFAULTS, LIFECYCLE_METRICS } from '@/components/calculator/lifecycle';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_RELIABILITY_RANGE, RELIABILITY_RANGES } from '@/components/reliability/aggregate';
-import { cachedJson } from '@/lib/api-cache';
-import { scenarioSegmentForSequence } from '@/lib/compare-scenario-route';
-import { COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { scenarioSegmentForSequence } from '@/lib/compare/compare-scenario-route';
+import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import {
   getModelCategory,
   getSequenceLabel,
+  getSequenceCategoryForModel,
   isSequenceDeprecated,
   Model,
   MODEL_OPTIONS,
@@ -47,15 +48,15 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
   sequenceKind,
-} from '@/lib/data-mappings';
-import { frameworkFamily } from '@/lib/framework-family';
+} from '@/lib/catalog/data-mappings';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   OVERVIEW_ENGINE_SCOPES,
   OVERVIEW_HARDWARE,
   OVERVIEW_HISTORY_WINDOWS,
   OVERVIEW_SCENARIOS,
   OVERVIEW_TIERS,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
@@ -96,6 +97,9 @@ function buildOptionsPayload() {
       category: getModelCategory(model),
       releaseDate: getModelReleaseDate(model),
       compareSlug: COMPARE_SLUG_BY_DISPLAY.get(model) ?? null,
+      deprecatedSequences: SEQUENCE_OPTIONS.filter(
+        (sequence) => getSequenceCategoryForModel(sequence, model) === 'deprecated',
+      ),
     };
   });
 
@@ -152,6 +156,7 @@ function buildOptionsPayload() {
     specMethods: [...SPEC_METHOD_KEYS].toSorted(),
     percentiles: PERCENTILE_OPTIONS,
     xAxisModes: X_AXIS_MODES,
+    fixedSequenceStatistics: ['median', 'mean'],
     scaleModes: ['auto', 'linear', 'log'],
     metrics,
     quickFilters: {
@@ -190,6 +195,11 @@ function buildOptionsPayload() {
       metric: DEFAULT_METRIC_CONFIG_KEY,
       percentile: 'p90',
       xmode: 'interactivity',
+      xstat: 'median',
+      serviceCompare: false,
+      roleShare: false,
+      powerFit: false,
+      powerBreakdown: false,
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',
@@ -210,7 +220,7 @@ export function GET(request: NextRequest) {
     }
 
     return Promise.resolve(
-      cachedJson({
+      cachedJson(request, {
         view: 'options',
         apiVersion: 'v1',
         params: { format: 'json' },

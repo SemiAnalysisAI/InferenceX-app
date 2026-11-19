@@ -10,6 +10,7 @@ import {
   requestIdleStats,
   shouldHandleTimelineBarClick,
   splitTimelineCid,
+  timelineWheelZoomDirection,
   type TimelineViewSnapshot,
 } from './request-timeline';
 
@@ -148,7 +149,6 @@ describe('subagent timeline hierarchy', () => {
     expect(rows[1]!.label).toBe('aux 001 · parallel');
     expect(rows[1]!.parentRowKey).toBe('conv');
     expect(rows[2]!.label).toBe('aux red:002 · parallel');
-    // Aux lanes inherit the parent conversation's color.
     expect(rows[1]!.color).toBe(rows[0]!.color);
     expect(rows[2]!.color).toBe(rows[0]!.color);
   });
@@ -160,7 +160,6 @@ describe('subagent timeline hierarchy', () => {
       { ...request(5, 15), cid: 'conv' },
     ];
     const index = computeStableRowIndex(records, 'conversation');
-    // 'conv' groups with its aux lane (earliest start 0) and sorts before 'other'.
     expect([...index.keys()].toSorted()).toEqual(['conv', 'other']);
     expect(index.get('conv')).toBe(0);
     expect(index.get('other')).toBe(1);
@@ -168,7 +167,7 @@ describe('subagent timeline hierarchy', () => {
 
   it('deep-links a main-agent aux request to the parent conversation without sa', () => {
     expect(conversationHref('slug', { ...request(0, 10), cid: 'abc123::aux:red:002', ti: 3 })).toBe(
-      '/agentx/slug/conversations/abc123?turn=3',
+      '/infx/agentx/slug/conversations/abc123?turn=3',
     );
   });
 });
@@ -238,13 +237,13 @@ describe('conversationHref', () => {
   it('builds a turn-carrying dataset link for a main-conversation request', () => {
     expect(
       conversationHref('cc-traces-weka-062126', { ...request(0, 10), cid: 'abc123', ti: 4 }),
-    ).toBe('/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
+    ).toBe('/infx/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
   });
 
   it('keeps Chinese conversation links inside the /zh tree', () => {
     expect(
       conversationHref('cc-traces-weka-062126', { ...request(0, 10), cid: 'abc123', ti: 4 }, 'zh'),
-    ).toBe('/zh/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
+    ).toBe('/zh/infx/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
   });
 
   it('carries the subagent id and strips the ::sa suffix from the conv id', () => {
@@ -254,7 +253,7 @@ describe('conversationHref', () => {
         cid: 'abc123::sa:subagent_001_bf1c5c16:s2',
         ti: 7,
       }),
-    ).toBe('/agentx/slug/conversations/abc123?turn=7&sa=subagent_001_bf1c5c16');
+    ).toBe('/infx/agentx/slug/conversations/abc123?turn=7&sa=subagent_001_bf1c5c16');
   });
 
   it('uses raw source provenance for flattened-agent dataset links', () => {
@@ -267,7 +266,7 @@ describe('conversationHref', () => {
         srcOuter: 204,
         srcKind: 'weka_flat',
       }),
-    ).toBe('/agentx/slug/conversations/02bc0afb13f7a2d9efa86c28511261d85c0e?turn=3&raw=204');
+    ).toBe('/infx/agentx/slug/conversations/02bc0afb13f7a2d9efa86c28511261d85c0e?turn=3&raw=204');
   });
 
   it('uses raw nested source provenance for subagent child links', () => {
@@ -282,7 +281,7 @@ describe('conversationHref', () => {
         srcKind: 'weka_subagent',
       }),
     ).toBe(
-      '/agentx/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
+      '/infx/agentx/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
     );
   });
 });
@@ -298,23 +297,32 @@ describe('shouldHandleTimelineBarClick', () => {
   });
 });
 
+describe('timelineWheelZoomDirection', () => {
+  it('reports the same direction the zoom step applies, including horizontal-only wheels', () => {
+    expect(timelineWheelZoomDirection({ deltaX: 0, deltaY: -100 })).toBe('in');
+    expect(timelineWheelZoomDirection({ deltaX: 0, deltaY: 100 })).toBe('out');
+    // Shift+wheel on many platforms arrives as deltaX with deltaY === 0.
+    expect(timelineWheelZoomDirection({ deltaX: 100, deltaY: 0 })).toBe('out');
+    expect(timelineWheelZoomDirection({ deltaX: -100, deltaY: 0 })).toBe('in');
+    // Vertical wins when both are present.
+    expect(timelineWheelZoomDirection({ deltaX: 100, deltaY: -100 })).toBe('in');
+  });
+});
+
+const rec = (
+  cid: string,
+  phase: RequestRecord['phase'],
+  start: number,
+  end: number,
+): RequestRecord => ({ ...request(start, end), cid, phase });
+
 describe('stable row order + color across phase filters', () => {
-  // Same conversations appear in both warmup and profiling. Their global
-  // first-start order is A (0) < B (10) < C (only profiling, 50). The bug:
-  // filtering to a phase re-sorted + re-colored by the visible subset, so a
-  // conversation jumped rows and swapped color when toggling phases.
-  const rec = (
-    cid: string,
-    phase: RequestRecord['phase'],
-    start: number,
-    end: number,
-  ): RequestRecord => ({ ...request(start, end), cid, phase });
   const full: RequestRecord[] = [
     rec('A', 'warmup', 0, 5),
     rec('A', 'profiling', 100, 110),
     rec('B', 'warmup', 10, 15),
     rec('B', 'profiling', 120, 130),
-    rec('C', 'profiling', 50, 60), // profiling-only; earliest profiling start
+    rec('C', 'profiling', 50, 60),
   ];
 
   it('keeps each conversation in the same position and color when the phase changes', () => {
@@ -332,12 +340,9 @@ describe('stable row order + color across phase filters', () => {
       index,
     ).filter((r) => r.kind === 'parent');
 
-    // Position: A before B in both phases (C only shows in profiling, and sorts
-    // after A/B by its global index — NOT first by its earlier profiling start).
     expect(warmupRows.map((r) => r.label)).toEqual(['A', 'B']);
     expect(profilingRows.map((r) => r.label)).toEqual(['A', 'B', 'C']);
 
-    // Color: identical per conversation across phases, distinct between them.
     const warmupColors = Object.fromEntries(warmupRows.map((r) => [r.label, r.color]));
     const profilingColors = Object.fromEntries(profilingRows.map((r) => [r.label, r.color]));
     expect(warmupColors.A).toBe(profilingColors.A);
@@ -346,11 +351,6 @@ describe('stable row order + color across phase filters', () => {
   });
 
   it('phase-spanning conversations occupy the same ABSOLUTE row in both phase views', () => {
-    // Warmup-only conversations start earliest — under a plain global-start
-    // ordering they'd sit above the shared ones in the warmup view but be
-    // absent from the profiling view, sliding every shared row up when the
-    // toggle flips. Spanning conversations must sort first so the leading block
-    // is identical in both views and a carried-over conversation never moves.
     const data: RequestRecord[] = [
       rec('W1', 'warmup', 0, 2),
       rec('W2', 'warmup', 3, 4),
@@ -370,21 +370,16 @@ describe('stable row order + color across phase filters', () => {
       )
         .filter((r) => r.kind === 'parent')
         .map((r) => r.label);
-    // Shared block [A, B] leads both views at rows 0 and 1; phase-unique
-    // conversations fill in below.
     expect(parentLabels('warmup')).toEqual(['A', 'B', 'W1', 'W2']);
     expect(parentLabels('profiling')).toEqual(['A', 'B', 'P']);
   });
 
   it('without a shared index, the same subset re-sorts by its own start times (regression guard)', () => {
-    // Sanity: the legacy self-contained path (no index arg) orders by the
-    // subset's own first-start, which is exactly why the shared index is needed.
     const profilingOnly = buildRequestTimelineRows(
       full.filter((r) => r.phase === 'profiling'),
       'conversation',
       new Set(),
     ).filter((r) => r.kind === 'parent');
-    // C (start 50) sorts first here, ahead of A (100) and B (120).
     expect(profilingOnly.map((r) => r.label)).toEqual(['C', 'A', 'B']);
   });
 });
@@ -408,7 +403,6 @@ describe('parseTimelineViewSnapshot', () => {
     expect(
       parseTimelineViewSnapshot(JSON.stringify({ ...full, phaseFilter: 'profiling' }))?.phaseFilter,
     ).toBe('profiling');
-    // 'all' is no longer a valid phase — coerces back to the profiling default.
     expect(
       parseTimelineViewSnapshot(JSON.stringify({ ...full, phaseFilter: 'all' }))?.phaseFilter,
     ).toBe('profiling');
@@ -424,7 +418,6 @@ describe('parseTimelineViewSnapshot', () => {
   it('preserves a null viewEnd (not zoomed) and rejects non-finite viewEnd', () => {
     const restored = parseTimelineViewSnapshot(JSON.stringify({ ...full, viewEnd: null }));
     expect(restored?.viewEnd).toBeNull();
-    // NaN / Infinity don't survive JSON, but a malformed string value must coerce to null.
     expect(parseTimelineViewSnapshot('{"viewEnd":"oops"}')?.viewEnd).toBeNull();
   });
 

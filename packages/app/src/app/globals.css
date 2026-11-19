@@ -1,25 +1,26 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './motion.css';
+@import '../components/ui/chart-point-details.css';
+@import '../components/inference/utils/pinnedTooltip.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
+/* A viewport too short for a tall figure, such as a phone held sideways. */
+@custom-variant short (@media (max-height: 480px));
 
-/* Allow hash navigation to clear the fixed navbar */
 .blog-prose h2[id],
 .blog-prose h3[id] {
   scroll-margin-top: 6rem;
 }
 
-/* Allow long inline code and links to wrap on mobile */
 .blog-prose code,
 .blog-prose a {
-  overflow-wrap: break-word;
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
-/* Allow wide tables to scroll horizontally on narrow viewports */
 .blog-prose .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -29,70 +30,85 @@
   min-width: 100%;
 }
 
-/* Inline code is already distinguished visually; omit Typography's generated backticks. */
 .blog-prose code::before,
 .blog-prose code::after {
   content: none;
 }
 
-/* Remove auto-inserted curly quotes from blockquotes in blog prose */
 .blog-prose blockquote p:first-of-type::before,
 .blog-prose blockquote p:last-of-type::after {
   content: none;
 }
 
-/* October header treatment; keep chart and export branding unchanged. */
-.halloween-wordmark {
-  color: #b54708;
-  /* Hinted glyph advances at 18px left DM Sans visibly uneven ("Inf e r");
-     unhinted advances plus explicit kerning keep the letters evenly set. */
+:lang(zh) {
+  --leading-reading: 1.8;
+}
+
+.inferencex-wave-wordmark {
+  --wordmark-blue: #1d4ed8;
+  color: var(--wordmark-blue);
   text-rendering: geometricPrecision;
   font-kerning: normal;
 }
 
-.halloween-wordmark-x {
-  color: #7e22ce;
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .inferencex-wave-wordmark {
+  --wordmark-blue: #93c5fd;
 }
 
-:is(.dark, .minecraft, .csgo) .halloween-wordmark {
-  color: #fb923c;
+.inferencex-wave-letter {
+  display: inline-block;
+  animation: inferencex-blue-wave 1.8s ease-in-out infinite;
 }
 
-:is(.dark, .minecraft, .csgo) .halloween-wordmark-x {
-  color: #c084fc;
-}
-
-.halloween-wordmark-pumpkin {
-  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-  transform: rotate(12deg);
-}
-
-@media (forced-colors: active) {
-  .halloween-wordmark,
-  .halloween-wordmark-x {
-    color: LinkText;
+@keyframes inferencex-blue-wave {
+  0%,
+  100% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(3px);
   }
 }
 
-/* October decoration: leaves falling down the left edge (autumn-leaves.tsx).
-   Sits under the sticky header (z-50) and never takes pointer input. */
+@media (prefers-reduced-motion: reduce) {
+  .inferencex-wave-letter {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .inferencex-wave-wordmark {
+    color: LinkText;
+  }
+  .inferencex-wave-letter {
+    animation: none;
+  }
+}
+
 .autumn-leaves {
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 40;
-  /* At container breakpoints only the page padding remains available. */
-  width: clamp(14px, calc((100vw - 1280px) / 2), 96px);
-  --leaf-sway-scale: 1;
+  width: calc(max(0px, (100vw - 1536px) / 2) + 1rem);
+  container-type: inline-size;
   overflow: hidden;
   pointer-events: none;
+}
+
+@media (min-width: 1024px) {
+  .autumn-leaves {
+    width: calc(max(0px, (100vw - 1536px) / 2) + 2rem);
+  }
 }
 
 .autumn-leaf {
   position: absolute;
   top: 0;
-  left: var(--leaf-left);
-  width: var(--leaf-size);
-  height: var(--leaf-size);
+  --leaf-sway-scale: 1;
+  --leaf-box: min(var(--leaf-size) * 2 / 3, 100cqw - 8px);
+  left: calc(4px + min(var(--leaf-left), 100cqw - 8px - var(--leaf-box)));
+  width: var(--leaf-box);
+  height: var(--leaf-box);
   opacity: 0.85;
   animation: autumn-leaf-fall var(--leaf-duration) linear var(--leaf-delay) infinite;
   will-change: transform;
@@ -106,15 +122,9 @@
     alternate;
 }
 
-/* Tablet and laptop breakpoints need the same protection as phones. */
-@media (max-width: 1359px) {
-  .autumn-leaves {
-    --leaf-sway-scale: 0.1;
-  }
+@container (max-width: 64px) {
   .autumn-leaf {
-    left: calc(var(--leaf-left) * 0.4);
-    width: calc(var(--leaf-size) * 0.25);
-    height: calc(var(--leaf-size) * 0.25);
+    --leaf-sway-scale: 0.1;
   }
 }
 
@@ -157,9 +167,6 @@ html[data-inferencex-embed] .autumn-leaves {
   display: none;
 }
 
-/* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
-   DOM text so they stay out of the element's text content and out of anything
-   the reader copies from the pane. */
 .log-lines {
   counter-reset: log-line;
 }
@@ -172,7 +179,6 @@ html[data-inferencex-embed] .autumn-leaves {
   content: counter(log-line);
 }
 
-/* Shiki dual-theme: light by default, dark when .dark class is active */
 .shiki,
 .shiki span {
   color: var(--shiki-light);
@@ -186,13 +192,11 @@ html[data-inferencex-embed] .autumn-leaves {
 }
 
 @theme inline {
-  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Base Theme Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-ring: var(--ring);
@@ -200,6 +204,8 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-border: var(--border);
   --color-border-alt: var(--border-alt);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -209,20 +215,19 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-brand: var(--brand);
+  --color-brand-fill: var(--brand-fill);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
 
-  /* Fonts */
+  --color-surface: var(--card);
+  --color-surface-hover: color-mix(in oklab, var(--muted) 55%, transparent);
+  --color-subtle: color-mix(in oklab, var(--muted-foreground) 55%, var(--background));
+
   --font-sans: var(--font-dm-sans);
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
 
-  /* Breakpoints */
-  --breakpoint-2xl: 80rem;
-  --breakpoint-3xl: 80rem;
-
-  /* Sidebar */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -233,32 +238,31 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-sidebar: var(--sidebar);
 }
 
-/* Typography tokens — the governed alternative to arbitrary values like
-   text-[11px] or tracking-[0.16em]. New arbitrary font-size/tracking values
-   are blocked by scripts/check-typography.ts; use these instead.
-   See docs/typography.md. */
 @theme {
-  /* Micro label sizes (smaller than text-xs). Deliberately no paired
-     --text-*--line-height: the arbitrary values these replace set only
-     font-size and inherited line-height, and dense tables depend on that. */
-  --text-2xs: 0.6875rem; /* 11px */
-  --text-3xs: 0.625rem; /* 10px */
+  --text-2xs: 0.6875rem;
+  --text-3xs: 0.625rem;
+  --text-dialog-title: 1.375rem;
+  --text-dialog-title--line-height: 1.875rem;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.25rem;
 
-  /* Named letter-spacing for the recurring uppercase-eyebrow and
-     tightened-heading recipes. */
+  --container-measure: 45rem;
+  --leading-reading: 1.65;
+
   --tracking-eyebrow: 0.16em;
-  --tracking-eyebrow-wide: 0.2em;
   --tracking-heading: -0.04em;
 }
 
+@utility container {
+  max-width: 96rem;
+}
+
 :root {
-  /* Setup variables */
   --radius: 0.625rem;
 
-  /* Base Theme Colors */
-  --background: #eaebec;
+  --background: #eef0f2;
   --foreground: #131416;
-  --card: #eaebec;
+  --card: #ffffff;
   --card-foreground: #131416;
   --popover: #fafafa;
   --popover-foreground: #171717;
@@ -267,17 +271,20 @@ html[data-inferencex-embed] .autumn-leaves {
   --secondary: #0b86d1;
   --secondary-foreground: #fafafa;
   --brand: var(--secondary);
+  --brand-fill: #096aa5;
   --muted: #b4b9bc;
   --muted-foreground: #27272a;
-  --accent: #fafafa;
+  --accent: #eef0f2;
   --accent-foreground: #1d1f21;
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: oklch(0.55 0.2 25);
+  --success: oklch(0.52 0.1 155);
+  --warning: oklch(0.54 0.12 65);
   --border: #656b72;
   --border-alt: #c2ccd7;
+  --chart-grid: color-mix(in oklab, var(--border-alt) 60%, var(--card));
   --input: #656b72;
   --ring: #27272a;
 
-  /* Sidebar */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -287,24 +294,24 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Overlay-run palette (light mode): darker + saturated so X-shape strokes and
-   * pastel legend swatches stay readable on the #eaebec background. */
-  --overlay-run-0: oklch(0.55 0.23 25); /* deep red */
-  --overlay-run-1: oklch(0.55 0.15 200); /* teal */
-  --overlay-run-2: oklch(0.6 0.17 65); /* burnt amber */
-  --overlay-run-3: oklch(0.5 0.25 290); /* royal violet */
-  --overlay-run-4: oklch(0.55 0.18 150); /* forest green */
-  --overlay-run-5: oklch(0.55 0.22 330); /* magenta */
-  --overlay-run-6: oklch(0.55 0.2 230); /* blue */
-  --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
+  --overlay-run-0: oklch(0.55 0.23 25);
+  --overlay-run-1: oklch(0.55 0.15 200);
+  --overlay-run-2: oklch(0.6 0.17 65);
+  --overlay-run-3: oklch(0.5 0.25 290);
+  --overlay-run-4: oklch(0.55 0.18 150);
+  --overlay-run-5: oklch(0.55 0.22 330);
+  --overlay-run-6: oklch(0.55 0.2 230);
+  --overlay-run-7: oklch(0.6 0.17 60);
 }
 
 .dark,
-.csgo {
-  /* Base Theme Colors */
+.csgo,
+.gta,
+.doom,
+.halo {
   --background: #131416;
   --foreground: #eaebec;
-  --card: #131416;
+  --card: #18191c;
   --card-foreground: #eaebec;
   --popover: #171717;
   --popover-foreground: #fafafa;
@@ -313,17 +320,20 @@ html[data-inferencex-embed] .autumn-leaves {
   --secondary: #0b86d1;
   --secondary-foreground: #fafafa;
   --brand: var(--primary);
+  --brand-fill: var(--brand);
   --muted: #27272a;
   --muted-foreground: #b4b9bc;
   --accent: #1d1f21;
   --accent-foreground: #fafafa;
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.74 0.1 155);
+  --warning: oklch(0.8 0.11 80);
   --border: #656b72;
   --border-alt: #222426;
+  --chart-grid: color-mix(in oklab, var(--foreground) 14%, var(--card));
   --input: oklch(1 0 0 / 15%);
   --ring: #fafafa;
 
-  /* Sidebar */
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -332,9 +342,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Overlay-run palette (dark mode): lighter + saturated so strokes pop on
-   * #131416. Hues align with the light-mode palette so each run index reads as
-   * the same conceptual color across themes. */
   --overlay-run-0: oklch(0.72 0.22 25);
   --overlay-run-1: oklch(0.75 0.2 190);
   --overlay-run-2: oklch(0.78 0.2 90);
@@ -345,7 +352,22 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-7: oklch(0.78 0.18 60);
 }
 
-/* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
+.doom {
+  color-scheme: dark;
+  --background: #140b09;
+  --foreground: #f1e6dc;
+  --card: #1d110d;
+  --card-foreground: #f1e6dc;
+  --popover: #22140f;
+  --popover-foreground: #f1e6dc;
+  --primary: #ff6a2b;
+  --primary-foreground: #140b09;
+  --muted: #33201a;
+  --muted-foreground: #c9b6aa;
+  --accent: #3a2219;
+  --ring: #ffb347;
+}
+
 .csgo {
   color-scheme: dark;
   --background: #101820;
@@ -376,83 +398,74 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-ring: #e6bd68;
   --radius: 0.125rem;
 }
-
-.csgo-scene {
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  pointer-events: none;
-  overflow: hidden;
+.gta {
+  --font-pricedown: 'Pricedown';
+  --font-chalet-comprime: 'ChaletComprime';
+  color-scheme: dark;
+  --background: #0a0a0b;
+  --foreground: #f5f5f5;
+  --card: #111113;
+  --card-foreground: #f5f5f5;
+  --popover: #0d0d0f;
+  --popover-foreground: #f5f5f5;
+  --primary: #72cc72;
+  --primary-foreground: #0a0a0b;
+  --secondary: #5d9bd5;
+  --secondary-foreground: #0a0a0b;
+  --muted: #232326;
+  --muted-foreground: #b8b8bd;
+  --accent: #2c2c30;
+  --accent-foreground: #f5f5f5;
+  --border: #3a3a3f;
+  --border-alt: #26262a;
+  --input: #4a4a50;
+  --ring: #ffffff;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #72cc72;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #2c2c30;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3f;
+  --sidebar-ring: #ffffff;
+  --radius: 0.125rem;
+  --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
+  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
-
-.csgo-scene-image,
-.csgo-scene-shade {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  inset: 0;
+.halo {
+  --font-industry: 'Industry';
+  color-scheme: dark;
+  --background: #070d16;
+  --foreground: #e8f1f8;
+  --card: #0c1622;
+  --card-foreground: #e8f1f8;
+  --popover: #0b1520;
+  --popover-foreground: #e8f1f8;
+  --primary: #5ed1ff;
+  --primary-foreground: #04101a;
+  --secondary: #9fd356;
+  --secondary-foreground: #0a1404;
+  --muted: #182635;
+  --muted-foreground: #a9bccb;
+  --accent: #1c2d3e;
+  --accent-foreground: #e8f1f8;
+  --border: #3b5468;
+  --border-alt: #1d2d3c;
+  --input: #3b5468;
+  --ring: #5ed1ff;
+  --sidebar: #0c1622;
+  --sidebar-foreground: #e8f1f8;
+  --sidebar-primary: #5ed1ff;
+  --sidebar-primary-foreground: #04101a;
+  --sidebar-accent: #1c2d3e;
+  --sidebar-accent-foreground: #e8f1f8;
+  --sidebar-border: #3b5468;
+  --sidebar-ring: #5ed1ff;
+  --radius: 0.125rem;
+  --halo-menu: var(--font-industry), 'Industry', 'Arial Narrow', sans-serif;
 }
-
-.csgo-scene-image {
-  object-fit: cover;
-  object-position: center top;
-}
-
-.csgo-scene-shade {
-  background: linear-gradient(180deg, #10182088, #101820d9 65%, #101820f5);
-}
-
-.csgo-theme-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-block: 1rem;
-  padding: 0.5rem 1rem;
-  border-left: 3px solid var(--primary);
-  background: linear-gradient(90deg, #18232deb, #18232d66);
-}
-
-.csgo-theme-banner img {
-  width: clamp(10rem, 22vw, 15rem);
-  height: auto;
-}
-
-.csgo-theme-banner span {
-  flex-shrink: 0;
-}
-
-.csgo header {
-  background: #101820ed;
-  border-bottom: 2px solid var(--primary);
-}
-
-.csgo :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
-
-.csgo :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
-  border-radius: var(--radius);
-}
-
-.csgo [data-slot='card'] {
-  background-color: #18232df5;
-  border-top-color: var(--primary);
-}
-
-.csgo .circuit-bg,
-.csgo .autumn-leaves,
-html[data-inferencex-embed] .csgo-scene {
-  display: none;
-}
-
-html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
-  display: none;
-}
-
-/* ── Minecraft Theme ── */
 .minecraft {
+  --font-minecraft: 'Monocraft';
   --background: #1e1e1e;
   --foreground: #ffffff;
   --card: #1e1e1e;
@@ -464,6 +477,7 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   --secondary: #0b86d1;
   --secondary-foreground: #ffffff;
   --brand: var(--primary);
+  --brand-fill: var(--brand);
   --muted: #3a3a3a;
   --muted-foreground: rgba(255, 255, 255, 0.55);
   --accent: #2a2a2a;
@@ -471,10 +485,10 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   --destructive: oklch(0.704 0.191 22.216);
   --border: #555555;
   --border-alt: #333333;
+  --chart-grid: color-mix(in oklab, var(--foreground) 14%, var(--card));
   --input: rgba(255, 255, 255, 0.15);
   --ring: #ffffff;
 
-  /* Sidebar */
   --sidebar: #1a1a1a;
   --sidebar-foreground: #ffffff;
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -484,15 +498,11 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   --sidebar-border: #555555;
   --sidebar-ring: #888888;
 
-  /* Override ALL fonts to pixel font */
   --font-dm-sans: var(--font-minecraft, 'Monocraft', monospace);
   --font-mono: var(--font-minecraft, 'Monocraft', monospace);
 
-  /* Kill all border radius — Minecraft has no curves */
   --radius: 0px;
 
-  /* Overlay-run palette (minecraft theme): same as dark since background is
-   * also dark (#1e1e1e). */
   --overlay-run-0: oklch(0.72 0.22 25);
   --overlay-run-1: oklch(0.75 0.2 190);
   --overlay-run-2: oklch(0.78 0.2 90);
@@ -502,105 +512,54 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
 }
-
-/* Force pixel font on everything in minecraft mode */
-.minecraft,
-.minecraft * {
-  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
+.excalidraw {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #1e1e1e;
+  --card: #ffffff;
+  --card-foreground: #1e1e1e;
+  --popover: #ffffff;
+  --popover-foreground: #1e1e1e;
+  --primary: #6965db;
+  --primary-foreground: #ffffff;
+  --secondary: #1971c2;
+  --secondary-foreground: #ffffff;
+  --brand: var(--primary);
+  --brand-fill: var(--brand);
+  --muted: #f1f0ff;
+  --muted-foreground: #5c5c5c;
+  --accent: #e0dfff;
+  --accent-foreground: #1e1e1e;
+  --destructive: #e03131;
+  --border: #1e1e1e;
+  --border-alt: #d6d6d6;
+  --input: #3d3d3d;
+  --ring: #6965db;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1e1e1e;
+  --sidebar-primary: #6965db;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e0dfff;
+  --sidebar-accent-foreground: #1e1e1e;
+  --sidebar-border: #d6d6d6;
+  --sidebar-ring: #6965db;
+  --radius: 0.5rem;
 }
 
-/* Minecraft text shadow on all text */
-.minecraft * {
-  text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.4);
-}
-
-/* Disable font smoothing for crisp pixel font */
-.minecraft {
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
-}
-
-/* Minecraft-style beveled buttons — raised 3D effect */
-.minecraft button,
-.minecraft [role='button'],
-.minecraft a[class*='rounded'] {
-  border: 2px solid !important;
-  border-color: #ffffff80 #37373780 #37373780 #ffffff80 !important;
-  border-radius: 0 !important;
-}
-.minecraft button:hover,
-.minecraft [role='button']:hover {
-  background-color: rgba(170, 170, 221, 0.15) !important;
-  border-color: #ffffffe0 #6666aa80 #6666aa80 #ffffffe0 !important;
-}
-.minecraft button:active,
-.minecraft [role='button']:active {
-  border-color: #37373780 #ffffff80 #ffffff80 #37373780 !important;
-}
-
-/* Force square corners on everything */
-.minecraft [class*='rounded'] {
-  border-radius: 0 !important;
-}
-
-/* Pixelated rendering for images */
-.minecraft img {
-  image-rendering: pixelated;
-}
-
-/* Minecraft header grass-block top accent */
-.minecraft header {
-  border-bottom: 3px solid transparent !important;
-  border-image: linear-gradient(to right, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
-}
-
-/* Sunken slot effect on cards */
-.minecraft .border-border {
-  border: 2px solid;
-  border-color: #373737 #ffffff40 #ffffff40 #373737;
-}
-
-/* Input fields — sunken slot style */
-.minecraft input,
-.minecraft select,
-.minecraft textarea {
-  border: 2px solid !important;
-  border-color: #373737 #c6c6c680 #c6c6c680 #373737 !important;
-  border-radius: 0 !important;
-  background-color: rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Shiki code blocks: reuse dark theme in minecraft mode */
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,
-.csgo .shiki span {
+.csgo .shiki span,
+.gta .shiki,
+.gta .shiki span,
+.doom .shiki,
+.doom .shiki span,
+.halo .shiki,
+.halo .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }
 
-/* Hide circuit background in minecraft mode */
-.minecraft .circuit-bg {
-  display: none;
-}
-
-/* Embed routes (/embed/model/[slug]) render one chart inside a third-party
- * iframe. The decorative backgrounds would show through as noise behind the
- * host page's own layout, so they are dropped; the attribute is set by
- * EmbedFrame on mount. */
-html[data-inferencex-embed] .circuit-bg {
-  display: none;
-}
-
-/* ── Embed skin: vLLM recipes ──
- * `/embed/model/[slug]?theme=vllm-light|vllm-dark`. Re-tokens the embed with
- * the vLLM recipes site's palette (shadcn slate scale, oklch values copied from
- * recipes/src/app/globals.css) plus its Inter / JetBrains Mono fonts, so the
- * iframe reads as part of the host page. Tokens InferenceX uses differently
- * from shadcn (`--muted` is a text color here, cards are translucent) get
- * embed-specific values instead of a straight copy. The skin attribute is set
- * by EmbedFrame; the theme class still comes from next-themes, so every
- * `.dark`-keyed rule and `resolvedTheme` check keeps working. */
 html[data-inferencex-skin='vllm'] {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -609,12 +568,13 @@ html[data-inferencex-skin='vllm'] {
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(0.97 0.005 265);
   --popover-foreground: oklch(0.25 0.04 265);
-  --primary: #fdb517; /* vLLM yellow */
+  --primary: #fdb517;
   --primary-foreground: oklch(0.129 0.042 264.695);
-  --secondary: #30a2ff; /* vLLM blue */
+  --secondary: #30a2ff;
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --brand: var(--secondary);
-  --muted: oklch(0.72 0.03 257); /* readable as text on white */
+  --brand-fill: var(--brand);
+  --muted: oklch(0.72 0.03 257);
   --muted-foreground: oklch(0.554 0.046 257.417);
   --accent: oklch(0.968 0.007 247.896);
   --accent-foreground: oklch(0.208 0.042 265.755);
@@ -636,7 +596,8 @@ html[data-inferencex-skin='vllm'].dark {
   --secondary: #30a2ff;
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --brand: var(--primary);
-  --muted: oklch(0.55 0.035 258); /* readable as text on slate */
+  --brand-fill: var(--brand);
+  --muted: oklch(0.55 0.035 258);
   --muted-foreground: oklch(0.704 0.04 256.788);
   --accent: oklch(0.279 0.041 260.031);
   --accent-foreground: oklch(0.984 0.003 247.858);
@@ -646,71 +607,15 @@ html[data-inferencex-skin='vllm'].dark {
   --ring: oklch(0.551 0.027 264.364);
 }
 
-/* Fonts: EmbedFrame copies --font-embed-* from the layout wrapper onto <html>. */
 html[data-inferencex-skin='vllm'] body {
   --font-dm-sans: var(--font-embed-sans, Inter, system-ui, sans-serif);
   --font-mono: var(--font-embed-mono, 'JetBrains Mono', ui-monospace, monospace);
 }
 
-/* Solid cards with a full-strength border, like the host's shadcn cards;
- * InferenceX's translucent blurred card reads as a foreign object on a flat
- * white or slate page. */
 html[data-inferencex-skin='vllm'] [data-slot='card'] {
   background-color: var(--card);
   border-color: var(--border);
   backdrop-filter: none;
-}
-
-/* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
- * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
- * and lands the dragon off-screen left so the GIF stops being rendered. The
- * dragon hovers in the center between 35% and 60% (4.2s–7.2s of the 12s
- * total) so the canonical 3s growl SFX from minecraft-decorations.tsx lines
- * up with a deliberate mid-screen pause rather than a moving target. */
-@keyframes mc-dragon-flyacross {
-  0% {
-    transform: translate(110vw, 0) scale(1);
-    opacity: 0;
-  }
-  8% {
-    opacity: 0.95;
-  }
-  35% {
-    transform: translate(40vw, -2vh) scale(1.05);
-  }
-  60% {
-    transform: translate(40vw, -2vh) scale(1.05);
-  }
-  92% {
-    opacity: 0.95;
-  }
-  100% {
-    transform: translate(-130vw, 1vh) scale(1);
-    opacity: 0;
-  }
-}
-
-.mc-dragon-flyacross {
-  animation: mc-dragon-flyacross 12s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mc-dragon-flyacross {
-    animation: none;
-    display: none;
-  }
-}
-
-/* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
-@keyframes splash-bounce {
-  0%,
-  100% {
-    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1);
-  }
-  50% {
-    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1.1);
-  }
 }
 
 .splash-wrapper {
@@ -725,8 +630,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 
 .splash-text {
   display: inline-block;
-  /* Light mode paints this over a white card, where flat #ffff00 all but
-     disappears — keep the Minecraft yellow but ring it with a dark outline. */
   color: #ffcc00;
   font-weight: bold;
   font-size: 0.85rem;
@@ -737,27 +640,22 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     -1px 1px 0 #4a3800,
     -1px -1px 0 #4a3800,
     2px 2px 0 #4a3800;
-  /* The keyframes re-declare this; keeping it on the element means the splash
-     still sits where it belongs when the animation is off (reduced motion). */
   transform: translate(2rem, 2.25rem) rotate(10deg);
-  animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: center;
-  /* Always use Minecraft font & style regardless of active theme */
-  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
+  font-family: inherit;
 }
 
-/* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
 .minecraft .splash-text,
-.csgo .splash-text {
+.csgo .splash-text,
+.doom .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-text {
+  .splash-text,
+  .minecraft .splash-text {
     animation: none;
   }
 }
@@ -780,8 +678,29 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a,
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='option'],
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  @media (max-width: 767px) and (pointer: coarse) {
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
   }
   button {
     cursor: pointer;
@@ -790,7 +709,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     outline: none;
   }
 }
-/* Custom scrollbar styling */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
@@ -812,7 +730,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   background-clip: padding-box;
 }
 
-/* Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
@@ -825,7 +742,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   fill: hsl(var(--foreground));
 }
 
-/* D3 chart theming via CSS vars */
 .chart-root .x-axis .domain,
 .chart-root .y-axis .domain {
   stroke: var(--border);
@@ -835,18 +751,247 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   stroke: var(--border);
 }
 .chart-root .tick text {
-  font-size: 10px;
-  fill: var(--foreground);
+  font-size: 12px;
+  fill: var(--muted-foreground);
+}
+
+.range-slider {
+  --range-fill: var(--brand);
+  --range-track: color-mix(in oklab, var(--muted-foreground) 25%, transparent);
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.range-slider::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--range-fill) var(--range-progress, 0%),
+    var(--range-track) var(--range-progress, 0%)
+  );
+}
+.range-slider::-moz-range-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--range-track);
+}
+.range-slider::-moz-range-progress {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--range-fill);
+}
+.range-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.3125rem;
+  border-radius: 9999px;
+  border: 2px solid var(--card);
+  background: var(--range-fill);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.range-slider::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid var(--card);
+  background: var(--range-fill);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.range-slider:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 9999px;
+}
+
+/*
+ * PowerX on phones (ChartDisplay sets data-powerx-surface): 44 px touch targets on
+ * the shared chart chrome without changing the glyphs or the row rhythm, and a 28 px
+ * slider thumb. Negative margins keep each target's
+ * layout box at the shared ChartLegend size, so legend rows, switches and the header
+ * line up with every other chart. Nothing here applies from md up.
+ */
+@media (max-width: 767px) {
+  [data-powerx-surface] [data-slot='info-help'][data-variant='inline'] {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -0.875rem -0.625rem;
+  }
+  [data-powerx-surface] .legend-container [data-testid^='legend-points-'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin-top: -0.75rem;
+    margin-bottom: -0.75rem;
+  }
+  [data-powerx-surface] [data-testid='legend-close-button'],
+  [data-powerx-surface] [data-testid='legend-open-button'] {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -0.375rem;
+  }
+  [data-powerx-surface] .powerx-range {
+    appearance: none;
+    height: 2.75rem;
+    background: transparent;
+  }
+  [data-powerx-surface] .powerx-range::-webkit-slider-runnable-track {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--border);
+  }
+  [data-powerx-surface] .powerx-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-top: -0.75rem;
+    border-radius: 9999px;
+    border: 2px solid var(--background);
+    background: currentColor;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  }
+  [data-powerx-surface] .powerx-range::-moz-range-track {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--border);
+  }
+  [data-powerx-surface] .powerx-range::-moz-range-thumb {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    border: 2px solid var(--background);
+    background: currentColor;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  }
 }
 .chart-root .grid line {
-  stroke: var(--border-alt);
+  stroke: var(--chart-grid);
 }
 .y-axis-label,
 .x-axis-label {
   fill: var(--foreground);
 }
 
-/* Subtle star button glow animation - uses opacity for GPU compositing */
+.no-scrollbar {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  [data-chart-tooltip][data-sheet='true'] {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(72dvh, 640px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 0 env(safe-area-inset-bottom);
+    background: var(--popover);
+    border-top: 1px solid var(--border);
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -12px 32px -12px rgb(0 0 0 / 0.45);
+    animation: chart-sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  [data-chart-tooltip][data-sheet='true']::before {
+    content: '';
+    position: sticky;
+    top: 0;
+    display: block;
+    width: 100%;
+    height: 20px;
+    background:
+      linear-gradient(var(--muted-foreground), var(--muted-foreground)) center 8px / 36px 4px
+        no-repeat,
+      var(--popover);
+    opacity: 0.9;
+    z-index: 1;
+  }
+  [data-chart-tooltip][data-sheet='true'] > div {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    max-width: none !important;
+    width: auto !important;
+    padding: 0 16px 16px !important;
+    font-size: 13px;
+  }
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child[style*='italic'],
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child.italic {
+    display: none;
+  }
+  [data-chart-tooltip][data-sheet='true'] button,
+  [data-chart-tooltip][data-sheet='true'] a[role='button'],
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    min-height: 44px;
+  }
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@keyframes new-badge-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 70%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--brand) 0%, transparent);
+  }
+}
+
+.new-badge-flash {
+  animation: new-badge-flash 1.5s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-badge-flash {
+    animation: none;
+  }
+}
+
+/* VideoGenX: a ring spreading from each playable chart point until the reader picks a clip. */
+@keyframes video-clip-pulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.55);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.video-clip-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: video-clip-pulse 2.2s ease-out infinite;
+}
+
+/* A ring is repainted by the main thread, so it rests while its chart is off screen. */
+[data-off-screen] .video-clip-pulse {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-clip-pulse {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 @keyframes star-glow {
   0%,
   100% {
@@ -869,4 +1014,38 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
   animation: star-glow 2s ease-in-out infinite;
   pointer-events: none;
+}
+
+@keyframes chart-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-chart-tooltip][data-sheet='true'] {
+    animation: none;
+  }
+}
+
+.chart-zoom svg:not(.lucide) text:not([transform]),
+.chart-zoom svg:not(.lucide) circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 / var(--k, 1)));
+}
+.chart-zoom svg:not(.lucide) text:not([transform]):not([text-anchor]),
+.chart-zoom svg:not(.lucide) text:not([transform])[text-anchor='start'] {
+  transform-origin: left center;
+}
+.chart-zoom svg:not(.lucide) text:not([transform])[text-anchor='end'] {
+  transform-origin: right center;
+}
+.chart-zoom svg:not(.lucide) :is(line, path, polyline, polygon, rect, circle, ellipse) {
+  vector-effect: non-scaling-stroke;
 }

@@ -1,14 +1,15 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { rememberChartStateInUrl } from '@/lib/url-state';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   useInferenceActions,
@@ -17,18 +18,21 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
+import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
+import { EngineComparisonConflictNotice } from '@/components/inference/ui/engine-comparison-conflict-notice';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { Button } from '@/components/ui/button';
-import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
-import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
-import { getChartWatermark, Sequence } from '@/lib/data-mappings';
-import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
-import { useLocale } from '@/lib/use-locale';
-import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
-import { useLogAvailability } from '@/hooks/api/use-log-availability';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { getInferenceHardwareConfig, getOverlayLineLabel } from '@/lib/benchmarks/inference-labels';
+import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
+import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type {
   CustomLayerConfig,
   D3ChartHandle,
@@ -41,44 +45,78 @@ import {
   applyNormalState,
   formatLargeNumber,
   getShapeKeyForPrecision,
+  HIT_AREA_RADIUS,
   logTickFormat,
-} from '@/lib/chart-rendering';
-import type { ParetoDirection } from '@/lib/chart-utils';
+} from '@/lib/charts/chart-rendering';
+import { computeTooltipPosition, syncPointLabel } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  attachOverlayXMarkerHandlers,
+  overlayMarkerPosition,
+  xMarkerPath,
+} from '@/lib/d3-chart/overlay-x-marker';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
+import {
+  overlayRooflineDasharray,
+  overlayRunColor,
+  overlayRunIndex,
+} from '@/lib/charts/overlay-run-style';
+import type { ParetoDirection } from '@/lib/charts/chart-utils';
 import {
   chartFrontier,
   upperPowerEnvelope,
   isPowerCurveMetric,
-  isMeasuredPowerCurveMetric,
+  isPowerGaugeSeries,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
   InferenceData,
   ScatterGraphProps,
 } from '@/components/inference/types';
+import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
+import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
-  buildRunNumbering,
-  comparisonEntryLabel,
-  comparisonEntrySortValue,
-  resolveComparisonEntries,
-} from '@/components/inference/utils/comparisonEntry';
-import { generateGPUGraphTooltipContent } from '@/components/inference/utils/tooltipUtils';
+  buildPointDetails,
+  generateHoverTooltipContent,
+} from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
+import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
+import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { pointLabelText } from '@/components/inference/ui/point-label';
 import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
 import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
-import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
+import {
+  chartNoticeKey,
+  useDismissedChartNotices,
+} from '@/components/inference/hooks/use-dismissed-chart-notices';
+import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
-import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
 import {
   isMeasuredEnergyConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
 } from '@/components/inference/metric-registry';
 import {
-  countPowerTiers,
-  MeasuredPowerSummary,
-} from '@/components/inference/ui/MeasuredPowerSummary';
+  clampIsoX,
+  clearPerfRulers,
+  computeIsoXRulerGeometry,
+  computePerfRulerLabelLayouts,
+  deletePerfRuler,
+  EMPTY_PERF_RULER_STATE,
+  intersectPathAtX,
+  isPerfRulerCurveVisible,
+  movePerfRulerIsoX,
+  nextPerfRulerState,
+  pathXExtent,
+  perfRulerCurveSet,
+  prunePerfRulers,
+  renderPerfRulers,
+  type PerfRulerEndInput,
+  type PerfRulerGeometry,
+  type PerfRulerRenderEntry,
+  type PerfRulerState,
+} from '@/lib/d3-chart/layers/perf-ruler';
 import {
   keepPointLabelsInPlot,
   parallelismLabelBoxes,
@@ -86,8 +124,17 @@ import {
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+
+const PowerTelemetryDialog = dynamic(
+  () =>
+    import('@/components/inference/power-telemetry-dialog').then(
+      (module) => module.PowerTelemetryDialog,
+    ),
+  { ssr: false },
+);
 
 const FixedSequenceLogDialog = dynamic(() =>
   import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
@@ -95,17 +142,42 @@ const FixedSequenceLogDialog = dynamic(() =>
   ),
 );
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const ReproduceDrawer = dynamic(
+  () =>
+    import('@/components/inference/reproduce/ReproduceDrawer').then(
+      (module) => module.ReproduceDrawer,
+    ),
+  { ssr: false },
+);
 
-// Label text combines the hw config (display label) and the date so
-// both dimensions of the GPU comparison view are legible on the chart,
-// not only the legend. Falls back to the raw hwKey if the config
-// lookup misses (legacy data).
-function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
+
+const OVERLAY_SERIES_PREFIX = 'overlay-run';
+
+const ROOFLINE_CLASS_PREFIX = 'roofline-';
+
+const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): RenderContext => {
+  const transform = d3.zoomTransform(svg);
+  if (transform.k === 1 && transform.x === 0 && transform.y === 0) return ctx;
+  return {
+    ...ctx,
+    xScale: transform.rescaleX(ctx.xScale as ContinuousScale),
+    yScale: transform.rescaleY(ctx.yScale as ContinuousScale),
+  };
+};
+
+function hardwareLabelFor(pts: InferenceData[], showFrameworkLabel = true): string {
   const hwKey = String(pts[0].hwKey);
   const cfg = getInferenceHardwareConfig(hwKey, pts[0].model, pts);
-  const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
-  return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
+  return cfg ? (showFrameworkLabel ? getDisplayLabel(cfg) : cfg.label) : hwKey;
+}
+
+function labelTextFor(
+  pts: InferenceData[],
+  numbering: Map<string, number>,
+  showFrameworkLabel: boolean,
+): string {
+  return `${hardwareLabelFor(pts, showFrameworkLabel)} · ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
 const GPU_STRINGS = {
@@ -113,44 +185,51 @@ const GPU_STRINGS = {
     logScale: 'Log Scale',
     highContrast: 'High Contrast',
     optimalOnly: 'Optimal Only',
-    showAllMeasurements: 'Show all measurements',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    powerCurves:
-      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
-    powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
-    labels: 'Labels',
+    labels: '# of GPUs Label',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
-    resetFilter: 'Reset filter',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
+    perfRuler: 'Perf Ruler',
+    perfRulerInfo:
+      'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
+    clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
+    noMeasuredDataHint:
+      'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
   },
   zh: {
     logScale: '对数缩放',
     highContrast: '高对比度',
     optimalOnly: '仅最优',
-    showAllMeasurements: '显示全部测量点',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    powerCurves:
-      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
-    labels: '标签',
+    labels: 'GPU 数量标签',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
-    resetFilter: '重置筛选',
+    frameworkLabel: '曲线框架标签',
+    offloadingLabel: 'offload 标签',
+    perfRuler: '性能标尺',
+    perfRulerInfo:
+      '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
+    clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     noData: '暂无数据',
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
     noRoleEnergyDataHint:
       '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
+    noMeasuredDataHint:
+      '当前选择没有实测 GPU 功耗数据。请选择其他芯片配置，或更换模型、场景、精度或日期。',
+    unofficialTitle: (branch: string) => `非官方：${branch}`,
   },
 } as const;
 
@@ -163,6 +242,8 @@ const GPUGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    footer,
+    overlayData,
     runNumbering: providedRunNumbering,
   }: ScatterGraphProps) => {
     const { hardwareConfig } = useInferenceData();
@@ -180,7 +261,6 @@ const GPUGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: savedHideNonOptimal,
-      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       logScale,
       isLegendExpanded,
@@ -188,13 +268,15 @@ const GPUGraph = React.memo(
       showConcurrencyLabels,
       highContrast,
       showLineLabels,
+      showOffloadingLabel,
+      showFrameworkLabel,
     } = useInferenceDisplay();
+    const pointLabelsVisible = showPointLabels || useAdvancedLabels || showConcurrencyLabels;
     const {
       setSelectedDates,
       toggleActiveDate,
       removeActiveDate,
       setHideNonOptimal,
-      setShowAllMeasurements,
       setShowPointLabels,
       setLogScale,
       setIsLegendExpanded,
@@ -203,36 +285,41 @@ const GPUGraph = React.memo(
       setHighContrast,
       selectAllActiveDates,
       setShowLineLabels,
+      setShowOffloadingLabel,
+      setShowFrameworkLabel,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
     } = useInferenceActions();
     const locale = useLocale();
+    const featureGateUnlocked = useFeatureGate();
+    const showPowerTelemetry =
+      featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+    const showPowerTelemetryRef = useRef(showPowerTelemetry);
+    showPowerTelemetryRef.current = showPowerTelemetry;
     const legendT = GPU_STRINGS[locale];
     const frontierDirection = chartDefinition[
       `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
     ] as ParetoDirection | undefined;
     const hideNonOptimal = Boolean(frontierDirection) && savedHideNonOptimal;
-    const powerCurveMetric = isPowerCurveMetric(selectedYAxisMetric);
-    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
-    const powerEnvelopeMode = powerCurveMetric && (isMeasuredPowerAxis || !hideNonOptimal);
-    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
+    const powerEnvelopeMode = isPowerCurveMetric(selectedYAxisMetric);
     const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
       ? legendT.noRoleEnergyDataHint
-      : legendT.noDataHint;
+      : isMeasuredEnergyConfigKey(selectedYAxisMetric)
+        ? legendT.noMeasuredDataHint
+        : legendT.noDataHint;
     const ephemeralUrlState = useEphemeralUrlState();
-    const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
-    // A framework lock (embed routes) is not a user filter, so it is not counted.
     const quickFilterCount =
       quickFilters.vendors.length +
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
+      (quickFilters.topologies?.length ?? 0) +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
@@ -240,43 +327,46 @@ const GPUGraph = React.memo(
       setQuickFilterDeployment([]);
       setQuickFilterSpec([]);
       setQuickFilterPower([]);
+      setQuickFilterTopologies([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
     ]);
 
-    // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
-    // and/or specific-run entries); a same-day range endpoint is dropped when that
-    // date also has run entries (resolveComparisonEntries), then sorted earliest →
-    // latest so a day's runs read #1 → #N.
-    const gpuDatePairs = useMemo(() => {
-      const deduplicated = resolveComparisonEntries(selectedDates, selectedDateRange);
-      deduplicated.sort((a, b) => {
-        const [ta, ia] = comparisonEntrySortValue(a);
-        const [tb, ib] = comparisonEntrySortValue(b);
-        return ta - tb || ia - ib;
-      });
-      const sortedGPUs = [...selectedGPUs].toSorted(
-        (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-      );
-      return { dates: deduplicated, sortedGPUs };
-    }, [selectedDateRange, selectedDates, selectedGPUs]);
+    const { runNumbering, allGraphs, paletteIdentity, resolveColor, getCssColor } =
+      useComparisonSeries(providedRunNumbering);
 
-    // Run numbers for legend/line labels. Prefer the stable numbering passed by
-    // the parent (shared with the changelog, so labels match it and removed runs
-    // leave a gap); fall back to gap-free numbering of the on-chart series.
-    const runNumbering = useMemo(
-      () => providedRunNumbering ?? buildRunNumbering(gpuDatePairs.dates),
-      [providedRunNumbering, gpuDatePairs.dates],
+    const { runIndexByUrl, unofficialRunInfos, activeOverlayHwTypes } = useUnofficialRun();
+    const overlayPoints = useMemo(
+      () =>
+        (overlayData?.data ?? []).filter(
+          (point) =>
+            !point.powerVariant &&
+            selectedPrecisions.includes(point.precision) &&
+            matchesQuickFilters(point, quickFilters) &&
+            activeOverlayHwTypes.has(String(point.hwKey)),
+        ),
+      [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes],
+    );
+    const overlayPointSet = useMemo(() => new Set(overlayPoints), [overlayPoints]);
+    const overlayRunOf = useCallback(
+      (point: InferenceData) => overlayRunIndex(point.run_url ?? null, runIndexByUrl),
+      [runIndexByUrl],
+    );
+    const overlaySeriesId = useCallback(
+      (point: InferenceData) => `${OVERLAY_SERIES_PREFIX}${overlayRunOf(point)}_${point.hwKey}`,
+      [overlayRunOf],
+    );
+    const seriesIdOf = useCallback(
+      (point: InferenceData) =>
+        overlayPointSet.has(point) ? overlaySeriesId(point) : `${point.date}_${point.hwKey}`,
+      [overlayPointSet, overlaySeriesId],
     );
 
-    // Removing a series from the legend should also drop it from the comparison
-    // selection so the config changelog stays in sync (two-way binding). Legend
-    // ids are `${entry}_${gpu}`; strip the gpu suffix to recover the entry. Range
-    // endpoints aren't individual selections, so those fall back to a visibility hide.
     const handleLegendRemove = useCallback(
       (id: string) => {
         const gpu = selectedGPUs.find((g) => id.endsWith(`_${g}`));
@@ -290,94 +380,22 @@ const GPUGraph = React.memo(
       [selectedGPUs, selectedDates, setSelectedDates, removeActiveDate],
     );
 
-    const graphIdentifiers = useMemo(() => {
-      const ids: string[] = [];
-      gpuDatePairs.sortedGPUs.forEach((gpu) =>
-        gpuDatePairs.dates.forEach((date) => ids.push(`${date}_${gpu}`)),
-      );
-      return ids;
-    }, [gpuDatePairs]);
-
-    // High contrast keys off the GPU (not `date_gpu`) so each hardware config
-    // gets exactly one hue; the dates within a config are separated by the
-    // lightness ramp built below rather than by unrelated hues.
-    const { resolveColor, getCssColor } = useThemeColors({
-      highContrast,
-      identifiers: graphIdentifiers,
-      hcKeys: gpuDatePairs.sortedGPUs,
-    });
-
-    // Dynamic GPU×date color map
-    const gpuDateColorMap = useMemo(() => {
-      const { dates, sortedGPUs } = gpuDatePairs;
-      if (sortedGPUs.length === 0 || dates.length === 0) return {};
-      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
-      return generateGpuDateColors(sortedGPUs, dates.length, theme);
-    }, [gpuDatePairs, resolvedTheme]);
-
-    // High-contrast GPU×date color map: one iwanthue hue per GPU, ramped across
-    // the compared dates so a config's runs stay recognisably the same color
-    // while still reading oldest → newest.
-    const hcGpuDateColorMap = useMemo(() => {
-      const { dates, sortedGPUs } = gpuDatePairs;
-      if (!highContrast || sortedGPUs.length === 0 || dates.length === 0) return {};
-      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
-      const baseColors: Record<string, string> = {};
-      for (const gpu of sortedGPUs) baseColors[gpu] = getCssColor(resolveColor(gpu));
-      return generateHighContrastGpuDateColors(baseColors, dates.length, theme);
-    }, [gpuDatePairs, highContrast, resolvedTheme, resolveColor, getCssColor]);
-
-    const allGraphs = useMemo(() => {
-      const { dates, sortedGPUs } = gpuDatePairs;
-      const result: { date: string; color: string; hwKey: string; id: string }[] = [];
-      sortedGPUs.forEach((gpu) => {
-        dates.forEach((date, dateIndex) => {
-          const id = `${date}_${gpu}`;
-          const compositeKey = `${dateIndex}_${gpu}`;
-          const dynamicColor = gpuDateColorMap[compositeKey];
-          result.push({
-            date,
-            hwKey: gpu,
-            id,
-            color: highContrast
-              ? hcGpuDateColorMap[compositeKey] || getCssColor(resolveColor(gpu))
-              : dynamicColor || 'var(--foreground)',
-          });
-        });
+    const groupedData = useMemo(() => {
+      const groups: Record<string, InferenceData[]> = {};
+      const add = (point: InferenceData) => {
+        const key = `${seriesIdOf(point)}_${point.precision}`;
+        (groups[key] ??= []).push(point);
+      };
+      data.forEach((point) => {
+        if (selectedPrecisions.includes(point.precision)) add(point);
       });
-      return result;
-    }, [gpuDatePairs, gpuDateColorMap, hcGpuDateColorMap, highContrast, resolveColor, getCssColor]);
+      overlayPoints.forEach(add);
+      return groups;
+    }, [data, selectedPrecisions, overlayPoints, seriesIdOf]);
 
-    const paletteIdentity = useMemo(
-      () =>
-        [
-          resolvedTheme ?? 'system',
-          highContrast ? 'high-contrast' : 'standard',
-          ...allGraphs.map(({ id, color }) => `${id}:${color}`),
-        ].join('|'),
-      [resolvedTheme, highContrast, allGraphs],
-    );
-
-    const groupedData = useMemo(
-      () =>
-        data.reduce(
-          (acc, point) => {
-            if (!selectedPrecisions.includes(point.precision)) return acc;
-            const key = `${point.date}_${point.hwKey}_${point.precision}`;
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(point);
-            return acc;
-          },
-          {} as Record<string, InferenceData[]>,
-        ),
-      [data, selectedPrecisions],
-    );
-
-    // Track which date+GPU combos have actual data points
     const idsWithData = useMemo(() => {
       const ids = new Set<string>();
       for (const key of Object.keys(groupedData)) {
-        // key = "date_hwKey_precision" — strip last segment
         const lastUnderscore = key.lastIndexOf('_');
         ids.add(key.slice(0, lastUnderscore));
       }
@@ -395,82 +413,66 @@ const GPUGraph = React.memo(
     }, [groupedData, frontierDirection]);
 
     const rooflines = useMemo(() => {
-      if (!powerEnvelopeMode) return paretoRooflines;
+      if (!powerEnvelopeMode || !frontierDirection) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
-        result[key] = upperPowerEnvelope(points, chartDefinition.chartType !== 'e2e');
+        result[key] = upperPowerEnvelope(
+          points,
+          frontierDirection,
+          isPowerGaugeSeries(selectedYAxisMetric, points[0]),
+        );
       }
       return result;
-    }, [powerEnvelopeMode, groupedData, paretoRooflines, chartDefinition.chartType]);
+    }, [powerEnvelopeMode, groupedData, paretoRooflines, frontierDirection, selectedYAxisMetric]);
 
+    const boundaryKeyOf = useCallback(
+      (p: InferenceData) => `${seriesIdOf(p)}_${p.precision}-${p.x}-${p.y}`,
+      [seriesIdOf],
+    );
     const boundaryPointKeys = useMemo(() => {
       const keys = new Set<string>();
-      Object.values(rooflines).forEach((pts) =>
-        pts.forEach((p) => keys.add(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`)),
-      );
+      Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(boundaryKeyOf(p))));
       return keys;
-    }, [rooflines]);
+    }, [rooflines, boundaryKeyOf]);
 
     const activeData = useMemo(
       () =>
         Object.values(groupedData)
           .flat()
-          .filter((p) => activeDates.has(`${p.date}_${p.hwKey}`)),
-      [groupedData, activeDates],
+          .filter((p) => overlayPointSet.has(p) || activeDates.has(`${p.date}_${p.hwKey}`)),
+      [groupedData, activeDates, overlayPointSet],
     );
 
     const filteredData = useMemo(() => {
-      if (hideNonOptimal || (powerEnvelopeMode && !showAllMeasurements))
-        return activeData.filter((p) =>
-          boundaryPointKeys.has(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`),
-        );
+      if (hideNonOptimal) return activeData.filter((p) => boundaryPointKeys.has(boundaryKeyOf(p)));
       return activeData;
-    }, [activeData, hideNonOptimal, powerEnvelopeMode, showAllMeasurements, boundaryPointKeys]);
+    }, [activeData, hideNonOptimal, boundaryPointKeys, boundaryKeyOf]);
+    const officialPoints = useMemo(
+      () => filteredData.filter((point) => !overlayPointSet.has(point)),
+      [filteredData, overlayPointSet],
+    );
+    const visibleOverlayPoints = useMemo(
+      () => filteredData.filter((point) => overlayPointSet.has(point)),
+      [filteredData, overlayPointSet],
+    );
 
-    // Keep domains fixed so revealing off-boundary dots cannot move power curves.
     const scaleData = powerEnvelopeMode ? activeData : filteredData;
 
-    const powerTierCounts = useMemo(
-      () => ({
-        total: countPowerTiers(
-          data.filter((point) => selectedPrecisions.includes(point.precision)),
-        ),
-        visible: countPowerTiers(filteredData),
-      }),
-      [data, filteredData, selectedPrecisions],
+    const hasPersistedPoint = useMemo(
+      () => officialPoints.some((point) => isPersistedBenchmarkId(point.id)),
+      [officialPoints],
     );
-
-    // GPU comparison currently renders official DB-backed points only. Unofficial
-    // overlays have no benchmark_results id or persisted trace, so they cannot
-    // open the dedicated per-point charts route.
-    const agenticIds = useMemo(
-      () =>
-        filteredData.flatMap((point) =>
-          point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)
-            ? [point.id]
-            : [],
-        ),
-      [filteredData],
-    );
-    const { data: traceAvailability } = useTraceAvailability(agenticIds);
-    const traceAvailabilityRef = useRef(traceAvailability);
-    traceAvailabilityRef.current = traceAvailability;
-
-    // Log availability applies to every persisted official point in the
-    // comparison, including fixed-sequence runs.
-    const persistedPointIds = useMemo(
-      () => filteredData.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
-      [filteredData],
-    );
-    const { data: logAvailability } = useLogAvailability(persistedPointIds);
-    const logAvailabilityRef = useRef(logAvailability);
-    logAvailabilityRef.current = logAvailability;
+    const { data: presence } = useBenchmarkPresence(hasPersistedPoint);
+    const presenceRef = useRef(presence);
+    presenceRef.current = presence;
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
+    const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
+    const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
+    useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
+    useDialogCloseTracking(fixedLogPointId !== null, 'gpu_timeseries_logs_closed');
+    useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
 
-    // Warning annotations for visible series with known upstream issues —
-    // same treatment the scatter view gets, applied to the date-comparison view.
-    // Lines here are colored per (gpu, date) pair, so take the first active
-    // pair's color as the series swatch.
+    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
         modelLabel,
@@ -490,7 +492,7 @@ const GPUGraph = React.memo(
         };
       });
       for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
-        const previewPoints = filteredData.filter((point) =>
+        const previewPoints = officialPoints.filter((point) =>
           hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
         );
         if (previewPoints.length === 0) continue;
@@ -511,8 +513,18 @@ const GPUGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations;
-    }, [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor, locale]);
+      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
+    }, [
+      dismissedNotices,
+      modelLabel,
+      filteredData,
+      officialPoints,
+      allGraphs,
+      activeDates,
+      resolveColor,
+      getCssColor,
+      locale,
+    ]);
 
     const knownIssueLayer = useMemo(
       () =>
@@ -526,16 +538,28 @@ const GPUGraph = React.memo(
             onLinkClick: (annotation) =>
               annotation.issue &&
               track('inference_known_issue_clicked', {
-                hwKey: annotation.issue.hwKey,
+                gpu: annotation.issue.hwKey,
                 issue: annotation.issue.issueRef,
               }),
+            onDismiss: (annotation) => {
+              track('inference_chart_notice_dismissed', { notice: chartNoticeKey(annotation) });
+              dismissNotice(annotation);
+            },
+            dismissLabel: locale === 'zh' ? '关闭提示' : 'Dismiss notice',
           }),
-          paletteIdentity,
+          `${paletteIdentity}:${[...dismissedNotices].join(',')}`,
         ),
-      [chartId, knownIssueAnnotations, getCssColor, paletteIdentity],
+      [
+        chartId,
+        knownIssueAnnotations,
+        getCssColor,
+        paletteIdentity,
+        dismissNotice,
+        dismissedNotices,
+        locale,
+      ],
     );
 
-    // Compute scale domains
     const xExtent = useMemo(() => {
       if (scaleData.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(scaleData, (d) => d.x) as [number, number];
@@ -557,17 +581,17 @@ const GPUGraph = React.memo(
       return [yMin, yExtent[1] * 1.05] as [number, number];
     }, [scaleData, logScale]);
 
-    const dataIdentity = useMemo(
-      () =>
-        filteredData
-          .map((point) => `${point.date}:${scatterPointConfigId(point)}`)
-          .toSorted()
-          .join('|'),
-      [filteredData],
+    const pointIdentity = useCallback(
+      (point: InferenceData) =>
+        overlayPointSet.has(point)
+          ? `overlay:${overlaySeriesId(point)}:${scatterPointConfigId(point)}`
+          : `${point.date}:${scatterPointConfigId(point)}`,
+      [overlayPointSet, overlaySeriesId],
     );
-    // Tooltip-only trace availability is deliberately excluded from chart
-    // identity; the long-lived D3 content callback reads its latest value via
-    // traceAvailabilityRef.
+    const dataIdentity = useMemo(
+      () => filteredData.map(pointIdentity).toSorted().join('|'),
+      [filteredData, pointIdentity],
+    );
     const metricIdentity = useMemo(
       () =>
         [
@@ -577,9 +601,7 @@ const GPUGraph = React.memo(
           powerEnvelopeMode ? 'power-envelope' : 'pareto-curves',
           `linear:${xExtent.join(',')}`,
           `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
-          ...filteredData.map(
-            (point) => `${point.date}:${scatterPointConfigId(point)}:${point.x}:${point.y}`,
-          ),
+          ...filteredData.map((point) => `${pointIdentity(point)}:${point.x}:${point.y}`),
         ]
           .toSorted()
           .join('|'),
@@ -592,18 +614,19 @@ const GPUGraph = React.memo(
         logScale,
         yDomain,
         filteredData,
+        pointIdentity,
       ],
     );
 
-    // Color resolver for points/rooflines
     const getColor = useMemo(
       () => (d: InferenceData) => {
+        if (overlayPointSet.has(d)) return overlayRunColor(overlayRunOf(d));
         const graphIndex = allGraphs.findIndex(
           ({ date, hwKey }) => d.date === date && d.hwKey === hwKey,
         );
         return graphIndex === -1 ? '#6b7280' : allGraphs[graphIndex].color;
       },
-      [allGraphs],
+      [allGraphs, overlayPointSet, overlayRunOf],
     );
 
     const getRooflineColor = useMemo(
@@ -617,16 +640,23 @@ const GPUGraph = React.memo(
     const isRooflineVisible = useMemo(
       () => (key: string) => {
         const point = rooflines[key]?.[0];
-        return point !== undefined && activeDates.has(`${point.date}_${point.hwKey}`);
+        if (point === undefined) return false;
+        return overlayPointSet.has(point) || activeDates.has(`${point.date}_${point.hwKey}`);
       },
-      [activeDates, rooflines],
+      [activeDates, rooflines, overlayPointSet],
     );
 
-    // ── Line labels (date along each roofline) ──
-    // One label per (date, hwKey) pair — keys with multiple precisions for the
-    // same combo dedupe down to the longest roofline so the label rides the
-    // line that has the most placement options. Labels track the active filter
-    // (`activeDates`) so removing a series via the legend hides its label too.
+    const getRooflineDasharray = useCallback(
+      (key: string) => {
+        const point = rooflines[key]?.[0];
+        if (!point) return null;
+        return overlayPointSet.has(point)
+          ? overlayRooflineDasharray(overlayRunOf(point))
+          : (frameworkDasharray(point.hwKey) ?? null);
+      },
+      [rooflines, overlayPointSet, overlayRunOf],
+    );
+
     const lineLabelLayer: CustomLayerConfig = useMemo(() => {
       const buildSeries = (): LineLabelSeries<InferenceData>[] => {
         const bestByGraph = new Map<
@@ -635,16 +665,31 @@ const GPUGraph = React.memo(
         >();
         for (const [key, points] of Object.entries(rooflines)) {
           if (points.length < 2 || !isRooflineVisible(key)) continue;
-          const graphId = `${points[0].date}_${points[0].hwKey}`;
+          const graphId = seriesIdOf(points[0]);
           const previous = bestByGraph.get(graphId);
           if (!previous || points.length > previous.points.length) {
             bestByGraph.set(graphId, { key, graphId, points });
           }
         }
+        const overlayRunsByHw = new Map<string, Set<number>>();
+        for (const { points } of bestByGraph.values()) {
+          if (!overlayPointSet.has(points[0])) continue;
+          const hwKey = String(points[0].hwKey);
+          const runs = overlayRunsByHw.get(hwKey) ?? new Set<number>();
+          overlayRunsByHw.set(hwKey, runs.add(overlayRunOf(points[0])));
+        }
+        const overlayLabelFor = (points: InferenceData[]) => {
+          const info = unofficialRunInfos[overlayRunOf(points[0])];
+          const hardwareLabel = hardwareLabelFor(points, showFrameworkLabel);
+          const sharesHardware = (overlayRunsByHw.get(String(points[0].hwKey))?.size ?? 0) > 1;
+          return info ? getOverlayLineLabel(hardwareLabel, info, sharesHardware) : hardwareLabel;
+        };
         return [...bestByGraph.values()].map(({ key, graphId, points }) => ({
           key,
           seriesId: graphId,
-          label: labelTextFor(points, runNumbering),
+          label: overlayPointSet.has(points[0])
+            ? overlayLabelFor(points)
+            : labelTextFor(points, runNumbering, showFrameworkLabel),
           color: getRooflineColor(key),
           points,
         }));
@@ -654,76 +699,406 @@ const GPUGraph = React.memo(
         yScale: ContinuousScale,
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ) => {
-        if (!showLineLabels) return [];
+        if (!showLineLabels) return { labels: [], occluders: [] };
         const series = buildSeries();
-        // Both chart types spread labels along their lines with collision
-        // avoidance — endpoint-only placement stacked every label at the
-        // right edge of the e2e latency chart.
-        return placeLineLabels(series, xScale, yScale, {
-          collisionWidth: 160,
-          obstacles: parallelismLabelBoxes(zoomGroup.node()),
-        });
+        const labelKeyByGraph = new Map(series.map((entry) => [entry.seriesId, entry.key]));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(rooflines)) {
+          if (points.length === 0 || !isRooflineVisible(key)) continue;
+          occluders.push({
+            key: labelKeyByGraph.get(seriesIdOf(points[0])) ?? key,
+            points: points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) })),
+          });
+        }
+        return {
+          labels: placeLineLabels(series, xScale, yScale, {
+            collisionWidth: 160,
+            obstacles: parallelismLabelBoxes(zoomGroup.node()),
+          }),
+          occluders,
+        };
       };
 
       return {
         type: 'custom',
         key: 'line-labels',
-        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${paletteIdentity}`,
+        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${showFrameworkLabel}:${paletteIdentity}`,
         render: (zoomGroup, ctx) => {
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.xScale as ContinuousScale,
+            ctx.yScale as ContinuousScale,
             zoomGroup,
-            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale, zoomGroup),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
           const transform = d3.zoomTransform(ctx.layout.svg.node()!);
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            transform.rescaleX(ctx.xScale as ContinuousScale),
+            transform.rescaleY(ctx.yScale as ContinuousScale),
             zoomGroup,
-            placeLabels(
-              transform.rescaleX(ctx.xScale as ContinuousScale),
-              transform.rescaleY(ctx.yScale as ContinuousScale),
-              zoomGroup,
-            ),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
           zoomGroup.selectAll('.line-label').raise();
         },
         onZoom: (zoomGroup, ctx) => {
-          updateRenderedLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
             zoomGroup,
-            placeLabels(
-              ctx.newXScale as ContinuousScale,
-              ctx.newYScale as ContinuousScale,
-              zoomGroup,
-            ),
-            { opacity: showLineLabels ? 0.95 : 0 },
           );
+          updateRenderedLineLabels(zoomGroup, labels, {
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
       };
     }, [
       showLineLabels,
+      showFrameworkLabel,
       rooflines,
       isRooflineVisible,
       getRooflineColor,
       chartDefinition.chartType,
       runNumbering,
       paletteIdentity,
+      seriesIdOf,
+      overlayPointSet,
+      overlayRunOf,
+      unofficialRunInfos,
     ]);
 
-    // Dismiss tooltip when pinned point's combo is hidden
-    useEffect(() => {
-      const pp = chartRef.current?.getPinnedPoint() as InferenceData | null;
-      if (pp && !activeDates.has(`${pp.date}_${pp.hwKey}`)) chartRef.current?.dismissTooltip();
-    }, [activeDates]);
+    const [perfRulerMode, setPerfRulerMode] = useState(false);
+    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    usePerfRulerAxisReset(
+      perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
+      setPerfRulerState,
+    );
+    const perfRulerModeRef = useRef(perfRulerMode);
+    perfRulerModeRef.current = perfRulerMode;
+    const perfRulerStateRef = useRef(perfRulerState);
+    perfRulerStateRef.current = perfRulerState;
+    const perfRulerLiveIsoXRef = useRef(new Map<number, number>());
+    useLayoutEffect(() => {
+      perfRulerLiveIsoXRef.current.clear();
+    }, [perfRulerState]);
 
-    // Dismiss on filter changes
+    const perfRulerDrawCtxRef = useRef<{
+      zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+      xScale: ContinuousScale;
+      yScale: ContinuousScale;
+      width: number;
+      height: number;
+    } | null>(null);
+    const drawPerfRulerRef = useRef<
+      | ((
+          zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+          xScale: ContinuousScale,
+          yScale: ContinuousScale,
+          width: number,
+          height: number,
+        ) => void)
+      | null
+    >(null);
+
+    const clampPerfRulerIsoXToOverlap = useCallback(
+      (curveA: string, curveB: string, isoX: number): number | null => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return null;
+        const [nodeA, nodeB] = [curveA, curveB].map((cls) =>
+          ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+        );
+        if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return null;
+        const extentA = pathXExtent(nodeA);
+        const extentB = pathXExtent(nodeB);
+        if (!extentA || !extentB) return null;
+        const clamped = clampIsoX(Number(ctx.xScale(isoX)), extentA, extentB);
+        return clamped === null ? null : Number(ctx.xScale.invert(clamped));
+      },
+      [],
+    );
+
+    const handlePerfRulerCurveClick = useCallback(
+      (curve: string, pixelX: number) => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        track('gpu_timeseries_perf_ruler_curve_clicked', { curve });
+        const isoX = Number(ctx.xScale.invert(pixelX));
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
+    const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
+    perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
+
+    const handlePerfRulerPointClick = useCallback(
+      (point: InferenceData) => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        const curve = `${ROOFLINE_CLASS_PREFIX}${seriesIdOf(point)}_${point.precision}`;
+        if (ctx.zoomGroup.select(`.${CSS.escape(curve)}`).empty()) return;
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX: point.x }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [clampPerfRulerIsoXToOverlap, seriesIdOf],
+    );
+
+    const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
+    perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
+
+    useEffect(() => {
+      if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
+    }, [perfRulerMode]);
+
+    const syncPerfRulerHitPaths = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        let hitLayer = zoomGroup.select<SVGGElement>('.perf-ruler-hits');
+        const rooflineNodes = zoomGroup
+          .selectAll<SVGPathElement, unknown>('.roofline-path')
+          .nodes();
+        const lastRoofline = rooflineNodes.at(-1);
+        if (!perfRulerModeRef.current || !lastRoofline) {
+          hitLayer.remove();
+          return;
+        }
+        if (hitLayer.empty()) {
+          const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          node.setAttribute('class', 'perf-ruler-hits');
+          lastRoofline.after(node);
+          hitLayer = d3.select(node) as typeof hitLayer;
+        } else if (hitLayer.node()!.previousElementSibling !== lastRoofline) {
+          lastRoofline.after(hitLayer.node()!);
+        }
+        interface HitEntry {
+          curve: string;
+          d: string;
+        }
+        const entries: HitEntry[] = [];
+        for (const node of rooflineNodes) {
+          const curve = [...node.classList].find((cls) => cls !== 'roofline-path');
+          const d = node.getAttribute('d');
+          if (!curve || !d || !isPerfRulerCurveVisible(node.style.opacity)) continue;
+          entries.push({ curve, d });
+        }
+        const selected = perfRulerCurveSet(perfRulerStateRef.current);
+        hitLayer
+          .selectAll<SVGPathElement, HitEntry>('.perf-ruler-hit')
+          .data(entries, (e) => e.curve)
+          .join('path')
+          .attr('class', 'perf-ruler-hit')
+          .attr('fill', 'none')
+          .attr('d', (e) => e.d)
+          .attr('stroke', 'var(--primary)')
+          .attr('stroke-opacity', (e) => (selected.has(e.curve) ? 0.18 : 0))
+          .attr('stroke-width', 13)
+          .style('pointer-events', 'stroke')
+          .style('cursor', 'crosshair')
+          .on('click', (event: MouseEvent, e: HitEntry) => {
+            event.stopPropagation();
+            const [pixelX] = d3.pointer(event, zoomGroup.node());
+            perfRulerCurveClickRef.current(e.curve, pixelX);
+          });
+      },
+      [],
+    );
+
+    const perfRulerDragTargetRef = useRef<{ id: number; pixelX: number } | null>(null);
+    const perfRulerDragFrameRef = useRef<number | null>(null);
+    const applyPerfRulerDragFrame = useCallback(() => {
+      const ctx = perfRulerDrawCtxRef.current;
+      const target = perfRulerDragTargetRef.current;
+      if (!ctx || !target) return;
+      const ruler = perfRulerStateRef.current.rulers.find((r) => r.id === target.id);
+      if (!ruler) return;
+      const [nodeA, nodeB] = [ruler.curveA, ruler.curveB].map((cls) =>
+        ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+      );
+      if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return;
+      const extentA = pathXExtent(nodeA);
+      const extentB = pathXExtent(nodeB);
+      if (!extentA || !extentB) return;
+      const clamped = clampIsoX(target.pixelX, extentA, extentB);
+      if (clamped === null) return;
+      perfRulerLiveIsoXRef.current.set(target.id, Number(ctx.xScale.invert(clamped)));
+      drawPerfRulerRef.current?.(ctx.zoomGroup, ctx.xScale, ctx.yScale, ctx.width, ctx.height);
+    }, []);
+    const applyPerfRulerDragFrameRef = useRef(applyPerfRulerDragFrame);
+    applyPerfRulerDragFrameRef.current = applyPerfRulerDragFrame;
+
+    const perfRulerDrag = useMemo(
+      () =>
+        d3
+          .drag<SVGLineElement, PerfRulerRenderEntry>()
+          .on(
+            'drag',
+            (
+              event: d3.D3DragEvent<SVGLineElement, PerfRulerRenderEntry, unknown>,
+              entry: PerfRulerRenderEntry,
+            ) => {
+              perfRulerDragTargetRef.current = { id: entry.id, pixelX: event.x };
+              if (perfRulerDragFrameRef.current === null) {
+                perfRulerDragFrameRef.current = requestAnimationFrame(() => {
+                  perfRulerDragFrameRef.current = null;
+                  applyPerfRulerDragFrameRef.current();
+                });
+              }
+            },
+          )
+          .on('end', () => {
+            if (perfRulerDragFrameRef.current !== null) {
+              cancelAnimationFrame(perfRulerDragFrameRef.current);
+              perfRulerDragFrameRef.current = null;
+              applyPerfRulerDragFrameRef.current();
+            }
+            const target = perfRulerDragTargetRef.current;
+            perfRulerDragTargetRef.current = null;
+            if (!target) return;
+            const isoX = perfRulerLiveIsoXRef.current.get(target.id);
+            if (isoX === undefined) return;
+            setPerfRulerState((prev) => movePerfRulerIsoX(prev, target.id, isoX));
+          }),
+      [],
+    );
+
+    const drawPerfRuler = useCallback(
+      (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        width: number,
+        height: number,
+      ) => {
+        perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
+        syncPerfRulerHitPaths(zoomGroup);
+        const state = perfRulerStateRef.current;
+        const entries: PerfRulerRenderEntry[] = [];
+        if (perfRulerModeRef.current && state.rulers.length > 0) {
+          const geometries: (PerfRulerGeometry | null)[] = state.rulers.map((ruler) => {
+            const isoX = perfRulerLiveIsoXRef.current.get(ruler.id) ?? ruler.isoX;
+            const pixelX = xScale(isoX);
+            const ends: PerfRulerEndInput[] = [];
+            for (const cls of [ruler.curveA, ruler.curveB]) {
+              const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
+              if (!node || typeof node.getPointAtLength !== 'function') break;
+              if (!isPerfRulerCurveVisible(node.style.opacity)) break;
+              const hit = intersectPathAtX(node, pixelX);
+              if (!hit) break;
+              ends.push({ py: hit.y, rawY: yScale.invert(hit.y) });
+            }
+            return ends.length === 2 ? computeIsoXRulerGeometry(pixelX, ends[0], ends[1]) : null;
+          });
+          const layouts = computePerfRulerLabelLayouts(geometries, {
+            chartWidth: width,
+            chartHeight: height,
+          });
+          for (const [index, ruler] of state.rulers.entries()) {
+            const geometry = geometries[index];
+            const layout = layouts[index];
+            if (geometry && layout) entries.push({ id: ruler.id, geometry, layout });
+          }
+        }
+        renderPerfRulers(zoomGroup, entries, {
+          color: 'var(--primary)',
+          halo: 'var(--background)',
+          onDelete: (id) => {
+            track('gpu_timeseries_perf_ruler_deleted');
+            setPerfRulerState((prev) => deletePerfRuler(prev, id));
+          },
+        });
+        const dragHandles = zoomGroup.selectAll<SVGLineElement, PerfRulerRenderEntry>(
+          '.perf-ruler .pr-drag',
+        );
+        if (!dragHandles.empty()) dragHandles.call(perfRulerDrag);
+      },
+      [syncPerfRulerHitPaths, perfRulerDrag],
+    );
+    drawPerfRulerRef.current = drawPerfRuler;
+
+    const perfRulerLayer: CustomLayerConfig = useMemo(
+      () => ({
+        type: 'custom',
+        key: 'perf-ruler',
+        render: (zoomGroup, ctx) =>
+          drawPerfRuler(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawPerfRuler(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+      }),
+      [drawPerfRuler],
+    );
+
+    const lastRenderCtxRef = useRef<RenderContext | null>(null);
+    const getDisplaySelection = useCallback(() => {
+      const svg = chartRef.current?.getSvgElement?.();
+      const ctx = lastRenderCtxRef.current;
+      if (!svg || !ctx) return null;
+      const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
+      return zoomGroup.empty() ? null : { svg, ctx, zoomGroup };
+    }, []);
+
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      const zoomCtx = currentZoomRenderContext(display.svg, display.ctx);
+      drawPerfRuler(
+        display.zoomGroup,
+        zoomCtx.xScale as ContinuousScale,
+        zoomCtx.yScale as ContinuousScale,
+        display.ctx.width,
+        display.ctx.height,
+      );
+      setPerfRulerState((prev) =>
+        prunePerfRulers(prev, (cls) => {
+          if (!cls.startsWith(ROOFLINE_CLASS_PREFIX)) return false;
+          const points = rooflines[cls.slice(ROOFLINE_CLASS_PREFIX.length)];
+          return points !== undefined && points.length >= 2;
+        }),
+      );
+    }, [
+      getDisplaySelection,
+      perfRulerMode,
+      perfRulerState,
+      drawPerfRuler,
+      dataIdentity,
+      rooflines,
+    ]);
+
+    useEffect(() => {
+      const handle = chartRef.current;
+      const pp = handle?.getPinnedPoint() as InferenceData | null;
+      if (!pp) return;
+      const visible = handle?.getPinnedPointIsOverlay()
+        ? activeOverlayHwTypes.has(String(pp.hwKey))
+        : activeDates.has(`${pp.date}_${pp.hwKey}`);
+      if (!visible) handle?.dismissTooltip();
+    }, [activeDates, activeOverlayHwTypes]);
+
     useEffect(() => {
       chartRef.current?.dismissTooltip();
     }, [
@@ -732,37 +1107,290 @@ const GPUGraph = React.memo(
       selectedGPUs,
       selectedDates,
       selectedDateRange,
-      showAllMeasurements,
+      overlayData,
     ]);
 
-    // Hover dimming animates via the inline `transition: opacity 150ms ease`
-    // onRender puts on dots and rooflines — a single style write per node. A
-    // d3 `.transition()` here would re-write opacity every animation frame,
-    // each write restarting the CSS transition (transitionrun/cancel per node
-    // per frame). Same rationale as ScatterGraph's hover handlers.
-    const handleLegendHover = useCallback((seriesId: string) => {
-      const svg = chartRef.current?.getSvgElement?.();
-      if (!svg) return;
-      const root = d3.select(svg);
-      root
-        .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .style('opacity', (d) => (`${d.date}_${d.hwKey}` === seriesId ? 1 : 0.15));
-      root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
-        const point = (d3.select(this).datum() as { points: InferenceData[] } | null)?.points[0];
-        const series = point ? `${point.date}_${point.hwKey}` : '';
-        return series === seriesId ? null : '0.15';
+    const overlayLegendItems = useMemo(() => {
+      const bySeries = new Map<string, InferenceData[]>();
+      for (const point of overlayPoints) {
+        const id = overlaySeriesId(point);
+        bySeries.set(id, [...(bySeries.get(id) ?? []), point]);
+      }
+      return [...bySeries].map(([id, points]) => {
+        const runIndex = overlayRunOf(points[0]);
+        const info = unofficialRunInfos[runIndex];
+        const branch = info?.branch || (info ? `run ${info.id}` : id);
+        return {
+          name: `unofficial-run-${info?.id ?? runIndex} ${points[0].hwKey}`,
+          hw: id,
+          label: `✕ ${hardwareLabelFor(points)}`,
+          color: overlayRunColor(runIndex),
+          lineDasharray: overlayRooflineDasharray(runIndex),
+          title: legendT.unofficialTitle(branch),
+          isActive: true,
+          isRemovable: false,
+          onClick: () => {},
+        };
       });
-    }, []);
+    }, [overlayPoints, overlaySeriesId, overlayRunOf, unofficialRunInfos, legendT]);
+
+    const openPowerTrace = usePowerTraceAction(chartRef);
+
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          comparisonDate: true,
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
+          showPowerTelemetry: showPowerTelemetryRef.current,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? presenceRef.current?.trace.has(d.id) === true
+              : false,
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? presenceRef.current?.log.has(d.id) === true
+            : false,
+          locale,
+          color: getColor(d),
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
+    );
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: getColor(d),
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
+          locale,
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
+    );
+    const overlayPointsLayer: CustomLayerConfig = useMemo(() => {
+      const updateLabels = (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        zoomGroup
+          .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+          .each(function (d) {
+            const lines = pointLabelText(
+              d,
+              showPointLabels,
+              useAdvancedLabels,
+              showConcurrencyLabels,
+            ).split('\n');
+            d3.select(this)
+              .selectAll<SVGTextElement, boolean>('.overlay-label')
+              .data([true])
+              .join('text')
+              .attr('class', 'overlay-label')
+              .attr('text-anchor', 'middle')
+              .attr('font-size', px(CHART_TYPE.dataLabel))
+              .attr('font-weight', '700')
+              .attr('pointer-events', 'none')
+              .style('fill', 'var(--foreground)')
+              .style('display', pointLabelsVisible ? '' : 'none')
+              .selectAll<SVGTSpanElement, string>('tspan')
+              .data(lines)
+              .join('tspan')
+              .attr('x', 0)
+              .attr('dy', (_line, i) =>
+                i === 0 ? `${-(1 + (lines.length - 1) * 1.1)}em` : '1.1em',
+              )
+              .text((line) => line);
+          });
+      };
+      return {
+        type: 'custom',
+        key: 'overlay-points',
+        displayIdentity: `labels:${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}`,
+        render: (zoomGroup, ctx) => {
+          const xScale = ctx.xScale as ContinuousScale;
+          const yScale = ctx.yScale as ContinuousScale;
+          const marks = zoomGroup
+            .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+            .data(visibleOverlayPoints, (_d, i) => String(i))
+            .join((enter) => {
+              const g = enter.append('g').attr('class', 'unofficial-overlay-pt');
+              g.append('circle')
+                .attr('r', HIT_AREA_RADIUS)
+                .attr('fill', 'transparent')
+                .attr('cursor', 'pointer');
+              g.append('path')
+                .attr('class', 'visible-shape overlay-x')
+                .attr('d', xMarkerPath(5, 0.7))
+                .attr('fill', 'none')
+                .attr('stroke-width', 2.5)
+                .attr('stroke-linecap', 'round')
+                .attr('cursor', 'pointer');
+              return g;
+            });
+          marks.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
+          marks.select('.overlay-x').attr('stroke', (d) => overlayRunColor(overlayRunOf(d)));
+          marks.each(function (d) {
+            renderOffloadHalo(
+              d3.select(this),
+              d,
+              overlayRunColor(overlayRunOf(d)),
+              showOffloadingLabel,
+            );
+          });
+          updateLabels(zoomGroup);
+
+          const container = ctx.layout.svg.node()!.parentElement as HTMLDivElement;
+          const tooltip = d3.select(ctx.tooltipElement);
+          attachOverlayXMarkerHandlers(marks, {
+            markerSelector: '.overlay-x',
+            normalPath: xMarkerPath(5, 0.7),
+            hoverPath: xMarkerPath(7, 0.7),
+            tooltip,
+            handle: chartRef.current,
+            panel: true,
+            content: (point) => hoverCard(point, true),
+            position: (event) => {
+              const [mouseX, mouseY] = d3.pointer(event, container);
+              return computeTooltipPosition(mouseX, mouseY, tooltip, container);
+            },
+            rulers: {
+              show: (point, marker) => {
+                const position = overlayMarkerPosition(marker) ?? {
+                  x: xScale(point.x),
+                  y: yScale(point.y),
+                };
+                zoomGroup.select('.ruler-group').style('display', 'block');
+                zoomGroup.select('.vertical-ruler').attr('x1', position.x).attr('x2', position.x);
+                zoomGroup.select('.horizontal-ruler').attr('y1', position.y).attr('y2', position.y);
+              },
+              hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
+            },
+            onClick: (point) => {
+              const ruler = perfRulerRef.current;
+              if (ruler.mode) {
+                track('gpu_timeseries_data_point_clicked', {
+                  gpu: String(point.hwKey),
+                  x: point.x,
+                  y: point.y,
+                  overlay: true,
+                  perf_ruler: true,
+                });
+                ruler.onPointClick(point);
+                return;
+              }
+              track('gpu_timeseries_data_point_clicked', {
+                gpu: String(point.hwKey),
+                x: point.x,
+                y: point.y,
+                overlay: true,
+              });
+            },
+          });
+        },
+        onDisplayUpdate: updateLabels,
+        onZoom: (zoomGroup, ctx) => {
+          const xScale = ctx.newXScale as ContinuousScale;
+          const yScale = ctx.newYScale as ContinuousScale;
+          zoomGroup
+            .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+            .attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
+        },
+      };
+    }, [
+      visibleOverlayPoints,
+      showOffloadingLabel,
+      overlayRunOf,
+      showPointLabels,
+      pointLabelsVisible,
+      useAdvancedLabels,
+      showConcurrencyLabels,
+      hoverCard,
+      getColor,
+    ]);
+
+    const handleLegendHover = useCallback(
+      (seriesId: string) => {
+        const svg = chartRef.current?.getSvgElement?.();
+        if (!svg) return;
+        const root = d3.select(svg);
+        root
+          .selectAll<SVGGElement, InferenceData>('.dot-group')
+          .style('opacity', (d) => (`${d.date}_${d.hwKey}` === seriesId ? 1 : 0.15));
+        root
+          .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+          .style('opacity', (d) => (overlaySeriesId(d) === seriesId ? 1 : 0.15));
+        root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
+          const point = (d3.select(this).datum() as { points: InferenceData[] } | null)?.points[0];
+          const series = point ? seriesIdOf(point) : '';
+          return series === seriesId ? null : '0.15';
+        });
+      },
+      [overlaySeriesId, seriesIdOf],
+    );
 
     const handleLegendHoverEnd = useCallback(() => {
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
-      root.selectAll('.dot-group').style('opacity', null);
+      root.selectAll('.dot-group, .unofficial-overlay-pt').style('opacity', null);
       root.selectAll('.roofline-path').style('opacity', null);
     }, []);
 
-    if (data.length === 0) {
+    const syncOffloadHalos = (group: RenderContext['layout']['zoomGroup']) => {
+      group.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+        renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
+      });
+      group.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (point) {
+        renderOffloadHalo(
+          d3.select(this),
+          point,
+          overlayRunColor(overlayRunOf(point)),
+          showOffloadingLabel,
+        );
+      });
+    };
+
+    const decorateRender = (ctx: RenderContext) => {
+      if (logScale) {
+        const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
+        ctx.layout.yAxisGroup.call(
+          d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
+        );
+      }
+      const group = ctx.layout.zoomGroup;
+      group.selectAll('.point-label').style('fill', 'var(--foreground)');
+      if (pointLabelsVisible) keepPointLabelsInPlot(group);
+      group
+        .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
+        .style('transition', 'opacity 150ms ease');
+      syncOffloadHalos(group);
+    };
+
+    if (data.length === 0 && overlayPoints.length === 0) {
       return (
         <div className="relative w-full p-3">
           <div className="flex flex-col items-center justify-center min-h-100 text-center">
@@ -798,47 +1426,27 @@ const GPUGraph = React.memo(
               </Button>
             </div>
           </div>
+          {footer}
           <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
 
-    return (
+    const chart = (
       <D3Chart<InferenceData>
         ref={chartRef}
-        // Embeds drop the zoom/pan hint line; the host page has its own caption.
         instructions={minimalChrome ? '' : undefined}
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        displayIdentity={`${showPointLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
-        data={filteredData}
+        displayIdentity={`${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${showOffloadingLabel}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
+        data={officialPoints}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
-        caption={
-          isMeasuredEnergyAxis || powerCurveMetric ? (
-            <>
-              {caption}
-              {isMeasuredEnergyAxis && (
-                <MeasuredPowerSummary
-                  total={powerTierCounts.total}
-                  visible={powerTierCounts.visible}
-                  bestPerSku={false}
-                  optimalOnly={hideNonOptimal}
-                />
-              )}
-              {powerCurveMetric && (
-                <p data-testid="power-curve-description" className="text-muted-foreground text-sm">
-                  {powerEnvelopeMode ? legendT.powerCurves : legendT.powerOptimal}
-                </p>
-              )}
-            </>
-          ) : (
-            caption
-          )
-        }
+        caption={caption}
+        footer={footer}
         xScale={{ type: 'linear', domain: xExtent, nice: true }}
         yScale={{ type: logScale ? 'log' : 'linear', domain: yDomain, nice: true }}
         xAxis={{
@@ -859,21 +1467,23 @@ const GPUGraph = React.memo(
             config: {
               getColor: getRooflineColor,
               isVisible: isRooflineVisible,
+              getDasharray: getRooflineDasharray,
               curve: d3.curveMonotoneX,
             },
           },
           {
             type: 'scatter',
             key: 'points',
-            data: filteredData,
+            data: officialPoints,
             config: {
               getColor,
-              hideLabels: !showPointLabels,
+              hideLabels: !pointLabelsVisible,
               // Match ScatterGraph: concurrency (C=) is appended only when the
               // advanced "# Concurrent Sessions" toggle is on, so compare-mode
               // points are annotated the same way as the single-run scatter
               // chart.
-              getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
+              getLabelText: (d) =>
+                pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
               foreground: 'var(--foreground)',
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
@@ -882,7 +1492,9 @@ const GPUGraph = React.memo(
             },
             keyFn: (point) => `${point.date}:${scatterPointConfigId(point)}`,
           },
+          overlayPointsLayer,
           lineLabelLayer,
+          perfRulerLayer,
           knownIssueLayer,
         ]}
         zoom={{
@@ -901,28 +1513,55 @@ const GPUGraph = React.memo(
               );
             }
             // Zoom moves points toward the plot edges; keep their labels inside.
-            if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
+            if (pointLabelsVisible) keepPointLabelsInPlot(ctx.layout.zoomGroup);
           },
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: InferenceData, isPinned: boolean) =>
-            generateGPUGraphTooltipContent({
-              data: d,
-              isPinned,
-              xLabel,
-              yLabel,
-              selectedYAxisMetric,
-              hardwareConfig,
-              runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace: isPersistedBenchmarkId(d.id)
-                ? traceAvailabilityRef.current?.[d.id] === true
-                : false,
-              hasLog: isPersistedBenchmarkId(d.id)
-                ? logAvailabilityRef.current?.[d.id] === true
-                : false,
-              locale,
-            }),
+          content: (d: InferenceData) => hoverCard(d, false),
+          details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+            <PointDetailsPanel
+              details={pointDetails(d, isOverlay)}
+              color={getColor(d)}
+              onClose={close}
+              onAction={(action, event) => {
+                event.stopPropagation();
+                if (action === 'view-power-trace') {
+                  openPowerTrace(event, d, isOverlay);
+                } else if (action === 'view-charts') {
+                  if (!ephemeralUrlState) rememberChartStateInUrl();
+                  track('gpu_timeseries_view_charts_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                  });
+                } else if (action === 'view-power-telemetry') {
+                  setPowerTelemetryPoint(d);
+                  chartRef.current?.dismissTooltip();
+                  track('inference_power_telemetry_opened', {
+                    id: d.id,
+                    gpu: d.hwKey,
+                    conc: d.conc,
+                  });
+                } else if (action === 'reproduce') {
+                  setReproducePoint(d);
+                  chartRef.current?.dismissTooltip();
+                } else if (action === 'view-logs' && typeof d.id === 'number') {
+                  if (d.benchmark_type !== 'agentic_traces') {
+                    event.preventDefault();
+                    setFixedLogPointId(d.id);
+                    chartRef.current?.dismissTooltip();
+                  }
+                  track('gpu_timeseries_view_logs_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                    benchmark_type: d.benchmark_type ?? 'single_turn',
+                  });
+                }
+              }}
+            />
+          ),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
@@ -936,264 +1575,267 @@ const GPUGraph = React.memo(
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onPointClick: (d: InferenceData) => {
+            const ruler = perfRulerRef.current;
+            if (ruler.mode) {
+              track('gpu_timeseries_data_point_clicked', {
+                id: d.id,
+                gpu: String(d.hwKey),
+                x: d.x,
+                y: d.y,
+                perf_ruler: true,
+              });
+              ruler.onPointClick(d);
+              return;
+            }
             track('gpu_timeseries_data_point_clicked', {
               id: d.id,
-              hw: String(d.hwKey),
+              gpu: String(d.hwKey),
               x: d.x,
               y: d.y,
-            });
-            const tooltipEl = chartRef.current?.getTooltipElement();
-            if (!tooltipEl) return;
-            const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (viewBtn && isPersistedBenchmarkId(d.id)) {
-              viewBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                // Full-document navigation: stamp the chart state onto THIS
-                // history entry first, or Back returns to a bare /inference
-                // that rebuilds from defaults. Skipped in ephemeral scopes
-                // (/model embeds): the store holds the primary dashboard's
-                // state there, not this chart's.
-                if (!ephemeralUrlState) rememberChartStateInUrl();
-                track('gpu_timeseries_view_charts_opened', {
-                  id: d.id,
-                  hwKey: String(d.hwKey),
-                  conc: d.conc,
-                });
-              });
-            }
-            const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-            if (logsBtn && typeof d.id === 'number') {
-              logsBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                if (d.benchmark_type !== 'agentic_traces') {
-                  event.preventDefault();
-                  setFixedLogPointId(d.id!);
-                  chartRef.current?.dismissTooltip();
-                }
-                track('gpu_timeseries_view_logs_opened', {
-                  id: d.id,
-                  hwKey: String(d.hwKey),
-                  conc: d.conc,
-                  benchmarkType: d.benchmark_type ?? 'single_turn',
-                });
-              });
-            }
-            // Pinning updates D3Chart's React state. GPU comparison rebuilds
-            // several inline layer configs on that render, whose cleanup can
-            // briefly hide the otherwise-pinned portal tooltip. Restore its
-            // pinned visibility after that render settles.
-            requestAnimationFrame(() => {
-              const pinnedTooltip = chartRef.current?.getTooltipElement();
-              if (!pinnedTooltip || chartRef.current?.getPinnedPoint() !== d) return;
-              pinnedTooltip.style.opacity = '1';
-              pinnedTooltip.style.display = 'block';
-              pinnedTooltip.style.pointerEvents = 'auto';
             });
           },
           attachToLayer: 1,
         }}
         onDisplayUpdate={(ctx: RenderContext) => {
-          // Point labels are laid out only while visible (a hidden label has
-          // no measurable box), so re-run the plot-bounds constraint once the
-          // display phase has turned them back on.
-          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
-        }}
-        onRender={(ctx: RenderContext) => {
-          // Apply log tick format on initial render (needs the built scale)
-          if (logScale) {
-            const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<
-              number,
-              number
-            >;
-            ctx.layout.yAxisGroup.call(
-              d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
-            );
-          }
-          // Set foreground color on scatter point labels
-          ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
-          // Strict plot bounding box: a label that would be sliced by the clip
-          // path flips to the other side of its point or slides inward.
-          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
-
-          // CSS transitions for smooth opacity animation on legend hover —
-          // the hover handlers write opacity once and let these animate.
-          ctx.layout.zoomGroup
-            .selectAll('.dot-group, .roofline-path')
-            .style('transition', 'opacity 150ms ease');
-
-          // Decorations stay inside the point group, so normal zoom transforms
-          // carry them without a separate update pass.
+          syncOffloadHalos(ctx.layout.zoomGroup);
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
             .each(function (point) {
-              renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
-              renderLegacyPowerRing(
-                d3.select(this),
-                point,
-                isMeasuredEnergyAxis,
+              syncPointLabel(
+                this,
+                pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
                 'var(--foreground)',
+                !pointLabelsVisible,
               );
             });
+          // Point labels are laid out only while visible (a hidden label has
+          // no measurable box), so re-run the plot-bounds constraint once the
+          // display phase has turned them back on.
+          if (pointLabelsVisible) keepPointLabelsInPlot(ctx.layout.zoomGroup);
         }}
+        onRender={(ctx: RenderContext) => {
+          lastRenderCtxRef.current = ctx;
+          decorateRender(ctx);
+        }}
+        onExportRender={decorateRender}
         legendElement={
-          <ChartLegend
-            variant="sidebar"
-            grouped={true}
-            disableActiveSort={true}
-            onItemHover={handleLegendHover}
-            onItemHoverEnd={handleLegendHoverEnd}
-            onItemRemove={handleLegendRemove}
-            legendItems={allGraphs
-              .filter(({ id }) => idsWithData.has(id))
-              .map(({ date, color, hwKey, id }) => ({
-                name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
-                hw: id,
-                label: comparisonEntryLabel(date, runNumbering),
-                color,
-                title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
-                isActive: activeDates.has(id),
-                onClick: () => {
-                  toggleActiveDate(id);
-                  track('interactivity_date_toggled', { date, hw: hwKey });
-                },
-              }))}
-            isLegendExpanded={isLegendExpanded}
-            onExpandedChange={(expanded) => {
-              setIsLegendExpanded(expanded);
-              track('interactivity_legend_expanded', { expanded });
-            }}
-            switches={[
-              {
-                id: 'gpu-log-scale',
-                label: legendT.logScale,
-                advanced: true,
-                checked: logScale,
-                onCheckedChange: (c) => {
-                  setLogScale(c);
-                  track('interactivity_log_scale_toggled', { enabled: c });
-                },
-              },
-              {
-                id: 'gpu-high-contrast',
-                label: legendT.highContrast,
-                advanced: true,
-                checked: highContrast,
-                onCheckedChange: (c) => {
-                  setHighContrast(c);
-                  track('interactivity_high_contrast_toggled', { enabled: c });
-                },
-              },
-              ...(frontierDirection
-                ? [
-                    {
-                      id: 'gpu-hide-non-optimal',
-                      label: legendT.optimalOnly,
-                      checked: hideNonOptimal,
-                      ...(isMeasuredPowerAxis ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
-                      onCheckedChange: (c: boolean) => {
-                        setHideNonOptimal(c);
-                        track('interactivity_hide_non_optimal_toggled', { enabled: c });
-                      },
+          <>
+            <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+            <EngineComparisonConflictNotice className="mb-2" />
+            <ChartLegend
+              variant="sidebar"
+              grouped={true}
+              disableActiveSort={true}
+              onItemHover={handleLegendHover}
+              onItemHoverEnd={handleLegendHoverEnd}
+              onItemRemove={handleLegendRemove}
+              legendItems={[
+                ...overlayLegendItems,
+                ...allGraphs
+                  .filter(({ id }) => idsWithData.has(id))
+                  .map(({ date, color, hwKey, id }) => ({
+                    name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
+                    hw: id,
+                    label: comparisonEntryLabel(date, runNumbering),
+                    color,
+                    lineDasharray: frameworkDasharray(hwKey),
+                    title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+                    isActive: activeDates.has(id),
+                    onClick: () => {
+                      toggleActiveDate(id);
+                      track('interactivity_date_toggled', { date, gpu: hwKey });
                     },
-                  ]
-                : []),
-              ...(powerEnvelopeMode && !isMeasuredPowerAxis
-                ? [
-                    {
-                      id: 'gpu-show-all-measurements',
-                      label: legendT.showAllMeasurements,
-                      checked: showAllMeasurements,
-                      onCheckedChange: (c: boolean) => {
-                        setShowAllMeasurements(c);
-                        track('gpu_timeseries_show_all_measurements_toggled', { enabled: c });
+                  })),
+              ]}
+              isLegendExpanded={isLegendExpanded}
+              onExpandedChange={(expanded) => {
+                setIsLegendExpanded(expanded);
+                track('interactivity_legend_expanded', { enabled: expanded });
+              }}
+              switches={[
+                {
+                  id: 'gpu-log-scale',
+                  label: legendT.logScale,
+                  advanced: true,
+                  checked: logScale,
+                  onCheckedChange: (c) => {
+                    setLogScale(c);
+                    track('interactivity_log_scale_toggled', { enabled: c });
+                  },
+                },
+                {
+                  id: 'gpu-high-contrast',
+                  label: legendT.highContrast,
+                  advanced: true,
+                  checked: highContrast,
+                  onCheckedChange: (c) => {
+                    setHighContrast(c);
+                    track('interactivity_high_contrast_toggled', { enabled: c });
+                  },
+                },
+                ...(frontierDirection
+                  ? [
+                      {
+                        id: 'gpu-hide-non-optimal',
+                        label: legendT.optimalOnly,
+                        checked: hideNonOptimal,
+                        ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
+                        onCheckedChange: (c: boolean) => {
+                          setHideNonOptimal(c);
+                          track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                        },
                       },
-                    },
-                  ]
-                : []),
-              {
-                id: 'gpu-point-labels',
-                label: legendT.labels,
-                advanced: true,
-                checked: showPointLabels,
-                onCheckedChange: (c) => {
-                  setShowPointLabels(c);
-                  track('interactivity_point_labels_toggled', { enabled: c });
+                    ]
+                  : []),
+                {
+                  id: 'gpu-point-labels',
+                  label: legendT.labels,
+                  advanced: true,
+                  checked: showPointLabels,
+                  onCheckedChange: (c) => {
+                    setShowPointLabels(c);
+                    track('interactivity_point_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-parallelism-labels',
-                label: legendT.parallelismLabels,
-                advanced: true,
-                checked: useAdvancedLabels,
-                onCheckedChange: (c) => {
-                  setUseAdvancedLabels(c);
-                  track('interactivity_advanced_labels_toggled', { enabled: c });
-                  // Parallelism labels are point labels; turning them on is
-                  // pointless if labels are hidden, so auto-enable Labels.
-                  if (c && !showPointLabels) setShowPointLabels(true);
+                {
+                  id: 'gpu-parallelism-labels',
+                  label: legendT.parallelismLabels,
+                  checked: useAdvancedLabels,
+                  onCheckedChange: (c) => {
+                    setUseAdvancedLabels(c);
+                    track('interactivity_advanced_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-line-labels',
-                label: legendT.lineLabels,
-                advanced: true,
-                checked: showLineLabels,
-                onCheckedChange: (c) => {
-                  setShowLineLabels(c);
-                  track('interactivity_line_labels_toggled', { enabled: c });
+                {
+                  id: 'gpu-line-labels',
+                  label: legendT.lineLabels,
+                  advanced: true,
+                  checked: showLineLabels,
+                  onCheckedChange: (c) => {
+                    setShowLineLabels(c);
+                    track('interactivity_line_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-concurrency-labels',
-                label: legendT.concurrencyLabels,
-                advanced: true,
-                checked: showConcurrencyLabels,
-                onCheckedChange: (c) => {
-                  setShowConcurrencyLabels(c);
-                  track('interactivity_concurrency_labels_toggled', { enabled: c });
-                  // Concurrency is a point-label annotation; turning it on is
-                  // pointless if labels are hidden, so auto-enable Labels.
-                  if (c && !showPointLabels) setShowPointLabels(true);
+                {
+                  id: 'gpu-framework-label',
+                  label: legendT.frameworkLabel,
+                  advanced: true,
+                  checked: showFrameworkLabel,
+                  onCheckedChange: (enabled) => {
+                    setShowFrameworkLabel(enabled);
+                    track('interactivity_framework_label_toggled', { enabled });
+                  },
                 },
-              },
-            ]}
-            actions={[
-              {
+                {
+                  id: 'gpu-concurrency-labels',
+                  label: legendT.concurrencyLabels,
+                  advanced: true,
+                  checked: showConcurrencyLabels,
+                  onCheckedChange: (c) => {
+                    setShowConcurrencyLabels(c);
+                    track('interactivity_concurrency_labels_toggled', { enabled: c });
+                  },
+                },
+                {
+                  id: 'gpu-offloading-label',
+                  label: legendT.offloadingLabel,
+                  advanced: true,
+                  checked: showOffloadingLabel,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowOffloadingLabel(checked);
+                    track('interactivity_offloading_label_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'gpu-perf-ruler',
+                  label: legendT.perfRuler,
+                  advanced: true,
+                  checked: perfRulerMode,
+                  infoTooltip: legendT.perfRulerInfo,
+                  onCheckedChange: (c: boolean) => {
+                    setPerfRulerMode(c);
+                    if (!c) setPerfRulerState(clearPerfRulers);
+                    track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                  },
+                },
+              ]}
+              reset={{
                 id: 'gpu-reset-filter',
-                label: legendT.resetFilter,
+                disabled:
+                  quickFilterCount === 0 &&
+                  allGraphs.every(({ id }) => !idsWithData.has(id) || activeDates.has(id)),
                 onClick: () => {
                   selectAllActiveDates();
                   clearQuickFilters();
                   track('gpu_timeseries_reset_filter');
                 },
-              },
-              {
-                id: 'gpu-quick-filters',
-                label: legendT.quickFilters(quickFilterCount),
-                onClick: () => {
-                  setQuickFiltersOpen(true);
-                  track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+              }}
+              actions={[
+                ...(perfRulerMode && perfRulerState.rulers.length > 0
+                  ? [
+                      {
+                        id: 'gpu-clear-perf-rulers',
+                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                        onClick: () => {
+                          track('gpu_timeseries_perf_ruler_cleared', {
+                            count: perfRulerState.rulers.length,
+                          });
+                          setPerfRulerState(clearPerfRulers);
+                        },
+                      },
+                    ]
+                  : []),
+                {
+                  id: 'gpu-quick-filters',
+                  label: legendT.quickFilters(quickFilterCount),
+                  onClick: () => {
+                    setQuickFiltersOpen(true);
+                    track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+                  },
                 },
-              },
-            ]}
-            hideAtomFootnote
-            readOnly={minimalChrome}
-            keyIndicators={
-              <>
-                {fixedLogPointId === null ? null : (
-                  <FixedSequenceLogDialog
-                    pointId={fixedLogPointId}
-                    onOpenChange={(open) => {
-                      if (!open) setFixedLogPointId(null);
-                    }}
-                  />
-                )}
-                <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
-              </>
-            }
-          />
+              ]}
+              hideAtomFootnote
+              readOnly={minimalChrome}
+              collapsible={!minimalChrome}
+              keyIndicators={
+                <>
+                  {fixedLogPointId === null ? null : (
+                    <FixedSequenceLogDialog
+                      pointId={fixedLogPointId}
+                      onOpenChange={(open) => {
+                        if (!open) setFixedLogPointId(null);
+                      }}
+                    />
+                  )}
+                  <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+                </>
+              }
+            />
+          </>
         }
       />
+    );
+
+    return (
+      <>
+        {powerTelemetryPoint === null ? null : (
+          <PowerTelemetryDialog
+            key={powerTelemetryPoint.id}
+            point={powerTelemetryPoint}
+            onOpenChange={(open) => {
+              if (!open) setPowerTelemetryPoint(null);
+            }}
+          />
+        )}
+        {reproducePoint === null ? null : (
+          <ReproduceDrawer
+            point={reproducePoint}
+            source="gpu_graph"
+            onClose={() => setReproducePoint(null)}
+          />
+        )}
+        {chart}
+      </>
     );
   },
 );

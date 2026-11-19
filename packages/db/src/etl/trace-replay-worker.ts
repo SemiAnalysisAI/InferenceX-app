@@ -1,23 +1,15 @@
 import { parentPort } from 'node:worker_threads';
 
 import { prepareTraceReplay, type PreparedTraceReplay } from './trace-replay-ingest';
-import type {
-  PreparedTraceReplayWire,
-  TraceReplayWorkerRequest,
-  TraceReplayWorkerResponse,
+import {
+  PREPARED_TRACE_REPLAY_BUFFER_FIELDS,
+  type PreparedTraceReplayWire,
+  type TraceReplayWorkerRequest,
+  type TraceReplayWorkerResponse,
 } from './trace-replay-worker-protocol';
 
 const port = parentPort;
 if (!port) throw new Error('trace-replay-worker must run in a worker thread');
-
-const BUFFER_FIELDS = [
-  'profileGz',
-  'serverMetricsCsv',
-  'serverMetricsJsonGz',
-  'aggregateStatsJson',
-  'chartSeriesJson',
-  'requestTimelineJson',
-] as const;
 
 function toWire(prepared: PreparedTraceReplay): {
   prepared: PreparedTraceReplayWire;
@@ -25,7 +17,7 @@ function toWire(prepared: PreparedTraceReplay): {
 } {
   const wire = { ...prepared } as unknown as PreparedTraceReplayWire;
   const transfer: ArrayBuffer[] = [];
-  for (const field of BUFFER_FIELDS) {
+  for (const field of PREPARED_TRACE_REPLAY_BUFFER_FIELDS) {
     const buffer = prepared[field];
     if (!buffer) continue;
     const transferable =

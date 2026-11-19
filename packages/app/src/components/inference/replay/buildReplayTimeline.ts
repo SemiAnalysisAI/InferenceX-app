@@ -1,6 +1,6 @@
-import type { BenchmarkRow } from '@/lib/api';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { createChartDataPoint, getHardwareKey } from '@/lib/charts/chart-utils';
 
 import type {
   AggDataEntry,
@@ -8,8 +8,9 @@ import type {
   InferenceData,
   YAxisMetricKey,
 } from '@/components/inference/types';
+import { isInputMetric as isInputMetricKey } from '@/components/inference/metric-registry';
 import { agenticSpecDecodingKeySuffix } from '@/components/inference/utils/point-identity';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 
 import type { PerStepValue } from './interpolateAtTime';
 
@@ -18,14 +19,12 @@ export interface ReplayConfigSeries {
   hwKey: string;
   precision: string;
   template: InferenceData;
-  // One entry per `dates[i]`; sticky-last carries the last observation forward.
   stepValues: PerStepValue[];
 }
 
 export interface ReplayTimeline {
   dates: string[];
   configs: ReplayConfigSeries[];
-  /** Global bounding box across all observations, all steps. */
   domain: { x: [number, number]; y: [number, number] };
 }
 
@@ -34,7 +33,6 @@ export interface StepDomain {
   y: [number, number];
 }
 
-// Axes shrink to fit configs that pass `hwFilter` (usually `activeHwTypes`).
 export function computeStepDomain(
   timeline: ReplayTimeline,
   stepIndex: number,
@@ -58,10 +56,6 @@ export function computeStepDomain(
   return { x: safeDomain(xMin, xMax), y: safeDomain(yMin, yMax) };
 }
 
-// Bounding box across ALL steps for configs passing `hwFilter`. Unlike
-// computeStepDomain (one step), this is the fixed extent used for the entire
-// replay so the axes stay constant and the frontier visibly marches toward them
-// over time instead of the axes refitting to each frame.
 export function computeFullRunDomain(
   timeline: ReplayTimeline,
   hwFilter: (hwKey: string) => boolean,
@@ -87,31 +81,24 @@ const buildReplayPointConfigId = (point: InferenceData): string => {
   let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
   if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
   if (point.recipe_fingerprint) key += `|recipe-${point.recipe_fingerprint}`;
-  // Preserve the pre-existing replay identity for fixed-sequence points. Agentic
-  // curves need only the decode-method suffix because their hwKey now merges it.
   return key + agenticSpecDecodingKeySuffix(point);
 };
 
 const safeDomain = (lo: number, hi: number): [number, number] => {
   if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
   if (lo === hi) {
-    // Pad degenerate single-point domains so axes don't collapse to a line.
     const pad = lo === 0 ? 1 : Math.abs(lo) * 0.1;
     return [lo - pad, hi + pad];
   }
   return lo < hi ? [lo, hi] : [hi, lo];
 };
 
-// Mirrors useChartData + processOverlayChartData so replay frames sit on the
-// same axes the static chart shows.
 function resolveXAxisField(
   chartDef: ChartDefinition,
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
 ): string {
-  const metricTitle =
-    (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-  const isInputMetric = metricTitle.toLowerCase().includes('input');
+  const isInputMetric = isInputMetricKey(selectedYAxisMetric);
   const isTtftOverride = selectedXAxisMetric === 'p90_ttft';
 
   if (selectedXAxisMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
@@ -142,8 +129,6 @@ export function buildReplayTimeline(
     };
   }
 
-  // Replay receives the live graph's resolved axis; a legacy input-metric
-  // override must not put history points on a different axis.
   const xAxisField =
     chartDef.x_scale_field ?? resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric);
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;

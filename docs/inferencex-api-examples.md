@@ -1,31 +1,29 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@1.0.0` to query existing
+Use `@semianalysisai/inferencex-skills@1.2.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
 constructing requests.
 
-## Install
-
 For Pareto frontier and hinterland observations, use the
 [Pareto boundary API recipe](../packages/skills/skills/inferencex-api/references/pareto.md).
 It covers explicit metric directions, exact workload selection, tied observations,
-and optional chart frontier share-link parameters. Confirm that `/api/v1/pareto` is
-present in the deployed OpenAPI contract before querying; there is no new formal
-CLI command or automatic package release in this change.
+and optional chart frontier share-link parameters.
 
-The commands below apply after 1.0.0 is published and publicly verified. During
-candidate review, use the [local archive instructions](../packages/skills/README.md#requirements-and-installation).
+## Install
+
+During candidate review, use the [local archive instructions](../packages/skills/README.md#install)
+instead of the commands below.
 
 With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
@@ -40,6 +38,14 @@ otherwise skipped. Save local edits first: force overwrites matching files and
 retains obsolete files. Installed copies do not update automatically.
 
 ## Find recent benchmark observations
+
+MiniMax-M3 and DeepSeek-V4-Pro are deprecated, but their historical observations
+remain queryable. `/api/v1/views/options` reports `category=deprecated` for both;
+the overview excludes them by default and includes them with `modelScope=all`.
+Current-image views omit their retired sweep rows. MiniMax-M3.1-Flash and
+DeepSeek-V4.1-Flash remain active. The examples below intentionally preserve
+explicit historical selectors; deprecation does not delete data or change raw API
+contracts, saved links, or unofficial-run overlays.
 
 > Use inferencex-api to show up to five latest available DeepSeek-V4-Pro
 > observations, limited to raw model dsv4 and single-turn requests with 8192 input

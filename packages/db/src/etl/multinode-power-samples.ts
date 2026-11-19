@@ -1,0 +1,82 @@
+import {
+  emptySample,
+  splitCsvLine,
+  type GpuMetricSample,
+  type GpuMetricsVendor,
+} from './gpu-metrics-csv';
+
+export interface MultinodePowerHost {
+  hostname: string;
+  samples: GpuMetricSample[];
+  gpuUuids: Record<number, string>;
+}
+
+const REQUIRED_COLUMNS = ['timestamp_unix', 'hostname', 'gpu_index', 'power_w'] as const;
+
+export function isMultinodePowerSamplesPath(relativePath: string): boolean {
+  const posix = relativePath.split('\\').join('/');
+  return /^LOGS\/(?:[^/]+\/)*samples\.csv$/u.test(posix);
+}
+
+export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[] | null {
+  const lines = csvText
+    .split('\n')
+    .map((line) => line.replace(/\r$/u, ''))
+    .filter((line) => line.trim().length > 0);
+  if (lines.length <= 1) return null;
+  const header = splitCsvLine(lines[0]!).map((cell) => cell.trim().toLowerCase());
+  const column = new Map(header.map((name, index) => [name, index] as const));
+  if (REQUIRED_COLUMNS.some((name) => !column.has(name))) return null;
+  const at = (cells: string[], name: string): string | undefined => cells[column.get(name)!];
+  const readInRange = (cells: string[], name: string, min: number, max: number): number | null => {
+    const text = at(cells, name);
+    const value = text ? Number(text) : Number.NaN;
+    return Number.isFinite(value) && value < 2147483632 && value >= min && value <= max
+      ? value
+      : null;
+  };
+
+  const hosts = new Map<string, MultinodePowerHost>();
+  for (const line of lines.slice(1)) {
+    const cells = splitCsvLine(line).map((cell) => cell.trim());
+    const hostname = at(cells, 'hostname');
+    const seconds = Number.parseFloat(at(cells, 'timestamp_unix') ?? '');
+    const gpuIndex = Number.parseInt(at(cells, 'gpu_index') ?? '', 10);
+    const powerW = Number.parseFloat(at(cells, 'power_w') ?? '');
+    if (
+      !hostname ||
+      !Number.isFinite(seconds) ||
+      !Number.isSafeInteger(gpuIndex) ||
+      gpuIndex < 0 ||
+      !Number.isFinite(powerW)
+    ) {
+      continue;
+    }
+    let host = hosts.get(hostname);
+    if (!host) {
+      host = { hostname, samples: [], gpuUuids: {} };
+      hosts.set(hostname, host);
+    }
+    const sample = {
+      ...emptySample(Math.round(seconds * 1000), gpuIndex),
+      powerW,
+      temperatureC: readInRange(cells, 'temperature_c', -273.15, 2147483632),
+      gpuUtilPct: readInRange(cells, 'gpu_util_pct', 0, 100),
+    };
+    host.samples.push(sample);
+    const uuid = at(cells, 'gpu_uuid');
+    if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
+  }
+  if (hosts.size === 0) return null;
+  return [...hosts.values()].toSorted((a, b) => a.hostname.localeCompare(b.hostname));
+}
+
+export function multinodePowerVendor(manifest: Record<string, unknown> | null): GpuMetricsVendor {
+  if (manifest?.source_metric === 'gpu_power_usage') return 'amd';
+  const source = [manifest?.source_metric, manifest?.producer]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+  if (/\b(?:amd|rocm)/u.test(source)) return 'amd';
+  return 'nvidia';
+}

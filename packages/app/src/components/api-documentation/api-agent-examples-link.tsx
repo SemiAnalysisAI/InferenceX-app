@@ -1,7 +1,7 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import type { ApiDocumentationLocale } from '@/lib/api-documentation';
+import { track } from '@/lib/analytics/analytics';
+import type { ApiDocumentationLocale } from '@/lib/api/api-documentation';
 
 export function ApiAgentExamplesLink({
   label,
@@ -14,7 +14,7 @@ export function ApiAgentExamplesLink({
     <a
       data-testid="api-agent-examples"
       href="https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md"
-      className="mt-3 inline-block text-sm underline underline-offset-4"
+      className="mt-3 inline-block text-sm font-medium text-brand hover:underline"
       onClick={() => track('api_agent_examples_opened', { locale })}
     >
       {label}

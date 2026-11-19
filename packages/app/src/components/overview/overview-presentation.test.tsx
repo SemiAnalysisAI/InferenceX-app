@@ -4,14 +4,14 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
-import type { OverviewPageData } from '@/lib/overview-data';
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const trackStub = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({ useRouter: () => routerStub }));
-vi.mock('@/lib/analytics', () => ({ track: trackStub }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: trackStub }));
 
 import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
 import { DesktopOverviewMatrix, overviewFormatters } from './overview-scorecard';
@@ -205,12 +205,7 @@ describe('OverviewPresentationSurface', () => {
   it('reasserts presentation intent when Back or Forward lands on an older URL', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(
-        () =>
-          new Promise(() => {
-            // Keep server navigation pending while checking client URL state.
-          }),
-      ),
+      vi.fn(() => new Promise(() => {})),
     );
     window.history.replaceState({}, '', '/overview?tier=100&compare=30d');
     render('/overview?tier=100&compare=30d');
@@ -228,7 +223,7 @@ describe('OverviewPresentationSurface', () => {
     );
     expect(surface()?.dataset.presenting).toBe('true');
     expect(fullscreenElement).toBe(surface());
-    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?tier=75&compare=30d', {
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?tier=75', {
       headers: { Accept: 'application/json' },
     });
   });
@@ -238,11 +233,11 @@ describe('OverviewPresentationSurface', () => {
     act(() => toggle()?.click());
 
     act(() => {
-      window.history.replaceState({}, '', '/inference');
+      window.history.replaceState({}, '', '/infx/inference');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
 
-    expect(window.location.pathname).toBe('/inference');
+    expect(window.location.pathname).toBe('/infx/inference');
     expect(window.location.search).toBe('');
   });
 
@@ -309,7 +304,7 @@ describe('OverviewPresentationSurface', () => {
 
     expect(requested).toHaveLength(1);
     expect(requested[0]).not.toContain('present=1');
-    expect(window.location.search).toBe('?present=1');
+    expect(window.location.search).toBe('?compare=hardware&present=1');
     expect(surface()?.dataset.presenting).toBe('true');
     expect(fullscreenElement).toBe(surface());
   });
@@ -411,7 +406,6 @@ describe('OverviewPresentationSurface', () => {
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
         requested.push(String(input));
-        // Never settles: the assertion only cares that the request went out.
         return new Promise<Response>(() => {});
       }),
     );
@@ -424,7 +418,6 @@ describe('OverviewPresentationSurface', () => {
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' })));
 
     expect(requested).toHaveLength(1);
-    // Leaving the history view is the whole point of the keypress.
     expect(requested[0]).not.toContain('compare=30d');
   });
 
@@ -451,18 +444,14 @@ const matrix = (presenting: boolean) => (
   />
 );
 
+const gate = () =>
+  container.querySelector('[data-testid="overview-desktop-matrix"]')?.parentElement?.className;
+
 describe('DesktopOverviewMatrix', () => {
   it('drops the viewport gate while presenting so a narrow projector still gets a matrix', () => {
-    const gate = () =>
-      container.querySelector('[data-testid="overview-desktop-matrix"]')?.parentElement?.className;
-
     act(() => root.render(matrix(false)));
     expect(gate()).toBe('hidden xl:block');
 
-    // `xl` asks whether the viewport can hold the matrix. That is the right
-    // question on the page and the wrong one on a deck, which lays out at a
-    // fixed width and is scaled by `zoom`: keeping it would blank the slide on
-    // any projector under 1280px, since presenting also drops the phone list.
     act(() => root.render(matrix(true)));
     expect(gate()).toBe('block');
   });

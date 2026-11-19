@@ -23,7 +23,7 @@ describe('Fixed-sequence benchmark logs', () => {
   });
 
   it('opens all stored .out and .log files on the fixed-sequence detail route', () => {
-    cy.visit('/inference/logs/96255', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/logs/96255', { onBeforeLoad: unlockAgenticGate });
     cy.wait('@logFiles');
     cy.wait('@logContent');
 
@@ -40,10 +40,8 @@ describe('Fixed-sequence benchmark logs', () => {
       .should('have.attr', 'href')
       .and('include', 'id=96255')
       .and('include', 'download=1');
-  });
 
-  it('provides the same viewer on the Simplified Chinese route', () => {
-    cy.visit('/zh/inference/logs/96255', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/logs/96255', { onBeforeLoad: unlockAgenticGate });
     cy.wait('@logFiles');
     cy.wait('@logContent');
 

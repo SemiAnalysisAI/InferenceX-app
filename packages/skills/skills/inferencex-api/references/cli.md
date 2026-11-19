@@ -26,6 +26,12 @@ selector includes every DB key in its family. Discovery slices each fetched
 snapshot locally. Check `coverage.complete_for_scope` before treating counts or
 hardware coverage as exhaustive; use `--limit` up to 1000 at offset 0 to include
 more rows in one response. Separate offset requests can observe different snapshots.
+Discovery stdout is a normalized projection; even a complete scope and recorded
+response hash do not retain the original API body. Use discovery to select a
+scope. For a report's coverage or exclusion counts, calculate from retained
+bundle bodies or the [raw capture recipes](public-api-examples.md), including
+supplemental diagnostics. Redirecting discovery stdout alone is insufficient
+source evidence.
 A formal command creates one new evidence directory containing `result.json` or
 `result.csv`, decoded response bodies, and `manifest.json`. `verify` replays that
 directory without network access.

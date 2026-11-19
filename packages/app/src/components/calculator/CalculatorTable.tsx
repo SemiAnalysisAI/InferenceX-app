@@ -9,9 +9,9 @@ import {
 } from '@/components/calculator/ThroughputBarChart';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import type { HardwareConfig } from '@/components/inference/types';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 interface CalculatorTableProps {
   results: InterpolatedResult[];

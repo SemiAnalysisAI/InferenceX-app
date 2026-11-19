@@ -1,35 +1,20 @@
-/**
- * Enforce all run-overrides.ts entries against the DB:
- *   1. Patch conclusions for CONCLUSION_OVERRIDES
- *   2. Patch changelogs listed in CHANGELOG_BACKFILLS
- *   3. Patch benchmark points listed in BENCHMARK_POINT_BACKFILLS
- *   4. Purge runs listed in PURGED_RUNS
- *   5. Purge specific attempts listed in PURGED_RUN_ATTEMPTS
- *   6. Purge individual benchmark points listed in PURGED_BENCHMARK_POINTS
- * Previews changes (read-only), then confirms before writing.
- *
- * Usage:
- *   bun run db:apply-overrides            # preview + confirm
- *   bun run db:apply-overrides --yes      # skip confirmation
- *   bun run db:apply-overrides --run-id 33219708211 --yes  # one registered run
- *   bun run db:apply-overrides --run-id 33721476500 --allow-unregistered-run --yes  # ingest
- *
- * Commits to run-overrides.ts are applied to production automatically after merge.
- * Use this command directly only for local preview or manual recovery.
- */
-
 import { isDeepStrictEqual } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
-import { configCacheKey } from './etl/config-cache.js';
-import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { bulkUpsertAvailability } from './etl/benchmark-ingest.js';
+import { configCacheKey, createConfigCache } from './etl/config-cache.js';
+import { type Sql, createAdminSql } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
 import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
 import { selectRunOverrides } from './lib/run-override-selection.js';
+import { deleteStaleAvailability, purgeBenchmarkResults, purgeRuns } from './lib/run-purge';
 import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
   type PurgedBenchmarkPoint,
+  type RunFrameworkOverride,
+  backfillDesiredConfig,
+  rewriteConfigKeyFramework,
   validateRunBackfills,
 } from './etl/run-overrides.js';
 
@@ -41,6 +26,7 @@ const {
   purgedPoints: PURGED_BENCHMARK_POINTS,
   purgedAttempts: PURGED_RUN_ATTEMPTS,
   purgedRuns: PURGED_RUNS,
+  frameworks: RUN_FRAMEWORK_OVERRIDES,
 } = selectRunOverrides(process.argv.slice(2));
 
 const sql = createAdminSql({
@@ -49,15 +35,12 @@ const sql = createAdminSql({
   onnotice: () => {},
 });
 
-// ── Conclusion overrides ──────────────────────────────────────────────────────
-
 interface StaleRow {
   githubRunId: number;
   current: string | null;
   expected: string;
 }
 
-/** Find runs whose conclusion doesn't match CONCLUSION_OVERRIDES. */
 async function previewConclusions(): Promise<StaleRow[]> {
   if (CONCLUSION_OVERRIDES.size === 0) return [];
 
@@ -92,8 +75,6 @@ async function applyConclusions(stale: StaleRow[]): Promise<void> {
   }
 }
 
-// ── Audited backfills ────────────────────────────────────────────────────────
-
 interface ChangelogBackfillTarget {
   backfill: ChangelogBackfill;
   changelogId: number;
@@ -114,7 +95,6 @@ function changelogBackfillIsApplied(
   );
 }
 
-/** Resolve one exact changelog row and return it only when its patch is stale. */
 async function previewChangelogBackfill(
   backfill: ChangelogBackfill,
 ): Promise<ChangelogBackfillTarget | null> {
@@ -194,6 +174,8 @@ interface BenchmarkPointBackfillTarget {
   backfill: BenchmarkPointBackfill;
   resultId: number;
   metrics: Record<string, unknown>;
+  sourceSpecMethod: string;
+  date: string;
 }
 
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
@@ -210,7 +192,6 @@ function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
   );
 }
 
-/** Resolve one source/desired point identity and fail closed on ambiguity. */
 async function previewBenchmarkPointBackfill(
   backfill: BenchmarkPointBackfill,
 ): Promise<BenchmarkPointBackfillTarget | null> {
@@ -219,8 +200,12 @@ async function previewBenchmarkPointBackfill(
   const sourceRecipeFingerprint = backfill.recipeFingerprint ?? null;
   const desiredRecipeFingerprint = backfill.set.recipeFingerprint ?? sourceRecipeFingerprint;
   const { config } = backfill;
+  const specMethods = [
+    ...new Set([config.specMethod, backfill.set.specMethod ?? config.specMethod]),
+  ];
   const rows = await sql`
-    SELECT br.id, br.offload_mode, br.recipe_fingerprint, br.metrics
+    SELECT br.id, br.offload_mode, br.recipe_fingerprint, br.metrics, br.date::text AS date,
+           c.spec_method
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     JOIN configs c ON c.id = br.config_id
@@ -230,7 +215,7 @@ async function previewBenchmarkPointBackfill(
       AND c.framework = ${config.framework}
       AND c.model = ${config.model}
       AND c.precision = ${config.precision}
-      AND c.spec_method = ${config.specMethod}
+      AND c.spec_method = ANY(${specMethods})
       AND c.disagg = ${config.disagg}
       AND c.is_multinode = ${config.isMultinode}
       AND c.prefill_tp = ${config.prefillTp}
@@ -266,6 +251,7 @@ async function previewBenchmarkPointBackfill(
     {
       offload_mode: row.offload_mode,
       recipe_fingerprint: row.recipe_fingerprint,
+      spec_method: row.spec_method,
       metrics: row.metrics,
     },
     backfill,
@@ -283,29 +269,239 @@ async function previewBenchmarkPointBackfill(
     backfill,
     resultId: row.id as number,
     metrics,
+    sourceSpecMethod: row.spec_method as string,
+    date: row.date as string,
   };
 }
 
 async function applyBenchmarkPointBackfillToDatabase(
   target: BenchmarkPointBackfillTarget,
 ): Promise<void> {
-  const { backfill, resultId, metrics } = target;
+  const { backfill, resultId, metrics, sourceSpecMethod, date } = target;
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   const desiredRecipeFingerprint =
     backfill.set.recipeFingerprint ?? backfill.recipeFingerprint ?? null;
-  const [updated] = await sql`
-    UPDATE benchmark_results
-    SET offload_mode = ${desiredOffloadMode},
-        recipe_fingerprint = ${desiredRecipeFingerprint},
-        metrics = ${jsonbParam(sql, metrics)}
-    WHERE id = ${resultId}
-    RETURNING id
-  `;
-  if (!updated) throw new Error(`${backfill.id}: benchmark row disappeared before update`);
+  const desiredConfig = backfillDesiredConfig(backfill);
+  await sql.begin(async (_tx) => {
+    const tx = _tx as unknown as Sql;
+    const configId = await createConfigCache(tx).getOrCreateConfig(desiredConfig);
+    const [updated] = await tx`
+      UPDATE benchmark_results
+      SET config_id = ${configId},
+          offload_mode = ${desiredOffloadMode},
+          recipe_fingerprint = ${desiredRecipeFingerprint},
+          metrics = ${jsonbParam(tx, metrics)}
+      WHERE id = ${resultId}
+      RETURNING id
+    `;
+    if (!updated) throw new Error(`${backfill.id}: benchmark row disappeared before update`);
+    if (sourceSpecMethod === desiredConfig.specMethod) return;
+    const availability = {
+      model: desiredConfig.model,
+      isl: backfill.isl,
+      osl: backfill.osl,
+      precision: desiredConfig.precision,
+      hardware: desiredConfig.hardware,
+      framework: desiredConfig.framework,
+      disagg: desiredConfig.disagg,
+    };
+    await bulkUpsertAvailability(
+      tx,
+      [
+        {
+          ...availability,
+          specMethod: desiredConfig.specMethod,
+          benchmarkType: backfill.benchmarkType,
+        },
+      ],
+      date,
+    );
+    await deleteStaleAvailability(tx, [{ ...availability, spec_method: sourceSpecMethod, date }]);
+  });
   console.log(`    ${backfill.id} patched.`);
 }
 
-// ── Purge ─────────────────────────────────────────────────────────────────────
+interface RunFrameworkOverrideTarget {
+  override: RunFrameworkOverride;
+  wrIds: number[];
+  configs: { sourceConfigId: number; benchmarkRows: number; evalRows: number }[];
+  changelogs: { changelogId: number; configKeys: string[] }[];
+}
+
+/**
+ * Find every row of the run still stored under the declared framework. Rows are
+ * matched per source config so each one moves to the config that differs only in
+ * its framework; unique constraints make a collision with an existing destination
+ * row fail the transaction instead of merging two points.
+ */
+async function previewRunFrameworkOverride(
+  override: RunFrameworkOverride,
+): Promise<RunFrameworkOverrideTarget | null> {
+  console.log(`    ${override.id}: run ${override.githubRunId}, ${override.from} → ${override.to}`);
+  console.log(`      reason: ${override.reason}`);
+  const runs = await sql`
+    SELECT id FROM workflow_runs WHERE github_run_id = ${override.githubRunId}
+  `;
+  if (runs.length === 0) {
+    console.log('      run not in DB, skipping.');
+    return null;
+  }
+  const wrIds = runs.map((r) => r.id as number);
+
+  const configRows = await sql`
+    SELECT c.id,
+      (SELECT count(*)::int FROM benchmark_results br
+        WHERE br.config_id = c.id AND br.workflow_run_id = ANY(${wrIds})) AS benchmark_rows,
+      (SELECT count(*)::int FROM eval_results er
+        WHERE er.config_id = c.id AND er.workflow_run_id = ANY(${wrIds})) AS eval_rows
+    FROM configs c
+    WHERE c.framework = ${override.from}
+      AND (
+        EXISTS (SELECT 1 FROM benchmark_results br
+          WHERE br.config_id = c.id AND br.workflow_run_id = ANY(${wrIds}))
+        OR EXISTS (SELECT 1 FROM eval_results er
+          WHERE er.config_id = c.id AND er.workflow_run_id = ANY(${wrIds}))
+      )
+    ORDER BY c.id
+  `;
+  const configs = configRows.map((row) => ({
+    sourceConfigId: row.id as number,
+    benchmarkRows: row.benchmark_rows as number,
+    evalRows: row.eval_rows as number,
+  }));
+
+  const changelogRows = await sql`
+    SELECT id, config_keys FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds}) ORDER BY id
+  `;
+  const changelogs: RunFrameworkOverrideTarget['changelogs'] = [];
+  for (const row of changelogRows) {
+    const current = Array.isArray(row.config_keys) ? (row.config_keys as string[]) : [];
+    const rewritten = current.map((key) =>
+      rewriteConfigKeyFramework(key, override.from, override.to),
+    );
+    if (!isDeepStrictEqual(current, rewritten)) {
+      changelogs.push({ changelogId: row.id as number, configKeys: rewritten });
+    }
+  }
+
+  if (configs.length === 0 && changelogs.length === 0) {
+    const [applied] = await sql`
+      SELECT count(*)::int AS n
+      FROM benchmark_results br
+      JOIN configs c ON c.id = br.config_id
+      WHERE br.workflow_run_id = ANY(${wrIds}) AND c.framework = ${override.to}
+    `;
+    console.log(
+      applied.n > 0
+        ? `      already applied (${applied.n} benchmark row(s) under ${override.to}).`
+        : `      no rows declare ${override.from}; nothing to do.`,
+    );
+    return null;
+  }
+
+  for (const config of configs) {
+    console.log(
+      `      config ${config.sourceConfigId}: ${config.benchmarkRows} benchmark row(s), ` +
+        `${config.evalRows} eval row(s)`,
+    );
+  }
+  for (const changelog of changelogs) {
+    console.log(
+      `      changelog ${changelog.changelogId}: ${JSON.stringify(changelog.configKeys)}`,
+    );
+  }
+  return { override, wrIds, configs, changelogs };
+}
+
+async function applyRunFrameworkOverride(target: RunFrameworkOverrideTarget): Promise<void> {
+  const { override, wrIds, configs, changelogs } = target;
+  await sql.begin(async (_tx) => {
+    const tx = _tx as unknown as Sql;
+    for (const { sourceConfigId } of configs) {
+      const [destination] = await tx`
+        INSERT INTO configs (
+          hardware, framework, model, precision, spec_method,
+          disagg, is_multinode,
+          prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers,
+          decode_tp, decode_ep, decode_dp_attention, decode_num_workers,
+          num_prefill_gpu, num_decode_gpu
+        )
+        SELECT hardware, ${override.to}, model, precision, spec_method,
+          disagg, is_multinode,
+          prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers,
+          decode_tp, decode_ep, decode_dp_attention, decode_num_workers,
+          num_prefill_gpu, num_decode_gpu
+        FROM configs WHERE id = ${sourceConfigId}
+        ON CONFLICT (
+          hardware, framework, model, precision, spec_method,
+          disagg, is_multinode,
+          prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers,
+          decode_tp, decode_ep, decode_dp_attention, decode_num_workers,
+          num_prefill_gpu, num_decode_gpu
+        )
+        DO UPDATE SET hardware = excluded.hardware
+        RETURNING id
+      `;
+      if (!destination) {
+        throw new Error(`${override.id}: config ${sourceConfigId} disappeared before update`);
+      }
+      const destinationConfigId = destination.id as number;
+      await tx`
+        UPDATE benchmark_results SET config_id = ${destinationConfigId}
+        WHERE config_id = ${sourceConfigId} AND workflow_run_id = ANY(${wrIds})
+      `;
+      await tx`
+        UPDATE eval_results SET config_id = ${destinationConfigId}
+        WHERE config_id = ${sourceConfigId} AND workflow_run_id = ANY(${wrIds})
+      `;
+      console.log(`    config ${sourceConfigId} → ${destinationConfigId}`);
+    }
+
+    await tx`
+      INSERT INTO availability (
+        model, isl, osl, precision, hardware, framework, spec_method, disagg, benchmark_type, date
+      )
+      SELECT DISTINCT c.model, br.isl, br.osl, c.precision, c.hardware, c.framework,
+        c.spec_method, c.disagg, br.benchmark_type, br.date
+      FROM benchmark_results br
+      JOIN configs c ON c.id = br.config_id
+      WHERE br.workflow_run_id = ANY(${wrIds}) AND br.error IS NULL
+        AND c.framework = ${override.to}
+      ON CONFLICT DO NOTHING
+    `;
+    await tx`
+      DELETE FROM availability a
+      WHERE a.framework = ${override.from}
+        AND EXISTS (
+          SELECT 1 FROM benchmark_results br
+          JOIN configs c ON c.id = br.config_id
+          WHERE br.workflow_run_id = ANY(${wrIds})
+            AND c.model = a.model AND c.precision = a.precision AND c.hardware = a.hardware
+            AND c.spec_method = a.spec_method AND c.disagg = a.disagg
+            AND br.isl IS NOT DISTINCT FROM a.isl AND br.osl IS NOT DISTINCT FROM a.osl
+            AND br.benchmark_type = a.benchmark_type AND br.date = a.date
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM benchmark_results br
+          JOIN configs c ON c.id = br.config_id
+          WHERE c.model = a.model
+            AND br.isl IS NOT DISTINCT FROM a.isl
+            AND br.osl IS NOT DISTINCT FROM a.osl
+            AND c.precision = a.precision AND c.hardware = a.hardware
+            AND c.framework = a.framework AND c.spec_method = a.spec_method
+            AND c.disagg = a.disagg AND br.benchmark_type = a.benchmark_type
+            AND br.date = a.date AND br.error IS NULL
+        )
+    `;
+
+    for (const { changelogId, configKeys } of changelogs) {
+      await tx`
+        UPDATE changelog_entries SET config_keys = ${configKeys} WHERE id = ${changelogId}
+      `;
+    }
+  });
+  console.log(`    ${override.id} applied.`);
+}
 
 interface PurgeTarget {
   githubRunId: number;
@@ -317,11 +513,6 @@ interface PurgeTarget {
   changelogs: number;
 }
 
-/**
- * Preview a run: print metadata and row counts. Returns null if not in DB.
- * If `attempts` is provided, only those `run_attempt` values are targeted;
- * otherwise every attempt for the run is included.
- */
 async function previewPurge(
   githubRunId: number,
   attempts?: ReadonlySet<number>,
@@ -358,17 +549,28 @@ async function previewPurge(
     );
   }
 
-  const [[bmk], [stats], [evals], [changelogs], [logs]] = await Promise.all([
+  const [[bmk], [stats], [evals], [changelogs], [logs], [telemetry]] = await Promise.all([
     sql`SELECT count(*)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(DISTINCT server_log_id)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds}) AND server_log_id IS NOT NULL`,
+    sql`
+      SELECT count(*)::int AS series, coalesce(sum(sample_count), 0)::bigint AS samples,
+        (SELECT count(*)::int FROM benchmark_result_gpu_metrics l
+          JOIN gpu_metric_series ls ON ls.id = l.series_id
+          WHERE ls.workflow_run_id = ANY(${wrIds})) AS links
+      FROM gpu_metric_series WHERE workflow_run_id = ANY(${wrIds})
+    `,
   ]);
 
   console.log(
     `    ${bmk.n} benchmarks, ${logs.n} server_logs, ${stats.n} run_stats, ${evals.n} evals, ${changelogs.n} changelogs`,
   );
+  if (telemetry.series > 0)
+    console.log(
+      `    ${telemetry.series} gpu_metric_series (${Number(telemetry.samples).toLocaleString('en-US')} samples, ${telemetry.links} point links)`,
+    );
 
   return {
     githubRunId,
@@ -381,122 +583,8 @@ async function previewPurge(
   };
 }
 
-/**
- * Delete benchmark results and any sidecars or availability rows left orphaned by
- * the deletion. The result IDs may come from a whole run or selected points.
- */
-async function purgeBenchmarkResults(tx: Sql, resultIds: number[]): Promise<void> {
-  if (resultIds.length === 0) return;
-
-  const availKeys = await tx`
-    SELECT DISTINCT c.model, br.isl, br.osl, c.precision, c.hardware,
-           c.framework, c.spec_method, c.disagg, br.date::text AS date
-    FROM benchmark_results br
-    JOIN configs c ON c.id = br.config_id
-    WHERE br.id = ANY(${resultIds})
-  `;
-  const logRows = await tx`
-    SELECT DISTINCT server_log_id AS id FROM benchmark_results
-    WHERE id = ANY(${resultIds}) AND server_log_id IS NOT NULL
-  `;
-  const traceRows = await tx`
-    SELECT DISTINCT trace_replay_id AS id FROM benchmark_results
-    WHERE id = ANY(${resultIds}) AND trace_replay_id IS NOT NULL
-  `;
-
-  await tx`DELETE FROM benchmark_results WHERE id = ANY(${resultIds})`;
-
-  const sIds = logRows.map((r) => r.id as number);
-  if (sIds.length > 0) {
-    await tx`
-      DELETE FROM server_logs
-      WHERE id = ANY(${sIds})
-        AND NOT EXISTS (
-          SELECT 1 FROM benchmark_results br WHERE br.server_log_id = server_logs.id
-        )
-    `;
-  }
-
-  const trIds = traceRows.map((r) => r.id as number);
-  if (trIds.length > 0) {
-    await tx`
-      DELETE FROM agentic_trace_replay
-      WHERE id = ANY(${trIds})
-        AND NOT EXISTS (
-          SELECT 1 FROM benchmark_results br WHERE br.trace_replay_id = agentic_trace_replay.id
-        )
-    `;
-  }
-
-  if (availKeys.length > 0) {
-    const models = availKeys.map((r) => r.model as string);
-    const isls = availKeys.map((r) => r.isl as number | null);
-    const osls = availKeys.map((r) => r.osl as number | null);
-    const precisions = availKeys.map((r) => r.precision as string);
-    const hardwares = availKeys.map((r) => r.hardware as string);
-    const frameworks = availKeys.map((r) => r.framework as string);
-    const specMethods = availKeys.map((r) => r.spec_method as string);
-    const disaggs = availKeys.map((r) => String(r.disagg));
-    const dates = availKeys.map((r) => r.date as string);
-
-    await tx`
-      DELETE FROM availability a
-      USING (
-        SELECT t.model, t.isl::int AS isl, t.osl::int AS osl, t.precision, t.hardware,
-               t.framework, t.spec_method, t.disagg::boolean AS disagg, t.date::date AS date
-        FROM unnest(
-          ${models}::text[], ${isls}::int[], ${osls}::int[],
-          ${precisions}::text[], ${hardwares}::text[], ${frameworks}::text[],
-          ${specMethods}::text[], ${disaggs}::text[], ${dates}::text[]
-        ) AS t(model, isl, osl, precision, hardware, framework, spec_method, disagg, date)
-      ) k
-      WHERE a.model = k.model
-        AND a.isl IS NOT DISTINCT FROM k.isl
-        AND a.osl IS NOT DISTINCT FROM k.osl
-        AND a.precision = k.precision AND a.hardware = k.hardware
-        AND a.framework = k.framework AND a.spec_method = k.spec_method
-        AND a.disagg = k.disagg AND a.date = k.date
-        AND NOT EXISTS (
-          SELECT 1 FROM benchmark_results br
-          JOIN configs c ON c.id = br.config_id
-          WHERE c.model = a.model
-            AND br.isl IS NOT DISTINCT FROM a.isl
-            AND br.osl IS NOT DISTINCT FROM a.osl
-            AND c.precision = a.precision AND c.hardware = a.hardware
-            AND c.framework = a.framework AND c.spec_method = a.spec_method
-            AND c.disagg = a.disagg AND br.date = a.date AND br.error IS NULL
-        )
-    `;
-  }
-}
-
-/**
- * Delete data for the given workflow_run rows (one or more attempts) in a transaction.
- * `wrIds` is the set of `workflow_runs.id` values to remove; sibling attempts of the
- * same `github_run_id` that aren't in `wrIds` are left intact.
- */
 async function purge(wrIds: number[]): Promise<void> {
-  // postgres TransactionSql Omit drops the call signature — cast to Sql type
-  await sql.begin(async (_tx) => {
-    const tx = _tx as unknown as Sql;
-
-    const resultRows = await tx`
-      SELECT id FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})
-    `;
-    await purgeBenchmarkResults(
-      tx,
-      resultRows.map((row) => row.id as number),
-    );
-
-    // Children first
-    await tx`DELETE FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`;
-    await tx`DELETE FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`;
-    await tx`DELETE FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`;
-
-    // Parent last (target the specific workflow_runs rows so partial purges
-    // leave sibling attempts of the same github_run_id intact)
-    await tx`DELETE FROM workflow_runs WHERE id = ANY(${wrIds})`;
-  });
+  await sql.begin((tx) => purgeRuns(tx as unknown as Sql, wrIds));
 
   console.log(`    deleted.`);
 }
@@ -505,13 +593,14 @@ interface BenchmarkPointPurgeTarget {
   resultIds: number[];
 }
 
-/** Preview exact benchmark rows selected by an audited point override. */
 async function previewBenchmarkPointPurge(
   point: PurgedBenchmarkPoint,
 ): Promise<BenchmarkPointPurgeTarget | null> {
   console.log(`  ${point.githubRunId} (attempt ${point.runAttempt})`);
   const rows = await sql`
-    SELECT br.id
+    SELECT br.id,
+      (SELECT count(*)::int FROM benchmark_result_gpu_metrics l
+        WHERE l.benchmark_result_id = br.id) AS telemetry_links
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     WHERE wr.github_run_id = ${point.githubRunId}
@@ -533,6 +622,9 @@ async function previewBenchmarkPointPurge(
     return null;
   }
   console.log(`    ${description}, ${rows.length} benchmark row(s).`);
+  const links = rows.reduce((sum, row) => sum + (row.telemetry_links as number), 0);
+  if (links > 0)
+    console.log(`    removes ${links} gpu_metric_series link(s); the series stay with the run.`);
   return { resultIds: rows.map((row) => row.id as number) };
 }
 
@@ -543,14 +635,11 @@ async function purgeBenchmarkPoints(resultIds: number[]): Promise<void> {
   console.log(`    deleted ${resultIds.length} benchmark point(s).`);
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
   validateRunBackfills();
   console.log('=== apply-overrides ===');
   if (runId !== undefined) console.log(`  Scoped to GitHub run ${runId}`);
 
-  // Phase 1: preview (read-only)
   let hasWork = false;
 
   const stale = await previewConclusions();
@@ -588,6 +677,18 @@ async function main(): Promise<void> {
   }
   if (benchmarkPointBackfillTargets.length > 0) hasWork = true;
 
+  const frameworkOverrideTargets: RunFrameworkOverrideTarget[] = [];
+  if (RUN_FRAMEWORK_OVERRIDES.length > 0) {
+    console.log(`\n  Run framework overrides (${RUN_FRAMEWORK_OVERRIDES.length}):`);
+    for (const override of RUN_FRAMEWORK_OVERRIDES) {
+      const target = await previewRunFrameworkOverride(override);
+      if (target) frameworkOverrideTargets.push(target);
+    }
+  } else {
+    console.log('\n  Run framework overrides: none registered.');
+  }
+  if (frameworkOverrideTargets.length > 0) hasWork = true;
+
   const purgeTargets = [...PURGED_RUNS];
   const found: PurgeTarget[] = [];
   if (purgeTargets.length > 0) {
@@ -602,7 +703,6 @@ async function main(): Promise<void> {
   if (attemptTargets.length > 0) {
     console.log(`\n  Purge attempt targets (${attemptTargets.length}):`);
     for (const [id, attempts] of attemptTargets) {
-      // Skip if the whole run is already covered by PURGED_RUNS
       if (PURGED_RUNS.has(id)) {
         console.log(`  ${id} — already in PURGED_RUNS, skipping per-attempt purge.`);
         continue;
@@ -638,7 +738,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Phase 2: confirm before writes
   if (!hasYesFlag()) {
     const ok = await confirm('\nApply changes? (y/N) ');
     if (!ok) {
@@ -647,7 +746,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // Phase 3: apply
   if (stale.length > 0) {
     console.log('\n  Patching conclusions...');
     await applyConclusions(stale);
@@ -667,6 +765,13 @@ async function main(): Promise<void> {
     }
   }
 
+  if (frameworkOverrideTargets.length > 0) {
+    console.log('\n  Reassigning run frameworks...');
+    for (const target of frameworkOverrideTargets) {
+      await applyRunFrameworkOverride(target);
+    }
+  }
+
   if (found.length > 0) {
     console.log('\n  Purging runs...');
     for (const { wrIds } of found) {
@@ -680,8 +785,11 @@ async function main(): Promise<void> {
       await purgeBenchmarkPoints(resultIds);
     }
   }
+  for (const override of RUN_FRAMEWORK_OVERRIDES) {
+    const staleTarget = await previewRunFrameworkOverride(override);
+    if (staleTarget) throw new Error(`${override.id}: run framework verification failed`);
+  }
 
-  // Phase 4: verify every requested backfill reached its declared state.
   for (const backfill of CHANGELOG_BACKFILLS) {
     const staleTarget = await previewChangelogBackfill(backfill);
     if (staleTarget) throw new Error(`${backfill.id}: changelog verification failed`);
@@ -690,9 +798,6 @@ async function main(): Promise<void> {
     const staleTarget = await previewBenchmarkPointBackfill(backfill);
     if (staleTarget) throw new Error(`${backfill.id}: benchmark point verification failed`);
   }
-
-  // Phase 5: refresh mat view
-  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
   console.log('  Manual runs: invalidate the API cache with bun run admin:cache:invalidate');

@@ -1,10 +1,9 @@
-import type { ParetoCoordinate } from '@/lib/pareto-frontier';
+import type { ParetoCoordinate } from '@/lib/charts/pareto-frontier';
 
-export { globalParetoFrontier, type ParetoCoordinate } from '@/lib/pareto-frontier';
+export { globalParetoFrontier, type ParetoCoordinate } from '@/lib/charts/pareto-frontier';
 
 const coordinates = (point: ParetoCoordinate) => `${point.x},${point.y}`;
 
-/** Fill only beyond this boundary toward its own preferred (or worst) corner. */
 export function paretoHighlightArea(
   points: readonly ParetoCoordinate[],
   cornerX: number,
@@ -21,10 +20,6 @@ export function paretoHighlightArea(
   return `M${polygon.map(coordinates).join('L')}Z`;
 }
 
-/**
- * Connect observed boundary points without extending to plot edges or filling
- * a region. Segments are linear in rendered coordinates, including log axes.
- */
 export function paretoHighlightGeometry(
   frontier: readonly ParetoCoordinate[],
   xScale: (value: number) => number,

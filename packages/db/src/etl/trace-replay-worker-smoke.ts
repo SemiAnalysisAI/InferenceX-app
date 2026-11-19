@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, inflateSync } from 'node:zlib';
 
 import { prepareTraceReplay, type PreparedTraceReplay } from './trace-replay-ingest';
 import { TraceReplayWorkerPool } from './trace-replay-worker-pool';
@@ -28,8 +28,20 @@ function fingerprint(prepared: PreparedTraceReplay) {
       : null,
     serverMetricsJsonSize: prepared.serverMetricsJsonSize,
     aggregateStatsJson: sha256(prepared.aggregateStatsJson),
+    sequenceLengthSketchesRaw: prepared.sequenceLengthSketches
+      ? sha256(inflateSync(prepared.sequenceLengthSketches))
+      : null,
     chartSeriesJson: sha256(prepared.chartSeriesJson),
-    requestTimelineJson: sha256(prepared.requestTimelineJson),
+    chartSeriesSummaryRaw: prepared.chartSeriesSummaryGz
+      ? sha256(gunzipSync(prepared.chartSeriesSummaryGz))
+      : null,
+    requestTimelineGz: sha256(prepared.requestTimelineGz),
+    requestTimelineRaw: prepared.requestTimelineGz
+      ? sha256(gunzipSync(prepared.requestTimelineGz))
+      : null,
+    requestChartDataRaw: prepared.requestChartDataGz
+      ? sha256(gunzipSync(prepared.requestChartDataGz))
+      : null,
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
     cacheHitRates: prepared.cacheHitRates,
@@ -51,7 +63,7 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
   }
 }
 
-const pool = new TraceReplayWorkerPool(2);
+const pool = new TraceReplayWorkerPool(2, 1);
 const job = {
   profileExportJsonl,
   serverMetricsCsv,
@@ -68,14 +80,14 @@ try {
   const direct = fingerprint(
     await prepareTraceReplay(profileExportJsonl, serverMetricsCsv, serverMetricsJson),
   );
-  const tasks = Array.from({ length: 3 }, () =>
+  const tasks = Array.from({ length: 5 }, () =>
     pool.run(job, async (prepared) => {
       consumers += 1;
       await gate;
       return fingerprint(prepared);
     }),
   );
-  await waitUntil(() => consumers === 2);
+  await waitUntil(() => consumers === 3);
   await delay(50);
   const consumersBeforeRelease = consumers;
   release();
@@ -90,6 +102,12 @@ try {
   } catch {
     rejectedMissingInput = true;
   }
+  const consumeError = await pool
+    .run(job, () => Promise.reject(new Error('persist failed')))
+    .then(
+      () => null,
+      (error: Error) => error.message,
+    );
   const recoveredTimelineRequests = await pool.run(job, (prepared) =>
     Promise.resolve(prepared.timelineRequests),
   );
@@ -101,6 +119,7 @@ try {
       direct,
       results,
       rejectedMissingInput,
+      consumeError,
       recoveredTimelineRequests,
     }),
   );

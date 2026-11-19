@@ -1,27 +1,34 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
-function hasMatchMedia(): boolean {
+const NOOP = () => {};
+
+export const MOBILE_VIEWPORT_QUERY = '(max-width: 767px)';
+
+export const COARSE_POINTER_QUERY = '(hover: none) and (pointer: coarse)';
+
+function canMatch(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
 }
 
-/**
- * Subscribe to a CSS media query. The server snapshot is `false`, so server
- * rendering and hydration take the non-matching branch and the client switches
- * right after hydration if the query matches.
- */
-export function useMediaQuery(query: string): boolean {
+/** `serverValue` is what the server and hydration render before the viewport can be asked. */
+export function useMediaQuery(query: string, serverValue = false): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
-      if (!hasMatchMedia()) return () => {};
+      if (!canMatch()) return NOOP;
       const mediaQuery = window.matchMedia(query);
       mediaQuery.addEventListener('change', onStoreChange);
       return () => mediaQuery.removeEventListener('change', onStoreChange);
     },
     [query],
   );
-  const getSnapshot = useCallback(
-    () => hasMatchMedia() && window.matchMedia(query).matches,
-    [query],
-  );
-  return useSyncExternalStore(subscribe, getSnapshot, () => false);
+  const getSnapshot = useCallback(() => canMatch() && window.matchMedia(query).matches, [query]);
+  return useSyncExternalStore(subscribe, getSnapshot, () => serverValue);
+}
+
+export function useIsMobileViewport(): boolean {
+  return useMediaQuery(MOBILE_VIEWPORT_QUERY);
+}
+
+export function useIsCoarsePointer(): boolean {
+  return useMediaQuery(COARSE_POINTER_QUERY);
 }

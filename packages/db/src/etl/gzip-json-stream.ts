@@ -1,25 +1,17 @@
-/**
- * Shared bounded and streaming parsers for gzipped server-metrics blobs.
- *
- * High-conc TP+EP rows can exceed 500 MB when decompressed. The bounded
- * synchronous helper preserves the historical Node string-size guard when
- * these scripts run under runtimes with larger string limits, while the
- * stream-json pipeline collects only the top-level subtrees callers need.
- */
-
 import { Readable } from 'node:stream';
 import { createGunzip, gunzipSync } from 'node:zlib';
 
 import { chain } from 'stream-chain';
+import { getManyValues, type Many, none } from 'stream-chain/defs.js';
+import fixUtf8Stream from 'stream-chain/utils/fixUtf8Stream.js';
 
-import { parser } from 'stream-json';
 import Assembler from 'stream-json/assembler.js';
-import type { Token } from 'stream-json/parser.js';
+import { jsonParser, parser, type Token } from 'stream-json/parser.js';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
 
-/** Bound peak memory while retaining the fast path for ordinary metric blobs. */
 const MAX_IN_MEMORY_JSON_BYTES = 128 * 1024 * 1024;
+const GUNZIP_CHUNK_BYTES = 64 * 1024;
 
 function isSizeLimitError(error: unknown): boolean {
   const code = error && (error as NodeJS.ErrnoException).code;
@@ -31,10 +23,6 @@ function isSizeLimitError(error: unknown): boolean {
   );
 }
 
-/**
- * Gunzip a JSON blob only while its output stays within the in-memory fast-path
- * ceiling. Returns null when the caller must use the streaming parser instead.
- */
 export function gunzipJsonWithinLimit(
   buffer: Buffer,
   maxOutputLength = MAX_IN_MEMORY_JSON_BYTES,
@@ -47,11 +35,6 @@ export function gunzipJsonWithinLimit(
   }
 }
 
-/**
- * Gunzip + stream-parse `buffer`, descending into the top-level `filter` key
- * (e.g. `metrics` / `warmup_metrics`) and collecting only the child entries
- * whose key is in `wanted`. Never materializes the full JSON string.
- */
 export async function streamCollectKeys<T>(
   buffer: Buffer,
   filter: string,
@@ -79,7 +62,6 @@ export async function streamCollectKeys<T>(
 export interface MetricPhaseMaps<T> {
   metrics: Record<string, T>;
   warmupMetrics: Record<string, T>;
-  /** True when the bounded fast path retained every metric in the document. */
   complete: boolean;
 }
 
@@ -102,10 +84,11 @@ function updateDepth(depth: number, token: Token): number {
 }
 
 /**
- * Consume the parser token stream once and assemble only selected direct
- * children of the two metric phase objects. Unselected metric subtrees still
- * have to be tokenized so the JSON can be validated, but they are never copied
- * to secondary streams or materialized as JavaScript objects.
+ * Collects the wanted members of the top-level `metrics` and `warmup_metrics`
+ * objects without building the rest of the document. stream-json's tokenizer
+ * is called once per gunzip chunk instead of behind an object-mode stream,
+ * because pushing every token through a stream costs about three times the
+ * tokenizing itself on multi-GiB AIPerf exports.
  */
 async function streamCollectMetricPhases<T>(
   buffer: Buffer,
@@ -121,24 +104,7 @@ async function streamCollectMetricPhases<T>(
   let valueTarget: Record<string, T> | null = null;
   let valueKey: string | null = null;
 
-  // Packed-only values avoid emitting start/chunk/end tokens in addition to
-  // their complete value token. This materially reduces the token count for
-  // metric-heavy multi-GiB documents.
-  const tokens = chain([
-    Readable.from(buffer),
-    createGunzip(),
-    parser({
-      packKeys: true,
-      packStrings: true,
-      packNumbers: true,
-      streamKeys: false,
-      streamStrings: false,
-      streamNumbers: false,
-    }),
-  ]);
-
-  for await (const rawToken of tokens) {
-    const token = rawToken as Token;
+  const consume = (token: Token): void => {
     const depthBefore = depth;
 
     if (valueAssembler) {
@@ -150,7 +116,13 @@ async function streamCollectMetricPhases<T>(
         valueTarget = null;
         valueKey = null;
       }
-      continue;
+      return;
+    }
+
+    // Tokens nested inside an unwanted member value only move the depth.
+    if (depthBefore > 2) {
+      depth = updateDepth(depth, token);
+      return;
     }
 
     if (token.name === 'keyValue') {
@@ -191,15 +163,34 @@ async function streamCollectMetricPhases<T>(
       phase = null;
       metricKey = null;
     }
-  }
+  };
+  const consumeAll = (tokens: Many<Token> | typeof none): void => {
+    if (tokens === none) return;
+    for (const token of getManyValues(tokens)) consume(token);
+  };
+
+  // The two stages parser() composes: UTF-8 decoding across chunk boundaries,
+  // then the tokenizer. Passing `none` flushes each stage.
+  const decodeUtf8 = fixUtf8Stream();
+  const tokenize = jsonParser({
+    packKeys: true,
+    packStrings: true,
+    packNumbers: true,
+    streamKeys: false,
+    streamStrings: false,
+    streamNumbers: false,
+  });
+  const gunzipped = Readable.from(buffer).pipe(createGunzip({ chunkSize: GUNZIP_CHUNK_BYTES }));
+  for await (const chunk of gunzipped) consumeAll(tokenize(decodeUtf8(chunk as Buffer)));
+  consumeAll(tokenize(decodeUtf8(none)));
+  // Flushable<I, O> types only the data argument. Like every flushable() stage,
+  // the tokenizer also takes `none` to flush and to reject truncated input.
+  const flushTokenizer = tokenize as unknown as (end: typeof none) => Many<Token> | typeof none;
+  consumeAll(flushTokenizer(none));
 
   return { metrics, warmupMetrics, complete: false };
 }
 
-/**
- * Gunzip and parse both server-metric phase blocks once. Large documents use a
- * single token consumer which materializes only the selected metric values.
- */
 export async function collectMetricPhases<T>(
   buffer: Buffer,
   wanted: ReadonlySet<string>,

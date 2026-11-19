@@ -1,20 +1,26 @@
 import type { ComparisonCase } from '@semianalysisai/inferencex-db/operatorx/compare';
 
-import { peakBandwidthTBs, peakTflops } from './hardware';
+import type { Locale } from '@/lib/i18n/i18n';
 
-export type MetricId = 'latency' | 'tflops' | 'bandwidth' | 'computeUtil' | 'bandwidthUtil';
+import { peakBandwidthTBs, peakTflops } from './hardware';
+import { rooflineBound } from './roofline-bound';
+
+export type MetricId =
+  | 'latency'
+  | 'tflops'
+  | 'bandwidth'
+  | 'computeUtil'
+  | 'bandwidthUtil'
+  | 'rooflineUtil';
 
 export interface Metric {
   id: MetricId;
-  label: string;
+  label: Record<Locale, string>;
   unit: string;
   better: 'higher' | 'lower';
-  /** Values span decades; charts default to a log scale. */
   log: boolean;
   value: (c: ComparisonCase, latencyUs: number, hardware: string) => number | null;
-  /** With the unit, for tooltips and labels. */
   format: (v: number) => string;
-  /** Without the unit, for axis ticks; the axis label carries the unit. */
   tick: (v: number) => string;
 }
 
@@ -26,7 +32,7 @@ const plainPct = (v: number) => String(Number((v * 100).toPrecision(3)));
 export const METRICS: Metric[] = [
   {
     id: 'latency',
-    label: 'Latency',
+    label: { en: 'Latency', zh: '延迟' },
     unit: 'µs',
     better: 'lower',
     log: true,
@@ -36,7 +42,7 @@ export const METRICS: Metric[] = [
   },
   {
     id: 'tflops',
-    label: 'Throughput',
+    label: { en: 'Throughput', zh: '吞吐量' },
     unit: 'TFLOPS',
     better: 'higher',
     log: true,
@@ -46,7 +52,7 @@ export const METRICS: Metric[] = [
   },
   {
     id: 'bandwidth',
-    label: 'Achieved bandwidth',
+    label: { en: 'Achieved bandwidth', zh: '实测带宽' },
     unit: 'TB/s',
     better: 'higher',
     log: true,
@@ -56,7 +62,7 @@ export const METRICS: Metric[] = [
   },
   {
     id: 'computeUtil',
-    label: 'Share of peak compute',
+    label: { en: 'Share of peak compute', zh: '计算峰值占比' },
     unit: '%',
     better: 'higher',
     log: false,
@@ -69,13 +75,26 @@ export const METRICS: Metric[] = [
   },
   {
     id: 'bandwidthUtil',
-    label: 'Share of peak bandwidth',
+    label: { en: 'Share of peak bandwidth', zh: '带宽峰值占比' },
     unit: '%',
     better: 'higher',
     log: false,
     value: (c, us, hw) => {
       const peak = peakBandwidthTBs(hw);
       return c.bytes && peak ? c.bytes / (us * 1e6) / peak : null;
+    },
+    format: pct,
+    tick: plainPct,
+  },
+  {
+    id: 'rooflineUtil',
+    label: { en: 'Share of roofline', zh: 'roofline 占比' },
+    unit: '%',
+    better: 'higher',
+    log: false,
+    value: (c, us, hw) => {
+      const bound = rooflineBound(c, hw);
+      return bound ? bound.us / us : null;
     },
     format: pct,
     tick: plainPct,

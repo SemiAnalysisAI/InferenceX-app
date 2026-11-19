@@ -12,7 +12,7 @@ export const EXAMPLE_PROMPTS = {
     '用条形图对比 DeepSeek R1 在 H100、B200 和 GB200 上每百万 token 的 hyperscaler 成本',
     '对比 Kimi K2.5 与 DeepSeek R1 在 8k/1k 下的单芯片吞吐量',
     'DeepSeek R1 在哪种芯片上的 GSM8K 准确率最高？',
-    '对比各类芯片的可靠性和运行成功率',
+    '对比各类芯片的可靠性（运行成功率）',
     '绘制 DeepSeek R1 在 8k/1k 下所有芯片配置的散点图，纵轴为单芯片吞吐量',
   ],
 } as const;

@@ -58,20 +58,558 @@ const gemm = comparisonView(
 );
 const moe = comparisonView(buildComparison('moe', []), null);
 
-it('shows measured and missing GPU coverage, then switches the URL to MoE', () => {
+it('shows measured and missing GPU coverage, then links to MoE and back', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
-  cy.visit('/operatorx');
+  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro');
   cy.wait('@gemm');
+  cy.get('[data-testid="operatorx-page"] h1')
+    .should('contain.text', 'OperatorX')
+    .find('[data-slot="badge"]')
+    .should('have.text', 'Experimental');
   cy.get('[data-testid="operatorx-coverage"]')
     .should('contain.text', 'Coverage of 2 cases')
     .and('contain.text', '2/2')
     .and('contain.text', '1/2');
   cy.get('[data-testid="operatorx-viz-metric-vs-size"]').should('contain.text', 'M');
 
-  cy.get('[data-testid="operatorx-page"]').contains('button', 'MoE').click();
+  cy.get('[data-testid="operatorx-page"] nav')
+    .contains('a', 'MoE')
+    .should('have.attr', 'href', '/opx/moe?model=DeepSeek-V4-Pro')
+    .click();
   cy.wait('@moe');
-  cy.location('search').should('contain', 'op=moe');
+  cy.location('pathname').should('eq', '/opx/moe');
+  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
   cy.contains('No results yet').should('be.visible');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', moe).as('attention');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Attention').click();
+  cy.location('pathname').should('eq', '/opx/attention');
+  cy.go('back');
+  cy.location('pathname').should('eq', '/opx/moe');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+
+  cy.go('back');
+  cy.location('pathname').should('eq', '/opx/gemm');
+  cy.get('[data-testid="operatorx-coverage"]').should('contain.text', 'Coverage of 2 cases');
+});
+
+it('keeps the view filters when the current category is clicked again', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
+  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro&parallel=tp8');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'GEMM').click();
+  cy.location('pathname').should('eq', '/opx/gemm');
+  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro&parallel=tp8');
+});
+
+it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
+  cy.request({ url: '/operatorx?op=model', followRedirect: false }).then((response) => {
+    expect(response.status).to.eq(308);
+    expect(new URL(response.headers.location as string, 'http://x').pathname).to.eq('/opx/model');
+  });
+  cy.visit('/operatorx?op=model');
+  cy.location('pathname').should('eq', '/opx/model');
+  cy.location('search').should('eq', '');
+});
+
+it('redirects a legacy ?op= link to the category path', () => {
+  cy.request({ url: '/opx?op=model&model=DeepSeek-V4-Pro', followRedirect: false })
+    .its('headers.location')
+    .should('match', /\/opx\/model\?model=DeepSeek-V4-Pro$/u);
+  cy.visit('/opx?op=model');
+  cy.location('pathname').should('eq', '/opx/model');
+  cy.location('search').should('eq', '');
+  cy.contains('[data-testid="operatorx-page"] nav a', 'Model View').should(
+    'have.attr',
+    'aria-current',
+    'page',
+  );
+});
+
+it('defaults to a measured 950PR shape and normalized BF16, while honoring precision and scale changes', () => {
+  const ascend = normalizeBundle(run('103', 'ascend950pr-external', [64, 128]));
+  const fp8 = normalizeBundle(run('104', 'h200-dgxc', [64, 128]));
+  fp8.results = [64, 128, 256].map((m, i) => ({
+    ...fp8.results[0],
+    index: i,
+    args: { ...fp8.results[0].args, m, a: { dtype: 'e4m3' }, b: { dtype: 'e4m3' } },
+    precision: 'e4m3 × e4m3 → bf16',
+  }));
+  const view = comparisonView(
+    buildComparison('gemm', [
+      { runner: 'h200-dgxc', dataset: fp8 },
+      { runner: 'ascend950pr-external', dataset: ascend },
+    ]),
+    null,
+  );
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('ascend');
+  cy.visit('/opx');
+  cy.wait('@ascend');
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"] [data-testid="chart-legend"]').should(
+    'contain.text',
+    '950PR',
+  );
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"] [aria-label="Shape"]').should(
+    'contain.text',
+    'bf16',
+  );
+  cy.get('[data-testid="operatorx-viz-roofline"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.contains('[role="tab"]', 'bf16').should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
+      cy.contains('[role="tab"]', 'fp8').click().should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
+      cy.contains('[role="tab"]', 'bf16').click().should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
+    });
+});
+
+it('defaults to shared cases and shows disjoint FP8 measurements per accelerator on request', () => {
+  const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+    const dataset = normalizeBundle(run(`fp8-disjoint-${gpu}`, runner, [64]));
+    dataset.results = dataset.results.map((row) => ({
+      ...row,
+      args: {
+        m: 4096 * (gpu + 1),
+        n: 4096,
+        k: 4096,
+        a: { dtype: 'e4m3' },
+        b: { dtype: 'e4m3' },
+        out: 'bf16',
+      },
+      latencyUs: 100,
+    }));
+    return { runner, dataset };
+  });
+  const view = comparisonView(buildComparison('gemm', datasets), null);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
+  cy.visit('/opx');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  // Shared cases only is on by default, and disjoint FP8 formats share no case.
+  cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'true');
+  cy.contains('No shared compute-bound cases').should('be.visible');
+  cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
+  cy.get('#opx-summary-shared').click();
+  cy.contains('No shared compute-bound cases').should('be.visible');
+});
+
+// Every median and best label stays vertically inside its own bar row, and the best label
+// never overlaps the median label.
+function expectSummaryLabelsOnRows() {
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').each(($row) => {
+    const band = $row.find('.summary-best')[0].getBoundingClientRect();
+    const median = $row.find('.summary-median-label')[0].getBoundingClientRect();
+    const best = $row.find('.summary-best-label')[0].getBoundingClientRect();
+    for (const label of [median, best]) {
+      const middle = (label.top + label.bottom) / 2;
+      expect(middle).to.be.within(band.top, band.bottom);
+    }
+    expect(best.left).to.be.at.least(median.right);
+  });
+}
+
+it('shows median and best bars across the row above metric vs size at /', () => {
+  const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+    const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
+    dataset.results = dataset.results.map((row, i) => ({
+      ...row,
+      args: {
+        m: 1024 * (i + 1),
+        n: 1024,
+        k: 1024,
+        a: { dtype: 'bf16' },
+        b: { dtype: 'bf16' },
+        out: 'bf16',
+      },
+      latencyUs: gpu === 0 ? 10 : 5,
+    }));
+    return { runner, dataset };
+  });
+  const view = comparisonView(buildComparison('gemm', datasets), null);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
+  cy.visit('/opx');
+  cy.wait('@summary');
+  cy.get('[data-testid^="operatorx-viz-"]')
+    .last()
+    .should('have.attr', 'data-testid', 'operatorx-viz-metric-vs-size');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]')
+    .scrollIntoView()
+    .should(($summary) => {
+      const next = $summary.next()[0];
+      expect(next?.dataset.testid).to.equal('operatorx-viz-metric-vs-size');
+      // Alone on its row, the panel spans the same 12 desktop columns as Metric vs size.
+      expect($summary[0].getBoundingClientRect().width).to.be.closeTo(
+        next.getBoundingClientRect().width,
+        1,
+      );
+      expect($summary[0].getBoundingClientRect().bottom).to.be.lessThan(
+        next.getBoundingClientRect().top,
+      );
+    });
+  cy.get('[data-testid="operatorx-roofline-summary"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.get('.summary-row').should('have.length', 2);
+      cy.get('.summary-row')
+        .first()
+        .should(($row) => {
+          const d = (
+            $row[0] as unknown as {
+              __data__: { hardware: string; n: number; median: number; best: number };
+            }
+          ).__data__;
+          expect(d.hardware).to.equal('ascend950pr');
+          expect(d.n).to.equal(2);
+          expect(d.median).to.be.closeTo(322.1225472 / 378, 1e-12);
+          expect(d.best).to.be.closeTo(429.4967296 / 378, 1e-12);
+        });
+      cy.get('.summary-median').should('have.length', 2);
+      cy.get('.summary-best').should('have.length', 2);
+      // Axis ticks use the page font, and hardware names match the bar value labels.
+      cy.get('.y-axis .tick text').should(($ticks) => {
+        const tick = getComputedStyle($ticks[0]);
+        const label = getComputedStyle(
+          $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
+        );
+        expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
+        expect(tick.fontSize).to.equal(label.fontSize);
+      });
+      cy.get('.x-axis .tick text')
+        .first()
+        .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
+    });
+  cy.get('#opx-summary-normalized').click();
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
+    .first()
+    .should(($row) => {
+      const d = (
+        $row[0] as unknown as { __data__: { hardware: string; median: number; best: number } }
+      ).__data__;
+      expect(d.hardware).to.equal('h200');
+      expect(d.median).to.be.closeTo(644.2450944, 1e-9);
+      expect(d.best).to.be.closeTo(858.9934592, 1e-9);
+    });
+  cy.viewport(390, 844);
+  cy.get('[data-testid="operatorx-roofline-summary"]').scrollIntoView().should('be.visible');
+  expectSummaryLabelsOnRows();
+});
+
+it('keeps a median label that does not fit its bar on the same row at /', () => {
+  const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+    const dataset = normalizeBundle(run(`short-${gpu}`, runner, [64, 128]));
+    dataset.results = dataset.results.map((row, i) => ({
+      ...row,
+      args: {
+        m: 1024 * (i + 1),
+        n: 1024,
+        k: 1024,
+        a: { dtype: 'bf16' },
+        b: { dtype: 'bf16' },
+        out: 'bf16',
+      },
+      // 950PR is 50x slower, so its median bar is too short to hold its label even across a full row.
+      latencyUs: gpu === 0 ? 250 : 5,
+    }));
+    return { runner, dataset };
+  });
+  const view = comparisonView(buildComparison('gemm', datasets), null);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('short');
+  cy.visit('/opx');
+  cy.wait('@short');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
+    .last()
+    .should(($row) => {
+      const bar = $row.find('.summary-median')[0].getBoundingClientRect();
+      const label = $row.find('.summary-median-label')[0].getBoundingClientRect();
+      expect(label.left, 'label starts after the short bar').to.be.at.least(bar.right);
+    });
+  expectSummaryLabelsOnRows();
+});
+
+it('keeps 950PR FP8 points visible when normalized at /', () => {
+  const dataset = normalizeBundle(run('950pr-fp8', 'ascend950pr-external', [64, 128]));
+  dataset.results = dataset.results.map((row, i) => ({
+    ...row,
+    args: {
+      m: 1024 * (i + 1),
+      n: 1024,
+      k: 1024,
+      a: { dtype: 'e4m3' },
+      b: { dtype: 'e4m3' },
+      out: 'bf16',
+    },
+  }));
+  const view = comparisonView(
+    buildComparison('gemm', [{ runner: 'ascend950pr-external', dataset }]),
+    null,
+  );
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('fp8');
+  cy.visit('/opx');
+  cy.wait('@fp8');
+  cy.get('[data-testid="operatorx-viz-roofline"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.contains('[role="tab"]', 'fp8').should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
+      cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
+        .should('have.length', 2)
+        .each(($point) => {
+          const point = $point[0] as unknown as { __data__: { y: number } };
+          expect(point.__data__.y).to.be.closeTo(268.435456 / 756, 1e-12);
+        });
+      cy.get('#opx-roofline-normalized').click();
+      cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
+        .should('have.length', 2)
+        .each(($point) => {
+          const point = $point[0] as unknown as { __data__: { y: number } };
+          expect(point.__data__.y).to.be.closeTo(268.435456, 1e-9);
+        });
+    });
+});
+
+describe('OperatorX progressive rendering', { testIsolation: true }, () => {
+  it('mounts lower charts near the viewport and preserves their controls at /', () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+    cy.visit('/opx');
+    cy.wait('@comparison');
+    cy.get('[data-testid^="operatorx-viz-"]')
+      .first()
+      .should('have.attr', 'aria-busy', 'false')
+      .find('svg')
+      .should('exist');
+    const lower = '[data-testid="operatorx-viz-metric-vs-size"]';
+    cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
+    cy.get(lower).scrollIntoView();
+    cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
+    cy.scrollTo('top');
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'false');
+  });
+
+  for (const prefix of ['', '/zh']) {
+    it(`does not fetch OperatorX on Huawei focus or navigation from ${prefix || '/'}`, () => {
+      cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
+      cy.visit(prefix || '/');
+      const link = '[data-testid="landing-huawei-results-link"]';
+      cy.get(link).should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`);
+      cy.get('@operatorxIntent.all').should('have.length', 0);
+      cy.get(link).focus();
+      cy.location('pathname').should('eq', prefix || '/');
+      cy.get(link).trigger('mouseover').focus().click();
+      cy.location('pathname').should('eq', `${prefix}/ubx/core-memory-profiles`);
+      cy.get('[data-testid="ascend-core-profiles"] h2').should(
+        'have.text',
+        `Huawei 950PR Ascend 950PR_9579 · 128 MiB · ${prefix ? 'Cube 与 Vector 标量控制器' : 'Cube and Vector scalar controllers'}`,
+      );
+      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+      cy.get('@operatorxIntent.all').should('have.length', 0);
+    });
+  }
+
+  it('renders every chart when viewport observation is unavailable', () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+    cy.visit('/opx', {
+      onBeforeLoad(win) {
+        Object.defineProperty(win, 'IntersectionObserver', { value: undefined });
+      },
+    });
+    cy.wait('@comparison');
+    cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
+      .should('have.attr', 'aria-busy', 'false')
+      .find('svg')
+      .should('exist');
+  });
+
+  it('isolates a GPU from a lower legend without scrolling the page', () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+    cy.visit('/opx');
+    cy.wait('@comparison');
+    cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
+      .scrollIntoView()
+      .should('have.attr', 'aria-busy', 'false');
+    cy.window().then((win) => {
+      const before = win.scrollY;
+      cy.get('[data-testid="operatorx-viz-metric-vs-size"] li label')
+        .first()
+        .then(($label) => {
+          cy.wrap($label).click({ scrollBehavior: false });
+          // As on the inference charts, clicking a shown GPU isolates it.
+          cy.get(`[id="${$label.attr('for')}"]`)
+            .should('be.checked')
+            .and('have.focus');
+          cy.get('[data-testid="operatorx-viz-metric-vs-size"] li input:checked').should(
+            'have.length',
+            1,
+          );
+        });
+      cy.window().its('scrollY').should('eq', before);
+    });
+  });
+});
+
+const operatorPoints = () =>
+  cy
+    .get('[data-testid="operatorx-viz-roofline"] circle.point')
+    .filter(
+      (_, element) =>
+        (element as unknown as { __data__: { hw: string } }).__data__.hw === 'ascend950pr',
+    );
+
+const bandwidthPoints = () =>
+  cy
+    .get('#ubenchx-mbu circle.point')
+    .filter(
+      (_, element) =>
+        (element as unknown as { __data__: { gpuKey: string } }).__data__.gpuKey === 'Huawei 950PR',
+    );
+
+it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switch', () => {
+  const ascend = normalizeBundle(run('201', 'ascend950pr-external', [64, 128]));
+  const nvidia = normalizeBundle(run('202', 'h200-dgxc', [64, 128]));
+  for (const dataset of [ascend, nvidia]) {
+    for (const row of dataset.results) {
+      const m = Number(row.args.m);
+      row.args = { ...row.args, n: 4096, k: 4096 };
+      row.shape = `${m} × 4096 × 4096`;
+      row.latencyUs = 100;
+      row.tflops = (2 * m * 4096 * 4096) / (100 * 1e6);
+    }
+  }
+  const view = comparisonView(
+    buildComparison('gemm', [
+      { runner: 'ascend950pr-external', dataset: ascend },
+      { runner: 'h200-dgxc', dataset: nvidia },
+    ]),
+    null,
+  );
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('colorComparison');
+  const visitOptions = {
+    onBeforeLoad(win: Cypress.AUTWindow) {
+      win.localStorage.setItem('theme', 'light');
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    },
+  };
+  cy.visit('/opx', visitOptions);
+  cy.wait('@colorComparison');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  operatorPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
+    .find('.rounded-full')
+    .first()
+    .should('have.css', 'background-color', 'rgb(148, 106, 0)');
+  cy.get('[data-testid="theme-toggle"]').click();
+  cy.get('html').should('have.class', 'dark');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
+    .find('.rounded-full')
+    .first()
+    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+
+  cy.visit('/ubx/mem-bw', visitOptions);
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  cy.get('[data-testid="theme-toggle"]').click();
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  bandwidthPoints().eq(20).trigger('mouseenter', { force: true });
+  cy.get('[data-chart-tooltip="ubenchx-mbu"]')
+    .should('contain', 'Huawei 950PR')
+    .find('span')
+    .first()
+    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+});
+
+it('reopens shared roofline and summary controls independently', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
+  cy.visit('/opx/gemm?scatterPrecision=bf16&summaryPrecision=bf16');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-roofline-log').click().should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="share-button"]').first().click();
+  cy.get('input[aria-label="Share link for the current view"]')
+    .invoke('val')
+    .then((value) => {
+      const url = new URL(String(value));
+      expect(url.searchParams.get('summarySharedOnly')).to.eq('false');
+      expect(url.searchParams.get('scatterNormalized')).to.eq('false');
+      expect(url.searchParams.get('scatterLog')).to.eq('true');
+      cy.visit(url.pathname + url.search);
+    });
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
+  cy.get('#opx-roofline-log').should('have.attr', 'aria-checked', 'true');
+  cy.get('[data-testid="operatorx-viz-roofline"] circle.point').should('have.length', 3);
+});
+
+it('reopens the model token selection and sweep mode from a share link', () => {
+  const model = gemm.models[0];
+  const view = {
+    ...gemm,
+    model,
+    modelOptions: [model],
+    hardware: gemm.hardware.filter((hw) => hw.id === 'h200'),
+    measurements: { h200: gemm.measurements.h200 },
+  };
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', {
+    ...moe,
+    model,
+    modelOptions: [model],
+  });
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', {
+    ...moe,
+    op: 'attention',
+    model,
+    modelOptions: [model],
+  });
+  cy.visit(`/opx/model?model=${encodeURIComponent(model)}&modelPrecision=bf16&modelBin=12`);
+  cy.get('[data-testid="operatorx-model-gpu-h200"]')
+    .click()
+    .should('have.attr', 'aria-pressed', 'true');
+  cy.location('search').should((search) =>
+    expect(new URLSearchParams(search).has('hardware')).to.eq(false),
+  );
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', '64 tokens');
+  cy.get('#operatorx-model-tokens').then(($input) => {
+    const input = $input[0] as HTMLInputElement;
+    const win = input.ownerDocument.defaultView!;
+    Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      input.max,
+    );
+    input.dispatchEvent(new win.Event('input', { bubbles: true }));
+  });
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
+  cy.get('[data-testid="share-button"]').first().click();
+  cy.get('input[aria-label="Share link for the current view"]')
+    .invoke('val')
+    .then((value) => {
+      const url = new URL(String(value));
+      expect(url.searchParams.get('modelBin')).to.eq('12');
+      expect(url.searchParams.get('modelSweep')).to.eq('true');
+      expect(url.searchParams.get('modelPrecision')).to.eq('bf16');
+      cy.visit(url.pathname + url.search);
+    });
+  cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
 });

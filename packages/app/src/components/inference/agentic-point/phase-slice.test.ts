@@ -81,14 +81,11 @@ describe('phaseBoundaryNs', () => {
 
 describe('phaseBoundarySec', () => {
   it('rebases through absolute ns by subtracting serverMetrics.startNs (origin gap)', () => {
-    // timeline origin and server-metrics origin differ — the classic ~124s gap.
     const tl = timeline(
       [req({ phase: 'warmup', start: 0 }), req({ phase: 'profiling', start: 600 * 1e9 })],
-      200 * 1e9, // timeline.startNs
+      200 * 1e9,
     );
-    // boundaryNs = 200e9 + 600e9 = 800e9 ; serverMetrics origin = 124e9 earlier
     const boundarySec = phaseBoundarySec({ startNs: 76 * 1e9 }, tl);
-    // (800e9 - 76e9)/1e9 = 724
     expect(boundarySec).toBe(724);
   });
 
@@ -129,16 +126,16 @@ describe('sliceServerSeriesByPhase', () => {
   it('warmup keeps t < boundary, no rebase, durationS = boundary', () => {
     const s = makeSeries([0, 1, 2, 3, 4]);
     const out = sliceServerSeriesByPhase(s, 'warmup', 2, 5);
-    expect(out.series.kvCacheUsage.map((p) => p.t)).toEqual([0, 1]); // excludes t===2
+    expect(out.series.kvCacheUsage.map((p) => p.t)).toEqual([0, 1]);
     expect(out.durationS).toBe(2);
   });
 
   it('profiling keeps t >= boundary and rebases to start at 0', () => {
     const s = makeSeries([0, 1, 2, 3, 4]);
     const out = sliceServerSeriesByPhase(s, 'profiling', 2, 5);
-    expect(out.series.kvCacheUsage.map((p) => p.t)).toEqual([0, 1, 2]); // 2,3,4 -> 0,1,2
-    expect(out.series.kvCacheUsage.map((p) => p.value)).toEqual([20, 30, 40]); // values preserved
-    expect(out.durationS).toBe(3); // 5 - 2
+    expect(out.series.kvCacheUsage.map((p) => p.t)).toEqual([0, 1, 2]);
+    expect(out.series.kvCacheUsage.map((p) => p.value)).toEqual([20, 30, 40]);
+    expect(out.durationS).toBe(3);
   });
 
   it('slices queueDepth, promptTokensBySource, and kvCacheUsageByEngine; preserves queue fields', () => {
@@ -178,7 +175,6 @@ describe('requestsForPhase', () => {
 });
 
 describe('sliceTimelineByPhase', () => {
-  // startNs origin = 1000; warmup request at offset 0..50, profiling at 100..300.
   const tl = timeline(
     [
       req({ phase: 'warmup', credit: 0, start: 0, ack: 10, end: 50, isl: 1 }),
@@ -186,7 +182,6 @@ describe('sliceTimelineByPhase', () => {
     ],
     1_000,
   );
-  // tl.durationS default = 1 from helper; override for window math.
   const tlDur: RequestTimeline = { ...tl, durationS: 3 };
 
   it('returns the input unchanged for a single-phase timeline', () => {
@@ -197,18 +192,16 @@ describe('sliceTimelineByPhase', () => {
   it('warmup keeps pre-boundary requests, no rebase, startNs unchanged', () => {
     const out = sliceTimelineByPhase(tlDur, 'warmup');
     expect(out.requests.map((r) => r.isl)).toEqual([1]);
-    expect(out.requests[0]!.start).toBe(0); // not rebased
+    expect(out.requests[0]!.start).toBe(0);
     expect(out.startNs).toBe(1_000);
   });
 
   it('profiling keeps post-boundary requests and rebases offsets + startNs', () => {
     const out = sliceTimelineByPhase(tlDur, 'profiling');
     expect(out.requests.map((r) => r.isl)).toEqual([2]);
-    // boundary offset = 100 → rebased: start 100→0, end 300→200, ack 120→20, credit 90→-10
     expect(out.requests[0]!.start).toBe(0);
     expect(out.requests[0]!.end).toBe(200);
     expect(out.requests[0]!.ack).toBe(20);
-    // startNs shifts forward by the boundary offset so absolute time is preserved
     expect(out.startNs).toBe(1_100);
   });
 });

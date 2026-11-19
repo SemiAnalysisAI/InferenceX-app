@@ -1,30 +1,33 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import {
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
   RankingsDetailContent,
   type RankingsStrings,
 } from '@/components/live-seo/rankings-page-sections';
-import { JsonLd } from '@/components/json-ld';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { getRankingPageEntry, scenarioLabel, type RankingPageEntry } from '@/lib/rankings';
+import { JsonLd } from '@/components/seo/json-ld';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { getRankingPageEntry, scenarioLabel, type RankingPageEntry } from '@/lib/live-seo/rankings';
 import {
   rankingPageDescriptionZh,
   rankingPageHeadingZh,
   rankingPageKeywordsZh,
   rankingPageTitleZh,
-} from '@/lib/rankings-zh';
-import { getRankingPageData, type RankingPageData } from '@/lib/run-rankings-data.server';
+} from '@/lib/live-seo/rankings-zh';
+import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
+import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -48,7 +51,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRankingPageData(entry.slug);
   const title = rankingPageTitleZh(entry);
-  const description = `${data ? statLedDescriptionZh(entry, data) : rankingPageDescriptionZh(entry)}${SUPPORTERS_LINE_ZH}`;
+  const description = clampMetaDescription(
+    data ? statLedDescriptionZh(entry, data) : rankingPageDescriptionZh(entry),
+    'zh',
+  );
   const url = `${SITE_URL}/zh/rankings/${entry.slug}`;
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
@@ -56,14 +62,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: rankingPageKeywordsZh(entry),
     authors: [{ name: AUTHOR_NAME }],
     alternates: zhAlternates(`/rankings/${entry.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      locale: ZH_OG_LOCALE,
+      locale: 'zh',
       type: 'article',
-    },
-    twitter: { card: 'summary_large_image', title: `${title} | ${SITE_NAME}`, description },
+    }),
   };
 }
 
@@ -87,7 +92,7 @@ function buildFaqZh(
           },
           {
             question: `“最快”是如何衡量的？`,
-            answer: `所有平台都在相同的交互速度档位（每用户每秒 ${data.tier} token）和${workload}下读取，再按实测单 GPU 吞吐排名。推导方式与 InferenceX 总览排行榜完全一致，因此本页排名不会与仪表盘出现分歧。`,
+            answer: `所有平台都在相同的交互速度档位（每用户每秒 ${data.tier} token）和${workload}下取值，再按实测单 GPU 吞吐排名。推导方式与 InferenceX 总览排行榜完全一致，因此本页排名不会与仪表盘出现分歧。`,
           },
         ]
       : [
@@ -176,7 +181,14 @@ export default async function ZhRankingPage({ params }: Props) {
     colCost: '每百万 token 成本',
     colPrecision: '精度',
     colEngine: '推理引擎',
-    emptyState: `${entry.model.seoName} 在该工作点暂无实测数据。InferenceX 集群持续运行基准测试，新结果落地后本页会自动填充。`,
+    emptyState:
+      data.unranked.length > 0
+        ? `${entry.model.seoName} 的现有基准测试结果尚未在足够多的硬件上达到同一交互速度档位，暂时无法排名。InferenceX 集群持续运行基准测试，新结果落地后本页会自动填充。`
+        : `${entry.model.seoName} 在该工作点暂无实测数据。InferenceX 集群持续运行基准测试，新结果落地后本页会自动填充。`,
+    unrankedNote:
+      data.unranked.length > 0
+        ? `以下硬件在每用户每秒 ${data.tier} token 下暂无实测数据：${data.unranked.join('、')}。`
+        : null,
     siblingLead: entry.kind === 'fastest-gpu' ? '更关注成本而不是速度？' : '更关注速度而不是成本？',
     siblingLabel:
       entry.kind === 'fastest-gpu'
@@ -185,7 +197,7 @@ export default async function ZhRankingPage({ params }: Props) {
     methodologyHeading: '测试方法',
     methodologyBody: [
       `本页所有数字都来自实测，而非纸面规格估算。InferenceX 集群使用社区推理引擎在真实硬件上部署 ${entry.model.seoName}，通过扫描并发数绘制每个平台的吞吐与交互速度前沿曲线。`,
-      `各平台均在同一工作点（每用户每秒 ${data.tier} token）读取数据，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
+      `各平台均在同一工作点（每用户每秒 ${data.tier} token）取值，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。排行默认使用每用户每秒 ${RANKING_STANDARD_TIER} token，这是当前测试覆盖硬件最多的速度，只有其他速度能为该模型排入更多 GPU 时才会改用。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
       `推导逻辑与 InferenceX 总览排行榜共用，基准测试持续重跑，新引擎版本和新配置落地后排行会自动更新。`,
     ],
     faqHeading: '常见问题',
@@ -196,7 +208,7 @@ export default async function ZhRankingPage({ params }: Props) {
         href: `/zh/model/${entry.model.slug}`,
         label: `${entry.model.seoName} 详解：架构、评估与性能`,
       },
-      { href: '/zh/inference', label: '交互式推理仪表盘' },
+      { href: `/zh${getDashboardRoute('inference').path}`, label: '交互式推理仪表盘' },
       { href: '/zh/overview', label: '跨模型推理排行榜' },
       { href: '/zh/compare', label: 'GPU 一对一对比' },
       { href: '/zh/chips', label: 'GPU 规格与价格' },

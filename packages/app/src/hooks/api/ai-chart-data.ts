@@ -1,5 +1,5 @@
-import { metricLabel } from '@/lib/chart-utils';
-import type { Locale } from '@/lib/i18n';
+import { metricLabel } from '@/lib/charts/chart-utils';
+import type { Locale } from '@/lib/i18n/i18n';
 import type { ChartDefinition } from '@/components/inference/types';
 
 export type AiMetricDirection = 'higher' | 'lower';
@@ -24,7 +24,7 @@ const AI_RADAR_METRIC_LABELS = {
     y_inputTputPerGpu: 'Input Tput/Chip',
     y_tpPerMw: 'Tput/MW',
     y_costh: 'Cost (Hyperscaler Vol.)',
-    y_costr: 'Cost (Rent - 3 Year Commit)',
+    y_costr: 'Cost (Rent – 3-Year Commit)',
     y_jTotal: 'J/Token',
     y_jOutput: 'J/Output',
     y_jInput: 'J/Input',
@@ -34,7 +34,7 @@ const AI_RADAR_METRIC_LABELS = {
     y_outputTputPerGpu: '每芯片输出吞吐量',
     y_inputTputPerGpu: '每芯片输入吞吐量',
     y_tpPerMw: '每 MW 吞吐量',
-    y_costh: '成本（超大规模云大批量）',
+    y_costh: '成本（自有 · 超大规模云厂商批量采购）',
     y_costr: '成本（租赁 - 3 年承诺）',
     y_jTotal: '每 token 能耗',
     y_jOutput: '每输出 token 能耗',

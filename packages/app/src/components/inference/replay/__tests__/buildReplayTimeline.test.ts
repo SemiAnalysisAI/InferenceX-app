@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 import type { ChartDefinition } from '@/components/inference/types';
 
 import {
@@ -95,9 +95,9 @@ describe('buildReplayTimeline', () => {
     const c8 = t.configs.find((c) => c.configId.includes('|8|'));
     const c16 = t.configs.find((c) => c.configId.includes('|16|'));
     expect(c8?.stepValues.map((s) => s.visible)).toEqual([true, true, true]);
-    expect(c8?.stepValues[1].y).toBe(1000); // sticky-last between step 0 and step 2
+    expect(c8?.stepValues[1].y).toBe(1000);
     expect(c16?.stepValues.map((s) => s.visible)).toEqual([false, true, true]);
-    expect(c16?.stepValues[2].y).toBe(2000); // sticky-last after final observation
+    expect(c16?.stepValues[2].y).toBe(2000);
   });
 
   it('computeStepDomain returns a tight bounding box that grows as configs appear', () => {
@@ -113,36 +113,29 @@ describe('buildReplayTimeline', () => {
     const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
     const d0 = computeStepDomain(t, 0, ALL_HW);
     const d1 = computeStepDomain(t, 1, ALL_HW);
-    // Step 0: only the conc=8 config is visible. safeDomain pads degenerate
-    // single-point domains, so we just check that the bounds fit a reasonable
-    // window around the observation.
     expect(d0.x[0]).toBeLessThanOrEqual(10);
     expect(d0.x[1]).toBeGreaterThanOrEqual(10);
     expect(d0.x[1]).toBeLessThan(50);
     expect(d0.y[1]).toBeGreaterThanOrEqual(100);
     expect(d0.y[1]).toBeLessThan(500);
-    // Step 1: both configs visible, so the domain stretches to fit the new one.
     expect(d1.x[1]).toBeGreaterThanOrEqual(200);
     expect(d1.y[1]).toBeGreaterThanOrEqual(5000);
   });
 
   it('computeStepDomain respects hwFilter and shrinks to selected hardware only', () => {
     const rows = [
-      // h100 with low values
       baseRow({
         hardware: 'h100',
         framework: 'trt',
         date: '2025-01-01',
         metrics: { tput_per_gpu: 100, median_intvty: 10 },
       }),
-      // mi355x with way smaller values
       baseRow({
         hardware: 'mi355x',
         framework: 'sglang',
         date: '2025-01-01',
         metrics: { tput_per_gpu: 50, median_intvty: 5 },
       }),
-      // big-domain GPU on the same step
       baseRow({
         hardware: 'b200',
         framework: 'trt',
@@ -154,7 +147,7 @@ describe('buildReplayTimeline', () => {
     const everything = computeStepDomain(t, 0, ALL_HW);
     const mi355xOnly = computeStepDomain(t, 0, (hw) => hw.startsWith('mi355x'));
     expect(everything.x[1]).toBeGreaterThanOrEqual(400);
-    expect(mi355xOnly.x[1]).toBeLessThan(50); // padded around 5
+    expect(mi355xOnly.x[1]).toBeLessThan(50);
   });
 
   it('computeFullRunDomain spans every step, not just one frame', () => {
@@ -169,12 +162,8 @@ describe('buildReplayTimeline', () => {
     ];
     const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
     const full = computeFullRunDomain(t, ALL_HW);
-    // The fixed extent reaches the run's largest observation (step 1's conc=16
-    // config) even though it isn't present at step 0 — that's what keeps the
-    // axes constant while the early frontier sits small in the corner.
     expect(full.x[1]).toBeGreaterThanOrEqual(200);
     expect(full.y[1]).toBeGreaterThanOrEqual(5000);
-    // And it never undershoots the per-step boxes.
     const d0 = computeStepDomain(t, 0, ALL_HW);
     expect(full.x[1]).toBeGreaterThanOrEqual(d0.x[1]);
     expect(full.y[1]).toBeGreaterThanOrEqual(d0.y[1]);
@@ -199,7 +188,7 @@ describe('buildReplayTimeline', () => {
     const everything = computeFullRunDomain(t, ALL_HW);
     const mi355xOnly = computeFullRunDomain(t, (hw) => hw.startsWith('mi355x'));
     expect(everything.x[1]).toBeGreaterThanOrEqual(400);
-    expect(mi355xOnly.x[1]).toBeLessThan(50); // padded around 5, ignores b200
+    expect(mi355xOnly.x[1]).toBeLessThan(50);
   });
 
   it('separates configs that differ in concurrency or tp', () => {

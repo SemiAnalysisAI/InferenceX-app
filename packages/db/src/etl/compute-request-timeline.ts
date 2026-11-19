@@ -1,13 +1,14 @@
 /**
  * Pre-compute the per-request timeline for the agentic detail page's
- * Gantt view. Output lands in `agentic_trace_replay.request_timeline`
- * and is read directly by the timeline API route.
+ * Gantt view. Output is stored as gzip-compressed JSON in
+ * `agentic_trace_replay.request_timeline_gz` (see `request-timeline-codec.ts`)
+ * and read by the timeline, request-chart-data, and trace-histograms routes.
  *
- * Shape is a thin array — roughly 150 bytes per request before JSONB
- * compression. The largest throughput runs contain hundreds of thousands of
- * requests, so extraction must not materialize the decompressed JSONL.
+ * Shape is a thin array of compact per-request records. The largest
+ * throughput runs contain hundreds of thousands of requests, so extraction
+ * must not materialize the decompressed JSONL.
  *
- * Versioned so the backfill script knows which rows are stale — bump
+ * Versioned so the backfill script knows which rows are stale. Bump
  * `REQUEST_TIMELINE_VERSION` whenever the extraction algorithm changes.
  */
 
@@ -161,24 +162,32 @@ function replayKey(meta: RawMetadata, maps: ReplayCorrelationMaps): string | und
  * `Readable.from([blob])` is intentional: without the array wrapper Node may
  * iterate the Buffer byte-by-byte instead of passing it as one chunk.
  */
-async function* gunzipLines(blob: Buffer): AsyncGenerator<string> {
+async function* gunzipLines(blob: Buffer | (() => AsyncIterable<Buffer>)): AsyncGenerator<string> {
   const decoder = new StringDecoder('utf8');
   let carry = '';
 
-  for await (const chunk of Readable.from([blob]).pipe(createGunzip())) {
-    const text = carry + decoder.write(chunk as Buffer);
-    let lineStart = 0;
-    let newline = text.indexOf('\n');
-    while (newline !== -1) {
-      yield text.slice(lineStart, newline);
-      lineStart = newline + 1;
-      newline = text.indexOf('\n', lineStart);
+  const source = Readable.from(typeof blob === 'function' ? blob() : [blob]);
+  const gunzip = createGunzip();
+  source.on('error', (error) => gunzip.destroy(error));
+  try {
+    for await (const chunk of source.pipe(gunzip)) {
+      const text = carry + decoder.write(chunk as Buffer);
+      let lineStart = 0;
+      let newline = text.indexOf('\n');
+      while (newline !== -1) {
+        yield text.slice(lineStart, newline);
+        lineStart = newline + 1;
+        newline = text.indexOf('\n', lineStart);
+      }
+      carry = text.slice(lineStart);
     }
-    carry = text.slice(lineStart);
-  }
 
-  carry += decoder.end();
-  if (carry.length > 0) yield carry;
+    carry += decoder.end();
+    if (carry.length > 0) yield carry;
+  } finally {
+    source.destroy();
+    gunzip.destroy();
+  }
 }
 
 function parseRawRecord(line: string): RawRecord | null {
@@ -194,7 +203,9 @@ function parseRawRecord(line: string): RawRecord | null {
  * Parse the gzipped `profile_export.jsonl` blob into a chart-ready
  * timeline. Returns null on a missing or malformed blob.
  */
-export async function computeRequestTimeline(blob: Buffer | null): Promise<RequestTimeline | null> {
+export async function computeRequestTimeline(
+  blob: Buffer | (() => AsyncIterable<Buffer>) | null,
+): Promise<RequestTimeline | null> {
   if (!blob) return null;
 
   // First pass: find the timeline bounds and the first dispatch for each

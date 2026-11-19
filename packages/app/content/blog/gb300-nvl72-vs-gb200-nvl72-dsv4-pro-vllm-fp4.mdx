@@ -23,7 +23,7 @@ On DeepSeek-V4-Pro FP4 at 8K/1K with Dynamo vLLM and disaggregated prefill/decod
 
 The mechanism is **HBM headroom**. At 1.6T params, DSv4-Pro's FP4 weights alone are about 800 GB, and on GB200 the available HBM at narrow prefill shapes is tight enough that the recipe has to compromise on batch size to fit. GB300's 1.5x HBM capacity (288 vs 192 GB/GPU) holds the same model on the same shape with hundreds of GB of headroom to spare, so prefill can run a wider batch that keeps the wider decode pool saturated. After a 20% per-GPU TCO premium ($2.65 vs $2.21/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/)), GB300 still lands **2.31x cheaper per million tokens at 27 tok/s/user**. More HBM, more save.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -40,13 +40,13 @@ DeepSeek-V4-Pro is DeepSeek's flagship MoE: **1.6T total parameters with 49B act
 
 ## On-Paper Specs
 
-GB300 NVL72 (Blackwell Ultra) and GB200 NVL72 (Blackwell) share the same NVLink 5 scale-up fabric, the same 72-GPU world size, the same NVSwitch generation, and the same 8 TB/s HBM bandwidth per GPU. The deltas are HBM capacity and dense FP4. Values pulled directly from [/gpu-specs](/gpu-specs):
+GB300 NVL72 (Blackwell Ultra) and GB200 NVL72 (Blackwell) share the same NVLink 5 scale-up fabric, the same 72-GPU world size, the same NVSwitch generation, and the same 8 TB/s HBM bandwidth per GPU. The deltas are HBM capacity and dense FP4. Values pulled directly from [/infx/gpu-specs](/infx/gpu-specs):
 
 <Figure
   srcLight="/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/specs-radar-light.png"
   srcDark="/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/specs-radar-dark.png"
   alt="GPU specs radar comparing GB200 NVL72 (light green) and GB300 NVL72 (dark green) across 7 axes: Memory, Mem BW, FP4/FP8/BF16 TFLOP/s, Scale Up BW, Scale Up Domain Memory, Scale Up Domain Mem BW. GB300 sits at 100% on Memory and FP4 (sets the ceiling); GB200 sits at ~67% on both because it has 1.5x less. Both tie on Mem BW, Scale Up BW, Scale Up Domain Mem BW, FP8, BF16."
-  caption="GB200 NVL72 (light green) vs GB300 NVL72 (dark green) on /gpu-specs. Values normalized per axis to the cross-vendor max across all SKUs in the panel. The only meaningful deltas are Memory (GB300 sets the 288 GB ceiling, GB200 reads ~67%) and FP4 (GB300 sets the 15 PFLOP/s ceiling, GB200 reads ~67%). Everything else — HBM bandwidth, NVLink scale-up bandwidth, world size, FP8, BF16 — is identical."
+  caption="GB200 NVL72 (light green) vs GB300 NVL72 (dark green) on /infx/gpu-specs. Values normalized per axis to the cross-vendor max across all SKUs in the panel. The only meaningful deltas are Memory (GB300 sets the 288 GB ceiling, GB200 reads ~67%) and FP4 (GB300 sets the 15 PFLOP/s ceiling, GB200 reads ~67%). Everything else — HBM bandwidth, NVLink scale-up bandwidth, world size, FP8, BF16 — is identical."
 />
 
 | Spec                               | GB200 NVL72         | GB300 NVL72         | GB300 / GB200 |
@@ -132,13 +132,13 @@ The 50 tok/s/user row shows the cost ratio (3.03x) widening again as both curves
   caption="DeepSeek-V4-Pro 1.6T FP4 8K/1K Pareto frontier. GB300 NVL72 vs GB200 NVL72, both Dynamo vLLM, both disaggregated prefill/decode. Measured on InferenceX on 2026-05-22 (run 26306422380). Point labels denote total TP."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1), pre-filtered to GB200 NVL72 and GB300 NVL72 Dynamo vLLM on DSv4-Pro FP4 8K/1K for the 2026-05-22 run.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1), pre-filtered to GB200 NVL72 and GB300 NVL72 Dynamo vLLM on DSv4-Pro FP4 8K/1K for the 2026-05-22 run.
 
 ## Acknowledgments
 
 Thanks to NVIDIA's Dynamo and vLLM teams — including Jatin Gangani, Kedar Potdar, Sridhar Ramaswamy, Ishan Dhanani, and Sahithi Chigurupati — and the vLLM team for shipping the GB200 and GB300 DSv4-Pro recipes that made the rack-to-rack comparison possible. Companion piece: [GB200 NVL72 vs B200 on DeepSeek R1](https://inferencex.semianalysis.com/blog/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt) covers the scale-up fabric advantage one step down the SKU ladder.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

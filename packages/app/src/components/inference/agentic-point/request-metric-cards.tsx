@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react';
 
 import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
-import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
+import { ChartEmpty, ChartSkeleton } from './chart-shared';
 import { Distribution } from './distribution';
 import { ExpandableChart } from './expandable-chart';
 import { TimeSeriesChart } from './time-series-chart';
@@ -80,9 +80,6 @@ const REQUEST_CARD_STRINGS = {
   },
 } as const;
 
-// Unofficial-run overlays cannot open this persisted point-detail route: they
-// have no benchmark_results id or stored request timeline. These charts are
-// therefore intentionally limited to DB-backed agentic points.
 export function RequestMetricOverTime({
   title,
   metric,
@@ -154,8 +151,7 @@ export function RequestMetricOverTime({
       title={latencySelector ? t.overTime(metricLabel) : title}
       controls={controls}
       testId={`${metric}-over-time-chart`}
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!timeline) return isLoading ? <ChartSkeleton /> : <ChartEmpty />;
         return (
           <TimeSeriesChart
@@ -179,8 +175,8 @@ export function RequestMetricOverTime({
             durationS={timeline.durationS}
             yFmt={
               isLatency
-                ? (value) => `${value < 10 ? value.toFixed(1) : value.toFixed(0)}s`
-                : (value) => `${value.toFixed(0)}`
+                ? (value) => `${Number(value.toFixed(1))}s`
+                : (value) => `${Number(value.toFixed(1))}`
             }
             yAxisLabel={isLatency ? `${metricLabel} (s)` : `${t.interactivity} (tok/s/user)`}
             {...size}
@@ -197,7 +193,6 @@ export function SequenceMetricCard({
   timelineLoading,
 }: {
   metric: 'isl' | 'osl';
-  /** Phase-scoped timeline — distribution values + in-flight are both derived from it. */
   timeline: RequestChartData | null | undefined;
   timelineLoading: boolean;
 }) {
@@ -211,8 +206,6 @@ export function SequenceMetricCard({
     { value: 'inflight', label: t.inflight },
   ];
   const testPrefix = `${metric}-metric`;
-  // Per-request ISL/OSL for the selected phase (request_timeline carries both,
-  // so the distribution honours the warmup/profiling toggle for free).
   const values = useMemo(
     () =>
       timeline
@@ -246,8 +239,7 @@ export function SequenceMetricCard({
           buttonClassName="px-2 py-1 text-xs"
         />
       }
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (view === 'distribution') {
           if (values && values.length > 0)
             return (

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import {
+  POWER_WORKLOADS,
   powerPublicationPoint,
+  powerVerificationReceipt,
+  unmappedPowerResultIssue,
+  powerWorkloadForScenario,
+  rawPowerWorkloadOf,
   verifyPowerPublication,
   type PublishedPowerRow,
 } from './power-publication';
@@ -37,7 +42,7 @@ function expected(overrides = {}) {
     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123/attempts/2',
     { path: 'bmk_qwen3.5/results.json', sha256: 'abc' },
   );
-  if (!point) throw new Error('Fixture must be 8K/1K');
+  if (!point) throw new Error('Fixture must belong to a supported PowerX workload');
   return point;
 }
 function actual(point = expected()): PublishedPowerRow {
@@ -51,6 +56,30 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('derives the receipt predicate and the raw-row diagnostic from POWER_WORKLOADS', () => {
+    const point = (overrides: Record<string, unknown>) =>
+      powerPublicationPoint(mapBenchmarkRow({ ...raw, ...overrides }, createSkipTracker())!, '', {
+        path: '',
+        sha256: '',
+      });
+    expect(point({ isl: 4096, osl: 1024 })).toBeNull();
+    expect(rawPowerWorkloadOf({ ...raw, isl: 4096, osl: 1024 })).toBeNull();
+    for (const workload of POWER_WORKLOADS) {
+      const row =
+        workload.benchmarkType === 'agentic_traces'
+          ? { isl: undefined, osl: undefined, scenario_type: 'agentic-coding', users: 32 }
+          : { isl: workload.isl, osl: workload.osl };
+      expect(point(row)?.identity).toMatchObject({
+        benchmark_type: workload.benchmarkType,
+        isl: workload.isl,
+        osl: workload.osl,
+      });
+      expect(rawPowerWorkloadOf({ ...raw, ...row })).toBe(workload);
+    }
+    expect(powerWorkloadForScenario('1k1k')).toMatchObject({ isl: 1024, osl: 1024 });
+    expect(powerWorkloadForScenario('8k1k')).toMatchObject({ isl: 8192, osl: 1024 });
+    expect(powerWorkloadForScenario('4k1k')).toBeUndefined();
+  });
   it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
     const point = expected({
       scenario_type: 'agentic-coding',
@@ -120,6 +149,7 @@ describe('PowerX publication', () => {
   });
   it('preserves invalid diagnostics and rejects leaked invalid watts', () => {
     const point = expected({ power_valid: 0, power_invalid_reasons: ['sampling_gap_exceeded'] });
+    expect(point.metrics).toMatchObject({ power_valid: 0 });
     expect(point.metrics).not.toHaveProperty('avg_power_w');
     expect(verifyPowerPublication([point], [actual(point)], 'API')).toEqual([]);
     const row = actual(point);
@@ -132,5 +162,90 @@ describe('PowerX publication', () => {
       mapBenchmarkRow({ ...raw, benchmark_outcome: { status: 'failed' } }, tracker),
     ).toBeNull();
     expect(tracker.skips.failedRun).toBe(1);
+  });
+});
+
+describe('NVL72 CPU publication', () => {
+  it('retains CPU watts and socket provenance and rejects their loss in DB/API readback', () => {
+    const point = expected({
+      cpu_power_valid: 1,
+      avg_total_cpu_power_w: 501,
+      power_audit: {
+        ...raw.power_audit,
+        cpu: {
+          sensor_kind: 'grace_socket',
+          source: 'acpi',
+          expected_sockets: 2,
+          observed_sockets: 2,
+          reason_codes: [],
+        },
+      },
+    });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 1, avg_total_cpu_power_w: 501 });
+    expect(point.power_audit).toMatchObject({
+      cpu: { sensor_kind: 'grace_socket', observed_sockets: 2 },
+    });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    const missingCpu = actual(point);
+    delete missingCpu.metrics.cpu_power_valid;
+    delete missingCpu.metrics.avg_total_cpu_power_w;
+    expect(verifyPowerPublication([point], [missingCpu], 'API')).toContainEqual(
+      expect.stringContaining('cpu_power_valid expected 1'),
+    );
+    expect(
+      verifyPowerPublication([point], [{ ...actual(point), power_audit: raw.power_audit }], 'API'),
+    ).toContainEqual(expect.stringContaining('power_audit differs'));
+  });
+});
+
+describe('known-failed PowerX results', () => {
+  it('warns for results the benchmark marked failed', () => {
+    expect(
+      unmappedPowerResultIssue({ ...raw, isl: 8192, osl: 1024 }, true, 'bmk_a/r.json'),
+    ).toEqual({ warning: 'Known-failed 8k1k result excluded: bmk_a/r.json' });
+    expect(
+      unmappedPowerResultIssue(
+        { ...raw, isl: undefined, osl: undefined, scenario_type: 'agentic-coding', users: 32 },
+        true,
+        'bmk_agentic_a/r.json',
+      ),
+    ).toEqual({ warning: 'Known-failed agentic result excluded: bmk_agentic_a/r.json' });
+  });
+
+  it('keeps unmapped results that are not marked failed fatal', () => {
+    expect(
+      unmappedPowerResultIssue({ ...raw, isl: 1024, osl: 1024 }, false, 'bmk_b/r.json'),
+    ).toEqual({ error: 'Unmapped 1k1k result: bmk_b/r.json' });
+  });
+
+  it('ignores results outside the PowerX workloads', () => {
+    expect(unmappedPowerResultIssue({ ...raw, isl: 4096, osl: 1024 }, true, 'x.json')).toBeNull();
+    expect(unmappedPowerResultIssue({ ...raw, isl: 4096, osl: 1024 }, false, 'x.json')).toBeNull();
+  });
+
+  it('copies publication warnings into the verification receipt without failing it', () => {
+    const manifest = {
+      version: 1 as const,
+      runId: 7,
+      runAttempt: 1,
+      points: [],
+      ingestErrors: [],
+      publicationWarnings: ['Known-failed 8k1k result excluded: bmk_a/r.json'],
+      telemetryWarnings: [],
+    };
+    expect(powerVerificationReceipt(manifest, [], '2026-10-15T00:00:00Z')).toEqual({
+      runId: 7,
+      runAttempt: 1,
+      checkedAt: '2026-10-15T00:00:00Z',
+      points: 0,
+      counts: { strict: 0, invalid: 0, other: 0 },
+      status: 'no_power_points',
+      errors: [],
+      publicationWarnings: ['Known-failed 8k1k result excluded: bmk_a/r.json'],
+      telemetryWarnings: [],
+    });
+    expect(powerVerificationReceipt(manifest, ['Unmapped 1k1k result: bmk_b/r.json']).status).toBe(
+      'failed',
+    );
   });
 });

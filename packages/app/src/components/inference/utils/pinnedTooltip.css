@@ -1,0 +1,161 @@
+.inferencex-pinned-tooltip .pinned-table-scroll {
+  overflow-x: auto;
+}
+
+.inferencex-pinned-tooltip .pinned-topology {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+}
+
+.inferencex-pinned-tooltip .pinned-topology th {
+  padding: 0 6px 2px;
+  color: var(--muted-foreground);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.inferencex-pinned-tooltip .pinned-topology td {
+  padding: 2px 6px;
+  white-space: nowrap;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.inferencex-pinned-tooltip .pinned-topology :is(th, td):first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
+.inferencex-pinned-tooltip .pinned-topology :is(th, td):last-child {
+  padding-right: 0;
+}
+
+.inferencex-pinned-tooltip .pinned-latency td {
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.inferencex-pinned-tooltip .pinned-latency td:first-child {
+  width: 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.inferencex-pinned-tooltip .pinned-latency-unit {
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.inferencex-pinned-tooltip .pinned-image {
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.inferencex-pinned-tooltip .pinned-image > span {
+  margin-right: 4px;
+}
+
+.inferencex-pinned-tooltip .pinned-image p {
+  display: inline;
+  margin: 0;
+  word-break: break-all;
+}
+
+.inferencex-pinned-tooltip .pinned-facts {
+  margin-bottom: 2px;
+}
+
+.inferencex-pinned-tooltip .pinned-facts-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.inferencex-pinned-tooltip .pinned-compact-topology strong,
+.inferencex-pinned-tooltip .pinned-facts strong {
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-bar {
+  margin: 2px 0;
+}
+
+.inferencex-pinned-tooltip .pinned-bar-row {
+  display: grid;
+  grid-template-columns: fit-content(55%) minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.inferencex-pinned-tooltip .pinned-bar-row > span {
+  color: var(--muted-foreground);
+}
+
+.inferencex-pinned-tooltip .pinned-bar-row > strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inferencex-pinned-tooltip .pinned-token-track {
+  display: flex;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.inferencex-pinned-tooltip [data-token-prompt],
+.inferencex-pinned-tooltip .token-prompt-dot {
+  background: #3b82f6;
+}
+
+.inferencex-pinned-tooltip [data-token-generated],
+.inferencex-pinned-tooltip .token-generated-dot {
+  background: #a78bfa;
+}
+
+.inferencex-pinned-tooltip .pinned-token-label i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+}
+
+.inferencex-pinned-tooltip .pinned-token-count {
+  color: var(--foreground);
+}
+
+.inferencex-pinned-tooltip .pinned-subsection {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inferencex-pinned-tooltip .pinned-subsection:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}

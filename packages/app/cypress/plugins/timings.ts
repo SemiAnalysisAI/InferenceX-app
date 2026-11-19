@@ -1,0 +1,54 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import cypressSplit from 'cypress-split';
+
+import type { TimingObservation } from '../../src/lib/testing/cypress-timing-data';
+import { cypressSourceFingerprint } from '../../src/lib/testing/cypress-source-fingerprint';
+
+export function setupTimingSplit(on: Cypress.PluginEvents, config: Cypress.PluginConfigOptions) {
+  const afterRun: ((
+    results: CypressCommandLine.CypressRunResult | CypressCommandLine.CypressFailedRunResult,
+  ) => unknown)[] = [];
+  const splitOn = ((...args: unknown[]) => {
+    const [event, handler] = args;
+    if (event === 'after:run') afterRun.push(handler as (typeof afterRun)[number]);
+    else Reflect.apply(on, undefined, args);
+  }) as Cypress.PluginEvents;
+  cypressSplit(splitOn, config);
+  on('after:run', async (results) => {
+    for (const handler of afterRun) await handler(results);
+    const output = process.env.CYPRESS_TIMING_OUTPUT;
+    if (!output) return;
+    if (!('runs' in results)) throw new Error('Cypress did not return test results');
+    const observation: TimingObservation = {
+      schemaVersion: 1,
+      kind: config.testingType,
+      browser: results.browserName,
+      revision: process.env.GITHUB_SHA ?? 'local',
+      runId: process.env.GITHUB_RUN_ID ?? 'local',
+      runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? '1',
+      sourceHash: cypressSourceFingerprint(config.projectRoot),
+      shard: Number(process.env.SPLIT_INDEX1 ?? 1),
+      shards: Number(process.env.SPLIT ?? 1),
+      passed:
+        results.totalFailed === 0 &&
+        results.totalPending === 0 &&
+        results.totalSkipped === 0 &&
+        results.totalPassed > 0 &&
+        results.runs.every(
+          (run) => !run.error && run.tests.every((test) => test.state === 'passed'),
+        ),
+      durations: results.runs.map((run) => ({
+        spec: run.spec.relative.replaceAll('\\', '/'),
+        duration: run.stats.duration ?? 0,
+        tests: run.tests.map((test) => ({
+          title: test.title,
+          duration: test.duration,
+          attempts: test.attempts.length,
+        })),
+      })),
+    };
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, `${JSON.stringify(observation, null, 2)}\n`);
+  });
+}

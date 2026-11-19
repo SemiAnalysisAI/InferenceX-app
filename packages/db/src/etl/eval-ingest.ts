@@ -1,7 +1,3 @@
-/**
- * Single-row eval result insert.
- */
-
 import type postgres from 'postgres';
 
 type Sql = postgres.Sql;
@@ -15,21 +11,6 @@ export interface EvalPersistenceInput {
   metrics: Record<string, number>;
 }
 
-/**
- * Insert a single `eval_results` row for an already resolved config id.
- * On conflict `(workflow_run_id, config_id, task, isl, osl, conc)` the metrics
- * are overwritten with the latest values.
- * Nullable identities reuse the existing row under a per-run transaction lock,
- * since PostgreSQL's ordinary UNIQUE constraint treats NULL values as distinct.
- *
- * @param sql - Active `postgres` connection.
- * @param configId - Resolved `configs.id` for this result.
- * @param p - Eval fields persisted on `eval_results`.
- * @param workflowRunId - DB id of the parent `workflow_runs` row.
- * @param date - ISO date string (`YYYY-MM-DD`) for the `date` column.
- * @returns Outcome (`'new'` or `'dup'`) and the inserted/updated row's `id`,
- *   so the caller can attach related data (e.g. `eval_samples`) to it.
- */
 export function ingestEvalRow(
   sql: Sql,
   configId: number,
@@ -42,7 +23,6 @@ export function ingestEvalRow(
   }
 
   return sql.begin(async (tx) => {
-    // Serialize nullable-key writers for this run without changing historical rows.
     await tx`select id from workflow_runs where id = ${workflowRunId} for update`;
     const [existing] = await tx<{ id: number }[]>`
       update eval_results set metrics = ${tx.json(p.metrics)}

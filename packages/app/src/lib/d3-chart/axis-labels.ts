@@ -5,22 +5,12 @@ import { CHART_TYPE, px } from './typography';
 export type LabelSplitMode = 'last-space' | 'newline' | 'parens';
 
 export interface TwoRowLabelOptions {
-  /** How to split labels into rows. Default: 'last-space' */
   split?: LabelSplitMode;
-  /** Vertical offset in px. Default: 0 */
   yOffset?: number;
-  /** CSS font-size for the first row. Default: CHART_TYPE.axisLabel. */
   primarySize?: string;
-  /** CSS font-size for the second row. Default: CHART_TYPE.axisLabelSub. */
   secondarySize?: string;
 }
 
-/**
- * Split a label into [primary, secondary] based on the split mode.
- * - 'last-space': splits at the last space
- * - 'newline': splits at first \n (remaining lines joined with spaces)
- * - 'parens': splits "Base (suffix)" into ["Base", "(suffix)"]
- */
 export function splitLabel(label: string, mode: LabelSplitMode): [string, string | null] {
   if (mode === 'newline') {
     const idx = label.indexOf('\n');
@@ -32,27 +22,18 @@ export function splitLabel(label: string, mode: LabelSplitMode): [string, string
     if (!match) return [label, null];
     return [match[1], match[2].trim()];
   }
-  // last-space
   const lastSpace = label.lastIndexOf(' ');
   if (lastSpace <= 0) return [label, null];
   return [label.slice(0, lastSpace), label.slice(lastSpace + 1)];
 }
 
-/**
- * Y-axis label customizer that splits labels into two rows.
- * First row: bold (font-weight 600).
- * Second row: muted (muted-foreground).
- *
- * Supports three split modes: last-space, newline, and parens.
- */
 export function twoRowYAxisLabels(options: TwoRowLabelOptions | number = {}) {
-  // Backwards compat: accept bare number as yOffset
   const opts = typeof options === 'number' ? { yOffset: options } : options;
   const {
     split = 'last-space',
     yOffset = 0,
     primarySize = px(CHART_TYPE.axisLabel),
-    secondarySize = px(CHART_TYPE.axisLabelSub),
+    secondarySize = px(CHART_TYPE.axisLabel),
   } = opts;
 
   return (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
@@ -70,7 +51,7 @@ export function twoRowYAxisLabels(options: TwoRowLabelOptions | number = {}) {
           .attr('x', -8)
           .attr('dy', '-0.4em')
           .attr('font-size', primarySize)
-          .attr('font-weight', '600');
+          .attr('font-weight', '500');
         el.append('tspan')
           .text(secondary)
           .attr('x', -8)
@@ -82,7 +63,7 @@ export function twoRowYAxisLabels(options: TwoRowLabelOptions | number = {}) {
           .text(primary)
           .attr('x', -8)
           .attr('font-size', primarySize)
-          .attr('font-weight', '600');
+          .attr('font-weight', '500');
       }
       el.attr('text-anchor', 'end');
     });

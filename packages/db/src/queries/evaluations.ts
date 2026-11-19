@@ -8,6 +8,8 @@ export interface EvalRow {
   model: string;
   precision: string;
   spec_method: string;
+  spec_algorithm: string | null;
+  spec_draft_model: string | null;
   disagg: boolean;
   is_multinode: boolean;
   prefill_tp: number;
@@ -39,6 +41,8 @@ export async function getAllEvalResults(sql: DbClient): Promise<EvalRow[]> {
       c.model,
       c.precision,
       c.spec_method,
+      spec.spec_algorithm,
+      spec.spec_draft_model,
       c.disagg,
       c.is_multinode,
       c.prefill_tp,
@@ -60,6 +64,16 @@ export async function getAllEvalResults(sql: DbClient): Promise<EvalRow[]> {
     FROM eval_results er
     JOIN configs c ON c.id = er.config_id
     JOIN latest_workflow_runs wr ON wr.id = er.workflow_run_id
+    LEFT JOIN LATERAL (
+      SELECT
+        br.metrics ->> 'spec_algorithm' AS spec_algorithm,
+        br.metrics ->> 'spec_draft_model' AS spec_draft_model
+      FROM benchmark_results br
+      WHERE br.workflow_run_id = er.workflow_run_id
+        AND br.config_id = er.config_id
+        AND c.spec_method <> 'none'
+      LIMIT 1
+    ) spec ON true
     ORDER BY er.date DESC, c.hardware
   `;
   return rows as unknown as EvalRow[];

@@ -2,8 +2,8 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { LinkIcon } from 'lucide-react';
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: { copy: 'Copy link to section', copied: 'Link copied' },
@@ -29,9 +29,7 @@ export function HeadingLink({ id, locale = 'en' }: { id: string; locale?: Locale
             timerRef.current = setTimeout(() => setState('idle'), 300);
           }, 2000);
         },
-        () => {
-          /* clipboard denied — silent fallback */
-        },
+        () => {},
       );
     },
     [id],

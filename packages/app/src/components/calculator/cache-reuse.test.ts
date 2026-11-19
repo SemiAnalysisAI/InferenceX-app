@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
   buildCacheReuse,
@@ -71,7 +71,6 @@ function makePoint(
 
 describe('cacheShareOf', () => {
   it('reproduces the article: B200 + SGLang at concurrency 8, 12, 16', () => {
-    // Live GLM-5.2 rows, 2026-09-17. The article rounds the remainder to one decimal.
     const rows = [
       [8, 0.903, 0.06, 0.056],
       [12, 0.765, 0.192, 0.123],
@@ -89,8 +88,6 @@ describe('cacheShareOf', () => {
         ),
       ),
     );
-    // The CPU-offload figure is the HiCache host tier the article plots; the
-    // router's external figure is reported too and must not be added on top.
     expect(shares.map((s) => s?.hostSource)).toEqual(['cpu', 'cpu', 'cpu']);
     expect(shares.map((s) => formatShare(s!.hbm))).toEqual(['90.3%', '76.5%', '54.8%']);
     expect(shares.map((s) => formatShare(s!.host))).toEqual(['6.0%', '19.2%', '40.3%']);
@@ -129,7 +126,6 @@ describe('cacheShareOf', () => {
         {
           server_gpu_cache_hit_rate: 0.8,
           server_cpu_cache_hit_rate: 0.1,
-          // The descriptor is a string inside the numeric metrics bag on real rows.
           kv_offloading: 'none' as unknown as number,
         },
         { framework: 'trt', offload_mode: 'on' },
@@ -139,7 +135,6 @@ describe('cacheShareOf', () => {
   });
 
   it('clamps an over-reported runtime figure and keeps the raw total for the caveat', () => {
-    // GB300 Dynamo rows report 1.012 on occasion.
     const share = cacheShareOf(makePoint({ server_gpu_cache_hit_rate: 1.012 }));
     expect(share).toMatchObject({ hbm: 1, host: 0, unreused: 0 });
     expect(share!.reportedTotal).toBeCloseTo(1.012);
@@ -157,7 +152,6 @@ describe('cacheShareOf', () => {
       cacheShareOf(makePoint({ server_gpu_cache_hit_rate: 0.5, theoretical_cache_hit_rate: 0.97 }))!
         .theoretical,
     ).toBe(0.97);
-    // A GB300 row scraped only at the frontend: ceiling but no measured tier.
     expect(cacheShareOf(makePoint({ theoretical_cache_hit_rate: 0.97 }))).toBeNull();
     expect(cacheShareOf(makePoint({ tput_per_gpu: 100 }))).toBeNull();
     expect(
@@ -198,7 +192,6 @@ describe('buildCacheReuse', () => {
           ),
           makePoint({ server_gpu_cache_hit_rate: 0.6 }, { conc: 24 }),
         ],
-        // Another chip in the same run: not this configuration, so not drawn.
         mi355x_sglang__run0: [
           makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware: 'mi355x' }),
         ],
@@ -257,12 +250,12 @@ describe('buildCacheReuse', () => {
   });
 });
 
-describe('defaultCacheReuseGroup', () => {
-  const tiered = (n: number, hardware: string, framework: string) =>
-    Array.from({ length: n }, (_, i) =>
-      makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware, framework, conc: i + 1 }),
-    );
+const tiered = (n: number, hardware: string, framework: string) =>
+  Array.from({ length: n }, (_, i) =>
+    makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware, framework, conc: i + 1 }),
+  );
 
+describe('defaultCacheReuseGroup', () => {
   it('opens on the configuration with the most tiered rows', () => {
     const groups = {
       b300_sglang: tiered(3, 'b300', 'sglang'),
@@ -290,9 +283,15 @@ describe('defaultCacheReuseGroup', () => {
 });
 
 describe('recipe identity', () => {
-  // Kimi K3 / H200 vLLM, 2026-09: three recipes share concurrency 8 and 10 —
-  // 4×DEP8 with offload off and on, and 2×TP16. Keyed on concurrency alone the
-  // chart kept whichever row came first and mixed recipes along one sweep.
+  it('keeps DWDP variants separate and preserves the legacy default key', () => {
+    const topology = { is_multinode: true, prefill_tp: 1, prefill_num_workers: 2 };
+    const legacy = recipeKeyOf(makePoint({}, topology));
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 1 }, topology))).toBe(legacy);
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 8 }, topology))).not.toBe(legacy);
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 8 }, topology))).not.toBe(
+      recipeKeyOf(makePoint({ prefill_dwdp_size: 4 }, topology)),
+    );
+  });
   const dep8 = {
     is_multinode: true,
     prefill_tp: 8,
@@ -323,7 +322,6 @@ describe('recipe identity', () => {
     );
   const wide = (conc: number, gpu: number) =>
     makePoint({ server_gpu_cache_hit_rate: gpu }, { ...tp16, conc, offload_mode: 'off' });
-  // Interleaved the way the API returns them: offload-on first at conc 8.
   const official = [
     off(4, 0.6),
     wide(4, 0.62),

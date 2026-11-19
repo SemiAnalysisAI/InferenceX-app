@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 
-import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
+import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
 import { errorMessage, errorStatus, listRuns, sourceName } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-export async function GET(_request?: Request) {
+export async function GET(request: Request) {
   try {
     return cachedJson(
+      request,
       { source: sourceName(), runs: await listRuns() },
       { tag: operatorXCacheTag() },
     );

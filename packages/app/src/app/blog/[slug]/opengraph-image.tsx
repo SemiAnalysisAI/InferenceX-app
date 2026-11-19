@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-import { getAllPosts, getPostBySlug } from '@/lib/blog';
+import { getAllPosts, getPostBySlug } from '@/lib/blog/blog';
 
 import { renderOgImage, size } from './og-image-render';
 

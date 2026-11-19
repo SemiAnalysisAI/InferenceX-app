@@ -24,6 +24,7 @@ export interface BenchmarkSibling {
   prefill_pp: number | null;
   prefill_dcp_size: number | null;
   prefill_pcp_size: number | null;
+  prefill_dwdp_size?: number | null;
   prefill_dp_attention: boolean;
   prefill_num_workers: number;
   num_prefill_gpu: number;
@@ -115,6 +116,7 @@ export async function getBenchmarkSiblings(
         (br.metrics->>'prefill_pcp_size')::int,
         (br.metrics->>'pcp_size')::int
       ) as prefill_pcp_size,
+      (br.metrics->>'prefill_dwdp_size')::int as prefill_dwdp_size,
       c.prefill_dp_attention, c.prefill_num_workers,
       c.num_prefill_gpu, c.num_decode_gpu, c.disagg, c.is_multinode,
       (br.metrics->>'tput_per_gpu')::float8 as tput_per_gpu,
@@ -149,6 +151,7 @@ export async function getBenchmarkSiblings(
     prefill_pp: number | null;
     prefill_dcp_size: number | null;
     prefill_pcp_size: number | null;
+    prefill_dwdp_size: number | null;
     prefill_dp_attention: boolean;
     prefill_num_workers: number;
     num_prefill_gpu: number;
@@ -176,6 +179,7 @@ export async function getBenchmarkSiblings(
     prefill_pp: r.prefill_pp === null ? null : Number(r.prefill_pp),
     prefill_dcp_size: r.prefill_dcp_size === null ? null : Number(r.prefill_dcp_size),
     prefill_pcp_size: r.prefill_pcp_size === null ? null : Number(r.prefill_pcp_size),
+    prefill_dwdp_size: r.prefill_dwdp_size === null ? null : Number(r.prefill_dwdp_size),
     prefill_dp_attention: r.prefill_dp_attention,
     prefill_num_workers: r.prefill_num_workers,
     num_prefill_gpu: r.num_prefill_gpu,

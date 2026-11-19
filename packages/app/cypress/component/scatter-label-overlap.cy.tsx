@@ -1,5 +1,5 @@
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import { Precision } from '@/lib/data-mappings';
+import { Precision } from '@/lib/catalog/data-mappings';
 
 import {
   createMockChartDefinition,
@@ -19,7 +19,6 @@ interface Box {
   bottom: number;
 }
 
-/** Overlap depth of two boxes along each axis; negative means no overlap. */
 function overlap(a: Box, b: Box): { x: number; y: number } {
   return {
     x: Math.min(a.right, b.right) - Math.max(a.left, b.left),
@@ -27,14 +26,8 @@ function overlap(a: Box, b: Box): { x: number; y: number } {
   };
 }
 
-/**
- * Both axes must exceed this for a collision to count. The placement engine
- * models a text block with fixed ascent/descent constants, so a glyph's real
- * ink box can stick out by about a pixel without anything looking wrong.
- */
 const TOLERANCE_PX = 1;
 
-/** A curve dense enough that its run-name pill has point labels to land on. */
 function curve(hwKey: string, ys: number[]) {
   return ys.map((y, i) =>
     createMockInferenceData({
@@ -43,8 +36,6 @@ function curve(hwKey: string, ys: number[]) {
       y,
       conc: 2 ** (i + 3),
       precision: Precision.FP4,
-      // Widens the label in advanced mode (a disagg prefill/decode split),
-      // which is the shape that overlapped in practice.
       disagg: true,
       dp_attention: true,
       prefill_tp: 8,
@@ -92,7 +83,6 @@ function mountChart(useAdvancedLabels: boolean) {
   );
 }
 
-/** Asserts no visible point label is drawn through a visible pill. */
 function expectNoPillOverlap() {
   cy.get(`#${CHART_ID} svg .ll-bg`).should('exist');
 
@@ -113,7 +103,6 @@ function expectNoPillOverlap() {
       })
       .map((text) => ({ label: text.textContent ?? '', box: text.getBoundingClientRect() }));
 
-    // Without these the assertion below would pass on an empty chart.
     expect(pills.length, 'visible run-name pills').to.be.greaterThan(0);
     expect(points.length, 'visible point labels').to.be.greaterThan(3);
 

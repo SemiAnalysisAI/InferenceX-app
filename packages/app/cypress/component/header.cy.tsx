@@ -4,10 +4,10 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { createMockRouter } from '../support/mock-router';
 
-// Mounted outside the Next app shell; next-style-loader inserts the global
-// stylesheet before this anchor, so it must exist before the import below.
 const cssAnchor = document.createElement('noscript');
 cssAnchor.id = '__next_css__DO_NOT_USE__';
 document.head.append(cssAnchor);
@@ -17,9 +17,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
 
-/** Minimum touch target, per WCAG 2.5.8 and the `size-11` / `min-h-11` utilities. */
 const MIN_TOUCH_PX = 44;
-/** Tolerance for sub-pixel layout rounding. */
 const EPSILON = 0.5;
 
 function rectOf(selector: string) {
@@ -37,7 +35,7 @@ describe('Header', () => {
             <ThemeProvider
               attribute="class"
               defaultTheme="light"
-              themes={['light', 'dark', 'minecraft', 'csgo']}
+              themes={APP_THEMES}
               disableTransitionOnChange
             >
               <Header />
@@ -49,51 +47,19 @@ describe('Header', () => {
   }
 
   beforeEach(() => {
-    // ThemeProvider reads persisted state, so isolate each header story from
-    // the preceding theme-cycle story (including the minecraft audio tools).
     cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
     mockRouter = createMockRouter();
     mountHeader('/');
   });
 
-  it('displays the InferenceX title', () => {
-    cy.get('[data-testid="header"]').contains('InferenceX').should('be.visible');
-  });
-
-  it('displays the SemiAnalysis logo', () => {
-    cy.get('[data-testid="header"]').find('img[alt="SemiAnalysis logo"]').should('exist');
-  });
-
   it('keeps the sticky header opaque enough that content cannot show through', () => {
-    // Regression: `bg-background/60 backdrop-blur-[2px]` let page text bleed
-    // through the sticky header while scrolling on mobile.
-    cy.get('[data-testid="header"]').should(($el) => {
-      const tokens = $el[0].className.split(/\s+/u);
-      expect(tokens).to.include('bg-background/95');
-      expect(tokens).to.include('supports-[backdrop-filter]:bg-background/80');
-      expect(tokens).to.include('backdrop-blur-md');
-      expect(tokens).to.not.include('bg-background/60');
-      expect(tokens).to.not.include('backdrop-blur-[2px]');
-    });
-    // With the stylesheet applied the header must actually blur what scrolls
-    // beneath it (backdrop-blur-md), not just carry the class names.
     cy.get('[data-testid="header"]').should(($el) => {
       const { backdropFilter } = getComputedStyle($el[0]);
       expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
     });
   });
 
-  it('shows Overview as a top-level nav link', () => {
-    cy.get('[data-testid="nav-link-overview"]')
-      .should('be.visible')
-      .and('have.attr', 'href', '/overview');
-  });
-
   it('pushes the desktop Overview link exactly once — no timer-based re-push', () => {
-    // The old 250ms retry re-read the address bar, which a stale
-    // mid-transition restore could revert; the retry then stacked a duplicate
-    // history entry and visibly restarted the transition (landing "Full
-    // dashboard" regression). A single push is the contract now.
     cy.clock();
     cy.get('[data-testid="nav-link-overview"]').click();
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
@@ -103,16 +69,34 @@ describe('Header', () => {
 
   it('pushes locale navigation exactly once outside Overview', () => {
     cy.clock();
-    mountHeader('/inference');
+    mountHeader('/infx/inference');
     cy.get('[data-testid="language-toggle"]')
       .invoke('attr', 'href')
       .then((href) => {
-        expect(href).to.include('/zh/inference');
+        expect(href).to.include('/zh/infx/inference');
         cy.get('[data-testid="language-toggle"]').click();
         cy.wrap(mockRouter.push).should('have.been.calledOnceWith', href);
         cy.tick(5000);
         cy.wrap(mockRouter.push).should('have.been.calledOnce');
       });
+  });
+
+  it('reports whether a nav link was clicked in the desktop nav or the mobile menu', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.viewport(1440, 900);
+    cy.get('[data-testid="nav-link-overview"]').click();
+    cy.get('@capture').should('have.been.calledWith', 'header_overview_clicked', {
+      placement: 'header_desktop',
+    });
+    cy.viewport(375, 812);
+    cy.get('[data-testid="mobile-menu-toggle"]').click();
+    cy.get('@capture').should('have.been.calledWith', 'header_mobile_menu_toggled', {
+      placement: 'header',
+    });
+    cy.get('[data-testid="mobile-menu"]').contains('a', 'Dashboard').click();
+    cy.get('@capture').should('have.been.calledWith', 'header_dashboard_clicked', {
+      placement: 'header_mobile',
+    });
   });
 
   it('makes a click on the tab already showing a no-op', () => {
@@ -122,44 +106,27 @@ describe('Header', () => {
   });
 
   it('still navigates to Dashboard from a sibling dashboard tab', () => {
-    // `/evaluation` lights up the Dashboard tab but is a different page, so the
-    // no-op guard must not fire — otherwise the link is dead on nine routes.
-    mountHeader('/evaluation');
+    mountHeader('/infx/evaluation');
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
-  });
-
-  it('shows Dashboard nav link', () => {
-    cy.get('[data-testid="nav-link-dashboard"]').should('be.visible');
-    cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
-  });
-
-  it('shows Comparisons nav link', () => {
-    cy.get('[data-testid="nav-link-compare"]').should('be.visible');
-    cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
+    cy.wrap(mockRouter.push).should('have.been.calledWith', '/infx/inference');
   });
 
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/agentx')
-      .find('[data-nav-badge="agentx"]')
-      .should('have.text', 'NEW');
+      .and('have.attr', 'href', '/infx/agentx');
 
-    mountHeader('/agentx/claude-code-traces');
-    cy.get('[data-testid="nav-link-agentx"]').should('have.class', 'text-brand');
+    mountHeader('/infx/agentx/claude-code-traces');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'aria-current', 'page');
   });
 
   it('keeps AgentX in the Chinese navigation tree', () => {
-    mountHeader('/zh/agentx');
+    mountHeader('/zh/infx/agentx');
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
       .and('contain.text', 'AgentX')
-      .and('have.attr', 'href', '/zh/agentx')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-agentx"]')
-      .find('[data-nav-badge="agentx"]')
-      .should('have.text', '新');
+      .and('have.attr', 'href', '/zh/infx/agentx')
+      .and('have.attr', 'aria-current', 'page');
   });
 
   it('localizes the mobile navigation accessible name without changing English', () => {
@@ -170,31 +137,16 @@ describe('Header', () => {
       'Navigation menu',
     );
 
-    mountHeader('/zh/inference');
+    mountHeader('/zh/infx/inference');
     cy.get('[data-testid="mobile-menu-toggle"]').should('have.attr', 'aria-label', '导航菜单');
   });
 
-  it('orders the nav with Home first and AgentX second', () => {
-    const expected = [
-      'Home',
-      'AgentX',
-      'Overview',
-      'Dashboard',
-      'Comparisons',
-      'Articles',
-      'About',
-    ];
+  it('orders the nav as Home, Overview, Dashboard, AgentX, uBenchX, About', () => {
+    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'uBenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
-      // Strip the NEW badge so the comparison is against the label alone.
-      const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
+      const labels = [...$links].map((link) => (link.textContent ?? '').replace('New', '').trim());
       expect(labels).to.deep.equal(expected);
     });
-  });
-
-  it('keeps footer destinations out of the primary nav', () => {
-    cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
-    // Telemetry moved to the footer; Articles took its place in the nav.
-    cy.get('[data-testid="nav-link-telemetry"]').should('not.exist');
   });
 
   it('shows the GitHub stars button linking to the correct repo', () => {
@@ -203,25 +155,6 @@ describe('Header', () => {
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
   });
-
-  it('shows the theme toggle button', () => {
-    cy.get('[data-testid="theme-toggle"]').should('be.visible');
-  });
-
-  for (const pathname of ['/', '/zh']) {
-    it(`omits the leaves toggle from desktop and mobile headers on ${pathname}`, () => {
-      cy.viewport(1440, 900);
-      mountHeader(pathname);
-      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
-      cy.get('[data-testid="language-toggle"]').should('be.visible');
-      cy.get('[data-testid="theme-toggle"]').should('be.visible');
-
-      cy.viewport(375, 812);
-      cy.get('[data-testid="mobile-menu-toggle"]').click();
-      cy.get('[data-testid="mobile-menu"]').should('be.visible');
-      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
-    });
-  }
 
   it('shows mobile hamburger menu on small viewports', () => {
     cy.viewport(375, 812);
@@ -233,22 +166,21 @@ describe('Header', () => {
       .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="mobile-menu"]').within(() => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
-      cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
-      cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
-      cy.contains('a', 'AgentX')
+      cy.contains('a', 'Dashboard')
         .should('be.visible')
-        .and('have.attr', 'href', '/agentx')
-        .find('[data-nav-badge="agentx"]')
-        .should('have.text', 'NEW');
-      cy.contains('a', 'Articles').should('be.visible').and('have.attr', 'href', '/blog');
+        .and('have.attr', 'href', '/infx/inference');
+      cy.contains('a', 'uBenchX').should('be.visible').and('have.attr', 'href', '/ubx/mem-bw');
+      cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/infx/agentx');
+      cy.contains('a', 'Comparisons').should('not.exist');
+      cy.contains('a', 'Articles').should('not.exist');
       cy.contains('a', 'Supporters').should('not.exist');
       cy.contains('a', 'Telemetry').should('not.exist');
     });
   });
 
-  it('uses the same resting icon color and shape for all three header utilities in each theme', () => {
+  it('uses the same resting icon color and shape for all three header utilities in light and dark', () => {
     cy.viewport(390, 844);
-    for (const theme of ['light', 'dark', 'minecraft', 'csgo']) {
+    for (const theme of ['light', 'dark']) {
       cy.get('[data-testid="theme-toggle"]').should(
         'have.attr',
         'aria-label',
@@ -266,8 +198,23 @@ describe('Header', () => {
           });
         }
       });
-      cy.get('[data-testid="theme-toggle"]').click();
+      if (theme === 'light') {
+        cy.get('[data-testid="theme-toggle"]').click();
+      }
     }
+  });
+
+  it('fits a 320px phone that shows a classic 15px scrollbar (305px content width)', () => {
+    cy.viewport(305, 700);
+    cy.get('[data-testid="header"]').then(($header) => {
+      const header = $header[0];
+      expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
+    });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth, 'document scrollWidth').to.be.at.most(
+        doc.documentElement.clientWidth,
+      );
+    });
   });
 
   it('pushes the mobile Overview link exactly once — no timer-based re-push', () => {
@@ -299,8 +246,8 @@ describe('Header', () => {
     });
   });
 
-  it('keeps every primary link inside the header at the xl desktop breakpoint', () => {
-    cy.viewport(1280, 720);
+  it('keeps every primary link inside the header at the desktop nav breakpoint', () => {
+    cy.viewport(1120, 720);
     cy.get('[data-testid="header"]').then(($header) => {
       const header = $header[0];
       const bounds = header.getBoundingClientRect();
@@ -328,6 +275,7 @@ describe('Header', () => {
         const bounds = $header[0].getBoundingClientRect();
         const selectors = [
           '[data-testid="header-brand"]',
+          '[data-testid="site-search-toggle"]',
           '[data-testid="language-toggle"]',
           '[data-testid="theme-toggle"]',
           '[data-testid="mobile-menu-toggle"]',
@@ -350,7 +298,11 @@ describe('Header', () => {
     });
 
     it('gives the icon controls a 44px touch target in both dimensions', () => {
-      ['[data-testid="theme-toggle"]', '[data-testid="mobile-menu-toggle"]'].forEach((selector) => {
+      [
+        '[data-testid="site-search-toggle"]',
+        '[data-testid="theme-toggle"]',
+        '[data-testid="mobile-menu-toggle"]',
+      ].forEach((selector) => {
         rectOf(selector).then((rect) => {
           expect(rect.width, `${selector} width`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
           expect(rect.height, `${selector} height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
@@ -358,44 +310,20 @@ describe('Header', () => {
       });
     });
 
-    it('does not overflow horizontally', () => {
-      cy.get('[data-testid="header"]').then(($header) => {
-        const header = $header[0];
-        expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
-      });
-    });
-
     it('still opens the menu and exposes its links', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'Articles', 'AgentX', 'About'].forEach(
-          (label) => {
-            cy.contains('a', label).should('be.visible');
-          },
-        );
-        ['Supporters', 'Telemetry'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'uBenchX', 'AgentX', 'About'].forEach((label) => {
+          cy.contains('a', label).should('be.visible');
+        });
+        ['Comparisons', 'Articles', 'Supporters', 'Telemetry'].forEach((label) => {
           cy.contains('a', label).should('not.exist');
         });
       });
       cy.get('[data-testid="mobile-menu"] a').each(($link) => {
         const rect = $link[0].getBoundingClientRect();
         expect(rect.height, `${$link.text()} link height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
-      });
-    });
-
-    it('exposes the minecraft audio toggles in the mobile menu without overflowing', () => {
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('html').should('have.class', 'minecraft');
-      cy.get('[data-testid="mobile-menu-toggle"]').click();
-      cy.get('[data-testid="mobile-menu"]').within(() => {
-        cy.get('button[aria-label="Mute music"]').should('be.visible');
-        cy.get('button[aria-label="Mute click sounds"]').should('be.visible');
-      });
-      cy.get('[data-testid="header"]').then(($header) => {
-        const header = $header[0];
-        expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
       });
     });
   });

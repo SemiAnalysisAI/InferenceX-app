@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -5,7 +7,7 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: undefined }),
 }));
 
-import { getWhitepaper, WHITEPAPER_COPY } from '@/lib/whitepapers';
+import { getWhitepaper, WHITEPAPER_COPY } from '@/lib/content/whitepapers';
 
 import { WhitepaperDetailContent } from './whitepaper-detail-content';
 import { WhitepaperIndexContent } from './whitepaper-index-content';
@@ -13,13 +15,16 @@ import { WhitepaperIndexContent } from './whitepaper-index-content';
 const MI355X_SLUG = 'amd-mi355x-32b-revenue-per-gigawatt-kimi-k3';
 const HAN = /\p{Script=Han}/u;
 
+const withQueryClient = (ui: ReactNode) => (
+  <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+);
+
 function paper() {
   const found = getWhitepaper(MI355X_SLUG);
   if (!found) throw new Error(`missing whitepaper ${MI355X_SLUG}`);
   return found;
 }
 
-/** renderToStaticMarkup escapes `&` in text nodes and attributes. */
 function escapeHtml(text: string) {
   return text.replaceAll('&', '&amp;');
 }
@@ -30,7 +35,9 @@ function countOccurrences(haystack: string, needle: string) {
 
 describe('WhitepaperDetailContent', () => {
   it('renders the hero, registry KPIs, comparison bar, both figures, and the sidebar PDF card', () => {
-    const html = renderToStaticMarkup(<WhitepaperDetailContent paper={paper()} locale="en" />);
+    const html = renderToStaticMarkup(
+      withQueryClient(<WhitepaperDetailContent paper={paper()} locale="en" />),
+    );
     const { en, chart, figures } = paper();
 
     expect(html).toContain('data-testid="whitepaper-detail-page"');
@@ -56,7 +63,6 @@ describe('WhitepaperDetailContent', () => {
     expect(html).toContain(chart.tcoSourceHref);
     expect(html).toContain(escapeHtml(chart.tcoSourceTitle));
     expect(html).toContain(chart.modelLogoPath);
-    // The chip is a pure visual overlay: decorative alt text, no caption.
     expect(html).toContain('mi355x-transparent.png');
     expect(html).toContain(WHITEPAPER_COPY.en.onThisPage);
     expect(html).toContain(WHITEPAPER_COPY.en.keyNumbers);
@@ -64,7 +70,9 @@ describe('WhitepaperDetailContent', () => {
   });
 
   it('renders the Chinese page with translated chrome and no English fallbacks', () => {
-    const html = renderToStaticMarkup(<WhitepaperDetailContent paper={paper()} locale="zh" />);
+    const html = renderToStaticMarkup(
+      withQueryClient(<WhitepaperDetailContent paper={paper()} locale="zh" />),
+    );
     const { zh } = paper();
 
     expect(html).toContain(WHITEPAPER_COPY.zh.keyNumbers);
@@ -84,13 +92,12 @@ describe('WhitepaperDetailContent', () => {
 
 describe('WhitepaperIndexContent', () => {
   it('renders one card per paper with cover, KPIs, tags, and links', () => {
-    const html = renderToStaticMarkup(<WhitepaperIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<WhitepaperIndexContent locale="en" />));
     const { en, coverImagePath, tags } = paper();
 
     expect(html).toContain('data-testid="whitepaper-index-page"');
     expect(html).toContain('data-testid="whitepaper-card"');
     expect(html).toContain('data-testid="whitepaper-card-kpis"');
-    expect(html).toContain(WHITEPAPER_COPY.en.indexEyebrow);
     expect(html).toContain(WHITEPAPER_COPY.en.indexTitle);
     expect(html).toContain(en.title);
     expect(html.includes(coverImagePath) || html.includes(encodeURIComponent(coverImagePath))).toBe(
@@ -108,10 +115,9 @@ describe('WhitepaperIndexContent', () => {
   });
 
   it('renders the Chinese index with translated strings', () => {
-    const html = renderToStaticMarkup(<WhitepaperIndexContent locale="zh" />);
+    const html = renderToStaticMarkup(withQueryClient(<WhitepaperIndexContent locale="zh" />));
     const { zh } = paper();
 
-    expect(html).toContain(WHITEPAPER_COPY.zh.indexEyebrow);
     expect(html).toContain(WHITEPAPER_COPY.zh.indexTitle);
     expect(html).toContain(WHITEPAPER_COPY.zh.readSummary);
     expect(html).toContain(zh.title);

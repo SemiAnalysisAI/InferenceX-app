@@ -1,14 +1,13 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
-/**
- * Analytics-instrumented link for the AgentX optimizations pages. The pages
- * themselves are server components, so every tracked click goes through here.
- */
-interface AgentXOptimizationsLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
+interface AgentXOptimizationsLinkProps extends Omit<
+  React.ComponentProps<typeof IntentPrefetchLink>,
+  'href'
+> {
   href: string;
   analyticsEvent:
     | 'agentx_optimizations_opened'
@@ -28,7 +27,7 @@ export function AgentXOptimizationsLink({
   ...props
 }: AgentXOptimizationsLinkProps) {
   return (
-    <Link
+    <IntentPrefetchLink
       {...props}
       href={href}
       onClick={(event) => {

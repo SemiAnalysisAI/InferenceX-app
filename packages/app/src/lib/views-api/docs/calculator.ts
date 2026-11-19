@@ -1,13 +1,11 @@
-import type { ApiOperation, ApiResponse, ApiSchema } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import type { ApiOperation, ApiResponse, ApiSchema } from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import {
   text,
   queryParameter as parameter,
   parameterErrorSchema as errorSchema,
-} from '@/lib/api-documentation-helpers';
+} from '@/lib/api/api-documentation-helpers';
 
-// The 'views' group id is registered by the docs coordinator alongside the
-// route catalog entries; fragments are written against it ahead of that.
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const nearestPointSchema: ApiSchema = {
@@ -215,7 +213,7 @@ export const operations: ApiOperation[] = [
         true,
         'string',
         'Display model name or compare slug.',
-        '展示模型名称或对比 slug。',
+        '模型显示名称或对比页 slug。',
         { type: 'string' },
         'DeepSeek-V4-Pro',
       ),
@@ -319,7 +317,7 @@ export const operations: ApiOperation[] = [
         'string',
         'Numeric GitHub workflow run id to pin the snapshot to.',
         '用于固定数据快照的 GitHub workflow 运行编号（数字）。',
-        { type: 'string', pattern: '^[1-9]\\d*$' },
+        { type: 'string', pattern: String.raw`^[1-9]\d*$` },
         '123456789',
       ),
       parameter(

@@ -1,9 +1,12 @@
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { ThemeProvider } from '@/components/ui/theme-provider';
-import { APP_THEMES } from '@/lib/themes';
+import { APP_THEMES } from '@/lib/themes/themes';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 describe('ModeToggle', () => {
   beforeEach(() => {
+    cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
     cy.mount(
       <ThemeProvider
         attribute="class"
@@ -14,36 +17,29 @@ describe('ModeToggle', () => {
         <ModeToggle />
       </ThemeProvider>,
     );
+    cy.get('[data-testid="theme-toggle"]').should(
+      'have.attr',
+      'aria-label',
+      'Switch theme (currently light mode)',
+    );
   });
 
-  it('clicking toggle cycles light → dark', () => {
-    cy.get('html').should('not.have.class', 'dark');
+  it('switches from light to dark, persists the selection, and reports analytics', () => {
+    cy.get('[data-testid="theme-toggle"] svg').should('have.class', 'lucide-sun');
     cy.get('[data-testid="theme-toggle"]').click();
     cy.get('html').should('have.class', 'dark');
-  });
-
-  it('clicking toggle twice cycles light → dark → minecraft', () => {
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'dark');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
-  });
-
-  it('cycles through CS:GO and returns to light mode', () => {
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'dark');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'csgo');
+    cy.get('[data-testid="theme-toggle"]').should('not.have.attr', 'aria-expanded');
     cy.get('[data-testid="theme-toggle"]')
-      .should('have.attr', 'aria-label', 'Switch theme (currently csgo mode)')
+      .should('have.attr', 'aria-label', 'Switch theme (currently dark mode)')
       .find('svg')
-      .should('have.class', 'lucide-crosshair');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'light');
-    cy.get('html').should('not.have.class', 'csgo');
-    cy.get('html').should('not.have.class', 'dark');
-    cy.get('html').should('not.have.class', 'minecraft');
+      .should('have.class', 'lucide-moon');
+    cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+    cy.get('@capture').should('have.been.calledWith', 'theme_toggled', { theme: 'dark' });
+  });
+
+  it('keeps a native button and retains focus after activation', () => {
+    cy.get('[data-testid="theme-toggle"]').focus().click();
+    cy.get('html').should('have.class', 'dark');
+    cy.focused().should('have.attr', 'data-testid', 'theme-toggle');
   });
 });

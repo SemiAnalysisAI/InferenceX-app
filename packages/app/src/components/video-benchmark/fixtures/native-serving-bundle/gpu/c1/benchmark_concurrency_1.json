@@ -1,0 +1,1 @@
+{"max_concurrency": 1, "benchmark_start_time_unix": 1005.0, "benchmark_end_time_unix": 1065.0, "duration": 60.0, "completed": 4, "scheduled": 4, "energy_normalization": "clips", "clock": {"utc_minus_monotonic_seconds": 905.0}}

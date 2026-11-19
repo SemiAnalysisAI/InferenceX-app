@@ -1,17 +1,8 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * A percentage typed straight into the chart caption, e.g. the utilization
- * or model license fee the profit estimator assumes. Styled like the
- * caption's Cost Tier trigger (same height and outline) so the three read as
- * one row of controls. The `%` sign is a pseudo-element so the caption's
- * textContent stays the export twin's plain value.
- *
- * The owner keeps the raw string and clamps on blur; this component only
- * draws the box and sizes it to the digits typed.
- */
 export function CaptionPercentInput({
   id,
   testId,
@@ -32,7 +23,8 @@ export function CaptionPercentInput({
   return (
     <span
       className={cn(
-        'inline-flex h-6 items-center rounded-sm border border-input px-1.5 text-xs font-medium text-foreground',
+        'inline-flex items-center rounded-md border border-input px-2 text-xs font-medium text-foreground',
+        CONTROL_HEIGHT.sm,
         "after:content-['%'] hover:bg-muted/60 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-ring/50 has-[input:focus-visible]:ring-[3px]",
         className,
       )}

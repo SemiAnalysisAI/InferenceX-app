@@ -1,10 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 interface CatalogLinkCardProps {
   href: string;
@@ -16,7 +17,6 @@ interface CatalogLinkCardProps {
   event: 'run_index_entry_clicked' | 'ranking_index_entry_clicked' | 'chip_index_entry_clicked';
 }
 
-/** A scan-friendly, keyboard-visible link used by public catalog indexes. */
 export function CatalogLinkCard({
   href,
   title,
@@ -27,30 +27,30 @@ export function CatalogLinkCard({
   event,
 }: CatalogLinkCardProps) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={href}
-      className="group flex min-h-14 items-center justify-between gap-4 rounded-lg border border-border/50 bg-background/30 px-4 py-3 transition-[border-color,background-color,box-shadow] hover:border-brand/45 hover:bg-brand/5 hover:shadow-sm focus-visible:outline-none"
+      className={cn(
+        'group flex min-h-14 justify-between gap-4 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        description ? 'items-start' : 'items-center',
+      )}
       onClick={() => track(event, { slug, locale })}
     >
       <span className="min-w-0">
-        {eyebrow && (
-          <span className="mb-0.5 block text-2xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
-            {eyebrow}
-          </span>
-        )}
-        <span className="block break-words text-sm font-medium text-foreground transition-colors group-hover:text-brand">
-          {title}
-        </span>
+        {eyebrow && <span className="mb-0.5 block text-xs text-muted-foreground">{eyebrow}</span>}
+        <span className="block break-words text-sm font-medium text-foreground">{title}</span>
         {description && (
           <span className="mt-0.5 block break-words text-xs text-muted-foreground">
             {description}
           </span>
         )}
       </span>
-      <ArrowUpRight
+      <ArrowRight
         aria-hidden="true"
-        className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand"
+        className={cn(
+          'size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground',
+          description && 'mt-0.5',
+        )}
       />
-    </Link>
+    </IntentPrefetchLink>
   );
 }

@@ -1,31 +1,30 @@
 import {
   FRAMEWORK_ALIASES,
   FW_REGISTRY,
+  GPU_RUNNER_ALIASES,
   resolveFrameworkAlias,
   resolveFrameworkPartLabel,
 } from '@semianalysisai/inferencex-constants';
 
-import { type Precision, MODEL_PREFIX_MAPPING, getPrecisionLabel } from '@/lib/data-mappings';
-import { getHardwareConfig } from '@/lib/constants';
-import { getDisplayLabel } from '@/lib/utils';
+import {
+  type Precision,
+  MODEL_PREFIX_MAPPING,
+  getPrecisionLabel,
+} from '@/lib/catalog/data-mappings';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 const CHANGELOG_FRAMEWORK_KEYS = [
   ...Object.keys(FW_REGISTRY),
   ...Object.keys(FRAMEWORK_ALIASES),
 ].toSorted((a, b) => b.length - a.length);
 
-/**
- * Convert a changelog config key into the canonical hardware key used by chart
- * points and the legend. Agentic config keys append scenario details such as
- * `agentic`, `hicache`, and `pcp` after the serving framework; those are not
- * framework labels and must not become part of the legend identity.
- */
 export function changelogConfigToHwKey(
   configKey: string,
   benchmarkType?: 'single_turn' | 'agentic_traces',
 ): string | null {
   const parts = configKey.toLowerCase().split('-');
-  const gpu = parts[2];
+  const gpu = GPU_RUNNER_ALIASES[parts[2]] ?? parts[2];
   const remainder = parts.slice(3).join('-');
   if (!gpu || !remainder) return null;
 
@@ -68,10 +67,6 @@ export function formatChangelogDescription(desc: string | string[]) {
   );
 }
 
-/**
- * Check if a changelog config key matches a hwKey.
- * Normalizes both to hyphen-separated form for comparison.
- */
 export function configKeyMatchesHwKey(
   configKey: string,
   hwKey: string,
@@ -94,9 +89,6 @@ export function formatConfigKeys(key: string) {
     return `${gpu} (${frameworkLabel}) ${modelLabel} ${getPrecisionLabel(precision as Precision)}`;
   }
 
-  // Use the same hardware entry builder and display combiner as the legend so
-  // aliases, compound framework names, and model-specific spec labels cannot
-  // drift between the two surfaces.
   const hardwareLabel = getDisplayLabel(getHardwareConfig(hwKey, modelLabel));
   return `${hardwareLabel} ${modelLabel} ${getPrecisionLabel(precision as Precision)}`;
 }

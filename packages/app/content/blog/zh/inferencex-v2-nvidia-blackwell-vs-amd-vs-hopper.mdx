@@ -136,7 +136,7 @@ MI300X 和 MI325X 有了一些改进，主要来自最新的 SGLang 版本。请
   caption="来源：SemiAnalysis InferenceX"
 />
 
-GB200 Dynamo TRT-LLM disagg 也有了显著改进，最大吞吐量在一个多月内提升了 20%。我们还看到中等交互性水平的改进，这部分采用了宽 EP。这可能归因于 GB200 上日趋成熟的宽 EP 内核。
+GB200 Dynamo TRT-LLM disagg 也有了显著改进，最大吞吐量在一个多月内提升了 20%。我们还看到中等交互性水平的改进，这部分采用了宽 EP。这可能归因于 GB200 上日趋成熟的宽 EP kernel。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/db4fa8dc-176c-4224-9ab5-6ebfe8f6af9c_1493x1280.png"
@@ -167,7 +167,7 @@ B200 SGLang 自我们去年 10 月首次发布以来，FP4 和 FP8 场景均呈�
 />
 
 就 MI325X 而言，下游 ROCm 分支镜像（2025 年 10 月 5 日运行时使用）中存在的性能优化似乎并非全部都已合入官方 vLLM ROCm 镜像。
-遗憾的是，MI355X 目前仍在使用 vLLM 0.10.1 版本的分支构建 `rocm/7.0:rocm7.0_ubuntu_22.04_vllm_0.10.1_instinct_20250927_rc1`。我们本希望现在已经更新了，但不幸的是，当前的官方镜像（撰写本文时为 0.15.1）尚未针对 MI355X 进行优化，并且会遇到硬错误。我们在 MI355X 上运行 vLLM 0.14 时也曾遇到硬错误崩溃。业界消息是 vLLM 0.16.0 将最终提供 MI355X 所需的全部改进。
+遗憾的是，MI355X 目前仍在使用 vLLM 0.10.1 版本的分支构建 `rocm/7.0:rocm7.0_ubuntu_22.04_vllm_0.10.1_instinct_20250927_rc1`。我们本希望现在已经更新了，但不幸的是，当前的官方镜像（撰写本文时为 0.15.1）尚未针对 MI355X 进行优化，并且会遇到硬错误。我们在 MI355X 上运行 vLLM 0.14 时也曾遇到硬错误崩溃。业界消息是 vLLM 0.16.0 最终将提供 MI355X 所需的全部改进。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/1755b498-ab4d-4c02-b6fd-152ee538a34d_2126x1788.png"
@@ -188,7 +188,7 @@ B200 SGLang 自我们去年 10 月首次发布以来，FP4 和 FP8 场景均呈�
 
 ## 分离式推理框架
 
-NVIDIA 使用 Dynamo 作为其分离式推理方案。[Dynamo](https://docs.nvidia.com/dynamo/design-docs/overall-architecture) 是一个专为多节点分布式推理设计的推理框架，具备预填充-解码分离、请求路由和 KV 缓存 offload 等技术。它与推理引擎无关，允许我们在基准测试中使用 SGLang 和 TRT-LLM 作为后端。对于 AMD，我们使用 SGLang 配合两种不同的 KV 缓存传输框架：MoRI 和 Mooncake。[MoRI](https://github.com/rocm/mori) 是一个高性能通信接口，专注于 RDMA 和 GPU 集成，提供网络集合操作和专家并行内核等应用。Mooncake [最近加入了 PyTorch 生态系统](https://pytorch.org/blog/mooncake-joins-pytorch-ecosystem/)，支持预填充-解码分离以及多种容错多节点功能。
+NVIDIA 使用 Dynamo 作为其分离式推理方案。[Dynamo](https://docs.nvidia.com/dynamo/design-docs/overall-architecture) 是一个专为多节点分布式推理设计的推理框架，具备预填充-解码分离、请求路由和 KV 缓存 offload 等技术。它与推理引擎无关，允许我们在基准测试中使用 SGLang 和 TRT-LLM 作为后端。对于 AMD，我们使用 SGLang 配合两种不同的 KV 缓存传输框架：MoRI 和 Mooncake。[MoRI](https://github.com/rocm/mori) 是一个高性能通信接口，专注于 RDMA 和 GPU 集成，提供网络集合操作和专家并行 kernel 等应用。Mooncake [最近加入了 PyTorch 生态系统](https://pytorch.org/blog/mooncake-joins-pytorch-ecosystem/)，支持预填充-解码分离以及多种容错多节点功能。
 
 ## DeepSeek Disagg + WideEP 结果深入分析
 
@@ -199,14 +199,14 @@ NVIDIA 使用 Dynamo 作为其分离式推理方案。[Dynamo](https://docs.nvid
   caption="来源：SemiAnalysis InferenceX"
 />
 
-NVIDIA 持续为 B200/GB200 FP8 推送新更新。最新数据展示了 DeepSeek FP8 B200 TRT 单节点（MTP 启用/禁用）vs GB200 Dynamo+TRT disagg（MTP 启用/禁用）的对比。这表明在改进机架规模推理软件和 wideEP 内核方面持续投入了工程力量。
+NVIDIA 持续为 B200/GB200 FP8 推送新更新。最新数据展示了 DeepSeek FP8 B200 TRT 单节点（MTP 启用/禁用）vs GB200 Dynamo+TRT disagg（MTP 启用/禁用）的对比。这表明在改进机架规模推理软件和 wideEP kernel 方面持续投入了工程力量。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/29485790-238d-4e1d-aa48-0559c79c9855_2132x1247.png"
   caption="来源：SemiAnalysis InferenceX"
 />
 
-在比较 MI355X 分离式推理与聚合推理时，我们注意到了类似的模式。分离式推理仅在低交互性、高批次的情况下超过聚合推理。这在 FP4 下尤为明显，可能源于优化不够充分的内核。
+在比较 MI355X 分离式推理与聚合推理时，我们注意到了类似的模式。分离式推理仅在低交互性、高批次的情况下超过聚合推理。这在 FP4 下尤为明显，可能源于优化不够充分的 kernel。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/25a7c41e-fa99-4117-8e49-ac121a22bf0f_2092x1241.png"
@@ -215,7 +215,7 @@ NVIDIA 持续为 B200/GB200 FP8 推送新更新。最新数据展示了 DeepSeek
 
 在 MI355X 上将 disagg 预填充+wideEP 与 FP4 组合使用时，我们观察到性能表现不佳。
 
-虽然理论建模显示 MI355X 上的 disagg 推理应该远优于单节点，但由于 ROCm 软件栈在组合多种 SOTA 推理优化时缺乏内核和集合通信优化，disagg 在较高交互性水平下的实际表现反而更差。
+虽然理论建模显示 MI355X 上的 disagg 推理应该远优于单节点，但由于 ROCm 软件栈在组合多种 SOTA 推理优化时缺乏 kernel 和集合通信优化，disagg 在较高交互性水平下的实际表现反而更差。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/2d82d32f-089b-405d-b4ef-94b4956676ed_2078x1233.png"
@@ -236,7 +236,7 @@ TensorRT-LLM 已在全球范围内为 TogetherAI 等服务商每小时处理数�
   caption="来源：SemiAnalysis InferenceX"
 />
 
-NVL72 系列更大世界规模带来的优势也体现在成本图表上。在固定 60 tok/s/user 交互性水平下，每块 GB200 NVL GPU 产出的 token/s 略低于 B200 的三倍。
+NVL72 系列更大的并行域（world size）带来的优势也体现在成本图表上。在固定 60 tok/s/user 交互性水平下，每块 GB200 NVL GPU 产出的 token/s 略低于 B200 的三倍。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/36087d46-94e1-4629-90cb-4b0dfad1a8c1_1856x827.png"
@@ -338,7 +338,7 @@ NVL72 系列更大世界规模带来的优势也体现在成本图表上。在�
   caption="来源：SemiAnalysis InferenceX"
 />
 
-让我们利用上述发现深入分析大规模 LLM 服务的单元经济学。从上面的 OpenRouter 数据可以看到，Crusoe 以 36 tok/sec/user 的交互性提供服务，输入 token 价格为 $1.35/M，输出 token 价格为 $5.40/M。如果我们假设没有缓存命中，并且 Crusoe 至少使用了配备 MTP、disagg 和宽 EP 等 SOTA 推理技术的 H200，上述数据表明他们的成本*不超过* $0.226/M 输入 token 和 $2.955/M 输出 token，输入 token 的利润率高达 83% 毛利率（折旧计入销售成本），输出 token 的毛利率为 45%。
+让我们利用上述发现深入分析大规模 LLM 服务的单元经济学。从上面的 OpenRouter 数据可以看到，Crusoe 以 36 tok/sec/user 的交互性提供服务，输入 token 价格为 $1.35/M，输出 token 价格为 $5.40/M。如果我们假设没有缓存命中，并且 Crusoe 至少使用了配备 MTP、disagg 和宽 EP 等 SOTA 推理技术的 H200，上述数据表明他们的成本*不超过* $0.226/M 输入 token 和 $2.955/M 输出 token，输入 token 的毛利率高达 83%（折旧计入销售成本），输出 token 的毛利率为 45%。
 
 当然，这些假设可能不*完全*正确，且这些计算没有考虑停机时间或利用率不足的情况，但这展示了使用 InferenceX 数据可以进行的一些有趣分析。更多关于推理经济学的分析可以在 [SemiAnalysis Tokenomics Model](https://semianalysis.com/tokenomics-model/) 中找到。
 
@@ -390,7 +390,7 @@ TP 将每一层的权重矩阵分片到各 GPU 上。这意味着每一层的每
 
 在更高并发度下，这种权衡发生变化。较大的批次使专家激活分布更加均匀，EP 的通信和权重加载优势开始主导 TP 昂贵的逐层 all-reduce。在曲线中段，混合 TP+EP 配置在两方面取得平衡——在每个专家内使用小规模 TP 组实现负载均衡，同时在更大范围的 GPU 上使用 EP 来分摊权重并减少通信。
 
-对于更高的交互性水平（小批次），大规模扩展世界往往不能带来更强的性能。B300 通过 IB 的 disagg 与 GB300 NVL72 的性能相同，因为工作负载受延迟限制而非带宽限制。NVL72 巨大的 NVLink 带宽优势并不重要，因为即使是慢得多的 IB 链路也不会被微小的 token 批次流量所饱和。
+对于更高的交互性水平（小批次），较大的 scale-up 域往往不能带来更强的性能。B300 通过 IB 的 disagg 与 GB300 NVL72 的性能相同，因为工作负载受延迟限制而非带宽限制。NVL72 巨大的 NVLink 带宽优势并不重要，因为即使是慢得多的 IB 链路也不会被微小的 token 批次流量所饱和。
 
 预填充/解码分离也发挥了重要作用。预填充是计算密集且突发的；解码是内存带宽受限且稳态的。当它们共享同一 GPU 时，会相互干扰，导致延迟抖动和容量浪费。将它们分离到专用 GPU 池，使每个阶段运行与其特性匹配的工作负载，从而提高有效利用率。这就是为什么分离式 B200 配置在吞吐量-交互性曲线中段优于单节点 B200。PD 分离结合跨更多 GPU 通过 IB 的更宽 EP 能比将两个阶段塞入单个 8-GPU 节点更高效地分摊权重。
 
@@ -410,7 +410,7 @@ TP 将每一层的权重矩阵分片到各 GPU 上。这意味着每一层的每
   caption="来源：Nvidia GTC 2024"
 />
 
-但事实证明，笑话在他们自己身上。快进将近两年后，我们现在可以看到这并非营销炒作，Jensen 实际上一直在低调承诺 Blackwell 的性能。根据我们的测试，相比强劲的 H100 disagg+wideEP FP8 基线，Blackwell 在大规模 MoE 推理上表现出色，在 116 toks/s/user 下，GB200 NVL72 FP4 达到了高达 98x 的性能提升，GB300 NVL72 FP4 更是达到了高达 100x！也许新的 Jensen 数学法则就是：在 token 吞吐量方面，他兑现的是承诺值的两倍。买得越多，省得越多！
+但事实证明，可笑的反而是他们自己。快进将近两年后，我们现在可以看到这并非营销炒作，Jensen 实际上一直在低调承诺 Blackwell 的性能。根据我们的测试，相比强劲的 H100 disagg+wideEP FP8 基线，Blackwell 在大规模 MoE 推理上表现出色，在 116 toks/s/user 下，GB200 NVL72 FP4 达到了高达 98x 的性能提升，GB300 NVL72 FP4 更是达到了高达 100x！也许新的 Jensen 数学法则就是：在 token 吞吐量方面，他兑现的是承诺值的两倍。买得越多，省得越多！
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/70638c7e-69a6-43f2-96a4-23766bcabbd2_2121x1248.png"
@@ -482,7 +482,7 @@ TP 将每一层的权重矩阵分片到各 GPU 上。这意味着每一层的每
 
 虽然 AMD 在单节点 FP4 上表现尚可，在 FP8 分布式推理上与 B200 SGLang 具有竞争力，但当前 AMD 开源推理栈的问题在于：虽然各个推理优化单独表现良好，但实际客户部署时会将多种优化组合使用。顶级 AI 实验室都同时启用 FP4 **配合**分离式推理**配合**宽专家并行，问题正出在这里。
 
-AMD 软件仍未达标，SemiAnalysis 和 AMD 内部的理论极限建模都表明，对于 FP4，分离式推理配合宽专家并行应该优于 MI355X 单节点推理。遗憾的是，软件仍然是 AMD GPU 的巨大瓶颈。AMD 管理层需要继续优化工程人才的资源配置——例如，将工程资源从无人使用的单节点宠物项目（如 ATOM）转移到修复上述推理优化可组合性问题上。当前不佳的软件表现源于缺乏聚焦和优先级设置不当。所有顶级实验室已在使用分离式推理和宽专家并行；AMD 需要停止专注于单节点，大力投入多节点推理的开源方案。
+AMD 软件仍未达标，SemiAnalysis 和 AMD 内部的理论极限建模都表明，对于 FP4，分离式推理配合宽专家并行应该优于 MI355X 单节点推理。遗憾的是，软件仍然是 AMD GPU 的巨大瓶颈。AMD 管理层需要继续优化工程人才的资源配置——例如，将工程资源从无人使用、却备受偏爱的单节点项目（如 ATOM）转移到修复上述推理优化可组合性问题上。当前不佳的软件表现源于缺乏聚焦和优先级设置不当。所有顶级实验室已在使用分离式推理和宽专家并行；AMD 需要停止专注于单节点，大力投入多节点推理的开源方案。
 
 AMD 在开源分布式推理、宽专家并行和 FP4 可组合性方面落后超过六个月，[NVIDIA 和 SGLang 团队六个月前就已展示了他们在 DeepSeek 上的 NVFP4 性能。](https://lmsys.org/blog/2025-09-25-gb200-part-2/)
 
@@ -493,20 +493,20 @@ AMD 在开源分布式推理、宽专家并行和 FP4 可组合性方面落后�
 
 ## AMD ATOM 引擎
 
-AMD 推出了名为 ATOM 的新推理引擎。ATOM 能提供略好的单节点性能，但在许多关键功能上完全缺失，导致无法用于真实工作负载。例如，它不支持 NVMe 或 CPU KV cache offload、工具解析、宽专家并行或分离式服务。这导致生产环境中没有任何客户使用它。与 NVIDIA 的 TRTLLM 不同——后者在 TogetherAI 等公司全球范围内每小时生成数十亿 token，[并且支持工具解析和其他功能](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve/trtllm-serve.html#cmdoption-trtllm-serve-serve-tool_parser)——由于上述功能缺失，目前没有任何 token 工厂在使用 ATOM。
+AMD 推出了名为 ATOM 的新推理引擎。ATOM 能提供略好的单节点性能，但在许多关键功能上完全缺失，导致无法用于真实工作负载。例如，它不支持 NVMe 或 CPU KV cache offload、工具解析、宽专家并行或分离式服务。这导致生产环境中没有任何客户使用它。与 NVIDIA 的 TRTLLM 不同——后者在全球范围内为 TogetherAI 等公司每小时生成数十亿 token，[并且支持工具解析和其他功能](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve/trtllm-serve.html#cmdoption-trtllm-serve-serve-tool_parser)——由于上述功能缺失，目前没有任何 token 工厂在使用 ATOM。
 
 此外，vLLM 等开源推理引擎的维护者对 AMD 感到失望，原因是 AMD 提供的工程和 GPU 资源不足。例如，vLLM 首席维护者 Simon Mo 在 GitHub RFC 中表示，他仍然没有可用的 MI355X 来添加到 vLLM CI 中，因此用户体验不佳。vLLM 上目前没有任何 MI355X 测试，而 NVIDIA 的 B200 在 vLLM 上有大量测试。同样，vLLM 上的 MI300X CI 机器数量仍然不够。上游 vLLM 至少还需要 20 台 MI300 机器、20 台 MI325 机器和 20 台 MI355X 机器才能达到与 CUDA 相同的可用性水平。
 
 在 SemiAnalysis，我们一直在推动 AMD 为 vLLM 贡献更多计算资源，并在最近几周取得了一些成果。vLLM 将开始获得几台 MI355X 机器，使其 CI 测试覆盖率从 0% 提升到非零水平。我们将在即将发布的"AMD 现状"文章中详细讨论 AMD 此前对 vLLM、SGLang、PyTorch CI 机器贡献不足的情况，以及 Anush 如何开始着手解决这一问题。在 SemiAnalysis，我们将建立内部仪表板来跟踪 AMD 和 NVIDIA 在 vLLM、SGLang、PyTorch 和 JAX 上运行的测试数量和质量。
 
-此外，vLLM 维护者表示，由于机器资源不足，他们无法为 ROCm 提供首日 vLLM 支持。这一巨大的上市时间差距导致 ROCm 持续落后，给 NVIDIA 留下了继续收取高达 75% 毛利率（4 倍成本加价）的巨大空间。
+此外，vLLM 维护者表示，由于机器资源不足，他们无法为 ROCm 提供首日 vLLM 支持。这一巨大的上市时间差距导致 ROCm 持续落后，给 NVIDIA 留下了继续维持高达 75% 的毛利率（4 倍成本加价）的巨大空间。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/96fd0617-347d-49a1-a971-19e42faeab25_1435x1289.png"
   caption="来源：Github"
 />
 
-最后，AMD 没有足够的提交者"通过功能引导和代码所有权展示持续的上游参与"，并且缺乏能审核自身代码的审稿人。这就是为什么 ROCm vLLM 的开发速度远慢于 CUDA vLLM。
+最后，AMD 没有足够的提交者"通过主导功能推进和代码所有权展示持续的上游参与"，并且缺乏能审核自身代码的审稿人。这就是为什么 ROCm vLLM 的开发速度远慢于 CUDA vLLM。
 
 AMD 有许多才华横溢的优秀工程师在 ATOM 上工作，我们鼓励 AMD 管理层考虑将这些优秀工程师重新部署到人们实际使用的库和框架上，如 vLLM 和 SGLang。
 
@@ -558,7 +558,7 @@ AMD 有许多才华横溢的优秀工程师在 ATOM 上工作，我们鼓励 AMD
   caption="来源：SemiAnalysis InferenceX"
 />
 
-关于 MTP 性能数据的有效性，有人可能会认为合成数据集的分布不能代表真实数据。然而，比较 MTBench 和我们的 1k1k 基准测试之间的 MTP 接受行为，我们发现分布非常相似，这证实了我们的 InferenceX 基准测试是真实世界生产性能的良好代理。话虽如此，InferenceX 并非完美，我们始终在寻求改进。如果您想加入我们的使命，[请在此申请加入我们的特别项目团队](https://app.dover.com/apply/semianalysis/2a9c8da5-6d59-4ac8-8302-3877345dbce1)。
+关于 MTP 性能数据的有效性，有人可能会认为合成数据集的分布不能代表真实数据。然而，对比 MTBench 与我们的 1k1k 基准测试的 MTP 接受行为，我们发现分布非常相似，这证实了我们的 InferenceX 基准测试是真实世界生产性能的良好代理。话虽如此，InferenceX 并非完美，我们始终在寻求改进。如果您想加入我们的使命，[请在此申请加入我们的特别项目团队](https://app.dover.com/apply/semianalysis/2a9c8da5-6d59-4ac8-8302-3877345dbce1)。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/6c4a7c01-3d56-486d-b959-cb4b6468f56f_2408x1390.png"
@@ -567,7 +567,7 @@ AMD 有许多才华横溢的优秀工程师在 ATOM 上工作，我们鼓励 AMD
 
 ## 精度评估
 
-吞吐量优化有时会悄然牺牲精度（例如通过过于激进的接受率放松、解码调整、数值不稳定的内核或端点配置错误）。如果没有评估，一个配置错误的服务器（截断、错误的解码、错误的端点参数）仍然可以产生很好的吞吐量数字，但输出的答案却是垃圾。例如，这一额外的检查层帮助我们发现了 GPT-OSS 的某些 DP 注意力实现的问题。
+吞吐量优化有时会悄然牺牲精度（例如通过过于激进的接受率放松、解码调整、数值不稳定的 kernel 或端点配置错误）。如果没有评估，一个配置错误的服务器（截断、错误的解码、错误的端点参数）仍然可以产生很好的吞吐量数字，但输出的答案却是垃圾。例如，这一额外的检查层帮助我们发现了 GPT-OSS 的某些 DP 注意力实现的问题。
 
 现在，每个代表性吞吐量配置都附带了数值精度检查。目前我们仅使用 GSM8k，但由于这是一个非常简单的基准测试，评估分数可能不会因数值计算差异而有太大变化，更难的基准测试可能会在数值精度方面产生更大的差异。因此，我们计划在未来扩展到更难的测试，如 GPQA、HLE、MATH-500、SWE-Bench verified。
 
@@ -582,7 +582,7 @@ AMD 有许多才华横溢的优秀工程师在 ATOM 上工作，我们鼓励 AMD
 
 Anthropic 最近伴随 Opus 4.6 发布了"[fast mode](https://code.claude.com/docs/en/fast-mode)"。其价值主张是：相同的模型质量，约 2.5 倍的速度提升，约 6-12 倍的价格。这两个数字可能都令人意外，一些用户推测[这一定需要新硬件](https://x.com/Yuchenj_UW/status/2020214926133063705)。实际上并不需要。这本质上就是那个根本性权衡在起作用。任何模型都可以在广泛的交互性水平（每用户 token/s）范围内提供服务，每百万 token 的成本（CPMT）会相应变化。用我们的类比来说，梅赛德斯既造公交车也造跑车。
 
-精打细算的人可能认为 fast mode 更贵，但如果从总拥有成本的角度来看，fast mode 在某些情况下实际上要便宜得多。例如，一个 GB200 NVL72 机架可以花费 330 万美元，因此，如果 Claude Code 的智能体循环（在生产中运行在 Trainium 上）通过工具调用使用 NVL72 机架，而这些机架的推理速度慢了 2.5x，您就需要 2.5x 更多的机架来提供推理服务，这意味着不启用 fast mode 将额外花费近 500 万美元。
+精打细算的人可能认为 fast mode 更贵，但如果从总拥有成本的角度来看，fast mode 在某些情况下实际上要便宜得多。例如，一台 GB200 NVL72 机架的成本可达 330 万美元，因此，如果 Claude Code 的智能体循环（在生产中运行在 Trainium 上）通过工具调用使用 NVL72 机架，而这些机架的推理速度慢了 2.5x，您就需要 2.5x 更多的机架来提供推理服务，这意味着不启用 fast mode 将额外花费近 500 万美元。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/cad37655-7b9a-4c86-81a8-3314ad0526fe_1694x348.png"
@@ -776,7 +776,7 @@ Anthropic 最近伴随 Opus 4.6 发布了"[fast mode](https://code.claude.com/do
 
 MI300X、MI325X、H200 和 H100 集中在吞吐量 vs 交互性图的左下方，表明它们之间的权衡大致相似，NVIDIA 通常保持适度领先。下一个层级是 MI355X，在给定交互性水平下每 GPU 的 token 吞吐量大约提升 2 倍以上。在 MI355X 中，ATOM 将曲线向低交互性高吞吐量方向移动，表明它优先考虑峰值吞吐量而非每用户响应速度。
 
-在这一层级之上是 NVIDIA 的 B200 和 GB200，它们在整个前沿线上都优于 MI355X。虽然 B200 和 GB200 共享相同的 Blackwell 计算核心，但 GB200 实现了更高的吞吐量-交互性曲线，因为该平台和服务栈减少了大规模部署中的非计算瓶颈（互连/拓扑、CPU-GPU 耦合和运行时调度），从而实现了有效的横向扩展和更低的每 token 开销。
+在这一层级之上是 NVIDIA 的 B200 和 GB200，它们在整个前沿线上都优于 MI355X。虽然 B200 和 GB200 共享相同的 Blackwell 计算 die，但 GB200 实现了更高的吞吐量-交互性曲线，因为该平台和服务栈减少了大规模部署中的非计算瓶颈（互连/拓扑、CPU-GPU 耦合和运行时调度），从而实现了有效的横向扩展和更低的每 token 开销。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/478b3a9a-c57d-4766-bde1-c3ee1fef550a_2068x1178.png"
@@ -790,7 +790,7 @@ MI300X、MI325X、H200 和 H100 集中在吞吐量 vs 交互性图的左下方�
   caption="来源：SemiAnalysis InferenceX"
 />
 
-再次回到 B200 与 GB200 NVL72 的比较，NVL72 的影响显而易见。我们在本文前面讨论了 GB200 NVL72 的 72 GPU 扩展世界规模与 B200 的 8 GPU 扩展世界规模的影响。在约 100 tok/s/user 的交互性范围内，每 GPU 的输出 token 吞吐量翻了一倍以上，展示了 NVL72 更大扩展域的影响。
+再次回到 B200 与 GB200 NVL72 的比较，NVL72 的影响显而易见。我们在本文前面讨论了 GB200 NVL72 的 72 GPU scale-up 域与 B200 的 8 GPU scale-up 域的影响。在约 100 tok/s/user 的交互性范围内，每 GPU 的输出 token 吞吐量翻了一倍以上，展示了 NVL72 更大 scale-up 域的影响。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/0186cfbc-1b42-46ae-ae1a-0d7791afcb20_2081x1306.png"
@@ -815,7 +815,7 @@ MI300X、MI325X、H200 和 H100 集中在吞吐量 vs 交互性图的左下方�
 
 在 InferenceX v1 发布后不久，我们意识到不充分利用 AI 会让多少开发吞吐量白白浪费。因此，我们卷起袖子决定拥抱 Claude Code，开始一次一个 token 地吸收智能，达到了目前每天 $6,000 的消费速率。如果您想为我们年化吸收 300 万美元 Claude 智能的 KPI 做贡献，[请在此申请加入使命。](https://app.dover.com/apply/semianalysis/2a9c8da5-6d59-4ac8-8302-3877345dbce1) 我们的启蒙之旅始于发现 GitHub Copilot agent 是免费的——起初我们简直不敢相信这个功能居然不收费！很快我们意识到 Copilot 很糟糕，也就明白了为什么 GitHub 要免费赠送。要让我们继续用它，恐怕*得倒贴钱*给我们才行。
 
-自 Claude Code 发布以来，我们一直在本地使用它。但最近，我们将 Claude Code 集成到了 InferenceX 的开发中，除了常规的 PR 审查等任务外，还赋予了它在集群上执行扫描的能力。通过我们搭建的工作流，Claude 可以手动启动运行、查看结果并进行迭代。这使我们能够通过 GitHub 应用轻松地在移动中部署快速修复。
+自 Claude Code 发布以来，我们一直在本地使用它。但最近，我们将 Claude Code 集成到了 InferenceX 的开发中，除了常规的 PR 审查等任务外，还赋予了它在集群上执行扫描的能力。通过我们搭建的工作流，Claude 可以手动启动运行、查看结果并进行迭代。这使我们能够通过 GitHub 应用随时随地轻松部署快速修复。
 
 另一个酷炫的用例是使用 Claude 为新的 vLLM/SGLang 镜像寻找配方。当新镜像发布时，配方有时需要更新以实现最佳性能（新环境变量、修改的引擎参数等）。通过我们的 Claude Code 集成，我们只需打开一个 issue 并要求 Claude 搜索镜像 changelog 中的所有提交，以找到需要添加到配方中的必要变更。这效果相当好，虽然不*完美*，但通常能提供一个良好的起点。
 

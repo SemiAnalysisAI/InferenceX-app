@@ -1,21 +1,55 @@
 import { GET as derived } from '@/app/api/v1/derived-agentic-metrics/route';
+import {
+  defaultInferenceHardware,
+  defaultInferenceXAxisMode,
+} from '@/components/inference/utils/model-defaults';
 import { preferVrDefaultRun, VR_DEFAULT_RUN } from '@/components/inference/default-run-preference';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
-import type { TokenRevenuePricing } from '@/components/inference/types';
+import {
+  buildEqualServiceComparison,
+  equalServiceSourceKey,
+  getEqualServiceComparisonCurve,
+  getEqualServiceSources,
+  getPrefillSharePoints,
+  getRolePoints,
+  type EqualServiceComparison,
+  type EqualServiceEstimate,
+} from '@/components/inference/utils/equal-service-comparison';
+import {
+  buildMatchedConcurrencyTable,
+  type MatchedConcurrencySide,
+  type MatchedConcurrencyTable,
+} from '@/components/inference/utils/matched-concurrency';
+import {
+  buildPowerBreakdowns,
+  powerBreakdownInteractivity,
+} from '@/components/inference/utils/power-breakdown';
+import { buildPowerFits } from '@/components/inference/utils/power-fit';
+import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
+import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
+import type {
+  InferenceData,
+  AggDataEntry,
+  TokenRevenuePricing,
+} from '@/components/inference/types';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import type { TcoBasis } from '@/lib/constants';
+import type { TcoBasis } from '@/lib/catalog/constants';
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
-  type Model,
+  Model,
   Percentile,
   PERCENTILE_OPTIONS,
   Sequence,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
+import { buildHeadroomRows, HEADROOM_INTERACTIVITIES } from '@/lib/power/headroom';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,
+  parseNumberParam,
   validateParams as validateViewParams,
   parseBoolParam,
   parseDateParam,
@@ -31,6 +65,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
@@ -43,18 +78,24 @@ import {
 } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { X_AXIS_MODES, type XAxisMode } from '@/components/inference/hooks/chart-data-core';
 import { POWER_TIER_ORDER } from '@/components/inference/utils/quickFilters';
-import { cachedJson } from '@/lib/api-cache';
-import { getCachedBenchmarks, getCachedBenchmarksForRun } from '@/lib/benchmark-query-cache.server';
+import { cachedJson } from '@/lib/cache/api-cache';
+import {
+  getCachedBenchmarks,
+  getCachedBenchmarksForRun,
+} from '@/lib/benchmarks/benchmark-query-cache.server';
 
-import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
-import { loadFixture } from '@/lib/test-fixtures';
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 
 import {
@@ -68,7 +109,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/v1/views/inference
  *
- * Chart-ready series for the main /inference scatter chart: the same dedupe →
+ * Chart-ready series for the main /infx/inference scatter chart: the same dedupe →
  * transform → filter → remap → Pareto pipeline `useChartData` runs client-side,
  * executed server-side via `buildInferenceSeries` (lib/views-api/series.ts).
  *
@@ -91,6 +132,7 @@ interface InferenceViewParams {
   readonly precisionsExplicit: boolean;
   readonly metric: string;
   readonly xmode: SeriesXMode;
+  readonly xstat: 'mean' | 'median';
   readonly xmetric: string;
   readonly percentile: string;
   readonly date?: string;
@@ -104,7 +146,9 @@ interface InferenceViewParams {
   readonly optimal: boolean;
   readonly best: boolean;
   readonly tcoBasis: TcoBasis;
+  readonly chipBasis: ChipBasis;
   readonly power: readonly ('certified' | 'legacy')[];
+  readonly topologies: readonly string[];
   readonly allPoints: boolean;
   readonly userCosts: Record<string, number>;
   readonly userPowers: Record<string, number>;
@@ -146,6 +190,7 @@ function buildView(
     precisions: resolvedPrecisions,
     metricConfigKey: parseMetricParam(params.metric),
     xmode: params.xmode,
+    fixedSequenceStatistic: params.xstat,
     xmetric: params.xmetric,
     gpus: params.gpus,
     quickFilters: {
@@ -156,10 +201,12 @@ function buildView(
       // Measured-power tier pills are a dashboard-only affordance; the API
       // returns every row regardless of power certification, like the default view.
       power: [...params.power],
+      topologies: [...params.topologies],
     },
     optimal: params.optimal,
     best: params.best,
     tcoBasis: params.tcoBasis,
+    chipBasis: params.chipBasis,
     allPoints: params.allPoints,
     userCosts: params.userCosts,
     userPowers: params.userPowers,
@@ -170,7 +217,14 @@ function buildView(
   return { resolvedPrecisions, result };
 }
 
-function csvRows(data: InferenceViewData) {
+function csvRows(data: { result: Pick<InferenceSeriesResult, 'series' | 'tableRows'> }) {
+  if (data.result.tableRows)
+    return data.result.tableRows.map(({ metrics, ...row }) => ({
+      ...row,
+      ...Object.fromEntries(
+        Object.entries(metrics).map(([key, value]) => [`metric_${key}`, value]),
+      ),
+    }));
   return data.result.series.flatMap((entry) =>
     entry.points.map((point) => ({
       hwKey: entry.hwKey,
@@ -184,6 +238,7 @@ function csvRows(data: InferenceViewData) {
       x: point.x,
       y: point.y,
       concurrency: point.concurrency,
+      topologyKey: point.topologyKey,
       tp: point.tp,
       date: point.date,
       runId: point.runId ?? '',
@@ -194,6 +249,64 @@ function csvRows(data: InferenceViewData) {
       ),
     })),
   );
+}
+
+/** Keep public endpoint provenance without serializing internal chart objects. */
+function observedPointIdentity(point: InferenceData) {
+  return {
+    id: point.id ?? null,
+    sourceKey: equalServiceSourceKey(point),
+    hwKey: point.hwKey,
+    precision: point.precision,
+    concurrency: point.conc,
+    topologyKey: pointTopologyKey(point),
+    date: point.actualDate ?? point.date,
+    runUrl: point.run_url ?? null,
+    recipeFingerprint: point.recipe_fingerprint ?? null,
+    image: point.image ?? null,
+  };
+}
+
+const estimate = (value: EqualServiceEstimate | null) =>
+  value === null
+    ? null
+    : {
+        ...value,
+        endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
+          ...endpoint,
+          point: observedPointIdentity(point),
+        })),
+      };
+
+function publicServiceComparison(comparison: EqualServiceComparison) {
+  return {
+    ...comparison,
+    metrics: Object.fromEntries(
+      Object.entries(comparison.metrics).map(([key, metric]) => [
+        key,
+        { ...metric, baseline: estimate(metric.baseline), comparator: estimate(metric.comparator) },
+      ]),
+    ),
+  };
+}
+
+function publicMatchedSide(side: MatchedConcurrencySide) {
+  if (side.status === 'observed')
+    return { status: side.status, values: side.values, point: observedPointIdentity(side.point) };
+  if (side.status === 'ambiguous')
+    return { status: side.status, points: side.points.map(observedPointIdentity) };
+  return side;
+}
+
+function publicMatchedConcurrency(table: MatchedConcurrencyTable) {
+  return {
+    ...table,
+    rows: table.rows.map((row) => ({
+      ...row,
+      baseline: publicMatchedSide(row.baseline),
+      comparator: publicMatchedSide(row.comparator),
+    })),
+  };
 }
 
 export function GET(request: NextRequest) {
@@ -209,7 +322,7 @@ export function GET(request: NextRequest) {
       search.get('xmode'),
       'xmode',
       X_AXIS_MODES,
-      'interactivity',
+      defaultInferenceXAxisMode(displayName),
     );
     // The trace-derived mode has no server-side data source; resolve it to the
     // interactivity chart (the dashboard applies the same fallback on fixed-seq).
@@ -217,6 +330,7 @@ export function GET(request: NextRequest) {
       requestedXMode === 'e2e-normalized-interactivity' && sequence !== Sequence.AgenticTraces
         ? 'interactivity'
         : requestedXMode;
+    const xstat = parseEnumParam(search.get('xstat'), 'xstat', ['mean', 'median'], 'median');
     const xmetric = parseEnumParam(search.get('xmetric'), 'xmetric', XMETRIC_VALUES, 'p90_ttft');
     const percentile = parseEnumParam(
       search.get('percentile'),
@@ -226,7 +340,10 @@ export function GET(request: NextRequest) {
     );
     const date = parseDateParam(search.get('date'), 'date');
     const runId = parseRunIdParam(search.get('runId'));
-    const gpus = parseFreeListParam(search.get('gpus'));
+    const gpus =
+      !search.has('gpus') && displayName === Model.Qwen3_5
+        ? [...defaultInferenceHardware(displayName, new Set(Object.keys(HW_REGISTRY)))]
+        : parseFreeListParam(search.get('gpus'));
     const vendors = parseVendorsParam(search.get('vendors'));
     const frameworks = parseFrameworkFamiliesParam(search.get('frameworks'));
     const deployment = parseDeploymentParam(search.get('deployment'));
@@ -238,8 +355,35 @@ export function GET(request: NextRequest) {
       !isBestPerSkuDefaultOff(displayName as Model, sequence),
     );
     const format = parseFormatParam(search.get('format'));
+    const serviceCompare = parseBoolParam(search.get('serviceCompare'), 'serviceCompare', false);
+    const roleShare = parseBoolParam(search.get('roleShare'), 'roleShare', false);
+    const powerFit = parseBoolParam(search.get('powerFit'), 'powerFit', false);
+    const powerBreakdown = parseBoolParam(search.get('powerBreakdown'), 'powerBreakdown', false);
+    const headroom = parseBoolParam(search.get('headroom'), 'headroom', false);
+    const requestedServiceBaseline = search.get('serviceBaseline');
+    const requestedServiceComparator = search.get('serviceComparator');
+    const serviceTarget = search.has('serviceTarget')
+      ? parseNumberParam(search.get('serviceTarget'), 'serviceTarget', 0, { min: Number.MIN_VALUE })
+      : null;
+    if (serviceTarget !== null && serviceTarget <= 0)
+      throw new ViewsApiParamError('serviceTarget', 'serviceTarget must be positive');
+    if (format === 'csv' && (serviceCompare || roleShare || powerFit || powerBreakdown || headroom))
+      throw new ViewsApiParamError(
+        'format',
+        'Equal-service, role-share, power-fit, power-breakdown and headroom panels require format=json',
+      );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
+    // Topology keys are opaque values returned by this view, not case-folded names.
+    const topologies = [
+      ...new Set(
+        (search.get('topologies') ?? '')
+          .split(',')
+          .map((key) => key.trim())
+          .filter(Boolean),
+      ),
+    ].toSorted();
     const allPoints = parseBoolParam(search.get('allPoints'), 'allPoints', false);
     const userCosts = parseNumberMap(search.get('userCosts'), 'userCosts');
     const userPowers = parseNumberMap(search.get('userPowers'), 'userPowers');
@@ -265,6 +409,7 @@ export function GET(request: NextRequest) {
       precisionsExplicit: precisions.length > 0,
       metric,
       xmode,
+      xstat,
       xmetric,
       percentile,
       ...(date ? { date } : {}),
@@ -277,7 +422,9 @@ export function GET(request: NextRequest) {
       optimal,
       best,
       tcoBasis,
+      chipBasis,
       power,
+      topologies,
       allPoints,
       userCosts,
       userPowers,
@@ -326,10 +473,16 @@ export function GET(request: NextRequest) {
         await getCachedBenchmarks([...dbModelKeys], VR_DEFAULT_RUN.date, true),
       );
     const data = await project(rows, params);
+    const observedPoints = [...data.result.observedPoints];
+    // Service/role panels pool every scope's observed points; the payload omits them.
+    const collectObserved = ({ observedPoints: points, ...result }: InferenceSeriesResult) => {
+      observedPoints.push(...points);
+      return result;
+    };
     const comparisons = await Promise.all(
       scopes.map(async (scope) => {
         const comparison = await project(await fetchRows(scope.params), scope.params);
-        return { entry: scope.entry, ...comparison.result };
+        return { entry: scope.entry, ...collectObserved(comparison.result) };
       }),
     );
     const overlayRows = await unofficialRows(request);
@@ -339,9 +492,100 @@ export function GET(request: NextRequest) {
           overlayRows.filter((row) => row.run_url === url),
           params,
         );
-        return { runUrl: url, ...overlay.result };
+        return { runUrl: url, ...collectObserved(overlay.result) };
       }),
     );
+
+    const serviceSources = serviceCompare ? getEqualServiceSources(observedPoints) : [];
+    const serviceBaseline = requestedServiceBaseline ?? serviceSources[0]?.key ?? '';
+    const serviceComparator = requestedServiceComparator ?? serviceSources[1]?.key ?? '';
+    const serviceOptions = {
+      baseline: serviceBaseline,
+      comparator: serviceComparator,
+      xField: data.result.xAxis.field as keyof AggDataEntry,
+    };
+    const servicePanels = serviceCompare
+      ? {
+          serviceSources,
+          equalServiceComparison:
+            serviceTarget === null
+              ? null
+              : publicServiceComparison(
+                  buildEqualServiceComparison(observedPoints, {
+                    ...serviceOptions,
+                    target: serviceTarget,
+                  }),
+                ),
+          equalServiceCurve: getEqualServiceComparisonCurve(observedPoints, serviceOptions).map(
+            publicServiceComparison,
+          ),
+          matchedConcurrency: publicMatchedConcurrency(
+            buildMatchedConcurrencyTable(observedPoints, {
+              baseline: serviceBaseline,
+              comparator: serviceComparator,
+              // The dashboard reads streaming speed at the selected statistic.
+              interactivityField: resolveServiceField('median_intvty', {
+                isAgentic: sequence === Sequence.AgenticTraces,
+                percentile,
+                fixedSequenceStatistic: xstat,
+              }),
+            }),
+          ),
+        }
+      : {};
+    const rolePanel = roleShare
+      ? {
+          roleEnergyShares: getPrefillSharePoints(observedPoints, serviceOptions.xField).map(
+            ({ point, ...energy }) => ({
+              ...energy,
+              point: observedPointIdentity(point),
+              decodeShare: 100 - energy.prefillShare,
+            }),
+          ),
+          rolePoints: getRolePoints(observedPoints, serviceOptions.xField).map(
+            ({ point, ...role }) => ({ ...role, point: observedPointIdentity(point) }),
+          ),
+        }
+      : {};
+    const fitPanel = powerFit
+      ? {
+          powerFits: buildPowerFits(observedPoints).map(({ observations, ...fit }) => ({
+            ...fit,
+            observations: observations.map(({ point, ...observation }) => ({
+              ...observation,
+              point: observedPointIdentity(point),
+            })),
+          })),
+        }
+      : {};
+    const breakdownInteractivity = powerBreakdownInteractivity(serviceOptions.xField);
+    const breakdownPanel = powerBreakdown
+      ? {
+          powerBreakdowns: buildPowerBreakdowns(observedPoints, 'en', breakdownInteractivity).map(
+            ({ points, ...series }) => ({
+              ...series,
+              interactivityField: breakdownInteractivity.field,
+              modelRevision: SYSTEM_POWER_MODEL_REVISION,
+              points: points.map(({ point, configKey: _configKey, ...entry }) => ({
+                ...entry,
+                point: observedPointIdentity(point),
+              })),
+            }),
+          ),
+        }
+      : {};
+
+    // PowerX headroom table: avg and P90 W per chip, % TDP and headroom at four
+    // interactivities, read along each chip's frontier with the chart's interpolation.
+    const headroomPanel = headroom
+      ? {
+          headroom: {
+            interactivities: [...HEADROOM_INTERACTIVITIES],
+            interactivityField: breakdownInteractivity.field,
+            rows: buildHeadroomRows(observedPoints),
+          },
+        }
+      : {};
 
     const resolvedParams = {
       model: displayName,
@@ -349,6 +593,7 @@ export function GET(request: NextRequest) {
       precisions: data.resolvedPrecisions,
       metric,
       xmode,
+      xstat: sequence === Sequence.AgenticTraces ? null : xstat,
       xmetric,
       percentile,
       date: date ?? null,
@@ -358,10 +603,12 @@ export function GET(request: NextRequest) {
       frameworks,
       deployment,
       spec,
+      topologies,
       optimal,
       best,
       format,
       tcoBasis,
+      chipBasis,
       power,
       allPoints,
       userCosts,
@@ -369,6 +616,14 @@ export function GET(request: NextRequest) {
       priceSource,
       dates,
       unofficialrun: search.get('unofficialrun') ?? null,
+      serviceCompare,
+      serviceBaseline: serviceCompare ? serviceBaseline : null,
+      serviceComparator: serviceCompare ? serviceComparator : null,
+      serviceTarget: serviceCompare ? serviceTarget : null,
+      roleShare,
+      powerFit,
+      powerBreakdown,
+      headroom,
     };
 
     if (format === 'csv') {
@@ -383,7 +638,7 @@ export function GET(request: NextRequest) {
       ]);
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'inference',
       apiVersion: 'v1',
       params: resolvedParams,
@@ -392,10 +647,16 @@ export function GET(request: NextRequest) {
       frontier: data.result.frontier,
       hardware: data.result.hardware,
       series: data.result.series,
+      ...(data.result.tableRows === undefined ? {} : { tableRows: data.result.tableRows }),
       count: data.result.count,
       comparisons,
       overlays,
       pricing,
+      ...servicePanels,
+      ...rolePanel,
+      ...fitPanel,
+      ...breakdownPanel,
+      ...headroomPanel,
     });
   });
 }

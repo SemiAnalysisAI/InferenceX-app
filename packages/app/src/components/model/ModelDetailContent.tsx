@@ -1,12 +1,15 @@
-import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
-import { JsonLd } from '@/components/json-ld';
+import { KatexStyles } from '@/components/blog/katex-styles';
+import { JsonLd } from '@/components/seo/json-ld';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import { compileBlogMdx } from '@/lib/blog-mdx';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import type { Locale } from '@/lib/i18n';
-import type { ModelPage } from '@/lib/model-pages';
+import { compileBlogMdx } from '@/lib/blog/blog-mdx';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import type { Locale } from '@/lib/i18n/i18n';
+import type { ModelPage } from '@/lib/catalog/model-pages';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import EmbeddedModelDashboard from './EmbeddedModelDashboard';
@@ -17,7 +20,9 @@ import {
   modelDashboardHref,
   modelEnglishArticleHref,
   modelIndexHref,
+  modelInferenceHref,
 } from './model-page-copy';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export default async function ModelDetailContent({
   slug,
@@ -29,7 +34,7 @@ export default async function ModelDetailContent({
   locale: Locale;
 }) {
   const { meta, entry, raw } = page;
-  const { content } = await compileBlogMdx(raw);
+  const { content, hasMath } = await compileBlogMdx(raw, locale);
   const scenario = comparisonScenarioForModel(entry);
   const dashboardQuery = new URLSearchParams({
     g_model: entry.displayName,
@@ -37,6 +42,7 @@ export default async function ModelDetailContent({
     i_optimal: '1',
   });
   const t = MODEL_PAGE_COPY[locale];
+  const inferenceHref = modelInferenceHref(slug, locale);
   const localePrefix = locale === 'zh' ? '/zh' : '';
   const pageUrl = `${SITE_URL}${localePrefix}/model/${slug}`;
 
@@ -72,20 +78,20 @@ export default async function ModelDetailContent({
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <Card>
           <header>
-            <p className="text-sm text-muted-foreground mb-2">
-              <Link
-                href={`${localePrefix}/inference`}
+            <p className="mb-2 text-sm text-muted-foreground">
+              <IntentPrefetchLink
+                href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}
-              </Link>{' '}
+              </IntentPrefetchLink>{' '}
               /{' '}
-              <Link
+              <IntentPrefetchLink
                 href={modelIndexHref(locale)}
                 className="hover:text-foreground transition-colors"
               >
                 {t.modelBreadcrumb}
-              </Link>
+              </IntentPrefetchLink>
             </p>
             <div className="flex items-center gap-3">
               <ModelDeveloperLogo
@@ -93,12 +99,24 @@ export default async function ModelDetailContent({
                 locale={locale}
                 className="size-8 lg:size-10"
               />
-              <Heading as="h1" level="page">
+              <Heading as="h1" level="page" className="text-balance">
                 {meta.title}
               </Heading>
             </div>
-            <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.description}</p>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
+            <p className="mt-3 max-w-3xl text-base text-muted-foreground">{meta.description}</p>
+            {inferenceHref && (
+              <Button
+                asChild
+                variant="outline"
+                className="mt-4 h-auto min-h-11 whitespace-normal py-2 text-left md:min-h-9"
+              >
+                <IntentPrefetchLink href={inferenceHref} data-testid="model-inference-link">
+                  {t.inferenceBenchmarksLink(meta.title)}
+                  <ArrowRight aria-hidden="true" />
+                </IntentPrefetchLink>
+              </Button>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>{meta.developer}</span>
               <span>&middot;</span>
               <span>
@@ -106,53 +124,52 @@ export default async function ModelDetailContent({
               </span>
             </div>
           </header>
-          <div
-            className="mt-6 overflow-x-auto rounded-xl border border-border/40 bg-muted/10 p-3 md:p-5"
-            data-testid="model-architecture-diagram"
-          >
+          <div className="mt-8 overflow-x-auto" data-testid="model-architecture-diagram">
             <ModelArchitectureInline displayName={entry.displayName} />
           </div>
-          <div className="mt-6 pt-6 border-t border-border/40">
-            {locale === 'zh' && (
+          <div className="mt-8 border-t border-border/30 pt-8">
+            {locale === 'zh' && page.contentLocale !== 'zh' && (
               <aside
                 role="note"
                 data-testid="model-english-article-notice"
-                className="mb-6 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+                className="mb-6 rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
               >
                 <p>{t.englishArticleNotice}</p>
-                <Link
+                <IntentPrefetchLink
                   href={modelEnglishArticleHref(slug)}
-                  className="mt-2 inline-flex text-primary hover:underline"
+                  className="mt-2 inline-flex font-medium text-foreground underline-offset-4 hover:underline"
                 >
                   {t.englishArticleLink}
-                </Link>
+                </IntentPrefetchLink>
               </aside>
             )}
+            {hasMath && <KatexStyles />}
             <article
               data-testid="model-page-article"
-              lang={locale === 'zh' ? 'en' : undefined}
-              className="prose prose-neutral dark:prose-invert max-w-none blog-prose"
+              lang={locale === 'zh' ? (page.contentLocale ?? 'en') : undefined}
+              className="prose prose-neutral dark:prose-invert max-w-4xl blog-prose"
             >
               {content}
             </article>
           </div>
         </Card>
         <Card data-testid="model-page-dashboard">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold mb-1">
+              <h2 className="mb-1 text-lg font-semibold">
                 {t.dashboardHeading(meta.title, scenario.label)}
               </h2>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 {t.dashboardDescription(entry.label, scenario.label)}
               </p>
             </div>
-            <Link
+            <IntentPrefetchLink
               href={modelDashboardHref(dashboardQuery.toString(), locale)}
-              className="text-sm text-primary hover:underline whitespace-nowrap"
+              className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-foreground underline-offset-4 hover:underline"
             >
               {t.openDashboard}
-            </Link>
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </IntentPrefetchLink>
           </div>
           <EmbeddedModelDashboard displayName={entry.displayName} sequence={scenario.sequence} />
         </Card>

@@ -5,7 +5,7 @@ const { mockGetLatestBenchmarks, mockUnofficial, mockCachedJson, mockCachedText 
   () => ({
     mockGetLatestBenchmarks: vi.fn(),
     mockUnofficial: vi.fn(),
-    mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+    mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
     mockCachedText: vi.fn(
       (data: string, contentType: string) =>
         new Response(data, { headers: { 'Content-Type': contentType } }),
@@ -25,8 +25,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
 
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
 
-vi.mock('@/lib/api-cache', () => ({
-  // Pass-through: the route's cachedQuery wrapper must not hide the query args.
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
@@ -34,9 +33,9 @@ vi.mock('@/lib/api-cache', () => ({
 
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import { buildGpuGroups } from '@/components/calculator/throughput-data';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { Percentile, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 
 import { GET } from './route';
 
@@ -82,7 +81,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/** Two operating points bracketing the default 35 tok/s/user target. */
 const FIXTURE_ROWS: BenchmarkRow[] = [
   makeRow({ conc: 8 }),
   makeRow({
@@ -134,7 +132,7 @@ describe('GET /api/v1/views/calculator', () => {
     expect(body.params).toMatchObject({
       model: 'DeepSeek-V4-Pro',
       sequence: '1k/1k',
-      precisions: ['fp4'], // auto-resolved: only precision in the rows
+      precisions: ['fp4'],
       target: 35,
       mode: 'interactivity-to-throughput',
       costProvider: 'costh',
@@ -152,7 +150,6 @@ describe('GET /api/v1/views/calculator', () => {
     expect(entry.nearest.above).toMatchObject({ interactivity: 50, throughput: 900 });
     expect(entry.fleet).toBeUndefined();
 
-    // Parity: the exact pure pipeline the dashboard runs on these rows.
     const { grouped } = buildGpuGroups(toCalculatorBenchmarkRows(FIXTURE_ROWS, '1k/1k'), {
       sequence: Sequence.OneK_OneK,
       precisions: ['fp4'],
@@ -171,6 +168,81 @@ describe('GET /api/v1/views/calculator', () => {
     expect(entry.cost.total).toBeCloseTo(expected!.cost, 10);
     expect(entry.tpPerMw).toBeCloseTo(expected!.tpPerMw, 10);
     expect(entry.concurrency).toBe(expected!.concurrency);
+  });
+
+  describe('chipBasis', () => {
+    const DISAGG_ROWS = [8, 16].map((conc) =>
+      makeRow({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        conc,
+        metrics: {
+          median_intvty: conc === 8 ? 50 : 30,
+          tput_per_gpu: conc === 8 ? 900 : 1500,
+          input_tput_per_gpu: conc === 8 ? 3000 : 5000,
+          output_tput_per_gpu: conc === 8 ? 100 : 166,
+        },
+      }),
+    );
+    const view = async (query: string) => {
+      mockGetLatestBenchmarks.mockResolvedValue(DISAGG_ROWS);
+      const response = await GET(
+        request(`/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k&${query}`),
+      );
+      return { status: response.status, body: await response.json() };
+    };
+
+    it('defaults to pool and echoes the resolved basis', async () => {
+      const { status, body } = await view('costType=output');
+      expect(status).toBe(200);
+      expect(body.params.chipBasis).toBe('pool');
+    });
+
+    it('rejects an unknown basis with the allowed values', async () => {
+      const { status, body } = await view('chipBasis=decode');
+      expect(status).toBe(400);
+      expect(body.param).toBe('chipBasis');
+      expect(body.allowed).toEqual(['pool', 'total']);
+    });
+
+    it.each(['pool', 'total'] as const)(
+      'matches the dashboard calculator math on the %s basis',
+      async (chipBasis) => {
+        const { body } = await view(`costType=output&chipBasis=${chipBasis}`);
+        expect(body.params.chipBasis).toBe(chipBasis);
+        const [entry] = body.hardware;
+        const { grouped } = buildGpuGroups(toCalculatorBenchmarkRows(DISAGG_ROWS, '1k/1k'), {
+          sequence: Sequence.OneK_OneK,
+          precisions: ['fp4'],
+          percentile: Percentile.P90,
+          tokenType: 'output',
+          chipBasis,
+          classify: (hwKey) => ({ key: hwKey, meta: { hwKey } }),
+        });
+        const expected = interpolateForGPU(
+          grouped[entry.hwKey],
+          35,
+          'interactivity_to_throughput',
+          'costh',
+        )!;
+        expect(entry.outputThroughput).toBeCloseTo(expected.outputTputValue, 10);
+        expect(entry.inputThroughput).toBeCloseTo(expected.inputTputValue, 10);
+      },
+    );
+
+    it('divides output by every chip on the total basis', async () => {
+      const poolView = await view('chipBasis=pool');
+      const totalView = await view('chipBasis=total');
+      const pool = poolView.body.hardware[0];
+      const total = totalView.body.hardware[0];
+      expect(total.outputThroughput).toBeCloseTo((pool.outputThroughput * 12) / 16, 9);
+      expect(total.inputThroughput).toBeCloseTo((pool.inputThroughput * 4) / 16, 9);
+      expect(total.value).toBeCloseTo(pool.value, 9);
+    });
   });
 
   it('canonicalizes list params: gpu base key and full hwKey select the same group', async () => {
@@ -250,7 +322,6 @@ describe('GET /api/v1/views/calculator', () => {
     const [entry] = body.hardware;
     expect(entry.fleet).not.toBeNull();
     expect(entry.fleet.chips).toBeGreaterThan(0);
-    // The fleet streams the whole interpolated total rate.
     expect(entry.fleet.totalTokPerSec).toBeCloseTo(entry.fleet.chips * entry.value, 6);
     expect(entry.fleet.concurrentUsers).toBeGreaterThan(0);
   });
@@ -263,7 +334,6 @@ describe('GET /api/v1/views/calculator', () => {
     );
     const body = await response.json();
     const [entry] = body.hardware;
-    // 1200 tok/s/gpu sits between the 900 and 1500 measurements.
     expect(entry.value).toBeGreaterThan(30);
     expect(entry.value).toBeLessThan(50);
     expect(entry.clamped).toBe(false);
@@ -275,7 +345,6 @@ describe('GET /api/v1/views/calculator', () => {
     );
     const body = await response.json();
     expect(body.costCap).toHaveLength(1);
-    // A cap this loose never binds, so the config serves its full measured range.
     expect(body.costCap[0].maxInteractivity).toBe(50);
   });
 

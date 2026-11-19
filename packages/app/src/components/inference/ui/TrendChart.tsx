@@ -1,6 +1,6 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useMemo } from 'react';
 
@@ -10,60 +10,99 @@ import {
   type ZoomContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
-import {
-  applyHoverState,
-  applyNormalState,
-  formatLargeNumber,
-  getShapeKeyForPrecision,
-  logTickFormat,
-} from '@/lib/chart-rendering';
-import { getChartWatermark } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
+import type { AnyScale } from '@/lib/d3-chart/chart-update';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
+import { SERIES_LINE_PATTERNS, frameworkDasharray } from '@/lib/charts/framework-dash';
+import { type Precision, getChartWatermark, getPrecisionLabel } from '@/lib/catalog/data-mappings';
+import { updateRepoUrl } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { fmt as formatExact } from '@/components/inference/utils/tooltipUtils';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
-interface TrendChartProps {
+export interface TrendChartProps {
   trendLines: Map<string, TrendDataPoint[]>;
   lineConfigs: TrendLineConfig[];
   yLabel: string;
   logScale: boolean;
-  /** Unique ID for this chart instance (used for SVG clip path IDs). Defaults to 'trend'. */
   chartId?: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Selected precisions, in selection order; controls scatter-point shape assignment. */
+  footer?: React.ReactNode;
   selectedPrecisions?: readonly string[];
+  lowerIsBetter?: boolean;
 }
 
-const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
+const CHART_MARGIN = { top: 20, right: 30, bottom: 64, left: 66 };
+
+const DAY_MS = 86_400_000;
+const DAY_TICK_STEPS = [1, 2, 3, 7, 14];
+const MONTH_TICK_STEPS = [1, 2, 3, 6];
+const MIN_DATE_TICKS = 3;
+
+/**
+ * About `count` UTC date ticks with equal gaps: whole days on a grid fixed to Mondays
+ * (1970-01-05 is day 4), so panning keeps the same dates, else months or years. Takes the
+ * coarsest step within `count`, unless it leaves fewer than three ticks and a finer one exists.
+ */
+function evenDateTicks(start: Date, end: Date, count: number): Date[] {
+  const stop = new Date(end.getTime() + 1);
+  const days = (end.getTime() - start.getTime()) / DAY_MS;
+  const candidates = [
+    ...DAY_TICK_STEPS.map(
+      (step) => () =>
+        d3.utcDay
+          .range(start, stop)
+          .filter((day) => (Math.round(day.getTime() / DAY_MS) - 4) % step === 0),
+    ),
+    ...MONTH_TICK_STEPS.map((step) => () => d3.utcMonth.every(step)?.range(start, stop) ?? []),
+    () => d3.utcYear.every(Math.ceil(days / 365.25 / count))?.range(start, stop) ?? [],
+  ];
+  let finer: Date[] | undefined;
+  for (const candidate of candidates) {
+    const ticks = candidate();
+    if (ticks.length <= count) return ticks.length < MIN_DATE_TICKS && finer ? finer : ticks;
+    finer = ticks;
+  }
+  return finer ?? [];
+}
 
 const STRINGS = {
   en: {
-    dismiss: 'Click elsewhere to dismiss',
-    noData: 'No historical data found for the tracked configurations.',
+    noData: 'No historical data found for the tracked configurations',
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     aria: 'Historical performance trend chart',
+    date: 'Date',
+    interpolatedAt: (target: number) => `Interpolated at ${target} tok/s/user`,
+    target: 'Target interactivity',
+    precision: 'Precision',
+    sourceDates: 'Source run dates',
+    run: (id: number) => `Run ${id}`,
   },
   zh: {
-    dismiss: '点击其他区域关闭',
-    noData: '当前追踪的配置暂无历史数据。',
+    noData: '当前追踪的配置暂无历史数据',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     aria: '历史性能趋势图表',
+    date: '日期',
+    interpolatedAt: (target: number) => `插值于 ${target} tok/s/user`,
+    target: '目标交互性',
+    precision: '精度',
+    sourceDates: '来源运行日期',
+    run: (id: number) => `运行 ${id}`,
   },
 } as const;
 
-/** Prepared line data point with parsed date and timestamp for D3 scales. */
 interface PreparedPoint {
   date: Date;
   value: number;
-  /** Interactivity value from interpolation. */
   interactivity: number;
   raw: TrendDataPoint;
-  /** Timestamp in ms — used as the x-coordinate in line/point layers. */
   ts: number;
-  /** Precision string for shape rendering. */
   precision: string;
-  /** Mapped for renderScatterPoints: x = ts, y = value. */
   x: number;
   y: number;
 }
@@ -77,6 +116,7 @@ const TrendChart = React.memo(
     chartId = 'trend',
     legendElement,
     caption,
+    footer,
     selectedPrecisions,
   }: TrendChartProps) => {
     const locale = useLocale();
@@ -100,7 +140,6 @@ const TrendChart = React.memo(
         }),
       [],
     );
-    // All data points flattened for computing axis domains — only from VISIBLE configs
     const visibleConfigIds = useMemo(() => new Set(lineConfigs.map((c) => c.id)), [lineConfigs]);
 
     const allPoints = useMemo(() => {
@@ -118,7 +157,6 @@ const TrendChart = React.memo(
       return points;
     }, [trendLines, visibleConfigIds]);
 
-    // Prepare line data: Record<safeId, PreparedPoint[]> and a flat array for renderPoints
     const { lineDataRecord, flatPointData } = useMemo(() => {
       const record: Record<string, { x: number; y: number }[]> = {};
       const flat: PreparedPoint[] = [];
@@ -152,14 +190,12 @@ const TrendChart = React.memo(
       return { lineDataRecord: record, flatPointData: flat };
     }, [lineConfigs, trendLines]);
 
-    // Reverse lookup: safeId -> config
     const safeIdToConfig = useMemo(() => {
       const map = new Map<string, TrendLineConfig>();
       for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/gu, '_'), c);
       return map;
     }, [lineConfigs]);
 
-    // Stable callback to find which config a PreparedPoint belongs to
     const getPointConfig = useCallback(
       (d: PreparedPoint): TrendLineConfig | undefined => {
         for (const config of lineConfigs) {
@@ -171,7 +207,6 @@ const TrendChart = React.memo(
       [lineConfigs, trendLines],
     );
 
-    // Compute scale domains
     const xScaleConfig = useMemo<ScaleConfig>(() => {
       if (allPoints.length === 0) {
         return { type: 'time', domain: [new Date(), new Date()] };
@@ -187,7 +222,6 @@ const TrendChart = React.memo(
       const valueExtent = d3.extent(allPoints, (d) => d.value) as [number, number];
       const dataMin = valueExtent[0];
       const dataMax = valueExtent[1];
-      // Pad a degenerate extent so the axis renders multiple ticks instead of one raw float.
       const yRange =
         dataMax - dataMin > 0 ? dataMax - dataMin : Math.max(Math.abs(dataMax) * 0.1, 1);
       let yMin: number;
@@ -208,7 +242,6 @@ const TrendChart = React.memo(
         : { type: 'linear', domain: [yMin, yMax], nice: true };
     }, [allPoints, logScale]);
 
-    // Apply logTickFormat to the y-axis after render (needs the built scale)
     const applyLogTickFormat = useCallback(
       (ctx: Pick<RenderContext, 'layout' | 'yScale' | 'renderedYScale'>) => {
         if (!logScale) return;
@@ -242,6 +275,9 @@ const TrendChart = React.memo(
           lines: lineDataRecord,
           config: {
             getColor: (key: string) => safeIdToConfig.get(key)?.color ?? '#888',
+            getStrokeDasharray: SERIES_LINE_PATTERNS
+              ? (key: string) => frameworkDasharray(safeIdToConfig.get(key)?.hwKey ?? '') ?? 'none'
+              : undefined,
             strokeWidth: 2,
             curve: d3.curveMonotoneX,
             isDefined: (d: { x: number; y: number }) =>
@@ -264,47 +300,104 @@ const TrendChart = React.memo(
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'crosshair' as const,
-        content: (d: PreparedPoint, isPinned: boolean) =>
-          `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
-            ${isPinned ? `<div class="text-muted-foreground text-3xs mb-1 italic">${t.dismiss}</div>` : ''}
-            <div class="font-semibold mb-1" style="color: ${getPointConfig(d)?.color ?? '#888'}">${getPointConfig(d)?.label ?? ''}</div>
-            <div class="text-muted-foreground">${locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}</div>
-            <div class="mt-1 font-medium">${yLabel}: ${formatLargeNumber(d.value)}</div>
-          </div>`,
+        proximityHover: true,
+        getDataX: (d: PreparedPoint) => d.x,
+        getDataY: (d: PreparedPoint) => d.y,
+        content: (d: PreparedPoint) => {
+          const config = getPointConfig(d);
+          return chartHoverCard(
+            {
+              title: config?.label ?? '',
+              subtitle: dateFormatter.format(new Date(d.raw.date)),
+              color: config?.color ?? '#888',
+              metrics: [{ value: formatLargeNumber(d.value), label: axisLabelUnit(yLabel) }],
+              summary: t.interpolatedAt(d.raw.x),
+            },
+            { pinned: false },
+          );
+        },
+        details: (d: PreparedPoint, _isOverlay: boolean, close: () => void) => {
+          const config = getPointConfig(d);
+          const sources = d.raw.sources ?? [];
+          const sourceDates = [...new Set(sources.map((source) => source.date))].toSorted();
+          const runs = [...new Map(sources.map((source) => [source.runId, source])).values()];
+          return (
+            <ChartPointDetails
+              title={config?.label ?? ''}
+              color={config?.color ?? '#888'}
+              date={dateFormatter.format(new Date(d.raw.date))}
+              metrics={[
+                { value: formatLargeNumber(d.value), label: yLabel, exact: formatExact(d.value) },
+              ]}
+              rows={[
+                { label: t.precision, value: getPrecisionLabel(d.precision as Precision) },
+                { label: t.target, value: `${d.raw.x} tok/s/user` },
+                ...(sourceDates.some((date) => date !== d.raw.date)
+                  ? [{ label: t.sourceDates, value: sourceDates.join(', '), wide: true }]
+                  : []),
+              ]}
+              links={runs.map((source) => ({
+                action: `run-${source.runId}`,
+                label: t.run(source.runId),
+                href: updateRepoUrl(source.runUrl),
+                external: true,
+              }))}
+              onClose={close}
+            />
+          );
+        },
         getRulerX: (d: PreparedPoint, xScale: any) => xScale(d.x),
         getRulerY: (d: PreparedPoint, yScale: any) => yScale(d.y),
-        onHoverStart: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
-          applyHoverState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, selectedPrecisions ?? []),
-          ),
-        onHoverEnd: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
-          applyNormalState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, selectedPrecisions ?? []),
-          ),
         onPointClick: (d: PreparedPoint) => {
           const config = getPointConfig(d);
           if (config)
             track('inference_trend_point_clicked', { config: config.hwKey, date: d.raw.date });
         },
-        attachToLayer: 1,
       }),
-      [dateFormatter, getPointConfig, locale, selectedPrecisions, t.dismiss, yLabel],
+      [dateFormatter, getPointConfig, t, yLabel],
     );
 
     const xAxisConfig = useMemo(
       () => ({
+        label: t.date,
         tickFormat: ((value: d3.AxisDomain) =>
           locale === 'zh'
             ? axisDateFormatter.format(new Date(Number(value)))
-            : d3.timeFormat('%b %d')(new Date(Number(value)))) as any,
+            : d3.utcFormat('%b %-d')(new Date(Number(value)))) as any,
         tickCount: 10,
+        // Short "Oct 1" labels fit every ~64px; the default 80px step leaves one tick on phones.
+        tickValues: (scale: AnyScale) => {
+          const time = scale as d3.ScaleTime<number, number>;
+          const [left, right] = time.range();
+          const [start, end] = time.domain();
+          return evenDateTicks(
+            start,
+            end,
+            Math.min(10, Math.max(3, Math.floor(Math.abs(right - left) / 64))),
+          );
+        },
         customize: (g: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-          g.selectAll('.tick text').attr('transform', 'rotate(-30)').attr('text-anchor', 'end');
+          const ticks = g.selectAll<SVGGElement, unknown>('.tick');
+          const xs = ticks
+            .nodes()
+            .map((node) =>
+              Number(
+                /translate\((?<x>[^,]+)/u.exec(node.getAttribute('transform') ?? '')?.groups?.x,
+              ),
+            );
+          const font = chartFont(CHART_TYPE.axisLabel);
+          const widest = Math.max(
+            0,
+            ...ticks.nodes().map((node) => measureTextWidth(node.textContent ?? '', font)),
+          );
+          const rotate = xs.some((x, i) => i > 0 && Math.abs(x - xs[i - 1]) < widest + 8);
+          ticks
+            .select('text')
+            .attr('transform', rotate ? 'rotate(-30)' : null)
+            .attr('text-anchor', rotate ? 'end' : null);
         },
       }),
-      [axisDateFormatter, locale],
+      [axisDateFormatter, locale, t.date],
     );
 
     const yAxisConfig = useMemo(
@@ -339,7 +432,6 @@ const TrendChart = React.memo(
         <D3Chart<PreparedPoint>
           chartId={chartId}
           data={flatPointData}
-          height={600}
           margin={CHART_MARGIN}
           watermark={getChartWatermark()}
           testId="trend-chart-svg"
@@ -353,8 +445,10 @@ const TrendChart = React.memo(
           zoom={zoomConfig}
           tooltip={tooltipConfig}
           onRender={onRender}
+          onExportRender={onRender}
           legendElement={legendElement}
           caption={caption}
+          footer={footer}
         />
       </div>
     );

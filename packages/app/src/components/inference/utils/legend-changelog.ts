@@ -1,11 +1,10 @@
 import type { ChangelogMetadata, InferenceData, RunInfo } from '../types';
-import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
-import { runIdFromRunUrl } from '@/lib/known-issues';
+import { MODEL_PREFIX_MAPPING } from '@/lib/catalog/data-mappings';
+import { runIdFromRunUrl } from '@/lib/benchmarks/known-issues';
 import { configKeyMatchesHwKey } from './changelogFormatters';
 
 type LegendPoint = Pick<InferenceData, 'hwKey' | 'model' | 'precision' | 'run_url'>;
 
-/** A hardware legend must not attribute a mixed-run curve to one run's changelog. */
 export function legendChangelogsByHardware(
   points: readonly LegendPoint[],
   availableRuns: Record<string, RunInfo> | null | undefined,

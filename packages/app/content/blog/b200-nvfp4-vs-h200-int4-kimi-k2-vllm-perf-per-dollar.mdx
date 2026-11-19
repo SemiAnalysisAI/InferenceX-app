@@ -20,7 +20,7 @@ Kimi K2.5 and K2.6 are the open-weights models behind xAI's Cursor Composer 2 an
 
 Both SKUs run the same `vllm/vllm-openai:v0.21.0` container. The spread comes from the silicon and the precision. B200 has 2.27x H200's FP8 dense throughput (4,500 vs 1,979 TFLOP/s), 1.67x its HBM bandwidth (8 vs 4.8 TB/s), and 2.00x its NVLink scale-up bandwidth (900 vs 450 GB/s uni-di). On the FP4 axis H200 has nothing — Hopper SM90 has no FP4 tensor cores, and the [official datasheet](https://resources.nvidia.com/en-us-data-center-overview/gtc24-h200-datasheet) stops at FP8. B200's NVFP4 cores deliver 9,000 TFLOP/s. The measured 3x cost-per-token gap is what those silicon ratios look like once you fold in B200's 1.38x TCO penalty ($1.95 vs $1.41 per GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics)).
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -48,13 +48,13 @@ A note on quantization: Moonshot ships K2.5/K2.6 with **native INT4 weights** as
 
 ## On-Paper Specs
 
-NVIDIA B200 SXM (Blackwell, 2025) vs NVIDIA H200 SXM (Hopper, 2024) — both are NVIDIA, both run vLLM, both ship in 8-GPU NVLink islands. The radar below normalizes each axis to the cross-vendor maximum in [`/gpu-specs`](/gpu-specs), so the visible polygons compress against axes where GB200 NVL72 / GB300 NVL72 set the ceiling (Scale Up Domain Memory + BW at world-size 72), and the FP4 axis is dominated by GB300 NVL72 at 15,000 TFLOP/s — B200's 9,000 TFLOP/s reads ~60% on that axis.
+NVIDIA B200 SXM (Blackwell, 2025) vs NVIDIA H200 SXM (Hopper, 2024) — both are NVIDIA, both run vLLM, both ship in 8-GPU NVLink islands. The radar below normalizes each axis to the cross-vendor maximum in [`/infx/gpu-specs`](/infx/gpu-specs), so the visible polygons compress against axes where GB200 NVL72 / GB300 NVL72 set the ceiling (Scale Up Domain Memory + BW at world-size 72), and the FP4 axis is dominated by GB300 NVL72 at 15,000 TFLOP/s — B200's 9,000 TFLOP/s reads ~60% on that axis.
 
 <Figure
   srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-dark.png"
-  alt="GPU specs radar comparing H200 SXM (dark green) and B200 SXM (light green) from /gpu-specs. B200 fills more of the polygon on every per-GPU axis except Memory (where it reads ~60% vs H200's ~45% — both compress against the MI355X 288 GB ceiling). B200's most visible advantages on the radar: Mem BW (100%, H200 ~55%), Scale Up BW (100%, H200 ~50%), BF16 + FP8 TFLOP/s (~85%, H200 ~35%). H200 reads 0% on the FP4 axis because Hopper has no FP4 tensor cores."
-  caption="B200 SXM (light green) vs H200 SXM (dark green) on /gpu-specs. Values normalized per axis to the cross-vendor maximum across all SKUs. B200 leads H200 on every per-GPU axis; the FP4 axis is where the gap is unbounded — H200 reads 0% because Hopper has no FP4 tensor-core path. Scale-up-domain axes compress against GB200/GB300 NVL72 at world-size 72, so both 8-GPU SKUs read ~11% there."
+  alt="GPU specs radar comparing H200 SXM (dark green) and B200 SXM (light green) from /infx/gpu-specs. B200 fills more of the polygon on every per-GPU axis except Memory (where it reads ~60% vs H200's ~45% — both compress against the MI355X 288 GB ceiling). B200's most visible advantages on the radar: Mem BW (100%, H200 ~55%), Scale Up BW (100%, H200 ~50%), BF16 + FP8 TFLOP/s (~85%, H200 ~35%). H200 reads 0% on the FP4 axis because Hopper has no FP4 tensor cores."
+  caption="B200 SXM (light green) vs H200 SXM (dark green) on /infx/gpu-specs. Values normalized per axis to the cross-vendor maximum across all SKUs. B200 leads H200 on every per-GPU axis; the FP4 axis is where the gap is unbounded — H200 reads 0% because Hopper has no FP4 tensor-core path. Scale-up-domain axes compress against GB200/GB300 NVL72 at world-size 72, so both 8-GPU SKUs read ~11% there."
 />
 
 | Spec                               | H200 SXM            | B200 SXM            | B200 / H200 |
@@ -144,13 +144,13 @@ Above 100 tok/s/user, only B200 NVFP4 has a recipe at all. H200 INT4's frontier 
   caption="Kimi K2.5/K2.6 (1T total, 32B active) vLLM at ISL 8192 / OSL 1024 on a single NVIDIA node. Source: SemiAnalysis InferenceX, 2026-05-19. Point labels denote GPU count per config."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm), pre-filtered to B200 + H200 vLLM Kimi K2.5/K2.6 across FP4 and INT4 on the same 2026-05-19 run.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm), pre-filtered to B200 + H200 vLLM Kimi K2.5/K2.6 across FP4 and INT4 on the same 2026-05-19 run.
 
 ## Acknowledgments
 
 Kimi K2.5 and K2.6 are the work of [Moonshot AI](https://www.moonshot.ai/), with weights at [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) and [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6). The vLLM NVFP4 path on Blackwell is the work of the [vLLM project](https://github.com/vllm-project/vllm) and NVIDIA's TensorRT-LLM / AITER kernel teams whose FP4 MoE kernels vLLM links against. Continuous benchmarking by SemiAnalysis on InferenceX. Speed is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

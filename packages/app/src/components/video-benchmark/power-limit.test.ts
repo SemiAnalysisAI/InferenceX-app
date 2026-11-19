@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { powerLimitComparison } from './power-limit';
 import type { Json } from './bundle';
 
-// Synthetic recorded snapshots; deliberately different configured and enforced limits.
 function fixture() {
   const gpus = ['GPU-a', 'GPU-b'].map((uuid) => ({
     uuid,

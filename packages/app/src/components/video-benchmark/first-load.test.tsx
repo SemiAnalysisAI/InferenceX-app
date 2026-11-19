@@ -1,0 +1,260 @@
+// @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React, { act } from 'react';
+import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { afterEach, expect, it, vi } from 'vitest';
+import VideoResultsClips from './VideoResultsClips';
+import { videoHistoryEntry, type VideoHistoryPage } from './history';
+import { namedRunPoints } from './points';
+import { referenceQualityFixture } from './reference-quality.fixture';
+import { publishedResultsSide } from './results-clips';
+import { useVideoPoints } from './use-video-points';
+import { videoClipSourceKey } from './initial-data';
+
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+
+let root: Root | undefined;
+let container: HTMLDivElement | undefined;
+afterEach(() => {
+  if (root) act(() => root?.unmount());
+  container?.remove();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it.each([true, false])(
+  'renders seeded points/media (available=%s) before effects and hydrates without refetching',
+  async (available) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    const fixture = referenceQualityFixture(20);
+    const path = fixture.attachment.pairs[0].candidate.media_path;
+    fixture.stored.sources[0].assets = [
+      [path, { url: '/retained.mp4', downloadUrl: '/retained.mp4' }],
+    ];
+    const page: VideoHistoryPage = {
+      schemaVersion: 1,
+      entries: [videoHistoryEntry(fixture.stored, null)],
+      nextPage: null,
+    };
+    const initial = { pages: [page], replay: true };
+    const point = namedRunPoints(initial.pages, '123').find(
+      (candidate) => candidate.cell === 'c1',
+    )!;
+    const side = publishedResultsSide(fixture.stored, point);
+    const queryClient = new QueryClient();
+    function InitialResults() {
+      const { points, namedPoints, loading, replay } = useVideoPoints('123', initial);
+      return (
+        <QueryClientProvider client={queryClient}>
+          <output>
+            {JSON.stringify({
+              official: points.length,
+              named: namedPoints.length,
+              loading,
+              replay,
+            })}
+          </output>
+          <VideoResultsClips
+            points={[point]}
+            initialSides={{ [videoClipSourceKey(point)]: available ? side : null }}
+            colorFor={() => 'black'}
+            against="reference"
+            onAgainstChange={() => {}}
+            onSubjectChange={() => {}}
+            onShow={() => {}}
+            reveal={0}
+          />
+        </QueryClientProvider>
+      );
+    }
+    const html = renderToString(<InitialResults />);
+    container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.append(container);
+    for (const video of container.querySelectorAll('video')) {
+      Object.defineProperty(video, 'readyState', { value: 4 });
+      Object.defineProperty(video, 'duration', { value: 5 });
+    }
+    expect(container.querySelector('video')?.getAttribute('src')).toBe(
+      available ? '/retained.mp4' : undefined,
+    );
+    if (available)
+      expect(
+        container.querySelector('video')?.getAttribute('preload'),
+        'no media before Play',
+      ).toBe('none');
+    expect(container.querySelector('output')?.textContent).toBe(
+      JSON.stringify({ official: 0, named: 3, loading: false, replay: true }),
+    );
+    const hydrationError = vi.fn();
+    await act(async () => {
+      root = hydrateRoot(container!, <InitialResults />, { onRecoverableError: hydrationError });
+      await Promise.resolve();
+    });
+    expect(hydrationError).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-testid="video-results-play"]')?.disabled,
+    ).toBe(!available);
+    expect(container.querySelector('video')?.getAttribute('src')).toBe(
+      available ? '/retained.mp4' : undefined,
+    );
+  },
+);
+
+it('shows a newly read clip while another selected source is still pending', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const fast = referenceQualityFixture(20, '123', 7);
+  const slow = referenceQualityFixture(20, '456', 8, 'b'.repeat(64), 'NVIDIA H100');
+  const points = [fast, slow].map((fixture) => {
+    const path = fixture.attachment.pairs[0].candidate.media_path;
+    fixture.stored.sources[0].assets = [
+      [path, { url: `/${fixture.stored.runId}.mp4`, downloadUrl: '/clip.mp4' }],
+    ];
+    return namedRunPoints(
+      [{ schemaVersion: 1, entries: [videoHistoryEntry(fixture.stored, null)], nextPage: null }],
+      fixture.stored.runId,
+    ).find((candidate) => candidate.cell === 'c1')!;
+  });
+  const pending = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.includes('run=123') ? Promise.resolve(Response.json(fast.stored)) : pending.promise,
+    ),
+  );
+  container = document.createElement('div');
+  document.body.append(container);
+  await act(async () => {
+    root = createRoot(container!);
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <VideoResultsClips
+          points={points}
+          colorFor={() => 'black'}
+          against="reference"
+          onAgainstChange={() => {}}
+          onSubjectChange={() => {}}
+          onShow={() => {}}
+          reveal={0}
+        />
+      </QueryClientProvider>,
+    );
+    await Promise.resolve();
+  });
+  expect(container.querySelectorAll('video')).toHaveLength(1);
+  expect(container.querySelector('video')?.getAttribute('src')).toBe('/123.mp4');
+  expect(container.textContent).toContain('Loading retained clips');
+  await act(async () => {
+    pending.resolve(Response.json(slow.stored));
+    await pending.promise;
+  });
+  expect(container.querySelectorAll('video')).toHaveLength(1);
+  expect(container.querySelector('video')?.getAttribute('src')).toBe('/123.mp4');
+  expect(container.textContent).not.toContain('Loading retained clips');
+});
+
+it('holds the prompt row and stage with a skeleton while the subject is read', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise<Response>(() => {})),
+  );
+  const fixture = referenceQualityFixture(20);
+  const point = namedRunPoints(
+    [{ schemaVersion: 1, entries: [videoHistoryEntry(fixture.stored, null)], nextPage: null }],
+    fixture.stored.runId,
+  ).find((candidate) => candidate.cell === 'c1')!;
+  container = document.createElement('div');
+  document.body.append(container);
+  act(() => {
+    root = createRoot(container!);
+    root.render(
+      <VideoResultsClips
+        points={[point]}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
+      />,
+    );
+  });
+  expect(container.querySelector('[data-testid="video-results-clips-skeleton"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="video-results-stage"]')).toBeNull();
+  expect(container.querySelector('[role="status"]')?.textContent).toBe('Loading retained clips…');
+});
+
+it('waits for a newly wanted side before a reveal scrolls, even after an earlier read failed', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  const broken = referenceQualityFixture(20, '123', 7);
+  const later = referenceQualityFixture(20, '456', 8, 'b'.repeat(64), 'NVIDIA H100');
+  const points = [broken, later].map((fixture) => {
+    const path = fixture.attachment.pairs[0].candidate.media_path;
+    fixture.stored.sources[0].assets = [
+      [path, { url: `/${fixture.stored.runId}.mp4`, downloadUrl: '/clip.mp4' }],
+    ];
+    return namedRunPoints(
+      [{ schemaVersion: 1, entries: [videoHistoryEntry(fixture.stored, null)], nextPage: null }],
+      fixture.stored.runId,
+    ).find((candidate) => candidate.cell === 'c1')!;
+  });
+  const pending = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.includes('run=123')
+        ? Promise.resolve(new Response(null, { status: 500 }))
+        : pending.promise,
+    ),
+  );
+  const queryClient = new QueryClient();
+  const render = (shown: typeof points, reveal: number) => (
+    <QueryClientProvider client={queryClient}>
+      <VideoResultsClips
+        points={shown}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+        onSubjectChange={() => {}}
+        onShow={() => {}}
+        reveal={reveal}
+      />
+    </QueryClientProvider>
+  );
+  container = document.createElement('div');
+  document.body.append(container);
+  try {
+    await act(async () => {
+      root = createRoot(container!);
+      root.render(render([points[0]], 0));
+      await Promise.resolve();
+    });
+    expect(container.textContent, 'the first read failed').toContain('Retry clips');
+    await act(async () => {
+      root!.render(render(points, 1));
+      await Promise.resolve();
+    });
+    expect(scroll, 'no scroll while the new side is still being read').not.toHaveBeenCalled();
+    await act(async () => {
+      pending.resolve(Response.json(later.stored));
+      await pending.promise;
+    });
+    expect(scroll).toHaveBeenCalledTimes(1);
+  } finally {
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  }
+});

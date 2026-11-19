@@ -25,11 +25,6 @@ interface Harness {
   unmount: () => void;
 }
 
-/**
- * Mounts a component that owns real perf-ruler state and runs the hook, so
- * the test observes exactly what a chart component would: the state the
- * draw pass reads after the axis key changes.
- */
 function mountHarness(initialKey: string): Harness {
   const snapshot: Snapshot = { state: EMPTY_PERF_RULER_STATE, renders: 0 };
   let axisMetricKey = initialKey;
@@ -79,8 +74,6 @@ describe('usePerfRulerAxisReset', () => {
     h.place();
     expect(h.snapshot.state).toBe(PLACED);
 
-    // Unrelated re-renders (legend toggles, zoom, date changes) pass the
-    // same key and must not disturb placed rulers or the draft.
     h.rerender(key);
     h.rerender(key);
     expect(h.snapshot.state).toBe(PLACED);
@@ -93,8 +86,6 @@ describe('usePerfRulerAxisReset', () => {
     h.rerender(perfRulerAxisMetricKey('p90_e2el', 'y_tpPerGpu'));
     expect(h.snapshot.state.rulers).toEqual([]);
     expect(h.snapshot.state.draft).toBeNull();
-    // Ids keep counting so a ruler placed after the switch never reuses a
-    // key the D3 join may still hold.
     expect(h.snapshot.state.nextId).toBe(PLACED.nextId);
     h.unmount();
   });

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EvalRow } from '@/lib/api';
-import { Model, Precision } from '@/lib/data-mappings';
+import type { EvalRow } from '@/lib/api/api';
+import { Model, Precision } from '@/lib/catalog/data-mappings';
 
 import {
   aggregateEvaluationChartRows,
   buildEvalChangelogEntries,
   buildEvaluationChartRows,
+  parallelismPills,
 } from './chart-data';
 
 function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
@@ -18,6 +19,8 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
     model: 'dsr1',
     precision: 'fp8',
     spec_method: 'none',
+    spec_algorithm: null,
+    spec_draft_model: null,
     disagg: false,
     is_multinode: false,
     prefill_tp: 8,
@@ -43,7 +46,35 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
   };
 }
 
+const chips = (overrides: Partial<EvalRow>) =>
+  buildEvaluationChartRows(
+    [
+      evalRow({
+        disagg: true,
+        framework: 'dynamo-sglang',
+        metrics: { em_strict: 0.8 },
+        ...overrides,
+      }),
+    ],
+    'gsm8k',
+    Model.DeepSeek_R1,
+    [Precision.FP8],
+    '2026-12-31',
+  )[0]?.physicalChips;
+
 describe('buildEvaluationChartRows', () => {
+  it('counts legacy unsplit disaggregated deployments once and real splits as both pools', () => {
+    expect(chips({ num_prefill_gpu: 36, num_decode_gpu: 36 })).toBe(36);
+    expect(
+      chips({
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        prefill_num_workers: 1,
+        decode_num_workers: 3,
+      }),
+    ).toBe(16);
+  });
+
   it('maps official rows for the selected benchmark/model/precision and date cutoff', () => {
     const rows = [
       evalRow({ config_id: 1, date: '2026-03-01', metrics: { em_strict: 0.8 } }),
@@ -65,7 +96,7 @@ describe('buildEvaluationChartRows', () => {
     expect(result[0]).toMatchObject({
       configId: 1,
       hwKey: 'h200_sglang',
-      configLabel: 'H200 (SGLang)\nC128 T8 E1',
+      configLabel: 'H200 (SGLang)\nC128 · TP8',
       score: 0.8,
       framework: 'sglang',
       precision: 'fp8',
@@ -81,10 +112,8 @@ describe('buildEvaluationChartRows', () => {
 
   it('keeps the latest date per (config, conc) when no date cutoff is provided', () => {
     const rows = [
-      // Same config_id (1), same conc (64): older date should drop.
       evalRow({ date: '2026-03-01', conc: 64, metrics: { em_strict: 0.81 } }),
       evalRow({ date: '2026-03-04', conc: 64, metrics: { em_strict: 0.85 } }),
-      // Same config_id, different conc: must stay as a separate data point.
       evalRow({ date: '2026-03-04', conc: 256, metrics: { em_strict: 0.92 } }),
     ];
 
@@ -108,7 +137,31 @@ describe('buildEvaluationChartRows', () => {
       '2026-03-01',
     );
 
-    expect(result[0].configLabel).toBe('H200 (Dynamo TRTLLM, MTP)\nFP4 C128 T8 E1');
+    expect(result[0].configLabel).toBe('H200 (Dynamo TRTLLM · MTP)\nFP4 · C128 · TP8');
+  });
+
+  it('names the recorded speculative algorithm and draft model in the chip and config labels', () => {
+    const row = evalRow({
+      framework: 'sglang',
+      spec_method: 'draft_model',
+      spec_algorithm: 'dflash',
+      spec_draft_model: 'RadixArk/Kimi-K3.1-Dflash2-Preview',
+    });
+    const [en] = buildEvaluationChartRows([row], 'gsm8k', Model.DeepSeek_R1, [Precision.FP8]);
+    expect(en).toMatchObject({
+      hwLabel: 'H200',
+      engineLabel: 'SGLang · DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)',
+      configLabel: 'H200 (SGLang · DFlash)\nC128 · TP8',
+    });
+    const [zh] = buildEvaluationChartRows(
+      [{ ...row, spec_method: 'mtp', spec_algorithm: 'mtp', spec_draft_model: 'native' }],
+      'gsm8k',
+      Model.DeepSeek_R1,
+      [Precision.FP8],
+      undefined,
+      'zh',
+    );
+    expect(zh.engineLabel).toBe('SGLang · MTP (原生)');
   });
 
   it('renders DPA flags distinguishing prefill/decode sides', () => {
@@ -147,10 +200,10 @@ describe('buildEvaluationChartRows', () => {
 
     const labels = rows.map((r) => r.configLabel).toSorted();
     expect(labels).toEqual([
-      'H200 (Dynamo TRTLLM)\nC128 P(8/1/T/0) D(8/1/F/0)',
-      'H200 (Dynamo TRTLLM)\nC256 P(8/1/F/0) D(8/1/T/0)',
-      'H200 (Dynamo TRTLLM)\nC512 P(8/1/T/0) D(8/1/T/0)',
-      'H200 (SGLang)\nC128 T8 E1 DPA',
+      'H200 (Dynamo TRTLLM)\nC128 · prefill TP8 DPA ×1 · decode TP8 ×1',
+      'H200 (Dynamo TRTLLM)\nC256 · prefill TP8 ×1 · decode TP8 DPA ×1',
+      'H200 (Dynamo TRTLLM)\nC512 · prefill TP8 DPA ×1 · decode TP8 DPA ×1',
+      'H200 (SGLang)\nC128 · TP8 DPA',
     ]);
   });
 
@@ -172,11 +225,20 @@ describe('buildEvaluationChartRows', () => {
   });
 });
 
+describe('parallelismPills', () => {
+  it('always shows TP and adds EP, DPA and DP only when they apply', () => {
+    expect(parallelismPills(8, 1, false)).toEqual([{ label: 'TP', value: 8 }]);
+    expect(parallelismPills(16, 16, true, 2)).toEqual([
+      { label: 'TP', value: 16 },
+      { label: 'EP', value: 16 },
+      { label: 'DPA' },
+      { label: 'DP', value: 2 },
+    ]);
+  });
+});
+
 describe('aggregateEvaluationChartRows', () => {
   it('averages repeated rows of the same config and keeps min/max/error bounds', () => {
-    // Same config_id (same configs.id row) run on the same date with different
-    // scores — e.g. a rerun on the same workflow. Dedup groups by configId so
-    // they collapse into one bar with mean/min/max/error-range metadata.
     const rows = buildEvaluationChartRows(
       [
         evalRow({
@@ -211,7 +273,6 @@ describe('aggregateEvaluationChartRows', () => {
   });
 
   it('keeps distinct configs as separate bars even when labels overlap', () => {
-    // Two rows with different configIds should render as two bars, not merge.
     const rows = buildEvaluationChartRows(
       [
         evalRow({ config_id: 1, metrics: { em_strict: 0.8 } }),
@@ -266,11 +327,11 @@ describe('buildEvalChangelogEntries', () => {
     expect(result).toEqual([
       {
         benchmark: 'gsm8k',
-        configs: ['H200 (Dynamo TRTLLM)\nC128', 'H200 (SGLang)\nC64'],
+        configs: ['H200 (Dynamo TRTLLM)\nC128 · TP8', 'H200 (SGLang)\nC64 · TP8'],
       },
       {
         benchmark: 'mmlu',
-        configs: ['H200 (SGLang)\nC256'],
+        configs: ['H200 (SGLang)\nC256 · TP8'],
       },
     ]);
   });

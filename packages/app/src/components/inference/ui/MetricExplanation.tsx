@@ -2,9 +2,8 @@
 
 import { METRIC_EXPLANATIONS } from '../axis-metric-explanations';
 import type { MetricKey } from '../metric-registry';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
-/** Shared by selector help and embedded charts, for official and overlay data alike. */
 export function MetricExplanation({ metricKey }: { metricKey: MetricKey }) {
   const locale = useLocale();
   const explanation = METRIC_EXPLANATIONS[metricKey];

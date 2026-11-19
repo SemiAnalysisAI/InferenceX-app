@@ -1,13 +1,13 @@
 import type { InferenceData } from '@/components/inference/types';
-import {
-  parseComparisonEntry,
-  resolveComparisonEntries,
-} from '@/components/inference/utils/comparisonEntry';
+import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import { applyQuickFilters, type QuickFilters } from '@/components/inference/utils/quickFilters';
-import { dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries } from '@/lib/benchmark-run-selection';
-import { GPU_ALIAS_TO_CANONICAL, hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
-import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplemental-benchmarks';
+import { dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries } from '@/lib/benchmarks/benchmark-run-selection';
+import { GPU_ALIAS_TO_CANONICAL, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import {
+  overviewServingSeriesKey,
+  type OverviewServingSeriesRow,
+} from '@/lib/overview/overview-data';
+import type { TokenMetricType } from '@/lib/benchmarks/token-metric-support';
 /**
  * Chart x-axis variant selected by the dropdown in the Chart panel. The
  * inference provider and ChartDisplay import this single definition.
@@ -30,23 +30,35 @@ export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
   return mode === 'e2e-normalized-interactivity';
 }
 
+/**
+ * Date the main benchmarks query asks for. The latest run date maps to `''`, so it shares the key
+ * the chart reads before availability resolves. A pinned run keeps its date.
+ */
+export function chartBenchmarkQueryDate(
+  selectedRunDate: string | undefined,
+  latestAvailableDate: string | undefined,
+  asOfRunId: string | undefined,
+): string | undefined {
+  if (asOfRunId) return selectedRunDate ?? '';
+  return selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
+    ? ''
+    : selectedRunDate;
+}
+
 /** Build deduplicated comparison dates, excluding the main run date. */
 export function buildComparisonDates(
   selectedGPUs: string[],
   selectedDates: string[],
   selectedDateRange: { startDate: string; endDate: string },
   selectedRunDate: string | undefined,
-  selectedRunId?: string,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
-  // Range endpoints + individually-added dates/runs (redundant same-day range
-  // endpoints dropped), minus the main date/run which the primary query covers.
-  // Other run-qualified entries on the same day are distinct overlays and stay.
-  return resolveComparisonEntries(selectedDates, selectedDateRange).filter((entry) => {
-    if (entry === selectedRunDate) return false;
-    const { runId } = parseComparisonEntry(entry);
-    return runId === undefined || runId !== selectedRunId;
-  });
+  // The primary query supplies only a plain-date series and may merge results
+  // from other runs. A run-qualified entry always needs its exact snapshot and
+  // date~rRUN series key, even when the run picker selected that same run.
+  return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
+    (entry) => entry !== selectedRunDate,
+  );
 }
 
 /** Filter data by GPU key, resolving aliases to canonical keys. */
@@ -115,7 +127,7 @@ const X_LABEL_STAT_PREFIX_RE = /^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b\s*/iu
  * existing leading statistic word (e.g. the TTFT override's "P90 Time To
  * First Token (s)") or prefixes the percentile when the configured label has
  * none (e.g. "Interactivity (tok/s/user)" → "P90 Interactivity (tok/s/user)").
- * Only call for agentic sequences — fixed-seq labels must stay untouched.
+ * Also used for the explicit Mean/Median labels on fixed-sequence service axes.
  */
 export function applyAgenticPercentileToXLabel(label: string, pctlWord: string): string {
   return X_LABEL_STAT_PREFIX_RE.test(label)
@@ -166,10 +178,16 @@ export function applyScopeFilters(
   return scoped;
 }
 
-/** Apply snapshot-scoped metric support using the source date, not its display date. */
+/** A source that publishes only output throughput stores output_tput_per_gpu without tput_per_gpu. */
 export function supportsPointTokenMetric(
-  point: Pick<InferenceData, 'hwKey' | 'date' | 'actualDate'>,
+  point: Pick<InferenceData, 'rawMetricKeys'>,
   tokenType: TokenMetricType,
 ): boolean {
-  return supportsChartTokenMetric(String(point.hwKey), point.actualDate ?? point.date, tokenType);
+  const keys = point.rawMetricKeys;
+  return (
+    tokenType === 'output' ||
+    keys === undefined ||
+    keys.includes('tput_per_gpu') ||
+    !keys.includes('output_tput_per_gpu')
+  );
 }

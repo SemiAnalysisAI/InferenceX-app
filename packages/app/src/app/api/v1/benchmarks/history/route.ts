@@ -3,15 +3,15 @@ import type { NextRequest } from 'next/server';
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
-import { cachedJson } from '@/lib/api-cache';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import {
   getCachedAgenticBenchmarkHistory,
   getCachedBenchmarkHistory,
-} from '@/lib/benchmark-query-cache.server';
-import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
-import { loadFixture } from '@/lib/test-fixtures';
-import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
+import { loadFixture } from '@/lib/testing/test-fixtures';
+import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-metadata';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
   if (FIXTURES_MODE) {
     const fixture = loadFixture('benchmarks-history');
     return cachedJson(
+      request,
       calculatorView && Array.isArray(fixture) ? applyCalculatorView(fixture, isl, osl) : fixture,
     );
   }
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       : await getCachedBenchmarkHistory(modelKeys, isl!, osl!);
     // Both trims run after the cache, so every view shares one cached query.
     const trimmed = agenticWorkflowMetadataOnly(rows);
-    return cachedJson(calculatorView ? applyCalculatorView(trimmed, isl, osl) : trimmed);
+    return cachedJson(request, calculatorView ? applyCalculatorView(trimmed, isl, osl) : trimmed);
   } catch (error) {
     console.error('Error fetching benchmark history:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

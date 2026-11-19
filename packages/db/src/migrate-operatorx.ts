@@ -1,12 +1,3 @@
-/**
- * Run OperatorX database migrations. Targets the separate OperatorX Neon
- * instance via DATABASE_OPERATORX_WRITE_URL (direct, non-pooled connection —
- * migrations must not go through PgBouncer's transaction pooling mode).
- *
- * Usage:
- *   bun run admin:db:migrate:operatorx
- */
-
 import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
@@ -19,7 +10,7 @@ const sql = createAdminSql({
   envVar: 'DATABASE_OPERATORX_WRITE_URL',
   noSsl: hasNoSslFlag(),
   max: 1,
-  onnotice: () => {}, // suppress "relation already exists" notices
+  onnotice: () => {},
 });
 
 async function migrate(): Promise<void> {

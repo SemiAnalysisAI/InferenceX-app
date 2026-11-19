@@ -1,47 +1,20 @@
-import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * Uppercase mono eyebrow label — the small kicker above headings. Wraps the
- * single most repeated typography recipe in the app so its size, weight, and
- * letter-spacing stay uniform. See docs/typography.md.
- */
-const eyebrowVariants = cva('font-mono text-xs font-semibold uppercase', {
-  variants: {
-    tone: {
-      brand: 'text-brand',
-      muted: 'text-muted-foreground',
-    },
-    wide: {
-      true: 'tracking-eyebrow-wide',
-      false: 'tracking-eyebrow',
-    },
-  },
-  defaultVariants: {
-    tone: 'brand',
-    wide: false,
-  },
-});
+/** Small title-case label above a heading. Pass title-case text; nothing is uppercased. */
+function eyebrowVariants({ className }: { className?: string } = {}) {
+  return cn('text-xs font-medium text-muted-foreground', className);
+}
 
 function Eyebrow({
   className,
-  tone,
-  wide,
   as: Tag = 'span',
   ...props
-}: React.HTMLAttributes<HTMLElement> &
-  VariantProps<typeof eyebrowVariants> & {
-    as?: 'span' | 'p' | 'div';
-  }) {
-  return (
-    <Tag
-      data-slot="eyebrow"
-      className={cn(eyebrowVariants({ tone, wide, className }))}
-      {...props}
-    />
-  );
+}: React.HTMLAttributes<HTMLElement> & {
+  as?: 'span' | 'p' | 'div';
+}) {
+  return <Tag data-slot="eyebrow" className={eyebrowVariants({ className })} {...props} />;
 }
 
 export { Eyebrow, eyebrowVariants };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { isUnofficialHostname } from '@/lib/unofficial-domain';
+import { isUnofficialHostname } from '@/lib/runtime/unofficial-domain';
 
 export function useUnofficialDomain(): boolean | null {
   const [isUnofficial, setIsUnofficial] = useState<boolean | null>(null);

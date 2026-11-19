@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 import { preferVrDefaultRun, VR_DEFAULT_RUN } from './default-run-preference';
 
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {

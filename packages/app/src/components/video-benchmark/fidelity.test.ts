@@ -62,6 +62,35 @@ describe('native H3 fidelity evidence (synthetic fixtures)', () => {
     });
     expect(() => verify(documents, checksums, fixture.runId)).toThrow('disagrees');
   });
+  it.each([
+    `h3-results-999-1-${'a'.repeat(64)}`,
+    `h3-results-101-2-${'a'.repeat(64)}`,
+    'h3-results-101-1-invalid_suffix',
+    'h3-fidelity-101-1',
+  ])('rejects invalid original artifact identity %s', (name) => {
+    const { documents, checksums } = changed();
+    both(documents, (value) =>
+      Object.assign(at(value, 'source_artifacts', 0, 'artifact')!, { name }),
+    );
+    expect(() => verify(documents, checksums, fixture.runId)).toThrow('source snapshots');
+  });
+  it.each([
+    ['manifest.json', { artifact_name: `h3-results-101-1-${'f'.repeat(64)}` }],
+    ['manifest.json', { run_attempt: '2' }],
+    ['manifest.json', { ci: { head_sha: 'f'.repeat(40) } }],
+    ['manifest.json', { ci: {} }],
+    ['manifest.json', { git_commit: 'not-a-checkout-sha' }],
+    ['ci.json', { source_sha: 'f'.repeat(40) }],
+    ['ci.json', { artifact_name: `h3-results-101-1-${'f'.repeat(64)}` }],
+    ['ci.json', { run_attempt: '2' }],
+    ['ci.json', { ci: { head_sha: 'f'.repeat(40) } }],
+  ])('rejects native source identity substitution in %s: %j', async (path, fields) => {
+    const sample = await fidelityFixture({ nativeOriginals: true });
+    Object.assign(sample.documents.get(`sources/101/${path}`)!, fields);
+    expect(() =>
+      verify(sample.documents, sample.checksums, sample.runId, new Map(sample.published.texts)),
+    ).toThrow('source snapshots');
+  });
   it('rejects substituted media hashes and missing verified entry points', () => {
     const extra = changed();
     extra.checksums.set('report/index_assets/unreferenced.mp4', 'e'.repeat(64));

@@ -1,0 +1,241 @@
+'use client';
+
+import { ChevronDown } from 'lucide-react';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  explorerHref,
+  explorerRelativePath,
+  versionQuery,
+} from '@/lib/agentic-workload-explorer/paths';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
+
+export interface ExplorerNavLink {
+  path: string;
+  label: { en: string; zh: string };
+}
+
+export const PRIMARY_SECTIONS: readonly ExplorerNavLink[] = [
+  { path: '/', label: { en: 'Overview', zh: '概览' } },
+  { path: '/sessions', label: { en: 'Sessions', zh: '会话' } },
+  { path: '/trends', label: { en: 'Trends', zh: '趋势' } },
+  { path: '/latency', label: { en: 'Latency', zh: '延迟' } },
+  { path: '/graphs', label: { en: 'Graphs', zh: '图表' } },
+  { path: '/session-reuse', label: { en: 'Session Reuse', zh: '会话复用' } },
+  { path: '/tool-analytics', label: { en: 'Tools', zh: '工具' } },
+  { path: '/costs', label: { en: 'Costs', zh: '成本' } },
+  { path: '/fast-mode', label: { en: 'Fast Mode', zh: 'Fast Mode' } },
+  { path: '/harnesses', label: { en: 'Harnesses', zh: 'Harness' } },
+];
+
+export const MORE_SECTIONS: readonly ExplorerNavLink[] = [
+  { path: '/models', label: { en: 'Models', zh: '模型' } },
+  { path: '/traffic', label: { en: 'Traffic', zh: '流量' } },
+  { path: '/session-insights', label: { en: 'Session Insights', zh: '会话洞察' } },
+  { path: '/errors', label: { en: 'Errors', zh: '错误' } },
+  { path: '/platform', label: { en: 'Platform', zh: '平台' } },
+  { path: '/cache', label: { en: 'Cache', zh: '缓存' } },
+  { path: '/streaming', label: { en: 'Streaming', zh: '流式输出' } },
+  { path: '/web-search', label: { en: 'Web Search', zh: 'Web 搜索' } },
+  { path: '/proxy-health', label: { en: 'Endpoints', zh: '端点' } },
+];
+
+export const ALL_SECTIONS: readonly ExplorerNavLink[] = [...PRIMARY_SECTIONS, ...MORE_SECTIONS];
+
+const STRINGS = {
+  en: { more: 'More', navLabel: 'Agentic Workload Explorer sections', select: 'Section' },
+  zh: { more: '更多', navLabel: 'Agentic Workload Explorer 分区', select: '分区' },
+};
+
+export function isActiveSection(relativePath: string | null, sectionPath: string): boolean {
+  if (relativePath === null) return false;
+  if (sectionPath === '/') return relativePath === '/';
+  return relativePath === sectionPath || relativePath.startsWith(`${sectionPath}/`);
+}
+
+function useSectionHotkeys(locale: Locale, query: string) {
+  const router = useRouter();
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable)
+        return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key < '0' || e.key > '9') return;
+      const num = Number.parseInt(e.key, 10);
+      const section = ALL_SECTIONS[num === 0 ? 9 : num - 1];
+      if (!section) return;
+      e.preventDefault();
+      track('agentic_workload_section_hotkey', { section: section.path });
+      router.push(explorerHref(section.path, locale) + query);
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [locale, query, router]);
+}
+
+const tabClass = (active: boolean) =>
+  cn(
+    '-mb-px inline-flex items-center gap-1 border-b-2 pt-1 pb-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-none',
+    active
+      ? 'border-brand text-foreground'
+      : 'border-transparent text-muted-foreground hover:text-foreground',
+  );
+
+function MoreMenu({
+  relativePath,
+  locale,
+  query,
+}: {
+  relativePath: string | null;
+  locale: Locale;
+  query: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const activeLink = MORE_SECTIONS.find((link) => isActiveSection(relativePath, link.path));
+
+  useEffect(() => setOpen(false), [relativePath]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          track('agentic_workload_more_menu_toggled', { enabled: !open });
+          setOpen(!open);
+        }}
+        aria-expanded={open}
+        className={tabClass(activeLink !== undefined)}
+      >
+        {activeLink?.label[locale] ?? STRINGS[locale].more}
+        <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col rounded-lg border border-border/30 bg-popover p-1 shadow-md">
+          {MORE_SECTIONS.map((link) => (
+            <IntentPrefetchLink
+              key={link.path}
+              href={explorerHref(link.path, locale) + query}
+              onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-sm transition-colors',
+                isActiveSection(relativePath, link.path)
+                  ? 'bg-brand/10 text-brand'
+                  : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
+              )}
+            >
+              {link.label[locale]}
+            </IntentPrefetchLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionNavWithVersion() {
+  const searchParams = useSearchParams();
+  return <SectionNavInner query={versionQuery(searchParams.get('version'))} />;
+}
+
+export function SectionNav() {
+  return (
+    <Suspense fallback={<SectionNavInner query="" />}>
+      <SectionNavWithVersion />
+    </Suspense>
+  );
+}
+
+function SectionNavInner({ query }: { query: string }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const locale = useLocale();
+  const relativePath = explorerRelativePath(pathname ?? '');
+  const strings = STRINGS[locale];
+  useSectionHotkeys(locale, query);
+
+  const activePath = useMemo(
+    () => ALL_SECTIONS.find((link) => isActiveSection(relativePath, link.path))?.path ?? '',
+    [relativePath],
+  );
+
+  return (
+    <>
+      <div className="flex items-center gap-2 text-sm lg:hidden">
+        <span className="text-muted-foreground">{strings.select}</span>
+        <Select
+          value={activePath}
+          onValueChange={(next) => {
+            track('agentic_workload_section_selected', { section: next });
+            router.push(explorerHref(next, locale) + query);
+          }}
+        >
+          <SelectTrigger aria-label={strings.select} className="min-h-11 min-w-0 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ALL_SECTIONS.map((link) => (
+              <SelectItem key={link.path} value={link.path}>
+                {link.label[locale]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <nav
+        aria-label={strings.navLabel}
+        className="relative z-40 hidden border-b border-border/30 lg:block"
+      >
+        <div className="flex items-end gap-6">
+          {PRIMARY_SECTIONS.map((link, index) => {
+            const active = isActiveSection(relativePath, link.path);
+            return (
+              <IntentPrefetchLink
+                key={link.path}
+                href={explorerHref(link.path, locale) + query}
+                aria-current={active ? 'page' : undefined}
+                title={`${link.label[locale]} (${index + 1})`}
+                onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
+                className={tabClass(active)}
+              >
+                {link.label[locale]}
+              </IntentPrefetchLink>
+            );
+          })}
+          <MoreMenu relativePath={relativePath} locale={locale} query={query} />
+        </div>
+      </nav>
+    </>
+  );
+}

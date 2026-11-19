@@ -1,22 +1,22 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetOverviewPageData: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),
   ),
 }));
 
-vi.mock('@/lib/overview-data.server', () => ({
+vi.mock('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));
@@ -32,7 +32,7 @@ function pageData(): OverviewPageData {
     models: [
       {
         model: 'DeepSeek-V4-Pro',
-        modelLabel: 'DeepSeekv4 Pro 0813 1.6T',
+        modelLabel: 'DeepSeek V4 Pro 0813 1.6T',
         category: 'default',
         scenario: 'single_turn_8k1k',
         platforms: [
@@ -121,9 +121,9 @@ describe('GET /api/v1/views/overview', () => {
     const body = await response.json();
 
     expect(mockGetOverviewPageData).toHaveBeenCalledWith(
-      50,
+      100,
       'community',
-      'hardware',
+      '30d',
       'b200',
       'default',
       'all',
@@ -133,9 +133,9 @@ describe('GET /api/v1/views/overview', () => {
     expect(body.apiVersion).toBe('v1');
     expect(body.generatedAt).toBe('2026-08-20');
     expect(body.params).toEqual({
-      tier: 50,
+      tier: 100,
       engine: 'community',
-      compare: 'hardware',
+      compare: '30d',
       ref: 'b200',
       models: 'default',
       rows: 'all',
@@ -149,7 +149,6 @@ describe('GET /api/v1/views/overview', () => {
     expect(row.model).toBe('DeepSeek-V4-Pro');
     expect(row.scenario).toBe('single_turn_8k1k');
     expect(row.cells).toHaveLength(2);
-    // Cell projection: page-internal fields (boundary, evidence, hwKey) stay out.
     expect(row.cells[0]).toEqual({
       hardware: 'b200',
       hardwareLabel: 'B200',
@@ -231,7 +230,7 @@ describe('GET /api/v1/views/overview', () => {
     const lines = text.trim().split('\r\n');
     expect(lines[0]).toContain('model');
     expect(lines[0]).toContain('cost_per_mtok');
-    expect(lines).toHaveLength(3); // header + 2 cells
+    expect(lines).toHaveLength(3);
     expect(lines[1]).toContain('b200');
     expect(lines[1]).toContain('0.42');
     expect(lines[2]).toContain('cannot_reach_at_tier');

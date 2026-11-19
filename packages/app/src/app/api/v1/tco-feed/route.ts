@@ -1,12 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DB_MODEL_TO_DISPLAY, DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { getReadDbs } from '@semianalysisai/inferencex-db/lib/payload-db';
 
-import { getLatestBenchmarks } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import { getLatestBenchmarksAcross } from '@semianalysisai/inferencex-db/queries/across-dbs';
 
-import { cachedJson, cachedQuery, cachedText } from '@/lib/api-cache';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery, cachedText } from '@/lib/cache/api-cache';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 import {
   computeTcoFeed,
@@ -21,7 +22,7 @@ import {
   type TcoFeedRow,
   type TcoFeedSourceRow,
   type TcoFeedWorkload,
-} from '@/lib/tco-feed';
+} from '@/lib/calculator/tco-feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +80,7 @@ const getCachedTcoFeed = cachedQuery(
     workloads: TcoFeedWorkload[],
     tiers: number[],
   ): Promise<TcoFeedRow[]> => {
-    const rows = await getLatestBenchmarks(getDb(), dbModelKeys, date);
+    const rows = await getLatestBenchmarksAcross(await getReadDbs(), dbModelKeys, date);
     return computeTcoFeed(rows, workloads, tiers);
   },
   'tco-feed-v2',
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
       if (format === 'csv') {
         return cachedText(tcoScoresToCsv(scores, workloads), 'text/csv; charset=utf-8');
       }
-      return cachedJson({
+      return cachedJson(request, {
         model,
         db_model_keys: dbModelKeys,
         date: date ?? null,
@@ -201,7 +202,7 @@ export async function GET(request: NextRequest) {
     if (format === 'csv') {
       return cachedText(tcoFeedToCsv(rows), 'text/csv; charset=utf-8');
     }
-    return cachedJson({
+    return cachedJson(request, {
       model,
       db_model_keys: dbModelKeys,
       date: date ?? null,

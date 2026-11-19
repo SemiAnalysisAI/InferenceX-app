@@ -1,56 +1,144 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
-import { allowedDevOriginsFromEnv } from './src/lib/allowed-dev-origins';
-import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/inference-model-redirects';
-import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video-alias-redirects';
+import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
+import { getDashboardRoute } from './src/lib/routing/dashboard-routes';
+import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
+import {
+  DEFAULT_INFERENCE_MODEL_SLUG,
+  DEFAULT_INFERENCE_REDIRECT_MISSING,
+  INFERENCE_MODEL_ALIAS_REDIRECTS,
+} from './src/lib/routing/inference-model-redirects';
+import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
+
+// Public files keep stable names across deploys, so they revalidate daily instead of being immutable.
+// Each source must match files only. `/whitepaper` and `/whitepaper/<slug>` are pages, while every
+// file in public/whitepaper sits in a per-paper folder, so that source requires two segments.
+const PUBLIC_ASSET_CACHE_CONTROL = 'public, max-age=86400, stale-while-revalidate=604800';
+const PUBLIC_ASSET_SOURCES = [
+  '/images/:path+',
+  '/brand/:path+',
+  '/logos/:path+',
+  '/decorative/:path+',
+  '/whitepaper/:paper/:file+',
+  String.raw`/:file(favicon\.ico|favicon-32\.webp|favicon-192\.webp|apple-touch-icon\.webp|og-image\.png|promo-poster\.webp)`,
+];
+
+const LOCALE_PREFIXES = ['', '/zh'] as const;
+const INFERENCE_PATH = getDashboardRoute('inference').path;
+
+const SEO_REDIRECTS = [
+  { source: '/datasets', destination: '/infx/agentx' },
+  { source: '/zh/datasets', destination: '/zh/infx/agentx' },
+  ...LOCALE_PREFIXES.flatMap((prefix) => [
+    { source: `${prefix}/xvideo`, destination: `${prefix}/vgx` },
+    { source: `${prefix}/xxvideo`, destination: `${prefix}/vgx` },
+    { source: `${prefix}/ubx`, destination: `${prefix}/ubx/mem-bw` },
+    { source: `${prefix}/run/glm-5-2-on-:chip`, destination: `${prefix}/run/glm-5-3-on-:chip` },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-glm-5-2`,
+      destination: `${prefix}/rankings/fastest-gpu-for-glm-5-3`,
+    },
+    {
+      source: `${prefix}/rankings/cheapest-gpu-for-glm-5-2`,
+      destination: `${prefix}/rankings/cheapest-gpu-for-glm-5-3`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-qwen-3-5-0`,
+      destination: `${prefix}/rankings/fastest-gpu-for-qwen-3-5`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-minimax-m3-1`,
+      destination: `${prefix}/rankings/fastest-gpu-for-minimax-m31-flash`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-minimax-m27-0`,
+      destination: `${prefix}/rankings/fastest-gpu-for-minimax-m27`,
+    },
+    {
+      source: `${prefix}/blog/minimax-m3-agentx-b200-b300-vs-rack-scale-0`,
+      destination: `${prefix}/blog/minimax-m3-agentx-b200-b300-vs-rack-scale`,
+    },
+    { source: `${prefix}/media`, destination: `${prefix}/quotes` },
+  ]),
+].map((redirect) => ({ ...redirect, permanent: true }));
 
 const nextConfig: NextConfig = {
-  // Allow a second, isolated dev server (e.g. a dump-mode instance on another
-  // port) to run from the same project dir by pointing it at a separate build
-  // dir via NEXT_DIST_DIR. Defaults to '.next' so the primary server and all
-  // CI/prod builds are unaffected. Next.js's single-dev-server lock lives under
-  // distDir, so distinct dirs let the two coexist.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
+  // Tests (Unit) typechecks the workspace; the E2E fixture build skips the duplicate pass.
+  typescript: { ignoreBuildErrors: process.env.E2E_FIXTURES === '1' },
   serverExternalPackages: ['shiki'],
+  // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.
+  skipTrailingSlashRedirect: true,
   redirects() {
     return Promise.resolve([
+      // Two rules: Vercel compiles an empty `:rest*` to a trailing slash, which loops.
+      { source: '/:first((?!ingest/)[^/]+)/', destination: '/:first', permanent: true },
+      {
+        source: '/:first((?!ingest/)[^/]+)/:rest+/',
+        destination: '/:first/:rest+',
+        permanent: true,
+      },
+      ...SEO_REDIRECTS,
+      // The featured model can change; do not permanently cache this default.
+      ...LOCALE_PREFIXES.map((prefix) => ({
+        source: `${prefix}${INFERENCE_PATH}`,
+        destination: `${prefix}${INFERENCE_PATH}/${DEFAULT_INFERENCE_MODEL_SLUG}`,
+        permanent: false,
+        missing: [...DEFAULT_INFERENCE_REDIRECT_MISSING],
+      })),
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
+      ...HISTORICAL_MODEL_ALIAS_REDIRECTS,
       ...VIDEO_ALIAS_REDIRECTS,
       {
         source: '/datasets/:path*',
-        destination: '/agentx/:path*',
+        destination: '/infx/agentx/:path*',
         permanent: true,
       },
       {
         source: '/zh/datasets/:path*',
-        destination: '/zh/agentx/:path*',
+        destination: '/zh/infx/agentx/:path*',
         permanent: true,
       },
+      { source: '/gpu-metrics', destination: INFERENCE_PATH, permanent: true },
+      { source: '/zh/gpu-metrics', destination: `/zh${INFERENCE_PATH}`, permanent: true },
+    ]);
+  },
+  rewrites() {
+    return Promise.resolve([
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/array/:path*',
+        destination: 'https://us-assets.i.posthog.com/array/:path*',
+      },
+      { source: '/ingest/:path*', destination: 'https://us.i.posthog.com/:path*' },
+    ]);
+  },
+  headers() {
+    return Promise.resolve([
+      ...PUBLIC_ASSET_SOURCES.map((source) => ({
+        source,
+        headers: [{ key: 'Cache-Control', value: PUBLIC_ASSET_CACHE_CONTROL }],
+      })),
+      {
+        source: '/:path((?!zh(?:/|$)).*)',
+        headers: [{ key: 'Content-Language', value: 'en' }],
+      },
+      { source: '/zh', headers: [{ key: 'Content-Language', value: 'zh-CN' }] },
+      { source: '/zh/:path*', headers: [{ key: 'Content-Language', value: 'zh-CN' }] },
     ]);
   },
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
-    // NOTE: route transitions (src/app/motion.css "Route transitions" block)
-    // need no config here. Next 15–16.2 gated React's <ViewTransition> behind
-    // `experimental.viewTransition`; the React build vendored by Next 16.3
-    // exports it as stable `React.ViewTransition`, and 16.3 removed the flag
-    // from the config schema (setting it now fails validation).
-    // components/motion/route-transition.tsx feature-detects the export, so
-    // navigation correctness never depends on it.
-    // NOTE: experimental.inlineCss was evaluated (2026-07) for the PageSpeed
-    // "Render-blocking requests" insight and rejected: it embeds the full CSS
-    // text in every route's RSC payload (~46 KiB gz, duplicated 2×), so every
-    // client-side tab navigation re-downloads CSS that is otherwise a
-    // one-time immutable fetch. Net regression for this SPA-heavy dashboard.
-    // Persist Turbopack's compiler cache under .next/cache in GitHub Actions
-    // so the workflow cache step makes warm builds fast. Gated on
-    // GITHUB_ACTIONS (not CI, which Vercel also sets) to keep the
-    // experimental flag out of production builds.
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
+    formats: ['image/webp'],
+    minimumCacheTTL: 86400,
     qualities: [75, 100],
     remotePatterns: [
       { hostname: 'placehold.co' },

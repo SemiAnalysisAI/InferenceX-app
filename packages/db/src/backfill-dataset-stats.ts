@@ -1,11 +1,3 @@
-/**
- * Backfill dataset summary stats and subagent-only ISL/OSL distributions from
- * the compact structures already stored in `dataset_conversations`.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-dataset-stats --yes
- */
-
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import { logHistogram, summarizeValues } from './etl/weka-structure';

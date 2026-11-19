@@ -4,25 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createServer } from './server.js';
 
-// ── Mock DB ────────────────────────────────────────────────────────────
-// returns a postgres tagged-template function. We mock it as a
-// callable that captures the query and returns canned rows.
-
 const { mockState, mockDb } = vi.hoisted(() => {
   const state = {
     dbRows: [] as Record<string, unknown>[],
     queryError: null as Error | null,
   };
-  const db = Object.assign(
-    // Tagged template call: db`SELECT ...`
-    () => Promise.resolve(state.dbRows),
-    {
-      unsafe: () => {
-        if (state.queryError) return Promise.reject(state.queryError);
-        return Promise.resolve(state.dbRows);
-      },
+  const db = Object.assign(() => Promise.resolve(state.dbRows), {
+    unsafe: () => {
+      if (state.queryError) return Promise.reject(state.queryError);
+      return Promise.resolve(state.dbRows);
     },
-  );
+  });
   return { mockState: state, mockDb: db };
 });
 
@@ -37,8 +29,6 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 vi.mock('postgres', () => ({
   default: () => mockDb,
 }));
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 let client: Client;
 let closeServer: () => Promise<void>;
@@ -73,8 +63,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await closeServer();
 });
-
-// ── Tests ──────────────────────────────────────────────────────────────
 
 describe('tool listing', () => {
   it('registers all expected tools', async () => {
@@ -172,13 +160,11 @@ describe('get_latest_benchmarks', () => {
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     const row = (result.rows as Record<string, unknown>[])[0];
 
-    expect(row.median_ttft).toBe(0.1235); // rounded from 0.123456789
+    expect(row.median_ttft).toBe(0.1235);
     expect(row.median_tpot).toBe(0.0045);
     expect(row.tput_per_gpu).toBe(500.123);
     expect(row.output_tput_per_gpu).toBe(300.999);
-    // extra_metric should NOT appear (not in default set)
     expect(row).not.toHaveProperty('extra_metric');
-    // raw metrics blob should NOT appear
     expect(row).not.toHaveProperty('metrics');
   });
 
@@ -189,11 +175,9 @@ describe('get_latest_benchmarks', () => {
     ) as Record<string, unknown>;
     const row = (result.rows as Record<string, unknown>[])[0];
 
-    // Filtered fields should be in filters, not in each row
     expect(result.filters).toEqual({ hardware: 'h100', model: 'dsr1' });
     expect(row).not.toHaveProperty('hardware');
     expect(row).not.toHaveProperty('model');
-    // Non-filtered fields still present
     expect(row).toHaveProperty('framework');
     expect(row).toHaveProperty('precision');
   });
@@ -214,7 +198,6 @@ describe('get_latest_benchmarks', () => {
     const row = (result.rows as Record<string, unknown>[])[0];
 
     expect(row.metrics).toEqual(baseRow.metrics);
-    // Should NOT have extracted individual keys alongside the blob
     expect(row).not.toHaveProperty('median_ttft');
   });
 

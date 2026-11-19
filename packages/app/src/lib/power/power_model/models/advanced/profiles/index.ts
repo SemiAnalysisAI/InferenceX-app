@@ -1,0 +1,257 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { formatG, Provenance } from '../../../base';
+
+export function nic_power_baseline(
+  nic_name: string,
+  idle_power_w: number,
+  active_power_w: number,
+): Provenance {
+  return new Provenance({
+    profile_id: `${nic_name}-state-power`,
+    version: '1',
+    source: 'User-specified model baseline',
+    kind: 'assumed',
+    input_boundary: 'One scale-out NIC; excludes separately modeled transceivers and switches',
+    assumptions: [
+      `Idle power is ${formatG(idle_power_w)} W per card.`,
+      `Power when using scale-out networking is ${formatG(active_power_w)} W per card.`,
+    ],
+  });
+}
+
+export const POLLARA_NIC_BASELINE = new Provenance({
+  profile_id: 'pollara-state-power',
+  version: '2',
+  source: 'nicctl total_power_drawn calibration on an MI355X host',
+  kind: 'estimated',
+  input_boundary: 'One scale-out NIC; excludes separately modeled transceivers and switches',
+  assumptions: [
+    'Power is 34.5 W per card in both states: total_power_drawn averaged 38.65 W during a ' +
+      'DeepSeek-R1 InferenceX run, plus a 10% margin, minus the separately modeled 8 W ' +
+      'transceiver.',
+    'total_power_drawn includes the QSFP-400G-DR4 transceiver.',
+    'InferenceX prefill/decode runs on two MI355X nodes with KV cache over Pollara read the ' +
+      'same as idle: DeepSeek-R1 at about 1 Gbit/s per NIC, and AgentX Kimi-K3 at 3.5 Gbit/s ' +
+      'per NIC with 38.4-39.4 W per card.',
+    'Synthetic RDMA at full 400 Gbit/s line rate both ways reads 42.6 W, within the margin.',
+  ],
+});
+
+export function system_side_transceiver_baseline(
+  bandwidth_gbps: number,
+  power_w: number,
+): Provenance {
+  return new Provenance({
+    profile_id: `system-side-${bandwidth_gbps}g-transceiver`,
+    version: '1',
+    source: 'User-specified model baseline',
+    kind: 'assumed',
+    input_boundary: 'One system-side optical transceiver; excludes NIC and switch-side optics',
+    assumptions: [
+      `Power is ${formatG(power_w)} W per ${bandwidth_gbps} Gbit/s transceiver.`,
+      'One transceiver per scale-out NIC, including board-mounted NICs.',
+      'Always powered, including when scale-out networking is off.',
+    ],
+  });
+}
+
+export const COMPONENT_INPUT = new Provenance({
+  profile_id: 'explicit-component-input',
+  version: '1',
+  source: 'Caller-supplied component power',
+  kind: 'input',
+  input_boundary: 'Component electrical input; excludes separately modeled components',
+});
+export const GPU_INPUT = new Provenance({
+  profile_id: 'gpu-input',
+  version: '1',
+  source: 'gpu_level_power_per_gpu argument',
+  kind: 'input',
+  input_boundary: 'GPU electrical power, excluding board and host overhead',
+});
+export const GRACE_SOCKET_INPUT = new Provenance({
+  profile_id: 'grace-socket-input',
+  version: '1',
+  source:
+    'cpu_and_dram_measured_power_per_socket argument; ' +
+    'ACPI Grace Power Socket average per socket',
+  kind: 'measured',
+  input_boundary: 'One Grace socket as reported by the ACPI Grace Power Socket sensor',
+  assumptions: [
+    "Covers CPU and SysIO rails, LPDDR5X and socket regulator loss: inferred from NVIDIA's " +
+      'socket-total statement and a ~42 W GB300 remainder above CPU plus SysIO.',
+    'GB200 firmware that reported the extra regulator rail only in module power under-reports.',
+    'DCGM field 1130 is the CPU rail alone and is not a valid input.',
+    'Replaces modeled GraceCPU and LPDDR5XMemory; no Grace-side loss is added.',
+    'Assumed downstream of the compute-tray DC/DC converter, which stays modeled.',
+    'Tray air takes only the modeled LPDDR5X share; the rest, including regulator loss, is ' +
+      'cold-plate heat. Routing all ~42 W to air would add up to ~0.5 kW of rack IT power.',
+  ],
+});
+export const X86_CPU_SOCKET_INPUT = new Provenance({
+  profile_id: 'x86-cpu-socket-input',
+  version: '1',
+  source:
+    'cpu_measured_power_per_socket argument; ' +
+    'RAPL package-N energy averaged over the window, per socket',
+  kind: 'measured',
+  input_boundary: 'One x86 CPU package as reported by RAPL; excludes DIMMs',
+  assumptions: [
+    'Replaces the modeled X86CPU only.',
+    'DDR5 DIMMs stay modeled. AMD EPYC RAPL has no DRAM domain; package power excludes DIMMs.',
+    'Sits downstream of the PSU, so PSU loss and fan draw respond.',
+    'Fan sizing keeps the modeled design-state CPU.',
+    'AMD Zen RAPL is not validated against wall power. Schöne et al. (TU Dresden, 2021) found ' +
+      'Zen 2 RAPL inaccurate, so treat the value as measured with that caveat.',
+  ],
+});
+export const X86_CPU_AND_DRAM_SOCKET_INPUT = new Provenance({
+  profile_id: 'x86-cpu-and-dram-socket-input',
+  version: '1',
+  source: 'cpu_and_dram_measured_power_per_socket argument',
+  kind: 'measured',
+  input_boundary: 'One x86 CPU and its attached DDR5 DIMMs, per socket',
+  assumptions: ['Replaces modeled X86CPU and DDR5DIMM power.'],
+});
+export const GRACE_CPU_SOCKET_INPUT = new Provenance({
+  profile_id: 'grace-cpu-socket-input',
+  version: '1',
+  source: 'cpu_measured_power_per_socket argument',
+  kind: 'measured',
+  input_boundary: 'One Grace CPU without its LPDDR5X memory pool',
+  assumptions: ['Replaces modeled GraceCPU power; LPDDR5X remains modeled.'],
+});
+export const NVME_BASELINE = new Provenance({
+  profile_id: 'hgx-idle-nvme',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'One NVMe drive',
+  assumptions: ['Idle is the only supported state.', 'Idle power is 5 W per drive.'],
+});
+export const DDR5_BASELINE = new Provenance({
+  profile_id: 'ddr5-dimm-offload',
+  version: '2',
+  source: 'BMC Power_Memory calibration on an MI325X (Quanta) host',
+  kind: 'estimated',
+  input_boundary: 'One DDR5 system-memory DIMM; excludes CPU and fan power',
+  assumptions: [
+    'Power is 2.75 W per DIMM in both states: the 58-61 W node total over 24 DIMMs, ' +
+      'idle and serving, plus a 10% margin.',
+    'CPU offloading leaves it unchanged: Qwen3.5 HiCache with up to 81% of reused prefix ' +
+      'tokens from host DRAM (about 1.3 GB/s) stayed within 1 W of idle.',
+    'Host-GPU copies add about 0.21 W per GB/s read and 0.26 W per GB/s written per node, ' +
+      'so offload traffic of a few GB/s is negligible.',
+    'Measured on 96 GB DDR5-6000 RDIMMs with 2x EPYC 9655; other DIMMs and hosts reuse it.',
+    "The sensor's electrical boundary is undocumented and not validated against wall power.",
+    'The model workload_state determines CPU offloading and the state of all DDR5 DIMMs.',
+  ],
+});
+export const X86_CPU_BASELINE = new Provenance({
+  profile_id: 'x86-cpu-state',
+  version: '2',
+  source: 'Provisional RAPL package-power calibration on AMD EPYC hosts',
+  kind: 'estimated',
+  input_boundary: 'One x86 CPU package; excludes separately modeled DIMMs and fans',
+  assumptions: [
+    'Idle power is 80 W per CPU; idle is not yet calibrated.',
+    'FixedSeqLen power is 165 W per CPU: 8k/1k on 2x EPYC 9655, 162-172 W across c4-c64.',
+    'Agentic power is 180 W per CPU, or 195 W with CPU offloading enabled: ' +
+      'TP8 c16 on 2x EPYC 9354, 179 / 193 W window means on different nodes.',
+    'Package power varies by about 6% across concurrency, so one value per state is used.',
+    'The offload step is not isolated from node-to-node variation.',
+    'Calibrated on AMD EPYC only; Intel Xeon hosts are not yet measured.',
+    'AMD Zen RAPL is not validated against wall power.',
+  ],
+});
+export const FAN_INPUT = new Provenance({
+  profile_id: 'explicit-fan-curve',
+  version: '1',
+  source: 'Caller-supplied fan relationship',
+  kind: 'estimated',
+  input_boundary: 'System fans, excluding facility cooling',
+});
+export const HOPPER_BOARD_BASELINE = new Provenance({
+  profile_id: 'hopper-hgx-board',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'HGX board; excludes host components, fans, and conversion losses',
+  assumptions: [
+    'Eight GPUs at the supplied GPU-level power.',
+    'Four Hopper HGX NVSwitches and eight PCIe 5.0 x16 retimers.',
+  ],
+});
+export const B200_BOARD_BASELINE = new Provenance({
+  profile_id: 'b200-hgx-board',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'HGX board; excludes chassis PCIe switches, host components, fans, and losses',
+  assumptions: [
+    'Eight B200 GPUs at the supplied GPU-level power.',
+    'Two Blackwell HGX NVSwitches at 200 W each, rated at 28.8 Tbit/s per switch.',
+    'Eight PCIe 5.0 x16 retimers at 12 W each; non-GPU board power totals 496 W.',
+  ],
+});
+export const B300_BOARD_BASELINE = new Provenance({
+  profile_id: 'b300-hgx-board',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'HGX board including NICs; excludes other host components, fans, and losses',
+  assumptions: [
+    'Eight B300 GPUs at the supplied GPU-level power.',
+    'Two Blackwell HGX NVSwitches at 200 W and 28.8 Tbit/s each.',
+    'Eight board-mounted ConnectX-8 NICs: 30 W idle or 50 W active per card.',
+    'No PCIe retimers, chassis-level NICs, or chassis PCIe switches in this B300 inventory.',
+  ],
+});
+export const BLACKWELL_NVSWITCH_BASELINE = new Provenance({
+  profile_id: 'blackwell-hgx-nvswitch',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'One Blackwell HGX NVSwitch',
+  assumptions: ['Power is 200 W per switch.', 'Bandwidth is 28.8 Tbit/s per switch.'],
+});
+export const AMD_UBB_BASELINE = new Provenance({
+  profile_id: 'amd-8way-ubb',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'AMD UBB; excludes chassis PCIe switches, host components, fans, and losses',
+  assumptions: [
+    'MI300, MI325, and MI355 boards each contain eight GPUs at the supplied GPU-level power.',
+    'Eight PCIe 5.0 x16 retimers at 12 W each; non-GPU board power totals 96 W.',
+  ],
+});
+export const HOPPER_NVSWITCH_BASELINE = new Provenance({
+  profile_id: 'hopper-hgx-nvswitch',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'One Hopper HGX NVSwitch',
+  assumptions: ['Power is 100 W per switch.', 'Bandwidth is 12.8 Tbit/s per switch.'],
+});
+export const PCIE5_RETIMER_BASELINE = new Provenance({
+  profile_id: 'pcie5-x16-retimer',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'One PCIe 5.0 x16 retimer',
+  assumptions: ['Power is 12 W per retimer.'],
+});
+export const PEX89144_BASELINE = new Provenance({
+  profile_id: 'broadcom-pex89144',
+  version: '1',
+  source: 'User-specified model baseline',
+  kind: 'assumed',
+  input_boundary: 'One chassis-owned Broadcom PEX89144 PCIe switch; excludes UBB and fans',
+  assumptions: [
+    'PCIe 5.0 with 144 lanes.',
+    'Always active at 45 W per switch.',
+    'Four switches per Hopper, MI300, MI325, MI355, and B200 HGX chassis.',
+  ],
+});

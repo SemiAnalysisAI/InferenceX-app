@@ -1,4 +1,4 @@
-import { type QueryClient, useQuery } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
 
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -11,10 +11,18 @@ import {
   TIMELINE_VERSION,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error ?? `OperatorX request failed (${response.status})`);
+  if (!response.ok) {
+    throw new ApiRequestError(
+      body?.error ?? `OperatorX request failed (${response.status})`,
+      response.status,
+      url,
+    );
+  }
   return body as T;
 }
 
@@ -46,11 +54,16 @@ export function useOperatorXResult(runId: string | null, index: number | null) {
   });
 }
 
-export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+export function operatorXComparisonQuery(
+  op: ComparisonOp | null,
+  workload: string | null,
+  parallel: string | null,
+) {
   const params = new URLSearchParams({ op: op ?? '' });
   if (workload) params.set('workload', workload);
-  return useQuery({
-    queryKey: ['operatorx', 'compare', op, workload],
+  if (parallel !== null) params.set('parallel', parallel);
+  return queryOptions({
+    queryKey: ['operatorx', 'compare', op, workload, parallel],
     queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
     enabled: op !== null,
     staleTime: 5 * 60_000,
@@ -58,9 +71,36 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
   });
 }
 
+export function useOperatorXComparison(
+  op: ComparisonOp | null,
+  workload: string | null,
+  parallel: string | null,
+) {
+  return useQuery(operatorXComparisonQuery(op, workload, parallel));
+}
+
+/** Every case one model contributes to an op family at one device split, across hardware. */
+export function operatorXModelQuery(
+  op: ComparisonOp,
+  model: string | null,
+  parallel: string | null,
+) {
+  const params = new URLSearchParams({ op });
+  if (model) params.set('model', model);
+  if (parallel !== null) params.set('parallel', parallel);
+  return queryOptions({
+    queryKey: ['operatorx', 'model', op, model, parallel],
+    queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useOperatorXModel(op: ComparisonOp, model: string | null, parallel: string | null) {
+  return useQuery(operatorXModelQuery(op, model, parallel));
+}
+
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 
-/** Kernel timelines of stored `runId:index:revision` results. */
 function timelinesQuery(op: ComparisonOp, refs: string[]) {
   return {
     queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],
@@ -70,6 +110,8 @@ function timelinesQuery(op: ComparisonOp, refs: string[]) {
         signal,
       ),
     staleTime: 5 * 60_000,
+    // One retry: three default retries of a slow read kept the detail spinning for minutes.
+    retry: 1,
   };
 }
 

@@ -1,12 +1,16 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
-interface AgentXMethodologyLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
+interface AgentXMethodologyLinkProps extends Omit<
+  React.ComponentProps<typeof IntentPrefetchLink>,
+  'href'
+> {
   href: string;
   analyticsEvent:
+    | 'agentx_quickstart_opened'
     | 'agentx_methodology_opened'
     | 'agentx_methodology_returned'
     | 'agentx_methodology_figure_opened'
@@ -23,7 +27,7 @@ export function AgentXMethodologyLink({
   ...props
 }: AgentXMethodologyLinkProps) {
   return (
-    <Link
+    <IntentPrefetchLink
       {...props}
       href={href}
       onClick={(event) => {

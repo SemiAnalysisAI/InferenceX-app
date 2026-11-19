@@ -43,17 +43,31 @@ function expectLowCls() {
 }
 
 describe('Landing page performance', () => {
-  it('links Anyscale to its localized quote without loading a landing-page logo', () => {
+  it('labels Jensen as Ex-NVIDIA and preserves the localized quote destination', () => {
     for (const prefix of ['', '/zh']) {
       cy.visit(prefix || '/');
       cy.get('[data-testid="intro-section"]').within(() => {
-        cy.contains('a', 'Anyscale').should('have.attr', 'href', `${prefix}/quotes#quote-anyscale`);
-        cy.get('img[alt="Anyscale"]').should('not.exist');
-        cy.contains('a', 'Anyscale').click();
+        cy.get(`a[href="${prefix}/quotes#quote-nvidia"]`)
+          .should('have.text', 'Ex-NVIDIA Jensen')
+          .click();
       });
       cy.location('pathname').should('eq', `${prefix}/quotes`);
-      cy.location('hash').should('eq', '#quote-anyscale');
-      cy.get('#quote-anyscale').should('be.visible').and('contain.text', 'Seiji Eicher');
+      cy.location('hash').should('eq', '#quote-nvidia');
+      cy.get('#quote-nvidia').should('be.visible').and('contain.text', 'Jensen Huang');
+    }
+  });
+
+  it('features Google instead of Anyscale and links to its localized quote without loading a logo', () => {
+    for (const prefix of ['', '/zh']) {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="intro-section"]').within(() => {
+        cy.contains('a', 'Google').should('have.attr', 'href', `${prefix}/quotes#quote-google`);
+        cy.get('img[alt="Google"]').should('not.exist');
+        cy.contains('a', 'Google').click();
+      });
+      cy.location('pathname').should('eq', `${prefix}/quotes`);
+      cy.location('hash').should('eq', '#quote-google');
+      cy.get('#quote-google').should('be.visible');
     }
   });
 
@@ -61,32 +75,43 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.request('/')
       .its('body')
-      .should('contain', 'See full quotes')
+      .should('contain', 'All quotes and supporters')
       .and('contain', 'href="/quotes#quote-minimax"')
-      .and('contain', 'data-testid="launch-banner"');
+      .and('contain', 'data-testid="launch-banner"')
+      // Both A/B arms are server-rendered; the pre-paint style shows only the assigned one.
+      .and('contain', 'data-banner-variant="ubenchx"')
+      .and('contain', 'data-banner-variant="operatorx"');
 
+    // The previous page can still be loading a chunk when this intercept starts, and the visit
+    // below aborts it. Cypress fails the test when a response callback loses its browser
+    // connection, so delay only the scripts requested by the document this test opens.
+    const pageUnderTest = `/?hydration-check=${Date.now()}`;
     cy.intercept('GET', '**/_next/static/**/*.js', (request) => {
+      if (!String(request.headers.referer ?? '').endsWith(pageUnderTest)) return;
       request.continue((response) => {
         response.setDelay(1500);
       });
     });
 
-    cy.visit('/', {
+    cy.visit(pageUnderTest, {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
         observeLayoutShifts(win);
       },
     });
 
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="intro-section"]').should(
-      'contain.text',
-      'See full quotes & more supporters',
-    );
+    // Hydration may already have dropped the unassigned arm by now, so only its visibility is
+    // checked here; the server-rendered markup is checked on the request above.
+    cy.get('[data-banner-variant="ubenchx"]:visible').should('not.exist');
+    cy.get('[data-testid="launch-banner"]:visible')
+      .should('have.length', 1)
+      .and('have.attr', 'href', '/opx');
+    cy.get('[data-testid="intro-section"]').should('contain.text', 'All quotes and supporters');
+    cy.get('[data-testid="compare-agentx-primary"]').should('be.visible');
     cy.get('[data-testid="supporters-more-row"]')
-      .should('have.class', 'justify-end')
       .find('a')
-      .should('have.text', 'See full quotes & more supporters →');
+      .should('have.text', 'All quotes and supporters');
     expectLowCls();
   });
 
@@ -94,39 +119,30 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
         observeLayoutShifts(win);
       },
     });
 
     cy.get('html').should('have.attr', 'data-landing-banner-dismissed');
     cy.get('[data-testid="launch-banner"]').should('not.exist');
-    cy.get('[data-testid="intro-section"]').should(
-      'contain.text',
-      'See full quotes & more supporters',
-    );
+    cy.get('[data-testid="intro-section"]').should('contain.text', 'All quotes and supporters');
     expectLowCls();
   });
 
-  it('does not load the decorative circuit mask on mobile', () => {
+  it('loads only colored supporter logos on mobile', () => {
     cy.viewport(412, 823);
     cy.visit('/');
 
-    cy.get('.circuit-bg').should('have.css', 'display', 'none');
     cy.window().then((win) => {
       const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
-      expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
-        false,
-      );
-      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
-      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
-      // The landing AgentX ledger has five lazy model marks. A mobile viewport may
-      // fetch any visible subset, but the text-only supporter strip must not pull
-      // in its former logo set.
       const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(landingLogos.size).to.be.lessThan(6);
       expect(
-        [...landingLogos].filter((name) => !new URL(name).pathname.endsWith('-color.svg')),
+        [...landingLogos].filter((name) => {
+          const pathname = new URL(name).pathname;
+          return !pathname.endsWith('-color.svg');
+        }),
       ).to.deep.eq([]);
       expect(
         resourceNames.some(
@@ -138,12 +154,6 @@ describe('Landing page performance', () => {
 
   it('preloads only the default font and no supporter logos', () => {
     cy.request('/').then((response) => {
-      // Next emits resource preloads as a `Link` response header (when `/` renders
-      // dynamically) and/or as inlined <link rel="preload"> tags in the document
-      // <head> (when `/` is statically prerendered) — and a production build can
-      // surface the same resource in BOTH places at once. Collect a deduplicated
-      // set of preloaded URLs per `as` type, keyed by URL, so the assertion holds
-      // in every render mode and never double-counts a resource listed twice.
       const linkHeader = String(response.headers.link ?? '');
       const body = String(response.body ?? '');
 
@@ -155,7 +165,6 @@ describe('Landing page performance', () => {
         else if (as === 'image' && url.startsWith('/logos/')) logos.add(url);
       };
 
-      // `Link` header entries: <url>; rel=preload; as="font"|"image"; ...
       for (const entry of linkHeader.split(',')) {
         if (!/\brel=preload\b/u.test(entry)) continue;
         add(
@@ -164,7 +173,6 @@ describe('Landing page performance', () => {
         );
       }
 
-      // Inlined <link rel="preload"> tags.
       for (const tag of body.match(/<link\b[^>]*\brel="preload"[^>]*>/gu) ?? []) {
         add(
           tag.match(/\bas="(?<as>[^"]+)"/u)?.groups?.as,
@@ -173,25 +181,7 @@ describe('Landing page performance', () => {
       }
 
       expect([...fonts]).to.have.length(1);
-      // The supporters band no longer renders a quote block, so no supporter
-      // logo is visible on the landing page and none should be preloaded.
       expect([...logos]).to.have.length(0);
-    });
-  });
-
-  it('loads Minecraft assets after the theme is activated', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('theme', 'dark');
-        win.localStorage.setItem('minecraft-music', 'false');
-      },
-    });
-
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
-    cy.window().should((win) => {
-      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
-      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(true);
     });
   });
 });

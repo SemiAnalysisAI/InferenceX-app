@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { configSegmentLabel, parallelismLabel } from './parallelism-label';
 
 describe('configSegmentLabel', () => {
+  it('labels weight-data parallelism separately from tensor and expert parallelism', () => {
+    expect(configSegmentLabel(1, 1, false, 1, 1, 1, undefined, 8)).toBe('DWDP8');
+    expect(configSegmentLabel(1, 1, false, 1, 1, 1, undefined, 1)).toBe('TP1');
+  });
   it('collapses symmetric tp===ep to TEP / DEP by dp-attention', () => {
     expect(configSegmentLabel(8, 8, false)).toBe('TEP8');
     expect(configSegmentLabel(8, 8, true)).toBe('DEP8');
@@ -45,6 +49,23 @@ describe('configSegmentLabel', () => {
 });
 
 describe('parallelismLabel', () => {
+  it('labels each DWDP group once and preserves the decode topology', () => {
+    expect(
+      parallelismLabel({
+        tp: 24,
+        disagg: true,
+        isMultinode: true,
+        prefillTp: 1,
+        prefillEp: 1,
+        prefillDwdp: 8,
+        prefillNumWorkers: 2,
+        decodeTp: 8,
+        decodeEp: 8,
+        decodeDpAttention: true,
+        decodeNumWorkers: 1,
+      }),
+    ).toBe('2xDWDP8+1xDEP8');
+  });
   it('falls back to bare tp when no ep data', () => {
     expect(parallelismLabel({ tp: 8 })).toBe('8');
   });
@@ -74,7 +95,6 @@ describe('parallelismLabel', () => {
   });
 
   it('single-node disagg uses the single (decode) segment, not worker syntax', () => {
-    // is_multinode false → no "NxPrefill+MxDecode" expansion.
     expect(
       parallelismLabel({ tp: 8, ep: 8, dpAttention: false, disagg: true, isMultinode: false }),
     ).toBe('TEP8');
@@ -127,9 +147,6 @@ describe('parallelismLabel', () => {
   });
 
   it('drops the decode segment when the decode pool is absent (0 workers, tp 0)', () => {
-    // Prefill-only agentic multinode runs (e.g. Kimi-K3 TP8 PP2 on b200-dgxc)
-    // emit decode_num_workers=0 / decode_tp=0 — the label is just the active
-    // side, without the 1x multiplier: "TP8PP2", not "1xTP8PP2+0xTP0".
     expect(
       parallelismLabel({
         tp: 0,

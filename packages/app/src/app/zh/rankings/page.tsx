@@ -1,22 +1,25 @@
 import type { Metadata } from 'next';
 
-import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { getAllRankingPageEntries } from '@/lib/rankings';
-import { rankingPageHeadingZh } from '@/lib/rankings-zh';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
+import { rankingPageHeadingZh } from '@/lib/live-seo/rankings-zh';
 
 const title = 'LLM 推理 GPU 排行榜';
 const description =
-  'DeepSeek、Kimi、GLM、MiniMax、Qwen 等开源大模型推理的最快与最省钱 GPU 实时排行。按实测单 GPU 每秒 token 数与每百万 token 成本排名，数据持续更新。';
+  'DeepSeek、Kimi、GLM、MiniMax、Qwen 等开源大模型推理的最快与最省钱 GPU 实时排行，按实测吞吐量与每百万 token 成本排名。';
 
 export const metadata: Metadata = {
   title,
-  description: `${description}${SUPPORTERS_LINE_ZH}`,
+  description,
   keywords: [
     'LLM 推理最快 GPU',
     'LLM 推理最便宜 GPU',
@@ -28,14 +31,12 @@ export const metadata: Metadata = {
     'GPU 推理排名',
   ],
   alternates: zhAlternates('/rankings'),
-  openGraph: {
+  ...socialMetadata({
     title: `${title} | ${SITE_NAME}`,
     description,
     url: `${SITE_URL}/zh/rankings`,
-    locale: ZH_OG_LOCALE,
-    type: 'website',
-  },
-  twitter: { card: 'summary_large_image', title, description },
+    locale: 'zh',
+  }),
 };
 
 export default function ZhRankingsIndexPage() {
@@ -61,9 +62,9 @@ export default function ZhRankingsIndexPage() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <h1 className="max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
+            <Heading as="h1" level="display" className="max-w-4xl">
               {title}
-            </h1>
+            </Heading>
             <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
               哪款 GPU
               最适合部署你的模型？以下每个排行都来自匹配交互速度下的实测基准数据，而非纸面规格，并随新结果自动更新。
@@ -71,10 +72,13 @@ export default function ZhRankingsIndexPage() {
           </header>
 
           <section className="mt-10 mb-16 grid gap-4 sm:grid-cols-2">
-            {INFERENCE_MODEL_SLUGS.map((model) => (
+            {PUBLIC_INFERENCE_MODEL_SLUGS.map((model) => (
               <Card key={model.slug} className="gap-0 p-5">
-                <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
-                <ul className="mt-4 space-y-2">
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <ModelLogo model={model.model} className="size-5" />
+                  {model.seoName}
+                </h2>
+                <ul className="-mx-3 mt-3 space-y-1">
                   <li>
                     <CatalogLinkCard
                       href={`/zh/rankings/fastest-gpu-for-${model.slug}`}

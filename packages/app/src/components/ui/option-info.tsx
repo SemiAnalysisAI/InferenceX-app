@@ -4,6 +4,7 @@ import { Info } from 'lucide-react';
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEventHandler,
@@ -12,34 +13,10 @@ import {
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HELP_CONTENT_CLASS_NAME } from './tooltip';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
-/** Closed-field help sits beside the value, independently of the select button. */
-export function SelectedOptionInfo({
-  label,
-  value,
-  children,
-}: {
-  label: string;
-  value: string;
-  children: ReactNode;
-}) {
-  return (
-    <InfoHelp
-      label={label}
-      value={value}
-      variant="selected"
-      triggerTestId={`selected-option-help-${value}`}
-      contentTestId={`selected-option-help-content-${value}`}
-    >
-      {children}
-    </InfoHelp>
-  );
-}
-
-/** A separate action beside an option, never nested inside its selection button. */
 export function OptionInfo(props: Omit<InfoHelpProps, 'variant'>) {
   return <InfoHelp {...props} variant="option" />;
 }
@@ -55,11 +32,10 @@ interface InfoHelpProps {
   contentTestId?: string;
   ariaLabel?: string;
   align?: 'start' | 'center' | 'end';
-  variant?: 'inline' | 'option' | 'selected';
+  variant?: 'inline' | 'option';
   analyticsEvent?: 'selector_option_help_opened' | 'selector_help_opened';
 }
 
-/** One hover/click/keyboard help surface for labels, selected values and options. */
 export function InfoHelp({
   label,
   value,
@@ -77,17 +53,25 @@ export function InfoHelp({
   const locale = useLocale();
   const titleId = useId();
   const [open, setOpen] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>();
   const hoverOpenedRef = useRef(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updateWidth = () => setViewportWidth(document.documentElement.clientWidth);
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [open]);
 
   const cancelClose = () => clearTimeout(closeTimerRef.current);
   useEffect(() => () => clearTimeout(closeTimerRef.current), []);
 
   const closeAfterHover = () => {
     cancelClose();
-    // Give the pointer time to cross the gap into the explanation and its links.
     if (hoverOpenedRef.current) {
       closeTimerRef.current = setTimeout(() => setOpen(false), 200);
     }
@@ -109,6 +93,8 @@ export function InfoHelp({
         <button
           ref={triggerRef}
           type="button"
+          data-slot="info-help"
+          data-variant={variant}
           data-option-help={variant === 'option' ? '' : undefined}
           data-testid={triggerTestId ?? `option-help-${value}`}
           aria-label={ariaLabel ?? (locale === 'zh' ? `${label}说明` : `Help: ${label}`)}
@@ -124,8 +110,6 @@ export function InfoHelp({
           onPointerLeave={closeAfterHover}
           onClick={(event) => {
             if (open && hoverOpenedRef.current) {
-              // Clicking an already-hovered icon keeps its help open instead of
-              // immediately toggling it shut. Touch/keyboard retain normal toggling.
               event.preventDefault();
               cancelClose();
               hoverOpenedRef.current = false;
@@ -138,11 +122,9 @@ export function InfoHelp({
             'no-export group/info-help inline-flex shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none',
             variant === 'option' && 'size-11 md:size-8',
             variant === 'inline' && 'size-6 -my-0.5',
-            variant === 'selected' && 'pointer-events-auto h-full w-7',
             triggerClassName,
           )}
         >
-          {/* Keep the hover circle consistent without shrinking the touch target. */}
           <span
             aria-hidden="true"
             data-slot="info-help-icon"
@@ -154,6 +136,11 @@ export function InfoHelp({
       </PopoverTrigger>
       <PopoverContent
         ref={contentRef}
+        style={
+          viewportWidth === undefined
+            ? undefined
+            : { maxWidth: `calc(${viewportWidth}px - 1.5rem)` }
+        }
         side="bottom"
         align={align}
         collisionPadding={12}
@@ -165,12 +152,9 @@ export function InfoHelp({
           hoverOpenedRef.current = false;
         }}
         onInteractOutside={(event) => {
-          // Activating the hovered trigger is part of this popover, not an
-          // outside interaction; Escape should still return focus to it.
           if (triggerRef.current?.contains(event.target as Node)) event.preventDefault();
         }}
         onOpenAutoFocus={(event) => {
-          // Looking up an option must not steal focus from the dropdown's search.
           if (hoverOpenedRef.current) event.preventDefault();
         }}
         onCloseAutoFocus={(event) => {
@@ -179,7 +163,7 @@ export function InfoHelp({
         data-testid={contentTestId ?? `option-help-content-${value}`}
         className={cn(
           HELP_CONTENT_CLASS_NAME,
-          'z-[130] w-96 max-w-[min(calc(100vw-1.5rem),var(--radix-popover-content-available-width))] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
+          'z-[130] w-96 max-w-[calc(100vw-1.5rem)] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
         )}
       >
         <p id={titleId} className="font-medium text-foreground">

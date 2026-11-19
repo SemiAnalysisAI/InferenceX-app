@@ -12,12 +12,16 @@ export function renderOffloadHalo(
   group: d3.Selection<SVGGElement, InferenceData, null, undefined>,
   point: InferenceData,
   stroke: string,
+  enabled = true,
 ): void {
+  if (!enabled || point.offload_mode !== 'on') {
+    for (const halo of group.node()?.querySelectorAll('.offload-halo') ?? []) halo.remove();
+    return;
+  }
   group
     .selectAll<SVGCircleElement, boolean>('.offload-halo')
-    .data(point.offload_mode === 'on' ? [true] : [])
+    .data([true])
     .join('circle')
-    // Every chart render re-syncs every point; skip unchanged writes.
     .each(function () {
       setAttrIfChanged(this, 'class', 'offload-halo');
       setAttrIfChanged(this, 'r', String(OFFLOAD_HALO_RADIUS));

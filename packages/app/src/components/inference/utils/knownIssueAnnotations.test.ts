@@ -2,13 +2,19 @@
 import * as d3 from 'd3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { KNOWN_CONFIG_ISSUES } from '@/lib/known-issues';
+import { KNOWN_CONFIG_ISSUES } from '@/lib/benchmarks/known-issues';
 
 import {
   type AnnotationRenderOptions,
   type KnownIssueAnnotation,
   renderKnownIssueAnnotations,
 } from './knownIssueAnnotations';
+
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
 
 let g: d3.Selection<SVGGElement, unknown, null, undefined>;
 let defs: d3.Selection<SVGDefsElement, unknown, null, undefined>;
@@ -145,7 +151,6 @@ describe('renderKnownIssueAnnotations', () => {
     expect(top1).toBeGreaterThan(bottom0);
     for (const rect of rects) {
       expect(Number(rect.getAttribute('x'))).toBeGreaterThanOrEqual(0);
-      // Right edges align at the plot's right edge minus the gap
       expect(Number(rect.getAttribute('x')) + Number(rect.getAttribute('width'))).toBe(800 - 10);
     }
   });
@@ -172,7 +177,6 @@ describe('renderKnownIssueAnnotations', () => {
   });
 
   it('omits the arrow when the series is zoomed/panned out of view', () => {
-    // Scales push every point far outside the 800x500 plot
     renderKnownIssueAnnotations(
       g,
       defs,
@@ -188,7 +192,7 @@ describe('renderKnownIssueAnnotations', () => {
     renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [gb300Annotation] }));
 
     expect(g.selectAll('[data-testid="known-issue-annotation"]').nodes()).toHaveLength(1);
-    expect(defs.selectAll('marker').nodes()).toHaveLength(1);
+    expect(defs.selectAll('marker').nodes()).toHaveLength(2);
   });
 
   it('fires the click callback with the annotation', () => {
@@ -198,5 +202,75 @@ describe('renderKnownIssueAnnotations', () => {
     const box = g.select('[data-testid="known-issue-annotation"]').node() as SVGAElement;
     box.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onLinkClick).toHaveBeenCalledWith(gb300Annotation);
+  });
+});
+
+describe('renderKnownIssueAnnotations dismiss control', () => {
+  it('omits the close button when no dismiss handler is provided', () => {
+    renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [veraRubinPreview] }));
+    expect(g.select('[data-testid="chart-notice-dismiss"]').empty()).toBe(true);
+  });
+
+  it('renders one close button per box, outside the issue link, and reports the annotation', () => {
+    const onDismiss = vi.fn();
+    const onLinkClick = vi.fn();
+    renderKnownIssueAnnotations(
+      g,
+      defs,
+      baseOptions({
+        annotations: [gb300Annotation, veraRubinPreview],
+        onDismiss,
+        onLinkClick,
+        dismissLabel: 'Dismiss notice',
+      }),
+    );
+
+    const buttons = g.selectAll('[data-testid="chart-notice-dismiss"]').nodes() as SVGGElement[];
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button.closest('a')).toBeNull();
+      expect(button.getAttribute('role')).toBe('button');
+      expect(button.getAttribute('aria-label')).toBe('Dismiss notice');
+    }
+
+    buttons[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onDismiss).toHaveBeenCalledWith(veraRubinPreview);
+    buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onDismiss).toHaveBeenCalledWith(gb300Annotation);
+    expect(onLinkClick).not.toHaveBeenCalled();
+  });
+
+  it('keeps the close button inside its box', () => {
+    renderKnownIssueAnnotations(
+      g,
+      defs,
+      baseOptions({ annotations: [veraRubinPreview], onDismiss: vi.fn() }),
+    );
+    const rect = g.select('.known-issue-annotation rect');
+    const right = Number(rect.attr('x')) + Number(rect.attr('width'));
+    const hit = g.select('.known-issue-dismiss rect');
+    expect(Number(hit.attr('x')) + Number(hit.attr('width'))).toBeLessThanOrEqual(right);
+    expect(right).toBe(800 - 10);
+  });
+});
+
+describe('renderKnownIssueAnnotations on phone-width plots', () => {
+  it('keeps an official-preview box inside a narrow plot', () => {
+    const width = 240;
+    renderKnownIssueAnnotations(g, defs, baseOptions({ width, annotations: [veraRubinPreview] }));
+    const rect = g.select('.known-issue-annotation rect');
+    const x = Number(rect.attr('x'));
+    const w = Number(rect.attr('width'));
+    expect(x).toBeGreaterThanOrEqual(2);
+    expect(x + w).toBeLessThanOrEqual(width);
+    const detail = g.select('.known-issue-annotation text:nth-of-type(2)').text();
+    expect(detail).not.toContain('Results may change');
+  });
+
+  it('keeps the full preview sentence when the plot is wide enough', () => {
+    renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [veraRubinPreview] }));
+    expect(g.select('.known-issue-annotation').text()).toContain(
+      'InferenceX Official Preview: Results may change as validation and publication continue.',
+    );
   });
 });

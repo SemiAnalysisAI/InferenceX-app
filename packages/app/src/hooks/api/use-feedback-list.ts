@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchFeedbackList } from '@/lib/api';
+import { fetchFeedbackList } from '@/lib/api/api';
 
 export function useFeedbackList() {
   return useQuery({

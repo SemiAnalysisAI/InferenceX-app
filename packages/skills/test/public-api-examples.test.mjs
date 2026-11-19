@@ -76,7 +76,7 @@ before(() => {
       assert.ok(snippet, `execute the installed ${heading} recipe`);
       return snippet.groups.code;
     });
-    installed.set(target, snippets);
+    installed.set(target, { root, snippets });
   }
   writeFileSync(
     preload,
@@ -107,7 +107,6 @@ function run(
     openapi = schema,
     project = suite.project('request-'),
     telemetry = true,
-    standalone = false,
   } = {},
 ) {
   const fixtures = { [`${base}/api/openapi.json`]: { body: JSON.stringify(openapi) } };
@@ -118,17 +117,20 @@ function run(
   const requestsPath = join(project, 'requests.jsonl');
   writeFileSync(fixturesPath, JSON.stringify(fixtures));
   writeFileSync(requestsPath, '');
-  let code = installed.get(target)[index];
+  const { root, snippets } = installed.get(target);
+  let code = snippets[index].replace(
+    './.agents/skills/inferencex-api/scripts/capture-response.mjs',
+    pathToFileURL(join(root, 'scripts/capture-response.mjs')).href,
+  );
   if (replacement) code = code.replace(...replacement);
   const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
     cwd: project,
     env: {
       ...environment,
-      INFERENCEX_SKILL_DIR: standalone ? '' : skillRoots.get(target),
+      INFERENCEX_SKILL_DIR: skillRoots.get(target),
       INFERENCEX_TELEMETRY: telemetry ? '1' : '0',
       DO_NOT_TRACK: '0',
-      INFERENCEX_EXPECT_USER_AGENT:
-        telemetry && !standalone ? `inferencex-skill/${packageInfo.version}` : '',
+      INFERENCEX_EXPECT_USER_AGENT: telemetry ? `inferencex-skill/${packageInfo.version}` : '',
       INFERENCEX_EXAMPLE_FIXTURES: fixturesPath,
       INFERENCEX_EXAMPLE_REQUESTS: requestsPath,
     },
@@ -246,6 +248,30 @@ test('raw recipes retain complete UTF-8 and failure bodies before parsing, and r
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
     assert.equal(assertCaptures(result).records.length, 2);
+  }
+});
+
+test('every installed raw recipe uses the shared capture budget before interpreting OpenAPI', () => {
+  for (const index of [0, 1, 2, 3]) {
+    const result = run(
+      index,
+      {},
+      {
+        replacement: ['createResponseCapture()', 'createResponseCapture({ responseBytes: 1024 })'],
+        openapi: { ...schema, extra: 'x'.repeat(1024) },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /1024-byte budget/u);
+    assert.deepEqual(result.requests, [`${base}/api/openapi.json`]);
+    const directory = readdirSync(result.project).find((name) => name.startsWith('api-evidence-'));
+    assert.deepEqual(readdirSync(join(result.project, directory)), ['1.json']);
+    const failed = JSON.parse(readFileSync(join(result.project, directory, '1.json'), 'utf8'));
+    assert.equal(failed.status, 200);
+    assert.equal(failed.body_path, undefined);
+    assert.equal(failed.sha256, undefined);
+    assert.ok(Number.isFinite(Date.parse(failed.failed_at)));
   }
 });
 
@@ -595,14 +621,12 @@ test('installed history recipe keeps all scoped observations, dates, raw configu
 });
 
 test('all four raw lookup recipes omit both attribution headers when opted out', () => {
-  for (const options of [{ telemetry: false }, { standalone: true }]) {
-    for (let index = 0; index < 4; index++) {
-      const result = run(index, {}, { openapi: {}, ...options });
-      assert.equal(result.requests.length, 1);
-      assert.doesNotMatch(
-        result.stderr,
-        /Unexpected attribution marker|Opt-out retained traffic marker/u,
-      );
-    }
+  for (let index = 0; index < 4; index++) {
+    const result = run(index, {}, { openapi: {}, telemetry: false });
+    assert.equal(result.requests.length, 1);
+    assert.doesNotMatch(
+      result.stderr,
+      /Unexpected attribution marker|Opt-out retained traffic marker/u,
+    );
   }
 });

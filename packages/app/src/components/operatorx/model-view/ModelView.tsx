@@ -1,0 +1,1401 @@
+'use client';
+
+import { ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useTheme } from 'next-themes';
+import {
+  type CSSProperties,
+  type ReactNode,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import type {
+  ComparisonOp,
+  ComparisonView,
+  ComputePrecision,
+} from '@semianalysisai/inferencex-db/operatorx/compare';
+import { compareSplits, parallelLabel } from '@semianalysisai/inferencex-db/operatorx/parallel';
+import { BLOCK_COLORS } from '@/components/inference/ui/model-architecture-diagram-renderer';
+import { Card } from '@/components/ui/card';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Heading } from '@/components/ui/heading';
+import { Label } from '@/components/ui/label';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import {
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { prefetchOperatorXTimelines } from '@/hooks/api/use-operatorx';
+import { useClientSearch } from '@/hooks/useClientSearch';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
+
+import { CaseDetail } from '../CaseDetail';
+import {
+  hardwareLabel,
+  measuredHardware,
+  operatorXColors,
+  removeHardwareSelection,
+  restoresAllHardware,
+  toggleHardwareSelection,
+} from '../compare/hardware';
+import { METRICS, metricById } from '../compare/metrics';
+import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
+import { slices } from '../compare/slices';
+import { shareBin, shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
+import { HARDWARE_PARAM, parsePickedHardware, setPickedHardware } from '../compare/url-selection';
+import { metricVsSize } from '../viz/metric-vs-size';
+import { roofline } from '../viz/roofline';
+import {
+  architecture,
+  type FlowNode,
+  type Fold,
+  type LayerBlock,
+  measuredRoles,
+  modelLayers,
+  type OpSlot,
+  slotCases,
+  subView,
+} from './layers';
+import { track } from '@/lib/analytics/analytics';
+import { isDarkTheme } from '@/lib/themes/themes';
+
+import { diagramText } from './diagram-copy';
+import {
+  barsHeight,
+  binPct,
+  binTokens,
+  gpuSweep,
+  gpuValues,
+  inBin,
+  OpBars,
+  OpSweep,
+  sizeBin,
+  SWEEP_PX,
+  tokenBin,
+} from './OpBars';
+import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
+
+import { ModelViewLoading } from './shell';
+
+const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
+const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
+
+const STRINGS = {
+  en: {
+    empty: 'No results yet',
+    model: 'Model',
+    devices: 'Devices',
+    metric: 'Metric',
+    precision: 'Precision',
+    computePrecision: 'Compute precision',
+    oneDevice: '1 GPU',
+    metricOption: (label: string, unit: string) => `${label} (${unit})`,
+    tokens: 'Tokens',
+    all: 'All',
+    allRange: (from: string, to: string) => `All · ${from}–${to}`,
+    allTokens: 'All token counts',
+    tokenCount: (tokens: string) => `${tokens} tokens`,
+    or: 'or',
+    shapes: (n: number) => `${n.toLocaleString()} ${n === 1 ? 'shape' : 'shapes'}`,
+    sizes: (n: number) => `${n.toLocaleString()} ${n === 1 ? 'size' : 'sizes'}`,
+    sizesOf: (n: number, dim: ReactNode) => (
+      <>
+        {n.toLocaleString()} {n === 1 ? 'size' : 'sizes'} of {dim}
+      </>
+    ),
+    atSize: (shapes: string, tokens: string, metric: string) =>
+      `${shapes} at ≈ ${tokens} tokens · median ${metric.toLowerCase()}`,
+    perSize: (shapes: string, metric: string) =>
+      `${shapes} · median ${metric.toLowerCase()} per size, lowest to highest`,
+    measured: (n: number) => `${n} measured`,
+    noResultsAtSize: 'No results at this size',
+    noShapesAtSize: 'No shapes at this size',
+    noResultsOnGpus: 'No results on these GPUs',
+    shape: 'Shape',
+    shapeNote: (n: number) =>
+      `This layer runs at ${n} shapes across the serving configs, mostly one shard size per tensor-parallel degree. Each is swept over the token count.`,
+    fold: 'Fold into the fused op',
+    unfold: 'Unfold into the ops it runs',
+  },
+  zh: {
+    empty: '暂无结果',
+    model: '模型',
+    devices: '设备',
+    metric: '指标',
+    precision: '精度',
+    computePrecision: '计算精度',
+    oneDevice: '单 GPU',
+    metricOption: (label: string, unit: string) => `${label}（${unit}）`,
+    tokens: 'Token 数',
+    all: '全部',
+    allRange: (from: string, to: string) => `全部 · ${from}–${to}`,
+    allTokens: '全部 token 数',
+    tokenCount: (tokens: string) => `${tokens} token`,
+    or: '或',
+    shapes: (n: number) => `${n.toLocaleString()} 个形状`,
+    sizes: (n: number) => `${n.toLocaleString()} 个尺寸`,
+    sizesOf: (n: number, dim: ReactNode) => (
+      <>
+        {dim} 的 {n.toLocaleString()} 个尺寸
+      </>
+    ),
+    atSize: (shapes: string, tokens: string, metric: string) =>
+      `≈ ${tokens} token 时共 ${shapes} · ${metric}中位数`,
+    perSize: (shapes: string, metric: string) => `共 ${shapes} · 各尺寸的${metric}中位数，由低到高`,
+    measured: (n: number) => `${n} 个已实测`,
+    noResultsAtSize: '此尺寸下暂无结果',
+    noShapesAtSize: '此尺寸下没有形状',
+    noResultsOnGpus: '所选 GPU 暂无结果',
+    shape: '形状',
+    shapeNote: (n: number) =>
+      `该层在各服务配置下共有 ${n} 种形状，大多是每个张量并行度对应一种分片尺寸。每种形状都按 token 数扫描。`,
+    fold: '折叠为融合 op',
+    unfold: '展开为其运行的各个 op',
+  },
+};
+
+function setParam(key: string, value: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.set(key, value);
+  replaceClientSearch(params);
+}
+
+const setPrecision = (value: ComputePrecision) => setParam('modelPrecision', value);
+const setBin = (value: number) => setParam('modelBin', String(value));
+
+/** A module name with line breaks allowed after `_`, `.` and `+`, never mid-word. */
+function breakable(label: string): ReactNode[] {
+  return label
+    .split(/(?<=[_.+])/u)
+    .flatMap((part, i) => (i > 0 ? [<wbr key={i} />, part] : [part]));
+}
+
+/** The one-device option's select value (its split key is empty). */
+const ONE_DEVICE = '1';
+
+function setParallel(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === ONE_DEVICE) params.delete('parallel');
+  else params.set('parallel', value);
+  replaceClientSearch(params);
+}
+
+function ControlGroup({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+/** A slot resolved against the data: its cases, and those at the selected size. */
+interface SlotData {
+  slot: OpSlot;
+  /** Rows of its block it spans, and the row of its bars. */
+  first: number;
+  last: number;
+  bar: number;
+  block: LayerBlock;
+  model: ComparisonModel | null;
+  indices: number[];
+  atSize: number[];
+}
+
+/** Default size: this many tokens, or the nearest size with data. */
+const DEFAULT_TOKENS = 128;
+
+const formatTokens = (t: number) =>
+  t >= 10_000 ? `${Number((t / 1000).toPrecision(3))}k` : t.toLocaleString();
+
+/** Token axis labels: both ends, and the powers of ten between them clear of the ends. */
+function tokenMarks(range: [number, number]): { tokens: number; pct: number }[] {
+  const ends = range.map((b) => ({ tokens: binTokens(b), pct: binPct(b, range) }));
+  if (range[0] === range[1]) return [ends[0]];
+  const inner: { tokens: number; pct: number }[] = [];
+  for (let t = 10; t < ends[1].tokens; t *= 10) {
+    const pct = binPct(tokenBin(t), range);
+    if (pct > 10 && pct < 90) inner.push({ tokens: t, pct });
+  }
+  return [ends[0], ...inner, ends[1]];
+}
+
+/**
+ * The token count every row shows, over the sizes any row has data at; or, with "All token
+ * counts" on, the token axis the rows' line charts share.
+ */
+function SizeControls({
+  bins,
+  bin,
+  onChange,
+  sweep,
+  onSweep,
+}: {
+  bins: number[];
+  bin: number;
+  onChange: (bin: number) => void;
+  sweep: boolean;
+  onSweep: (enabled: boolean) => void;
+}) {
+  const strings = STRINGS[useLocale()];
+  const range: [number, number] = [bins[0], bins.at(-1)!];
+  // One step past the largest size: every size at once, as line charts.
+  const all = bins.length;
+  // Where the thumb sits at the largest size; the 16px is the range thumb's width.
+  const last = bins.length > 1 ? (bins.length - 1) / bins.length : 0;
+  const lastAt = `calc(${last * 100}% + ${(0.5 - last) * 16}px)`;
+  return (
+    <div className="space-y-1">
+      <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2 text-xs">
+        <span className="text-muted-foreground">{strings.tokens}</span>
+        <span className="font-medium tabular-nums">
+          {sweep
+            ? strings.allRange(formatTokens(binTokens(range[0])), formatTokens(binTokens(range[1])))
+            : `≈ ${formatTokens(binTokens(bin))}`}
+        </span>
+      </label>
+      <div className="relative">
+        <input
+          id="operatorx-model-tokens"
+          type="range"
+          min={0}
+          max={all}
+          step={1}
+          value={sweep ? all : bins.indexOf(bin)}
+          aria-valuetext={
+            sweep ? strings.allTokens : strings.tokenCount(formatTokens(binTokens(bin)))
+          }
+          onChange={(e) => {
+            const at = Number(e.target.value);
+            if (at === all) {
+              if (!sweep) onSweep(true);
+              return;
+            }
+            if (sweep) onSweep(false);
+            onChange(bins[at]);
+          }}
+          className="range-slider relative h-4 w-full"
+          style={rangeProgressStyle(sweep ? all : bins.indexOf(bin), 0, all)}
+          data-testid="operatorx-model-tokens"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 h-3 w-px -translate-y-1/2 bg-muted-foreground/60"
+          style={{ left: lastAt }}
+          data-testid="operatorx-model-tokens-notch"
+        />
+      </div>
+      <div className="relative h-4 text-2xs text-muted-foreground tabular-nums">
+        <span className="absolute left-0">{formatTokens(binTokens(range[0]))}</span>
+        {bins.length > 1 && (
+          <span className="absolute -translate-x-full pr-1" style={{ left: lastAt }}>
+            {formatTokens(binTokens(range[1]))}
+          </span>
+        )}
+        <span className={`absolute right-0 ${sweep ? 'font-medium text-foreground' : ''}`}>
+          {strings.all}
+        </span>
+      </div>
+      {sweep && (
+        // Aligned with the charts' plot area, which leaves room for the value labels.
+        <div
+          className="relative mr-[4.5rem] h-6 border-t border-border/60 text-2xs text-muted-foreground tabular-nums"
+          data-testid="operatorx-model-token-axis"
+        >
+          {tokenMarks(range).map((m, i, every) => (
+            <span
+              key={m.tokens}
+              // too narrow for the inner powers of ten on phones: the ends only
+              className={`absolute top-1 whitespace-nowrap ${i === 0 ? '' : i === every.length - 1 ? '-translate-x-full' : '-translate-x-1/2 max-md:hidden'}`}
+              style={{ left: `${m.pct}%` }}
+            >
+              {formatTokens(m.tokens)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SlotTooltip({ data, tokens, sweep }: { data: SlotData; tokens: number; sweep: boolean }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
+  const { model, atSize, slot, block } = data;
+  if (!model) return null;
+  const title = diagramText(slot.label, locale);
+  const subtitle = diagramText(block.label, locale);
+  if (sweep) {
+    const { format, unit } = model.metric;
+    // `8.13–2222 TFLOPS`: the unit once, after the range
+    const bare = (v: number) => format(v).replace(unit, '').trim();
+    return (
+      <ChartHoverCardBody
+        title={title}
+        subtitle={subtitle}
+        metrics={gpuSweep(model, data.indices).map(({ hardware, points }) => {
+          const values = points.map((p) => p.value);
+          return {
+            value: `${bare(Math.min(...values))}–${bare(Math.max(...values))} ${unit}`,
+            label: `${hardwareLabel(hardware)} · ${strings.sizes(points.length)}`,
+            color: model.colors[hardware],
+          };
+        })}
+        summary={strings.perSize(strings.shapes(data.indices.length), model.metric.label[locale])}
+      />
+    );
+  }
+  return (
+    <ChartHoverCardBody
+      title={title}
+      subtitle={subtitle}
+      metrics={gpuValues(model, atSize).map((r) => ({
+        value: model.metric.format(r.value),
+        label: `${hardwareLabel(r.hardware)} · ${strings.measured(r.measured)}`,
+        color: model.colors[r.hardware],
+      }))}
+      summary={strings.atSize(
+        strings.shapes(atSize.length),
+        formatTokens(tokens),
+        model.metric.label[locale],
+      )}
+    />
+  );
+}
+
+const HEADER_PX = 32;
+/** The strip along an unfolded block's bottom that folds it back. */
+const FOLD_PX = 22;
+const COMPACT_PX = 34;
+const TALL_NODE_PX = 26;
+const COMPACT_NODE_PX = 20;
+/** Box geometry, in percent of the diagram column: margins, gap between branches. */
+const MARGIN = 4;
+const LANE_GAP = 4;
+const TRUNK_WIDTH = 72;
+
+interface Box {
+  left: number;
+  width: number;
+  cx: number;
+  top: number;
+  bottom: number;
+}
+
+/** Where every box of a block sits: x in percent of the column, y in pixels. */
+function boxes(block: LayerBlock, tallPx: number): { rows: number[]; at: Map<string, Box> } {
+  const rows = block.tall.map((t) => (t ? tallPx : COMPACT_PX));
+  const tops = rows.map((_, r) => HEADER_PX + rows.slice(0, r).reduce((a, b) => a + b, 0));
+  const colWidth = (100 - 2 * MARGIN - (block.cols - 1) * LANE_GAP) / block.cols;
+  const at = new Map<string, Box>();
+  for (const n of block.nodes) {
+    const width = n.col === null ? TRUNK_WIDTH : n.span * colWidth + (n.span - 1) * LANE_GAP;
+    const left = n.col === null ? (100 - width) / 2 : MARGIN + n.col * (colWidth + LANE_GAP);
+    const h = n.slots.length > 0 && block.tall[n.row] ? TALL_NODE_PX : COMPACT_NODE_PX;
+    const top = (tops[n.row] + tops[n.rowEnd] + rows[n.rowEnd] - h) / 2;
+    at.set(n.id, { left, width, cx: left + width / 2, top, bottom: top + h });
+  }
+  return { rows, at };
+}
+
+const pct = (v: number) => `${v}%`;
+/** Grid rows of block rows `first..last`, after the title row. */
+const gridRow = (first: number, last: number) => `${first + 2} / ${last + 3}`;
+
+type Line = [number, number, number, number, boolean];
+
+/** Arrows between a block's boxes: straight down, or down, across and down. */
+const FlowEdges = memo(({ block, at }: { block: LayerBlock; at: Map<string, Box> }) => {
+  const marker = `operatorx-arrow-${block.id}`;
+  const lines: Line[] = [];
+  const hits = (seg: Line, skip: Box[]) =>
+    [...at.values()].some((b) => {
+      if (skip.includes(b)) return false;
+      const [x1, y1, x2, y2] = seg;
+      return x1 === x2
+        ? x1 > b.left &&
+            x1 < b.left + b.width &&
+            Math.min(y1, y2) < b.bottom &&
+            Math.max(y1, y2) > b.top
+        : y1 > b.top &&
+            y1 < b.bottom &&
+            Math.min(x1, x2) < b.left + b.width &&
+            Math.max(x1, x2) > b.left;
+    });
+  // Down, then across just above the target; if that crosses a box, across just below the source.
+  const route = (a: Box, b: Box) => {
+    const [x0, y0, x1, y1] = [a.cx, a.bottom, b.cx, b.top];
+    if (Math.abs(x0 - x1) < 0.5) {
+      lines.push([x0, y0, x0, y1, true]);
+      return;
+    }
+    const via = (bend: number): Line[] => [
+      [x0, y0, x0, bend, false],
+      [x0, bend, x1, bend, false],
+      [x1, bend, x1, y1, true],
+    ];
+    const near = via(y1 - 7);
+    lines.push(...(near.every((seg) => !hits(seg, [a, b])) ? near : via(y0 + 7)));
+  };
+  for (const [from, to] of block.edges) {
+    const a = at.get(from);
+    const b = at.get(to);
+    if (a && b) route(a, b);
+  }
+  // The block's input splits along a bus under its title into each entry.
+  const entries = block.entries.flatMap((id) => at.get(id) ?? []);
+  const bus = HEADER_PX + 1;
+  if (entries.length === 1 && Math.abs(entries[0].cx - 50) < 0.5)
+    lines.push([50, HEADER_PX - 6, 50, entries[0].top, true]);
+  else if (entries.length > 0) {
+    const xs = entries.map((e) => e.cx);
+    lines.push(
+      [50, HEADER_PX - 6, 50, bus, false],
+      [Math.min(50, ...xs), bus, Math.max(50, ...xs), bus, false],
+      ...entries.map((e): Line => [e.cx, bus, e.cx, e.top, true]),
+    );
+  }
+  return (
+    <svg className="absolute inset-0 size-full overflow-visible text-muted-foreground" aria-hidden>
+      <defs>
+        <marker
+          id={marker}
+          viewBox="0 0 6 6"
+          refX="5"
+          refY="3"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto"
+        >
+          <path d="M0,0 L6,3 L0,6 z" fill="currentColor" />
+        </marker>
+      </defs>
+      {lines.map(([x1, y1, x2, y2, arrow], k) => (
+        <line
+          key={k}
+          x1={pct(x1)}
+          y1={y1}
+          x2={pct(x2)}
+          y2={y2}
+          stroke="currentColor"
+          strokeOpacity={0.7}
+          strokeWidth={1.25}
+          markerEnd={arrow ? `url(#${marker})` : undefined}
+        />
+      ))}
+    </svg>
+  );
+});
+
+/**
+ * Each unfolded fused op of a block with the boxes it runs, and how many unfolded ops it
+ * holds inside (0 for the innermost).
+ */
+function outlines(nodes: FlowNode[]): { fold: Fold; members: FlowNode[]; depth: number }[] {
+  const out = new Map<string, { fold: Fold; members: FlowNode[]; depth: number }>();
+  for (const n of nodes)
+    (n.groups ?? []).forEach((fold, i) => {
+      const entry = out.get(fold.key) ?? { fold, members: [], depth: 0 };
+      entry.members.push(n);
+      entry.depth = Math.max(entry.depth, (n.groups ?? []).length - 1 - i);
+      out.set(fold.key, entry);
+    });
+  return [...out.values()];
+}
+
+/** A chevron that unfolds a fused op into the ops it runs, or folds them back. */
+function FoldButton({
+  fold,
+  onFold,
+  className,
+  style,
+  testId,
+}: {
+  fold: Fold;
+  onFold: (key: string) => void;
+  className: string;
+  style?: CSSProperties;
+  testId: string;
+}) {
+  const strings = STRINGS[useLocale()];
+  const Icon = fold.open ? ChevronUp : ChevronDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onFold(fold.key)}
+      className={`pointer-events-auto flex size-3.5 items-center justify-center rounded-full border bg-card text-muted-foreground hover:text-foreground ${className}`}
+      style={style}
+      aria-expanded={fold.open}
+      aria-label={fold.open ? strings.fold : strings.unfold}
+      data-testid={testId}
+    >
+      <Icon className="size-3" />
+    </button>
+  );
+}
+
+const SlotRow = memo(
+  ({
+    data,
+    tokens,
+    range,
+    lit,
+    onOpen,
+    onHover,
+  }: {
+    data: SlotData;
+    tokens: number;
+    range: [number, number] | null;
+    lit: boolean;
+    onOpen: (data: SlotData) => void;
+    onHover: (slot: string | null) => void;
+  }) => {
+    const locale = useLocale();
+    const strings = STRINGS[locale];
+    const measured = data.indices.length > 0;
+    const target = (
+      <button
+        type="button"
+        disabled={!measured}
+        onClick={() => onOpen(data)}
+        onMouseEnter={() => onHover(data.slot.id)}
+        onMouseLeave={() => onHover(null)}
+        onFocus={() => onHover(data.slot.id)}
+        onBlur={() => onHover(null)}
+        className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${lit && measured ? 'bg-muted/60' : ''}`}
+        style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
+        aria-label={diagramText(data.slot.label, locale)}
+        data-testid={`operatorx-model-slot-${data.slot.id}`}
+      />
+    );
+    return (
+      <div className="contents">
+        {measured ? (
+          <TooltipRoot delayDuration={150}>
+            <TooltipTrigger asChild>{target}</TooltipTrigger>
+            <TooltipContent side="top" align="center">
+              <SlotTooltip data={data} tokens={tokens} sweep={range !== null} />
+            </TooltipContent>
+          </TooltipRoot>
+        ) : (
+          target
+        )}
+        <div
+          className="pointer-events-none relative z-[2] flex items-center"
+          style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
+        >
+          {measured && data.model && range ? (
+            <div className="w-full">
+              <OpSweep
+                model={data.model}
+                series={gpuSweep(data.model, data.indices)}
+                range={range}
+                empty={strings.noResultsOnGpus}
+              />
+            </div>
+          ) : measured && data.model ? (
+            <div className="w-full">
+              <OpBars
+                model={data.model}
+                values={gpuValues(data.model, data.atSize)}
+                empty={data.atSize.length > 0 ? strings.noResultsAtSize : strings.noShapesAtSize}
+              />
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">{strings.empty}</span>
+          )}
+        </div>
+      </div>
+    );
+  },
+);
+
+const BlockDiagram = memo(
+  ({
+    block,
+    at,
+    hovered,
+    stroke,
+    locale,
+    onFold,
+  }: {
+    block: LayerBlock;
+    at: Map<string, Box>;
+    hovered: string | null;
+    stroke: string;
+    locale: Locale;
+    onFold: (key: string) => void;
+  }) => (
+    <div
+      className="pointer-events-none relative z-[1]"
+      style={{ gridColumn: 1, gridRow: '1 / -1' }}
+    >
+      <FlowEdges block={block} at={at} />
+      {block.nodes.map((n) => {
+        const box = at.get(n.id)!;
+        const measured = n.slots.length > 0;
+        const lit = hovered !== null && n.slots.includes(hovered);
+        return (
+          <div
+            key={n.id}
+            title={n.title && diagramText(n.title, locale)}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-sm border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+            style={{
+              left: pct(box.left),
+              width: pct(box.width),
+              top: box.top,
+              height: box.bottom - box.top,
+              borderColor: measured ? stroke : undefined,
+            }}
+            data-testid={`operatorx-model-node-${n.id}`}
+          >
+            <span className="line-clamp-2 break-words">
+              {breakable(diagramText(n.label, locale))}
+            </span>
+          </div>
+        );
+      })}
+      {block.nodes.map((n) => {
+        if (!n.fold) return null;
+        const box = at.get(n.id)!;
+        return (
+          <FoldButton
+            key={`${n.id}:fold`}
+            fold={n.fold}
+            onFold={onFold}
+            className="absolute -translate-x-1/2"
+            style={{ left: pct(box.left + box.width / 2), top: box.bottom - 7 }}
+            testId={`operatorx-model-fold-${n.id}`}
+          />
+        );
+      })}
+      {outlines(block.nodes).map(({ fold, members, depth }) => {
+        // The ops an unfolded fused op runs, outlined together with one chevron; an
+        // outer fold's outline sits a step outside the ones it holds.
+        const rects = members.map((n) => at.get(n.id)!);
+        const pad = 4 + 4 * depth;
+        const left = Math.min(...rects.map((o) => o.left));
+        const right = Math.max(...rects.map((o) => o.left + o.width));
+        const top = Math.min(...rects.map((o) => o.top)) - pad;
+        const bottom = Math.max(...rects.map((o) => o.bottom)) + pad;
+        return (
+          <div key={`${fold.key}:fold`} className="contents">
+            <div
+              className="absolute rounded-md border border-dashed border-muted-foreground/40"
+              style={{
+                left: `calc(${pct(left)} - ${pad}px)`,
+                width: `calc(${pct(right - left)} + ${2 * pad}px)`,
+                top,
+                height: bottom - top,
+              }}
+            />
+            <FoldButton
+              fold={fold}
+              onFold={onFold}
+              className="absolute -translate-x-1/2"
+              style={{ left: pct((left + right) / 2), top: bottom - 7 }}
+              testId={`operatorx-model-fold-${fold.key}`}
+            />
+          </div>
+        );
+      })}
+    </div>
+  ),
+);
+
+const BlockRows = memo(
+  ({
+    block,
+    slots,
+    tokens,
+    range,
+    lanes,
+    isDark,
+    onOpen,
+    onFold,
+  }: {
+    block: LayerBlock;
+    slots: SlotData[];
+    tokens: number;
+    /** The size bins the line charts span with the slider on All, or null. */
+    range: [number, number] | null;
+    /** GPUs shown, which sets the height of a row of bars. */
+    lanes: number;
+    isDark: boolean;
+    onOpen: (data: SlotData) => void;
+    /** Unfolds a fused op, or folds it back. */
+    onFold: (key: string) => void;
+  }) => {
+    const locale = useLocale();
+    const strings = STRINGS[locale];
+    const [hovered, setHovered] = useState<string | null>(null);
+    const c = BLOCK_COLORS[block.kind];
+    const rowPx = Math.max(range ? SWEEP_PX : barsHeight(lanes), 40);
+    const { rows, at } = useMemo(() => boxes(block, rowPx), [block, rowPx]);
+    return (
+      <div
+        className={`grid ${ROW_GRID} gap-x-4`}
+        style={{
+          gridTemplateRows: [HEADER_PX, ...rows, ...(block.fold ? [FOLD_PX] : [])]
+            .map((h) => `${h}px`)
+            .join(' '),
+        }}
+        data-testid={`operatorx-model-block-${block.id}`}
+      >
+        <div
+          className="rounded-lg border"
+          style={{
+            gridColumn: 1,
+            gridRow: '1 / -1',
+            background: isDark ? c.dark : c.light,
+            borderColor: c.stroke,
+          }}
+        />
+        <div className="flex items-baseline gap-2 px-3 pt-2" style={{ gridColumn: 1, gridRow: 1 }}>
+          <span className="text-sm font-medium">{diagramText(block.label, locale)}</span>
+          {block.repeat && block.repeat > 1 && (
+            <span className="text-xs text-muted-foreground tabular-nums">×{block.repeat}</span>
+          )}
+        </div>
+        {slots.map((data) => (
+          <SlotRow
+            key={data.slot.id}
+            data={data}
+            tokens={tokens}
+            range={range}
+            lit={hovered === data.slot.id}
+            onOpen={onOpen}
+            onHover={setHovered}
+          />
+        ))}
+        <BlockDiagram
+          block={block}
+          at={at}
+          hovered={hovered}
+          stroke={c.stroke}
+          locale={locale}
+          onFold={onFold}
+        />
+        {block.fold && (
+          <button
+            type="button"
+            onClick={() => onFold(block.fold!.key)}
+            className="relative z-[2] flex items-center justify-center rounded-b-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            style={{ gridColumn: 1, gridRow: -2 }}
+            aria-expanded
+            aria-label={strings.fold}
+            data-testid={`operatorx-model-fold-${block.id}`}
+          >
+            <ChevronUp className="size-3.5" />
+          </button>
+        )}
+      </div>
+    );
+  },
+);
+
+const ModelControls = memo(
+  ({
+    requested,
+    modelOptions,
+    split,
+    splits,
+    metric,
+    precision,
+    precisions,
+    locale,
+    onPrecision,
+  }: {
+    requested: string;
+    modelOptions: string[];
+    split: string;
+    splits: { key: string; label: string }[];
+    metric: string;
+    precision: ComputePrecision | null;
+    precisions: ComputePrecision[];
+    locale: Locale;
+    onPrecision: (precision: ComputePrecision) => void;
+  }) => (
+    <Card className="relative z-10 py-4 md:py-5">
+      <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ControlGroup label={STRINGS[locale].model} htmlFor="operatorx-model">
+          <SearchableSelect
+            triggerId="operatorx-model"
+            value={requested}
+            onValueChange={(v) => {
+              track('operatorx_model_selected', { model: v });
+              setParam('model', v);
+            }}
+            groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
+          />
+        </ControlGroup>
+        <ControlGroup label={STRINGS[locale].devices} htmlFor="operatorx-model-parallel">
+          <SearchableSelect
+            triggerId="operatorx-model-parallel"
+            value={split || ONE_DEVICE}
+            onValueChange={(v) => {
+              track('operatorx_parallel_selected', { op: 'model', parallel: v });
+              setParallel(v);
+            }}
+            searchable={false}
+            groups={[
+              {
+                label: '',
+                options: splits.map((o) => ({
+                  value: o.key || ONE_DEVICE,
+                  label: o.key ? o.label : STRINGS[locale].oneDevice,
+                })),
+              },
+            ]}
+          />
+        </ControlGroup>
+        <ControlGroup label={STRINGS[locale].metric} htmlFor="operatorx-metric">
+          <SearchableSelect
+            triggerId="operatorx-metric"
+            value={metric}
+            onValueChange={(v) => {
+              track('operatorx_metric_selected', { op: 'model', metric: v });
+              setParam('metric', v);
+            }}
+            searchable={false}
+            groups={[
+              {
+                label: '',
+                options: METRICS.map((m) => ({
+                  value: m.id,
+                  label: STRINGS[locale].metricOption(m.label[locale], m.unit),
+                })),
+              },
+            ]}
+          />
+        </ControlGroup>
+        <ControlGroup label={STRINGS[locale].precision} htmlFor="operatorx-model-precision">
+          {precision && (
+            <SegmentedToggle
+              value={precision}
+              onValueChange={(v) => {
+                track('operatorx_model_precision_selected', { precision: v });
+                onPrecision(v);
+              }}
+              ariaLabel={STRINGS[locale].computePrecision}
+              options={precisions.map((p) => ({ value: p, label: p }))}
+            />
+          )}
+        </ControlGroup>
+      </div>
+    </Card>
+  ),
+);
+
+/** The dim each op sweeps with the token count. */
+const SIZE_DIM: Partial<Record<string, string>> = { gemm: 'm', moe: 'tokens', attention: 'tokens' };
+
+/**
+ * A slot's cases as the shapes Metric vs size sweeps (`sliceKey`): one shape over the token
+ * count each. A layer runs at several shard sizes across serving configs (one per
+ * tensor-parallel degree), so a slot can hold more than one. Largest shard first: the lowest
+ * tensor-parallel degree.
+ */
+function shapeFamilies(
+  view: ComparisonView,
+  indices: number[],
+  op: ComparisonOp,
+): [string, number[]][] {
+  const size = SIZE_DIM[op] ?? 'tokens';
+  const volume = (i: number) =>
+    Object.entries(view.cases[i].dims)
+      .filter(([k]) => k !== size)
+      .reduce((t, [, v]) => t * v, 1);
+  return [
+    ...slices(
+      op,
+      indices.map((i) => view.cases[i]),
+    ),
+  ]
+    .map(([key, at]): [string, number[]] => [key, at.map((j) => indices[j])])
+    .sort(([ka, a], [kb, b]) => volume(b[0]) - volume(a[0]) || ka.localeCompare(kb));
+}
+
+/** One shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
+const SlotDetail = memo(
+  ({
+    data,
+    modelName,
+    onClose,
+  }: {
+    data: SlotData | null;
+    modelName: string;
+    onClose: () => void;
+  }) => {
+    const locale = useLocale();
+    const strings = STRINGS[locale];
+    const [inspected, setInspected] = useState<number | null>(null);
+    const [pickedFamily, setFamily] = useState<string | null>(null);
+    // A case or shape opened for one op never carries over to the next op shown
+    const [inspectedFor, setInspectedFor] = useState(data);
+    if (inspectedFor !== data) {
+      setInspectedFor(data);
+      setInspected(null);
+      setFamily(null);
+    }
+    const families = useMemo(
+      () =>
+        data?.model
+          ? shapeFamilies(data.model.view, data.indices, data.slot.op as ComparisonOp)
+          : [],
+      [data],
+    );
+    const [familyKey, familyIndices] = families.find(([k]) => k === pickedFamily) ??
+      families[0] ?? [null, []];
+    const queryClient = useQueryClient();
+    const sub = useMemo(() => {
+      if (!data?.model || familyKey === null) return null;
+      const { model, slot } = data;
+      const view = subView(model.view, familyIndices);
+      const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
+      const op = slot.op as ComparisonOp;
+      // only the GPUs that measured this op's shapes
+      const hardware = model.hardware.filter((hw) => measured.includes(hw));
+      return {
+        op,
+        model: buildModel(
+          view,
+          model.metric,
+          {
+            hardware,
+            available: measured,
+            toggle: (hw) => (restoresAllHardware(hardware, hw) ? model.reset() : model.toggle(hw)),
+            remove: model.remove,
+            reset: model.reset,
+          },
+          model.colors,
+          null,
+          {
+            inspect: setInspected,
+            preview: (i) =>
+              prefetchOperatorXTimelines(
+                queryClient,
+                op,
+                caseRefs(view, model.hardware, i).map((r) => r.ref),
+              ),
+          },
+        ),
+      };
+    }, [data, familyKey, familyIndices, queryClient]);
+    return (
+      <Dialog open={data !== null} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent
+          className="flex max-h-[94vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
+          data-testid="operatorx-model-slot-detail"
+        >
+          {data && sub && familyKey !== null && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-mono">
+                  {diagramText(data.slot.label, locale)}
+                </DialogTitle>
+                <DialogDescription>
+                  {diagramText(data.block.label, locale)} · {modelName} ·{' '}
+                  {strings.sizesOf(
+                    familyIndices.length,
+                    <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>,
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              {/* One picker for both charts: Metric vs size gets this one shape only */}
+              <div className="space-y-1.5" data-testid="operatorx-model-slot-shapes">
+                <SearchableSelect
+                  size="sm"
+                  searchable={families.length > 8}
+                  value={familyKey}
+                  onValueChange={(key) => {
+                    track('operatorx_model_shape_selected', { op: data.slot.op });
+                    setInspected(null);
+                    setFamily(key);
+                  }}
+                  triggerAriaLabel={strings.shape}
+                  groups={[{ label: '', options: families.map(([k]) => ({ value: k, label: k })) }]}
+                />
+                {families.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    {strings.shapeNote(families.length)}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-6">
+                <section className="space-y-2">
+                  <Heading as="h3" level="card">
+                    {roofline.title[locale]}
+                  </Heading>
+                  <roofline.Component model={sub.model} />
+                </section>
+                <section className="space-y-2">
+                  <Heading as="h3" level="card">
+                    {metricVsSize.title[locale]}
+                  </Heading>
+                  <metricVsSize.Component model={sub.model} />
+                </section>
+              </div>
+              <CaseDetail
+                op={sub.op}
+                view={sub.model.view}
+                hardware={sub.model.hardware}
+                colors={sub.model.colors}
+                caseIndex={inspected}
+                onClose={() => setInspected(null)}
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  },
+);
+
+/** A model top down, each op beside a per-GPU sweep of its OperatorX results. */
+export function ModelView({
+  gemm,
+  moe,
+  attention,
+}: Record<'gemm' | 'moe' | 'attention', UseQueryResult<ComparisonView>>) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
+  const search = new URLSearchParams(useClientSearch());
+  const metric = metricById(search.get('metric'));
+  const requested = search.get('model') ?? DEFAULT_OPERATORX_MODEL;
+  const requestedSplit = search.get('parallel');
+  const isDark = isDarkTheme(useTheme().resolvedTheme);
+  // GPU picks live in the address bar so share links reproduce them.
+  const pickedParam = search.get(HARDWARE_PARAM);
+  const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
+  const pickedPrecision = sharePrecision(search.get('modelPrecision'));
+  const [open, setOpen] = useState<SlotData | null>(null);
+  const pickedBin = shareBin(search.get('modelBin'));
+  const sweep = shareBoolean(search.get('modelSweep'), false);
+
+  // Device splits any of the model's ops has cases at; one device by default.
+  const splits = useMemo(() => {
+    const keys = new Set<string>();
+    for (const v of [gemm.data, moe.data, attention.data])
+      for (const o of v?.parallelOptions ?? []) keys.add(o.key);
+    return [...keys]
+      .map((key) => ({ key, label: parallelLabel(key) }))
+      .sort((a, b) => compareSplits(a.key, b.key));
+  }, [gemm.data, moe.data, attention.data]);
+  // A split the model has; any other (e.g. the Data API's `1` for one device) opens on the
+  // first, as the compare API answers it.
+  const split = splits.find((s) => s.key === requestedSplit)?.key ?? splits[0]?.key ?? '';
+  // A view without cases at the split falls back to another; its cases are not this split's.
+  const atSplit = (v: ComparisonView | undefined) => (v?.parallel === split ? v : undefined);
+  const gemmView = atSplit(gemm.data);
+  const moeView = atSplit(moe.data);
+  const attentionView = atSplit(attention.data);
+  const views = useMemo(
+    () => [gemm.data, moe.data, attention.data].filter((v): v is ComparisonView => Boolean(v)),
+    [gemm.data, moe.data, attention.data],
+  );
+  // GPUs with results at the selected device split
+  const atSplitViews = useMemo(() => views.filter((v) => v.parallel === split), [views, split]);
+  const modelOptions = useMemo(() => [...new Set(views.flatMap((v) => v.modelOptions))], [views]);
+  // a link to a model without results opens on one with results
+  const loaded = !gemm.isLoading && !moe.isLoading && !attention.isLoading;
+  useEffect(() => {
+    if (loaded && modelOptions.length > 0 && !modelOptions.includes(requested))
+      setParam(
+        'model',
+        modelOptions.includes(DEFAULT_OPERATORX_MODEL) ? DEFAULT_OPERATORX_MODEL : modelOptions[0],
+      );
+  }, [loaded, modelOptions, requested]);
+  // GPUs with measured results at the selected device split
+  const available = useMemo(() => measuredHardware(atSplitViews), [atSplitViews]);
+  const colors = useMemo(
+    () =>
+      operatorXColors(
+        [...new Set(views.flatMap((v) => v.hardware.map((h) => h.id)))],
+        isDark ? 'dark' : 'light',
+      ),
+    [views, isDark],
+  );
+  const hardware = useMemo(
+    () => (picked ? available.filter((h) => picked.includes(h)) : available),
+    [picked, available],
+  );
+  const precisionCounts = useMemo(() => {
+    const m = new Map<ComputePrecision, number>();
+    for (const v of atSplitViews)
+      for (const c of v.cases) m.set(c.computePrecision, (m.get(c.computePrecision) ?? 0) + 1);
+    return m;
+  }, [atSplitViews]);
+  const precisions = useMemo(
+    () => PRECISIONS.filter((p) => precisionCounts.has(p)),
+    [precisionCounts],
+  );
+  const precision =
+    pickedPrecision && precisions.includes(pickedPrecision)
+      ? pickedPrecision
+      : (precisions.toSorted(
+          (a, b) => (precisionCounts.get(b) ?? 0) - (precisionCounts.get(a) ?? 0),
+        )[0] ?? null);
+
+  const arch = architecture(requested);
+  // Fused ops the reader unfolded.
+  const [openFolds, setOpenFolds] = useState<ReadonlySet<string>>(new Set());
+  const present = useMemo(() => measuredRoles(gemmView, requested), [gemmView, requested]);
+  const hasMoe = (moe.data?.cases.length ?? 0) > 0;
+  const blocks = useMemo(
+    () => modelLayers(arch, present, attentionView, requested, hasMoe, openFolds),
+    [arch, present, attentionView, requested, hasMoe, openFolds],
+  );
+
+  // The legends are the one GPU control, as on the op tabs
+  const toggle = useCallback(
+    (hw: string, placement: 'diagram' | 'chart') => {
+      track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement });
+      const next = toggleHardwareSelection(hardware, hw, available);
+      if (next !== hardware) setPickedHardware(next.length === available.length ? null : next);
+    },
+    [hardware, available],
+  );
+  const remove = useCallback(
+    (hw: string) => {
+      track('operatorx_gpu_removed', { op: 'model', gpu: hw, placement: 'chart' });
+      const next = removeHardwareSelection(hardware, hw);
+      if (next !== hardware) setPickedHardware(next.length === available.length ? null : next);
+    },
+    [hardware, available],
+  );
+  const models = useMemo(() => {
+    const reset = () => {
+      track('operatorx_legend_filter_reset', { op: 'model' });
+      setPickedHardware(null);
+    };
+    const build = (view: ComparisonView | undefined) =>
+      view
+        ? buildModel(
+            view,
+            metric,
+            { hardware, available, toggle: (hw) => toggle(hw, 'chart'), remove, reset },
+            colors,
+            null,
+            {
+              inspect: () => {},
+              preview: () => {},
+            },
+          )
+        : null;
+    return { gemm: build(gemmView), moe: build(moeView), attention: build(attentionView) };
+  }, [gemmView, moeView, attentionView, metric, hardware, available, colors, toggle, remove]);
+  const slotIndices = useMemo(() => {
+    const opViews = { gemm: gemmView, moe: moeView, attention: attentionView };
+    return blocks.map((block) =>
+      block.spans.map(({ slot }) => slotCases(opViews[slot.op], slot, requested, precision)),
+    );
+  }, [blocks, gemmView, moeView, attentionView, requested, precision]);
+  const resolved = useMemo(
+    () =>
+      blocks.map((block, b) => ({
+        block,
+        slots: block.spans.map(({ slot, first, last, bar }, s) => {
+          const model = models[slot.op];
+          return {
+            slot,
+            first,
+            last,
+            bar,
+            block,
+            model,
+            indices: model ? slotIndices[b][s] : [],
+          };
+        }),
+      })),
+    [blocks, models, slotIndices],
+  );
+  const bins = useMemo(() => {
+    const out = new Set<number>();
+    for (const { slots } of resolved)
+      for (const s of slots)
+        for (const i of s.indices) {
+          const x = s.model!.view.cases[i].x;
+          if (x && x > 0) out.add(sizeBin(x));
+        }
+    return [...out].sort((a, b) => a - b);
+  }, [resolved]);
+  const bin =
+    pickedBin !== null && bins.includes(pickedBin)
+      ? pickedBin
+      : (bins.toSorted(
+          (a, b) => Math.abs(a - sizeBin(DEFAULT_TOKENS)) - Math.abs(b - sizeBin(DEFAULT_TOKENS)),
+        )[0] ?? null);
+  const slots = useMemo(
+    () =>
+      new Map(
+        resolved.map((r) => [
+          r.block.id,
+          r.slots.map((s): SlotData => ({
+            ...s,
+            atSize: s.model && bin !== null ? inBin(s.model, s.indices, bin) : [],
+          })),
+        ]),
+      ),
+    [resolved, bin],
+  );
+  const tokens = bin === null ? DEFAULT_TOKENS : binTokens(bin);
+  const range = useMemo<[number, number] | null>(
+    () => (sweep && bins.length > 0 ? [bins[0], bins.at(-1)!] : null),
+    [sweep, bins],
+  );
+  const toggleSweep = useCallback(
+    (enabled: boolean) => {
+      track('operatorx_model_sweep_toggled', { model: requested, enabled });
+      setParam('modelSweep', String(enabled));
+    },
+    [requested],
+  );
+  const openSlot = useCallback(
+    (data: SlotData) => {
+      track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
+      setOpen(data);
+    },
+    [requested],
+  );
+  const toggleFold = useCallback(
+    (key: string) => {
+      track('operatorx_model_fold_toggled', { model: requested, enabled: !openFolds.has(key) });
+      setOpenFolds((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
+    },
+    [requested, openFolds],
+  );
+  const closeSlot = useCallback(() => setOpen(null), []);
+
+  const error = gemm.error ?? moe.error ?? attention.error;
+  if (error)
+    return (
+      <RetryableQueryError
+        message={error.message}
+        analyticsEvent="operatorx_model_view_retry"
+        onRetry={() => {
+          void gemm.refetch();
+          void moe.refetch();
+          void attention.refetch();
+        }}
+        testId="operatorx-model-view-error"
+      />
+    );
+  if (gemm.isLoading || moe.isLoading || attention.isLoading) return <ModelViewLoading />;
+  if (modelOptions.length === 0) return <EmptyState>{strings.empty}</EmptyState>;
+
+  return (
+    <TooltipProvider>
+      <div className="flex flex-col gap-4" data-testid="operatorx-model-view">
+        <ModelControls
+          requested={requested}
+          modelOptions={modelOptions}
+          split={split}
+          splits={splits}
+          metric={metric.id}
+          precision={precision}
+          precisions={precisions}
+          locale={locale}
+          onPrecision={setPrecision}
+        />
+        {/* Too narrow for the diagram beside its bars: the card scrolls sideways, not the page */}
+        <Card className="gap-3 max-md:overflow-x-auto" data-testid="operatorx-model-diagram">
+          <div className="flex flex-col gap-3 max-md:min-w-[36rem]">
+            <div
+              className={`max-md:static sticky top-14 z-20 -mx-2 grid ${ROW_GRID} items-end gap-x-4 rounded-md bg-card px-2 py-2`}
+            >
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                {available.map((hw) => (
+                  <button
+                    type="button"
+                    key={hw}
+                    aria-pressed={hardware.includes(hw)}
+                    onClick={() => toggle(hw, 'diagram')}
+                    className={`flex items-center gap-1.5 ${hardware.includes(hw) ? '' : 'opacity-40'}`}
+                    data-testid={`operatorx-model-gpu-${hw}`}
+                  >
+                    <span
+                      className="inline-block size-2 rounded-full"
+                      style={{ background: colors[hw] }}
+                    />
+                    {hardwareLabel(hw)}
+                  </button>
+                ))}
+              </div>
+              {bin === null ? (
+                <div />
+              ) : (
+                <SizeControls
+                  bins={bins}
+                  bin={bin}
+                  onChange={setBin}
+                  sweep={sweep}
+                  onSweep={toggleSweep}
+                />
+              )}
+            </div>
+            <div className="flex flex-col">
+              {blocks.map((block, b) => (
+                <div key={block.id}>
+                  {b > 0 && (
+                    <div className={`grid ${ROW_GRID} gap-x-4`}>
+                      {block.alternative ? (
+                        <span className="my-0.5 text-center text-xs text-muted-foreground">
+                          {strings.or}
+                        </span>
+                      ) : (
+                        <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
+                  <BlockRows
+                    block={block}
+                    slots={slots.get(block.id) ?? []}
+                    tokens={tokens}
+                    range={range}
+                    lanes={hardware.length}
+                    isDark={isDark}
+                    onOpen={openSlot}
+                    onFold={toggleFold}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+        <SlotDetail data={open} modelName={requested} onClose={closeSlot} />
+      </div>
+    </TooltipProvider>
+  );
+}

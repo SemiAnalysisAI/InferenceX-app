@@ -2,23 +2,19 @@ import { notFound } from 'next/navigation';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { renderCompareOg } from '@/lib/compare-og';
-import { getAllComparablePrecisionSlugs } from '@/lib/compare-variant-availability';
+import { renderCompareOg } from '@/lib/compare/compare-og';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
   precisionDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 
 export const alt = 'Chip precision inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export async function generateStaticParams() {
-  const slugs = await getAllComparablePrecisionSlugs();
-  return slugs.map(({ modelSlug, gpu, precA, precB }) => ({
-    slug: canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB),
-  }));
+export function generateStaticParams(): { slug: string }[] {
+  return [];
 }
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {

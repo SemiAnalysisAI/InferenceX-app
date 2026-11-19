@@ -11,10 +11,10 @@ import {
   getInitialCalendarMonth,
   getLatestSelectableDate,
   isCalendarDateOutOfRange,
-  parseCalendarDate,
   resolveCalendarDateBounds,
   useCalendarMonth,
 } from '@/components/ui/calendar-picker-utils';
+import { parseCalendarDate } from '@/lib/shared/display-date';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;

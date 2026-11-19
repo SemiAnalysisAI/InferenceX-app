@@ -1,15 +1,16 @@
 'use client';
 
 import { type ReactNode, useMemo } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { select, type Selection, type ScaleLinear, type ScaleBand } from 'd3';
 
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
-import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/gpu-specs';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import type {
   CustomLayerConfig,
   HorizontalBarLayerConfig,
@@ -22,20 +23,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const NVIDIA_BAR_COLOR = '#76b900';
 const AMD_BAR_COLOR = '#ed1c24';
 
 const STRINGS = {
   en: {
-    metric: 'Metric:',
-    noData: 'No data available for this metric.',
+    metric: 'Metric',
+    noData: 'No data available for this metric',
     instructions: 'Hover over a bar for details',
     fp4Note: 'Chips without FP4 support (H100, H200, MI300X, MI325X) are excluded.',
   },
   zh: {
-    metric: '指标：',
-    noData: '该指标暂无数据。',
+    metric: '指标',
+    noData: '该指标暂无数据',
     instructions: '悬停柱形可查看详情',
     fp4Note: '不支持 FP4 的芯片（H100、H200、MI300X、MI325X）不会显示。',
   },
@@ -47,7 +49,6 @@ interface ChartDatum {
   value: number;
 }
 
-/** Position value + overlay labels together, flipping both when the longer one doesn't fit. */
 function positionLabelPairs(
   group: Selection<SVGGElement, unknown, null, undefined>,
   xScale: ScaleLinear<number, number>,
@@ -56,7 +57,6 @@ function positionLabelPairs(
   const valueLabels = group.selectAll<SVGTextElement, ChartDatum>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, ChartDatum>('.overlay-label');
 
-  // Build a map of max text width per name (pretext, no reflow)
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
     const text = select(this).text();
@@ -86,7 +86,6 @@ function positionLabelPairs(
   applyOutlined(overlayLabels);
 }
 
-/** Format a numeric value with commas and up to 2 decimals. */
 function formatValue(value: number): string {
   if (value >= 1000 && Number.isInteger(value)) {
     return value.toLocaleString('en-US');
@@ -128,11 +127,8 @@ export function GpuSpecsBarChart({
   );
 
   const metricSelector = (
-    <div className="mb-4 flex flex-col gap-1.5 px-4 sm:flex-row sm:items-center sm:gap-3 md:px-8">
-      <label
-        htmlFor="gpu-specs-metric-select"
-        className="text-sm font-medium text-muted-foreground"
-      >
+    <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+      <label htmlFor="gpu-specs-metric-select" className="text-sm font-medium">
         {t.metric}
       </label>
       <Select
@@ -144,7 +140,7 @@ export function GpuSpecsBarChart({
       >
         <SelectTrigger
           id="gpu-specs-metric-select"
-          className="w-full sm:w-[240px]"
+          className="w-full sm:w-60"
           data-testid="gpu-specs-metric-select"
         >
           <SelectValue />
@@ -188,10 +184,8 @@ export function GpuSpecsBarChart({
       render: (group: Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => {
         const xScale = ctx.xScale as ScaleLinear<number, number>;
         const yScale = ctx.yScale as ScaleBand<string>;
-        // Remove stale labels from previous render (e.g. old .bar-value class)
         group.selectAll('.bar-value').remove();
 
-        // Value labels (top line, bold)
         group
           .selectAll<SVGTextElement, ChartDatum>('.value-label')
           .data(chartData, (d) => d.name)
@@ -205,7 +199,6 @@ export function GpuSpecsBarChart({
           .style('pointer-events', 'none')
           .text((d) => `${formatValue(d.value)} ${unit}`);
 
-        // Subtitle labels (bottom line, muted)
         group
           .selectAll<SVGTextElement, ChartDatum>('.overlay-label')
           .data(chartData, (d) => d.name)
@@ -219,7 +212,6 @@ export function GpuSpecsBarChart({
           .style('pointer-events', 'none')
           .text((d) => (d.vendor === 'nvidia' ? 'NVIDIA' : 'AMD'));
 
-        // Position both labels together using the longer text width
         positionLabelPairs(group, xScale, (d) =>
           d.vendor === 'nvidia' ? NVIDIA_BAR_COLOR : AMD_BAR_COLOR,
         );
@@ -233,21 +225,13 @@ export function GpuSpecsBarChart({
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (d: ChartDatum) => {
-        const vendorColor = d.vendor === 'nvidia' ? NVIDIA_BAR_COLOR : AMD_BAR_COLOR;
-        const vendorLabel = d.vendor === 'nvidia' ? 'NVIDIA' : 'AMD';
-        return `
-          <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              <div style="width: 10px; height: 10px; border-radius: 2px; background: ${vendorColor};"></div>
-              <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.name}</span>
-              <span style="font-size: 10px; color: ${vendorColor}; font-weight: 500;">${vendorLabel}</span>
-            </div>
-            <div style="color: var(--muted-foreground); font-size: 11px;">
-              <strong>${metricLabel}${locale === 'zh' ? '：' : ':'}</strong> ${formatValue(d.value)} ${unit}
-            </div>
-          </div>`;
-      },
+      content: (d: ChartDatum) =>
+        chartHoverCard({
+          title: d.name,
+          subtitle: d.vendor === 'nvidia' ? 'NVIDIA' : 'AMD',
+          color: d.vendor === 'nvidia' ? NVIDIA_BAR_COLOR : AMD_BAR_COLOR,
+          metrics: [{ value: formatValue(d.value), label: xAxisLabel }],
+        }),
       getRulerX: (d: ChartDatum, xs: any) => (xs as ScaleLinear<number, number>)(d.value),
       getRulerY: (d: ChartDatum, ys: any) => {
         const bandScale = ys as ScaleBand<string>;
@@ -261,7 +245,7 @@ export function GpuSpecsBarChart({
       },
       attachToLayer: 0,
     }),
-    [locale, metric, metricLabel, unit],
+    [xAxisLabel],
   );
 
   const layers = useMemo(() => [barLayer, labelLayer], [barLayer, labelLayer]);
@@ -295,9 +279,9 @@ export function GpuSpecsBarChart({
     return (
       <div data-testid="gpu-specs-bar-chart">
         {metricSelector}
-        <div className="flex items-center justify-center h-60 text-muted-foreground">
+        <EmptyState bare className="h-60">
           {t.noData}
-        </div>
+        </EmptyState>
       </div>
     );
   }
