@@ -10,6 +10,8 @@ import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { mountWithProviders } from '../support/test-utils';
 
 const metric = (y: number) => ({ y, roof: false });
+
+const keyToggle = () => cy.get('[data-testid="power-chip-compare-key-toggle"]');
 // One full chassis (8 GPUs) or one NVL72 compute tray (4 GPUs).
 const row = (hardware: string, gpuWatts: number, gpus = hardware === 'gb200' ? 4 : 8) =>
   ({
@@ -88,6 +90,28 @@ const pues = points.flatMap((p) =>
   p.modeledSystemPower?.status === 'supported' ? [p.modeledSystemPower.pue] : [],
 );
 
+function mountBreakdown() {
+  mountWithProviders(
+    <PathnameContext.Provider value="/pwx">
+      <PowerXSurfaceProvider>
+        <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
+          <div className="mb-3 flex flex-wrap items-start gap-x-6">
+            <PowerXFacilitySwitch pues={pues} />
+          </div>
+          <PowerAnalysisPanels
+            data={points}
+            xField="mean_tpot_intvty"
+            xLabel="Interactivity (output tok/s/user)"
+            chartId="powerx-facility-test"
+            placement="before"
+          />
+        </div>
+      </PowerXSurfaceProvider>
+    </PathnameContext.Provider>,
+    { inference: {}, unofficial: {} },
+  );
+}
+
 describe('PowerX Include facility switch (mobile)', () => {
   beforeEach(() => {
     cy.viewport(393, 900);
@@ -97,25 +121,7 @@ describe('PowerX Include facility switch (mobile)', () => {
   });
 
   it('starts on, shows the facility layer and labels the PUE range of the chips', () => {
-    mountWithProviders(
-      <PathnameContext.Provider value="/pwx">
-        <PowerXSurfaceProvider>
-          <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
-            <div className="mb-3 flex flex-wrap items-start gap-x-6">
-              <PowerXFacilitySwitch pues={pues} />
-            </div>
-            <PowerAnalysisPanels
-              data={points}
-              xField="mean_tpot_intvty"
-              xLabel="Interactivity (output tok/s/user)"
-              chartId="powerx-facility-test"
-              placement="before"
-            />
-          </div>
-        </PowerXSurfaceProvider>
-      </PathnameContext.Provider>,
-      { inference: {}, unofficial: {} },
-    );
+    mountBreakdown();
     // Compare at lives in the PowerX context strip now; the bars are the readiness signal.
     cy.get('[data-testid="power-chip-compare-segment"]').should('have.length.greaterThan', 0);
     cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').should(
@@ -136,5 +142,22 @@ describe('PowerX Include facility switch (mobile)', () => {
       'have.length',
       0,
     );
+  });
+
+  it('folds the layer key behind one closed Key toggle on a phone only', () => {
+    mountBreakdown();
+    cy.get('[data-testid="power-chip-compare-segment"]').should('have.length.greaterThan', 0);
+    keyToggle()
+      .should('be.visible')
+      .and('contain.text', 'Key')
+      .and('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="power-chip-compare-legend"]').should('not.be.visible');
+    keyToggle().click();
+    keyToggle().should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="power-chip-compare-legend-item"]').first().should('be.visible');
+
+    cy.viewport(1360, 900);
+    keyToggle().should('not.exist');
+    cy.get('[data-testid="power-chip-compare-legend-item"]').first().should('be.visible');
   });
 });

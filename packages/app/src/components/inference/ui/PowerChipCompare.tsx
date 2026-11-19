@@ -1,8 +1,8 @@
 'use client';
 
 import * as d3 from 'd3';
-import { Pin } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ChevronDown, Pin } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -65,6 +65,7 @@ const STRINGS = {
     comparedAt: (x: string, at: string) =>
       `Pinned point at ${x} tok/s/user · Compare at ${at} tok/s/user`,
     legend: 'Power layers',
+    key: 'Key',
     ofTotal: 'of total',
     bands: {
       gpu: 'GPU',
@@ -115,6 +116,7 @@ const STRINGS = {
     pinnedPoint: (conc: number) => `已固定在 c${conc} · 点击后跟随对比点`,
     comparedAt: (x: string, at: string) => `固定点 ${x} tok/s/user · 对比点 ${at} tok/s/user`,
     legend: '功耗分层',
+    key: '图例',
     ofTotal: '占总功耗',
     bands: {
       gpu: 'GPU',
@@ -236,6 +238,10 @@ export default function PowerChipCompare({
   // readout and the parts rows carry the numbers); from `md` up the rows are unchanged.
   const mobile = useIsMobileViewport();
   const compactRows = powerX && mobile;
+  // PowerX phones fold the layer key behind one toggle, closed by default, so the bars come first.
+  const [keyOpen, setKeyOpen] = useState(false);
+  const keyId = useId();
+  const showKey = !compactRows || keyOpen;
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
@@ -355,7 +361,29 @@ export default function PowerChipCompare({
 
   return (
     <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
+      {compactRows && (
+        <button
+          type="button"
+          aria-expanded={keyOpen}
+          aria-controls={keyId}
+          data-testid="power-chip-compare-key-toggle"
+          onClick={() => {
+            const open = !keyOpen;
+            setKeyOpen(open);
+            track('powerx_breakdown_key_toggled', { open });
+          }}
+          className="-mx-1.5 flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+        >
+          {t.key}
+          <ChevronDown
+            aria-hidden
+            className={cn('size-3.5 transition-transform', keyOpen && 'rotate-180')}
+          />
+        </button>
+      )}
       <ul
+        id={keyId}
+        hidden={!showKey}
         className="flex flex-wrap gap-x-1 gap-y-0.5 text-xs text-muted-foreground"
         aria-label={t.legend}
         data-testid="power-chip-compare-legend"
