@@ -43,7 +43,7 @@ export interface PowerXRankingRow<P extends PowerXRankingPoint> {
   key: string;
   /** 1-based among the visible rows that have a value; null for the rest. */
   rank: number | null;
-  /** The point the row reads; for an aggregated row the nearest all-GPU point, for context. */
+  /** The point the row reads; for an aggregated row the nearest drawn all-GPU point, if any. */
   point: P | null;
   /** The ranked value; null for aggregated rows and rows with no point. */
   value: number | null;

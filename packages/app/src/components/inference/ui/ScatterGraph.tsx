@@ -4043,7 +4043,7 @@ const ScatterGraph = React.memo(
                 const yScale = zoomed.yScale as ContinuousScale;
                 const ir = interactionRef.current;
                 return [
-                  ...pointsData
+                  ...drawnPointsData
                     .filter((point) => ir.isPointVisible(point))
                     .map((point) => ({
                       point,
@@ -4051,7 +4051,7 @@ const ScatterGraph = React.memo(
                       y: yScale(point.y),
                       overlay: false,
                     })),
-                  ...processedOverlayData
+                  ...drawnOverlayData
                     .filter((point) => ir.isOverlayPointVisible(point))
                     .map((point) => ({
                       point,
