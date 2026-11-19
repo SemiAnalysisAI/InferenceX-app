@@ -177,7 +177,7 @@ describe('ComparisonDashboard live state', () => {
   });
 
   it('never empties the GPU selection when toggling after a workload switch', () => {
-    act(() => state.models.at(-1)!.toggle(state.models.at(-1)!.available[0]));
+    act(() => state.models.at(-1)!.remove(state.models.at(-1)!.available[0]));
     expect(state.models.at(-1)!.hardware).toHaveLength(1);
 
     act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
@@ -187,24 +187,38 @@ describe('ComparisonDashboard live state', () => {
     // The last selected GPU stays selected, so the chart does not rebuild.
     const rendered = state.models.length;
     act(() => state.models.at(-1)!.toggle(only));
+    act(() => state.models.at(-1)!.remove(only));
     expect(state.models).toHaveLength(rendered);
     expect(state.models.at(-1)!.hardware).toEqual([only]);
   });
 
-  it('toggles legend GPUs within the GPU list the charts show', () => {
+  it('isolates a clicked legend GPU and restores all on a second click, like the inference charts', () => {
     const [first, second] = state.models.at(-1)!.available;
 
     act(() => state.models.at(-1)!.toggle(first));
+    expect(state.models.at(-1)!.hardware).toEqual([first]);
+
+    act(() => state.models.at(-1)!.toggle(second));
+    expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+
+    act(() => state.models.at(-1)!.toggle(second));
     expect(state.models.at(-1)!.hardware).toEqual([second]);
 
-    act(() => state.models.at(-1)!.toggle(first));
-    expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+    act(() => state.models.at(-1)!.toggle(second));
+    expect(state.models.at(-1)!.hardware).toEqual(state.models.at(-1)!.available);
+  });
+
+  it('hides a GPU with the legend remove button', () => {
+    const [first, second] = state.models.at(-1)!.available;
+
+    act(() => state.models.at(-1)!.remove(first));
+    expect(state.models.at(-1)!.hardware).toEqual([second]);
   });
 
   it('resets the legend filter to every GPU the charts show', () => {
     const [first, second] = state.models.at(-1)!.available;
 
-    act(() => state.models.at(-1)!.toggle(first));
+    act(() => state.models.at(-1)!.remove(first));
     expect(state.models.at(-1)!.hardware).toEqual([second]);
 
     act(() => state.models.at(-1)!.reset());
