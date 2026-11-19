@@ -1,30 +1,17 @@
 // @vitest-environment jsdom
-import { act, memo } from 'react';
+import { act, memo, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AvailabilityRow } from '@/lib/api/api';
+import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
+import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import type * as UrlStateModule from '@/lib/routing/url-state';
 
-/**
- * Regression coverage for the stale-`i_seq` snapshot bug behind the paramless
- * AgentX hero links (see `agentxDashboardHref`).
- *
- * The module-level URL snapshot retains self-written params across soft
- * navigations: every dashboard visit pins its resolved sequence via the
- * URL-sync effect, and `refreshUrlParams` does not evict keys absent from the
- * live URL. `getUrlParam('i_seq')` can therefore return the PREVIOUS page's
- * sequence on a navigation whose URL carries no `i_seq` at all. Applying that
- * value flips `sequenceExplicit`, which blocks the availability-driven AgentX
- * default — a bare `/inference/kimi-k3` hero link would open on 8K/1K.
- *
- * The provider must consult `hasExplicitUrlParam('i_seq')` (which IS refreshed
- * per navigation) before honoring the snapshot value.
- */
-
 const mocks = vi.hoisted(() => ({
   availability: {
-    data: [] as unknown[],
+    data: undefined as AvailabilityIndex | undefined,
     error: null as Error | null,
     isSuccess: true,
   },
@@ -62,13 +49,14 @@ import {
   useGlobalFilterSelection,
 } from './GlobalFilterContext';
 
-/** Kimi-K3 availability: both the Agentic and the 8K/1K scenario exist. */
+const indexRows = (rows: readonly object[]) =>
+  indexAvailability(compactAvailability(rows as AvailabilityRow[]));
+
 const KIMI_K3_ROWS = [
   { model: 'kimik3', isl: null, osl: null, benchmark_type: 'agentic_traces' },
   { model: 'kimik3', isl: 8192, osl: 1024, benchmark_type: 'single_turn' },
 ];
 
-/** Two Agentic run dates; a retained `g_rundate` snapshot points at the older one. */
 const STALE_RUN_DATE = '2026-08-20';
 const LATEST_RUN_DATE = '2026-09-01';
 const KIMI_K3_DATED_ROWS = [
@@ -105,7 +93,7 @@ function mountProvider(): void {
 }
 
 beforeEach(() => {
-  mocks.availability.data = KIMI_K3_ROWS;
+  mocks.availability.data = indexRows(KIMI_K3_ROWS);
   mocks.getUrlParam.mockClear();
   mocks.setUrlParams.mockClear();
   mocks.hasExplicitUrlParam.mockClear();
@@ -140,14 +128,16 @@ describe('GlobalFilterProvider stale i_seq snapshot', () => {
 
 describe('GlobalFilterProvider stale i_prec snapshot', () => {
   beforeEach(() => {
-    mocks.availability.data = ['fp4', 'fp8'].map((precision) => ({
-      ...KIMI_K3_ROWS[0],
-      precision,
-      hardware: precision === 'fp4' ? 'vr200' : 'h200',
-      framework: 'trt',
-      spec_method: 'none',
-      disagg: false,
-    }));
+    mocks.availability.data = indexRows(
+      ['fp4', 'fp8'].map((precision) => ({
+        ...KIMI_K3_ROWS[0],
+        precision,
+        hardware: precision === 'fp4' ? 'vr200' : 'h200',
+        framework: 'trt',
+        spec_method: 'none',
+        disagg: false,
+      })),
+    );
     mocks.getUrlParam.mockImplementation((key) => (key === 'i_prec' ? 'fp8' : undefined));
   });
 
@@ -168,17 +158,9 @@ describe('GlobalFilterProvider stale i_prec snapshot', () => {
   });
 });
 
-/**
- * The same snapshot-vs-live-URL split applies to the run pins. Every manual
- * date pick (and every blog "live chart" link) writes `g_rundate` into the
- * snapshot; `refreshUrlParams` never evicts it. If the provider honored that
- * retained value on a navigation whose URL carries no `g_rundate`, it would flip
- * the explicit-date flag and open a fresh dashboard on the OLD date instead of
- * the latest run — the "run date is not at the latest on a fresh load" bug.
- */
 describe('GlobalFilterProvider stale g_rundate snapshot', () => {
   beforeEach(() => {
-    mocks.availability.data = KIMI_K3_DATED_ROWS;
+    mocks.availability.data = indexRows(KIMI_K3_DATED_ROWS);
     mocks.getUrlParam.mockImplementation((key: string) =>
       key === 'g_rundate' ? STALE_RUN_DATE : undefined,
     );
@@ -198,5 +180,46 @@ describe('GlobalFilterProvider stale g_rundate snapshot', () => {
     mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_rundate');
     mountProvider();
     expect(observedRunDate).toBe(STALE_RUN_DATE);
+  });
+});
+
+const mount = (Probe: ComponentType, initialChipBasis?: 'pool' | 'total') => {
+  container = document.createElement('div');
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <GlobalFilterProvider initialModel={Model.Kimi_K3} initialChipBasis={initialChipBasis}>
+        <Probe />
+      </GlobalFilterProvider>,
+    ),
+  );
+};
+
+describe('GlobalFilterProvider chip basis', () => {
+  let observedChipBasis: string | undefined;
+  const ChipBasisProbe = memo(() => {
+    observedChipBasis = useGlobalFilterSelection().chipBasis;
+    return null;
+  });
+
+  beforeEach(() => {
+    mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_chips');
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'g_chips' ? 'pool' : undefined));
+  });
+  afterEach(() => {
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'i_seq' ? '8k/1k' : undefined));
+  });
+
+  it('applies g_chips from the URL on dashboard pages', () => {
+    mocks.getUrlParam.mockImplementation((key: string) =>
+      key === 'g_chips' ? 'total' : undefined,
+    );
+    mount(ChipBasisProbe);
+    expect(observedChipBasis).toBe('total');
+  });
+
+  it('keeps an embed’s server-resolved basis over the URL', () => {
+    mount(ChipBasisProbe, 'total');
+    expect(observedChipBasis).toBe('total');
   });
 });

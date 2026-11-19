@@ -1,5 +1,3 @@
-import { Quote } from 'lucide-react';
-
 import { Card } from '@/components/ui/card';
 import { SupportersStrip } from '@/components/landing/supporters-strip';
 import {
@@ -8,9 +6,9 @@ import {
   CAROUSEL_LABELS,
   orgAnchorId,
 } from '@/components/quotes/quotes-data';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 import type { Locale } from '@/lib/i18n/i18n';
 
-// Strip order follows QUOTES order — supporter orgs are listed first there.
 const stripOrgs = [
   ...new Set(
     QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org)).map((q) => q.org),
@@ -25,27 +23,19 @@ const supporterOrgs = (quotesPath: string) =>
 
 const HEADING = {
   en: 'Open-Source Continuous AI Accelerator System Benchmark Trusted by GigaWatt Token Factories',
-  zh: 'InferenceX 提供持续更新的开源 AI 加速器系统基准测试，已获得吉瓦级 token 工厂运营方的信赖。',
+  zh: 'InferenceX 提供持续更新的开源 AI 加速器系统基准测试，已获得吉瓦级 token 工厂运营方的信赖',
 } as const;
 
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   const isZh = locale === 'zh';
   return (
-    <section>
+    <section {...analyticsPlacement('landing_section')}>
       <Card data-testid="intro-section">
-        {/* The splash moved to the AgentX hero, which now opens the landing
-            page — two copies of the same announcement one scroll apart read
-            as a duplicate rather than a callout. */}
-        <div className="flex items-start gap-2 mb-4">
-          <Quote className="size-5 shrink-0 mt-1 text-brand" />
-          <h2 className="text-lg font-semibold">{HEADING[locale]}</h2>
-        </div>
-        {/* Quote text lives on /quotes now — the band keeps just the org
-            strip and a link out, saving vertical space above the fold. */}
+        <h2 className="mb-4 text-lg font-semibold text-balance">{HEADING[locale]}</h2>
         <SupportersStrip
           orgs={supporterOrgs(isZh ? '/zh/quotes' : '/quotes')}
           moreHref={isZh ? '/zh/quotes' : '/quotes'}
-          moreLabel={isZh ? '查看完整评价与更多支持者 →' : undefined}
+          moreLabel={isZh ? '查看全部评价与支持者' : undefined}
         />
       </Card>
     </section>

@@ -3,9 +3,6 @@ import * as T from 'three';
 import { buildingMaterial, type TextureSet } from './gta-materials';
 import type { Point, World } from './gta-world';
 
-// Hand-modelled San Francisco and Santa Clara landmarks, placed at their real
-// coordinates. Proportions follow published dimensions.
-
 interface Ctx {
   tex: TextureSet;
   base: string;
@@ -20,7 +17,6 @@ const DECK = new T.MeshStandardMaterial({ color: '#3a3b3d', roughness: 0.9 });
 const COPPER = new T.MeshStandardMaterial({ color: '#8e7a4e', roughness: 0.45, metalness: 0.7 });
 const GOLD = new T.MeshStandardMaterial({ color: '#d4af5a', roughness: 0.3, metalness: 1 });
 
-/** Facade geometry (compatible with the building shader) for a tapered polygon prism. */
 function prism(
   ring: Point[],
   y0: number,
@@ -57,7 +53,6 @@ function prism(
       aB.push(len, style, 0.37, height);
       cl.push(col.r, col.g, col.b);
     }
-    // Outward winding for counter-clockwise rings in x/z.
     idx.push(o, o + 2, o + 1, o, o + 3, o + 2);
   }
   const g = new T.BufferGeometry();
@@ -112,7 +107,6 @@ function boxAt(
   return b;
 }
 
-/** Canvas text sign texture. */
 export function signTexture(
   lines: { text: string; font: string; color: string; y: number }[],
   w: number,
@@ -179,7 +173,6 @@ function signPanel(
   return g;
 }
 
-/** Nearest building facade to a point: returns the wall midpoint and outward angle. */
 function facadeNear(world: World, p: Point, range = 30) {
   let best = { x: p.x, z: p.z, angle: 0, d: Infinity, top: 10, base: world.height(p.x, p.z) };
   for (const b of world.buildings) {
@@ -244,7 +237,6 @@ function suspension(
     pz = ux;
   const at = (t: number, off = 0, y = 0) =>
     new T.Vector3(a.x + dx * t + px * off, y, a.z + dz * t + pz * off);
-  // Deck with stiffening truss.
   const deck = mesh(new T.BoxGeometry(width, 1.2, len), DECK);
   deck.position.copy(at(0.5, 0, deckH));
   deck.rotation.y = ang;
@@ -260,7 +252,6 @@ function suspension(
     rail.rotation.y = ang;
     g.add(rail);
   }
-  // Towers: two stepped legs joined by portal struts.
   for (const t of towers) {
     const ground = Math.max(0, world.height(a.x + dx * t, a.z + dz * t));
     for (const side of [-1, 1]) {
@@ -284,7 +275,6 @@ function suspension(
       g.add(strut);
     }
   }
-  // Main cables (parabolic) and vertical suspenders.
   const cablePts = (side: number) => {
     const pts: T.Vector3[] = [];
     const t0 = towers[0],
@@ -298,7 +288,6 @@ function suspension(
       else if (t > t1)
         y = anchorsAtEnds ? deckH + 4 + ((towerH - deckH - 4) * (1 - t)) / (1 - t1) : towerH;
       else {
-        // Parabola between consecutive towers.
         let k = 0;
         while (k < towers.length - 2 && t > towers[k + 1]) k++;
         const ta = towers[k],
@@ -335,7 +324,6 @@ function suspension(
   return g;
 }
 
-/** Canvas texture of triangular roof panels with skylights (NVIDIA campus). */
 function facetTexture() {
   const c = document.createElement('canvas');
   c.height = 512;
@@ -378,7 +366,6 @@ function facetTexture() {
   return t;
 }
 
-/** White precast quartz panels with narrow punched windows (Transamerica). */
 function precastTexture() {
   const c = document.createElement('canvas');
   c.height = 128;
@@ -399,7 +386,6 @@ function precastTexture() {
   return t;
 }
 
-/** Curtain-wall glass with mullions. */
 function curtainTexture() {
   const c = document.createElement('canvas');
   c.width = 256;
@@ -421,10 +407,6 @@ function curtainTexture() {
   return t;
 }
 
-/**
- * Replace an OSM footprint with a faceted, sloping roof building, approximating
- * NVIDIA's triangle-panelled Endeavor and Voyager roofs.
- */
 function facetedBuilding(
   world: World,
   index: number,
@@ -447,7 +429,6 @@ function facetedBuilding(
   cz /= n;
   const base = b.base;
   const g = new T.Group();
-  // Walls.
   const wp: number[] = [],
     wu: number[] = [];
   let run = 0;
@@ -487,7 +468,6 @@ function facetedBuilding(
   wg.setAttribute('uv', new T.Float32BufferAttribute(wu, 2));
   wg.computeVertexNormals();
   g.add(mesh(wg, wallMat));
-  // Roof: concentric rings rising toward an offset apex.
   const rings = 6;
   const ax0 = cx + tilt.x,
     az0 = cz + tilt.z;
@@ -552,7 +532,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
   facade.side = T.DoubleSide;
   const h = (p: Point) => world.height(p.x, p.z);
 
-  // OSM footprints replaced by the hand-built models below.
   for (const [id, r] of [
     ['transamerica', 24],
     ['coit', 10],
@@ -565,7 +544,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     });
   }
 
-  // Transamerica Pyramid: 260 m, tapering square plan with elevator wings.
   {
     const c = L.transamerica;
     const y = h(c);
@@ -600,7 +578,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(base);
   }
 
-  // Coit Tower: 64 m fluted concrete column on Telegraph Hill.
   {
     const c = L.coit;
     const y = h(c);
@@ -629,7 +606,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(boxAt(26, 1.2, 26, c.x, y + 0.6, c.z, STONE));
   }
 
-  // Ferry Building clock tower (75 m) with lit clock faces.
   {
     const c = L.ferry;
     const y = Math.max(3, h(c));
@@ -678,10 +654,8 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     }
   }
 
-  // City Hall dome (94 m), gilded lantern.
   {
     const c = L.city_hall;
-    // Beaux-Arts body (the OSM footprint is often a courtyard outline only).
     const hall = world.buildingAt(c.x, c.z, 8);
     if (hall < 0 || world.buildings[hall].height < 18) {
       if (hall >= 0) skip.add(hall);
@@ -716,7 +690,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(spire);
   }
 
-  // Palace of Fine Arts rotunda.
   {
     const c = L.palace;
     const y = h(c);
@@ -740,7 +713,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(dome);
   }
 
-  // Sutro Tower: 298 m three-legged mast in red and white bands.
   {
     const c = L.sutro;
     const y = h(c);
@@ -771,7 +743,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     }
   }
 
-  // Dewey Monument, Union Square.
   {
     const c = L.union_square;
     const y = h(c);
@@ -786,7 +757,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(statue);
   }
 
-  // Alcatraz cellhouse and lighthouse.
   {
     const c = L.alcatraz;
     const y = Math.max(8, h(c));
@@ -808,9 +778,7 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(light);
   }
 
-  // Golden Gate Bridge: 227 m towers, 67 m deck, International Orange.
   group.add(suspension(world, L.gg_south, L.gg_north, [0.17, 0.83], 227, 67, 27, ORANGE));
-  // Bay Bridge west span to Yerba Buena Island: twin suspension spans.
   group.add(
     suspension(
       world,
@@ -825,7 +793,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     ),
   );
 
-  // Chinatown Dragon Gate on Grant Ave.
   {
     const c = L.dragon_gate;
     const y = h(c);
@@ -845,7 +812,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(g);
   }
 
-  // Salesforce Tower crown lattice (lit LED sculpture at night).
   {
     const c = L.salesforce;
     let top = 326;
@@ -866,7 +832,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(crown);
   }
 
-  // Oren's Hummus storefront, 71 3rd St.
   {
     const f = facadeNear(world, L.oren);
     const sign = signPanel(
@@ -892,7 +857,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     sign.position.set(f.x + Math.sin(f.angle) * 0.2, f.base + 4.6, f.z + Math.cos(f.angle) * 0.2);
     sign.rotation.y = f.angle;
     group.add(sign);
-    // Blade sign perpendicular to the wall and a few sidewalk tables.
     const blade = signPanel(
       signTexture(
         [{ text: "OREN'S", font: 'bold 150px Georgia, serif', color: '#f6efe0', y: 128 }],
@@ -922,7 +886,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     }
   }
 
-  // Fisherman's Wharf, Pier 39 and Ghirardelli signs.
   {
     const wharf = signPanel(
       signTexture(
@@ -987,7 +950,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(ghSign);
   }
 
-  // Painted Ladies: Victorian row houses on Steiner St facing Alamo Square.
   {
     const c = L.painted_ladies;
     const colors = ['#e8d9b5', '#b9c9d6', '#e3b8a6', '#c8d4b8', '#f0e0c0', '#d7c3d8', '#a9c2c9'];
@@ -999,7 +961,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
       const y = world.height(x, z);
       const body = new T.MeshStandardMaterial({ color: colors[i], roughness: 0.8 });
       group.add(boxAt(14, 9, 7.4, x, y + 4.5 + 1, z, body));
-      // Gabled roof facing the park (west).
       const gable = new T.Shape([
         new T.Vector2(-3.7, 0),
         new T.Vector2(3.7, 0),
@@ -1011,7 +972,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
       roof.rotation.y = Math.PI / 2;
       roof.position.set(x, y + 10, z);
       group.add(roof);
-      // Bay window and trim.
       group.add(boxAt(0.9, 6, 3.6, x - 7.45, y + 5, z - 1.2, body));
       group.add(boxAt(0.3, 0.4, 7.6, x - 7.1, y + 10.1, z, trim));
       group.add(
@@ -1022,7 +982,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     }
   }
 
-  // Oracle Park: brick bowl, clock towers and the light standards on the bay.
   {
     const c = L.oracle;
     const y = h(c);
@@ -1072,7 +1031,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     }
   }
 
-  // Lombard Street hedges and flower beds along the switchbacks.
   {
     const hedge = new T.MeshStandardMaterial({ color: '#3d6b35', roughness: 0.95 });
     const bloom = new T.MeshStandardMaterial({ color: '#c8507a', roughness: 0.9 });
@@ -1111,7 +1069,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     }
   }
 
-  // SAP Center ("the Shark Tank") in downtown San Jovano.
   {
     const c = L.sap_center;
     const y = h(c);
@@ -1130,7 +1087,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     group.add(lid);
   }
 
-  // NVIDIA Endeavor / Voyager and AMD HQ, with official logos.
   const [nv, amd] = await Promise.all([
     imageTexture(`${ctx.base}sf/logos/nvidia.png`, ctx.signal),
     imageTexture(`${ctx.base}sf/logos/amd.png`, ctx.signal),
@@ -1146,7 +1102,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     );
     sign.rotation.y = f.angle;
     group.add(sign);
-    // Monument sign at the entrance.
     const mon = new T.Group();
     mon.add(
       boxAt(
@@ -1170,8 +1125,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     mon.rotation.y = f.angle;
     group.add(mon);
   };
-  // Endeavor (2017) and Voyager (2022): low glass walls under faceted roofs
-  // studded with triangular skylights.
   {
     const roof = new T.MeshStandardMaterial({
       map: facetTexture(),
@@ -1200,7 +1153,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
   logoSign(nv, L.nvidia_voyager, 11, 13.5);
   logoSign(amd, L.amd_hq, 12);
 
-  // Welcome sign on US-101 at the South Bay boundary.
   {
     const p = world.freeway[Math.floor(world.freeway.length * 0.45)] ?? { x: 230, z: 4400 };
     const welcome = signPanel(
@@ -1243,7 +1195,6 @@ export async function buildLandmarks(world: World, ctx: Ctx) {
     );
   }
 
-  // Cable cars running along the Powell and California St cable lines.
   const cars: { rail: number; s: number; speed: number; obj: T.Object3D }[] = [];
   {
     const red = new T.MeshStandardMaterial({ color: '#9e2a22', roughness: 0.5 });

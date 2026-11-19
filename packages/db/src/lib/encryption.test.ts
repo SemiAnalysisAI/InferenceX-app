@@ -83,7 +83,6 @@ describe('loadKey', () => {
   });
 
   it('rejects base64url alphabet (- and _) explicitly', () => {
-    // base64url chars Node would silently drop, masking the real problem:
     vi.stubEnv(ENV, 'aaaa-_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=');
     expect(() => loadKey(ENV)).toThrowError(/non-base64 characters/u);
   });

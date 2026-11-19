@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -40,65 +42,70 @@ vi.mock('@/lib/blog/blog', async (importOriginal) => {
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: undefined }) }));
 
 import { BlogFeaturedPost } from './blog-featured-post';
-import { BlogIndexContent } from './blog-index-content';
+import { BlogIndexContent, blogIndexData } from './blog-index-content';
+import { BlogIndexPosts } from './blog-index-posts';
 
 const HAN = /\p{Script=Han}/u;
+const withQueryClient = (ui: ReactNode) => (
+  <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+);
+
+function renderTagged(locale: 'en' | 'zh', tag: string): string {
+  return renderToStaticMarkup(
+    withQueryClient(<BlogIndexPosts locale={locale} {...blogIndexData(locale)} activeTag={tag} />),
+  );
+}
 
 describe('BlogIndexContent', () => {
   it('features the newest post once and lists the rest in the grid', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<BlogIndexContent locale="en" />));
 
     expect(html).toContain('data-testid="blog-featured-post"');
     expect(html).toContain('href="/blog/newest"');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(POSTS.length - 1);
-    expect(html).toContain('InferenceX Research');
     expect(html).toContain('href="/glossary"');
     expect(html).not.toContain('opengraph-image');
     expect(html).toContain('4 min read');
   });
 
   it('uses post figures as thumbnails and a text-free tile when a post has none', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
+    const html = renderToStaticMarkup(withQueryClient(<BlogIndexContent locale="en" />));
 
-    // Paired light/dark figures go through the themed image (per-theme data
-    // attributes), resized by the Next image optimizer. The featured card asks
-    // for the wide variant.
     expect(html).toContain(
       'data-src-light="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-light.png&amp;w=1200&amp;q=75"',
     );
     expect(html).toContain(
       'data-src-dark="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-dark.png&amp;w=1200&amp;q=75"',
     );
-    // A single theme-neutral figure renders as a plain responsive image.
     expect(html).toContain(
       'src="/_next/image?url=%2Fimages%2Fmid%2Fcontext.png&amp;w=640&amp;q=75"',
     );
     expect(html).toContain('sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"');
-    // Posts without figures get the tile; the title never appears inside it.
     expect(html.match(/data-testid="blog-thumbnail-tile"/gu)).toHaveLength(2);
     expect(html.match(/data-testid="blog-thumbnail-figure"/gu)).toHaveLength(2);
     const tile = html.slice(html.indexOf('data-testid="blog-thumbnail-tile"'));
     const tileInner = tile.slice(0, tile.indexOf('<div class="flex flex-1'));
     expect(tileInner).not.toContain('Title old');
-    expect(tileInner).toContain('>nvidia<');
+    expect(tileInner).toContain('>NVIDIA<');
     expect(tileInner).toContain('4 min read');
     expect(html).toContain('data-layout="figure"');
-    expect(html).toContain('class="grid items-start');
   });
 
   it('lays the featured card out as a single text column when the post has no figure', () => {
     const html = renderToStaticMarkup(
-      <BlogFeaturedPost
-        slug="newest"
-        title="Title newest"
-        subtitle="Subtitle newest"
-        dateLabel="May 1, 2026"
-        date="2026-05-01"
-        readingLabel="4 min read"
-        tags={['nvidia']}
-        thumbnail={null}
-        labels={{ eyebrow: 'Latest', read: 'Read article', tags: 'Tags' }}
-      />,
+      withQueryClient(
+        <BlogFeaturedPost
+          slug="newest"
+          title="Title newest"
+          subtitle="Subtitle newest"
+          dateLabel="May 1, 2026"
+          date="2026-05-01"
+          readingLabel="4 min read"
+          tags={['nvidia']}
+          thumbnail={null}
+          labels={{ eyebrow: 'Latest', read: 'Read article', tags: 'Tags' }}
+        />,
+      ),
     );
     expect(html).toContain('data-layout="text"');
     expect(html).not.toContain('<img');
@@ -108,22 +115,24 @@ describe('BlogIndexContent', () => {
   });
 
   it('keeps the ?tag= filter contract and drops the featured card when filtering', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="nvidia" />);
+    const html = renderTagged('en', 'nvidia');
 
     expect(html).not.toContain('data-testid="blog-featured-post"');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(2);
     expect(html).toContain('href="/blog?tag=agentx"');
     expect(html).toContain('aria-current="page"');
-    expect(html).toContain('Tagged');
+    expect(html).toContain('Tagged “NVIDIA”');
+    expect(html).toContain('>AgentX<');
+    expect(html).not.toContain('>agentx<');
   });
 
   it('accepts any casing in the tag query', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="NVIDIA" />);
+    const html = renderTagged('en', 'NVIDIA');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(2);
   });
 
   it('puts the long tail of tags behind a disclosure and keeps the active tail tag visible', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="qwen" />);
+    const html = renderTagged('en', 'qwen');
 
     expect(html).toContain('<details');
     expect(html).toContain('More tags');
@@ -132,7 +141,7 @@ describe('BlogIndexContent', () => {
   });
 
   it('shows an empty state with a reset link for unknown tags', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="tpu" />);
+    const html = renderTagged('en', 'tpu');
 
     expect(html).not.toContain('data-testid="blog-post-card"');
     expect(html).toContain('No articles tagged');
@@ -140,7 +149,9 @@ describe('BlogIndexContent', () => {
   });
 
   it('renders Chinese chrome and zh routes for the zh locale', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="zh" activeTag="agentx" />);
+    const html =
+      renderToStaticMarkup(withQueryClient(<BlogIndexContent locale="zh" />)) +
+      renderTagged('zh', 'agentx');
 
     expect(html).toContain('href="/zh/blog?tag=nvidia"');
     expect(html).toContain('href="/zh/blog/newest"');

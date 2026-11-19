@@ -1,6 +1,5 @@
 import type { ScaleConfig } from '@/lib/d3-chart/D3Chart';
 
-/** Log domain over the positive values when `log`, else linear from zero. */
 export function valueScale(log: boolean, values: number[]): ScaleConfig {
   const pos = values.filter((v) => v > 0);
   const hi = pos.length > 0 ? Math.max(...pos) : 1;
@@ -15,7 +14,6 @@ export function valueScale(log: boolean, values: number[]): ScaleConfig {
   return { type: 'linear', domain: [0, hi * 1.05], nice: true };
 }
 
-/** Log domain for ratios around 1×, always including 1. */
 export function ratioScale(values: number[]): ScaleConfig {
   const pos = values.filter((v) => v > 0);
   return {
@@ -27,17 +25,12 @@ export function ratioScale(values: number[]): ScaleConfig {
 
 export const formatRatio = (v: number) => `${v >= 10 ? v.toFixed(0) : v.toFixed(2)}×`;
 
-/** Compact number for axis ticks: 1.5k, 2M. */
 export function formatCompact(v: number): string {
   if (v >= 1e6) return `${Number((v / 1e6).toPrecision(3))}M`;
   if (v >= 1e3) return `${Number((v / 1e3).toPrecision(3))}k`;
   return `${Number(v.toPrecision(3))}`;
 }
 
-/**
- * Ticks for a log axis: powers of ten over wide ranges, 1-2-5 over a few decades,
- * finer steps within one decade.
- */
 export function logTicks(domain: number[]): number[] {
   const lo = Math.min(...domain);
   const hi = Math.max(...domain);
@@ -52,7 +45,6 @@ export function logTicks(domain: number[]): number[] {
   return out;
 }
 
-/** Tick settings for an axis on `scale`: log scales get `logTicks`. */
 export function ticksFor(scale: ScaleConfig): { tickValues?: number[] } {
   return scale.type === 'log' ? { tickValues: logTicks(scale.domain) } : {};
 }

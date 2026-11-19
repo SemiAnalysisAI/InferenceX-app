@@ -1,10 +1,13 @@
 'use client';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 import { buildTelemetryData, type ParsedPoint } from './chart-data';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -29,42 +32,37 @@ import {
 
 const STRINGS = {
   en: {
-    empty: 'No Chip metrics data to display.',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    seconds: 'Seconds',
-    dismiss: 'Click elsewhere to dismiss',
+    empty: 'No Chip metrics data to display',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
+    seconds: 'Time (s)',
     chip: 'Chip',
-    power: 'Power',
-    temp: 'Temp',
-    utilization: 'Chip Util',
+    sampledAt: 'Sampled at',
     rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
+    smoothing: 'Smoothing',
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
     rightAxis: 'right axis',
+    allIn: 'All-in provisioned',
   },
   zh: {
-    empty: '暂无可显示的芯片指标数据。',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    seconds: '秒',
-    dismiss: '点击其他区域关闭',
+    empty: '暂无可显示的芯片指标数据',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
+    seconds: '时间（秒）',
     chip: '芯片',
-    power: '功耗',
-    temp: '温度',
-    utilization: '芯片利用率',
+    sampledAt: '采样时间',
     rollingSuffix: (windowS: number) => `${windowS} 秒滚动平均`,
+    smoothing: '平滑',
     meanChips: '可见芯片均值',
     meanCount: (n: number) => `${n} 个芯片`,
     rightAxis: '右轴',
+    allIn: '整体预配功耗',
   },
 } as const;
 
-/** A second time series drawn over the telemetry on its own right-hand axis. */
 export interface TelemetryOverlaySeries {
   label: string;
   unit: string;
   color: string;
-  /** Absolute-time samples; the chart re-bases them onto its own t=0. */
   points: TimedSample[];
 }
 
@@ -73,23 +71,15 @@ interface GpuMetricsChartProps {
   visibleGpus: Set<number>;
   metricKey: GpuMetricKey;
   artifactName: string;
-  /**
-   * Hardware key of the benchmark point (`b200`, `h200`, …). Multinode bundle
-   * names are hash-truncated and carry no SKU token, so callers that know the
-   * point pass it explicitly; the artifact-name sniff stays the fallback.
-   */
   hardware?: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Max interactive points before LTTB downsampling. Infinity to disable. */
   maxPoints?: number;
-  /** Raw samples vs. time-window rolling average. Defaults to raw samples. */
   display?: TelemetryDisplayState;
-  /** Optional secondary series (e.g. decode throughput) on a right y-axis. */
   overlay?: TelemetryOverlaySeries | null;
+  showAllIn?: boolean;
 }
 
-/** Mean across the visible chips, aligned by nearest sample within one poll interval. */
 function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): ParsedPoint[] {
   const arrays = [...groups.values()];
   if (arrays.length === 0) return [];
@@ -105,15 +95,17 @@ function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): Pars
   }));
 }
 
-/** Replace each point's value with its centered time-window mean. */
 function smoothSeries(points: ParsedPoint[], windowS: number): ParsedPoint[] {
   const averaged = rollingTimeAverage(points, windowS * 1000);
   return points.map((point, i) => ({ ...point, value: averaged[i]!.value, raw: null }));
 }
 
-/** Per-chip palette shared with legends that toggle chips on and off. */
+export function allInWattsForHardware(hardware: string | undefined): number | null {
+  const power = hardware ? HW_REGISTRY[hardware.toLowerCase()]?.power : undefined;
+  return power && power > 0 ? power * 1000 : null;
+}
+
 export const GPU_COLORS = d3.schemeTableau10;
-/** Pseudo chip index and line key for the mean across visible chips. */
 const MEAN_INDEX = -1;
 const MEAN_KEY = 'mean';
 const MEAN_COLOR = 'var(--foreground)';
@@ -127,7 +119,6 @@ function colorFor(gpuIndex: number): string {
 }
 const CHART_ID = 'gpu-metrics-line';
 const MARGIN = { top: 24, right: 20, bottom: 60, left: 60 };
-/** Room for the overlay's right axis ticks and rotated title. */
 const MARGIN_WITH_OVERLAY = { ...MARGIN, right: 84 };
 
 interface OverlayPoint {
@@ -155,11 +146,6 @@ function overlayLine(
     .curve(d3.curveMonotoneX);
 }
 
-/**
- * Draw the overlay path inside the clipped zoom group and its axis in the
- * unclipped root group. Both are removed first so toggling the overlay off
- * (or re-rendering) never leaves a stale axis behind.
- */
 function renderOverlay(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   ctx: RenderContext,
@@ -214,6 +200,7 @@ const GpuMetricsChart = React.memo(
     maxPoints,
     display = DEFAULT_TELEMETRY_DISPLAY,
     overlay,
+    showAllIn = false,
   }: GpuMetricsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
@@ -227,8 +214,6 @@ const GpuMetricsChart = React.memo(
       [data, visibleGpus, metricKey],
     );
 
-    // Displayed series keyed by chip index (MEAN_INDEX for the mean line):
-    // per-chip and/or mean, then optionally smoothed.
     const groupedData = useMemo(() => {
       const series = new Map<number, ParsedPoint[]>();
       if (showChips) for (const [gpuIndex, points] of rawGroups) series.set(gpuIndex, points);
@@ -246,11 +231,12 @@ const GpuMetricsChart = React.memo(
 
     const allPoints = useMemo(() => {
       const pts: ParsedPoint[] = [];
-      for (const points of groupedData.values()) pts.push(...points);
+      for (const points of groupedData.values()) {
+        pts.push(...points.filter((point) => Number.isFinite(point.value)));
+      }
       return pts;
     }, [groupedData]);
 
-    // Build line data as Record<string, {x,y}[]> for the line layer
     const lineData = useMemo(() => {
       const result: Record<string, { x: number; y: number }[]> = {};
       for (const [gpuIndex, points] of groupedData) {
@@ -259,9 +245,6 @@ const GpuMetricsChart = React.memo(
       return result;
     }, [groupedData]);
 
-    // Overlay samples, smoothed with the same window as the chip lines when
-    // averaging so both series answer the same "how much over N seconds"
-    // question, then re-based onto the telemetry's t=0.
     const overlaySamples = useMemo<TimedSample[]>(() => {
       if (!overlay) return [];
       return rolling ? rollingTimeAverage(overlay.points, display.windowS * 1000) : overlay.points;
@@ -312,7 +295,6 @@ const GpuMetricsChart = React.memo(
         </>
       ) : undefined;
 
-    // Scale domains
     const xDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(allPoints, (d) => d.seconds) as [number, number];
@@ -323,12 +305,13 @@ const GpuMetricsChart = React.memo(
       metricKey === 'power'
         ? (tdpForHardware(hardware) ?? detectTdpFromArtifactName(artifactName))
         : null;
+    const allInWatts =
+      metricKey === 'power' && showAllIn && hardware ? allInWattsForHardware(hardware) : null;
 
     const yDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(allPoints, (d) => d.value) as [number, number];
       const range = ext[1] - ext[0];
-      // Constant telemetry and floating-point noise still need a readable axis.
       const padding = Math.max(
         range * 0.05,
         Math.max(Math.abs(ext[0]), Math.abs(ext[1])) * 0.01,
@@ -336,17 +319,60 @@ const GpuMetricsChart = React.memo(
       );
       const yMin = Math.max(0, ext[0] - padding);
       let yMax = ext[1] + padding;
-      if (tdpInfo && tdpInfo.tdp > yMax) yMax = tdpInfo.tdp * 1.05;
+      const ceiling = Math.max(tdpInfo?.tdp ?? 0, allInWatts ?? 0);
+      if (ceiling > yMax) yMax = ceiling * 1.05;
       return [yMin, yMax] as [number, number];
-    }, [allPoints, tdpInfo]);
+    }, [allPoints, tdpInfo, allInWatts]);
 
     if (allPoints.length === 0) {
       return (
-        <div className="flex items-center justify-center min-h-[600px]">
+        <div className="flex min-h-150 items-center justify-center">
           <p className="text-muted-foreground text-sm">{t.empty}</p>
         </div>
       );
     }
+
+    const describePoint = (d: ParsedPoint) => {
+      const overlayAt = overlay && hasOverlay ? nearestSample(overlaySamples, d.ms) : null;
+      const raw = d.raw;
+      return {
+        title:
+          d.gpuIndex === MEAN_INDEX
+            ? `${t.meanChips}${d.count ? ` · ${t.meanCount(d.count)}` : ''}`
+            : `${t.chip} ${d.gpuIndex}`,
+        color: colorFor(d.gpuIndex),
+        time: `${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}`,
+        value: d.value.toFixed(1),
+        overlay:
+          overlay && overlayAt
+            ? {
+                value:
+                  overlayAt.value >= 100 ? overlayAt.value.toFixed(0) : overlayAt.value.toFixed(1),
+                label: overlay.label,
+                unit: overlay.unit,
+              }
+            : null,
+        summary: [
+          rolling && t.rollingSuffix(display.windowS),
+          raw?.power !== undefined && `${raw.power.toFixed(1)} W`,
+          raw?.temperature !== undefined && `${raw.temperature}\u00B0C`,
+          raw?.gpuUtil !== undefined && `${raw.gpuUtil}%`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        rows: [
+          ...(rolling ? [{ label: t.smoothing, value: t.rollingSuffix(display.windowS) }] : []),
+          ...(raw ? [{ label: t.sampledAt, value: raw.timestamp }] : []),
+          ...ALL_METRIC_OPTIONS.flatMap((metric) => {
+            const reading = raw?.[metric.key];
+            if (reading === undefined || !Number.isFinite(reading)) return [];
+            const unit =
+              metric.unit === '%' || metric.unit === '°C' ? metric.unit : ` ${metric.unit}`;
+            return [{ label: getGpuMetricLabel(metric, locale), value: `${reading}${unit}` }];
+          }),
+        ],
+      };
+    };
 
     return (
       <D3Chart<ParsedPoint>
@@ -370,37 +396,64 @@ const GpuMetricsChart = React.memo(
         }}
         yAxis={{ label: getGpuMetricYAxisLabel(metricConfig, locale), tickCount: 8 }}
         layers={[
-          // TDP reference line (power metric only)
           {
             type: 'custom',
-            key: 'tdp-line',
+            key: 'reference-lines',
             render: (group, ctx) => {
-              group.selectAll('.tdp-line').remove();
-              if (!tdpInfo) return;
+              group.selectAll('.tdp-line, .all-in-line').remove();
               const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-              const tdpY = yScale(tdpInfo.tdp);
-              const tdpGroup = group.append('g').attr('class', 'tdp-line');
-              tdpGroup
-                .append('line')
-                .attr('x1', 0)
-                .attr('x2', ctx.width)
-                .attr('y1', tdpY)
-                .attr('y2', tdpY)
-                .attr('stroke', '#ef4444')
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', '6,4');
-              tdpGroup
-                .append('text')
-                .attr('x', ctx.width - 4)
-                .attr('y', tdpY - 6)
-                .attr('text-anchor', 'end')
-                .attr('fill', '#ef4444')
-                .attr('font-size', '11px')
-                .attr('font-weight', '600')
-                .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
+              const references: {
+                className: string;
+                watts: number;
+                color: string;
+                dash: string;
+                label: string;
+              }[] = [];
+              if (tdpInfo) {
+                references.push({
+                  className: 'tdp-line',
+                  watts: tdpInfo.tdp,
+                  color: '#ef4444',
+                  dash: '6,4',
+                  label: `${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`,
+                });
+              }
+              if (allInWatts !== null && hardware) {
+                references.push({
+                  className: 'all-in-line',
+                  watts: allInWatts,
+                  color: '#f59e0b',
+                  dash: '2,3',
+                  label: `${tdpInfo?.sku ?? hardware.toUpperCase()} ${t.allIn}: ${Math.round(allInWatts)}W`,
+                });
+              }
+              for (const reference of references) {
+                const lineY = yScale(reference.watts);
+                const lineGroup = group.append('g').attr('class', reference.className);
+                if (reference.className === 'all-in-line') {
+                  lineGroup.attr('data-testid', 'gpu-power-all-in-line');
+                }
+                lineGroup
+                  .append('line')
+                  .attr('x1', 0)
+                  .attr('x2', ctx.width)
+                  .attr('y1', lineY)
+                  .attr('y2', lineY)
+                  .attr('stroke', reference.color)
+                  .attr('stroke-width', 1.5)
+                  .attr('stroke-dasharray', reference.dash);
+                lineGroup
+                  .append('text')
+                  .attr('x', ctx.width - 4)
+                  .attr('y', lineY - 6)
+                  .attr('text-anchor', 'end')
+                  .attr('fill', reference.color)
+                  .attr('font-size', '11px')
+                  .attr('font-weight', '600')
+                  .text(reference.label);
+              }
             },
           },
-          // GPU lines
           {
             type: 'line',
             key: 'gpu-lines',
@@ -409,26 +462,23 @@ const GpuMetricsChart = React.memo(
               getColor: (key) => (key === MEAN_KEY ? MEAN_COLOR : colorFor(parseInt(key, 10))),
               getStrokeWidth: (key) => (key === MEAN_KEY ? 2.5 : rolling ? 1.75 : 1.5),
               curve: d3.curveMonotoneX,
+              isDefined: (point) => Number.isFinite(point.y),
             },
           },
-          // GPU data points
           {
             type: 'point',
             key: 'gpu-points',
             data: allPoints,
             config: {
-              getCx: () => 0, // overridden by getX at render time via onRender
+              getCx: () => 0,
               getCy: () => 0,
               getX: (d) => d.seconds,
               getY: (d) => d.value,
-              // Averaged mode draws lines only; the circles stay as invisible
-              // hover targets so the tooltip and crosshair keep working.
               getColor: (d) => (rolling ? 'transparent' : colorFor(d.gpuIndex)),
               getRadius: () => (rolling ? 3 : 2),
               maxPoints,
             },
           },
-          // Secondary series on a right-hand axis (e.g. decode throughput)
           {
             type: 'custom',
             key: 'telemetry-overlay',
@@ -455,45 +505,54 @@ const GpuMetricsChart = React.memo(
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: ParsedPoint, isPinned: boolean) => {
-            const color = colorFor(d.gpuIndex);
-            const sep = locale === 'zh' ? '：' : ':';
-            const title =
-              d.gpuIndex === MEAN_INDEX
-                ? `${t.meanChips}${d.count ? ` · ${t.meanCount(d.count)}` : ''}`
-                : `${t.chip} ${d.gpuIndex}`;
-            const overlayAt = hasOverlay ? nearestSample(overlaySamples, d.ms) : null;
-            const overlayRow =
-              overlay && overlayAt
-                ? `<div class="mt-1" style="color: ${overlay.color}">${overlay.label}${sep} ${
-                    overlayAt.value >= 100 ? overlayAt.value.toFixed(0) : overlayAt.value.toFixed(1)
-                  } ${overlay.unit}</div>`
-                : '';
-            return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
-              ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-              <div class="font-semibold mb-1" style="color: ${color}">${title}</div>
-              <div class="text-muted-foreground">${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}</div>
-              <div class="mt-1 font-medium">${getGpuMetricLabel(metricConfig, locale)}${sep} ${d.value.toFixed(1)} ${metricConfig.unit}</div>
-              ${rolling ? `<div class="text-muted-foreground">${t.rollingSuffix(display.windowS)}</div>` : ''}
-              ${
-                d.raw
-                  ? `${
-                      d.raw.power === undefined
-                        ? ''
-                        : `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>`
-                    }${
-                      d.raw.temperature === undefined
-                        ? ''
-                        : `<div class="text-muted-foreground">${t.temp}${sep} ${d.raw.temperature}\u00B0C</div>`
-                    }${
-                      d.raw.gpuUtil === undefined
-                        ? ''
-                        : `<div class="text-muted-foreground">${t.utilization}${sep} ${d.raw.gpuUtil}%</div>`
-                    }`
-                  : ''
-              }
-              ${overlayRow}
-            </div>`;
+          content: (d: ParsedPoint) => {
+            const point = describePoint(d);
+            return chartHoverCard(
+              {
+                title: point.title,
+                subtitle: point.time,
+                color: point.color,
+                metrics: [
+                  { value: point.value, label: metricConfig.unit },
+                  ...(point.overlay
+                    ? [
+                        {
+                          value: point.overlay.value,
+                          label: `${point.overlay.label} (${point.overlay.unit})`,
+                        },
+                      ]
+                    : []),
+                ],
+                summary: point.summary || undefined,
+              },
+              { pinned: false },
+            );
+          },
+          details: (d: ParsedPoint, _isOverlay: boolean, close: () => void) => {
+            const point = describePoint(d);
+            return (
+              <ChartPointDetails
+                title={point.title}
+                color={point.color}
+                date={point.time}
+                metrics={[
+                  {
+                    value: point.value,
+                    label: `${getGpuMetricLabel(metricConfig, locale)} (${metricConfig.unit})`,
+                  },
+                  ...(point.overlay
+                    ? [
+                        {
+                          value: point.overlay.value,
+                          label: `${point.overlay.label} (${point.overlay.unit})`,
+                        },
+                      ]
+                    : []),
+                ]}
+                rows={point.rows}
+                onClose={close}
+              />
+            );
           },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.seconds),
           getRulerY: (d, yScale) => yScale(d.value),

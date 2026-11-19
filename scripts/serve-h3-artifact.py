@@ -1,4 +1,4 @@
-"""Serve one extracted H3 CI bundle on loopback for the /video local demo."""
+"""Serve one extracted H3 CI bundle on loopback for the /vgx local demo."""
 import argparse
 import functools
 import http.server

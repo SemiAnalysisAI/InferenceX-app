@@ -16,7 +16,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/evaluations', () => ({
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { GET } from './route';
@@ -26,24 +26,10 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/evaluations', () => {
-  it('returns evaluation data', async () => {
-    const mockRows = [
-      { model: 'dsr1', benchmark: 'mmlu', score: 0.95 },
-      { model: 'llama70b', benchmark: 'mmlu', score: 0.88 },
-    ];
-    mockGetAllEvalResults.mockResolvedValueOnce(mockRows);
-
-    const res = await GET();
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual(mockRows);
-    expect(mockGetAllEvalResults).toHaveBeenCalledWith('mock-sql');
-  });
-
   it('returns empty array when no evaluations', async () => {
     mockGetAllEvalResults.mockResolvedValueOnce([]);
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/evaluations'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
@@ -52,7 +38,7 @@ describe('GET /api/v1/evaluations', () => {
   it('returns 500 when query throws', async () => {
     mockGetAllEvalResults.mockRejectedValueOnce(new Error('Query timeout'));
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/evaluations'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');

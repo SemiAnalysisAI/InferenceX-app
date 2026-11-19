@@ -3,33 +3,20 @@ import type { Harness } from './shared/harness';
 import { requestsVisFilter, SESSION_HARNESS_SQL, sessionsVisFilter } from './operations';
 import type { Database } from './types';
 
-/**
- * Share of `requests` heap blocks (TABLESAMPLE SYSTEM) behind the per-request
- * harness comparisons. A full pass over `requests` takes ~30 s; a fixed-seed
- * 0.5% block sample (~14k requests) reads a few seconds cold and returns the
- * same rows on every call.
- */
 export const HARNESS_SAMPLE_PERCENT = 0.5;
 const HARNESS_SAMPLE_SEED = 7;
 
-/** Requests per log10 token bucket: bucket `b` covers [10^(b/10), 10^((b+1)/10)). */
 export const HARNESS_BUCKETS_PER_DECADE = 10;
 
 export interface HarnessTotals {
   harness: Harness;
-  /** Sampled requests. */
   requests: number;
-  /** Sampled requests sent by the main agent (no subagent label). */
   mainRequests: number;
-  /** Tool calls across the sampled requests. */
   toolCalls: number;
-  /** Prompt tokens (input + cache read + cache write) across the sampled requests. */
   promptTokens: number;
-  /** Output tokens across the sampled requests. */
   outputTokens: number;
 }
 
-/** Exact per-session figures over every session with recorded prompt tokens. */
 export interface HarnessSessions {
   harness: Harness;
   sessions: number;
@@ -39,7 +26,6 @@ export interface HarnessSessions {
   promptP90: number;
   outputP50: number;
   outputP90: number;
-  /** Session prompt tokens divided by its request count. */
   promptPerRequestP50: number;
   outputPerRequestP50: number;
   inputTokens: number;
@@ -55,7 +41,6 @@ export interface HarnessBucket {
 
 export type SessionMetric = 'prompt' | 'output' | 'requests' | 'promptPerRequest';
 
-/** Log buckets per decade for each session metric; request counts are small integers. */
 export const SESSION_METRIC_PER_DECADE: Record<SessionMetric, number> = {
   prompt: HARNESS_BUCKETS_PER_DECADE,
   output: HARNESS_BUCKETS_PER_DECADE,
@@ -77,23 +62,12 @@ export interface HarnessProfile {
   samplePercent: number;
   totals: HarnessTotals[];
   sessions: HarnessSessions[];
-  /** Sessions per log bucket of each session metric. */
   sessionBuckets: HarnessSessionBucket[];
-  /** Main-agent prompt size (input + cache read + cache write), log buckets. */
   contextBuckets: HarnessBucket[];
-  /** Output tokens per response, log buckets; zero-token responses land in bucket -1. */
   outputBuckets: HarnessBucket[];
-  /** Main-agent responses by tool calls emitted (`key` is '0'..'3' or '4+'). */
   toolCallsPerResponse: HarnessShare[];
 }
 
-/**
- * Everything the Harnesses page compares, in one round trip. Per-session
- * figures are exact, from `session_summary`; per-request distributions come
- * from one fixed block sample of `requests` (tool calls read from the small
- * inline `metadata.toolUses`, which mirrors `request_stats.tool_uses`, to
- * avoid a second random-access pass).
- */
 export async function getHarnessProfile(
   db: Kysely<Database>,
   vis: string[] | null,

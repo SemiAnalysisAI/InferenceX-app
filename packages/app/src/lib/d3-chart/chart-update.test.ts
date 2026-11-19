@@ -10,6 +10,8 @@ import {
   setAttrIfChanged,
   setStyleIfChanged,
   setTextIfChanged,
+  writeAttrs,
+  writeText,
 } from './chart-update';
 import type { ChartLayout, ChartSetupConfig } from './types';
 
@@ -38,7 +40,6 @@ describe('renderAxes', () => {
 
       renderAxes(layout, xScale, yScale, {});
 
-      // D3 axisBottom/axisLeft create .tick groups and a .domain path
       expect(layout.xAxisGroup.select('.domain').empty()).toBe(false);
       expect(layout.yAxisGroup.select('.domain').empty()).toBe(false);
       expect(layout.xAxisGroup.selectAll('.tick').size()).toBeGreaterThan(0);
@@ -52,10 +53,25 @@ describe('renderAxes', () => {
 
       renderAxes(layout, xScale, yScale, { xTickCount: 3 });
 
-      // D3 .ticks(3) is a hint, not exact, but should produce roughly 3-5 ticks
       const tickCount = layout.xAxisGroup.selectAll('.tick').size();
       expect(tickCount).toBeGreaterThan(0);
       expect(tickCount).toBeLessThanOrEqual(8);
+    });
+
+    it('thins x ticks and grid lines to about one per 80px on a narrow plot', () => {
+      const layout = makeLayout({ containerWidth: 340 });
+      const xScale = d3.scaleLinear().domain([0, 700]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderAxes(layout, xScale, yScale, { xTickCount: 10 });
+      renderGrid(layout, xScale, yScale);
+
+      const labels = layout.xAxisGroup
+        .selectAll<SVGTextElement, unknown>('.tick text')
+        .nodes()
+        .map((node) => node.textContent);
+      expect(labels).toEqual(['0', '200', '400', '600']);
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBe(4);
     });
 
     it('renders only explicit x tick values within the visible domain', () => {
@@ -73,6 +89,32 @@ describe('renderAxes', () => {
         labels.push(d3.select(this).text());
       });
       expect(labels).toEqual(['2', '4']);
+    });
+
+    it('hides the label next to a clamped last x tick when they collide', () => {
+      Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
+        value: () => 60,
+        configurable: true,
+      });
+      try {
+        const layout = makeLayout();
+        const xScale = d3.scaleLinear().domain([0, layout.width]).range([0, layout.width]);
+        const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+        renderAxes(layout, xScale, yScale, {
+          xTickValues: [0, layout.width - 40, layout.width],
+          xTickFormat: String,
+        });
+
+        const ticks = layout.xAxisGroup.selectAll<SVGGElement, unknown>('.tick').nodes();
+        const text = (index: number) => ticks[index].querySelector('text')!;
+        expect(text(2).getAttribute('dx')).toBe('-30');
+        expect(text(1).getAttribute('visibility')).toBe('hidden');
+        expect(ticks[1].querySelector('line')).not.toBeNull();
+        expect(text(0).getAttribute('visibility')).toBeNull();
+      } finally {
+        Reflect.deleteProperty(SVGElement.prototype, 'getComputedTextLength');
+      }
     });
 
     it('respects yTickCount', () => {
@@ -101,7 +143,6 @@ describe('renderAxes', () => {
         tickTexts.push(d3.select(this).text());
       });
       expect(tickTexts.length).toBeGreaterThan(0);
-      // Every formatted tick should start with $
       for (const t of tickTexts) {
         expect(t).toMatch(/^\$/u);
       }
@@ -133,7 +174,6 @@ describe('renderAxes', () => {
 
       renderAxes(layout, xScale, yScale, {});
 
-      // D3 creates <line> inside each .tick with x2 = -tickSize for axisLeft
       const firstTickLine = layout.yAxisGroup.select('.tick line');
       if (!firstTickLine.empty()) {
         expect(Number(firstTickLine.attr('x2'))).toBe(-6);
@@ -206,7 +246,6 @@ describe('renderAxes', () => {
       });
       expect(tickTexts).toEqual(['Low', 'Med', 'High']);
 
-      // Default yTickSize for band is 0
       const firstTickLine = layout.yAxisGroup.select('.tick line');
       if (!firstTickLine.empty()) {
         expect(Number(firstTickLine.attr('x2'))).toBe(0);
@@ -246,7 +285,6 @@ describe('renderAxes', () => {
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
       const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
 
-      // Should not throw — the transition path creates a d3 transition
       renderAxes(layout, xScale, yScale, { transitionDuration: 300 });
 
       expect(layout.xAxisGroup.select('.domain').empty()).toBe(false);
@@ -285,7 +323,6 @@ describe('renderAxes', () => {
       renderAxes(layout, xScale, yScale, {});
       renderAxes(layout, xScale, yScale, {});
 
-      // D3 axis replaces content, so there should be exactly 1 .domain per axis group
       expect(layout.xAxisGroup.selectAll('.domain').size()).toBe(1);
       expect(layout.yAxisGroup.selectAll('.domain').size()).toBe(1);
     });
@@ -298,12 +335,10 @@ describe('renderAxes', () => {
       renderAxes(layout, xScale, yScale, {});
       const ticks1 = layout.xAxisGroup.selectAll('.tick').size();
 
-      // Change to wider domain
       xScale.domain([0, 1000]);
       renderAxes(layout, xScale, yScale, {});
       const ticks2 = layout.xAxisGroup.selectAll('.tick').size();
 
-      // Both should have ticks; exact count may differ
       expect(ticks1).toBeGreaterThan(0);
       expect(ticks2).toBeGreaterThan(0);
     });
@@ -456,12 +491,10 @@ describe('renderGrid', () => {
       renderGrid(layout, xScale, yScale, 3);
       const hLines3 = layout.gridGroup.select('.grid-h').selectAll('line').size();
 
-      // Reset
       const layout2 = makeLayout();
       renderGrid(layout2, xScale, yScale, 10);
       const hLines10 = layout2.gridGroup.select('.grid-h').selectAll('line').size();
 
-      // More ticks requested should produce at least as many lines (D3 ticks() is a hint)
       expect(hLines3).toBeGreaterThan(0);
       expect(hLines10).toBeGreaterThan(0);
       expect(hLines10).toBeGreaterThanOrEqual(hLines3);
@@ -531,7 +564,6 @@ describe('renderGrid', () => {
       const vLines = vGroup.selectAll('line').size();
       expect(vLines).toBe(domain.length);
 
-      // Each line should be at band center
       const lineXPositions: number[] = [];
       vGroup.selectAll('line').each(function () {
         lineXPositions.push(Number(d3.select(this).attr('x1')));
@@ -555,7 +587,6 @@ describe('renderGrid', () => {
       const hLines = hGroup.selectAll('line').size();
       expect(hLines).toBe(domain.length);
 
-      // Each line should span full width
       hGroup.selectAll('line').each(function () {
         const line = d3.select(this);
         expect(Number(line.attr('x1'))).toBe(0);
@@ -614,7 +645,6 @@ describe('renderGrid', () => {
 
       renderGrid(layout, xScale, yScale);
 
-      // After first render, lines should match [0, 100] ticks
       const ticks1 = xScale.ticks();
       const positions1: number[] = [];
       layout.gridGroup
@@ -628,11 +658,9 @@ describe('renderGrid', () => {
         expect(positions1[i]).toBeCloseTo(xScale(ticks1[i]));
       }
 
-      // Change domain — same range, different mapping
       xScale.domain([0, 1000]);
       renderGrid(layout, xScale, yScale);
 
-      // After second render, lines should match [0, 1000] ticks
       const ticks2 = xScale.ticks();
       const positions2: number[] = [];
       layout.gridGroup
@@ -655,7 +683,6 @@ describe('renderGrid', () => {
       renderGrid(layout, xScale, yScale);
       const initialCount = layout.gridGroup.select('.grid-v').selectAll('line').size();
 
-      // Use a much narrower domain that produces fewer ticks
       xScale.domain([0, 2]);
       renderGrid(layout, xScale, yScale);
       const updatedCount = layout.gridGroup.select('.grid-v').selectAll('line').size();
@@ -672,7 +699,6 @@ describe('renderGrid', () => {
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
       const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
 
-      // Should not throw and should produce grid lines
       renderGrid(layout, xScale, yScale, 5, 300);
 
       expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBeGreaterThan(0);
@@ -684,10 +710,8 @@ describe('renderGrid', () => {
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
       const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
 
-      // First render without transition
       renderGrid(layout, xScale, yScale);
 
-      // Second render with transition — exercises the update + transition branches
       xScale.domain([0, 200]);
       renderGrid(layout, xScale, yScale, 5, 200);
 
@@ -790,6 +814,143 @@ describe('write-if-changed helpers', () => {
     element.style.display = 'none';
     setStyleIfChanged(element, 'display', '');
     expect(element.style.display).toBe('');
+  });
+});
+
+describe('writeAttrs and writeText', () => {
+  it('write only changed attributes, remove nullish ones and keep attribute order', () => {
+    const element = document.createElementNS(SVG_NS, 'rect');
+    const selection = d3.select(element).datum(2);
+    writeAttrs(selection, { x: (d) => d * 10, class: 'bar', fill: 'red' });
+    expect(element.outerHTML).toBe('<rect x="20" class="bar" fill="red"></rect>');
+
+    const records = recordMutations(element, () =>
+      writeAttrs(selection, { x: (d) => d * 10, class: () => undefined, fill: null, y: 5 }),
+    );
+    expect(records.map((record) => record.attributeName)).toEqual(['class', 'fill', 'y']);
+    expect(element.outerHTML).toBe('<rect x="20" y="5"></rect>');
+  });
+
+  it('replace element children with one text node, as selection.text does', () => {
+    const element = document.createElementNS(SVG_NS, 'text');
+    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    tspan.textContent = 'TP8';
+    element.append(tspan);
+    const selection = d3.select(element).datum('TP8');
+
+    writeText(selection, (d) => d);
+    expect(element.outerHTML).toBe('<text>TP8</text>');
+    expect(recordMutations(element, () => writeText(selection, (d) => d))).toHaveLength(0);
+
+    writeText(selection, () => null);
+    expect(element.childNodes).toHaveLength(0);
+    expect(recordMutations(element, () => writeText(selection, () => ''))).toHaveLength(0);
+
+    element.append('TP8', tspan);
+    writeText(selection, (d) => d);
+    expect(element.outerHTML).toBe('<text>TP8</text>');
+  });
+});
+
+const prefixedLabel = (d: d3.AxisDomain) => `#${String(d)}`;
+
+const split = (group: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+  group.selectAll('.tick').attr('data-mark', (_, index) => String(index));
+  group.selectAll<SVGTextElement, unknown>('.tick text').each(function () {
+    const label = this.textContent ?? '';
+    this.textContent = '';
+    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    tspan.textContent = label;
+    this.append(tspan);
+  });
+};
+
+describe('renderAxes parity with d3-axis', () => {
+  it('renders the same DOM as d3 axis generators across domain, format and tick changes', () => {
+    const ours = makeLayout();
+    const theirs = makeLayout();
+    const steps: [
+      d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
+      number[] | undefined,
+    ][] = [
+      [d3.scaleLinear().domain([0, 100]).range([0, 720]), undefined],
+      [d3.scaleLinear().domain([20, 60]).range([0, 720]), undefined],
+      [d3.scaleLinear().domain([60, 20]).range([0, 720]), [25, 30, 55, 70]],
+      [d3.scaleLog().domain([1, 1000]).range([0, 720]), undefined],
+    ];
+    for (const [index, [xScale, tickValues]] of steps.entries()) {
+      const yScale = d3
+        .scaleLinear()
+        .domain([0, 10 * (index + 1)])
+        .range([540, 0]);
+      renderAxes(ours, xScale, yScale, {
+        xTickCount: index === 1 ? 4 : undefined,
+        xTickValues: tickValues,
+        xTickFormat: index === 2 ? prefixedLabel : undefined,
+        yTickCount: 3,
+        yTickSize: index === 3 ? 0 : undefined,
+      });
+      const xGen = d3.axisBottom(xScale).tickSize(6);
+      if (index === 1) xGen.ticks(4);
+      if (tickValues) xGen.tickValues(tickValues.filter((v) => v >= 20 && v <= 60));
+      if (index === 2) xGen.tickFormat(prefixedLabel);
+      theirs.xAxisGroup.call(xGen);
+      theirs.yAxisGroup.call(
+        d3
+          .axisLeft(yScale)
+          .tickSize(index === 3 ? 0 : 6)
+          .ticks(3),
+      );
+      expect(ours.xAxisGroup.node()!.outerHTML).toBe(theirs.xAxisGroup.node()!.outerHTML);
+      expect(ours.yAxisGroup.node()!.outerHTML).toBe(theirs.yAxisGroup.node()!.outerHTML);
+    }
+  });
+
+  it('matches d3 for band and time scales and after labels are customized', () => {
+    const ours = makeLayout();
+    const theirs = makeLayout();
+    const domains = [
+      ['b200 fp4', 'h100 fp8', 'mi355x fp4'],
+      ['h100 fp8', 'gb200 fp4', 'b200 fp4', 'mi300x fp8'],
+      ['h100 fp8', 'gb200 fp4', 'b200 fp4', 'mi300x fp8'],
+    ];
+    for (const [index, domain] of domains.entries()) {
+      const yScale = d3.scaleBand().domain(domain).range([0, 540]).padding(0.2);
+      const xScale = d3
+        .scaleTime()
+        .domain([new Date(2026, 0, 1), new Date(2026, index + 2, 1)])
+        .range([0, 720]);
+      renderAxes(ours, xScale, yScale, { xTickCount: 5 });
+      theirs.xAxisGroup.call(d3.axisBottom(xScale).tickSize(6).ticks(5));
+      theirs.yAxisGroup.call(d3.axisLeft(yScale).tickSize(0));
+      expect(ours.xAxisGroup.node()!.outerHTML).toBe(theirs.xAxisGroup.node()!.outerHTML);
+      expect(ours.yAxisGroup.node()!.outerHTML).toBe(theirs.yAxisGroup.node()!.outerHTML);
+      split(ours.yAxisGroup);
+      split(theirs.yAxisGroup);
+    }
+    const bandX = d3.scaleBand().domain(['a', 'b', 'c']).range([0, 720]).round(true);
+    renderAxes(ours, bandX, d3.scaleLinear().range([540, 0]), { xTickFormat: (d) => `#${d}` });
+    theirs.xAxisGroup.call(
+      d3
+        .axisBottom(bandX)
+        .tickSize(6)
+        .tickFormat((d) => `#${d}`),
+    );
+    expect(ours.xAxisGroup.node()!.outerHTML).toBe(theirs.xAxisGroup.node()!.outerHTML);
+  });
+
+  it('writes nothing when axes and grid are re-rendered with unchanged scales', () => {
+    const layout = makeLayout();
+    const xScale = d3.scaleLinear().domain([0, 100]).range([0, 720]);
+    const yScale = d3.scaleLinear().domain([0, 10]).range([540, 0]);
+    renderAxes(layout, xScale, yScale, {});
+    renderGrid(layout, xScale, yScale, 5);
+    expect(
+      recordMutations(layout.g.node()!, () => {
+        renderAxes(layout, xScale, yScale, {});
+        renderGrid(layout, xScale, yScale, 5);
+      }),
+    ).toHaveLength(0);
   });
 });
 

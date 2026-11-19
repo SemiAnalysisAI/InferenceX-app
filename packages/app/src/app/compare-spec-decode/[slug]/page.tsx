@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import {
@@ -16,11 +11,12 @@ import {
 } from '@/lib/compare/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n/i18n';
 import {
-  AGENTIC_SCENARIO_INTRO,
-  getCachedBenchmarks,
-  KNOWN_SEQUENCES,
-  pickString,
-} from '@/lib/compare/compare-ssr';
+  compareSocialImages,
+  specDecodeMetaDescription,
+  specDecodeMetaTitle,
+} from '@/lib/compare/compare-meta';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { AGENTIC_SCENARIO_INTRO, getCachedBenchmarks } from '@/lib/compare/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
@@ -40,14 +36,12 @@ import {
 
 import CompareSpecDecodePageClient from './page-client';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-/**
- * `/compare-spec-decode/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
+
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
@@ -60,7 +54,6 @@ function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): str
 
 interface Props {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -84,16 +77,12 @@ export function buildSpecDecodeMetadata(
     parsed.precision,
     parsed.method,
   );
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const canonicalPath = scenarioPath(canonical);
   const url = `${SITE_URL}${routePath}`;
   const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-  const description = `${parsed.model.label} on ${gpuLabel} ${precLabel}: ${aLabel} vs Off speculative decoding comparison. Verified, reproducible results from InferenceX, the independent open-source benchmark by SemiAnalysis. ${SUPPORTERS_LINE} See whether speculative decoding improves throughput and cost at every interactivity level.`;
-  const title = `${parsed.model.label} — ${gpuLabel} ${precLabel}: ${aLabel} vs Off — Speculative Decoding`;
+  const description = specDecodeMetaDescription(parsed.model.label, gpuLabel, precLabel, aLabel);
+  const title = specDecodeMetaTitle(parsed.model.label, gpuLabel, precLabel, aLabel);
   return {
     title,
     description,
@@ -101,34 +90,28 @@ export function buildSpecDecodeMetadata(
       canonical: canonicalUrl,
       languages: languageAlternates(canonicalPath),
     },
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-    },
+      locale: 'en',
+      images: compareSocialImages(
+        canonicalPath,
+        `${parsed.model.label} ${gpuLabel} ${precLabel} ${aLabel} vs Off`,
+      ),
+    }),
   };
 }
 
-export default async function CompareSpecDecodePage({ params, searchParams }: Props) {
+export default async function CompareSpecDecodePage({ params }: Props) {
   const { slug } = await params;
-  return renderSpecDecodePage(slug, await searchParams, {});
+  return renderSpecDecodePage(slug, {});
 }
 
-export async function renderSpecDecodePage(
-  slug: string,
-  sp: Record<string, string | string[] | undefined>,
-  { scenarioSegment }: ScenarioOptions,
-) {
+export async function renderSpecDecodePage(slug: string, { scenarioSegment }: ScenarioOptions) {
   const parsed = parseSpecDecodeCompareSlug(slug);
   if (!parsed) notFound();
 
-  // 308 canonical redirect: alias model, reversed 'none-vs-mtp' form.
   const canonical = canonicalSpecDecodeCompareSlug(
     parsed.model.slug,
     parsed.gpu,
@@ -136,17 +119,7 @@ export async function renderSpecDecodePage(
     parsed.method,
   );
   if (canonical !== slug.toLowerCase()) {
-    const qs = Object.entries(sp)
-      .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
-        if (v === undefined) return [];
-        return [[k, v] as const];
-      })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
-    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
+    permanentRedirect(scenarioPath(canonical, scenarioSegment));
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -156,16 +129,13 @@ export async function renderSpecDecodePage(
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
   const bLabel = 'Off';
 
-  // Precision is fixed by the slug — both sides share it.
   const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
   const sideB: VariantCompareSide = { specMethod: 'none', precision: parsed.precision };
 
   const defaults = pickVariantPairDefaults('spec-decode', rows, parsed.gpu, sideA, sideB);
 
-  const urlSeq = pickString(sp.i_seq);
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const effectiveSequence =
-    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : defaults.sequence);
+  const effectiveSequence = pathSequence ?? defaults.sequence;
   const effectivePrecision = parsed.precision;
 
   const sideAFull: VariantCompareSide = {

@@ -1,5 +1,20 @@
 import { GET as videoRuns } from '@/app/api/video-runs/route';
+import { compareSide, pairCases } from '@/components/video-benchmark/compare';
+import {
+  publishedResultsSide,
+  resultsClipEvidence,
+  resultsClipPoints,
+} from '@/components/video-benchmark/results-clips';
+import {
+  VIDEO_HISTORY_MAX_PAGES,
+  VIDEO_HISTORY_PAGE_SIZE,
+  type VideoHistoryPage,
+} from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
+import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { chartedCells } from '@/components/video-benchmark/results-chart';
+import { RESULT_CSV_COLUMNS, resultCsvRows } from '@/components/video-benchmark/results-csv';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   efficiencyValue,
@@ -18,11 +33,181 @@ import {
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import { videoDashboardProjection } from '@/lib/views-api/video-dashboard';
+import { toCsv } from '@/lib/views-api/csv';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
+
+async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare' | 'overview') {
+  const history = await readResponse<VideoHistoryPage>(
+    await videoRuns(
+      sourceRequest(request, '/api/video-runs', {
+        format: 'history',
+        page: '1',
+        pages: String(VIDEO_HISTORY_MAX_PAGES),
+      }),
+    ),
+  );
+  if (history.schemaVersion !== 1 || !Array.isArray(history.entries))
+    throw new Error('Unsupported published history projection');
+  const { nextPage } = history;
+  const pagesRead =
+    nextPage === null
+      ? Math.max(1, Math.ceil(history.entries.length / VIDEO_HISTORY_PAGE_SIZE))
+      : nextPage - 1;
+  if (view === 'overview') {
+    const state = parseResultsState(request.nextUrl.search);
+    let named = namedRunPoints([history], state.unofficialRun);
+    if (named.length === 0 && state.unofficialRun) {
+      // Like the UI, an unstored run is read live from its artifacts; a failed read is no overlay.
+      const live = await videoRuns(
+        sourceRequest(request, '/api/video-runs', { run: state.unofficialRun, format: 'live' }),
+      );
+      if (live.ok)
+        named = namedRunPoints(
+          [history, await readResponse<VideoHistoryPage>(live)],
+          state.unofficialRun,
+        );
+    }
+    const projection = resultProjection(videoPoints([history]), state, named);
+    if (request.nextUrl.searchParams.get('format') === 'csv')
+      return new Response(toCsv(resultCsvRows(projection), RESULT_CSV_COLUMNS), {
+        headers: {
+          ...headers,
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="videogenx-results.csv"',
+        },
+      });
+    const selected = resultsClipPoints(chartedCells(projection, state), { tier: state.costTier });
+    const stored = new Map<string, Promise<StoredArtifact | null>>();
+    const reads = await Promise.allSettled(
+      selected.map(async (point) => {
+        const key = JSON.stringify([point.runId, point.artifactId]);
+        if (!stored.has(key))
+          stored.set(
+            key,
+            (async () => {
+              const read = (format: 'published' | 'live') =>
+                videoRuns(
+                  sourceRequest(request, '/api/video-runs', {
+                    run: point.runId,
+                    artifact: String(point.artifactId),
+                    format,
+                  }),
+                );
+              let response = await read('published');
+              // Like the UI, an unstored named run carries PSNR without media.
+              if (response.status === 204 && point.runId === state.unofficialRun)
+                response = await read('live');
+              return response.status === 204 ? null : readResponse<StoredArtifact>(response);
+            })(),
+          );
+        const artifact = await stored.get(key)!;
+        return artifact === null ? null : publishedResultsSide(artifact, point);
+      }),
+    );
+    const sides = reads.flatMap((read) =>
+      read.status === 'fulfilled' && read.value ? [read.value] : [],
+    );
+    const clipQuality = {
+      status:
+        sides.length === selected.length ? 'ready' : sides.length > 0 ? 'partial' : 'unavailable',
+      groups: resultsClipEvidence(sides),
+    };
+    return NextResponse.json(
+      {
+        view: 'video',
+        apiVersion: 'v1',
+        ...projection,
+        clipQuality,
+        params: { ...projection.state, view },
+        coverage: {
+          pagesRead,
+          maxPages: VIDEO_HISTORY_MAX_PAGES,
+          nextPage,
+          truncated: nextPage !== null,
+        },
+      },
+      { headers },
+    );
+  }
+  const projection = videoDashboardProjection([history], request.nextUrl.search);
+  const { baseline, candidate } = projection.comparison;
+  let cases: {
+    status: 'not-requested' | 'no-pair' | 'not-published' | 'ready' | 'unavailable';
+    resolvedCaseIndex: number;
+    count: number;
+    selected: ReturnType<typeof pairCases>['pairs'][number] | null;
+    unmatched: ReturnType<typeof pairCases>['unmatched'] | null;
+  } = { status: 'not-requested', resolvedCaseIndex: 0, count: 0, selected: null, unmatched: null };
+  if (view === 'compare') {
+    cases.status = 'no-pair';
+    if (baseline && candidate) {
+      // Same artifact can contain both points. Read it once, through the published-only media path.
+      const artifacts = new Map<string, StoredArtifact | null>();
+      try {
+        for (const point of [baseline, candidate]) {
+          const key = `${point.runId}:${point.artifactId}`;
+          if (artifacts.has(key)) continue;
+          const response = await videoRuns(
+            sourceRequest(request, '/api/video-runs', {
+              run: point.runId,
+              artifact: String(point.artifactId),
+              format: 'published',
+            }),
+          );
+          artifacts.set(
+            key,
+            response.status === 204 ? null : await readResponse<StoredArtifact>(response),
+          );
+        }
+        const b = artifacts.get(`${baseline.runId}:${baseline.artifactId}`);
+        const c = artifacts.get(`${candidate.runId}:${candidate.artifactId}`);
+        cases.status = 'not-published';
+        if (b && c) {
+          const matched = pairCases(
+            compareSide(b, baseline).records,
+            compareSide(c, candidate).records,
+          );
+          const index = Math.min(
+            projection.params.caseIndex,
+            Math.max(matched.pairs.length - 1, 0),
+          );
+          cases = {
+            status: 'ready',
+            resolvedCaseIndex: index,
+            count: matched.pairs.length,
+            selected: matched.pairs[index] ?? null,
+            unmatched: matched.unmatched,
+          };
+        }
+      } catch {
+        // Like the collapsed UI panel, a media error does not erase published chart metrics.
+        cases.status = 'unavailable';
+      }
+    }
+  }
+  return NextResponse.json(
+    {
+      view: 'video',
+      apiVersion: 'v1',
+      ...projection,
+      params: { ...projection.params, view, displayView: projection.params.view },
+      coverage: {
+        pagesRead,
+        maxPages: VIDEO_HISTORY_MAX_PAGES,
+        nextPage,
+        truncated: nextPage !== null,
+      },
+      comparison: { ...projection.comparison, cases },
+    },
+    { headers },
+  );
+}
+
 function serializePoint({
   run: evidenceRun,
   ...point
@@ -42,6 +227,48 @@ export function GET(request: NextRequest) {
   return runViewsRoute('video', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['video']);
     const s = request.nextUrl.searchParams;
+    const mode = parseEnumParam(
+      s.get('view'),
+      'view',
+      ['dashboard', 'compare', 'overview', 'discovery', 'results', 'tradeoff'],
+      s.has('run') || s.has('artifact') ? 'results' : 'dashboard',
+    );
+    if (mode === 'overview') {
+      parseEnumParam(s.get('format'), 'format', ['json', 'csv'], 'json');
+      if (s.has('unofficialrun') && s.has('unofficialruns'))
+        throw new ViewsApiParamError('unofficialruns', 'Use one overlay parameter alias, not both');
+      for (const key of ['unofficialrun', 'unofficialruns'])
+        if (s.has(key)) parseRunIdParam(s.get(key), key);
+      for (const key of s.keys())
+        if (
+          key !== 'view' &&
+          key !== 'format' &&
+          key !== 'unofficialrun' &&
+          key !== 'unofficialruns' &&
+          !key.startsWith('r_')
+        )
+          throw new ViewsApiParamError(
+            key,
+            'Results overview accepts r_ selectors and one unofficialrun/unofficialruns ID',
+          );
+      return dashboardResponse(request, mode);
+    }
+    if (s.has('format')) throw new ViewsApiParamError('format', 'CSV requires view=overview');
+    for (const key of s.keys())
+      if (key.startsWith('r_') || key === 'unofficialrun' || key === 'unofficialruns')
+        throw new ViewsApiParamError(key, 'Results selectors require view=overview');
+    if (mode === 'dashboard' || mode === 'compare') {
+      for (const key of s.keys())
+        if (key !== 'view' && !key.startsWith('v_'))
+          throw new ViewsApiParamError(key, 'Use a legacy view for run/artifact selectors');
+      return dashboardResponse(request, mode);
+    }
+    for (const key of s.keys())
+      if (key.startsWith('v_'))
+        throw new ViewsApiParamError(
+          key,
+          'Dashboard selectors require view=dashboard or view=compare',
+        );
     // GitHub run id and artifact id share the positive-digits rule.
     const run = parseRunIdParam(s.get('run'), 'run');
     const artifact = parseRunIdParam(s.get('artifact'), 'artifact');
@@ -73,16 +300,16 @@ export function GET(request: NextRequest) {
     )
       throw new ViewsApiParamError('compare', 'Expected up to eight run:artifact pairs');
     const saved = [payload];
+    const unpublishedCompare: string[] = [];
     for (const ref of new Set(refs)) {
       const [r, a] = ref.split(':');
       if (r === run && a === artifact) continue;
-      saved.push(
-        await readResponse<StoredArtifact>(
-          await videoRuns(
-            sourceRequest(request, '/api/video-runs', { run: r, artifact: a, format: 'published' }),
-          ),
-        ),
+      const compared = await videoRuns(
+        sourceRequest(request, '/api/video-runs', { run: r, artifact: a, format: 'published' }),
       );
+      // An unstored ref is missing evidence, not a failed read of the primary artifact.
+      if (compared.status === 204) unpublishedCompare.push(ref);
+      else saved.push(await readResponse<StoredArtifact>(compared));
     }
     const runs = saved.flatMap((item) =>
       item.sources
@@ -176,7 +403,7 @@ export function GET(request: NextRequest) {
       ['participating', 'allocated'],
       'participating',
     );
-    const view = parseEnumParam(s.get('view'), 'view', ['results', 'tradeoff'], 'results');
+    const view = mode;
     const cell = s.get('cell'),
       slot = s.get('slot');
     const evidence = selectedSource
@@ -204,6 +431,7 @@ export function GET(request: NextRequest) {
           phase,
           gpuBasis,
         },
+        unpublishedCompare,
         sources: payload.sources,
         workloads,
         evidence,

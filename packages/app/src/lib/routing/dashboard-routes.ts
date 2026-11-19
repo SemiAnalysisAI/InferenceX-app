@@ -1,5 +1,5 @@
-export type DashboardNavGroup = 'primary' | 'feature-gated' | 'footer-only';
-export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_';
+export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
+export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
 export interface DashboardProviderCapabilities {
   readonly globalFilters: boolean;
@@ -9,22 +9,38 @@ export interface DashboardProviderCapabilities {
 export interface DashboardShellCapabilities {
   readonly providers: DashboardProviderCapabilities;
   readonly dashboardNudge: boolean;
-  /** Whether the InferenceX dashboard tab strip renders above the page. */
   readonly tabNav: boolean;
 }
 
 interface DashboardRouteDefinition {
   readonly key: string;
-  /** Route used for dashboard navigation. */
   readonly path: `/${string}`;
-  /** SEO canonical and sitemap route. The inference dashboard canonicalizes to `/`. */
   readonly canonicalPath: '/' | `/${string}`;
+  readonly legacyPath?: `/${string}`;
   readonly navGroup: DashboardNavGroup;
   readonly indexable: boolean;
   readonly localeMirrored: boolean;
   readonly providers: DashboardProviderCapabilities;
   readonly shareParamScopes: readonly DashboardShareParamScope[];
+  /** Unprefixed params the page keeps in the address bar itself; share links copy them as-is. */
+  readonly shareLiveParams?: readonly string[];
 }
+
+/**
+ * OperatorX controls kept in the address bar. The scatter and summary charts use
+ * separate prefixes, distinct from the compare API's `roofline*` projection selectors.
+ */
+export const OPERATORX_SHARE_CONTROLS = [
+  'modelPrecision',
+  'modelBin',
+  'modelSweep',
+  'scatterPrecision',
+  'scatterNormalized',
+  'scatterLog',
+  'summaryPrecision',
+  'summaryNormalized',
+  'summarySharedOnly',
+] as const;
 
 const FILTERED_DASHBOARD_PROVIDERS = {
   globalFilters: true,
@@ -46,37 +62,30 @@ interface DashboardShellCapabilityRoute extends DashboardShellCapabilities {
   readonly includeChildren: boolean;
 }
 
-/**
- * Shell-only route overrides. These live beside the dashboard registry so
- * provider and nudge decisions are data-driven rather than inferred in the
- * React shell. Locale-prefixed paths are normalized by the resolver.
- */
 export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   {
-    path: '/video',
+    path: '/vgx',
     includeChildren: false,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
     tabNav: true,
   },
   {
-    path: '/inference/agentic',
+    path: '/infx/inference/agentic',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
     tabNav: true,
   },
   {
-    path: '/collectivex',
+    path: '/colx',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
     tabNav: true,
   },
   {
-    // The explorer has its own section nav; the dashboard tab strip would
-    // stack a second, unrelated navigation bar above it.
-    path: '/agentic-workload-explorer',
+    path: '/infx/agentic-workload-explorer',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
@@ -84,42 +93,46 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   },
 ] as const satisfies readonly DashboardShellCapabilityRoute[];
 
-/**
- * Canonical, data-only registry for every dashboard route.
- *
- * Localized labels and metadata prose deliberately live in `tab-meta*.ts` and
- * `tab-nav.tsx`; this module can be consumed by server and client code without
- * importing React or locale content.
- */
 export const DASHBOARD_ROUTES = [
   {
     key: 'video',
-    path: '/video',
-    canonicalPath: '/video',
+    path: '/vgx',
+    canonicalPath: '/vgx',
+    legacyPath: '/video',
     navGroup: 'feature-gated',
     indexable: false,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: [],
+    shareParamScopes: ['v_', 'r_'],
   },
   {
     key: 'inference',
-    path: '/inference',
-    canonicalPath: '/',
+    path: '/infx/inference',
+    canonicalPath: '/infx/inference',
+    legacyPath: '/inference',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
-  // The two profit views sit between Inference Performance and Accuracy
-  // Evals; the TCO calculator and fleet lifecycle moved to the footer's
-  // "More" column.
+  {
+    key: 'powerx',
+    path: '/pwx',
+    canonicalPath: '/pwx',
+    legacyPath: '/powerx',
+    navGroup: 'feature-gated',
+    indexable: false,
+    localeMirrored: true,
+    providers: FILTERED_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_'],
+  },
   {
     key: 'profit-estimator-per-gigawatt',
-    path: '/profit-estimator-per-gigawatt',
-    canonicalPath: '/profit-estimator-per-gigawatt',
-    navGroup: 'primary',
+    path: '/infx/profit-estimator-per-gigawatt',
+    canonicalPath: '/infx/profit-estimator-per-gigawatt',
+    legacyPath: '/profit-estimator-per-gigawatt',
+    navGroup: 'merged',
     indexable: true,
     localeMirrored: true,
     providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
@@ -127,8 +140,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'profit-estimator',
-    path: '/profit-estimator',
-    canonicalPath: '/profit-estimator',
+    path: '/infx/profit-estimator',
+    canonicalPath: '/infx/profit-estimator',
+    legacyPath: '/profit-estimator',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -137,21 +151,20 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'evaluation',
-    path: '/evaluation',
-    canonicalPath: '/evaluation',
+    path: '/infx/evaluation',
+    canonicalPath: '/infx/evaluation',
+    legacyPath: '/evaluation',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'e_'],
   },
-  // Historical Trends moved to the footer as well: almost nobody opened the
-  // view, and people compare curves across dates on the inference dashboard
-  // instead. The route, canonical, /zh mirror, and sitemap entry stay.
   {
     key: 'historical',
-    path: '/historical',
-    canonicalPath: '/historical',
+    path: '/infx/historical',
+    canonicalPath: '/infx/historical',
+    legacyPath: '/historical',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -160,8 +173,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'calculator',
-    path: '/calculator',
-    canonicalPath: '/calculator',
+    path: '/infx/calculator',
+    canonicalPath: '/infx/calculator',
+    legacyPath: '/calculator',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -170,8 +184,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'fleet',
-    path: '/fleet',
-    canonicalPath: '/fleet',
+    path: '/infx/fleet',
+    canonicalPath: '/infx/fleet',
+    legacyPath: '/fleet',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -180,8 +195,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'first-token',
-    path: '/first-token',
-    canonicalPath: '/first-token',
+    path: '/infx/first-token',
+    canonicalPath: '/infx/first-token',
+    legacyPath: '/first-token',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -190,8 +206,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'cache-reuse',
-    path: '/cache-reuse',
-    canonicalPath: '/cache-reuse',
+    path: '/infx/cache-reuse',
+    canonicalPath: '/infx/cache-reuse',
+    legacyPath: '/cache-reuse',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -199,19 +216,10 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
-    key: 'reliability',
-    path: '/reliability',
-    canonicalPath: '/reliability',
-    navGroup: 'footer-only',
-    indexable: true,
-    localeMirrored: true,
-    providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: ['r_'],
-  },
-  {
     key: 'gpu-specs',
-    path: '/gpu-specs',
-    canonicalPath: '/gpu-specs',
+    path: '/infx/gpu-specs',
+    canonicalPath: '/infx/gpu-specs',
+    legacyPath: '/gpu-specs',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -220,8 +228,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'submissions',
-    path: '/submissions',
-    canonicalPath: '/submissions',
+    path: '/infx/submissions',
+    canonicalPath: '/infx/submissions',
+    legacyPath: '/submissions',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -230,31 +239,41 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'operatorx',
-    path: '/operatorx',
-    canonicalPath: '/operatorx',
-    navGroup: 'feature-gated',
+    path: '/opx',
+    canonicalPath: '/opx',
+    legacyPath: '/operatorx',
+    navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
+    shareLiveParams: [
+      'workload',
+      'parallel',
+      'metric',
+      'model',
+      'hardware',
+      'baseline',
+      ...OPERATORX_SHARE_CONTROLS,
+    ],
   },
 
   {
     key: 'collectivex',
-    path: '/collectivex',
-    canonicalPath: '/collectivex',
+    path: '/colx',
+    canonicalPath: '/colx',
+    legacyPath: '/collectivex',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
-  // Agentic Workload Explorer: a frozen, anonymized ProxyTrace snapshot read
-  // from its own database (DATABASE_PROXYTRACE_READONLY_URL).
   {
     key: 'agentic-workload-explorer',
-    path: '/agentic-workload-explorer',
-    canonicalPath: '/agentic-workload-explorer',
+    path: '/infx/agentic-workload-explorer',
+    canonicalPath: '/infx/agentic-workload-explorer',
+    legacyPath: '/agentic-workload-explorer',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
@@ -263,8 +282,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'ai-chart',
-    path: '/ai-chart',
-    canonicalPath: '/ai-chart',
+    path: '/infx/ai-chart',
+    canonicalPath: '/infx/ai-chart',
+    legacyPath: '/ai-chart',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
@@ -273,8 +293,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'current-inferencex-image',
-    path: '/current-inferencex-image',
-    canonicalPath: '/current-inferencex-image',
+    path: '/infx/current-inferencex-image',
+    canonicalPath: '/infx/current-inferencex-image',
+    legacyPath: '/current-inferencex-image',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
@@ -293,6 +314,9 @@ export const DASHBOARD_ROUTES = [
   },
 ] as const satisfies readonly DashboardRouteDefinition[];
 
+export const AGENTX_ROUTE = { path: '/infx/agentx', legacyPath: '/agentx' } as const;
+export const UBENCHX_ROUTE = { path: '/ubx', legacyPath: '/ubenchx' } as const;
+
 export type DashboardRoute = (typeof DASHBOARD_ROUTES)[number];
 export type DashboardRouteKey = DashboardRoute['key'];
 
@@ -304,11 +328,19 @@ export function isDashboardRouteKey(value: string): value is DashboardRouteKey {
   return DASHBOARD_ROUTE_KEYS.includes(value as DashboardRouteKey);
 }
 
-export function getDashboardRoute(key: DashboardRouteKey): DashboardRoute {
-  return DASHBOARD_ROUTES.find((route) => route.key === key)!;
+export function getDashboardRoute<K extends DashboardRouteKey>(
+  key: K,
+): Extract<DashboardRoute, { key: K }> {
+  return DASHBOARD_ROUTES.find(
+    (route): route is Extract<DashboardRoute, { key: K }> => route.key === key,
+  )!;
 }
 
-/** Resolve a dashboard route from an English or `/zh` pathname, including child routes. */
+/** Plain address-bar params a route's share links carry, beyond its prefixed URL state. */
+export function shareLiveParamsFor(route: DashboardRoute | undefined): readonly string[] {
+  return route && 'shareLiveParams' in route ? route.shareLiveParams : [];
+}
+
 export function dashboardRouteForPathname(pathname: string): DashboardRoute | undefined {
   const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
   const enPath = barePath === '/zh' ? '/' : barePath.replace(/^\/zh(?=\/)/u, '');
@@ -320,13 +352,21 @@ export function dashboardRouteForPathname(pathname: string): DashboardRoute | un
   );
 }
 
+const MERGED_DASHBOARD_TABS: Partial<Record<DashboardRouteKey, DashboardRouteKey>> = {
+  'profit-estimator-per-gigawatt': 'profit-estimator',
+};
+
+export function dashboardNavTabForPathname(pathname: string): DashboardRouteKey | undefined {
+  const key = dashboardRouteForPathname(pathname)?.key;
+  return key && (MERGED_DASHBOARD_TABS[key] ?? key);
+}
+
 const DEFAULT_DASHBOARD_SHELL_CAPABILITIES: DashboardShellCapabilities = {
   providers: FILTERED_DASHBOARD_PROVIDERS,
   dashboardNudge: true,
   tabNav: true,
 };
 
-/** Resolve providers and dashboard nudges for an English or Chinese pathname. */
 export function dashboardShellCapabilitiesForPathname(
   pathname: string,
 ): DashboardShellCapabilities {
@@ -348,9 +388,6 @@ export function dashboardShellCapabilitiesForPathname(
   if (!dashboardRoute) return DEFAULT_DASHBOARD_SHELL_CAPABILITIES;
   return {
     providers: dashboardRoute.providers,
-    // Provider ownership and nudge ownership are independent. Production
-    // mounted dashboard nudges on standalone tabs too; only explicit shell
-    // overrides suppress them.
     dashboardNudge: true,
     tabNav: true,
   };

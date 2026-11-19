@@ -2,9 +2,9 @@
 
 Use this cookbook to discover public communication sweeps, compare two returned
 runs, and export the evidence. These are existing observations; no new benchmark
-is run. Public GETs can populate the service's documented lazy cache from existing
-GitHub artifacts. No database credentials, admin operations, or launch tools are
-needed.
+is run. Each run is one uploaded CollectiveX results directory laid over the
+previous latest run; the service stores it when an operator uploads it, never on
+read. No database credentials, admin operations, or launch tools are needed.
 
 For a replayable contract 1 comparison:
 
@@ -44,8 +44,12 @@ node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
 Requires Node 24 or 26. The command checks the current OpenAPI operations, reads the run
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
-bounded example selection, not a representative sample. A cancelled or failed
-workflow can still contain measured cases; its conclusion remains in the export.
+bounded example selection, not a representative sample. The run ID is the upload
+time in epoch seconds (raised past the newest stored run when needed) and the dataset's
+`run.source_sha` is the `collectivex/` commit the uploaded results were measured with;
+the conclusion remains in the export. EP tail percentiles (`p90`, `p95`, `p99`) of latencies and derived rates can be
+`null` where the harness withheld them; `p50` is always a number. Report a `null` tail as
+unavailable, never as zero.
 
 Run-list counts identify candidate pairs; exact EP and KV identities in the returned
 details establish whether they have matched groups. For a requested pair, supply
@@ -65,33 +69,34 @@ never substitutes a different run.
 
 The public operations require `version=1`:
 
-| Operation                                                                                        | Meaning                                                                          |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | Newest available run by run ID; it need not contain measurements.                |
-| [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)     | Retained summaries and `discovery_complete`; the helper uses this for selection. |
-| `/collectivex/runs/{runId}`                                                                      | One run dataset, possibly refreshed to a newer attempt.                          |
+| Operation                                                                                              | Meaning                                                                                              |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1)       | Newest stored run by run ID; only runs with a measured result are stored.                            |
+| [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)           | Retained summaries and `discovery_complete`; the helper uses this for selection.                     |
+| `/collectivex/runs/{runId}`                                                                            | One run dataset; a re-ingest of the same commit can replace its contents.                            |
+| [`/collectivex/changelog`](https://inferencex.semianalysis.com/api/v1/collectivex/changelog?version=1) | The perf-changelog.yaml PR entries linked to stored runs, with each changed case's before/after p50. |
+
+The changelog lists an entry only for a run that changed at least one of the cases it selects.
 
 All paths above are under `/api/v1`. Consult the [public API reference](https://inferencex.semianalysis.com/api)
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the
-current contract. A missing/unsupported version is HTTP 400. HTTP 404, an upstream
-502/503, malformed data, a redirect, or an interrupted response is a failed read,
+current contract. A missing/unsupported version is HTTP 400. HTTP 404, a 5xx,
+malformed data, a redirect, or an interrupted response is a failed read,
 not an empty comparison. The command exits nonzero without a completed manifest on
 those failures; it never substitutes a different run.
 
-`discovery_complete=false` means further bounded discovery passes may reveal more
-runs. Report that flag even when two selections were available. The route has no
+The service now always reports `discovery_complete=true`; a `false` value would mean
+further passes may reveal more runs. Report the flag as returned. The route has no
 documented `limit`, `offset`, or cursor: do not invent pagination parameters. If
 fewer than two measured summaries were returned, the helper exports
 `fewer_than_two_measured_runs` and makes no detail requests. Further discovery, if
 needed, should have an explicit small request budget and retain each response.
 
-Even `discovery_complete=true` does **not** mean complete workflow history. Recent
-discovery has a bounded upstream window, artifacts expire, and retained runs can
-outlive their artifacts. The export therefore always sets `history_complete=false`.
-Stored fallback data can also be served when upstream refresh fails. Compare each
-detail's returned `run_attempt` with its discovery summary; a later attempt is a
-different snapshot, even under the same run ID. Equal attempt numbers do not prove
-identical snapshots; data can refresh within an attempt.
+Even `discovery_complete=true` does **not** prove complete history: the stored runs
+are whatever uploads the service still holds (an operator can delete a run). The export
+therefore always sets `history_complete=false`. Compare each detail's returned
+`run_attempt` with its summary; equal attempt numbers do not prove identical snapshots,
+because a stored run's contents can be rewritten under the same run ID and attempt.
 
 ## 2. Check comparability before interpreting differences
 
@@ -102,6 +107,10 @@ aggregation, best-of selection, or hardware ranking:
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | EP          | Full series configuration, including `series_id`, backend, phase, kernel mode, precision (dtype), hardware/vendor, and every `system` topology field; operation; `tokens_per_rank`; `global_tokens`; component `payload_bytes`.                                                      |
 | KV-transfer | Case configuration including `case_id`, backend, hardware/vendor, fabric, workload, precision, and topology; row `kind`, `isl`, `page_tokens`, `batch`, `op`, `descs`, and `req_bytes`. Cosmetic labels and outcome/reason text are retained as evidence but excluded from matching. |
+
+The kv-transfer suite was archived on 2026-11-10. Runs uploaded since then request no KV
+case and return an empty `kv` array; the KV-transfer rules in this cookbook apply only to
+earlier stored runs that still carry KV cases.
 
 Topology includes EP/rank count (`ep_size`), nodes, GPUs per node, scale-up domain,
 scale-up and scale-out transports, and topology class. Keep a declared null
@@ -138,7 +147,7 @@ the complete datasets' `coverage` and optional `kv` arrays for their outcome,
 disposition, reason, detail, and per-point terminal status. Retain pending,
 unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
 coverage statement. A successful workflow does not imply complete measurement
-coverage; absence of the optional `kv` field does not imply a failed KV suite.
+coverage; an empty or absent `kv` array does not imply a failed KV suite.
 Pending data and a cancelled run do not establish whether a case started or why
 measurements are missing. Keep those returned states separate from explanations.
 
@@ -183,6 +192,11 @@ effect. Equal SHAs also do not establish identical runtime conditions.
 | Swap `swap_blocks[].points[].latency_us`                         | Copy latency in microseconds at the named percentile.                                                                                         |
 | Swap `swap_blocks[].points[].payload_gbps_at_latency_percentile` | Payload GB/s at the named latency percentile, with bytes counted once.                                                                        |
 
+EP p90, p95 and p99 are null where the harness withheld that tail: too many of the
+series' samples were misaligned across ranks or host-stalled. The rates at a
+withheld tail are null too; p50 is always present. Report a null tail as withheld,
+not as zero or as a missing measurement.
+
 The saved OpenAPI operation description defines the optional swap metrics even
 when their property schemas omit descriptions. Swap points remain in the raw
 datasets, outside the formal EP/KV comparison groups. For supplemental summaries,
@@ -190,6 +204,17 @@ prefer the recorded point percentiles. A requested median across point p50 value
 uses the middle value for odd counts and the mean of the two middle values for even
 counts after sorting. Name that population and count; this is a median of point
 statistics, not the p50 of pooled timing samples.
+
+The swap chart defaults to **Best by SKU**. `GET /api/v1/views/collectivex`
+with `swapView=best` (the default) or `swapView=range` returns `swap.ranges`: one
+entry per run and SKU, holding at each block size the lowest (`lo`), median
+(`mid`) and highest (`hi`) value across that SKU's block counts, plus each block
+count's value in `members`, best first (highest bandwidth, lowest latency). The
+best view plots `members[0]` and names its block count; the range view plots the
+band and median. The median uses the same odd/even rule. `swapView=series` returns
+an empty `swap.ranges`, and `swap.points` always keeps every block-count series.
+The best value is a maximum (or minimum latency) over block counts, not a tuned
+optimum, and the range is a spread across block counts, not a confidence interval.
 
 `roundtrip_token_rate_at_latency_percentile` belongs to each point, beside
 `components`. The latency, activation/payload data rates, and `payload_bytes`

@@ -1,17 +1,17 @@
 import '@/lib/runtime/polyfills';
 import './globals.css';
 
-import { Analytics } from '@vercel/analytics/next';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 
+import { VercelAnalytics } from '@/components/analytics/vercel-analytics';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
+import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
-import { CircuitBackground } from '@/components/effects/circuit-background';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -25,14 +25,13 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
-import { fetchStarCount } from '@/lib/github/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
-import { VisitTracker } from '@/providers/visit-tracker';
 import {
-  LANDING_BANNER_DISMISSED_ATTRIBUTE,
-  LANDING_BANNER_STORAGE_KEY,
+  landingBannerPrepaintScript as buildLandingBannerPrepaintScript,
+  landingBannerPrepaintStyle as buildLandingBannerPrepaintStyle,
 } from '@/lib/nudges/landing-banner';
+import { unofficialDomainPrepaintScript as buildUnofficialDomainPrepaintScript } from '@/lib/runtime/unofficial-domain';
 
 const dm_sans = DM_Sans({
   subsets: ['latin'],
@@ -44,7 +43,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: `%s | ${SITE_NAME} by ${AUTHOR_NAME}`,
+    template: `%s | ${SITE_NAME}`,
   },
   description: DESCRIPTION,
   keywords: [
@@ -93,7 +92,6 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: SITE_URL,
     types: {
       'application/rss+xml': `${SITE_URL}/feed.xml`,
     },
@@ -169,30 +167,17 @@ const jsonLd = {
   ],
 };
 
-const landingBannerPrepaintScript = `try{if(localStorage.getItem(${JSON.stringify(
-  LANDING_BANNER_STORAGE_KEY,
-)})){document.documentElement.setAttribute(${JSON.stringify(
-  LANDING_BANNER_DISMISSED_ATTRIBUTE,
-)},'')}}catch{}`;
-const landingBannerPrepaintStyle = `html[${LANDING_BANNER_DISMISSED_ATTRIBUTE}] [data-initial-banner]{display:none}`;
+const landingBannerPrepaintScript = buildLandingBannerPrepaintScript();
+const landingBannerPrepaintStyle = buildLandingBannerPrepaintStyle();
+const unofficialDomainPrepaintScript = buildUnofficialDomainPrepaintScript();
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const starCount = await fetchStarCount();
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link
-          rel="preload"
-          as="image"
-          href="/brand/left-pattern-full.svg"
-          fetchPriority="high"
-          media="(min-width: 640px)"
-        />
-      </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <style
           id="landing-banner-prepaint-style"
@@ -203,30 +188,35 @@ export default async function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
-        <CircuitBackground />
+        <script
+          id="unofficial-domain-prepaint"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: unofficialDomainPrepaintScript }}
+        />
         <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="dark"
+              defaultTheme="light"
               themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <VisitTracker />
-              <Header starCount={starCount} />
+              <Header />
+              <UnofficialDomainNotice />
               <EasterEggThemeLazy />
               <div className="grow flex flex-col">
-                <RouteTransition>{children}</RouteTransition>
+                <ModelFeatureBoundary>
+                  <RouteTransition>{children}</RouteTransition>
+                </ModelFeatureBoundary>
               </div>
-              <Footer starCount={starCount} />
+              <Footer />
             </ThemeProvider>
           </QueryProvider>
-          {process.env.VERCEL && <Analytics />}
-          {process.env.VERCEL && <SpeedInsights />}
+          {process.env.VERCEL && <VercelAnalytics />}
         </PostHogProvider>
       </body>
     </html>

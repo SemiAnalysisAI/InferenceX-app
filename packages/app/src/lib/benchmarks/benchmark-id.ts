@@ -10,7 +10,7 @@
  * `number` yet neither is a real row. Passing them to the id-keyed endpoints
  * (`/api/v1/agentic-aggregates?ids=…`, `…?id=…`) yields a 400 (the routes
  * filter to `Number.isFinite(n) && n > 0`), and building an
- * `/inference/agentic/<id>` link out of one points at a non-existent row.
+ * `/infx/inference/agentic/<id>` link out of one points at a non-existent row.
  *
  * Use this predicate at every site that collects ids for a fetch or builds a
  * per-point detail link so overlay-only views skip cleanly instead of erroring.

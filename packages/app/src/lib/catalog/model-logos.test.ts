@@ -15,6 +15,12 @@ const MODELS_DIR = path.join(process.cwd(), 'content', 'models');
 const LOGOS_DIR = path.join(process.cwd(), 'public', 'logos');
 
 describe('model developer logos', () => {
+  it('uses the full-color Meta mark for Muse Spark and Llama', () => {
+    expect(getModelLogo(Model.Muse_Spark_Open)).toBe('meta-color.svg');
+    expect(isMonochromeLogo(getModelLogo(Model.Muse_Spark_Open)!)).toBe(false);
+    expect(getModelLogo(Model.Llama3_3_70B)).toBe('meta-color.svg');
+  });
+
   it('maps every model-page developer to a logo', () => {
     const developers = new Set(
       fs
@@ -60,12 +66,11 @@ describe('model developer logos', () => {
   it('uses the actual Z.ai mark for GLM models', () => {
     expect(getModelLogo(Model.GLM_5)).toBe('zai-color.svg');
     expect(getModelLogo(Model.GLM_5_2)).toBe('zai-color.svg');
+    expect(getModelLogo(Model.GLM_5_3_Flash)).toBe('zai-color.svg');
     expect(getModelDeveloperLogo('Z.ai (Zhipu AI)')).toBe('zai-color.svg');
   });
 
   it('keeps every model logo full-color except monochrome-by-design marks', () => {
-    // `currentColor` fills are the monochrome giveaway: a full-color mark
-    // ships its own brand fills and never inherits the text color.
     for (const model of Object.values(Model)) {
       const logo = getModelLogo(model);
       if (!logo || !logo.endsWith('.svg') || isMonochromeLogo(logo)) continue;

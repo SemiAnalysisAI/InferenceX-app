@@ -14,7 +14,7 @@
  */
 
 import { Readable } from 'node:stream';
-import { createGunzip, gunzipSync } from 'node:zlib';
+import { createGunzip } from 'node:zlib';
 
 import { chain } from 'stream-chain';
 
@@ -24,10 +24,9 @@ import { streamObject } from 'stream-json/streamers/stream-object.js';
 
 import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
 import type { DbClient } from '../connection.js';
-import { computeDerivedFromBlob } from './derived-agentic-metrics';
+import { readServerMetricsGz } from '../lib/server-metrics-storage';
+import { computeStoredProfileDistributions } from './derived-agentic-metrics';
 import {
-  extractIslOsl,
-  fetchAggregateStatsRows,
   percentilesOf,
   sequenceLengthSketches,
   STATS_VERSION,
@@ -61,14 +60,10 @@ export type AgenticAggregateMap = Record<number, AgenticAggregate>;
 
 /**
  * `profile_export_jsonl_gz` is small (~1-3 MB) so we can batch many per
- * round-trip. `server_metrics_json_gz` is much bigger (~17 MB compressed
- * for high-conc TP+EP runs; Neon encodes bytea over HTTP at ~1.6× wire
- * size, so two of those = ~50 MB and three already trips the 64 MB cap).
- * We fetch the two blob types in separate queries with different chunk
- * sizes.
+ * round-trip. `server_metrics_json_gz` can reach hundreds of MB, so it is read
+ * one trace at a time in bounded slices.
  */
 const PROFILE_CHUNK_SIZE = 8;
-const SERVER_CHUNK_SIZE = 1;
 
 interface TimeSlice {
   start_ns?: number;
@@ -159,6 +154,7 @@ export function extractServerMetricSamples(json: string): {
     'sglang:token_usage',
     'atom:kv_cache_usage_ratio',
     'trtllm_kv_cache_utilization',
+    'tokenspeed:kv_cache_usage_perc',
   );
   const kvCacheUtil = [...aggregateSeriesByStart(kvSeriesAll, 'avg', 'avg').values()];
 
@@ -221,6 +217,8 @@ const TARGET_METRIC_KEYS = new Set([
   'atom:prefix_cache_cached_tokens',
   'atom:prefix_cache_full_tokens',
   'atom:prefix_cache_hit_ratio',
+  // TokenSpeed (device KV utilization only; no prefix-hit counter is exported)
+  'tokenspeed:kv_cache_usage_perc',
   // TensorRT-LLM
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',
@@ -284,23 +282,35 @@ export async function getAgenticAggregates(
   // round-trip pulls everything we need for every requested id with no blob
   // decompression, so the slow blob-parsing fallback only runs for ids
   // whose stats are missing or were produced by an older `STATS_VERSION`.
-  const statsRows = await fetchAggregateStatsRows<AggregateStatsRow>(sql, benchmarkResultIds);
+  const statsRows = (await sql`
+    select
+      br.id as benchmark_result_id,
+      atr.id as trace_replay_id,
+      atr.aggregate_stats->'version' as version,
+      atr.aggregate_stats->'isl' as isl,
+      atr.aggregate_stats->'osl' as osl,
+      atr.aggregate_stats->'kvCacheUtil' as kv_cache_util,
+      atr.aggregate_stats->'prefixCacheHitRate' as prefix_cache_hit_rate
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = any(${benchmarkResultIds}::bigint[])
+  `) as unknown as AggregateStatsRow[];
 
   const idsNeedingProfile: number[] = [];
-  const idsNeedingServer: number[] = [];
+  const idsNeedingServer: { id: number; traceReplayId: number }[] = [];
   for (const row of statsRows) {
     const id = Number(row.benchmark_result_id);
     const agg = blankAggregate(id);
-    if (row.stats && Number(row.stats.version) === STATS_VERSION) {
-      agg.isl = row.stats.isl ?? null;
-      agg.osl = row.stats.osl ?? null;
-      agg.kvCacheUtil = row.stats.kvCacheUtil ?? null;
-      agg.prefixCacheHitRate = row.stats.prefixCacheHitRate ?? null;
+    if (Number(row.version) === STATS_VERSION) {
+      agg.isl = row.isl ?? null;
+      agg.osl = row.osl ?? null;
+      agg.kvCacheUtil = row.kv_cache_util ?? null;
+      agg.prefixCacheHitRate = row.prefix_cache_hit_rate ?? null;
     } else {
       // No stats (or stale version) — schedule the blob-parse fallback below
       // so the response still surfaces data. Backfill should drain these.
       idsNeedingProfile.push(id);
-      idsNeedingServer.push(id);
+      idsNeedingServer.push({ id, traceReplayId: Number(row.trace_replay_id) });
     }
     result[id] = agg;
   }
@@ -321,29 +331,31 @@ export async function getAgenticAggregates(
   // good stored data.
   const pendingById = new Map<number, { traceReplayId: number; stats: FullAggregateStats }>();
 
-  // ── Fallback Pass 1: profile_export blobs (cheap; large batches). ──────
+  // ── Fallback Pass 1: profile metadata batches, then bounded profile reads. ──
   for (let i = 0; i < idsNeedingProfile.length; i += PROFILE_CHUNK_SIZE) {
     const chunk = idsNeedingProfile.slice(i, i + PROFILE_CHUNK_SIZE);
     const rows = (await sql`
       select
         br.id as benchmark_result_id,
         atr.id as trace_replay_id,
-        atr.profile_export_jsonl_gz as profile_blob
+        (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_profile
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
     `) as {
       benchmark_result_id: number;
       trace_replay_id: number;
-      profile_blob: Buffer | null;
+      has_profile: boolean;
     }[];
     for (const row of rows) {
       const id = Number(row.benchmark_result_id);
       result[id] ??= blankAggregate(id);
-      if (row.profile_blob) {
+      if (row.has_profile) {
         try {
-          const jsonl = gunzipSync(row.profile_blob).toString('utf8');
-          const { isl, osl } = extractIslOsl(jsonl);
+          const { isl, osl, e2el_per_osl } = await computeStoredProfileDistributions(
+            sql,
+            Number(row.trace_replay_id),
+          );
           const islPct = percentilesOf(isl);
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
@@ -351,7 +363,6 @@ export async function getAgenticAggregates(
           // Recompute every profile-derived field from this same JSONL so the
           // self-healed bundle is complete at the new version. Server-derived
           // fields are filled in Pass 2 (or stay null without a server blob).
-          const derived = computeDerivedFromBlob(jsonl);
           pendingById.set(id, {
             traceReplayId: Number(row.trace_replay_id),
             stats: {
@@ -360,7 +371,7 @@ export async function getAgenticAggregates(
               osl: oslPct,
               kvCacheUtil: null,
               prefixCacheHitRate: null,
-              e2elPerOsl: derived.e2el_per_osl,
+              e2elPerOsl: e2el_per_osl,
               sequenceLengths: sequenceLengthSketches(isl, osl),
             },
           });
@@ -374,40 +385,29 @@ export async function getAgenticAggregates(
   // Serial to avoid OOM on the decompressed JSON of a high-conc TP+EP row
   // (>500 MB raw). The aggregator is fronted by a blob cache, so the slow
   // path runs at most once per sibling set.
-  for (let i = 0; i < idsNeedingServer.length; i += SERVER_CHUNK_SIZE) {
-    const chunk = idsNeedingServer.slice(i, i + SERVER_CHUNK_SIZE);
-    const rows = (await sql`
-      select
-        br.id as benchmark_result_id,
-        atr.server_metrics_json_gz as server_blob
-      from benchmark_results br
-      join agentic_trace_replay atr on atr.id = br.trace_replay_id
-      where br.id = any(${chunk}::bigint[])
-    `) as { benchmark_result_id: number; server_blob: Buffer | null }[];
-    for (const row of rows) {
-      const id = Number(row.benchmark_result_id);
-      result[id] ??= blankAggregate(id);
-      if (!row.server_blob) continue;
-      let parsed: { kvCacheUtil: number[]; prefixCacheHitRate: number[] } | null = null;
-      try {
-        const json = gunzipJsonWithinLimit(row.server_blob);
-        parsed =
-          json === null
-            ? await streamExtractServerMetricSamples(row.server_blob)
-            : extractServerMetricSamples(json);
-      } catch {
-        // malformed blob or failed stream fallback — leave nulls
-      }
-      if (parsed) {
-        const kvPct = percentilesOf(parsed.kvCacheUtil);
-        const prefixPct = percentilesOf(parsed.prefixCacheHitRate);
-        result[id].kvCacheUtil = kvPct;
-        result[id].prefixCacheHitRate = prefixPct;
-        const pending = pendingById.get(id);
-        if (pending) {
-          pending.stats.kvCacheUtil = kvPct;
-          pending.stats.prefixCacheHitRate = prefixPct;
-        }
+  for (const { id, traceReplayId } of idsNeedingServer) {
+    result[id] ??= blankAggregate(id);
+    const blob = await readServerMetricsGz(sql, traceReplayId);
+    if (!blob) continue;
+    let parsed: { kvCacheUtil: number[]; prefixCacheHitRate: number[] } | null = null;
+    try {
+      const json = gunzipJsonWithinLimit(blob);
+      parsed =
+        json === null
+          ? await streamExtractServerMetricSamples(blob)
+          : extractServerMetricSamples(json);
+    } catch {
+      // malformed blob or failed stream fallback — leave nulls
+    }
+    if (parsed) {
+      const kvPct = percentilesOf(parsed.kvCacheUtil);
+      const prefixPct = percentilesOf(parsed.prefixCacheHitRate);
+      result[id].kvCacheUtil = kvPct;
+      result[id].prefixCacheHitRate = prefixPct;
+      const pending = pendingById.get(id);
+      if (pending) {
+        pending.stats.kvCacheUtil = kvPct;
+        pending.stats.prefixCacheHitRate = prefixPct;
       }
     }
   }
@@ -426,13 +426,14 @@ export async function getAgenticAggregates(
   return result;
 }
 
-/** Shape of the JSONB column when read back via postgres-js. */
 interface AggregateStatsRow {
-  version: number;
+  benchmark_result_id: number;
+  trace_replay_id: number;
+  version: unknown;
   isl: MetricPercentiles | null;
   osl: MetricPercentiles | null;
-  kvCacheUtil: MetricPercentiles | null;
-  prefixCacheHitRate: MetricPercentiles | null;
+  kv_cache_util: MetricPercentiles | null;
+  prefix_cache_hit_rate: MetricPercentiles | null;
 }
 
 /**

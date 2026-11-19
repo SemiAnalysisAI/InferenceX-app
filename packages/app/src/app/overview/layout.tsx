@@ -1,11 +1,5 @@
 import { NudgeEngine } from '@/components/nudges/nudge-engine';
 
-/**
- * `/overview` sits outside DashboardShell: it has no TabNav, and it reads none
- * of the dashboard's shared state, so mounting GlobalFilterProvider and
- * UnofficialRunProvider only cost it two API requests it never used. The
- * container classes are copied from DashboardShell so the page is pixel-identical.
- */
 export default function OverviewLayout({ children }: { children: React.ReactNode }) {
   return (
     <>

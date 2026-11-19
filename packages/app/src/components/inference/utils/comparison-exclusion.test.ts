@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveExclusionGroups, resolveExclusionToggle } from '@/lib/benchmarks/exclusion';
+import {
+  buildExclusion,
+  resolveExclusionGroups,
+  resolveExclusionToggle,
+} from '@/lib/benchmarks/exclusion';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
+  blockedComparisonToggles,
   comparisonDefaultGroup,
   comparisonExclusion,
   comparisonExclusionPolicy,
@@ -19,9 +24,8 @@ describe('isEngineGuardLifted', () => {
     expect(isEngineGuardLifted(true, false)).toBe(true);
   });
 
-  it('lifts the guard when the ↑↑↓↓ feature gate is unlocked', () => {
+  it('lifts the guard when the ↑↑↓↓←→←→BA feature gate is unlocked', () => {
     expect(isEngineGuardLifted(false, true)).toBe(true);
-    // No exclusion means vLLM and SGLang configs may share one graph.
     expect(comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, true)).toBeNull();
     expect(comparisonDefaultGroup(Sequence.AgenticTraces, true)).toBeNull();
   });
@@ -45,9 +49,6 @@ describe('comparisonExclusion', () => {
   });
 
   it('keeps the vLLM default when arriving from an unrestricted chart', () => {
-    // 1K/1K leaves per-hardware STP keys unrestricted, so both engines are active
-    // before the user picks Agentic Traces. That prior selection names both groups
-    // and must not out-vote the chart's vLLM default.
     const fixedSeqSelection = new Set([
       'b200_sglang',
       'b200_vllm',
@@ -151,9 +152,6 @@ describe('comparisonExclusion', () => {
       comparisonDefaultGroup(Sequence.EightK_OneK, false),
     );
 
-    // TRTLLM and ATOM sit outside the 8K/1K rules entirely — standard-token and
-    // MTP alike — so they survive next to the kept vLLM configs. Only SGLang,
-    // the one other guarded family, is dropped.
     expect([...resolved.result].toSorted()).toEqual([
       'b200_trt',
       'b200_trt_mtp',
@@ -189,7 +187,6 @@ describe('comparisonExclusion', () => {
     'mi355x_mooncake-atom',
     'mi355x_mooncake-atom_mtp',
   ])('leaves %s unguarded on the 8K/1K chart', (key) => {
-    // Only vLLM and SGLang are guarded here, on standard-token and MTP alike.
     const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false)!;
 
     expect(exclusion.familyOf(key)).toBeNull();
@@ -197,8 +194,6 @@ describe('comparisonExclusion', () => {
     expect(exclusion.scopesOf(key)).toEqual([]);
   });
 
-  // ATOM and TRTLLM sit outside the guarded families on both scenarios, so they
-  // do not participate at all and stay comparable with every other engine.
   it.each([Sequence.AgenticTraces, Sequence.EightK_OneK])(
     'leaves ATOM and TRTLLM unguarded on %s',
     (sequence) => {
@@ -225,8 +220,6 @@ describe('comparisonExclusion', () => {
     },
   );
 
-  // The guard exists to stop two engines being read off one SKU's curve, so
-  // every participating key is scoped to its own hardware and never globally.
   it.each([Sequence.AgenticTraces, Sequence.EightK_OneK, Sequence.OneK_OneK])(
     'scopes both standard-token and MTP guards to a single SKU on %s',
     (sequence) => {
@@ -234,7 +227,7 @@ describe('comparisonExclusion', () => {
 
       for (const key of ['b200_vllm', 'b200_vllm_mtp', 'b200_sglang', 'b200_sglang_mtp']) {
         const scopes = exclusion.scopesOf(key);
-        if (scopes.length === 0) continue; // key not guarded on this scenario
+        if (scopes.length === 0) continue;
         expect(scopes).toEqual(['b200']);
       }
     },
@@ -425,8 +418,6 @@ describe('comparisonExclusion', () => {
       candidate: 'b200_trt',
       expected: 'fallthrough',
     },
-    // Agentic now guards the same two families as 8K/1K, so ATOM and TRTLLM are
-    // comparable with everything there too.
     {
       name: 'allows Agentic ATOM MTP next to vLLM MTP on the same SKU',
       sequence: Sequence.AgenticTraces,
@@ -558,5 +549,60 @@ describe('comparisonExclusion', () => {
 
   it('disables the engine-family guard for unofficial previews', () => {
     expect(comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, true)).toBeNull();
+  });
+});
+
+describe('blockedComparisonToggles', () => {
+  const exclusion = buildExclusion([
+    {
+      suffix: '_mtp',
+      stripPrefixes: ['dynamo-', 'mori-'],
+      groupAliases: { atom: 'sglang' },
+    },
+    {
+      suffix: null,
+      stripPrefixes: ['dynamo-', 'mori-'],
+      groupAliases: { atom: 'sglang' },
+      scope: 'hardware',
+    },
+  ]);
+
+  it('reports the conflict for an inactive config on the same SKU as another engine', () => {
+    const blocked = blockedComparisonToggles(
+      new Set(['b300_sglang']),
+      new Set(['b300_sglang', 'b300_vllm', 'b200_vllm']),
+      exclusion,
+      false,
+    );
+    expect([...blocked]).toEqual([['b300_vllm', { attempted: 'vllm', existing: 'sglang' }]]);
+  });
+
+  it('leaves vLLM/SGLang pairs unblocked where the consent dialog handles the click', () => {
+    expect(
+      blockedComparisonToggles(
+        new Set(['b300_sglang']),
+        new Set(['b300_sglang', 'b300_vllm']),
+        exclusion,
+        true,
+      ).size,
+    ).toBe(0);
+  });
+
+  it('still blocks conflicts the consent dialog does not cover', () => {
+    const blocked = blockedComparisonToggles(
+      new Set(['mi355x_atom_mtp']),
+      new Set(['mi355x_atom_mtp', 'mi355x_vllm_mtp']),
+      exclusion,
+      true,
+    );
+    expect(blocked.get('mi355x_vllm_mtp')).toEqual({ attempted: 'vllm', existing: 'atom' });
+  });
+
+  it('never marks active configs and reports nothing without an exclusion', () => {
+    const candidates = new Set(['b300_sglang', 'b300_vllm']);
+    expect(blockedComparisonToggles(candidates, candidates, exclusion, false).size).toBe(0);
+    expect(blockedComparisonToggles(new Set(['b300_sglang']), candidates, null, false).size).toBe(
+      0,
+    );
   });
 });

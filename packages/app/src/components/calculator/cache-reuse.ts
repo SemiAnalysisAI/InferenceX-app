@@ -6,28 +6,8 @@ import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import type { GPUDataPoint } from './types';
 import type { GroupMeta, OverlayGroupMeta } from './useThroughputData';
 
-/**
- * Prefix-cache reuse: where a configuration's prompt tokens came from at each
- * concurrency — HBM (the chip's own KV cache), the host tier behind it, or
- * nowhere (recomputed) — as shares of all prompt tokens.
- *
- * Every bar is one measured row. The host segment is the CPU-offload rate
- * (HiCache and its peers report host-memory hits there) and falls back to the
- * router's external rate only when a row reports no CPU figure. This differs
- * from `measuredCacheHitRate`, which prices cached input conservatively by
- * preferring the external figure: that guards a revenue number against
- * double-counting, whereas this chart names the tier a token was served from,
- * and on SGLang rows the host figure is the CPU one. Both tiers are never
- * summed here, so the bar cannot double count.
- *
- * TensorRT-LLM with offload enabled reports HBM and host as one combined figure
- * (the point summary labels it "Combined chip + CPU"), so those rows draw one
- * reused segment rather than inventing a split the data does not have.
- */
-
 export type CacheTier = 'hbm' | 'host' | 'unreused';
 
-/** Tier colors, fixed rather than per-hardware: the bars compare tiers, not chips. */
 export const CACHE_TIER_COLORS: Record<CacheTier, string> = {
   hbm: '#3f9fe0',
   host: '#f2b13a',
@@ -35,18 +15,12 @@ export const CACHE_TIER_COLORS: Record<CacheTier, string> = {
 };
 
 export interface CacheShare {
-  /** Prompt tokens served from the chip's KV cache, 0..1. */
   hbm: number;
-  /** Prompt tokens served from the host tier (CPU offload, else the router's external cache), 0..1. */
   host: number;
-  /** Prompt tokens recomputed, 0..1; the three shares sum to 1. */
   unreused: number;
-  /** The runtime folded host hits into the HBM figure, so `hbm` is both tiers. */
   combined: boolean;
   hostSource: 'cpu' | 'external' | null;
-  /** Infinite-cache ceiling from the trace itself, when the row carries one. */
   theoretical: number | null;
-  /** Reported tiers summed before clamping; above 1 the runtime over-reported. */
   reportedTotal: number;
 }
 
@@ -54,7 +28,6 @@ const finite = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
-/** Prompt-token shares for one row, or null when the runtime reported no tier at all. */
 export function cacheShareOf(point: GPUDataPoint): CacheShare | null {
   const row = point.sourceRow;
   if (!row) return null;
@@ -95,7 +68,6 @@ export function cacheShareOf(point: GPUDataPoint): CacheShare | null {
 }
 
 export interface CacheReuseSeries {
-  /** `official`, or `run:<index>` for an unofficial run. */
   key: string;
   label: string;
   runIndex?: number;
@@ -112,39 +84,23 @@ export interface CacheReuseBar {
 
 export interface CacheReuseResult {
   series: CacheReuseSeries[];
-  /** Ascending, the union across series. */
   concurrencies: number[];
   bars: CacheReuseBar[];
-  /** Rows of the chosen configuration that reported no cache tier, per series. */
   unmeasured: { seriesKey: string; concurrency: number; point: GPUDataPoint }[];
   anyCombined: boolean;
-  /** Official recipes, or matching overlay recipes when no official rows exist. */
   recipes: CacheReuseRecipe[];
-  /** The selected recipe; null when the configuration has no rows. */
   recipe: string | null;
 }
 
 export interface CacheReuseInput {
   official: readonly GPUDataPoint[];
-  /** Every overlay group; only those on the same hardware (and precision) are read. */
   overlay?: Record<string, GPUDataPoint[]>;
   overlayMeta?: Record<string, OverlayGroupMeta>;
   overlayLabels?: Record<number, string>;
-  /** The chosen configuration, matched against overlay group metadata. */
   config: GroupMeta;
-  /**
-   * The serving recipe plotted, a `recipeKeyOf` value. Absent or unknown means
-   * the recipe with the most tiered rows, using overlays only without official rows.
-   */
   recipe?: string;
 }
 
-/**
- * One serving recipe inside a configuration group. A group is hardware +
- * framework (+ precision) only, so the same concurrency can carry several
- * recipes — 4×DEP8 with KV offload off and on, 2×TP16 — each with its own cache
- * behaviour. Bars from different recipes are not comparable along one sweep.
- */
 export interface CacheReuseRecipe {
   key: string;
   label: string;
@@ -152,11 +108,6 @@ export interface CacheReuseRecipe {
   tiered: number;
 }
 
-/**
- * Everything that makes two rows of one group different deployments at the same
- * concurrency: parallelism, worker layout, disaggregation, speculative decoding,
- * KV offload, and the recipe fingerprint when the producer stamps one.
- */
 export function recipeKeyOf(point: GPUDataPoint): string {
   const row = point.sourceRow;
   if (!row) return `tp${point.tp}`;
@@ -229,7 +180,6 @@ export function recipeLabelOf(point: GPUDataPoint): string {
   return parts.join(' · ');
 }
 
-/** Recipes in a group, most tiered rows first, then most rows, then label. */
 export function cacheReuseRecipes(points: readonly GPUDataPoint[]): CacheReuseRecipe[] {
   const byKey = new Map<string, CacheReuseRecipe>();
   for (const point of points) {
@@ -244,7 +194,6 @@ export function cacheReuseRecipes(points: readonly GPUDataPoint[]): CacheReuseRe
   );
 }
 
-/** The requested recipe when the points carry it, else the best-covered one. */
 export function resolveRecipe(
   points: readonly GPUDataPoint[],
   requested: string | undefined,
@@ -254,11 +203,6 @@ export function resolveRecipe(
   return recipes[0]?.key ?? null;
 }
 
-/**
- * The stacked bars for one configuration: its official rows, plus each loaded
- * unofficial run's rows on the same hardware as their own series, so a branch
- * can be read against the published curve concurrency by concurrency.
- */
 export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const perSeries = new Map<string, readonly GPUDataPoint[]>();
 
@@ -275,9 +219,6 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const recipePoints = input.official.length > 0 ? input.official : [...perSeries.values()].flat();
   const recipes = cacheReuseRecipes(recipePoints);
   const recipe = resolveRecipe(recipePoints, input.recipe);
-  // One recipe per series. A run keeps the plotted recipe when it measured it,
-  // and otherwise its own best-covered recipe, so a branch that tries a new
-  // layout still draws without mixing layouts within its bars.
   const ofRecipe = (points: readonly GPUDataPoint[], wanted: string | null) => {
     const key = points.some((p) => recipeKeyOf(p) === wanted)
       ? wanted
@@ -304,8 +245,6 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const unmeasured: CacheReuseResult['unmeasured'] = [];
   const concurrencies = new Set<number>();
   for (const entry of series) {
-    // One bar per concurrency: within one recipe the latest official row is
-    // unique per concurrency; a run that repeats one keeps its first row.
     const seen = new Set<number>();
     for (const point of perSeries.get(entry.key) ?? []) {
       if (seen.has(point.concurrency)) continue;
@@ -342,11 +281,6 @@ export function tieredRowCount(points: readonly GPUDataPoint[]): number {
   return points.filter((p) => cacheShareOf(p) !== null).length;
 }
 
-/**
- * The configuration the page opens on: the one with the most rows reporting
- * cache tiers, preferring an SGLang-family config on a tie because SGLang
- * separates HBM from host hits. Null when no group reports any tier.
- */
 export function defaultCacheReuseGroup(
   groups: Record<string, GPUDataPoint[]>,
   meta: Record<string, GroupMeta>,

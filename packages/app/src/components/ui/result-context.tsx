@@ -1,70 +1,68 @@
 import type { ReactNode } from 'react';
 
+import { TcoPriceTableSlotsProvider } from '@/components/ui/editable-tco-badges';
 import type { Locale } from '@/lib/i18n/i18n';
+import { formatDisplayDate } from '@/lib/shared/display-date';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * Trigger styling for a select that sits inside the caption's Cost Tier
- * line: sized to the caption's text line rather than a form control, with a
- * visible outline so readers can tell the tier is a control, not a label.
- */
 export const captionControlTriggerClassName =
   'h-6 md:h-6 w-auto gap-1 rounded-sm border-input bg-transparent px-1.5 py-0 text-xs font-medium text-foreground shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/60 [&_svg]:size-3';
 
+export const sourceLinkClassName = 'text-brand-fill hover:underline';
+
 export interface ResultContextProps {
   locale: Locale;
-  /** Omitted when the chart heading already names the model. */
   model?: string;
   workload?: string;
+  scenario?: ReactNode;
   precision?: string;
   metric?: string;
-  /** Pricing basis of a cost or purchasing-power metric (e.g. "Owning at Large Hyperscaler Volume"). */
   costTier?: string;
-  /**
-   * Interactive replacement for the `costTier` text, e.g. the inline Cost
-   * Tier selector on the inference dashboard. The plain `costTier` label is
-   * still rendered as an `export-only` twin so PNG exports keep the text
-   * while the control itself stays `no-export`.
-   */
   costTierControl?: ReactNode;
-  /** Fleet utilization the revenue figures assume (e.g. "60%"). */
+  tcoBasis?: ReactNode;
+  chipBasis?: ReactNode;
   utilization?: string;
-  /** Inline editor for `utilization`; rendered like `costTierControl`. */
   utilizationControl?: ReactNode;
-  /** Id of the input inside `utilizationControl`, so the caption label names it. */
   utilizationControlId?: string;
-  /** Share of revenue paid to the model lab (e.g. "30%"). */
   licenseFee?: string;
-  /** Inline editor for `licenseFee`; rendered like `costTierControl`. */
   licenseFeeControl?: ReactNode;
-  /** Id of the input inside `licenseFeeControl`, so the caption label names it. */
   licenseFeeControlId?: string;
   target?: string;
   date?: string;
   dates?: readonly string[];
   dateRange?: { start: string; end: string };
   source?: string;
+  deprecated?: boolean;
   costBasis?: string;
   costBasisTestId?: string;
+  layout?: 'footer';
+  /** Footer only. The table takes the cost tier as its row label and `metaEnd` as its footnote. */
+  priceTable?: ReactNode;
+  markers?: ReactNode;
+  metaEnd?: ReactNode;
 }
 
-/**
- * One caption entry. With a `control`, the interactive element renders in a
- * `.no-export` span and the plain `value` stays as an `export-only` twin, so
- * PNG exports print the text the control stands for. `controlId` turns the
- * term into a `<label>` for the control's input.
- */
-function CaptionField({
+const META_ITEM = "after:ml-2 after:text-muted-foreground/60 after:content-['·']";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+
+const metaDate = (value: string, locale: Locale) =>
+  ISO_DATE.test(value) ? formatDisplayDate(value, locale) : value;
+
+export function CaptionField({
   label,
   value,
   control,
   controlId,
   testId,
+  hideLabel = false,
 }: {
   label: string;
   value: string;
   control?: ReactNode;
   controlId?: string;
   testId: string;
+  hideLabel?: boolean;
 }) {
   if (!control) {
     return (
@@ -78,27 +76,43 @@ function CaptionField({
   }
   return (
     <div className="inline-flex flex-wrap items-center gap-x-1">
-      {/* The space keeps textContent identical to the plain-text variant. */}
-      <dt className="font-medium text-foreground">
-        {controlId ? <label htmlFor={controlId}>{label}:</label> : <>{label}:</>}
-      </dt>{' '}
-      <dd className="inline-flex items-center" data-testid={testId}>
-        <span className="no-export inline-flex items-center">{control}</span>
+      {hideLabel ? (
+        <dt>
+          {controlId ? (
+            <label htmlFor={controlId} className="sr-only">
+              {label}
+            </label>
+          ) : (
+            <span className="sr-only">{label}</span>
+          )}
+          <span aria-hidden className="export-only hidden font-medium text-foreground">
+            {label}:
+          </span>
+        </dt>
+      ) : (
+        <dt className="font-medium text-foreground">
+          {controlId ? <label htmlFor={controlId}>{label}:</label> : <>{label}:</>}
+        </dt>
+      )}{' '}
+      <dd className="inline" data-testid={testId}>
+        <span className="no-export inline-flex items-center align-middle">{control}</span>
         <span className="export-only hidden">{value}</span>
       </dd>
     </div>
   );
 }
 
-/** Compact, reusable context for the values shown in a result chart. */
 export function ResultContext({
   locale,
   model,
   workload,
+  scenario,
   precision,
   metric,
   costTier,
   costTierControl,
+  tcoBasis,
+  chipBasis,
   utilization,
   utilizationControl,
   utilizationControlId,
@@ -110,8 +124,13 @@ export function ResultContext({
   dates,
   dateRange,
   source,
+  deprecated = false,
   costBasis,
   costBasisTestId,
+  layout,
+  priceTable,
+  markers,
+  metaEnd,
 }: ResultContextProps) {
   const labels =
     locale === 'zh'
@@ -144,8 +163,11 @@ export function ResultContext({
           licenseFee: 'Model License Fee Assumption',
         };
   const hasRange = Boolean(dateRange?.start && dateRange.end);
-  const selectedDates = dates && dates.length > 1 ? dates.join(', ') : date;
-  const dateValue = hasRange ? `${dateRange!.start} → ${dateRange!.end}` : selectedDates;
+  const selectedDates =
+    dates && dates.length > 1 ? dates.map((d) => metaDate(d, locale)).join(', ') : date;
+  const dateValue = hasRange
+    ? `${metaDate(dateRange!.start, locale)} → ${metaDate(dateRange!.end, locale)}`
+    : selectedDates && metaDate(selectedDates, locale);
   const dateLabel = hasRange
     ? labels.range
     : dates && dates.length > 1
@@ -154,11 +176,124 @@ export function ResultContext({
         : 'Dates'
       : labels.date;
 
+  if (layout === 'footer') {
+    const singleDate = !hasRange && !(dates && dates.length > 1);
+    return (
+      <div data-testid="result-context" className="mb-2 text-xs text-muted-foreground">
+        <dl className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 empty:hidden">
+          {scenario}
+          {precision && (
+            <div>
+              <dt className="inline font-medium text-foreground">{labels.precision}:</dt>{' '}
+              <dd className="inline">{precision}</dd>
+            </div>
+          )}
+          {costTier && !priceTable && (
+            <CaptionField
+              label={labels.costTier}
+              value={costTier}
+              control={costTierControl}
+              testId="result-context-cost-tier"
+              hideLabel
+            />
+          )}
+          {utilization && (
+            <CaptionField
+              label={labels.utilization}
+              value={utilization}
+              control={utilizationControl}
+              controlId={utilizationControlId}
+              testId="result-context-utilization"
+              hideLabel
+            />
+          )}
+          {licenseFee && (
+            <CaptionField
+              label={labels.licenseFee}
+              value={licenseFee}
+              control={licenseFeeControl}
+              controlId={licenseFeeControlId}
+              testId="result-context-license-fee"
+              hideLabel
+            />
+          )}
+          {tcoBasis}
+          {chipBasis}
+        </dl>
+        <div
+          className={cn(priceTable && 'flex flex-wrap items-end justify-between gap-x-6 gap-y-2')}
+        >
+          {priceTable && (
+            <div className="max-w-full min-w-0">
+              <TcoPriceTableSlotsProvider
+                rowLabel={
+                  costTier && (
+                    <span data-testid="result-context-cost-tier">
+                      {costTierControl ? (
+                        <>
+                          <span className="no-export inline-flex items-center align-middle">
+                            {costTierControl}
+                          </span>
+                          <span className="export-only hidden">{costTier}</span>
+                        </>
+                      ) : (
+                        costTier
+                      )}
+                    </span>
+                  )
+                }
+                footnote={metaEnd}
+              >
+                {priceTable}
+              </TcoPriceTableSlotsProvider>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <dl className={cn('contents', !markers && '[&>:last-child]:after:content-none')}>
+              {dateValue && (
+                <div className={META_ITEM}>
+                  <dt className="inline">
+                    {singleDate ? (locale === 'zh' ? '更新时间' : 'Updated') : `${dateLabel}:`}
+                  </dt>{' '}
+                  <dd className="inline tabular-nums">{dateValue}</dd>
+                </div>
+              )}
+              {source && (
+                <div className={META_ITEM}>
+                  <dt className="sr-only">{labels.source}</dt>
+                  <dd className="inline">
+                    {source}
+                    {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (Deprecated)')}
+                  </dd>
+                </div>
+              )}
+              {costBasis && (
+                <div className={META_ITEM}>
+                  <dt className="inline">{labels.cost}:</dt>{' '}
+                  <dd className="inline" data-testid={costBasisTestId}>
+                    {costBasis}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {markers && (
+              <div data-testid="result-context-markers" className="inline-flex items-center">
+                {markers}
+              </div>
+            )}
+            {metaEnd && !priceTable && <div className="ml-auto">{metaEnd}</div>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <dl
       data-testid="result-context"
       className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
     >
+      {scenario}
       {model && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.model}:</dt>{' '}
@@ -191,6 +326,7 @@ export function ResultContext({
           testId="result-context-cost-tier"
         />
       )}
+      {tcoBasis}
       {utilization && (
         <CaptionField
           label={labels.utilization}
@@ -231,7 +367,10 @@ export function ResultContext({
       {source && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.source}:</dt>{' '}
-          <dd className="inline">{source}</dd>
+          <dd className="inline">
+            {source}
+            {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (Deprecated)')}
+          </dd>
         </div>
       )}
       {costBasis && (

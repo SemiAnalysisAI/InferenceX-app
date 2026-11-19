@@ -6,10 +6,6 @@ import { Pool } from 'pg';
 import { resolveDatabaseConnection } from '../connection';
 import type { Database } from './types';
 
-/**
- * The Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot
- * from its own Neon read replica. It never writes, so only a read-only URL exists.
- */
 export const PROXYTRACE_DB_ENV_VAR = 'DATABASE_PROXYTRACE_READONLY_URL';
 
 function resolveProxyTraceConnection() {
@@ -29,10 +25,8 @@ function createPoolDb(): Kysely<Database> {
   });
 }
 
-// Survive Next.js HMR, like the shared clients in ../connection.ts.
 const g = globalThis as unknown as { __proxyTraceDb?: Kysely<Database> };
 
-/** Shared query builder: the Neon HTTP driver for Neon hosts, a pg pool otherwise. */
 export function getDb(): Kysely<Database> {
   if (!g.__proxyTraceDb) {
     const { url, driver } = resolveProxyTraceConnection();
@@ -44,10 +38,6 @@ export function getDb(): Kysely<Database> {
   return g.__proxyTraceDb;
 }
 
-/**
- * Pool-backed connection for full-history analytics where the Neon HTTP driver
- * is a poor fit (many statements per request). Callers must `destroy()` it.
- */
 export function createDirectDb(): Kysely<Database> {
   return createPoolDb();
 }

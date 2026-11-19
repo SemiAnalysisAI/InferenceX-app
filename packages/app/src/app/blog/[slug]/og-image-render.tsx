@@ -1,6 +1,3 @@
-/**
- * Blog OG image — circuit tile sidebar with content panel.
- */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -14,20 +11,19 @@ const BLUE = '#0B86D1';
 const BG = '#131416';
 const PANEL_BG = '#0F1214';
 
-// Tile grid layout (row-major, 2 cols). rotate: degrees to apply at render time.
 const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
-  { file: 'teal-chevron.png', rotate: 180 }, // r0c0
-  { file: 'gold-diagonal.png' }, // r0c1
-  { file: 'teal-circuit.png' }, // r1c0
-  null, // r1c1
-  { file: 'gold-wavy.png' }, // r2c0
-  { file: 'teal-chip.png' }, // r2c1
-  { file: 'teal-chevron.png', rotate: 90 }, // r3c0
-  { file: 'teal-organic.png' }, // r3c1
-  null, // r4c0
-  { file: 'gold-circuit.png' }, // r4c1
-  { file: 'teal-circuit.png', rotate: 180 }, // r5c0
-  { file: 'teal-organic.png', rotate: 180 }, // r5c1
+  { file: 'teal-chevron.png', rotate: 180 },
+  { file: 'gold-diagonal.png' },
+  { file: 'teal-circuit.png' },
+  null,
+  { file: 'gold-wavy.png' },
+  { file: 'teal-chip.png' },
+  { file: 'teal-chevron.png', rotate: 90 },
+  { file: 'teal-organic.png' },
+  null,
+  { file: 'gold-circuit.png' },
+  { file: 'teal-circuit.png', rotate: 180 },
+  { file: 'teal-organic.png', rotate: 180 },
 ];
 
 async function loadTile(name: string): Promise<string> {
@@ -35,7 +31,6 @@ async function loadTile(name: string): Promise<string> {
   return `data:image/png;base64,${buf.toString('base64')}`;
 }
 
-// Dedupe file loads — same file used multiple times only loads once
 async function loadTiles() {
   const uniqueFiles = [...new Set(TILE_GRID.filter(Boolean).map((t) => t!.file))];
   const loaded = await Promise.all(uniqueFiles.map(async (f) => [f, await loadTile(f)] as const));
@@ -46,10 +41,6 @@ async function loadTiles() {
 export async function renderOgImage(
   meta: Pick<BlogPostMeta, 'title' | 'subtitle' | 'date'>,
   opts?: {
-    /**
-     * Pre-formatted footer label. When set, `meta.date` is ignored — used by
-     * non-blog reusers (e.g. /model pages) whose dates are free-form text.
-     */
     dateLabel?: string;
   },
 ) {
@@ -61,13 +52,12 @@ export async function renderOgImage(
   ]);
   const titleSize = meta.title.length > 50 ? 56 : meta.title.length > 35 ? 64 : 72;
 
-  // Estimate how much subtitle fits after the title
-  const contentWidth = 895; // 1200 - 195 panel - 55*2 padding
-  const textBoxHeight = 482; // 630 - 48 top - 20 bottom - 80 logo row
+  const contentWidth = 895;
+  const textBoxHeight = 482;
   const titleLineH = Math.ceil(titleSize * 1.2);
   const charsPerTitleLine = Math.floor(contentWidth / (titleSize * 0.55));
   const titleLines = Math.ceil(meta.title.length / charsPerTitleLine);
-  const titleHeight = titleLines * titleLineH + 18; // +18 for gap
+  const titleHeight = titleLines * titleLineH + 18;
   const subtitleLineH = Math.ceil(42 * 1.4);
   const subtitleSpace = textBoxHeight - titleHeight;
   const maxSubtitleLines = Math.max(0, Math.floor(subtitleSpace / subtitleLineH));
@@ -92,7 +82,6 @@ export async function renderOgImage(
         overflow: 'hidden',
       }}
     >
-      {/* Left panel */}
       <div
         style={{
           display: 'flex',
@@ -102,7 +91,6 @@ export async function renderOgImage(
           position: 'relative',
         }}
       >
-        {/* Grid of circuit tile images */}
         {tiles.map((tile, i) => {
           if (!tile) return null;
           const row = Math.floor(i / 2);
@@ -125,7 +113,6 @@ export async function renderOgImage(
             />
           );
         })}
-        {/* Blue accent bar */}
         <div
           style={{
             position: 'absolute',
@@ -139,7 +126,6 @@ export async function renderOgImage(
         />
       </div>
 
-      {/* Content */}
       <div
         style={{
           display: 'flex',

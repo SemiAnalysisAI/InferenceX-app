@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "package_version": "1.2.0",
+  "files": {
+    "SKILL.md": "d0851c1c728ee65244e7526a0debf8551ce9068ac9e94406984632cda51fb7b3",
+    "agents/openai.yaml": "02288ecf7628bd11cdea9aa1339b7310650d069b29959924600c03639928c03e",
+    "scripts/waterfall.mjs": "44632960b2fe45a7b96f7b1e11b7e7c801006b3edd0dc470648b1d9d58e7aa17"
+  }
+}

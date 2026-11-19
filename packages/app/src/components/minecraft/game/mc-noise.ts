@@ -1,5 +1,3 @@
-/** Seeded simplex noise (2D and 3D) and a small deterministic PRNG. */
-
 export function hashSeed(text: string): number {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) {
@@ -9,7 +7,6 @@ export function hashSeed(text: string): number {
   return h >>> 0;
 }
 
-/** mulberry32: fast deterministic PRNG returning [0, 1). */
 export function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -21,7 +18,6 @@ export function rng(seed: number) {
   };
 }
 
-/** Integer hash of a 3D lattice position; stable across sessions. */
 export function hash3(seed: number, x: number, y: number, z: number): number {
   let h = seed ^ Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -154,7 +150,6 @@ export class Simplex {
     return 32 * n;
   }
 
-  /** Fractal Brownian motion in 2D, roughly in [-1, 1]. */
   fbm2(x: number, y: number, octaves: number, lacunarity = 2, gain = 0.5): number {
     let amp = 1;
     let freq = 1;

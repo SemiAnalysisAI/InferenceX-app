@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
 import { track } from '@/lib/analytics/analytics';
@@ -12,12 +12,11 @@ const STRINGS = {
   zh: { chart: '前缀缓存复用 →', point: '查看此配置的前缀缓存复用 →' },
 } as const;
 
-/** Agentic-only link into the Prefix Cache Reuse tab, from the chart footer or a point. */
 export function CacheReuseLink({ point, className }: { point?: PointMeta; className?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   return (
-    <Link
+    <IntentPrefetchLink
       href={cacheReuseHref(locale, point)}
       data-testid="cache-reuse-link"
       className={
@@ -31,6 +30,6 @@ export function CacheReuseLink({ point, className }: { point?: PointMeta; classN
       }
     >
       {point ? t.point : t.chart}
-    </Link>
+    </IntentPrefetchLink>
   );
 }

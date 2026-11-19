@@ -4,9 +4,10 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
+import { OptionInfo } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { matchesSearch } from '@/lib/shared/search-match';
 import { cn } from '@/lib/shared/utils';
 import {
   CONTROL_HEIGHT,
@@ -16,6 +17,7 @@ import {
   CONTROL_SEARCH_STYLE,
   CONTROL_SEARCH_CLEAR_STYLE,
 } from './control-styles';
+import { useOptionIntent } from './option-intent';
 
 const STRINGS = {
   en: {
@@ -39,7 +41,6 @@ export interface SearchableSelectOption {
   label: string;
   help?: React.ReactNode;
   testId?: string;
-  /** Optional trailing visual (e.g. a lock glyph) rendered after the label. */
   badge?: React.ReactNode;
 }
 
@@ -51,21 +52,15 @@ export interface SearchableSelectGroup {
 
 interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
-  /** Search options may include aliases for the same value; groups owns the selected label. */
   searchGroups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
-  /** Hydration-safe label for selectors with a known server-side default. */
   initialLabel?: string;
   className?: string;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
-  /**
-   * Accessible name for the trigger when no visible <label htmlFor> points at
-   * it, e.g. when the select sits inline in a caption next to a <dt>.
-   */
   triggerAriaLabel?: string;
   size?: 'sm' | 'default';
   disabled?: boolean;
@@ -76,8 +71,9 @@ interface SearchableSelectProps {
   searchAriaLabel?: string;
   clearSearchLabel?: string;
   noResultsLabel?: string;
-  /** Analytics event prefix, e.g. "yaxis_metric" → "yaxis_metric_searched" */
   trackPrefix?: string;
+  /** Called with an option's value once the user shows intent toward it. */
+  onOptionIntent?: (value: string) => void;
 }
 
 export function SearchableSelect({
@@ -102,6 +98,7 @@ export function SearchableSelect({
   clearSearchLabel: clearSearchLabelProp,
   noResultsLabel: noResultsLabelProp,
   trackPrefix,
+  onOptionIntent,
 }: SearchableSelectProps) {
   const t = STRINGS[useLocale()];
   const placeholder = placeholderProp ?? t.placeholder;
@@ -113,19 +110,14 @@ export function SearchableSelect({
   const isOpen = !disabled && (open ?? internalOpen);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
-  // Defer the trigger label until the component has mounted on the client.
-  // The selected value derives from URL params / persisted state which only
-  // resolve client-side, so SSR would otherwise lock in the default label and
-  // leave it stale after hydration.
   const [mounted, setMounted] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const listboxRef = React.useRef<HTMLDivElement>(null);
   const searchUsedRef = React.useRef(false);
   const escapeDismissedRef = React.useRef(false);
+  const optionIntent = useOptionIntent(isOpen, onOptionIntent);
   const tabFocusRef = React.useRef<HTMLElement | null>(null);
-  // A grid gives option selection and help their own cells/buttons. A listbox
-  // option cannot contain another interactive action accessibly.
   const hasOptionHelp = [...groups, ...(searchGroups ?? [])].some((group) =>
     group.options.some((option) => option.help),
   );
@@ -139,7 +131,10 @@ export function SearchableSelect({
     if (nextOpen) escapeDismissedRef.current = false;
     if (!nextOpen && isOpen) {
       if (searchUsedRef.current && trackPrefix) {
-        track(`${trackPrefix}_searched`, { query: search });
+        track(`${trackPrefix}_searched`, {
+          query_length: search.length,
+          results: filteredGroups.reduce((count, group) => count + group.options.length, 0),
+        });
         searchUsedRef.current = false;
       }
       setSearch('');
@@ -150,14 +145,12 @@ export function SearchableSelect({
 
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
-    const lower = search.toLowerCase();
     const seen = new Set<string>();
     return (searchGroups ?? groups)
       .map((g) => ({
         ...g,
         options: g.options.filter((opt) => {
-          const matches =
-            opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower);
+          const matches = matchesSearch(opt.label, search) || matchesSearch(g.label, search);
           if (!matches || seen.has(opt.value)) return false;
           seen.add(opt.value);
           return true;
@@ -174,10 +167,6 @@ export function SearchableSelect({
     return undefined;
   }, [groups, value]);
   const triggerLabel = mounted ? (selectedLabel ?? placeholder) : (initialLabel ?? placeholder);
-  const selectedOption = groups
-    .flatMap((group) => group.options)
-    .find((option) => (mounted ? option.value === value : option.label === initialLabel));
-  const selectedHelp = selectedOption?.help;
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
@@ -224,7 +213,7 @@ export function SearchableSelect({
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
-      <div className="relative">
+      <div>
         <PopoverTrigger asChild>
           <button
             ref={triggerRef}
@@ -258,7 +247,6 @@ export function SearchableSelect({
             <span
               className={cn(
                 'flex-1 text-left truncate',
-                selectedHelp && 'mr-7',
                 (mounted ? !selectedLabel : !initialLabel) && 'text-muted-foreground',
               )}
               title={triggerLabel}
@@ -273,31 +261,11 @@ export function SearchableSelect({
             />
           </button>
         </PopoverTrigger>
-        {selectedHelp && selectedOption && !isOpen && (
-          <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
-            {/* Mirror the label's width so help follows short labels and stays
-                inside long ones. This copy is only a layout spacer; the real
-                label and native select button above own the accessible name. */}
-            <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
-              {triggerLabel}
-            </span>
-            <SelectedOptionInfo
-              key={selectedOption.value}
-              label={selectedOption.label}
-              value={selectedOption.value}
-            >
-              {selectedHelp}
-            </SelectedOptionInfo>
-          </div>
-        )}
         <PopoverContent
           data-slot="select-content"
           align="start"
           sideOffset={4}
           onKeyDown={(event) => {
-            // Grid navigation uses arrows; Tab leaves the field instead of
-            // walking every option/help action or looping in Radix's scope.
-            // A nested help dialog retains its own keyboard behavior.
             if (
               hasOptionHelp &&
               event.key === 'Tab' &&
@@ -332,9 +300,6 @@ export function SearchableSelect({
               tabFocusRef.current = null;
               return;
             }
-            // Keyboard cancellation returns to the field, even if another
-            // page interaction was recorded while the non-modal menu was open.
-            // Outside clicks retain Radix's normal focus behavior.
             if (escapeDismissedRef.current) {
               event.preventDefault();
               triggerRef.current?.focus({ preventScroll: true });
@@ -348,7 +313,9 @@ export function SearchableSelect({
                 ...(listboxRef.current?.querySelectorAll<HTMLElement>('[data-select-option]') ??
                   []),
               ];
-              (options.find((option) => option.dataset.value === value) ?? options[0])?.focus();
+              optionIntent.focusQuietly(
+                options.find((option) => option.dataset.value === value) ?? options[0],
+              );
             }
           }}
           className={cn(
@@ -356,9 +323,6 @@ export function SearchableSelect({
             contentClassName,
           )}
         >
-          {/* Search header lives outside the scrollable region so it never picks up
-           * `sticky` → `position: fixed` resolution that puts it behind the page
-           * header (and breaks Cypress's visibility check on the input). */}
           {searchable && (
             <div className="flex items-center gap-1.5 px-2 py-1 border-b bg-popover">
               <SearchIcon className="size-3.5 shrink-0 text-muted-foreground mr-2" />
@@ -450,6 +414,7 @@ export function SearchableSelect({
                             data-value={option.value}
                             data-testid={option.testId}
                             aria-pressed={isSelected}
+                            {...optionIntent.optionProps(option.value, !isSelected)}
                             onClick={() => handleSelect(option.value)}
                             onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                             className={cn(
@@ -500,6 +465,7 @@ export function SearchableSelect({
                       data-select-option
                       data-value={option.value}
                       data-testid={option.testId}
+                      {...optionIntent.optionProps(option.value, !isSelected)}
                       onClick={() => handleSelect(option.value)}
                       onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                       className={cn(

@@ -106,17 +106,41 @@ jobs:
           npm --version
           uname -a
           if [[ "$RUNNER_OS" == "macOS" ]]; then sw_vers; else cat /etc/os-release; fi
-      - name: Test the packed interfaces
+      # Pull requests run the full suite on Linux/Node 24 and only the
+      # filesystem, process and installer tests on the other cells. Manual
+      # dispatch runs the full suite everywhere and is the release-qualification run.
+      - name: Select test scope
+        id: scope
+        env:
+          FULL: ${{ github.event_name != 'pull_request' || (matrix.os.id == 'linux' && matrix.node-version == '24') }}
+        shell: bash
+        run: echo "scope=$([[ "$FULL" == 'true' ]] && echo full || echo platform)" >> "$GITHUB_OUTPUT"
+      - name: Test the packed interfaces (${{ steps.scope.outputs.scope }})
         env:
           INFERENCEX_SKILLS_ARCHIVE: ${{ runner.temp }}/inferencex-skills-archive/${{ needs.pack-archive.outputs.filename }}
           INFERENCEX_SKILLS_ARCHIVE_SHA256: ${{ needs.pack-archive.outputs.sha256 }}
-        run: node --test packages/skills/test/*.test.mjs
+          SCOPE: ${{ steps.scope.outputs.scope }}
+        shell: bash
+        run: |
+          if [[ "$SCOPE" == 'full' ]]; then
+            files=(packages/skills/test/*.test.mjs)
+          else
+            files=()
+            for name in install install-recovery install-cancellation cli-contract doctor onboarding discover release; do
+              file="packages/skills/test/$name.test.mjs"
+              [[ -f "$file" ]] || { echo "::error::Platform test file is missing: $file"; exit 1; }
+              files+=("$file")
+            done
+          fi
+          node --test "${files[@]}"
       - name: Validate published schemas
+        if: ${{ steps.scope.outputs.scope == 'full' }}
         env:
           INFERENCEX_SKILLS_ARCHIVE: ${{ runner.temp }}/inferencex-skills-archive/${{ needs.pack-archive.outputs.filename }}
           INFERENCEX_SKILLS_ARCHIVE_SHA256: ${{ needs.pack-archive.outputs.sha256 }}
         run: node packages/skills/test/schema-consumers.mjs
       - name: Record successful platform acceptance
+        if: ${{ steps.scope.outputs.scope == 'full' }}
         env:
           ACCEPTANCE_OS: ${{ matrix.os.id }}
           ACCEPTANCE_NODE: ${{ matrix.node-version }}
@@ -129,6 +153,7 @@ jobs:
           node -e "const fs=require('node:fs'); const record={os:process.env.ACCEPTANCE_OS,node:process.env.ACCEPTANCE_NODE,arch:process.arch,status:'passed',archive_sha256:process.env.ARCHIVE_SHA256,run_id:process.env.GITHUB_RUN_ID,run_attempt:process.env.GITHUB_RUN_ATTEMPT,head_sha:process.env.GITHUB_SHA,job_name:process.env.ACCEPTANCE_JOB,evidence_url:'https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/'+process.env.GITHUB_RUN_ID}; fs.writeFileSync(process.argv[1], JSON.stringify(record,null,2)+'\n',{flag:'wx'})" "$destination/${ACCEPTANCE_OS}-node-${ACCEPTANCE_NODE}.json"
           cp "$RUNNER_TEMP/inferencex-skills-archive/archive.sha256" "$destination/archive.sha256"
       - name: Upload platform acceptance record
+        if: ${{ steps.scope.outputs.scope == 'full' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: inferencex-skills-${{ matrix.os.id }}-node-${{ matrix.node-version }}-attempt-${{ github.run_attempt }}

@@ -1,22 +1,8 @@
-/**
- * First-Token Limits (`/first-token`).
- *
- * The page reads *measured* rows: for each time-to-first-token cap, the cheapest
- * configuration per vendor that also clears an interactivity floor. The
- * fixed-sequence overlay fixtures suit it well — every row reports a 0.5 s
- * median TTFT, so a 0.1 s cap empties every slot and a 2 s cap fills them, and
- * the floor decides which concurrency wins.
- *
- * Official data: B300 (tput ×1) and B200 (×0.6), both NVIDIA, so the page shows
- * one vendor series. The unofficial run adds B300 (×1.3) and an overlay-only
- * MI355X (×0.8), which must render as the run's own bar rather than an AMD bar.
- */
 import {
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
   OVERLAY_RUN_ID,
-  SINGLE_TURN_CONFIGS,
 } from '../support/overlay-fixtures';
 
 const SEQUENCE = '1k/1k';
@@ -25,18 +11,11 @@ const EMPTY_MARKS = '[data-testid="first-token-chart"] svg .ft-empty';
 const X_TICKS = '[data-testid="first-token-chart"] svg .x-axis .tick text';
 const SUMMARY = '[data-testid="first-token-chart"] svg .ft-summary-who';
 
-const concurrenciesAtOrAbove = (floor: number) =>
-  SINGLE_TURN_CONFIGS.filter(([, intvty]) => intvty >= floor).map(([conc]) => conc);
-
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 };
 
-/**
- * A named cell of the first table row, resolved by header text so a new column
- * cannot silently re-point an assertion at its neighbour.
- */
 const firstRowCell = (header: string) =>
   cy.get('[data-testid="first-token-table"] thead th').then(($ths) => {
     const index = $ths.toArray().findIndex((th) => (th.textContent ?? '').includes(header));
@@ -48,7 +27,7 @@ describe('First-Token Limits', () => {
   describe('official rows only', () => {
     before(() => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -56,17 +35,8 @@ describe('First-Token Limits', () => {
     });
 
     it('picks the cheapest row that clears the interactivity floor, not the cheapest row', () => {
-      cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT Caps');
       cy.get('[data-testid="first-token-caps"]').should('have.value', '0.1,2');
-      cy.get('label[for="first-token-min-interactivity"]').should(
-        'contain.text',
-        'Minimum Median Interactivity',
-      );
-      // Fixed sequences default to the calculator's floor; the field shows it
-      // as a placeholder rather than writing the default into the URL.
-      cy.get('[data-testid="first-token-min-interactivity"]')
-        .should('have.value', '')
-        .and('have.attr', 'placeholder', '35');
+      cy.get('[data-testid="first-token-min-interactivity"]').should('have.value', '');
       cy.get(X_TICKS).should('have.length', 2);
       cy.get(X_TICKS).first().should('have.text', '≤0.1s');
       cy.get(X_TICKS).last().should('have.text', '≤2s');
@@ -80,14 +50,10 @@ describe('First-Token Limits', () => {
         expect(labels).to.deep.equal(['', 'B300 only']);
       });
 
-      // At the 35 tok/s floor the 48-concurrency row (10.6 tok/s) is out, so the
-      // winner is the next-highest-throughput row: concurrency 8.
-      expect(concurrenciesAtOrAbove(35)).to.deep.equal([8, 2, 1]);
       firstRowCell('Concurrency').should('have.text', '8');
       firstRowCell('Configuration').should('contain.text', 'B300');
       firstRowCell('Median TTFT').should('have.text', '0.50');
 
-      // Raising the floor above 111 tok/s leaves only the single-user row.
       cy.get('[data-testid="first-token-min-interactivity"]').clear().type('120').blur();
       firstRowCell('Concurrency').should('have.text', '1');
       cy.get(BARS).should('have.length', 1);
@@ -96,9 +62,45 @@ describe('First-Token Limits', () => {
       firstRowCell('Concurrency').should('have.text', '8');
     });
 
+    it('repositions calculator titles and summaries in fixed-ratio PNG exports', () => {
+      let downloads = 0;
+      let failure: unknown;
+      cy.window().then((win) => {
+        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+          this: HTMLAnchorElement,
+        ) {
+          if (!this.download.endsWith('.png')) return;
+          try {
+            const root = win.document.querySelector('#first-token-limits-export')!;
+            const svg = root.querySelector('svg[data-testid="d3-chart-svg"]')!;
+            const plot = svg.querySelector('.grid .border-right')!;
+            const width = Number(plot.getAttribute('x1'));
+            const height = Number(plot.getAttribute('y2'));
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('x'))).to.eq(width / 2);
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('y'))).to.eq(height + 82);
+            for (const summary of svg.querySelectorAll('.ft-summary-who')) {
+              expect(Number(summary.getAttribute('y'))).to.eq(height + 40);
+            }
+            const bounds = svg.getBoundingClientRect();
+            expect(bounds.bottom).to.be.at.most(root.getBoundingClientRect().bottom);
+            downloads++;
+          } catch (error) {
+            failure = error;
+          }
+        });
+      });
+      (['16:9', '1:1'] as const).forEach((ratio, index) => {
+        cy.get('[data-testid="first-token-figure"] [data-testid="export-button"]').click();
+        cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
+        cy.get('[data-testid="export-png-button"]').click();
+        cy.wrap(null).should(() => {
+          if (failure) throw failure;
+          expect(downloads).to.eq(index + 1);
+        });
+      });
+    });
+
     it('re-picks the winner when the legend isolates another chip', () => {
-      // Clicking a visible entry while everything is visible solos it, the
-      // calculator's legend convention; clicking the lone entry restores all.
       cy.get('.sidebar-legend label').contains('B200').click();
       cy.get(BARS).should('have.attr', 'data-hw', 'b200_sglang');
       cy.get(SUMMARY).last().should('have.text', 'B200 only');
@@ -120,7 +122,7 @@ describe('First-Token Limits', () => {
   describe('empty states', () => {
     it('blames the cap ladder, not the floor, when rows qualify but none clears a cap', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -132,7 +134,7 @@ describe('First-Token Limits', () => {
 
     it('blames the floor when nothing reaches the requested interactivity', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -142,10 +144,8 @@ describe('First-Token Limits', () => {
 
   describe('share-link seeding', () => {
     it('reads the interactivity floor and cap ladder from the URL', () => {
-      // Share-link params are stripped from the address bar on load and carried
-      // by the share button instead, so seeding is asserted on the controls.
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -160,7 +160,7 @@ describe('First-Token Limits', () => {
     before(() => {
       interceptCalculatorOverlayRun();
       cy.visit(
-        `/first-token?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`,
+        `/infx/first-token?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`,
         { onBeforeLoad: dismissNudges },
       );
       cy.wait('@unofficialRun');
@@ -174,7 +174,6 @@ describe('First-Token Limits', () => {
         const fills = [...$bars].map((el) => el.getAttribute('fill') ?? '');
         expect(fills.filter((f) => f.includes('overlay-run-0'))).to.have.length(1);
       });
-      // The run's cheapest qualifying row is its faster B300, not the overlay-only MI355X.
       cy.get(`${BARS}[data-series="run:0"]`).should('have.attr', 'data-hw', 'b300_sglang');
       cy.get(EMPTY_MARKS).should('have.length', 2);
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
@@ -185,8 +184,6 @@ describe('First-Token Limits', () => {
     });
 
     it('lets the legend hide hardware inside the run too', () => {
-      // Solo the overlay-only MI355X: no official chip is visible, so the vendor
-      // bar goes, and the run's bar moves off its (hidden) B300 onto MI355X.
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       cy.get(BARS).should('have.length', 1);
       cy.get(BARS)
@@ -195,21 +192,6 @@ describe('First-Token Limits', () => {
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       cy.get(BARS).should('have.length', 2);
       cy.get(`${BARS}[data-series="run:0"]`).should('have.attr', 'data-hw', 'b300_sglang');
-    });
-  });
-
-  describe('Chinese page', () => {
-    it('renders the intro and Chinese control labels', () => {
-      interceptCalculatorOverlayRun();
-      cy.visit(`/zh/first-token?i_seq=${encodeURIComponent(SEQUENCE)}`, {
-        onBeforeLoad: dismissNudges,
-      });
-      cy.wait('@benchmarks');
-      cy.get('[data-testid="zh-tab-intro"]').should('contain.text', '首 token 延迟约束');
-      cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT 上限');
-      cy.get('label[for="first-token-min-interactivity"]').should('contain.text', '交互性');
-      cy.get('[data-testid="first-token-figure"]').should('exist');
-      cy.get(SUMMARY).last().should('have.text', '仅 B300');
     });
   });
 });

@@ -3,8 +3,6 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// analytics.track lazy-imports posthog-js, which is irrelevant here — stub it
-// out so an unlock side-effect doesn't fire a network call in jsdom.
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import {
@@ -15,8 +13,27 @@ import {
   useFeatureGate,
 } from './use-feature-gate';
 
-// Lightweight renderHook — TLR isn't installed, so we mount a 1-component root
-// and capture the latest hook return value in a ref-style object.
+const KONAMI_CODE = [
+  'ArrowUp',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowLeft',
+  'ArrowRight',
+  'B',
+  'A',
+];
+
+function pressKeys(keys: string[]): void {
+  act(() => {
+    for (const key of keys) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+    }
+  });
+}
+
 function renderHook<T>(hook: () => T): { result: { current: T }; unmount: () => void; root: Root } {
   const result = { current: undefined as unknown as T };
   function TestComponent() {
@@ -84,23 +101,72 @@ describe('useFeatureGate', () => {
     unmount();
   });
 
-  it('unlocks after the ↑↑↓↓ keydown sequence and persists to localStorage', () => {
+  it('rejects and removes the legacy saved unlock', () => {
+    localStorage.setItem('inferencex-feature-gate', '1');
     const { result, unmount } = renderHook(() => useFeatureGate());
     expect(result.current).toBe(false);
-    act(() => {
-      for (const key of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown']) {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key }));
-      }
-    });
+    expect(localStorage.getItem('inferencex-feature-gate')).toBeNull();
+    expect(localStorage.getItem(FEATURE_GATE_KEY)).toBeNull();
+    pressKeys(KONAMI_CODE);
+    expect(result.current).toBe(true);
+    unmount();
+  });
+
+  it('unlocks after the full uppercase Konami code and persists across remounts', () => {
+    const { result, unmount } = renderHook(() => useFeatureGate());
+    expect(result.current).toBe(false);
+    pressKeys(KONAMI_CODE.slice(0, -1));
+    expect(result.current).toBe(false);
+    pressKeys(['A']);
     expect(result.current).toBe(true);
     expect(localStorage.getItem(FEATURE_GATE_KEY)).toBe('1');
+    unmount();
+    const restored = renderHook(() => useFeatureGate());
+    expect(restored.result.current).toBe(true);
+    restored.unmount();
+  });
+
+  it('does not unlock with the old four-arrow sequence', () => {
+    const { result, unmount } = renderHook(() => useFeatureGate());
+    pressKeys(KONAMI_CODE.slice(0, 4));
+    expect(result.current).toBe(false);
+    expect(localStorage.getItem(FEATURE_GATE_KEY)).toBeNull();
+    unmount();
+  });
+
+  it.each([
+    ['b', 'a'],
+    ['b', 'A'],
+    ['B', 'a'],
+  ])('rejects case-sensitive suffix %s %s', (b, a) => {
+    const { result, unmount } = renderHook(() => useFeatureGate());
+    pressKeys([...KONAMI_CODE.slice(0, 8), b, a]);
+    expect(result.current).toBe(false);
+    expect(localStorage.getItem(FEATURE_GATE_KEY)).toBeNull();
+    unmount();
+  });
+
+  it.each(['Shift', 'CapsLock'])('allows %s before the uppercase suffix', (modifier) => {
+    const { result, unmount } = renderHook(() => useFeatureGate());
+    pressKeys([...KONAMI_CODE.slice(0, 8), modifier, 'B', 'A']);
+    expect(result.current).toBe(true);
+    unmount();
+  });
+
+  it('does not count auto-repeat as a second arrow press', () => {
+    const { result, unmount } = renderHook(() => useFeatureGate());
+    pressKeys(['ArrowUp']);
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', repeat: true }));
+    });
+    pressKeys(KONAMI_CODE.slice(2));
+    expect(result.current).toBe(false);
     unmount();
   });
 
   it('ignores partial / out-of-order sequences', () => {
     const { result, unmount } = renderHook(() => useFeatureGate());
     act(() => {
-      // Reversed direction — must not unlock.
       for (const key of ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key }));
       }
@@ -110,10 +176,10 @@ describe('useFeatureGate', () => {
     unmount();
   });
 
-  it('accepts the sequence even when wrapped in noise (sliding window of last 4 keys)', () => {
+  it('accepts the complete sequence after unrelated keys', () => {
     const { result, unmount } = renderHook(() => useFeatureGate());
     act(() => {
-      for (const key of ['a', 'b', 'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown']) {
+      for (const key of ['a', 'b', ...KONAMI_CODE]) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key }));
       }
     });
@@ -122,13 +188,28 @@ describe('useFeatureGate', () => {
   });
 
   it('flips back to locked when FEATURE_GATE_LOCKED_EVENT fires (e.g. via relockFeatureGate)', () => {
-    localStorage.setItem(FEATURE_GATE_KEY, '1');
     const { result, unmount } = renderHook(() => useFeatureGate());
+    pressKeys(KONAMI_CODE);
     expect(result.current).toBe(true);
     act(() => {
       relockFeatureGate();
     });
     expect(result.current).toBe(false);
+    pressKeys(['A']);
+    expect(result.current).toBe(false);
+    pressKeys(KONAMI_CODE);
+    expect(result.current).toBe(true);
+    unmount();
+  });
+
+  it('clears a partial sequence on relock even when already locked', () => {
+    const { result, unmount } = renderHook(() => useFeatureGate());
+    pressKeys(KONAMI_CODE.slice(0, -1));
+    act(() => relockFeatureGate());
+    pressKeys(['A']);
+    expect(result.current).toBe(false);
+    pressKeys(KONAMI_CODE);
+    expect(result.current).toBe(true);
     unmount();
   });
 

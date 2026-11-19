@@ -1,20 +1,14 @@
 import { notFound } from 'next/navigation';
 
-import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
 import { renderCompareOg } from '@/lib/compare/compare-og';
-import {
-  canonicalCompareSlug,
-  compareDisplayLabel,
-  parseCompareSlug,
-} from '@/lib/compare/compare-slug';
+import { compareDisplayLabel, parseCompareSlug } from '@/lib/compare/compare-slug';
 
 export const alt = 'Chip performance-per-dollar inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export async function generateStaticParams() {
-  const slugs = await getAllComparableCompareSlugs();
-  return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
+export function generateStaticParams(): { slug: string }[] {
+  return [];
 }
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {

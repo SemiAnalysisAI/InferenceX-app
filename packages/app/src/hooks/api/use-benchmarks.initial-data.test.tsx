@@ -160,7 +160,7 @@ describe('useBenchmarks initial calculator data', () => {
           QueryClientProvider,
           { client },
           createElement(FullProbe, {
-            model: 'Overridden-Model',
+            model: 'Kimi-K3',
             date: '',
             initialData: undefined,
           }),
@@ -170,7 +170,7 @@ describe('useBenchmarks initial calculator data', () => {
 
     expect(mockFetchBenchmarks).toHaveBeenCalledTimes(1);
     expect(mockFetchBenchmarks).toHaveBeenCalledWith(
-      'Overridden-Model',
+      'Kimi-K3',
       '',
       undefined,
       expect.any(AbortSignal),

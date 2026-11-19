@@ -1,7 +1,6 @@
 import { expect, it } from 'vitest';
 import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
-
-import { storedPowerSeries } from './stored-power-series';
+import { storedPowerSeries } from '@semianalysisai/inferencex-db/power-series/stored-power-series';
 
 it.each(['gpu_metrics.csv', 'samples.csv'])(
   'preserves measured zero and omits missing power in stored %s',

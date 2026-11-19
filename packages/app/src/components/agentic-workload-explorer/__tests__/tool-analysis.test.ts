@@ -59,7 +59,6 @@ describe('analyzeToolOutcomes', () => {
 
     const toolResults: ToolResultRow[] = [
       toolResult('s1', 'r3', '2025-01-01T00:02:00Z', 'bash-1', true, 'fail'),
-      // Same historical tool_result appears in later request history; only the first counts.
       toolResult('s1', 'r4', '2025-01-01T00:03:00Z', 'bash-1', true, 'fail'),
       toolResult('s1', 'r5', '2025-01-01T00:04:00Z', 'bash-2', false, 'pass'),
     ];

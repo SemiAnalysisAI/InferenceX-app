@@ -45,10 +45,6 @@ export function HaloThemeBanner() {
   );
 }
 
-/**
- * Follow the root class like the other optional themes, because this mounts
- * outside ThemeProvider. No image requests until Halo is selected.
- */
 export function HaloDecorations() {
   const [active, setActive] = useState(false);
 

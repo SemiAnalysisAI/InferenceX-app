@@ -2,14 +2,14 @@
 
 ## Benchmark your own hardware
 
-Share [the AgentX quickstart](https://inferencex.semianalysis.com/agentx/quickstart)
-([简体中文](https://inferencex.semianalysis.com/zh/agentx/quickstart)).
+Share [the AgentX quickstart](https://inferencex.semianalysis.com/infx/agentx/quickstart)
+([简体中文](https://inferencex.semianalysis.com/zh/infx/agentx/quickstart)).
 Use Python 3.11–3.13. Start an OpenAI-compatible streaming
 chat-completions server, then set `HUGGINGFACE_MODEL_NAME` and `CONC_SESSIONS`
 for your deployment:
 
 ```bash
-pip install 'agentx-harness==1.0.7'
+pip install 'agentx-harness==1.0.14'
 
 export HUGGINGFACE_MODEL_NAME="org/model"
 export CONC_SESSIONS=16
@@ -46,6 +46,45 @@ your server; it does not publish results to InferenceX or add a read-only API
 operation.
 
 ## Read published benchmark results
+
+GLM-5.3-Flash uses display model `GLM-5.3-Flash`, raw DB key `glm5.3flash`,
+and dashboard route `/infx/inference/glm-5-3-flash` (also under `/zh`). Use
+`model=GLM-5.3-Flash&sequence=agentic-traces` for the inference view. Native
+`zai-org/GLM-5.3-Flash` and `nvidia/GLM-5.3-Flash-NVFP4` observations share
+this model bucket; precision remains a separate field. Registration does not
+publish experimental runs or establish hardware qualification. Preserve empty
+responses, and never substitute the older GLM-5.2/5.3 bucket. The future
+`OneNexus/GLM-5.3-Flash-MXFP4` checkpoint is not registered as a qualified
+benchmark target; `OneNexus/GLM-5.3-MXFP4` is a different, non-Flash checkpoint.
+Parameter counts, weights-publication date, OpenRouter ID and API list pricing
+remain unverified and are not inherited from GLM-5.3.
+
+The dashboard exposes this model only after its existing UI feature gate is
+enabled. This is a presentation flag, not authorization: read-only API model
+parameters, raw identities and returned data are unaffected. An unofficial
+run does not unlock the UI. Public model discovery omits Flash by default.
+
+For interactivity comparisons and performance-over-time charts, first read
+[AgentX P90 interactivity](agentic-interactivity.md). The dashboard operating point
+uses reciprocal P90 full-response ITL, not the median or P90 of token rates.
+
+Muse Spark 1.3/Open is the UI label (with an `816B` suffix where sizes are shown).
+The measured checkpoints remain Open, not Meta's hosted Muse Spark 1.3 service.
+It uses API display-model identifier `Muse-Spark-Open`, raw DB key
+`musespark`, and dashboard route `/infx/inference/muse-spark-open` (also under `/zh`).
+Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
+with `sequence=agentic-traces` for the latter. Comparison results links open the
+canonical dashboard without an `unofficialRun` parameter.
+Unofficial runs remain available through explicitly supplied overlay links; they
+do not populate the published benchmark API. Preserve empty API responses as no
+published data; do not substitute another model.
+
+MiniMax M3.1 Flash uses display model `MiniMax-M3.1-Flash`, raw DB key
+`minimaxm31flash`, and dashboard route `/infx/inference/minimax-m31-flash` (also under
+`/zh`). It is benchmarked on AgentX only, with the checkpoint's built-in DSpark
+drafter, which the API reports as spec method `mtp`. Use
+`model=MiniMax-M3.1-Flash` for benchmark reads and the inference view API, with
+`sequence=agentic-traces` for the latter. Its rows never fall back to `MiniMax-M3`.
 
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or

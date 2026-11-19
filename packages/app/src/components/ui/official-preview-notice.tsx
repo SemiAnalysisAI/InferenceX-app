@@ -47,8 +47,6 @@ export const TPUV7_PREVIEW_STRINGS = {
   },
 } as const;
 
-// TPUv7 data is currently the supplemental Qwen3.5 8k/1k snapshot only, so a
-// hardware-scoped match covers exactly that curve, mirroring Jalapeño.
 export const OFFICIAL_PREVIEW_SERIES = [
   {
     id: 'jalapeno-official-preview',
@@ -95,10 +93,33 @@ interface OfficialPreviewNoticeProps {
     | typeof VERA_RUBIN_PREVIEW_STRINGS
     | typeof TPUV7_PREVIEW_STRINGS;
   testId: string;
+  variant?: OfficialPreviewNoticeVariant;
 }
 
-function OfficialPreviewNotice({ strings, testId }: OfficialPreviewNoticeProps) {
+type OfficialPreviewNoticeVariant = 'callout' | 'inline';
+
+function OfficialPreviewNotice({
+  strings,
+  testId,
+  variant = 'callout',
+}: OfficialPreviewNoticeProps) {
   const t = strings[useLocale()];
+
+  if (variant === 'inline') {
+    return (
+      <p
+        role="note"
+        aria-label={t.title}
+        data-testid={testId}
+        className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"
+      >
+        <Info aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-brand" />
+        <span className="min-w-0">
+          <span className="font-medium text-foreground">{t.title}</span> · {t.description}
+        </span>
+      </p>
+    );
+  }
 
   return (
     <div
@@ -116,26 +137,38 @@ function OfficialPreviewNotice({ strings, testId }: OfficialPreviewNoticeProps) 
   );
 }
 
-export function JalapenoOfficialPreviewNotice() {
+export function JalapenoOfficialPreviewNotice({
+  variant,
+}: { variant?: OfficialPreviewNoticeVariant } = {}) {
   return (
     <OfficialPreviewNotice
       strings={JALAPENO_PREVIEW_STRINGS}
       testId="jalapeno-official-preview-notice"
+      variant={variant}
     />
   );
 }
 
-export function VeraRubinOfficialPreviewNotice() {
+export function VeraRubinOfficialPreviewNotice({
+  variant,
+}: { variant?: OfficialPreviewNoticeVariant } = {}) {
   return (
     <OfficialPreviewNotice
       strings={VERA_RUBIN_PREVIEW_STRINGS}
       testId="vera-rubin-official-preview-notice"
+      variant={variant}
     />
   );
 }
 
-export function Tpuv7OfficialPreviewNotice() {
+export function Tpuv7OfficialPreviewNotice({
+  variant,
+}: { variant?: OfficialPreviewNoticeVariant } = {}) {
   return (
-    <OfficialPreviewNotice strings={TPUV7_PREVIEW_STRINGS} testId="tpuv7-official-preview-notice" />
+    <OfficialPreviewNotice
+      strings={TPUV7_PREVIEW_STRINGS}
+      testId="tpuv7-official-preview-notice"
+      variant={variant}
+    />
   );
 }

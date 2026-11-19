@@ -21,12 +21,8 @@ export default defineConfig({
     specPattern: 'cypress/e2e/**/*.cy.ts',
     supportFile: 'cypress/support/e2e.ts',
     setupNodeEvents(on, config) {
-      // Landing reveals animate opacity/transform (see src/app/motion.css).
-      // Force reduced motion so e2e clicks always land on settled elements.
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'chromium' && browser.name !== 'electron') {
-          // The retained isolation checks activate optional WebGL backgrounds.
-          // Use software rendering on GPU-less CI runners.
           launchOptions.args.push(
             '--force-prefers-reduced-motion',
             '--use-angle=swiftshader',

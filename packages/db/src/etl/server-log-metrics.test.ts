@@ -32,7 +32,6 @@ describe('kvCachePoolTokensFromServerLog', () => {
 (EngineCore_DP0 pid=1) GPU KV cache size: 5,000,000 tokens
 (EngineCore_DP1 pid=2) GPU KV cache size: 5,000,000 tokens
 `;
-    // DP0 counted once + DP1 once = 10M, not 15M.
     expect(kvCachePoolTokensFromServerLog(log)).toBe(10_000_000);
   });
 

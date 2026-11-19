@@ -3,6 +3,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (label: string, font: string) =>
+    label.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 import { IncidentSignalRail } from '@/components/agentic-workload-explorer/incident-signal-rail';
 import { ModelImpactMatrix } from '@/components/agentic-workload-explorer/model-impact-matrix';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';

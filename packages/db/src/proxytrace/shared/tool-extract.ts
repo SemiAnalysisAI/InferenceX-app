@@ -9,33 +9,13 @@ import {
   type VerificationStatus,
 } from './tool-classifiers';
 
-// Pre-extracts the `tool_use` and `tool_result` blocks from a recorded
-// request/response pair AND pre-classifies them — `verification_kind` for
-// Bash commands, pass/fail/unknown `status` for tool_results. The rows
-// written into `request_stats` carry only the compact classified values,
-// so the dashboard queries never have to ship raw commands or 8KB content
-// blobs back to the app server.
-//
-// Keep the shapes in sync with the backfill in
-// packages/db/migrations/017_classify_stats.ts — both populate the same
-// columns from historical rows.
-
 export interface ToolUseEvent {
   ordinality: number;
   id: string | null;
   name: string | null;
   verification_kind?: VerificationKind | null;
-  // First command-position binary — kept for legacy rows and single-turn
-  // timing attribution.
   command_binary?: string | null;
-  // Every command-position binary in order, occurrences kept (pipes, &&/||
-  // chains, substitutions, wrappers). Present only for compound commands
-  // (length > 1) — single-binary rows fall back to command_binary in the
-  // tool-timings query, so storing a one-element copy would be pure bloat.
   command_binaries?: string[];
-  // Allowlisted verification binaries found outside shell command positions,
-  // such as pytest in `uv run pytest`. Kept separate so command_binaries
-  // preserves its ordered lexical meaning.
   additional_binaries?: string[];
 }
 

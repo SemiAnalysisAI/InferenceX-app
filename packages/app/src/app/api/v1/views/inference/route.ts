@@ -1,4 +1,8 @@
 import { GET as derived } from '@/app/api/v1/derived-agentic-metrics/route';
+import {
+  defaultInferenceHardware,
+  defaultInferenceXAxisMode,
+} from '@/components/inference/utils/model-defaults';
 import { preferVrDefaultRun, VR_DEFAULT_RUN } from '@/components/inference/default-run-preference';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import {
@@ -16,6 +20,10 @@ import {
   type MatchedConcurrencySide,
   type MatchedConcurrencyTable,
 } from '@/components/inference/utils/matched-concurrency';
+import {
+  buildPowerBreakdowns,
+  powerBreakdownInteractivity,
+} from '@/components/inference/utils/power-breakdown';
 import { buildPowerFits } from '@/components/inference/utils/power-fit';
 import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
@@ -27,14 +35,17 @@ import type {
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import type { TcoBasis } from '@/lib/catalog/constants';
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
-  type Model,
+  Model,
   Percentile,
   PERCENTILE_OPTIONS,
   Sequence,
 } from '@/lib/catalog/data-mappings';
+import { buildHeadroomRows, HEADROOM_INTERACTIVITIES } from '@/lib/power/headroom';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,
@@ -54,6 +65,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
@@ -66,7 +78,7 @@ import {
 } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
@@ -97,7 +109,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/v1/views/inference
  *
- * Chart-ready series for the main /inference scatter chart: the same dedupe →
+ * Chart-ready series for the main /infx/inference scatter chart: the same dedupe →
  * transform → filter → remap → Pareto pipeline `useChartData` runs client-side,
  * executed server-side via `buildInferenceSeries` (lib/views-api/series.ts).
  *
@@ -134,6 +146,7 @@ interface InferenceViewParams {
   readonly optimal: boolean;
   readonly best: boolean;
   readonly tcoBasis: TcoBasis;
+  readonly chipBasis: ChipBasis;
   readonly power: readonly ('certified' | 'legacy')[];
   readonly topologies: readonly string[];
   readonly allPoints: boolean;
@@ -193,6 +206,7 @@ function buildView(
     optimal: params.optimal,
     best: params.best,
     tcoBasis: params.tcoBasis,
+    chipBasis: params.chipBasis,
     allPoints: params.allPoints,
     userCosts: params.userCosts,
     userPowers: params.userPowers,
@@ -203,7 +217,14 @@ function buildView(
   return { resolvedPrecisions, result };
 }
 
-function csvRows(data: { result: Pick<InferenceSeriesResult, 'series'> }) {
+function csvRows(data: { result: Pick<InferenceSeriesResult, 'series' | 'tableRows'> }) {
+  if (data.result.tableRows)
+    return data.result.tableRows.map(({ metrics, ...row }) => ({
+      ...row,
+      ...Object.fromEntries(
+        Object.entries(metrics).map(([key, value]) => [`metric_${key}`, value]),
+      ),
+    }));
   return data.result.series.flatMap((entry) =>
     entry.points.map((point) => ({
       hwKey: entry.hwKey,
@@ -246,17 +267,18 @@ function observedPointIdentity(point: InferenceData) {
   };
 }
 
+const estimate = (value: EqualServiceEstimate | null) =>
+  value === null
+    ? null
+    : {
+        ...value,
+        endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
+          ...endpoint,
+          point: observedPointIdentity(point),
+        })),
+      };
+
 function publicServiceComparison(comparison: EqualServiceComparison) {
-  const estimate = (value: EqualServiceEstimate | null) =>
-    value === null
-      ? null
-      : {
-          ...value,
-          endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
-            ...endpoint,
-            point: observedPointIdentity(point),
-          })),
-        };
   return {
     ...comparison,
     metrics: Object.fromEntries(
@@ -300,7 +322,7 @@ export function GET(request: NextRequest) {
       search.get('xmode'),
       'xmode',
       X_AXIS_MODES,
-      'interactivity',
+      defaultInferenceXAxisMode(displayName),
     );
     // The trace-derived mode has no server-side data source; resolve it to the
     // interactivity chart (the dashboard applies the same fallback on fixed-seq).
@@ -318,7 +340,10 @@ export function GET(request: NextRequest) {
     );
     const date = parseDateParam(search.get('date'), 'date');
     const runId = parseRunIdParam(search.get('runId'));
-    const gpus = parseFreeListParam(search.get('gpus'));
+    const gpus =
+      !search.has('gpus') && displayName === Model.Qwen3_5
+        ? [...defaultInferenceHardware(displayName, new Set(Object.keys(HW_REGISTRY)))]
+        : parseFreeListParam(search.get('gpus'));
     const vendors = parseVendorsParam(search.get('vendors'));
     const frameworks = parseFrameworkFamiliesParam(search.get('frameworks'));
     const deployment = parseDeploymentParam(search.get('deployment'));
@@ -333,6 +358,8 @@ export function GET(request: NextRequest) {
     const serviceCompare = parseBoolParam(search.get('serviceCompare'), 'serviceCompare', false);
     const roleShare = parseBoolParam(search.get('roleShare'), 'roleShare', false);
     const powerFit = parseBoolParam(search.get('powerFit'), 'powerFit', false);
+    const powerBreakdown = parseBoolParam(search.get('powerBreakdown'), 'powerBreakdown', false);
+    const headroom = parseBoolParam(search.get('headroom'), 'headroom', false);
     const requestedServiceBaseline = search.get('serviceBaseline');
     const requestedServiceComparator = search.get('serviceComparator');
     const serviceTarget = search.has('serviceTarget')
@@ -340,12 +367,13 @@ export function GET(request: NextRequest) {
       : null;
     if (serviceTarget !== null && serviceTarget <= 0)
       throw new ViewsApiParamError('serviceTarget', 'serviceTarget must be positive');
-    if (format === 'csv' && (serviceCompare || roleShare || powerFit))
+    if (format === 'csv' && (serviceCompare || roleShare || powerFit || powerBreakdown || headroom))
       throw new ViewsApiParamError(
         'format',
-        'Equal-service, role-share and power-fit panels require format=json',
+        'Equal-service, role-share, power-fit, power-breakdown and headroom panels require format=json',
       );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
     // Topology keys are opaque values returned by this view, not case-folded names.
     const topologies = [
@@ -394,6 +422,7 @@ export function GET(request: NextRequest) {
       optimal,
       best,
       tcoBasis,
+      chipBasis,
       power,
       topologies,
       allPoints,
@@ -529,6 +558,34 @@ export function GET(request: NextRequest) {
           })),
         }
       : {};
+    const breakdownInteractivity = powerBreakdownInteractivity(serviceOptions.xField);
+    const breakdownPanel = powerBreakdown
+      ? {
+          powerBreakdowns: buildPowerBreakdowns(observedPoints, 'en', breakdownInteractivity).map(
+            ({ points, ...series }) => ({
+              ...series,
+              interactivityField: breakdownInteractivity.field,
+              modelRevision: SYSTEM_POWER_MODEL_REVISION,
+              points: points.map(({ point, configKey: _configKey, ...entry }) => ({
+                ...entry,
+                point: observedPointIdentity(point),
+              })),
+            }),
+          ),
+        }
+      : {};
+
+    // PowerX headroom table: avg and P90 W per chip, % TDP and headroom at four
+    // interactivities, read along each chip's frontier with the chart's interpolation.
+    const headroomPanel = headroom
+      ? {
+          headroom: {
+            interactivities: [...HEADROOM_INTERACTIVITIES],
+            interactivityField: breakdownInteractivity.field,
+            rows: buildHeadroomRows(observedPoints),
+          },
+        }
+      : {};
 
     const resolvedParams = {
       model: displayName,
@@ -551,6 +608,7 @@ export function GET(request: NextRequest) {
       best,
       format,
       tcoBasis,
+      chipBasis,
       power,
       allPoints,
       userCosts,
@@ -564,6 +622,8 @@ export function GET(request: NextRequest) {
       serviceTarget: serviceCompare ? serviceTarget : null,
       roleShare,
       powerFit,
+      powerBreakdown,
+      headroom,
     };
 
     if (format === 'csv') {
@@ -578,7 +638,7 @@ export function GET(request: NextRequest) {
       ]);
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'inference',
       apiVersion: 'v1',
       params: resolvedParams,
@@ -587,6 +647,7 @@ export function GET(request: NextRequest) {
       frontier: data.result.frontier,
       hardware: data.result.hardware,
       series: data.result.series,
+      ...(data.result.tableRows === undefined ? {} : { tableRows: data.result.tableRows }),
       count: data.result.count,
       comparisons,
       overlays,
@@ -594,6 +655,8 @@ export function GET(request: NextRequest) {
       ...servicePanels,
       ...rolePanel,
       ...fitPanel,
+      ...breakdownPanel,
+      ...headroomPanel,
     });
   });
 }

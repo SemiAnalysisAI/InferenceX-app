@@ -7,6 +7,7 @@ import {
   PURGED_BENCHMARK_POINTS,
   PURGED_RUN_ATTEMPTS,
   PURGED_RUNS,
+  RUN_FRAMEWORK_OVERRIDES,
 } from '../etl/run-overrides.js';
 
 export function selectRunOverrides(args: string[]) {
@@ -36,6 +37,7 @@ export function selectRunOverrides(args: string[]) {
     purgedRuns: new Set([...PURGED_RUNS].filter(matches)),
     purgedAttempts: new Map([...PURGED_RUN_ATTEMPTS].filter(([id]) => matches(id))),
     purgedPoints: PURGED_BENCHMARK_POINTS.filter((entry) => matches(entry.githubRunId)),
+    frameworks: RUN_FRAMEWORK_OVERRIDES.filter((entry) => matches(entry.githubRunId)),
   };
   if (
     runId !== undefined &&
@@ -45,7 +47,8 @@ export function selectRunOverrides(args: string[]) {
       selection.benchmarks.length +
       selection.purgedRuns.size +
       selection.purgedAttempts.size +
-      selection.purgedPoints.length ===
+      selection.purgedPoints.length +
+      selection.frameworks.length ===
       0
   ) {
     throw new Error(`No registered overrides for run ${runId}`);

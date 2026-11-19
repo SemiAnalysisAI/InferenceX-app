@@ -10,7 +10,6 @@ export interface FavoritePreset {
   tags: string[];
   category: 'comparison' | 'improvements';
   wide?: boolean;
-  /** Routable via ?preset=ID but hidden from the landing-page list. */
   hidden?: boolean;
   config: {
     model: Model;
@@ -24,15 +23,6 @@ export interface FavoritePreset {
   };
 }
 
-/**
- * Match an hwKey against a preset's hwFilter. Exact entries always match
- * exactly (so MTP keys like `h100_dynamo-trt_mtp` can be explicitly opted in).
- * Bare GPU prefixes (no underscore) match any framework variant on that GPU,
- * but for models with an exclusion rule (currently dsv4 MTP) they also skip
- * keys matching the rule's suffix — otherwise the preset would surface two
- * comparability groups on the same chart, which the legend toggle guard already
- * blocks for explicit user actions.
- */
 export function matchesPresetHwFilter(
   hwKey: string,
   filter: string[],
@@ -47,10 +37,6 @@ export function matchesPresetHwFilter(
   );
 }
 
-/**
- * Find the closest available date to a target date string (YYYY-MM-DD).
- * Returns the date from availableDates that is closest to targetDate.
- */
 export function findClosestDate(availableDates: string[], targetDate: string): string {
   if (availableDates.length === 0) return '';
 
@@ -69,22 +55,12 @@ export function findClosestDate(availableDates: string[], targetDate: string): s
   return closest;
 }
 
-/**
- * Subtract months from a date string (YYYY-MM-DD format).
- */
 export function subtractMonths(dateStr: string, months: number): string {
   const date = new Date(dateStr);
   date.setUTCMonth(date.getUTCMonth() - months);
   return date.toISOString().split('T')[0];
 }
 
-/**
- * Given history rows for a model+sequence, find dates within a range where
- * net-new configs first appeared for specific GPUs and precisions.
- * Tracks the cumulative set of all configs seen — a date is included only
- * when it introduces a config key never seen on any earlier date.
- * The first date in the range is always included.
- */
 export function findConfigChangeDates(
   rows: Pick<
     BenchmarkRow,
@@ -102,7 +78,6 @@ export function findConfigChangeDates(
   startDate: string,
   endDate: string,
 ): string[] {
-  // Filter to matching GPU+precision within date range
   const filtered = rows.filter(
     (r) =>
       precisions.includes(r.precision) &&
@@ -111,7 +86,6 @@ export function findConfigChangeDates(
       gpuPrefixes.some((prefix) => `${r.hardware}_${r.framework}`.startsWith(prefix)),
   );
 
-  // Group by date
   const byDate = new Map<string, Set<string>>();
   for (const r of filtered) {
     const key = `${r.conc}_${r.decode_tp}_${r.decode_ep}_${r.decode_dp_attention}`;
@@ -126,7 +100,6 @@ export function findConfigChangeDates(
   const dates = [...byDate.keys()].toSorted();
   if (dates.length === 0) return [];
 
-  // Flag dates where the config set differs from the previous date
   let prevConfigs: Set<string> | null = null;
   const result: string[] = [];
   for (const date of dates) {
@@ -142,7 +115,6 @@ export function findConfigChangeDates(
 }
 
 export const FAVORITE_PRESETS: FavoritePreset[] = [
-  // 0 — Kimi K3 launch (all configs) — current day-0 featured model
   {
     id: 'kimi-k3-launch',
     title: 'Kimi K3 — First Look',
@@ -161,9 +133,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
     },
   },
-  // Hidden — previous MiniMax M3 launch preset (all configs), retired when Kimi K3 became
-  // the day-0 model. Retained so prior ?preset=minimax-m3-launch links (banner, modal,
-  // external shares) keep working.
   {
     id: 'minimax-m3-launch',
     title: 'MiniMax M3 — First Look',
@@ -183,9 +152,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
     },
   },
-  // Hidden — previous DeepSeek V4 Pro launch preset (all configs), retired when MiniMax M3
-  // became the day-0 model. Retained so prior ?preset=dsv4-launch links (banner, modal,
-  // external shares) keep working.
   {
     id: 'dsv4-launch',
     title: 'DeepSeek V4 Pro — First Look',
@@ -203,8 +169,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
     },
   },
-  // Hidden — original NVIDIA-only DeepSeek V4 Pro launch preset, retained so prior
-  // ?preset=dsv4-launch-nvidia links (banner, modal, external shares) keep working.
   {
     id: 'dsv4-launch-nvidia',
     title: 'DeepSeek V4 Pro — NVIDIA First Look',
@@ -222,7 +186,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300'],
     },
   },
-  // 1 — NVIDIA
   {
     id: 'gb200-vs-b200',
     title: 'GB200 NVL72 vs B200 — Multi vs Single Node',
@@ -240,7 +203,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['gb200_dynamo-trt', 'b200_dynamo-trt'],
     },
   },
-  // 2 — NVIDIA
   {
     id: 'b200-vs-h200',
     title: 'B200 vs H200 — Blackwell vs Hopper',
@@ -259,7 +221,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['b200_dynamo-trt', 'h200_dynamo-trt'],
     },
   },
-  // 3 — AMD
   {
     id: 'amd-generations',
     title: 'AMD MI300X → MI325X → MI355X',
@@ -278,7 +239,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['mi300x_sglang', 'mi325x_sglang', 'mi355x_sglang'],
     },
   },
-  // 4 — NVIDIA disagg generational
   {
     id: 'h100-vs-gb300-disagg',
     title: 'H100 vs GB300 Disagg — DeepSeek',
@@ -296,7 +256,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['h100_dynamo-trt_mtp', 'gb300_dynamo-trt_mtp'],
     },
   },
-  // 5 — Disagg cross-vendor
   {
     id: 'disagg-b200-vs-mi355x',
     title: 'Disagg B200 SGLang vs MI355X vs B200 TRTLLM',
@@ -315,7 +274,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['b200_dynamo-sglang', 'mi355x_mori-sglang', 'b200_dynamo-trt'],
     },
   },
-  // 6 — AMD
   {
     id: 'mi355x-sglang-disagg-timeline',
     title: 'MI355X SGLang Disagg Over Time — DeepSeek (FP8)',

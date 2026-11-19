@@ -1,64 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-/**
- * Options for configuring the useChartZoom hook
- */
 export interface UseChartZoomOptions {
-  /** Chart-specific event name for zoom reset (e.g., 'reliability_zoom_reset') */
   resetEventName: string;
 
-  /** Default zoom scale (k value). Defaults to 1 (no zoom) */
   defaultZoomK?: number;
 
-  /** Min/max zoom scale extent [min, max]. Defaults to [1, 100] */
   scaleExtent?: [number, number];
 
-  /** Optional callback to execute after zoom reset (e.g., reset filters, track analytics) */
   onReset?: () => void;
 
-  /** SVG ref to animate zoom reset on **/
   svgRef: React.RefObject<SVGSVGElement | null>;
 }
 
-/**
- * Options for setting up zoom behavior on an SVG element
- */
 export interface SetupZoomOptions {
-  /** Translate extent to constrain panning [[x0, y0], [x1, y1]] */
   translateExtent?: [[number, number], [number, number]];
 
-  /** Viewport extent [[x0, y0], [x1, y1]]. Defaults to [[0, 0], [width, height]] */
   extent?: [[number, number], [number, number]];
 
-  /** Custom constrain function for advanced zoom/pan limiting */
   constrain?: (
     transform: d3.ZoomTransform,
     extent: [[number, number], [number, number]],
     translateExtent: [[number, number], [number, number]],
   ) => d3.ZoomTransform;
 
-  /** Callback fired on every zoom event */
   onZoom?: (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => void;
 
-  /** Custom transform storage function (e.g., to only store y-axis translation) */
   customTransformStorage?: (transform: d3.ZoomTransform) => d3.ZoomTransform;
 }
 
-/**
- * Return value from useChartZoom hook
- */
 export interface UseChartZoomResult {
-  /** D3 zoom behavior instance ref */
   zoomRef: React.MutableRefObject<d3.ZoomBehavior<SVGSVGElement, unknown> | null>;
 
-  /** Current zoom transform ref */
   zoomTransformRef: React.MutableRefObject<d3.ZoomTransform>;
 
-  /** Default zoom transform (based on defaultZoomK) */
   defaultZoomTransform: d3.ZoomTransform;
 
-  /** Setup function to call in chart's main useEffect */
   setupZoom: (
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
     width: number,
@@ -67,18 +44,6 @@ export interface UseChartZoomResult {
   ) => d3.ZoomBehavior<SVGSVGElement, unknown>;
 }
 
-/**
- * Decides which input events may start or feed a chart zoom gesture.
- *
- * - Touch: a single finger must reach the page so phones can scroll past the
- *   chart (d3-zoom would otherwise preventDefault every touchmove); two fingers
- *   zoom/pan. One-finger pan was a dead zone anyway: ScatterGraph's constrain
- *   pins the translate at k=1.
- * - Wheel: require Shift so bare scroll doesn't hijack the page, and reject
- *   ctrlKey because browsers synthesize trackpad pinch as ctrl+wheel, which
- *   should fall through to native browser zoom.
- * - Mouse: left button only, no Ctrl (context menu on macOS).
- */
 export function zoomEventFilter(event: {
   type: string;
   shiftKey?: boolean;
@@ -91,43 +56,26 @@ export function zoomEventFilter(event: {
   return !event.ctrlKey && !event.button;
 }
 
-/**
- * Custom hook for managing D3 zoom behavior across charts
- *
- * This hook extracts the common zoom pattern used across all D3 charts:
- * - Manages zoom behavior and transform refs
- * - Listens for external reset events
- * - Provides a setupZoom function to configure zoom on an SVG
- * - Handles double-click reset and transform persistence
- *
- * @param options - Configuration options
- * @returns Zoom refs and setup function
- */
 export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
   const { resetEventName, defaultZoomK = 1, scaleExtent = [1, 100], onReset, svgRef } = options;
 
-  // create zoom behavior and transform refs
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const defaultZoomTransform = useMemo(() => d3.zoomIdentity.scale(defaultZoomK), [defaultZoomK]);
   const zoomTransformRef = useRef<d3.ZoomTransform>(defaultZoomTransform);
   const scaleExtentRef = useRef(scaleExtent);
   scaleExtentRef.current = scaleExtent;
 
-  // listen for reset zoom events
   useEffect(() => {
     const handleResetZoom = () => {
       if (svgRef.current && zoomRef.current) {
-        // update the ref first
         zoomTransformRef.current = defaultZoomTransform;
 
-        // apply zoom reset with animation
         const transition = d3
           .select(svgRef.current)
           .transition('zoom')
           .duration(750)
           .call(zoomRef.current.transform as any, defaultZoomTransform);
 
-        // call onReset after the animation completes to avoid race condition
         if (onReset) {
           transition.on('end', () => {
             onReset();
@@ -140,7 +88,6 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
     return () => window.removeEventListener(resetEventName, handleResetZoom);
   }, [resetEventName, defaultZoomTransform, onReset, svgRef]);
 
-  // setup zoom function - memoized to avoid recreating on every render
   const setupZoom = useCallback(
     (
       svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
@@ -162,12 +109,9 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
         customTransformStorage,
       } = setupOptions || {};
 
-      // create zoom behavior
       const zoom = d3
         .zoom<SVGSVGElement, unknown>()
         .filter(zoomEventFilter)
-        // macOS swaps deltaY→deltaX when Shift is held (Chrome/Safari OS-level behavior).
-        // Fall back to deltaX so D3 doesn't get delta=0 and compute pow(2,0)=1 (no zoom).
         .wheelDelta((event: WheelEvent) => {
           const delta = event.deltaY || event.deltaX;
           return -delta * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
@@ -176,42 +120,24 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
         .extent(extent)
         .translateExtent(translateExtent);
 
-      // apply custom constrain function if provided
       if (constrain) {
         zoom.constrain(constrain);
       }
 
-      // set up zoom event handler
       if (onZoom) {
         zoom.on('zoom', onZoom);
       }
 
-      // store transform on zoom events (with optional custom storage logic)
       zoom.on('zoom.store', (event) => {
         zoomTransformRef.current = customTransformStorage
           ? customTransformStorage(event.transform)
           : event.transform;
       });
 
-      // apply zoom to SVG
       svg.call(zoom as any);
 
-      // store zoom behavior in ref
       zoomRef.current = zoom;
 
-      // Restore the previous zoom transform — but only when there is actually
-      // a zoom to restore. `zoom.transform` dispatches start/zoom/end events
-      // synchronously, and the chart's zoom handler answers with a full
-      // axes + grid + every-layer re-render. Charts call setupZoom right after
-      // drawing at base scales, so replaying an identity transform repeats all
-      // of that work to render the exact same pixels — on every rebuild.
-      //
-      // At identity nothing needs to move: attaching the behavior above
-      // already initialized the node's internal `__zoom` state (d3-zoom
-      // preserves an existing transform or defaults to identity), so internal
-      // state and drawn state agree. The node-state check is defensive: if the
-      // node somehow disagrees with our ref (it shouldn't — the `zoom.store`
-      // listener keeps them in sync), fall through to the replay.
       const stored = zoomTransformRef.current;
       const nodeTransform = d3.zoomTransform(svg.node()!);
       const isIdentity = (t: d3.ZoomTransform) => t.k === 1 && t.x === 0 && t.y === 0;
@@ -219,7 +145,6 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
         svg.call(zoom.transform as any, stored);
       }
 
-      // double-click to reset zoom
       svg.on('dblclick.zoom', () => {
         svg
           .transition('zoom')

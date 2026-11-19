@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -30,8 +30,10 @@ import {
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,6 +41,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -61,7 +64,7 @@ import {
   type CacheReuseBar,
 } from './cache-reuse';
 import CacheReuseChart, { CACHE_REUSE_STRINGS, configLabel, tierLabel } from './CacheReuseChart';
-import { useThroughputData, type GroupMeta } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange, type GroupMeta } from './useThroughputData';
 
 const STRINGS = {
   en: {
@@ -84,7 +87,8 @@ const STRINGS = {
       'Fixed-sequence runs record no prefix-cache tiers, so there is nothing to stack here. Switch the scenario to AgentX.',
     noTiers:
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
-    captionSource: 'Source: SemiAnalysis InferenceX',
+    source: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + unofficial overlays',
     unofficialRun: 'Unofficial run',
     colSeries: 'Series',
     colConcurrency: 'Concurrency',
@@ -114,7 +118,8 @@ const STRINGS = {
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
     noTiersFixed: '固定序列的运行不记录前缀缓存层级，此处没有可堆叠的数据。请将场景切换为 AgentX。',
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
-    captionSource: '来源：SemiAnalysis InferenceX',
+    source: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + 非官方 overlays',
     unofficialRun: '非官方运行',
     colSeries: '系列',
     colConcurrency: '并发数',
@@ -145,21 +150,24 @@ interface ConfigOption {
   key: string;
   meta: GroupMeta;
   label: string;
-  /** No official rows; the configuration exists only in a loaded run. */
   overlayOnly: boolean;
 }
 
-export default function CacheReuseDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+export default function CacheReuseDisplay() {
   return (
-    <GlobalFilterProvider
-      initialModel={urlSeed?.model}
-      initialSequence={urlSeed?.sequence}
-      initialPrecisions={urlSeed?.precisions}
-      initialRunDate={urlSeed?.runDate}
-      initialRunId={urlSeed?.runId}
-    >
-      <CacheReuseInner />
-    </GlobalFilterProvider>
+    <CalculatorUrlSeedBoundary>
+      {(urlSeed) => (
+        <GlobalFilterProvider
+          initialModel={urlSeed.model}
+          initialSequence={urlSeed.sequence}
+          initialPrecisions={urlSeed.precisions}
+          initialRunDate={urlSeed.runDate}
+          initialRunId={urlSeed.runId}
+        >
+          <CacheReuseInner />
+        </GlobalFilterProvider>
+      )}
+    </CalculatorUrlSeedBoundary>
   );
 }
 
@@ -176,16 +184,12 @@ function CacheReuseInner() {
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const warmThroughputChange = useWarmThroughputChange();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
 
-  // URL-seeded so an article can link the exact configuration; empty means
-  // "the configuration with the most tiered rows", which is why the default
-  // is never written back.
   const [configInput, setConfigInput] = useState<string>(() => readUrlParams().c_cfg ?? '');
-  // Empty means the recipe with the most tiered rows; like `c_cfg`, the
-  // default is never written back.
   const [recipeInput, setRecipeInput] = useState<string>(() => readUrlParams().c_recipe ?? '');
   const [showCeiling, setShowCeiling] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
@@ -335,7 +339,6 @@ function CacheReuseInner() {
   }, []);
   const handleConfigChange = useCallback((key: string) => {
     setConfigInput(key);
-    // Recipe keys belong to one configuration; carry none across a switch.
     setRecipeInput('');
     writeUrlParams({ c_cfg: key, c_recipe: '' });
     track('cache_reuse_config_selected', { config: key });
@@ -430,7 +433,12 @@ function CacheReuseInner() {
         sortValue: (r) => r.ceiling ?? -1,
         align: 'right',
       },
-      { header: t.colRecipe, cell: (r) => r.recipe, sortValue: (r) => r.recipe },
+      {
+        header: t.colRecipe,
+        cell: (r) => r.recipe,
+        sortValue: (r) => r.recipe,
+        className: 'whitespace-nowrap',
+      },
       {
         header: t.colRun,
         cell: (r) =>
@@ -439,7 +447,7 @@ function CacheReuseInner() {
               href={r.runUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2"
+              className="text-brand underline underline-offset-2"
               onClick={() => track('cache_reuse_run_link_clicked')}
             >
               {t.viewRun}
@@ -492,15 +500,31 @@ function CacheReuseInner() {
 
   const caption = (
     <>
-      <Heading as="h2" level="card">
-        {t.title}
-      </Heading>
-      <p className="text-sm text-muted-foreground mb-2">
-        {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)}
-        {selectedConfig ? ` • ${selectedConfig.label}` : ''}
-        {plottedRecipeLabel ? ` • ${plottedRecipeLabel}` : ''} • {t.captionSource}
-      </p>
+      <div className="md:pr-12">
+        <Heading as="h2" level="card">
+          {t.title}
+        </Heading>
+        <p className="text-sm text-muted-foreground mb-2">
+          {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)}
+          {selectedConfig ? ` · ${selectedConfig.label}` : ''}
+          {plottedRecipeLabel ? ` · ${plottedRecipeLabel}` : ''}
+        </p>
+      </div>
+      {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+      {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+      {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
+  );
+
+  const footer = (
+    <div className="mt-3">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        date={selectedRunDate}
+        source={isUnofficialRun ? t.sourceWithOverlays : t.source}
+      />
+    </div>
   );
 
   const legendElement = (
@@ -510,7 +534,7 @@ function CacheReuseInner() {
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('cache_reuse_legend_expanded', { expanded });
+        track('cache_reuse_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {
@@ -529,11 +553,12 @@ function CacheReuseInner() {
   if (!loading && error) {
     console.error(error);
     return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
     );
   }
 
@@ -542,7 +567,11 @@ function CacheReuseInner() {
       <section data-testid="cache-reuse-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
+            <DashboardSectionHeader
+              headingAs="h1"
+              title={t.title}
+              actions={<ChartShareActions />}
+            />
 
             <TooltipProvider delayDuration={0}>
               <ControlPanel
@@ -558,6 +587,7 @@ function CacheReuseInner() {
                     onChange={handleModelChange}
                     open={openDropdown === 'model'}
                     onOpenChange={handleDropdownOpenChange('model')}
+                    onOptionIntent={(model) => warmThroughputChange({ model })}
                     availableModels={availableModels}
                   />
                 </div>
@@ -568,6 +598,7 @@ function CacheReuseInner() {
                   onChange={handleSequenceChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
+                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
                   availableSequences={availableSequences}
                   model={selectedModel}
                 />
@@ -578,6 +609,7 @@ function CacheReuseInner() {
                   onChange={handlePrecisionChange}
                   open={openDropdown === 'precision'}
                   onOpenChange={handleDropdownOpenChange('precision')}
+                  onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
                   availablePrecisions={availablePrecisions}
                 />
               </ControlPanel>
@@ -657,29 +689,27 @@ function CacheReuseInner() {
       )}
 
       {!loading && !hasAnyData && (
-        <Card>
-          <div
-            className="flex items-center justify-center h-64 text-muted-foreground text-center px-6"
-            data-testid="cache-reuse-no-data"
-          >
-            {t.noData}
-          </div>
-        </Card>
+        <EmptyState className="h-64" data-testid="cache-reuse-no-data">
+          {t.noData}
+        </EmptyState>
       )}
 
       {!loading && hasAnyData && (
         <Card>
-          <figure data-testid="cache-reuse-figure" className="relative rounded-lg">
+          <figure data-testid="cache-reuse-figure" className="relative min-w-0">
             <ChartButtons
               chartId="cache-reuse"
               analyticsPrefix="cache_reuse"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+              })}
+              className="md:absolute md:right-0 md:top-0 md:z-10 md:mb-0"
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_cache_reuse_${selectedModel}`}
             />
-            {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-            {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
             {hasBars ? (
               <CacheReuseChart
                 result={result}
@@ -688,16 +718,15 @@ function CacheReuseInner() {
                 runInfoByIndex={runInfoByIndex}
                 legendElement={legendElement}
                 caption={caption}
+                footer={footer}
               />
             ) : (
               <>
                 <figcaption>{caption}</figcaption>
-                <div
-                  className="flex items-center justify-center h-48 text-muted-foreground text-center px-6"
-                  data-testid="cache-reuse-no-tiers"
-                >
+                <EmptyState bare className="h-48 px-6" data-testid="cache-reuse-no-tiers">
                   {isAgenticSequence ? t.noTiers : t.noTiersFixed}
-                </div>
+                </EmptyState>
+                {footer}
               </>
             )}
           </figure>

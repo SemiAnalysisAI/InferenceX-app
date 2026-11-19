@@ -8,8 +8,6 @@ import {
   type HorizontalBarConfig,
 } from './horizontal-bars';
 
-// ── Fixtures ─────────────────────────────────────────────────────────
-
 interface TestDatum {
   label: string;
   value: number;
@@ -42,8 +40,6 @@ function makeScales() {
   const xScale = d3.scaleLinear().domain([0, 300]).range([0, 600]);
   return { yScale, xScale };
 }
-
-// ── renderHorizontalBars ─────────────────────────────────────────────
 
 describe('renderHorizontalBars', () => {
   it('creates one rect per data item', () => {
@@ -112,12 +108,10 @@ describe('renderHorizontalBars', () => {
   it('clamps negative xScale values to 0', () => {
     const group = createMockGroup();
     const { yScale } = makeScales();
-    // Scale that can produce negative values
     const xScale = d3.scaleLinear().domain([100, 300]).range([0, 600]);
     const data: TestDatum[] = [{ label: 'GPU-A', value: 50, color: '#f00' }];
     const result = asMock(renderHorizontalBars(group as any, data, yScale, xScale, makeConfig()));
 
-    // xScale(50) would be negative
     expect(result.elements[0].attrs['width']).toBe(0);
   });
 
@@ -215,8 +209,6 @@ describe('renderHorizontalBars', () => {
   });
 });
 
-// ── updateHorizontalBarsOnZoom ───────────────────────────────────────
-
 describe('updateHorizontalBarsOnZoom', () => {
   it('updates width on existing bars with new scale', () => {
     const group = createMockGroup();
@@ -237,6 +229,5 @@ describe('updateHorizontalBarsOnZoom', () => {
     const group = createMockGroup();
     const xScale = d3.scaleLinear().domain([0, 300]).range([0, 600]);
     updateHorizontalBarsOnZoom(group as any, xScale, (d: TestDatum) => d.value);
-    // Should not throw
   });
 });

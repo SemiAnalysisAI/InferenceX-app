@@ -52,11 +52,11 @@ export function ScatterEmptyState({
     <div
       data-testid="scatter-empty-state"
       data-reason={reason}
-      className="pointer-events-auto mx-auto flex max-w-lg flex-col items-center gap-3 rounded-xl border bg-background/95 p-5 text-center shadow-sm"
+      className="pointer-events-auto mx-auto flex max-w-lg flex-col items-center gap-3 rounded-xl border border-border/30 bg-card p-5 text-center"
     >
       <ChartNoAxesCombined className="size-7 text-muted-foreground" aria-hidden="true" />
       <div className="space-y-1.5">
-        <h3 className="text-sm font-semibold">{t.title}</h3>
+        <h3 className="text-sm font-medium">{t.title}</h3>
         <p className="text-sm text-muted-foreground">
           {description ?? (reason === 'selection' ? t.hint : t[reason])}
         </p>

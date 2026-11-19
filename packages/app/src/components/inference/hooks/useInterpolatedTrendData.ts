@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
@@ -9,13 +9,15 @@ import type {
   TrendDataPoint,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
+import { useTrendHistory } from '@/hooks/api/use-trend-history';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
-import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import type { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
-  buildTrendLines,
-  groupTrendRowsByDate,
+  buildTrendCurves,
+  evaluateTrendCurves,
+  groupTrendRows,
+  prepareTrendRows,
   trendMetricDependencies,
 } from './interpolated-trend-core';
 export {
@@ -35,6 +37,7 @@ interface UseInterpolatedTrendDataParams {
   tokenRevenuePricing?: TokenRevenuePricing | null;
   enabled: boolean;
   tcoBasis?: TcoBasis;
+  chipBasis?: ChipBasis;
 }
 
 interface UseInterpolatedTrendDataResult {
@@ -46,13 +49,6 @@ interface UseInterpolatedTrendDataResult {
   refetch: () => Promise<unknown>;
 }
 
-/**
- * Hook that loads historical benchmark data, groups by GPU per date, and interpolates
- * the selected metric at a user-specified interactivity level for each date.
- *
- * Uses the /api/v1/benchmarks/history endpoint which returns all dates in one query.
- * The interpolation memo re-computes instantly when targetInteractivity or metric changes.
- */
 export function useInterpolatedTrendData({
   selectedModel,
   selectedSequence,
@@ -62,26 +58,22 @@ export function useInterpolatedTrendData({
   tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
   tcoBasis = DEFAULT_TCO_BASIS,
+  chipBasis = DEFAULT_CHIP_BASIS,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
-  const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
-
   const {
     data: allRows,
     isLoading,
     error,
     refetch,
-  } = useBenchmarkHistory(
-    enabled ? selectedModel : '',
-    seqIslOsl?.isl ?? 0,
-    seqIslOsl?.osl ?? 0,
-    selectedSequence === Sequence.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
-  );
+  } = useTrendHistory(enabled ? selectedModel : '', selectedSequence);
   const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
   const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 
+  const trendRows = useMemo(() => prepareTrendRows(allRows ?? [], chipBasis), [allRows, chipBasis]);
+
   const dateGroupedData = useMemo(
     () =>
-      groupTrendRowsByDate(allRows ?? [], {
+      groupTrendRows(trendRows, {
         selectedPrecisions,
         selectedYAxisMetric,
         requestedMetrics,
@@ -89,7 +81,7 @@ export function useInterpolatedTrendData({
         tcoBasis,
       }),
     [
-      allRows,
+      trendRows,
       selectedPrecisions,
       selectedYAxisMetric,
       requestedMetrics,
@@ -98,18 +90,20 @@ export function useInterpolatedTrendData({
     ],
   );
 
-  const { trendLines, hwKeysWithData } = useMemo(
-    () =>
-      buildTrendLines(dateGroupedData, {
-        targetInteractivity,
-        trendMetricKey,
-        tokenRevenuePricing,
-        extendToDate: new Date().toISOString().slice(0, 10),
-      }),
-    [dateGroupedData, targetInteractivity, trendMetricKey, tokenRevenuePricing],
+  const trendCurves = useMemo(
+    () => buildTrendCurves(dateGroupedData, { trendMetricKey, tokenRevenuePricing }),
+    [dateGroupedData, trendMetricKey, tokenRevenuePricing],
   );
 
-  // Artificial progress that ramps up while the API call is in flight
+  const { trendLines, hwKeysWithData } = useMemo(
+    () =>
+      evaluateTrendCurves(trendCurves, {
+        targetInteractivity,
+        extendToDate: new Date().toISOString().slice(0, 10),
+      }),
+    [trendCurves, targetInteractivity],
+  );
+
   const [progress, setProgress] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
 

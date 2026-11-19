@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import GpuMetricsChart, {
+  allInWattsForHardware,
   GPU_COLORS,
   type TelemetryOverlaySeries,
 } from '@/components/gpu-power/GpuPowerChart';
@@ -22,6 +23,7 @@ import {
 } from '@/components/gpu-power/types';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import {
@@ -35,13 +37,14 @@ import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-me
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 
 import { availableOverlaySources } from './overlay-sources';
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
     loading: 'Loading PowerX telemetry…',
-    error: 'Failed to load PowerX telemetry.',
+    error: 'Failed to load PowerX telemetry',
     missing:
       'No PowerX telemetry is stored for benchmark point #{id}. Telemetry may not have been collected or ingested.',
     series: 'Telemetry series',
@@ -56,19 +59,21 @@ const STRINGS = {
     perGpuStats: 'Per-chip statistics',
     chip: 'Chip',
     secondsUnit: 's',
-    resetFilter: 'Show all chips',
+    allInLine: 'All-in provisioned line',
+    allInHelp:
+      'Dashed reference at the all-in provisioned utility power per chip from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
     overlayToggle: 'Overlay server metric',
     overlayNone: 'None',
     overlayLoading: 'Loading server metrics…',
     overlayError: 'Server metrics failed to load; overlays are unavailable.',
-    overlayUnavailable: 'This point has no server-metric series to overlay.',
+    overlayUnavailable: 'This point has no server-metric series to overlay',
     overlayAligned: 'The overlay is aligned to the telemetry by wall-clock timestamps.',
     overlayRelative:
       'The trace has no wall-clock timestamps, so the overlay and the telemetry are both aligned at their own t=0.',
   },
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
-    error: 'PowerX 遥测数据加载失败。',
+    error: 'PowerX 遥测数据加载失败',
     missing: '基准测试数据点 #{id} 没有存储的 PowerX 遥测数据。遥测数据可能尚未采集或入库。',
     series: '遥测序列',
     metric: '指标',
@@ -82,12 +87,14 @@ const STRINGS = {
     perGpuStats: '单芯片统计信息',
     chip: '芯片',
     secondsUnit: '秒',
-    resetFilter: '显示全部芯片',
+    allInLine: '整体预配功耗参考线',
+    allInHelp:
+      '以虚线标出硬件注册表中每芯片的整体预配功耗，即市电侧的 all-in 功率（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
     overlayToggle: '叠加服务端指标',
     overlayNone: '无',
     overlayLoading: '正在加载服务端指标……',
     overlayError: '服务端指标加载失败，无法叠加显示。',
-    overlayUnavailable: '该数据点没有可叠加的服务端指标序列。',
+    overlayUnavailable: '该数据点没有可叠加的服务端指标序列',
     overlayAligned: '叠加曲线已按绝对时间戳与遥测数据对齐。',
     overlayRelative: 'trace 缺少绝对时间戳，因此叠加曲线与遥测数据均从各自的 t=0 开始对齐。',
   },
@@ -95,10 +102,6 @@ const STRINGS = {
 
 const VENDOR_LABEL: Record<string, string> = { nvidia: 'nvidia-smi', amd: 'amd-smi' };
 
-/**
- * Single-node CSVs come from the vendor CLI; multinode power bundles record
- * their own producer (e.g. `srt-slurm.dcgm-power`) in the context sidecar.
- */
 export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecars'>): string {
   const context = series.sidecars?.context;
   const producer =
@@ -107,12 +110,18 @@ export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecar
   return VENDOR_LABEL[series.vendor] ?? series.vendor;
 }
 
+/** Reader-facing collector name; the raw producer id stays in the title attribute. */
+function collectorDisplayName(producer: string): string {
+  if (/dcgm/iu.test(producer)) return 'NVIDIA DCGM';
+  if (/amd-smi|amdsmi|rocm-smi/iu.test(producer)) return 'AMD SMI';
+  if (/nvidia-smi|nvml/iu.test(producer)) return 'nvidia-smi';
+  return producer;
+}
+
 interface Props {
   id: number;
   enabled: boolean;
-  /** The point's hardware key, for the TDP reference line. */
   hardware?: string;
-  /** Fixed-sequence points do not have AgentX server-metric overlays. */
   serverMetricsEnabled?: boolean;
 }
 
@@ -120,13 +129,9 @@ function seriesLabel(series: GpuMetricSeries, total: number): string {
   return total > 1 ? `${series.artifactName} · ${series.fileName}` : series.artifactName;
 }
 
-/**
- * PowerX tab of the per-point detail page: the full-resolution chip telemetry
- * recorded while this benchmark point ran, read from the ingest-time digest
- * (migration 016) rather than from GitHub artifacts.
- */
 export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled = true }: Props) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const query = useGpuMetricsPoint(id, enabled);
   const seriesList = query.data?.series ?? [];
@@ -150,8 +155,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
     () => [...new Set(data.map((row) => row.index))].toSorted((a, b) => a - b),
     [data],
   );
-  // Hidden chips are scoped to the series they were hidden on so switching
-  // series never carries over a stale filter.
   const [hiddenSelection, setHiddenSelection] = useState<{
     seriesId: number;
     hidden: number[];
@@ -171,7 +174,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   );
   const toggleGpu = (gpuIndex: number) => {
     if (!selectedSeries) return;
-    track('inference_agentic_power_gpu_toggled', { id, gpuIndex });
+    track('inference_agentic_power_gpu_toggled', { id, gpu_index: gpuIndex });
     const next = new Set(hiddenGpus);
     if (next.has(gpuIndex)) next.delete(gpuIndex);
     else next.add(gpuIndex);
@@ -179,9 +182,8 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   };
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
+  const [showAllIn, setShowAllIn] = useState(false);
 
-  // Server-metric overlay. The series are fetched as soon as the tab opens so
-  // the menu can list exactly the metrics this point has; one source at a time.
   const metricsQuery = useTraceServerMetrics(id, enabled && serverMetricsEnabled);
   const serverMetrics = metricsQuery.data;
   const overlaySources = useMemo(() => availableOverlaySources(serverMetrics), [serverMetrics]);
@@ -190,8 +192,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   );
   const overlayKey = overlaySelection?.id === id ? overlaySelection.key : 'none';
   const overlaySource = overlaySources.find((source) => source.key === overlayKey) ?? null;
-  // Trace timeslices carry epoch-ns starts, so both series can share wall-clock
-  // time. A zero startNs means the trace only has relative time.
   const overlayAbsolute = Boolean(serverMetrics && serverMetrics.startNs > 0);
   const overlay = useMemo<TelemetryOverlaySeries | null>(() => {
     if (!overlaySource || !serverMetrics || !selectedSeries) return null;
@@ -216,14 +216,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   if (!enabled) return null;
 
   if (query.isLoading) {
-    return (
-      <div
-        className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground"
-        data-testid="power-telemetry-loading"
-      >
-        {t.loading}
-      </div>
-    );
+    return <EmptyState data-testid="power-telemetry-loading">{t.loading}</EmptyState>;
   }
   if (query.isError && !query.data) {
     return (
@@ -237,12 +230,9 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   }
   if (!selectedSeries) {
     return (
-      <div
-        className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground"
-        data-testid="power-telemetry-missing"
-      >
+      <EmptyState data-testid="power-telemetry-missing">
         {t.missing.replace('{id}', String(id))}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -259,7 +249,9 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
         <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.vendor}</dt>
-            <dd className="font-medium">{collectorLabel(selectedSeries)}</dd>
+            <dd className="truncate font-medium" title={collectorLabel(selectedSeries)}>
+              {collectorDisplayName(collectorLabel(selectedSeries))}
+            </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.samples}</dt>
@@ -294,11 +286,19 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               <Select
                 value={String(selectedSeries.id)}
                 onValueChange={(value) => {
-                  track('inference_agentic_power_series_selected', { id, seriesId: Number(value) });
+                  track('inference_agentic_power_series_selected', {
+                    ...analyticsContext,
+                    id,
+                    series_id: Number(value),
+                  });
                   setSeriesSelection({ id, seriesId: Number(value) });
                 }}
               >
-                <SelectTrigger id="power-telemetry-series-select" className="w-full truncate">
+                <SelectTrigger
+                  id="power-telemetry-series-select"
+                  size="sm"
+                  className="w-full truncate"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -323,6 +323,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               <SelectTrigger
                 id="power-telemetry-metric-select"
                 data-testid="power-telemetry-metric-select"
+                size="sm"
                 className="w-full sm:w-56"
               >
                 <SelectValue />
@@ -359,6 +360,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 <SelectTrigger
                   id="power-telemetry-overlay"
                   data-testid="power-telemetry-overlay-select"
+                  size="sm"
                   className="w-full sm:w-64"
                 >
                   <SelectValue />
@@ -395,6 +397,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
           maxPoints={2000}
           display={display}
           overlay={overlay}
+          showAllIn={showAllIn}
           legendElement={
             <ChartLegend
               variant="sidebar"
@@ -403,6 +406,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 hw: String(gpuIndex),
                 label: `${t.chip} ${gpuIndex}`,
                 color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+                lineDasharray: 'none',
                 isActive: visibleGpus.has(gpuIndex),
                 onClick: () => toggleGpu(gpuIndex),
               }))}
@@ -413,22 +417,32 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               isLegendExpanded={isLegendExpanded}
               onExpandedChange={(expanded) => {
                 setIsLegendExpanded(expanded);
-                track('inference_agentic_power_legend_expanded', { id, expanded });
+                track('inference_agentic_power_legend_expanded', { id, enabled: expanded });
               }}
-              actions={
-                hiddenGpus.size === 0
-                  ? []
-                  : [
+              switches={
+                metricKey === 'power' && hardware && allInWattsForHardware(hardware) !== null
+                  ? [
                       {
-                        id: 'power-telemetry-show-all-chips',
-                        label: t.resetFilter,
-                        onClick: () => {
-                          track('inference_agentic_power_gpu_reset_filter', { id });
-                          setHiddenSelection(null);
+                        id: 'power-telemetry-all-in',
+                        label: t.allInLine,
+                        checked: showAllIn,
+                        onCheckedChange: (checked) => {
+                          setShowAllIn(checked);
+                          track('inference_agentic_power_all_in_toggled', { id, enabled: checked });
                         },
+                        infoTooltip: t.allInHelp,
                       },
                     ]
+                  : undefined
               }
+              reset={{
+                id: 'power-telemetry-show-all-chips',
+                disabled: hiddenGpus.size === 0,
+                onClick: () => {
+                  track('inference_agentic_power_gpu_reset_filter', { id });
+                  setHiddenSelection(null);
+                },
+              }}
             />
           }
           caption={

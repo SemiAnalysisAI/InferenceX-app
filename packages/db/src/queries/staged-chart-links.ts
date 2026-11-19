@@ -1,6 +1,5 @@
 import type { DbClient } from '../connection.js';
 
-/** Source fields for the chart lines actually present in one ingested run. */
 export interface StagedChartScope {
   model: string;
   hardware: string;
@@ -14,7 +13,6 @@ export interface StagedChartScope {
   date: string;
 }
 
-/** Read successful points from the latest ingested attempt, including partial sweeps. */
 export async function getStagedChartScopes(
   sql: DbClient,
   githubRunId: string,

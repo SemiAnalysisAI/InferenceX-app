@@ -183,12 +183,10 @@ describe('computePrefillSpeed', () => {
   });
 
   it('computes speed from cacheRead and ttftMs', () => {
-    // 100000 tokens / (500ms / 1000) = 200000 tok/s
     expect(computePrefillSpeed(100000, 0, 500)).toBe(200000);
   });
 
   it('sums cacheRead and cacheWrite', () => {
-    // (50000 + 50000) / (500ms / 1000) = 200000 tok/s
     expect(computePrefillSpeed(50000, 50000, 500)).toBe(200000);
   });
 });
@@ -203,7 +201,6 @@ describe('formatJsonCompact', () => {
     const obj = { hash_ids: ['abc123', 'def456', 'ghi789'] };
     const result = formatJsonCompact(obj);
     expect(result).toContain('"hash_ids": ["abc123", "def456", "ghi789"]');
-    // Should NOT have newlines inside the hash_ids array
     const hashIdsMatch = result.match(/"hash_ids":\s*\[.*\]/u);
     expect(hashIdsMatch).toBeTruthy();
     expect(hashIdsMatch![0]).not.toContain('\n');
@@ -212,7 +209,6 @@ describe('formatJsonCompact', () => {
   it('preserves other arrays normally', () => {
     const obj = { items: [1, 2, 3] };
     const result = formatJsonCompact(obj);
-    // Standard JSON.stringify expands arrays vertically
     expect(result).toBe(JSON.stringify(obj, null, 2));
   });
 });

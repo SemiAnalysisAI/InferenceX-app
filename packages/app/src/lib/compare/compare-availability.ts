@@ -1,19 +1,7 @@
-/**
- * Server-side helper: for each canonical compare model slug, returns the list
- * of GPU pairs that actually have benchmark data on both sides.
- *
- * Used by the /compare index, the sitemap, and the [slug] generateStaticParams
- * to avoid emitting cards / URLs for (model, pair) combinations where one or
- * both GPUs have no rows for that model. A pair is "comparable" if both GPU
- * keys appear in the availability table for any of the model's dbKeys.
- *
- * The page-level handler at /compare/[slug] still renders the empty-state
- * fallback if a user reaches a filtered-out URL directly, so this filtering
- * is purely an indexing/navigation concern, not a hard gate.
- */
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-
+import { mergeAvailabilityRows } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import {
   type AvailabilityRow,
   getAvailabilityData,
@@ -27,15 +15,12 @@ import {
   COMPARE_MODEL_SLUGS,
 } from '@/lib/compare/compare-slug';
 
-/** Cached availability query — shared with compare-variant-availability.ts. */
-export const getCachedAvailability = cachedQuery(() => {
-  if (FIXTURES_MODE) return Promise.resolve(loadFixture<AvailabilityRow[]>('availability'));
+export const getCachedAvailability = cachedQuery(async () => {
+  if (FIXTURES_MODE) return loadFixture<AvailabilityRow[]>('availability');
 
-  return getAvailabilityData(getDb());
+  return mergeAvailabilityRows(await readEachDb(getAvailabilityData));
 }, 'availability');
 
-/** Build a dbKey → canonical model slug index from COMPARE_MODEL_SLUGS. Shared
- *  with compare-variant-availability.ts to avoid duplicating the mapping. */
 export function buildDbKeyToSlugMap(): Map<string, string> {
   const dbKeyToSlug = new Map<string, string>();
   for (const m of COMPARE_MODEL_SLUGS) {
@@ -44,10 +29,7 @@ export function buildDbKeyToSlugMap(): Map<string, string> {
   return dbKeyToSlug;
 }
 
-/** Map from canonical model slug → set of GPU keys that have benchmark rows
- *  for any of the model's dbKeys. */
-async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
-  const rows = await getCachedAvailability();
+function hardwareByModelSlug(rows: readonly AvailabilityRow[]): Map<string, Set<string>> {
   const dbKeyToSlug = buildDbKeyToSlugMap();
   const out = new Map<string, Set<string>>();
   for (const m of COMPARE_MODEL_SLUGS) out.set(m.slug, new Set());
@@ -59,12 +41,15 @@ async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
   return out;
 }
 
-/** For each canonical model slug, return the GPU pairs where both GPUs have
- *  benchmark data for that model. Pairs are alphabetical (a < b), matching
- *  the canonical slug ordering. Returns empty list for models with fewer than
- *  2 GPUs that have data. */
-export async function getComparablePairsByModelSlug(): Promise<Map<string, ComparePair[]>> {
-  const hwByModel = await getHardwareByModelSlug();
+/** Hardware keys with benchmark rows, keyed by model slug. */
+export async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
+  return hardwareByModelSlug(await getCachedAvailability());
+}
+
+export async function getComparablePairsByModelSlug(
+  rows?: readonly AvailabilityRow[],
+): Promise<Map<string, ComparePair[]>> {
+  const hwByModel = hardwareByModelSlug(rows ?? (await getCachedAvailability()));
   const allPairs = allCanonicalComparePairs();
   const out = new Map<string, ComparePair[]>();
   for (const m of COMPARE_MODEL_SLUGS) {
@@ -77,12 +62,10 @@ export async function getComparablePairsByModelSlug(): Promise<Map<string, Compa
   return out;
 }
 
-/** Flattened cross-product of (model, comparable pair). Used by the sitemap
- *  and by `generateStaticParams` so neither emits URLs for empty pairs. */
-export async function getAllComparableCompareSlugs(): Promise<
-  { modelSlug: string; a: string; b: string }[]
-> {
-  const byModel = await getComparablePairsByModelSlug();
+export async function getAllComparableCompareSlugs(
+  rows?: readonly AvailabilityRow[],
+): Promise<{ modelSlug: string; a: string; b: string }[]> {
+  const byModel = await getComparablePairsByModelSlug(rows);
   const out: { modelSlug: string; a: string; b: string }[] = [];
   for (const [modelSlug, pairs] of byModel.entries()) {
     for (const p of pairs) out.push({ modelSlug, a: p.a, b: p.b });

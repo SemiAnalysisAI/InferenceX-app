@@ -14,10 +14,14 @@ import {
   type ScaleConfig,
   type AxisConfig,
 } from '@/lib/d3-chart/D3Chart';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import DOMPurify from 'dompurify';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -25,7 +29,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { AiChartBarPoint, AiChartSpec } from './types';
 import type { AiSingleChartResult, AiRadarItem } from '@/hooks/api/use-ai-chart';
 
-/** Sanitize tooltip HTML that may contain LLM-generated strings. */
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['div', 'span', 'strong', 'br'],
@@ -42,10 +45,9 @@ const STRINGS = {
   en: {
     interactivityAxis: 'Interactivity (tok/s/user)',
     interactivity: 'Interactivity',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     summary: 'AI Summary',
-    noData: 'No data matched this chart specification.',
+    noData: 'No data matched this chart specification',
     chartAria: {
       bar: 'AI-generated bar chart',
       scatter: 'AI-generated scatter chart',
@@ -56,9 +58,9 @@ const STRINGS = {
   zh: {
     interactivityAxis: '交互性（tok/s/user）',
     interactivity: '交互性',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     summary: 'AI 总结',
-    noData: '当前图表配置没有匹配的数据。',
+    noData: '当前图表配置没有匹配的数据',
     chartAria: {
       bar: 'AI 生成的条形图',
       scatter: 'AI 生成的散点图',
@@ -67,10 +69,6 @@ const STRINGS = {
     },
   },
 } as const;
-
-// ---------------------------------------------------------------------------
-// Bar Chart (horizontal)
-// ---------------------------------------------------------------------------
 
 function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }) {
   const locale = useLocale();
@@ -119,22 +117,27 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     return [barLayer];
   }, [data]);
 
-  const tooltip = useMemo<TooltipConfig<AiChartBarPoint>>(
-    () => ({
+  const tooltip = useMemo<TooltipConfig<AiChartBarPoint>>(() => {
+    const metrics = (d: AiChartBarPoint, unitsOnly: boolean) => [
+      {
+        value: d.value.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+        label: unitsOnly ? axisLabelUnit(spec.yAxisLabel) : spec.yAxisLabel,
+      },
+    ];
+    return {
       rulerType: 'none',
       content: (d) =>
-        sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>
-        </div>`),
-    }),
-    [numberLocale, spec.yAxisLabel],
-  );
+        sanitize(chartHoverCard({ title: d.label, color: d.color, metrics: metrics(d, true) })),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails
+          title={d.label}
+          color={d.color}
+          metrics={metrics(d, false)}
+          onClose={close}
+        />
+      ),
+    };
+  }, [numberLocale, spec.yAxisLabel]);
 
   return (
     <div role="img" aria-label={t.chartAria.bar}>
@@ -154,10 +157,6 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Scatter Chart
-// ---------------------------------------------------------------------------
 
 function ScatterChart({
   data,
@@ -202,28 +201,36 @@ function ScatterChart({
     return [scatterLayer];
   }, [data, colorMap]);
 
-  const tooltip = useMemo<TooltipConfig<InferenceData>>(
-    () => ({
-      rulerType: 'crosshair',
-      content: (d) => {
-        const hwKey = d.hwKey ?? '';
-        const color = colorMap[hwKey] ?? '#888';
-        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${hwKey}</span>
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
-            <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>
-        </div>`);
+  const tooltip = useMemo<TooltipConfig<InferenceData>>(() => {
+    const metrics = (d: InferenceData, unitsOnly: boolean) => [
+      {
+        value: d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+        label: unitsOnly ? axisLabelUnit(spec.yAxisLabel) : spec.yAxisLabel,
       },
-    }),
-    [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
-  );
+      { value: d.x.toFixed(1), label: unitsOnly ? 'tok/s/user' : t.interactivityAxis },
+    ];
+    return {
+      rulerType: 'crosshair',
+      content: (d) =>
+        sanitize(
+          chartHoverCard({
+            title: d.hwKey ?? '',
+            color: colorMap[d.hwKey ?? ''] ?? '#888',
+            metrics: metrics(d, true),
+          }),
+        ),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails
+          title={d.hwKey ?? ''}
+          color={colorMap[d.hwKey ?? ''] ?? '#888'}
+          metrics={metrics(d, false)}
+          onClose={close}
+        />
+      ),
+      getRulerX: (d, xS) => (xS as ContinuousScale)(d.x),
+      getRulerY: (d, yS) => yS(d.y),
+    };
+  }, [colorMap, numberLocale, spec.yAxisLabel, t.interactivityAxis]);
 
   return (
     <div role="group" aria-label={t.chartAria.scatter}>
@@ -250,10 +257,6 @@ function ScatterChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Line Chart
-// ---------------------------------------------------------------------------
 
 interface LinePoint {
   hwKey: string;
@@ -327,34 +330,41 @@ function LineChart({
     return [lineLayer, scatterLayer];
   }, [lineData, flatPoints, colorMap]);
 
-  const tooltip = useMemo<TooltipConfig<LinePoint>>(
-    () => ({
-      rulerType: 'crosshair',
-      content: (d) => {
-        const color = colorMap[d.hwKey] ?? '#888';
-        const config = getHardwareConfig(d.hwKey);
-        const label = config
-          ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}`
-          : d.hwKey;
-        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${label}</span>
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
-            <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>
-        </div>`);
+  const tooltip = useMemo<TooltipConfig<LinePoint>>(() => {
+    const label = (d: LinePoint) => {
+      const config = getHardwareConfig(d.hwKey);
+      return config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : d.hwKey;
+    };
+    const metrics = (d: LinePoint, unitsOnly: boolean) => [
+      {
+        value: d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+        label: unitsOnly ? axisLabelUnit(spec.yAxisLabel) : spec.yAxisLabel,
       },
-      getRulerX: (d, xS) => (xS as any)(d.x),
-      getRulerY: (d, yS) => (yS as any)(d.y),
+      { value: d.x.toFixed(1), label: unitsOnly ? 'tok/s/user' : t.interactivityAxis },
+    ];
+    return {
+      rulerType: 'crosshair',
+      content: (d) =>
+        sanitize(
+          chartHoverCard({
+            title: label(d),
+            color: colorMap[d.hwKey] ?? '#888',
+            metrics: metrics(d, true),
+          }),
+        ),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails
+          title={label(d)}
+          color={colorMap[d.hwKey] ?? '#888'}
+          metrics={metrics(d, false)}
+          onClose={close}
+        />
+      ),
+      getRulerX: (d, xS) => (xS as ContinuousScale)(d.x),
+      getRulerY: (d, yS) => yS(d.y),
       attachToLayer: 1,
-    }),
-    [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
-  );
+    };
+  }, [colorMap, numberLocale, spec.yAxisLabel, t.interactivityAxis]);
 
   return (
     <div role="group" aria-label={t.chartAria.line}>
@@ -381,10 +391,6 @@ function LineChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Radar Chart
-// ---------------------------------------------------------------------------
 
 function RadarChart({
   data,
@@ -414,32 +420,29 @@ function RadarChart({
     return [radarLayer];
   }, [data, axes]);
 
-  const tooltip = useMemo<TooltipConfig<AiRadarItem>>(
-    () => ({
+  const tooltip = useMemo<TooltipConfig<AiRadarItem>>(() => {
+    const metrics = (d: AiRadarItem) =>
+      axes.flatMap((axis, i) => {
+        const raw = d.rawValues[i];
+        return raw === null || raw === undefined
+          ? []
+          : [
+              {
+                value: raw.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+                label: axis.label,
+              },
+            ];
+      });
+    return {
       rulerType: 'none',
-      content: (d) => {
-        const metricRows = axes
-          .map((axis, i) => {
-            const raw = d.rawValues[i];
-            return raw === null
-              ? ''
-              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}</div>`;
-          })
-          .filter(Boolean)
-          .join('');
-        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">${metricRows}</div>
-        </div>`);
-      },
-    }),
-    [axes, numberLocale],
-  );
+      content: (d) =>
+        sanitize(chartHoverCard({ title: d.label, color: d.color, metrics: metrics(d) })),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails title={d.label} color={d.color} metrics={metrics(d)} onClose={close} />
+      ),
+    };
+  }, [axes, numberLocale]);
 
-  // Radar ignores scales/axes — it draws its own grid. Provide dummy scales.
   const dummyScale = useMemo<ScaleConfig>(() => ({ type: 'linear', domain: [0, 1] }), []);
 
   return (
@@ -457,10 +460,6 @@ function RadarChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Inline Legend
-// ---------------------------------------------------------------------------
 
 function InlineLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
@@ -488,10 +487,6 @@ function buildLegendItems(colorMap: Record<string, string>): { label: string; co
   });
 }
 
-// ---------------------------------------------------------------------------
-// Main Result Component
-// ---------------------------------------------------------------------------
-
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -506,8 +501,20 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
           Object.keys(chart.lineData).length > 0 ||
           chart.radarData.length > 0;
         return (
-          <figure key={i} className="relative rounded-lg">
-            <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
+          <figure key={i} className="relative">
+            <ChartButtons
+              chartId={chartId}
+              analyticsPrefix="ai_chart"
+              analyticsContext={selectionAnalyticsContext({
+                model: chart.spec.model,
+                sequence: chart.spec.sequence,
+                precisions: chart.spec.precisions,
+                // No hardware keys means every GPU, so the count is unknown.
+                gpuCount:
+                  chart.spec.hardwareKeys.length > 0 ? chart.spec.hardwareKeys.length : undefined,
+              })}
+              hideZoomReset={!hasZoom}
+            />
             <Card id={`${chartId}-export`}>
               <CardHeader>
                 <CardTitle>{chart.spec.title}</CardTitle>

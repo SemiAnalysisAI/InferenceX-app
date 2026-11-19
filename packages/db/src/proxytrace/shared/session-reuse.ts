@@ -1,4 +1,3 @@
-/** Aggregate-only session continuation evidence. No user or storage inference. */
 import { asOfDate } from './as-of';
 export const DEFAULT_REUSE_DAYS = [1, 2, 3, 4, 5, 6, 7, 14, 21, 28] as const;
 export const REUSE_FOLLOWUP_DAYS = 28;
@@ -92,7 +91,6 @@ function total(rows: readonly ReuseBucket[]): number {
   return rows.reduce((sum, r) => sum + r.count, 0);
 }
 
-/** R-7 quantile of a frequency table, without expanding request-sized arrays. */
 function quantile(rows: readonly ReuseBucket[], p: number): number | null {
   const n = total(rows);
   if (!n) return null;
@@ -212,7 +210,6 @@ function escapeCsvCell(value: string | number): string {
   return /[",\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-/** Numeric aggregates and fixed labels only; no session/credential IDs. */
 export function sessionReuseCsv(data: SessionReusePayload): string {
   const header = [
     'cohort',

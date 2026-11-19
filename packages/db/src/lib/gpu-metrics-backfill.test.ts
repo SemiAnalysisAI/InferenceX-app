@@ -24,8 +24,6 @@ const unreadable = (artifact: ArtifactMeta): Promise<never> =>
 
 describe('pairGpuMetricsArtifacts', () => {
   it('lets a power_audit bundle stand in only when its suffix has no unexpired gpu_metrics upload', () => {
-    // The bundle is listed before its gpu_metrics sibling on purpose: input
-    // order alone must not decide the winner.
     const pairs = pairGpuMetricsArtifacts([
       meta('power_audit_cfg-mn_b200-slurm_0', 1),
       meta('bmk_cfg-mn_b200-slurm_0', 2),

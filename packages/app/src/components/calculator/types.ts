@@ -9,59 +9,17 @@ export type CostType = 'total' | 'input' | 'output';
 export type BarMetric = 'throughput' | 'power' | 'cost';
 
 export interface GPUDataPoint {
-  /** Preserve the source of each frontier knot for paired power estimates. */
   sourceRow?: BenchmarkRow;
   hwKey: string;
-  interactivity: number; // tokens/sec/user (median_intvty = x in interactivity chart)
-  /**
-   * Time to first token in seconds, read at the same percentile as
-   * `interactivity` (agentic rows) or the median (fixed sequences), mirroring
-   * the inference chart's TTFT axis. Absent when the row reported none, so a
-   * missing measurement can never pass a first-token cap as a zero.
-   */
+  interactivity: number;
   ttft?: number;
-  /**
-   * End-to-end latency at the selected percentile. Agentic calculator groups
-   * use this to keep only the same anti-benchmark-hacking Pareto winners as the
-   * main interactivity chart before interpolation.
-   */
   e2eLatency?: number;
-  /** Run date used to keep agentic end-to-end frontiers date-scoped. */
   date?: string;
-  throughput: number; // tokens/sec/gpu total (tput_per_gpu = y in interactivity chart)
-  outputThroughput: number; // output tokens/sec/gpu
-  inputThroughput: number; // input tokens/sec/gpu
-  /**
-   * Fraction of this config's input tokens served from cache rather than
-   * prefilled — GPU plus external when external is reported, otherwise GPU plus
-   * CPU, clamped to [0,1].
-   *
-   * External already contains the CPU/offload tier on rows that report both, so
-   * CPU is used only in external's absence. Clamped because the GPU figure alone
-   * reaches 1.185 on some rows.
-   *
-   * Undefined for fixed sequences, which carry neither metric on any row. That
-   * absence is what makes cached-input billing a no-op outside agentic traces.
-   */
+  throughput: number;
+  outputThroughput: number;
+  inputThroughput: number;
   cacheHitRate?: number;
-  /**
-   * Infinite-cache theoretical hit rate (0..1) computed from the trace itself,
-   * representing the maximum reuse potential of the workload with unbounded
-   * cache capacity. See `theoretical_cache_hit_rate` on the source row.
-   * Undefined for fixed sequences or rows that did not report a theoretical rate.
-   */
   theoreticalCacheHitRate?: number;
-  /**
-   * Fraction of the tokens this config serves that are input tokens.
-   *
-   * Not simply `inputThroughput / (inputThroughput + outputThroughput)`: on a
-   * disaggregated run those two are per *prefill* and per *decode* chip while
-   * `throughput` is per chip overall, so they sum to as much as 16x the total.
-   * Revenue is charged on the fleet's chips, so it has to use the same
-   * denominator the fleet is sized and costed on — hence a share applied to
-   * `throughput` rather than the two rates read directly. See `inputTokenShare`
-   * in `useThroughputData.ts` for how the share is recovered.
-   */
   inputTokenShare?: number;
   concurrency: number;
   dp?: number;
@@ -70,80 +28,40 @@ export interface GPUDataPoint {
   ep?: number;
   dp_attention?: boolean;
   disagg?: boolean;
-  costh: number; // cost per million total tokens (owning at large hyperscaler volume)
-  costr: number; // cost per million total tokens (rental)
-  costhi: number; // cost per million input tokens (owning at large hyperscaler volume)
-  costri: number; // cost per million input tokens (rental)
-  costhOutput: number; // cost per million output tokens (owning at large hyperscaler volume)
-  costrOutput: number; // cost per million output tokens (rental)
-  tpPerMw: number; // total throughput per megawatt
-  inputTpPerMw: number; // input throughput per megawatt
-  outputTpPerMw: number; // output throughput per megawatt
+  costh: number;
+  costr: number;
+  costhi: number;
+  costri: number;
+  costhOutput: number;
+  costrOutput: number;
+  tpPerMw: number;
+  inputTpPerMw: number;
+  outputTpPerMw: number;
 }
 
 export interface InterpolatedResult {
-  hwKey: string; // hardware key for color/config lookup
-  resultKey: string; // unique key (hwKey or hwKey__precision when multi-precision)
-  precision?: string; // precision label when multiple precisions are selected
-  value: number; // interpolated total throughput or interactivity
-  outputTputValue: number; // interpolated output token throughput per GPU
-  inputTputValue: number; // interpolated input token throughput per GPU
-  cost: number; // cost per million total tokens at that operating point
-  costInput: number; // cost per million input tokens at that operating point
-  costOutput: number; // cost per million output tokens at that operating point
-  tpPerMw: number; // total throughput per megawatt at that operating point
-  inputTpPerMw: number; // input throughput per megawatt at that operating point
-  outputTpPerMw: number; // output throughput per megawatt at that operating point
-  /**
-   * Cached fraction of input tokens at that operating point, or undefined when
-   * the frontier did not carry a measured rate on every point (which is every
-   * fixed-sequence frontier). See {@link GPUDataPoint.cacheHitRate}.
-   */
+  hwKey: string;
+  resultKey: string;
+  precision?: string;
+  value: number;
+  outputTputValue: number;
+  inputTputValue: number;
+  cost: number;
+  costInput: number;
+  costOutput: number;
+  tpPerMw: number;
+  inputTpPerMw: number;
+  outputTpPerMw: number;
   cacheHitRate?: number;
-  /**
-   * Infinite-cache theoretical hit rate at that operating point, or undefined
-   * when the frontier did not carry a theoretical rate on every point.
-   * See {@link GPUDataPoint.theoreticalCacheHitRate}.
-   */
   theoreticalCacheHitRate?: number;
-  /**
-   * Fraction of the tokens this config serves that are input tokens.
-   *
-   * Not simply `inputThroughput / (inputThroughput + outputThroughput)`: on a
-   * disaggregated run those two are per *prefill* and per *decode* chip while
-   * `throughput` is per chip overall, so they sum to as much as 16x the total.
-   * Revenue is charged on the fleet's chips, so it has to use the same
-   * denominator the fleet is sized and costed on — hence a share applied to
-   * `throughput` rather than the two rates read directly. See `inputTokenShare`
-   * in `useThroughputData.ts` for how the share is recovered.
-   */
   inputTokenShare?: number;
-  concurrency: number; // concurrency at that operating point
-  nearestPoints: GPUDataPoint[]; // the data points used for interpolation
-  /**
-   * True when the requested target fell outside this series' measured range and
-   * the value is its nearest edge point rather than an interpolation. Shown in
-   * the tooltip so a clamped bar isn't read as measured at the current target.
-   */
+  concurrency: number;
+  nearestPoints: GPUDataPoint[];
   clamped?: boolean;
-  /**
-   * True when the target is above the frontier's max x (config cannot operate at
-   * this interactivity, so the bar is projected from the max edge).
-   */
   clampedAbove?: boolean;
-  /**
-   * True when the target is below the frontier's min x (the bar is projected from
-   * the min edge).
-   */
   clampedBelow?: boolean;
-  /**
-   * True when this result was interpolated from an unofficial-run overlay
-   * (`?unofficialrun=…`) rather than official DB data. Overlay results are
-   * rendered in the run's palette color and never mixed into the official
-   * Pareto frontier.
-   */
   isOverlay?: boolean;
-  runIndex?: number; // position of the run in the loaded set — drives the palette color
-  runLabel?: string; // branch name (or `run <id>` fallback) shown in labels/tooltips
-  runUrl?: string; // GitHub Actions run URL, linked from the overlay tooltip
+  runIndex?: number;
+  runLabel?: string;
+  runUrl?: string;
 }

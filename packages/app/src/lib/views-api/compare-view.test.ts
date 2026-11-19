@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// compare-ssr transitively imports the DB-backed benchmark loader; this pure
-// projection test never touches it, so stub the import chain out.
 vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));
 
 import type { BenchmarkRow } from '@/lib/api/api';

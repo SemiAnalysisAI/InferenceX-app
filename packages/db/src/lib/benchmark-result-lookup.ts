@@ -1,10 +1,3 @@
-/**
- * Resolve persisted `benchmark_results` ids for raw artifact rows that were
- * mapped through the production mapper. Shared by the sidecar backfills
- * (server logs, gpu_metrics) so every historical attachment uses the same
- * natural-key match as the CI ingest path.
- */
-
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -20,7 +13,6 @@ export interface BenchmarkRunSelector {
   run_attempt: number;
 }
 
-/** Purged points must not become missing-result errors or receipt expectations. */
 export async function filterPurgedBenchmarkRows(
   sql: Sql,
   run: BenchmarkRunSelector,
@@ -33,7 +25,6 @@ export async function filterPurgedBenchmarkRows(
   )
     return [...rows];
   const configIds = await loadConfigIds(sql);
-  // A config not stored yet cannot match an id-keyed purge.
   return rows.filter(
     (row) =>
       !isBenchmarkPointPurged(run.github_run_id, run.run_attempt, {
@@ -105,10 +96,6 @@ function findJsonFiles(root: string): string[] {
   return files.toSorted();
 }
 
-/**
- * Map known successful rows with the source run id, so run-scoped repairs apply
- * as in CI ingest; report unidentifiable rows separately from known failures.
- */
 export function readMappedBenchmarkRows(
   root: string,
   onUnmapped: (error: string) => void = () => {},

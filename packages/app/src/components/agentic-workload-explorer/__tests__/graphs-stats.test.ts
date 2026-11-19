@@ -20,19 +20,12 @@ import {
   statsCacheKey,
 } from '@semianalysisai/inferencex-db/proxytrace/stats';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Parity fixtures: inline copies of the ORIGINAL client-side math that lived in
-// packages/app/src/app/(dashboard)/graphs/page.tsx before the server-side binning
-// rewrite. The server ports (graph*) must be byte-for-byte equal to these.
-// ─────────────────────────────────────────────────────────────────────────
-
 interface Bucket {
   min: number;
   max: number;
   count: number;
 }
 
-// Original `buildHistogram(values, bucketCount)` — verbatim.
 function originalBuildHistogram(values: number[], bucketCount: number): Bucket[] {
   if (values.length === 0) return [];
   const sorted = [...values].toSorted((a, b) => a - b);
@@ -58,7 +51,6 @@ function originalBuildHistogram(values: number[], bucketCount: number): Bucket[]
   return buckets;
 }
 
-// Original Histogram percentile block — verbatim.
 function originalPercentiles(
   values: number[],
   tailDirection: 'high' | 'low',
@@ -73,7 +65,6 @@ function originalPercentiles(
   return ps.map((p) => ({ label: `p${p}`, value: transform(pct(p)) }));
 }
 
-// Original bucketConcurrencyCounts — verbatim (minus the client-only color).
 const ORIGINAL_CONCURRENCY_DEFS: { label: string; accepts: (v: number) => boolean }[] = [
   { label: '0', accepts: (v) => v === 0 },
   { label: '1', accepts: (v) => v === 1 },
@@ -96,9 +87,6 @@ function originalConcurrency(values: number[]): { label: string; value: number }
   return ORIGINAL_CONCURRENCY_DEFS.map((def, i) => ({ label: def.label, value: counts[i] }));
 }
 
-// Deterministic pseudo-random in [0, 1) so the adversarial fixtures are stable
-// across runs (exact values don't matter — the port is compared to the original
-// over the SAME array).
 function pseudoRandom(i: number): number {
   const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
@@ -151,7 +139,7 @@ describe('graphBuildHistogram (verbatim port of client buildHistogram)', () => {
 
 describe('graphPercentiles (verbatim port of the client percentile block)', () => {
   for (const { name, values } of ADVERSARIAL) {
-    if (values.length === 0) continue; // percentiles are never read when n===0
+    if (values.length === 0) continue;
     it(`high-tail set matches original on: ${name}`, () => {
       expect(graphPercentiles(values, 'high')).toEqual(originalPercentiles(values, 'high'));
     });
@@ -176,14 +164,11 @@ describe('graphPercentiles (verbatim port of the client percentile block)', () =
       'p25',
       'p50',
     ]);
-    // Nearest-rank: pct(50) = sorted[floor(0.5*100)] = sorted[50] = 51.
     expect(graphPercentiles(v, 'high')[0]).toEqual({ label: 'p50', value: 51 });
   });
 });
 
 describe('interactivity source/transform behavior', () => {
-  // TPOT (ms) → interactivity (tok/s): histogram uses 1000/tpot clipped to <=200,
-  // but percentiles come from ALL positive TPOT, transformed via 1000/v, low tail.
   const tpot = [0, 2, 4, 5, 8, 10, 12, 16, 20, 40, 100, 500, 1000, 4000];
   const positiveTpot = tpot.filter((v) => v > 0);
   const interactivityValues = positiveTpot.map((v) => 1000 / v).filter((v) => v <= 200);
@@ -198,8 +183,6 @@ describe('interactivity source/transform behavior', () => {
     const ported = graphPercentiles(interactivityValues, 'low', positiveTpot, (v) => 1000 / v);
     const original = originalPercentiles(interactivityValues, 'low', positiveTpot, (v) => 1000 / v);
     expect(ported).toEqual(original);
-    // Sanity: p1 of interactivity = 1000 / TPOT_p1 = 1000 / smallest positive TPOT.
-    // pct(1) over positiveTpot (n=13) = sorted[floor(0.01*13)] = sorted[0] = 2 → 500.
     expect(ported[0]).toEqual({ label: 'p1', value: 500 });
   });
 });
@@ -220,7 +203,6 @@ describe('graphConcurrencyBuckets (verbatim port of bucketConcurrencyCounts)', (
   it('emits the 7 labeled buckets in order (en-dash labels intact)', () => {
     const out = graphConcurrencyBuckets([0, 1, 2, 3, 4, 5, 6, 10, 11]);
     expect(out.map((b) => b.label)).toEqual(['0', '1', '2', '3', '4–5', '6–10', '11+']);
-    // 4 and 5 → '4–5'; 6 and 10 → '6–10'; 11 → '11+'.
     expect(out).toEqual([
       { label: '0', value: 1 },
       { label: '1', value: 1 },
@@ -249,11 +231,6 @@ describe("statsCacheKey('graphs', ...) shape", () => {
   });
 });
 
-// A Kysely instance whose connection always rejects — lets us prove whether a
-// dataset's query was ever attempted, without needing a real per-key row
-// shape for all 19 GraphDatasetKeys (which would require a live DB). If
-// computeGraphsPayload resolves without touching this connection, no dataset
-// query ran; if it queries at all, the returned promise rejects.
 const noop = () => Promise.resolve();
 function alwaysThrowsDb() {
   const err = new Error('unexpected query — dataset was not skipped');

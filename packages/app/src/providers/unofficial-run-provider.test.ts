@@ -3,20 +3,16 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 
+import { buildChartData } from './unofficial-chart-data';
 import {
-  buildChartData,
   overlaySelectionReducer,
   parseAvailableModelsAndSequences,
   parseUnofficialRunIds,
   type OverlaySelectionState,
 } from './unofficial-run-provider';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Minimal BenchmarkRow stub — only fields used by buildChartData key logic. */
 function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
     id: 1,
@@ -74,10 +70,6 @@ function rawPowerArtifact(overrides: Record<string, unknown> = {}): Record<strin
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// parseAvailableModelsAndSequences
-// ---------------------------------------------------------------------------
 
 describe('parseAvailableModelsAndSequences', () => {
   it('returns empty array for null input', () => {
@@ -149,11 +141,13 @@ describe('parseAvailableModelsAndSequences', () => {
     ]);
   });
 
-  it('skips keys with unknown model names', () => {
+  it('keeps keys whose model is unregistered under the raw identity', () => {
     const chartData = {
       'UnknownModel_1k/1k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
-    expect(parseAvailableModelsAndSequences(chartData)).toEqual([]);
+    expect(parseAvailableModelsAndSequences(chartData)).toEqual([
+      { model: 'UnknownModel', sequence: Sequence.OneK_OneK, precisions: [] },
+    ]);
   });
 
   it('skips keys without underscores', () => {
@@ -164,7 +158,6 @@ describe('parseAvailableModelsAndSequences', () => {
   });
 
   it('deduplicates identical model/sequence combinations', () => {
-    // Simulate data where the same key appears twice (e.g. via spread merge)
     const entry = { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } };
     const chartData = Object.fromEntries([
       ['Kimi-K2.5_1k/1k', entry],
@@ -175,11 +168,151 @@ describe('parseAvailableModelsAndSequences', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// buildChartData — key construction
-// ---------------------------------------------------------------------------
+describe('unofficial run with an unregistered model and hardware', () => {
+  it('normalizes, groups and plots the artifact rows under raw identities', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawPowerArtifact({ infmax_model_prefix: 'futuremodel9', hw: 'cluster:zx9-lab', conc: 64 }),
+        rawPowerArtifact({ infmax_model_prefix: 'futuremodel9', hw: 'cluster:zx9-lab', conc: 128 }),
+      ],
+      '2026-11-11',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/900000001',
+    );
+    expect(rows.map((row) => [row.model, row.hardware, row.conc])).toEqual([
+      ['futuremodel9', 'zx9', 64],
+      ['futuremodel9', 'zx9', 128],
+    ]);
+
+    const chartData = buildChartData(rows);
+    expect(parseAvailableModelsAndSequences(chartData)).toEqual([
+      { model: 'futuremodel9', sequence: Sequence.OneK_OneK, precisions: ['fp8'] },
+    ]);
+    const { data, gpus } = chartData['futuremodel9_1k/1k'].interactivity;
+    expect(data.map((point) => point.conc).toSorted((a, b) => a - b)).toEqual([64, 128]);
+    expect(new Set(data.map((point) => point.hwKey))).toEqual(new Set(['zx9_sglang']));
+    expect(gpus.zx9_sglang).toMatchObject({ label: 'ZX9', suffix: '(SGLang)' });
+  });
+});
 
 describe('buildChartData', () => {
+  it('keeps A100 AgentX artifacts and prices overlay and official points identically', () => {
+    const rows = normalizeArtifactRows(
+      [
+        {
+          hw: 'cluster:a100-cw',
+          model: 'deepseek-ai/DeepSeek-V4.1-Flash',
+          infmax_model_prefix: 'dsv41flash',
+          framework: 'vllm',
+          precision: 'fp4',
+          spec_decoding: 'mtp',
+          scenario_type: 'agentic-coding',
+          conc: 28,
+          tp: 8,
+          ep: 1,
+          num_gpus: 8,
+          disagg: false,
+          is_multinode: false,
+          request_metrics: {
+            latency: {
+              full_response_itl: { p50: 0.00775, p90: 0.01509 },
+              e2el: { p50: 3.92612 },
+            },
+            throughput: {
+              per_gpu: {
+                total_tput_tps: 21089.85878,
+                output_tput_tps: 135.93515,
+                input_tput_tps: 20953.92363,
+              },
+            },
+          },
+        },
+      ],
+      '2026-11-11',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42940055863',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      hardware: 'a100',
+      model: 'dsv41flash',
+      framework: 'vllm',
+      benchmark_type: 'agentic_traces',
+      conc: 28,
+      num_decode_gpu: 8,
+    });
+    const data = buildChartData(rows)['DeepSeek-V4.1-Flash_agentic-traces'];
+    expect(data.interactivity.data).toHaveLength(1);
+    const point = data.interactivity.data[0];
+    expect(point.hwKey).toBe('a100_vllm');
+    expect(point.tpPerGpu.y).toBe(21089.85878);
+    expect(point.costh.y).toBeCloseTo(0.78 / (21089.85878 * 3600 * 1e-6));
+    expect(point.tokensPerDollarH?.y).toBeCloseTo((21089.85878 * 3600) / 0.78);
+    const official = transformBenchmarkRows(rows, 'median', 'external');
+    const officialPoint = official.chartData.flat().find((p) => p.hwKey === 'a100_vllm')!;
+    expect(officialPoint.tokensPerDollarH?.y).toBe(point.tokensPerDollarH?.y);
+    expect(
+      parseAvailableModelsAndSequences({ 'DeepSeek-V4.1-Flash_agentic-traces': data }),
+    ).toEqual([
+      { model: Model.DeepSeek_V4_1_Flash, sequence: Sequence.AgenticTraces, precisions: ['fp4'] },
+    ]);
+  });
+
+  it('rescales agentic overlay token rates on the uncached basis', () => {
+    const rows = [
+      stubRow({
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics: {
+          tput_per_gpu: 900,
+          output_tput_per_gpu: 600,
+          input_tput_per_gpu: 300,
+          theoretical_cache_hit_rate: 0.8,
+          mean_ttft: 0.5,
+          mean_tpot: 0.01,
+          mean_e2el: 1,
+          mean_intvty: 50,
+        },
+      }),
+    ];
+    const [key] = Object.keys(buildChartData(rows));
+    const total = buildChartData(rows)[key].interactivity.data[0];
+    const uncached = buildChartData(rows, 'uncached')[key].interactivity.data[0];
+    expect(total.tpPerGpu.y).toBe(900);
+    expect(uncached.tpPerGpu.y).toBeCloseTo(660);
+    expect(uncached.inputTputPerGpu?.y).toBeCloseTo(60);
+  });
+
+  it('rescales disaggregated overlay input/output rates on the total chip basis', () => {
+    const rows = [
+      stubRow({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        isl: 1024,
+        osl: 1024,
+        metrics: {
+          tput_per_gpu: 1000,
+          output_tput_per_gpu: 133,
+          input_tput_per_gpu: 3600,
+          median_intvty: 50,
+          median_e2el: 1,
+        },
+      }),
+    ];
+    const [key] = Object.keys(buildChartData(rows));
+    const pool = buildChartData(rows)[key].interactivity.data[0];
+    const total = buildChartData(rows, 'total', 'total')[key].interactivity.data[0];
+    expect(pool.outputTputPerGpu?.y).toBe(133);
+    expect(total.outputTputPerGpu?.y).toBeCloseTo((133 * 12) / 16, 9);
+    expect(total.inputTputPerGpu?.y).toBeCloseTo(900, 9);
+    expect(total.tpPerGpu.y).toBe(1000);
+  });
+
   it('maps DB model key to display name in chart data keys', () => {
     const rows = [stubRow({ model: 'dsr1', isl: 1024, osl: 1024 })];
     const result = buildChartData(rows);
@@ -199,9 +332,6 @@ describe('buildChartData', () => {
   });
 
   it('prices TPUv7 overlay points on the external basis for later repricing', () => {
-    // processOverlayChartDataWithClipping reprices from external at render
-    // time, so the source overlay data must not already carry the internal
-    // owner cost even though internal is the app default.
     const rows = [
       stubRow({
         model: 'qwen3.5-397b',
@@ -264,9 +394,7 @@ describe('buildChartData', () => {
     ];
     const result = buildChartData(rows);
     const group = result['DeepSeek-R1-0528_1k/1k'];
-    // e2e chart x-axis is median_e2el
     expect(group.e2e.data[0].x).toBe(5);
-    // interactivity chart x-axis is median_intvty
     expect(group.interactivity.data[0].x).toBe(150);
   });
 
@@ -281,7 +409,6 @@ describe('buildChartData', () => {
     delete raw.num_prefill_gpu;
     delete raw.num_decode_gpu;
     const rows = normalizeArtifactRows([raw], '2026-08-12');
-    // Reproduce the ingest default that used to bypass the chart's PP fallback.
     expect(rows[0].num_decode_gpu).toBe(4);
     expect(rows[0].num_prefill_gpu).toBe(4);
     const group = buildChartData(rows)['DeepSeek-R1-0528_1k/1k'];
@@ -294,8 +421,6 @@ describe('buildChartData', () => {
   });
 
   it('preserves all data points for disagg configs with different parallelism but same tp', () => {
-    // Two configs: same hwKey/precision/tp/conc but different decode_ep/dp_attention.
-    // Both must survive buildChartData; D3 dedup is a rendering concern, not a data one.
     const rows = [
       stubRow({
         disagg: true,
@@ -322,7 +447,6 @@ describe('buildChartData', () => {
     const group = result['DeepSeek-R1-0528_1k/1k'];
     expect(group.interactivity.data).toHaveLength(2);
     expect(group.e2e.data).toHaveLength(2);
-    // Verify the two points have different x/y values (different perf numbers)
     const [a, b] = group.interactivity.data;
     expect(a.x).not.toBe(b.x);
   });

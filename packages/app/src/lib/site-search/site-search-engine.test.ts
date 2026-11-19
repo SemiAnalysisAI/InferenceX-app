@@ -95,18 +95,15 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await settle(engine);
 
-    // Seed is replaced by the real section; "watt" reaches it through concepts.
     expect(engine.search('watts')[0]).toMatchObject({
       url: '/chips/b200#power',
       source: 'page',
       section: 'Power',
     });
-    // Query-matching pages are fetched before the rest of the queue.
     const crawlOrder = fetchMock.mock.calls
       .map(([input]) => String(input))
       .filter((p) => p !== '/llms.txt');
     expect(crawlOrder[0]).toBe('/chips/b200');
-    // Feeds and external links from llms.txt are never fetched.
     expect(crawlOrder).not.toContain('/feed.xml');
     expect(engine.status()).toMatchObject({ crawling: false, seeded: true });
     expect(engine.status().indexedPages).toBe(engine.status().totalPages);
@@ -140,7 +137,7 @@ describe('SiteSearchEngine', () => {
     await settle(engine);
     const paths = fetchMock.mock.calls.map(([input]) => String(input));
     expect(paths).toContain('/zh/chips/b200');
-    expect(paths).toContain('/zh/agentx');
+    expect(paths).toContain('/zh/infx/agentx');
   });
 
   it('links untranslated /zh family members to the English page instead of a 404', async () => {
@@ -165,14 +162,12 @@ describe('SiteSearchEngine', () => {
     });
     const engine = new SiteSearchEngine('zh', fetchMock as typeof fetch);
 
-    // Before anything is crawled, seeds link the English page, which always exists.
     await engine.seed();
     expect(engine.search('untranslated')[0].url).toBe('/blog/untranslated-post');
 
     engine.start();
     await settle(engine);
     expect(engine.search('sunflower')[0].url).toBe('/blog/untranslated-post');
-    // Translated pages switch to /zh once that page loads, replacing the English seed.
     expect(engine.search('blackwell').map((r) => r.url)).toEqual(['/zh/chips/b200']);
     expect(engine.search('chip').every((r) => r.url !== '/chips/b200')).toBe(true);
   });
@@ -180,12 +175,12 @@ describe('SiteSearchEngine', () => {
   it('indexes redirected pages under their final path so anchors survive', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = String(input);
-      if (path === '/ubenchx') {
+      if (path === '/ubx') {
         const res = response(
           html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Zebrafish bandwidth.</p>'),
         );
         Object.defineProperty(res, 'redirected', { value: true });
-        Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
+        Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubx/mem-bw` });
         return Promise.resolve(res);
       }
       return Promise.resolve(new Response('missing', { status: 404 }));
@@ -194,7 +189,7 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await engine.seed();
     await settle(engine);
-    expect(engine.search('zebrafish')[0].url).toBe('/ubenchx/mem-bw#sweep');
+    expect(engine.search('zebrafish')[0].url).toBe('/ubx/mem-bw#sweep');
   });
 
   it('applies a query typed before the seed list loads to the seeded queue', async () => {
@@ -206,7 +201,6 @@ describe('SiteSearchEngine', () => {
     });
     const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
     engine.start();
-    // The user types while /llms.txt is still in flight.
     engine.prioritize('mi355x');
     releaseSeeds(response(LLMS_TXT, 'text/plain'));
     await engine.seed();
@@ -221,15 +215,13 @@ describe('SiteSearchEngine', () => {
     let calls = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = String(input);
-      if (path !== '/ubenchx') return Promise.resolve(new Response('missing', { status: 404 }));
+      if (path !== '/ubx') return Promise.resolve(new Response('missing', { status: 404 }));
       calls++;
       const res = response(
         html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Okapi bandwidth.</p>'),
       );
       Object.defineProperty(res, 'redirected', { value: true });
-      Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
-      // First attempt: the dialog closes while the page waits for idle time
-      // to be parsed, after the redirect has already been observed.
+      Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubx/mem-bw` });
       if (calls === 1) setTimeout(() => engine.stop(), 5);
       return Promise.resolve(res);
     });
@@ -240,6 +232,6 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await settle(engine);
     expect(calls).toBeGreaterThanOrEqual(2);
-    expect(engine.search('okapi')[0].url).toBe('/ubenchx/mem-bw#sweep');
+    expect(engine.search('okapi')[0].url).toBe('/ubx/mem-bw#sweep');
   });
 });

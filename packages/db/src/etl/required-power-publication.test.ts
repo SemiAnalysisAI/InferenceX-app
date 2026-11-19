@@ -109,8 +109,43 @@ function multinodeFixture() {
   });
   return dir;
 }
+function centralSingleNodeFixture() {
+  const dir = fixture();
+  const files = {
+    'power_audit_golden/LOGS/power/samples.csv':
+      'timestamp_unix,hostname,gpu_uuid,power_w\n1700000000,golden-node,GPU-golden,500\n',
+    'power_audit_golden/LOGS/power/manifest.json': JSON.stringify({
+      status: 'complete',
+      publication_valid: true,
+    }),
+    'power_audit_golden/LOGS/power/windows/point.json': JSON.stringify({
+      benchmark_start_time_unix: 1700000000,
+      benchmark_end_time_unix: 1700000002,
+    }),
+  };
+  for (const [file, contents] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(dir, file), contents);
+  }
+  changeArtifact(dir, auditPath, (audit) => {
+    audit.selected_window = {
+      benchmark_type: 'agentx',
+      concurrency: 1,
+      window_file: 'windows/point.json',
+    };
+    audit.per_gpu_energy_j = { 'golden-node/GPU-golden': 1000 };
+    audit.per_gpu_role = { 'golden-node/GPU-golden': 'agg' };
+  });
+  changeManifest(dir, (manifest) => {
+    manifest.points[0].artifacts = [auditPath, benchmarkPath, ...Object.keys(files)].map(
+      (file) => ({ path: file, sha256: sha256(dir, file), validation_state: 'valid' }),
+    );
+  });
+  for (const file of ['gpu_metrics.csv', 'gpu_metrics_identity.csv', 'power_node.txt'])
+    fs.rmSync(path.join(dir, 'agentic_golden', file));
+  return dir;
+}
 const nativeNodes = { 'node-a': 'GPU-a', 'node-b': 'GPU-b' };
-/** Non-disagg two-node bundle whose telemetry is per-node nvidia-smi with signed receipts. */
 function nativeFixture() {
   const dir = fixture();
   changeArtifact(dir, benchmarkPath, (row) =>
@@ -161,7 +196,6 @@ function nativeFixture() {
       role: 'aggregate',
       energy_j: 500,
     }));
-    // The single-node gpu_metrics.csv must not stay declared: traces are counted per node.
     point.artifacts = [auditPath, benchmarkPath, ...files].map((file) => ({
       path: file,
       sha256: sha256(dir, file),
@@ -257,6 +291,47 @@ describe('required power publication contract', () => {
     });
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('unsupported telemetry_kind');
   });
+  it('accepts native central telemetry for a single-node point without legacy identity files', () => {
+    const dir = centralSingleNodeFixture();
+    const scope = verifyRequiredPowerArtifacts(dir, source);
+    expect(scope?.points).toHaveLength(1);
+    expect(scope?.points[0].config.isMultinode).toBe(false);
+    expect(scope?.points[0].metrics.total_gpu_energy_j).toBe(1000);
+    changeArtifact(dir, auditPath, (audit) => {
+      audit.per_gpu_energy_j = { 'another-node/GPU-golden': 1000 };
+      audit.per_gpu_role = { 'another-node/GPU-golden': 'agg' };
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
+      'physical GPU evidence differs from audit',
+    );
+  });
+  it('requires the native single-node measurement window to be hash-bound', () => {
+    const dir = centralSingleNodeFixture();
+    changeManifest(dir, (manifest) => {
+      manifest.points[0].artifacts = manifest.points[0].artifacts.filter(
+        (file: { path: string }) => !file.path.includes('/windows/'),
+      );
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
+      'missing central measurement window artifact',
+    );
+  });
+  it('excludes service-only nodes while requiring every compute node in the power evidence', () => {
+    const dir = multinodeFixture();
+    changeManifest(dir, (manifest) => {
+      Object.assign(manifest.matrix.multi_node.agentic[0], {
+        'node-count': 3,
+        'compute-node-count': 2,
+      });
+    });
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
+    for (const count of [0, 1, 3, 4, 1.5, null]) {
+      changeManifest(dir, (manifest) => {
+        manifest.matrix.multi_node.agentic[0]['compute-node-count'] = count;
+      });
+      expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('Required power:');
+    }
+  });
   it('accepts a native multinode bundle and rejects a receipt whose telemetry hash differs', () => {
     const dir = nativeFixture();
     expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
@@ -271,7 +346,6 @@ describe('required power publication contract', () => {
     changeArtifact(dir, nodeManifest, (value) => {
       value.lifecycle = 'partial';
     });
-    // Re-sign the receipt so only the lifecycle check can fire.
     changeArtifact(dir, auditPath, (audit) => {
       audit.nodes[0].manifest_sha256 = sha256(dir, nodeManifest);
     });
@@ -317,14 +391,22 @@ describe('required power publication contract', () => {
       'hash',
     );
   });
-  it('accepts identical aggregate copies but rejects conflicting duplicate rows', () => {
+  it('uses the per-job copy over aggregate rows from other attempts', () => {
     const dir = fixture();
     fs.mkdirSync(path.join(dir, 'results_bmk'));
     fs.copyFileSync(path.join(dir, benchmarkPath), path.join(dir, 'results_bmk/agg.json'));
     expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
+    const older = json(dir, benchmarkPath);
+    older.avg_power_w = 501;
+    write(dir, 'results_bmk/agg.json', [older, json(dir, benchmarkPath)]);
+    const [point] = verifyRequiredPowerArtifacts(dir, source)!.points;
+    expect(point!.metrics.avg_power_w).toBe(json(dir, benchmarkPath).avg_power_w);
+  });
+  it('still rejects conflicting per-job copies of one point', () => {
+    const dir = fixture();
     const rows = json(dir, benchmarkPath);
-    rows.avg_power_w = 501;
-    write(dir, 'results_bmk/agg.json', rows);
+    fs.mkdirSync(path.join(dir, 'bmk_agentic_golden_retry'));
+    write(dir, 'bmk_agentic_golden_retry/agg.json', { ...rows, avg_power_w: 501 });
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('conflicting');
   });
   it('names the stage when a required identity is missing or a power field differs', () => {

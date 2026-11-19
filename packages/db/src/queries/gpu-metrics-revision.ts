@@ -2,7 +2,6 @@ import { GPU_STATS_VERSION } from '../lib/gpu-metric-stats';
 
 import type { DbClient } from '../connection';
 
-/** Re-ingest, shared-link and statistics-calculator changes must bypass older point payloads. */
 export async function getGpuMetricsPointRevision(
   sql: DbClient,
   benchmarkResultId: number,

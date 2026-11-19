@@ -1,5 +1,6 @@
 import { GPU_VENDORS, rowToSequence } from '@semianalysisai/inferencex-constants';
 
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   applyAgenticPercentileToXLabel,
   applyScopeFilters,
@@ -9,6 +10,7 @@ import {
   type RooflineDirection,
 } from '@/components/inference/hooks/chart-data-core';
 import chartDefinitions, {
+  isAllInMeasuredConfigKey,
   METRIC_REGISTRY,
   tokenMetricTypeForConfigKey,
   type MetricConfigKey,
@@ -24,7 +26,14 @@ import type {
   TokenRevenuePricing,
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import {
+  bestSeriesPerSkuOnce,
+  withUnrankedSkus,
+} from '@/components/inference/utils/best-series-per-sku';
+import {
+  allInMeasuredTableData,
+  allInMeasuredUnavailableReason,
+} from '@/components/inference/utils/inference-table-data';
 import { isPowerCurveMetric, upperPowerEnvelope } from '@/components/inference/utils/powerCurves';
 import { pointDeploymentMode, type QuickFilters } from '@/components/inference/utils/quickFilters';
 import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
@@ -34,7 +43,7 @@ import {
 } from '@/components/inference/utils/resolveXAxisField';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import type { BenchmarkRow } from '@/lib/api/api';
-import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { transformChartRowsForPrecisions } from '@/lib/benchmarks/benchmark-transform';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
@@ -85,6 +94,8 @@ export interface InferenceSeriesOptions {
   /** Return only the best series per GPU SKU. */
   readonly best: boolean;
   readonly tcoBasis?: TcoBasis;
+  /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+  readonly chipBasis?: ChipBasis;
   readonly allPoints?: boolean;
   readonly userCosts?: Record<string, number>;
   readonly userPowers?: Record<string, number>;
@@ -120,6 +131,22 @@ export interface InferenceSeriesEntry {
   readonly points: readonly InferenceSeriesPoint[];
 }
 
+export interface InferenceTableRow extends Omit<InferenceSeriesPoint, 'x' | 'y'> {
+  readonly hwKey: string;
+  readonly gpu: string;
+  readonly framework: string;
+  readonly specMethod: string;
+  readonly label: string;
+  readonly vendor?: string;
+  readonly deployment: string;
+  readonly kvOffload: boolean;
+  readonly x: number | null;
+  readonly y: number | null;
+  readonly measuredGpuWatts: number;
+  readonly status: 'available' | 'unavailable';
+  readonly unavailableReason: ReturnType<typeof allInMeasuredUnavailableReason>;
+}
+
 export interface InferenceSeriesMetricMeta {
   readonly key: MetricKey;
   readonly configKey: MetricConfigKey;
@@ -132,6 +159,8 @@ export interface InferenceSeriesMetricMeta {
 
 export interface InferenceSeriesResult {
   readonly series: readonly InferenceSeriesEntry[];
+  /** All in Measured table population, including unavailable system estimates. */
+  readonly tableRows?: readonly InferenceTableRow[];
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
   readonly frontier: { direction: ParetoDirection | null; points: number };
   readonly metric: InferenceSeriesMetricMeta;
@@ -156,11 +185,15 @@ function extractMetricValue(point: InferenceData, metricKey: string): number | u
   return undefined;
 }
 
+const THROUGHPUT_METRIC_KEYS = ['tpPerGpu', 'outputTputPerGpu', 'inputTputPerGpu'] as const;
+
 /** Raw metric values shipped with each point: the selected metric + throughput bases. */
 function pointMetrics(point: InferenceData, metricKey: MetricKey): Record<string, number> {
-  const keys = new Set<string>([metricKey, 'tpPerGpu', 'outputTputPerGpu', 'inputTputPerGpu']);
   const metrics: Record<string, number> = {};
-  for (const key of keys) {
+  const selected = extractMetricValue(point, metricKey);
+  if (selected !== undefined) metrics[metricKey] = selected;
+  for (const key of THROUGHPUT_METRIC_KEYS) {
+    if (key === metricKey) continue;
     const value = extractMetricValue(point, key);
     if (value !== undefined) metrics[key] = value;
   }
@@ -218,9 +251,6 @@ export function buildInferenceSeries(
   const seqRows = rows.filter((row) => rowToSequence(row) === sequence);
   const deduped = dedupeRowsToLatestPerConfig([...seqRows]);
 
-  // 2. Full chart transform at the selected percentile (same as the dashboard).
-  const { chartData } = transformBenchmarkRows(deduped, percentile, options.tcoBasis);
-
   // 3. Pick the chart definition for the x mode (index order matches
   //    `chartDefinitions`: [interactivity, e2e]).
   const chartIndex = xmode === 'interactivity' || xmode === 'e2e-normalized-interactivity' ? 0 : 1;
@@ -237,9 +267,13 @@ export function buildInferenceSeries(
   //    The dashboard's GPU selector passes full hardware keys (`b200_trt`), but
   //    API callers may pass base registry keys (`b200`), so expand base keys to
   //    every matching hardware key before reusing the dashboard scope filter.
-  const precisionSet = new Set(precisions);
-  const precisionScoped = (chartData[chartIndex] ?? []).filter((point) =>
-    precisionSet.has(point.precision),
+  const precisionScoped = transformChartRowsForPrecisions(
+    deduped,
+    chartIndex,
+    new Set(precisions),
+    percentile,
+    options.tcoBasis,
+    options.chipBasis,
   );
   const matchedHwKeys = [
     ...new Set(
@@ -269,19 +303,14 @@ export function buildInferenceSeries(
   const remapped = scoped
     .filter((point) => metricKey in point && supportsPointTokenMetric(point, tokenType))
     .map((point) => remapInferencePoint(point, metricKey, resolved.xAxisField));
-  const partition = partitionChartDataByLimits(
-    remapped,
-    { ...chartDef, x_scale_field: resolved.xAxisField },
-    metricConfigKey,
-    {
-      isTtftX: resolved.xAxisField.endsWith('_ttft'),
-      isAgentic,
-    },
-  );
+  const partition = partitionChartDataByLimits(remapped, chartDef, metricConfigKey, {
+    isTtftX: resolved.xAxisField.endsWith('_ttft'),
+    isAgentic,
+  });
   let mapped = options.allPoints ? remapped : partition.data;
   if (xmode === 'e2e-normalized-interactivity')
     mapped = mapped.flatMap((point) => {
-      const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
+      const derived = point.id === undefined ? point : options.derivedMetrics?.[point.id];
       const x = percentile === 'p75' ? derived?.p75_e2e_norm_intvty : derived?.p90_e2e_norm_intvty;
       return typeof x === 'number' && Number.isFinite(x) && x > 0 ? [{ ...point, x }] : [];
     });
@@ -312,11 +341,24 @@ export function buildInferenceSeries(
   if (direction) {
     const frontierFn = paretoFrontForDirection(direction);
     const byHwDate = new Map<string, InferenceData[]>();
+    let openBucket: InferenceData[] | undefined;
+    let openBucketPoint: InferenceData | undefined;
     for (const point of mapped) {
-      const key = `${point.hwKey}|${point.precision}|${point.date}`;
-      const bucket = byHwDate.get(key);
-      if (bucket) bucket.push(point);
-      else byHwDate.set(key, [point]);
+      if (
+        !openBucket ||
+        point.hwKey !== openBucketPoint!.hwKey ||
+        point.precision !== openBucketPoint!.precision ||
+        point.date !== openBucketPoint!.date
+      ) {
+        const key = `${point.hwKey}|${point.precision}|${point.date}`;
+        openBucket = byHwDate.get(key);
+        if (!openBucket) {
+          openBucket = [];
+          byHwDate.set(key, openBucket);
+        }
+        openBucketPoint = point;
+      }
+      openBucket.push(point);
     }
     for (const bucket of byHwDate.values()) {
       const frontier = isMeasuredPower
@@ -329,7 +371,7 @@ export function buildInferenceSeries(
   }
 
   // 8. Best series per SKU over the full mapped point set.
-  const bestHwKeys = direction ? bestSeriesPerSku(mapped, direction) : new Set<string>();
+  const bestHwKeys = direction ? bestSeriesPerSkuOnce(mapped, direction) : new Set<string>();
 
   // 9. Group into series by hwKey.
   const byHwKey = new Map<string, InferenceData[]>();
@@ -360,7 +402,7 @@ export function buildInferenceSeries(
       gpu: hwKey.split('_')[0],
       framework: sample.framework ?? '',
       specMethod: sample.spec_decoding ?? 'none',
-      label: hardwareLegendLabel(hwKey, sample.model),
+      label: hardwareLegendLabel(hwKey, sample.model, allPoints),
       vendor: GPU_VENDORS[hwKey.split('_')[0]],
       deployment: deployments.size === 1 ? [...deployments][0] : 'mixed',
       kvOffload: kept.some((point) =>
@@ -372,29 +414,87 @@ export function buildInferenceSeries(
       bestPerSku: seriesIsBest,
       points: kept
         .toSorted((a, b) => a.x - b.x)
-        .map((point) => ({
-          id: point.id ?? null,
-          precision: point.precision,
-          x: point.x,
-          y: point.y,
-          concurrency: point.conc ?? 0,
-          topologyKey: pointTopologyKey(point),
-          tp: point.tp ?? 0,
-          date: point.date ?? '',
-          ...(runIdFromUrl(point.run_url) === undefined
-            ? {}
-            : { runId: runIdFromUrl(point.run_url) }),
-          frontier: frontierPoints.has(point),
-          bestPerSku: seriesIsBest,
-          metrics: pointMetrics(point, metricKey),
-        })),
+        .map((point) => {
+          const runId = runIdFromUrl(point.run_url);
+          return {
+            id: point.id ?? null,
+            precision: point.precision,
+            x: point.x,
+            y: point.y,
+            concurrency: point.conc ?? 0,
+            topologyKey: pointTopologyKey(point),
+            tp: point.tp ?? 0,
+            date: point.date ?? '',
+            ...(runId === undefined ? {} : { runId }),
+            frontier: frontierPoints.has(point),
+            bestPerSku: seriesIsBest,
+            metrics: pointMetrics(point, metricKey),
+          };
+        }),
     });
   }
 
   const count = series.reduce((total, entry) => total + entry.points.length, 0);
+  // Remapping retains nested metric objects, including for transient rows without IDs.
+  const frontierMetrics = new Set([...frontierPoints].map((point) => point[metricKey]));
+  const allInRows = isAllInMeasuredConfigKey(metricConfigKey)
+    ? allInMeasuredTableData(scoped, metricKey, resolved.xAxisField)
+    : undefined;
+  // Match the dashboard: ranked SKUs keep their winner and table-only SKUs stay.
+  const tableHwKeys =
+    allInRows && best && bestHwKeys.size > 0
+      ? withUnrankedSkus(bestHwKeys, mapped, allInRows)
+      : undefined;
+  const tableRows = allInRows
+    ? allInRows
+        .filter((point) => !tableHwKeys || tableHwKeys.has(point.hwKey))
+        .map((point): InferenceTableRow => {
+          const derived = point.id === undefined ? point : options.derivedMetrics?.[point.id];
+          const x =
+            xmode === 'e2e-normalized-interactivity'
+              ? percentile === 'p75'
+                ? derived?.p75_e2e_norm_intvty
+                : derived?.p90_e2e_norm_intvty
+              : point.x;
+          const unavailableReason = allInMeasuredUnavailableReason(point, metricKey);
+          return {
+            id: point.id ?? null,
+            precision: point.precision,
+            hwKey: point.hwKey,
+            gpu: point.hwKey.split('_')[0],
+            framework: point.framework ?? '',
+            specMethod: point.spec_decoding ?? 'none',
+            label: hardwareLegendLabel(point.hwKey, point.model, [point]),
+            vendor: GPU_VENDORS[point.hwKey.split('_')[0]],
+            deployment: pointDeploymentMode(point),
+            kvOffload: isKvOffloadEnabled(point),
+            x:
+              typeof x === 'number' &&
+              Number.isFinite(x) &&
+              (xmode !== 'e2e-normalized-interactivity' || x > 0)
+                ? x
+                : null,
+            y: Number.isFinite(point.y) ? point.y : null,
+            concurrency: point.conc ?? 0,
+            topologyKey: pointTopologyKey(point),
+            tp: point.tp ?? 0,
+            date: point.date ?? '',
+            ...(runIdFromUrl(point.run_url) === undefined
+              ? {}
+              : { runId: runIdFromUrl(point.run_url) }),
+            frontier: unavailableReason === null && frontierMetrics.has(point[metricKey]),
+            bestPerSku: bestHwKeys.has(point.hwKey),
+            metrics: pointMetrics(point, metricKey),
+            measuredGpuWatts: point.measuredAvgPower!.y,
+            status: unavailableReason === null ? 'available' : 'unavailable',
+            unavailableReason,
+          };
+        })
+    : undefined;
 
   return {
     series,
+    ...(tableRows === undefined ? {} : { tableRows }),
     hardware: series.map((entry) => ({
       key: entry.hwKey,
       label: entry.label,

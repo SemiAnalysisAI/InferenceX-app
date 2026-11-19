@@ -4,7 +4,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from './dashboard-routes';
 
 import { isValidTab, TAB_META } from './tab-meta';
-import { isZhTab, TAB_INTRO_ZH, TAB_LABELS_ZH, TAB_META_ZH, tabMetadataZh } from './tab-meta-zh';
+import { isZhTab, TAB_LABELS_ZH, TAB_META_ZH, tabMetadataZh } from './tab-meta-zh';
 
 const HAN_REGEX = /\p{Script=Han}/u;
 
@@ -17,10 +17,8 @@ describe('mirrored dashboard routes', () => {
   });
 
   it.each(mirroredRoutes)('has complete Chinese content for "$key"', ({ key }) => {
-    // Actual Chinese text, not an English placeholder that slipped through.
     expect(TAB_META_ZH[key].title).toMatch(HAN_REGEX);
     expect(TAB_META_ZH[key].description).toMatch(HAN_REGEX);
-    expect(TAB_INTRO_ZH[key]).toMatch(HAN_REGEX);
     expect(TAB_LABELS_ZH[key]).toMatch(HAN_REGEX);
   });
 });
@@ -35,24 +33,33 @@ describe('isZhTab', () => {
 });
 
 describe('tabMetadataZh', () => {
-  it('canonicalizes the inference tab to the zh homepage, mirroring English', () => {
+  it('canonicalizes the inference tab to its own zh URL, not the zh landing page', () => {
     const meta = tabMetadataZh('inference');
-    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh`);
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/infx/inference`);
   });
 
   it('canonicalizes other tabs to their own zh URL with bidirectional hreflang', () => {
     const meta = tabMetadataZh('evaluation');
-    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/evaluation`);
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/infx/evaluation`);
     expect(meta.alternates?.languages).toEqual({
-      en: `${SITE_URL}/evaluation`,
-      'zh-CN': `${SITE_URL}/zh/evaluation`,
-      'x-default': `${SITE_URL}/evaluation`,
+      en: `${SITE_URL}/infx/evaluation`,
+      'zh-CN': `${SITE_URL}/zh/infx/evaluation`,
+      'x-default': `${SITE_URL}/infx/evaluation`,
     });
   });
 
   it('sets the zh Open Graph locale and URL', () => {
     const meta = tabMetadataZh('gpu-specs');
     expect(meta.openGraph?.locale).toBe('zh_CN');
-    expect(meta.openGraph?.url).toBe(`${SITE_URL}/zh/gpu-specs`);
+    expect(meta.openGraph?.url).toBe(`${SITE_URL}/zh/infx/gpu-specs`);
+  });
+});
+
+describe('PowerX copy', () => {
+  it('describes energy per token, the PowerX default unit, not per output token', () => {
+    expect(TAB_META.powerx.description).toContain('energy per token');
+    expect(TAB_META.powerx.description).not.toContain('output token');
+    expect(TAB_META_ZH.powerx.description).toContain('每 Token 能耗');
+    expect(TAB_META_ZH.powerx.description).not.toContain('输出 Token');
   });
 });

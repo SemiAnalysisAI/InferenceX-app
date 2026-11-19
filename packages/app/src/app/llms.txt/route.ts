@@ -1,10 +1,12 @@
 import { getAllPosts } from '@/lib/blog/blog';
+import { getAllHardwarePages, hardwarePagePath } from '@/lib/hardware/hardware';
 import { getAllChipPages, getAllChipVsPages } from '@/lib/catalog/chip-pages';
 import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/live-seo/rankings';
 import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 // oxlint-disable-next-line require-await
 export async function GET() {
@@ -18,10 +20,11 @@ export async function GET() {
     `## Links`,
     '',
     `- [Dashboard](${SITE_URL})`,
-    `- [AgentX](${SITE_URL}/agentx)`,
-    `- [Benchmark your own chips with AgentX](${SITE_URL}/agentx/quickstart): agentx-harness 1.0.7 installation, public trace replay, and optional session-routing headers`,
-    `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
+    `- [AgentX](${SITE_URL}${AGENTX_ROUTE.path})`,
+    `- [Benchmark your own chips with AgentX](${SITE_URL}${AGENTX_ROUTE.path}/quickstart): agentx-harness 1.0.14 installation, public trace replay, and optional session-routing headers`,
+    `- [AgentX Methodology](${SITE_URL}${AGENTX_ROUTE.path}/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
+    `- [Hardware Results](${SITE_URL}/hardware)`,
     `- [Whitepapers](${SITE_URL}/whitepaper)`,
     `- [API Reference](${SITE_URL}/api)`,
     `- [OpenAPI 3.1 Specification](${SITE_URL}/api/openapi.json)`,
@@ -31,9 +34,9 @@ export async function GET() {
     '',
     `## Model Benchmark Pages`,
     '',
-    ...INFERENCE_MODEL_SLUGS.map(
+    ...PUBLIC_INFERENCE_MODEL_SLUGS.map(
       (entry) =>
-        `- [${inferenceModelMeta(entry).title}](${SITE_URL}/inference/${entry.slug}): ${entry.label}`,
+        `- [${inferenceModelMeta(entry).title}](${SITE_URL}${getDashboardRoute('inference').path}/${entry.slug}): ${entry.label}`,
     ),
     '',
     `## Chip Pages`,
@@ -61,6 +64,13 @@ export async function GET() {
     `## Articles`,
     '',
     ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.subtitle}`),
+    '',
+    `## Hardware Results`,
+    '',
+    ...getAllHardwarePages().map(
+      (page) =>
+        `- [${page.title}](${SITE_URL}${hardwarePagePath(page.slug)}): ${page.seoDescription}`,
+    ),
     '',
     `## Whitepapers`,
     '',

@@ -12,10 +12,6 @@ const toggleClasses = cn(
   'focus-visible:outline-none',
 );
 
-/**
- * Header toggles for Minecraft audio — both the click-sound and music
- * toggles only render when the minecraft theme is active.
- */
 export function MinecraftToggles() {
   const [isMinecraft, setIsMinecraft] = useState(false);
   const [musicOn, setMusicOn] = useState(true);

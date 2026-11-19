@@ -1,8 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pause, Play, SkipBack } from 'lucide-react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 
 const STRINGS = {
   en: {
@@ -18,8 +21,6 @@ const STRINGS = {
     cycleSpeed: '切换速度',
   },
 } as const;
-
-// ── Replay Hook ────────────────────────────────────────────────────
 
 type Speed = 1 | 2 | 5 | 10;
 
@@ -73,13 +74,11 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
       return;
     }
 
-    // Compute delay based on timestamp gaps
     let delay: number;
     if (idx < ts.length - 1 && ts[idx + 1] > 0 && ts[idx] > 0) {
       const gap = ts[idx + 1] - ts[idx];
       delay = Math.max(100, Math.min(2000, gap)) / spd;
     } else {
-      // Default gap when no timestamp data
       delay = 500 / spd;
     }
 
@@ -95,7 +94,6 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
     }, delay);
   }, [clearTimer]);
 
-  // Schedule next tick whenever playing and currentIndex changes
   useEffect(() => {
     if (!isPlaying) {
       clearTimer();
@@ -143,7 +141,6 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
     setCurrentIndex(0);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => clearTimer, [clearTimer]);
 
   return {
@@ -158,8 +155,6 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
     reset,
   };
 }
-
-// ── Replay Controls Component ──────────────────────────────────────
 
 const SPEED_CYCLE: Speed[] = [1, 2, 5, 10];
 
@@ -193,52 +188,59 @@ export function ReplayControls({
   };
 
   return (
-    <div className="bg-surface border border-border rounded-md px-3 py-2 flex items-center gap-3 font-mono text-2xs">
-      {/* Play/Pause */}
-      <button
+    <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex items-center gap-2 font-mono text-2xs">
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
         onClick={() => {
           onToggle();
           track('agentic_workload_replay_toggled', { playing: !isPlaying });
         }}
-        className="bg-surface hover:bg-surface-hover border border-border rounded px-2 py-1 font-mono text-2xs text-foreground transition-colors min-w-[52px]"
+        className="min-w-18 justify-start"
         title={isPlaying ? t.pause : t.play}
       >
-        {isPlaying ? `\u23F8 ${t.pause}` : `\u25B6 ${t.play}`}
-      </button>
+        {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+        {isPlaying ? t.pause : t.play}
+      </Button>
 
-      {/* Reset */}
-      <button
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-xs"
         onClick={() => {
           onReset();
           track('agentic_workload_replay_reset');
         }}
-        className="bg-surface hover:bg-surface-hover border border-border rounded px-2 py-1 font-mono text-2xs text-foreground transition-colors"
+        className="[&_svg:not([class*='size-'])]:size-3.5"
         title={t.resetTitle}
+        aria-label={t.resetTitle}
       >
-        {'\u23EE'}
-      </button>
+        <SkipBack aria-hidden="true" />
+      </Button>
 
-      {/* Speed */}
-      <button
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
         onClick={cycleSpeed}
-        className="bg-surface hover:bg-surface-hover border border-border rounded px-2 py-1 font-mono text-2xs text-emerald-500 transition-colors min-w-[36px]"
+        className="min-w-12 tabular-nums"
         title={t.cycleSpeed}
       >
         {speed}x
-      </button>
+      </Button>
 
-      {/* Scrubber */}
       <input
         type="range"
         min={0}
         max={total}
         value={currentIndex}
         onChange={(e) => onSeek(Number(e.target.value))}
-        className="flex-1 h-1 accent-emerald-500 cursor-pointer"
+        className="range-slider ml-1 h-4 flex-1"
+        style={rangeProgressStyle(currentIndex, 0, total)}
       />
 
-      {/* Counter */}
-      <span className="text-muted-foreground shrink-0">
+      <span className="text-muted-foreground shrink-0 tabular-nums">
         {currentIndex} / {total}
       </span>
     </div>

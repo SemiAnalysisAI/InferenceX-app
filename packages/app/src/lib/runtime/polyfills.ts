@@ -1,8 +1,3 @@
-/**
- * Polyfill for Array.prototype.toSorted (ES2023).
- * Some browsers (e.g. older Chrome/Safari/Firefox) lack this method.
- * Must be imported before any code that calls .toSorted().
- */
 if (!Array.prototype.toSorted) {
   const nativeSort = Array.prototype.sort;
 

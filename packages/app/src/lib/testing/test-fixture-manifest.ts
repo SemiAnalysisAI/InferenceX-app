@@ -25,7 +25,6 @@ export function fixtureTopLevel(value: unknown): FixtureTopLevel {
   throw new Error('Cypress API fixtures must contain a top-level array or object');
 }
 
-/** Fixture-specific invariants required for substantive E2E coverage. */
 export function assertFixtureContent(name: string, value: unknown): void {
   fixtureTopLevel(value);
   if (name !== 'benchmarks-history') return;

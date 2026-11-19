@@ -68,7 +68,7 @@ All performance tracking is documented in our open-source GitHub repo. Feel free
   caption="Source: SemiAnalysis - InferenceX GitHub"
 />
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?preset=dsv4-launch">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?preset=dsv4-launch">
   Click to see the full DeepSeekV4 InferenceX dashboard →
 </DashboardCTA>
 
@@ -118,7 +118,7 @@ Turning to [SGLang](https://github.com/sgl-project/sglang/pull/23600) and [vLLM]
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_hc=1&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cb300_vllm%2Cgb200_dynamo-vllm%2Ch200_vllm%2Cmi355x_atom%2Cmi355x_sglang)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_hc=1&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cb300_vllm%2Cgb200_dynamo-vllm%2Ch200_vllm%2Cmi355x_atom%2Cmi355x_sglang)
 
 The below graph shows SGLang Day 0 performance:
 
@@ -128,7 +128,7 @@ The below graph shows SGLang Day 0 performance:
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_prec=fp4%2Cfp8&g_runid=24943464864&i_active=b200_sglang%2Cb300_sglang%2Cmi355x_sglang)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_prec=fp4%2Cfp8&g_runid=24943464864&i_active=b200_sglang%2Cb300_sglang%2Cmi355x_sglang)
 
 Let’s now dive deeper into each group of Day 0 results.
 
@@ -140,7 +140,7 @@ Let’s now dive deeper into each group of Day 0 results.
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b200_vllm%2Cgb200_dynamo-vllm)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b200_vllm%2Cgb200_dynamo-vllm)
 
 vLLM and Nvidia were very fast in delivering their GB200 distributed inference Dynamo vLLM recipe in [srt-slurm](https://github.com/NVIDIA/srt-slurm/pull/71). Disaggregated inferencing and wide expert parallelism (WideEP) are inference optimization techniques that can considerably improve performance per dollar - readers can learn more about these techniques in our [InferenceX V2 article](https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs). The recipe itself was rudimentary: eager on prefill, using NIXL for KV cache transfer. We independently replicated the recipe achieving up to 5x better results than for a B200 run using lower interactivity configs.
 
@@ -154,7 +154,7 @@ This is a great example of the CUDA moat at work: With CUDA, distributed inferen
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b300_sglang%2Cb300_sglang_mtp)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b300_sglang%2Cb300_sglang_mtp)
 
 The first MTP support delivered for DeepSeek v4 came on Day 3 from SGLang. Using MTP led to a substantial improvement in throughput at higher interactivities. An explanation of MTP and how it benefits memory-bound small batch size decode can be found in our [InferenceX V2 article](https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs).
 
@@ -170,7 +170,7 @@ We used the Day 0 WIP recipe provided by an [SGLang PR](https://github.com/sgl-p
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_hc=1&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_atom%2Cmi355x_sglang&i_dstart=2026-04-25&i_dend=2026-04-26&i_active=mi355x_sglang)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_hc=1&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_atom%2Cmi355x_sglang&i_dstart=2026-04-25&i_dend=2026-04-26&i_active=mi355x_sglang)
 
 ### AMD ATOM Inference Engine Disappointment
 
@@ -215,7 +215,7 @@ _MI355X DeepSeek V4 Pro performance improving from Day 0 onward. Source: SemiAna
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_sglang%2Ch200_sglang&i_dstart=2026-04-25&i_dend=2026-05-27&i_dates=2026-05-02%2C2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-10%2C2026-05-19%2C2026-05-21&i_active=mi355x_sglang)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_sglang%2Ch200_sglang&i_dstart=2026-04-25&i_dend=2026-05-27&i_dates=2026-05-02%2C2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-10%2C2026-05-19%2C2026-05-21&i_active=mi355x_sglang)
 
 The chart above shows how the throughput pareto-optimal frontier climbed when comparing results from the FP8 build on Day 0 released on 25th April to results from the FP4 build released on the 27th of May. The gain came almost entirely from AMD replacing PyTorch-native fallback paths with real AITER, Triton, TileLang, and FlyDSL kernels.
 
@@ -233,7 +233,7 @@ The next big jump came on May 19th as the team retired the remaining fallbacks: 
   caption="ATOM grows from one point in bottom left to full frontier. H200 for reference. Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-31&g_runid=26696268345&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_atom%2Ch200_sglang&i_dstart=2026-04-26&i_dend=2026-05-14&i_prec=fp4%2Cfp8&i_active=mi355x_atom&i_dates=2026-05-02)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-31&g_runid=26696268345&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_atom%2Ch200_sglang&i_dstart=2026-04-26&i_dend=2026-05-14&i_prec=fp4%2Cfp8&i_active=mi355x_atom&i_dates=2026-05-02)
 
 ATOM also improved drastically, expanding from a single conc=1 point to delivering decent throughput along the whole pareto frontier, with some points beating H200. The first gain came from [AITER fix #2916](https://github.com/ROCm/aiter/pull/2916), which corrected the device-allocation bug behind the mHC crash and let ATOM restore that AITER kernel. Next, FP4 experts moved onto AITER’s fused MoE kernel (Triton override removed), the sparse-attention OOM was cleared so eager mode and the single-sequence caps could be dropped. Batching support was also implemented, expanding the sweep from conc=1 to conc 1–512 with much better performance.
 
@@ -249,7 +249,7 @@ By Week 4, MTP was working for AMD on all frameworks, delivering multiple-fold i
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-29&g_model=DeepSeek-V4-Pro&g_runid=26649066318&i_gpus=b300_sglang%2Cb300_trt%2Cb300_vllm&i_active=b300_sglang%2Cb300_trt&i_dstart=2026-04-24&i_dend=2026-05-18&i_dates=2026-04-25%2C2026-04-26%2C2026-04-27%2C2026-04-28%2C2026-04-29%2C2026-05-03%2C2026-05-05)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-29&g_model=DeepSeek-V4-Pro&g_runid=26649066318&i_gpus=b300_sglang%2Cb300_trt%2Cb300_vllm&i_active=b300_sglang%2Cb300_trt&i_dstart=2026-04-24&i_dend=2026-05-18&i_dates=2026-04-25%2C2026-04-26%2C2026-04-27%2C2026-04-28%2C2026-04-29%2C2026-05-03%2C2026-05-05)
 
 For B300 on SGLang, DeepGEMM MegaMoE, our results showed a 3x improvement over less than a week thanks to the use of a grouped FP4 MoE GEMM that keeps experts resident and does one mega-dispatch instead of per-expert kernels, as well as from tuning to use EP4 instead of EP8.
 
@@ -276,7 +276,7 @@ _GB300 NVL72 DeepSeek V4 Pro performance improving over time. Source: SemiAnalys
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-08&g_runid=27099659001&i_prec=fp4%2Cfp8&i_gpus=gb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp&i_active=gb300_dynamo-sglang&i_dates=2026-04-30%2C2026-05-07%2C2026-05-11%2C2026-05-20%2C2026-05-22%2C2026-05-28%2C2026-06-02%2C2026-06-03%2C2026-06-08&i_dstart=2026-04-30&i_dend=2026-06-08)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-08&g_runid=27099659001&i_prec=fp4%2Cfp8&i_gpus=gb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp&i_active=gb300_dynamo-sglang&i_dates=2026-04-30%2C2026-05-07%2C2026-05-11%2C2026-05-20%2C2026-05-22%2C2026-05-28%2C2026-06-02%2C2026-06-03%2C2026-06-08&i_dstart=2026-04-30&i_dend=2026-06-08)
 
 The most dramatic improvements for GB300 SGLang MTP came on June 2nd from the implementation of W4A4 (MXFP4) MegaMoE. Compared to the non-MTP implementation that was in use on May 7th, the main improvements in the June 2nd version came entirely from a rewrite of the GB300 decode topology rather than touching kernels or precision. While the Day 0 recipe ran at most points with narrow EP=8 fed by one or two prefill workers and capped concurrency at 16,384; the May 20th run widened decode to EP=16, scaled prefill to four–twelve workers per decode worker, and pushed concurrency to 21,504.
 
@@ -294,7 +294,7 @@ For the B200 with the vLLM engine, token throughput per all-in provisioned utili
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_metric=y_tpPerMw&i_gpus=b200_vllm&i_dates=2026-04-28&i_dstart=2026-04-27&i_dend=2026-06-05&i_hc=1&i_linelabel=1)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_metric=y_tpPerMw&i_gpus=b200_vllm&i_dates=2026-04-28&i_dstart=2026-04-27&i_dend=2026-06-05&i_hc=1&i_linelabel=1)
 
 Tokens per all-in provisioned-utility MW is the best figure of merit for considering return on investment at the fleet scale: It adds more information to raw per-GPU token throughput because it reflects PUE and datacenter overhead. Because a B200's all-in utility power envelope is fixed near 2.17 kW/GPU, that ~1.7x jump from ~300k to ~500k tok/s/MW reflects a pure software gain.
 
@@ -312,7 +312,7 @@ Let’s round out this section on performance improvements by quickly reviewing 
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_active=b300_sglang_mtp%2Cgb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp%2Cmi355x_sglang_mtp&i_linelabel=1)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_active=b300_sglang_mtp%2Cgb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp%2Cmi355x_sglang_mtp&i_linelabel=1)
 
 When we switch on MTP, serving with the GB300 is unbeatable across all interactivity levels we analyzed. The cost per million output tokens for the GB300 reaches $0.156 at 50 tok/s/user assuming 8k tokens input, 1k tokens output. Find out more about how we calculate Total Cost of Ownership (TCO) in our [TCO model](https://semianalysis.com/ai-cloud-tco-model/).
 
@@ -322,7 +322,7 @@ When we switch on MTP, serving with the GB300 is unbeatable across all interacti
   caption="Source: InferenceX TCO calculator"
 />
 
-[Live TCO calculator view](https://inferencex.semianalysis.com/calculator?g_rundate=2026-06-08&g_model=DeepSeek-V4-Pro&g_runid=27099659001)
+[Live TCO calculator view](https://inferencex.semianalysis.com/infx/calculator?g_rundate=2026-06-08&g_model=DeepSeek-V4-Pro&g_runid=27099659001)
 
 The rack-scale advantage is fundamentally a scale-up domain story. NVL72 puts 72 GPUs in a single NVLink domain, which lets the serving stack run expert parallelism wide enough to keep DeepSeek V4's MoE dispatch/combine all-to-all entirely on NVLink instead of spilling onto the slower scale-out fabric, all while amortizing expert-weight loads across far more ranks.
 
@@ -338,7 +338,7 @@ When it comes to ROCm, progress has been much slower for native vLLM vs native S
   caption="Source: InferenceX"
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cmi355x_vllm&g_runid=27002889438)
+[Live chart](https://inferencex.semianalysis.com/infx/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cmi355x_vllm&g_runid=27002889438)
 
 ## What’s next for DeepSeek v4
 
@@ -527,7 +527,7 @@ The paper claims a theoretical speedup of 1.92x over the naive kernel in the Dee
 
 Now that we have discussed performance benchmarks in detail, let’s discuss total cost of ownership and cost per token when running DeepSeek v4 on H200 and the GB200 NVL72.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?preset=dsv4-launch">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?preset=dsv4-launch">
   Click to see the full DeepSeekV4 InferenceX dashboard →
 </DashboardCTA>
 

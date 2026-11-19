@@ -1,44 +1,89 @@
-import { prepareWithSegments, walkLineRanges } from '@chenglou/pretext';
+import {
+  clearCache,
+  prepareWithSegments,
+  walkLineRanges,
+  type PrepareOptions,
+} from '@chenglou/pretext';
+import { useSyncExternalStore } from 'react';
 
 import { splitLabel, type LabelSplitMode } from './axis-labels';
 import type { ChartMargin } from './types';
 
-/** Measure single-line text width using pretext (no DOM reflow). */
-export function measureTextWidth(text: string, font: string): number {
-  const prepared = prepareWithSegments(text, font);
+const widthCache = new Map<string, number>();
+
+export function measureTextWidth(text: string, font: string, options?: PrepareOptions): number {
+  const key = `${options?.whiteSpace ?? ''}\n${font}\n${text}`;
+  const cached = widthCache.get(key);
+  if (cached !== undefined) return cached;
+  const prepared = prepareWithSegments(text, font, options);
   let width = 0;
   walkLineRanges(prepared, Infinity, (line) => {
     width = line.width;
   });
+  if (widthCache.size >= 4096) widthCache.clear();
+  widthCache.set(key, width);
   return width;
 }
 
+export function chartFont(sizePx: number, weight: number | string = 400, family?: string): string {
+  const style = getComputedStyle(document.body);
+  const resolved =
+    family?.replaceAll(
+      /var\((?<name>--[\w-]+)(?:,\s*(?<fallback>[^)]*))?\)/gu,
+      (_, name: string, fallback?: string) =>
+        style.getPropertyValue(name).trim() || fallback || 'sans-serif',
+    ) ?? style.fontFamily;
+  return `${weight} ${sizePx}px ${resolved}`;
+}
+
+function countLoadedFaces(): number {
+  let loaded = 0;
+  for (const face of document.fonts) if (face.status === 'loaded') loaded++;
+  return loaded;
+}
+
+let fontsVersion = 0;
+const fontListeners = new Set<() => void>();
+if (typeof document !== 'undefined' && document.fonts) {
+  let loadedFaces = countLoadedFaces();
+  document.fonts.addEventListener('loadingdone', () => {
+    // Chrome fires loadingdone on every resize; only a newly loaded face changes widths.
+    const loaded = countLoadedFaces();
+    if (loaded === loadedFaces) return;
+    loadedFaces = loaded;
+    clearCache();
+    widthCache.clear();
+    fontsVersion++;
+    for (const listener of fontListeners) listener();
+  });
+}
+
+function subscribeFonts(listener: () => void) {
+  fontListeners.add(listener);
+  return () => fontListeners.delete(listener);
+}
+
+export function useFontsVersion(): number {
+  return useSyncExternalStore(
+    subscribeFonts,
+    () => fontsVersion,
+    () => 0,
+  );
+}
+
 export interface LeftMarginOptions {
-  /** How to split labels into rows. Default: 'last-space' */
   split?: LabelSplitMode;
-  /** CSS font for the first (or only) row. Default: '600 12px sans-serif' */
   primaryFont?: string;
-  /** CSS font for subsequent rows. Default: '10px sans-serif' */
   secondaryFont?: string;
-  /** Minimum left margin in px. Default: 60 */
   minMargin?: number;
-  /** Extra padding after text in px. Default: 16 */
   padding?: number;
 }
 
-/**
- * Compute dynamic left margin for horizontal bar charts based on y-axis label widths.
- * Uses @chenglou/pretext for fast, accurate text measurement without DOM reflow.
- *
- * Supports two split modes:
- * - 'last-space': splits at the last space (for twoRowYAxisLabels)
- * - 'newline': splits on \n (for multi-line eval labels)
- */
 export function computeLeftMargin(labels: string[], options: LeftMarginOptions = {}): number {
   const {
     split = 'last-space',
-    primaryFont = '600 12px sans-serif',
-    secondaryFont = '10px sans-serif',
+    primaryFont = '500 12px sans-serif',
+    secondaryFont = '12px sans-serif',
     minMargin = 60,
     padding = 16,
   } = options;
@@ -54,16 +99,6 @@ export function computeLeftMargin(labels: string[], options: LeftMarginOptions =
   return Math.max(minMargin, Math.ceil(maxWidth) + padding);
 }
 
-/**
- * Compute dynamic bottom margin based on x-axis tick label widths.
- * Useful when tick labels are rotated (e.g. dates at -30deg).
- *
- * @param labels - X-axis tick label strings
- * @param font - CSS font string for tick labels (default '12px sans-serif')
- * @param rotation - Label rotation in degrees (default 0, use 30 for rotated dates)
- * @param minMargin - Minimum bottom margin (default 40)
- * @param padding - Extra padding (default 16)
- */
 export function computeBottomMargin(
   labels: string[],
   font = '12px sans-serif',
@@ -75,21 +110,11 @@ export function computeBottomMargin(
   for (const label of labels) {
     maxWidth = Math.max(maxWidth, measureTextWidth(label, font));
   }
-  // When rotated, the vertical space needed is width * sin(angle)
   const radians = (rotation * Math.PI) / 180;
   const verticalSpace = rotation > 0 ? maxWidth * Math.sin(radians) : 0;
   return Math.max(minMargin, Math.ceil(verticalSpace) + padding);
 }
 
-/**
- * Compute a full ChartMargin with dynamic left and bottom based on label content.
- *
- * @param options.yLabels - Y-axis labels for left margin computation
- * @param options.xLabels - X-axis labels for bottom margin computation
- * @param options.xFont - CSS font for x-axis labels
- * @param options.xRotation - X-axis label rotation in degrees
- * @param options.base - Base margins to start from
- */
 export function computeDynamicMargins(options: {
   yLabels?: string[];
   xLabels?: string[];

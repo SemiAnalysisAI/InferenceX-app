@@ -6,8 +6,10 @@ import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/infe
 import {
   extractZipEntries,
   fetchGithubRunArtifacts,
+  fetchGithubWorkflowRun,
   getRunDate,
   normalizeGithubRunInfo,
+  resetGithubRunRepositories,
   type GithubArtifact,
   type GithubWorkflowRun,
 } from './github-artifacts';
@@ -17,8 +19,17 @@ vi.stubGlobal('fetch', mockFetch);
 
 afterEach(() => {
   mockFetch.mockReset();
+  resetGithubRunRepositories();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
+
+const authHeaders = {
+  headers: {
+    Accept: 'application/vnd.github.v3+json',
+    Authorization: 'Bearer token-123',
+  },
+};
 
 function workflowRun(overrides: Partial<GithubWorkflowRun> = {}): GithubWorkflowRun {
   return {
@@ -78,6 +89,77 @@ describe('getRunDate', () => {
   });
 });
 
+describe('fetchGithubWorkflowRun', () => {
+  it('reads only the primary repository when no source repositories are configured', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
+    const notFound = new Response(null, { status: 404, statusText: 'Not Found' });
+    mockFetch.mockResolvedValueOnce(notFound);
+
+    await expect(fetchGithubWorkflowRun('456', 'token-123')).resolves.toBe(notFound);
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${GITHUB_API_BASE}/repos/SemiAnalysisAI/InferenceX/actions/runs/456`,
+      authHeaders,
+    );
+  });
+
+  it('falls back to configured source repositories in order', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(Response.json(workflowRun({ id: 456 })));
+
+    const response = await fetchGithubWorkflowRun('456', 'token-123');
+
+    expect(await response.json()).toMatchObject({ id: 456 });
+    expect(mockFetch.mock.calls).toEqual([
+      [`${GITHUB_API_BASE}/repos/SemiAnalysisAI/InferenceX/actions/runs/456`, authHeaders],
+      [`${GITHUB_API_BASE}/repos/example-org/bench-a/actions/runs/456`, authHeaders],
+      [`${GITHUB_API_BASE}/repos/example-org/bench-b/actions/runs/456`, authHeaders],
+    ]);
+  });
+
+  it('asks the known owner first for artifacts after the run lookup found it', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json(workflowRun({ id: 456 })))
+      .mockResolvedValueOnce(Response.json({ artifacts: [] }));
+
+    await fetchGithubWorkflowRun('456', 'token-123');
+    await fetchGithubRunArtifacts('456', 'token-123');
+
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch.mock.calls[3][0]).toBe(
+      `${GITHUB_API_BASE}/repos/example-org/bench-b/actions/runs/456/artifacts?per_page=100&page=1`,
+    );
+  });
+
+  it('stops at the first repository that has the run', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
+    mockFetch.mockResolvedValueOnce(Response.json(workflowRun({ id: 456 })));
+
+    const response = await fetchGithubWorkflowRun('456', 'token-123');
+    expect(response.ok).toBe(true);
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it('reports an API failure instead of a later repository 404', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(new Response(null, { status: 502, statusText: 'Bad Gateway' }))
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }));
+
+    const response = await fetchGithubWorkflowRun('456', 'token-123');
+
+    expect(response.status).toBe(502);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('fetchGithubRunArtifacts', () => {
   it('paginates artifacts and returns accumulated results when a later page fails', async () => {
     const page1Artifacts = Array.from({ length: 100 }, (_, index) => artifact(index + 1));
@@ -116,6 +198,49 @@ describe('fetchGithubRunArtifacts', () => {
         },
       },
     );
+  });
+
+  it('returns no artifacts after a single request by default', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }));
+
+    await expect(fetchGithubRunArtifacts('456', 'token-123')).resolves.toEqual([]);
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to the next source repository when a run listing fails', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    const sourceArtifacts = [artifact(7, 'results_bmk')];
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(Response.json({ artifacts: sourceArtifacts }));
+
+    await expect(fetchGithubRunArtifacts('456', 'token-123')).resolves.toEqual(sourceArtifacts);
+    expect(mockFetch.mock.calls).toEqual([
+      [
+        `${GITHUB_API_BASE}/repos/SemiAnalysisAI/InferenceX/actions/runs/456/artifacts?per_page=100&page=1`,
+        authHeaders,
+      ],
+      [
+        `${GITHUB_API_BASE}/repos/example-org/bench-a/actions/runs/456/artifacts?per_page=100&page=1`,
+        authHeaders,
+      ],
+    ]);
+  });
+
+  it('keeps the owning repository listing even when it is empty or partial', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
+    mockFetch.mockResolvedValueOnce(Response.json({ artifacts: [] }));
+    await expect(fetchGithubRunArtifacts('456', 'token-123')).resolves.toEqual([]);
+    expect(mockFetch).toHaveBeenCalledOnce();
+
+    mockFetch.mockReset();
+    const page1Artifacts = Array.from({ length: 100 }, (_, index) => artifact(index + 1));
+    mockFetch
+      .mockResolvedValueOnce(Response.json({ artifacts: page1Artifacts }))
+      .mockResolvedValueOnce(new Response(null, { status: 502, statusText: 'Bad Gateway' }));
+    await expect(fetchGithubRunArtifacts('456', 'token-123')).resolves.toEqual(page1Artifacts);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

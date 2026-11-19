@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 
-const route = vi.hoisted(() => ({ pathname: '/inference' }));
+const route = vi.hoisted(() => ({ pathname: '/infx/inference' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
+const trackMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/analytics', () => ({ track: trackMock }));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -26,7 +28,7 @@ const GROUPS: SearchableSelectGroup[] = [
 ];
 
 beforeEach(() => {
-  route.pathname = '/inference';
+  route.pathname = '/infx/inference';
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -56,9 +58,6 @@ function openMenu() {
   act(() => trigger.click());
 }
 
-// React 18 controlled inputs ignore direct `.value` assignment because the
-// internal value tracker thinks nothing changed. Use the native HTMLInputElement
-// setter so React picks up the change and fires onChange in jsdom.
 function setSearchValue(value: string) {
   const input = document.body.querySelector('input[type="text"]') as HTMLInputElement;
   const nativeSetter = Object.getOwnPropertyDescriptor(
@@ -73,7 +72,7 @@ function setSearchValue(value: string) {
 
 describe('SearchableSelect', () => {
   it('uses Chinese defaults for search, clear, empty and placeholder without overriding caller copy', () => {
-    route.pathname = '/zh/inference';
+    route.pathname = '/zh/infx/inference';
     render({ value: 'unknown' });
     expect(container.textContent).toContain('请选择...');
     openMenu();
@@ -122,6 +121,16 @@ describe('SearchableSelect', () => {
     openMenu();
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     expect(items).toHaveLength(3);
+  });
+
+  it('reports search length and result count, never the typed text', () => {
+    trackMock.mockClear();
+    render({ trackPrefix: 'yaxis' });
+    openMenu();
+    setSearchValue('input token');
+    openMenu();
+    expect(trackMock).toHaveBeenCalledWith('yaxis_searched', { query_length: 11, results: 1 });
+    expect(JSON.stringify(trackMock.mock.calls)).not.toContain('input token');
   });
 
   it('filters options across groups by the search query (option label match)', () => {
@@ -300,7 +309,6 @@ describe('SearchableSelect', () => {
     ) as HTMLDivElement;
     act(() => target.click());
     expect(handle).toHaveBeenCalledExactlyOnceWith('y_inputTputPerGpu');
-    // Menu closed → no select-item visible
     expect(document.body.querySelectorAll('[data-slot="select-item"]')).toHaveLength(0);
   });
 

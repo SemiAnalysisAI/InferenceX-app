@@ -17,7 +17,7 @@ const routes = [
 ];
 
 test('the packed npm binary works from an arbitrary Unicode path', () => {
-  const result = suite.query(['--version'], suite.project('项目 with spaces-'));
+  const result = suite.npmQuery(['--version'], suite.project('项目 with spaces-'));
   succeeded(result);
   assert.equal(result.stdout, `${packageInfo.version}\n`);
   assert.equal(result.stderr, '');

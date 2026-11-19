@@ -8,7 +8,6 @@ interface Props {
   searchParams: Promise<EmbedSearchParams>;
 }
 
-/** Chinese sibling of `/embed/model/[slug]`; see that route for the contract. */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const entry = getCompareModelBySlug(slug);

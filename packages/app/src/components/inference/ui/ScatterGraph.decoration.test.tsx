@@ -1,23 +1,29 @@
 // @vitest-environment jsdom
 import * as d3 from 'd3';
-import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { IdBitset } from '@/lib/benchmarks/benchmark-presence';
 
 import {
   POINTS,
   baseInferenceState,
-  dotGroups,
+  dispatchAtPoint,
   inferenceState,
   mountChart,
   point,
   rebuildCount,
-  traceAvailabilityState,
-  availabilityState,
+  presenceState,
+  scatterPoints,
 } from './ScatterGraph.test-harness';
 import { pointLabelText } from './point-label';
+
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
 
 const datedPoint = (date: string, x: number, y: number) => ({
   ...point('h100', 'fp8', x, y, 8),
@@ -32,9 +38,9 @@ describe('pointLabelText', () => {
     const mtp = { ...standard, spec_decoding: 'mtp' };
     const eagle = { ...standard, spec_decoding: 'eagle' };
 
-    expect(pointLabelText(standard, false, true)).toBe('8\nC=16');
-    expect(pointLabelText(mtp, false, true)).toBe('8\nC=16');
-    expect(pointLabelText(eagle, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(standard, true, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(mtp, true, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(eagle, true, false, true)).toBe('8\nC=16');
   });
 
   it('omits concurrency unless the advanced toggle enables it', () => {
@@ -42,8 +48,8 @@ describe('pointLabelText', () => {
     standard.benchmark_type = 'agentic_traces';
     standard.spec_decoding = 'none';
 
-    expect(pointLabelText(standard, false, false)).toBe('8');
-    expect(pointLabelText(standard, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(standard, true, false, false)).toBe('8');
+    expect(pointLabelText(standard, true, false, true)).toBe('8\nC=16');
   });
 
   it('keeps fixed-sequence labels unchanged', () => {
@@ -51,7 +57,7 @@ describe('pointLabelText', () => {
     fixed.benchmark_type = 'single_turn';
     fixed.spec_decoding = 'mtp';
 
-    expect(pointLabelText(fixed, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(fixed, true, false, true)).toBe('8\nC=16');
   });
 });
 
@@ -59,27 +65,25 @@ describe('ScatterGraph toggle decoration', () => {
   it('renders all points and rooflines after mount', () => {
     const { container, unmount } = mountChart();
 
-    expect(dotGroups(container)).toHaveLength(POINTS.length);
+    expect(scatterPoints(container)).toHaveLength(POINTS.length);
     expect(container.querySelectorAll('.roofline-path').length).toBeGreaterThan(0);
     expect(rebuildCount()).toBeGreaterThan(0);
     unmount();
   });
 
-  it('checks log availability for fixed-sequence and agentic official points', () => {
+  it('requests presence only when a persisted point is shown, fixed-sequence included', () => {
+    const unpersisted = mountChart();
+    expect(presenceState.enabled).toBe(false);
+    unpersisted.unmount();
+
     const fixed = {
       ...point('h100', 'fp8', 10, 100, 1),
       id: 96255,
       benchmark_type: 'single_turn',
     } as InferenceData;
-    const agentic = {
-      ...point('h100', 'fp8', 20, 200, 2),
-      id: 206885,
-      benchmark_type: 'agentic_traces',
-    } as InferenceData;
-    const { unmount } = mountChart({ data: [fixed, agentic] });
+    const { unmount } = mountChart({ data: [fixed] });
 
-    expect(availabilityState.logIds).toEqual([96255, 206885]);
-    expect(availabilityState.traceIds).toEqual([206885]);
+    expect(presenceState.enabled).toBe(true);
     unmount();
   });
 
@@ -113,19 +117,34 @@ describe('ScatterGraph toggle decoration', () => {
       ...baseInferenceState(),
       selectedSequence: 'agentic-traces',
     };
-    const { container, unmount } = mountChart({
+    const { container, rerender, unmount } = mountChart({
       data: [standard, mtp, mtpWithOffload, fixedMtp],
     });
-    const groups = dotGroups(container);
+    const before = scatterPoints(container);
 
     expect(container.querySelector('.spec-decode-marker')).toBeNull();
-    expect(groups[1].querySelector('.offload-halo')).toBeNull();
-    expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
+    expect(before[1].halo).toBeNull();
+    expect(before[2].halo).toBe('var(--foreground)');
     expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
-    // The KV-offload key and optimization note moved to the axis-metric info
-    // footer rendered by ChartDisplay, so the chart itself carries neither.
     expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
+    const builds = rebuildCount();
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: false };
+    rerender();
+    const hidden = scatterPoints(container);
+    expect(hidden.map((entry) => entry.halo)).toEqual([null, null, null, null]);
+    expect(hidden.map((entry) => [entry.key, entry.x, entry.y])).toEqual(
+      before.map((entry) => [entry.key, entry.x, entry.y]),
+    );
+    expect(rebuildCount()).toBe(builds);
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: true };
+    rerender();
+    expect(scatterPoints(container).map((entry) => entry.halo)).toEqual([
+      null,
+      null,
+      'var(--foreground)',
+      null,
+    ]);
     unmount();
   });
 
@@ -141,24 +160,22 @@ describe('ScatterGraph toggle decoration', () => {
     };
     const { container, rerender, unmount } = mountChart({ data: [agenticPoint] });
     const buildsAfterMount = rebuildCount();
-    const originalDot = container.querySelector<SVGGElement>('.dot-group')!;
-    const dot = container.querySelector<SVGGElement>('.dot-group')!;
+    const layer = container.querySelector('.canvas-point-layer');
+    const [target] = scatterPoints(container);
 
-    act(() =>
-      dot.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 20 })),
-    );
+    dispatchAtPoint(container, 'click', target);
     expect(document.querySelector('[data-action="view-charts"]')).toBeNull();
+    expect(target.attrs['has-trace']).toBeUndefined();
 
-    traceAvailabilityState.current = { 42: true };
+    presenceState.current = { trace: new IdBitset([42, 1]), log: new IdBitset([]) };
     rerender();
     expect(rebuildCount()).toBe(buildsAfterMount);
-    expect(container.querySelector<SVGGElement>('.dot-group')).toBe(originalDot);
-    act(() =>
-      dot.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 20 })),
-    );
+    expect(container.querySelector('.canvas-point-layer')).toBe(layer);
+    expect(scatterPoints(container)[0].attrs['has-trace']).toBe('true');
+    for (let click = 0; click < 2; click++) dispatchAtPoint(container, 'click', target);
 
     expect(document.querySelector('[data-action="view-charts"]')?.getAttribute('href')).toBe(
-      '/inference/agentic/42',
+      '/infx/inference/agentic/42',
     );
     unmount();
   });
@@ -216,7 +233,8 @@ describe('ScatterGraph toggle decoration', () => {
       showPointLabels: false,
     };
     rerender();
-    expect(label?.style.display).toBe('none');
+    expect(label?.isConnected).toBe(false);
+    expect(container.querySelector('.point-label')).toBeNull();
     unmount();
   });
 
@@ -247,6 +265,38 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
+  it('updates each annotation while another keeps point labels visible', () => {
+    inferenceState.current = {
+      ...baseInferenceState(),
+      showPointLabels: true,
+    };
+    const { container, rerender, unmount } = mountChart({
+      data: [{ ...point('h100', 'fp8', 20, 200, 8), ep: 1 }],
+    });
+    const anchor = container.querySelector('.point-label-anchor');
+    const buildsAfterMount = rebuildCount();
+    const lines = () =>
+      [...container.querySelectorAll('.point-label tspan')].map((span) => span.textContent);
+    expect(lines()).toEqual(['8']);
+
+    const changes = [
+      { useAdvancedLabels: true, expected: ['8', 'TP8'] },
+      { showConcurrencyLabels: true, expected: ['8', 'TP8', 'C=16'] },
+      { useAdvancedLabels: false, expected: ['8', 'C=16'] },
+      { showPointLabels: false, expected: ['C=16'] },
+      { useAdvancedLabels: true, expected: ['TP8', 'C=16'] },
+      { showConcurrencyLabels: false, expected: ['TP8'] },
+    ];
+    for (const { expected, ...change } of changes) {
+      inferenceState.current = { ...inferenceState.current, ...change };
+      rerender();
+      expect(lines()).toEqual(expected);
+      expect(container.querySelector('.point-label-anchor')).toBe(anchor);
+      expect(rebuildCount()).toBe(buildsAfterMount);
+    }
+    unmount();
+  });
+
   it('hides a toggled-off hw via opacity without rebuilding the chart', () => {
     const { container, rerender, unmount } = mountChart();
     const buildsAfterMount = rebuildCount();
@@ -257,13 +307,19 @@ describe('ScatterGraph toggle decoration', () => {
     };
     rerender();
 
-    for (const dot of dotGroups(container, 'b200')) {
-      expect(dot.style.opacity).toBe('0');
-      expect(dot.style.pointerEvents).toBe('none');
+    const b200 = scatterPoints(container, 'b200');
+    expect(b200.length).toBeGreaterThan(0);
+    for (const entry of b200) {
+      expect(entry.opacity).toBe(0);
+      expect(entry.interactive).toBe(false);
     }
-    for (const dot of dotGroups(container, 'h100').filter((d) => d.dataset.precision === 'fp8')) {
-      expect(dot.style.opacity).toBe('1');
-      expect(dot.style.pointerEvents).toBe('auto');
+    const h100 = scatterPoints(container, 'h100').filter(
+      (entry) => entry.attrs.precision === 'fp8',
+    );
+    expect(h100.length).toBeGreaterThan(0);
+    for (const entry of h100) {
+      expect(entry.opacity).toBe(1);
+      expect(entry.interactive).toBe(true);
     }
     const b200Roofline = container.querySelector<SVGPathElement>(
       '.roofline-path[data-hw-key="b200"]',
@@ -271,20 +327,36 @@ describe('ScatterGraph toggle decoration', () => {
     expect(b200Roofline).not.toBeNull();
     expect(b200Roofline!.style.opacity).toBe('0');
 
-    // The whole point: a legend toggle is a restyle, not a teardown/rebuild.
     expect(rebuildCount()).toBe(buildsAfterMount);
+    unmount();
+  });
+
+  it('clears the Pareto fade from every faded mark when the frontier is turned off', () => {
+    inferenceState.current = { ...baseInferenceState(), showParetoFrontier: true };
+    const { container, rerender, unmount } = mountChart({
+      data: [...POINTS, point('h100', 'fp8', 70, 300, 2)],
+    });
+    const faded = () =>
+      [...container.querySelectorAll<SVGElement>('svg *')].filter(
+        (node) => node.style.filter !== '',
+      );
+    expect(faded().length).toBeGreaterThan(0);
+    expect(scatterPoints(container, 'b200').every((entry) => entry.faded)).toBe(true);
+    expect(scatterPoints(container, 'h100').some((entry) => entry.faded)).toBe(false);
+
+    inferenceState.current = { ...inferenceState.current, showParetoFrontier: false };
+    rerender();
+    expect(faded()).toEqual([]);
+    expect(scatterPoints(container).some((entry) => entry.faded)).toBe(false);
     unmount();
   });
 
   it('recolors remaining series when the active set changes, without rebuilding', () => {
     const { container, rerender, unmount } = mountChart();
     const buildsAfterMount = rebuildCount();
-    const h100Fill = () =>
-      dotGroups(container, 'h100')[0].querySelector('.visible-shape')!.getAttribute('fill');
+    const h100Fill = () => scatterPoints(container, 'h100')[0].color;
     const before = h100Fill();
 
-    // h100 and b200 share the NVIDIA hue zone: dropping one redistributes
-    // the remaining hues (dynamic-colors), so the dots must actually recolor.
     inferenceState.current = {
       ...inferenceState.current,
       activeHwTypes: new Set(['h100']),
@@ -299,11 +371,11 @@ describe('ScatterGraph toggle decoration', () => {
   it('swaps point shapes when a second precision is selected, without rebuilding', () => {
     const { container, rerender, unmount } = mountChart();
     const buildsAfterMount = rebuildCount();
-    const fp4Dot = () => dotGroups(container, 'h100').find((d) => d.dataset.precision === 'fp4')!;
+    const fp4Dot = () =>
+      scatterPoints(container, 'h100').find((entry) => entry.attrs.precision === 'fp4')!;
 
-    // Single precision: fp4 points are hidden circles.
-    expect(fp4Dot().style.opacity).toBe('0');
-    expect(fp4Dot().querySelector('.visible-shape')!.tagName.toLowerCase()).toBe('circle');
+    expect(fp4Dot().opacity).toBe(0);
+    expect(fp4Dot().shape).toBe('circle');
 
     inferenceState.current = {
       ...inferenceState.current,
@@ -311,11 +383,8 @@ describe('ScatterGraph toggle decoration', () => {
     };
     rerender();
 
-    // Second precision becomes visible as the square shape (slot 2).
-    expect(fp4Dot().style.opacity).toBe('1');
-    const shape = fp4Dot().querySelector<SVGElement>('.visible-shape')!;
-    expect(shape.tagName.toLowerCase()).toBe('rect');
-    expect(shape.dataset.shapeKey).toBe('square');
+    expect(fp4Dot().opacity).toBe(1);
+    expect(fp4Dot().shape).toBe('square');
     expect(rebuildCount()).toBe(buildsAfterMount);
     unmount();
   });
@@ -323,8 +392,8 @@ describe('ScatterGraph toggle decoration', () => {
   it('updates scale-dependent geometry without rebuilding chart structure', () => {
     const { container, rerender, unmount } = mountChart();
     const buildsAfterMount = rebuildCount();
-    const b200Dot = dotGroups(container, 'b200')[0];
-    const transformBefore = b200Dot.getAttribute('transform');
+    const layer = container.querySelector('.canvas-point-layer');
+    const b200Before = scatterPoints(container, 'b200')[0];
 
     inferenceState.current = {
       ...inferenceState.current,
@@ -333,8 +402,10 @@ describe('ScatterGraph toggle decoration', () => {
     rerender();
 
     expect(rebuildCount()).toBe(buildsAfterMount);
-    expect(dotGroups(container, 'b200')[0]).toBe(b200Dot);
-    expect(b200Dot.getAttribute('transform')).not.toBe(transformBefore);
+    expect(container.querySelector('.canvas-point-layer')).toBe(layer);
+    const b200After = scatterPoints(container, 'b200')[0];
+    expect(b200After.key).toBe(b200Before.key);
+    expect([b200After.x, b200After.y]).not.toEqual([b200Before.x, b200Before.y]);
     unmount();
   });
 
@@ -346,29 +417,24 @@ describe('ScatterGraph toggle decoration', () => {
       transitionDuration: 0,
     };
     const { container, rerender, unmount } = mountChart(chartProps);
-    const groups = dotGroups(container);
+    const before = scatterPoints(container);
     const buildsAfterMount = rebuildCount();
 
-    expect(groups).toHaveLength(2);
-    expect(groups[0].getAttribute('transform')).not.toBe(groups[1].getAttribute('transform'));
+    expect(before).toHaveLength(2);
+    expect([before[0].x, before[0].y]).not.toEqual([before[1].x, before[1].y]);
 
     chartProps.data = [datedPoint('2026-05-15', 30, 300), datedPoint('2026-06-15', 70, 700)];
     rerender();
 
-    const updatedGroups = dotGroups(container);
+    const after = scatterPoints(container);
     const pointsByDate = new Map(
-      updatedGroups.map((group) => {
-        const datum = (group as SVGGElement & { __data__: InferenceData }).__data__;
-        return [datum.date, { datum, transform: group.getAttribute('transform') }] as const;
-      }),
+      after.map((entry) => [(entry.datum as InferenceData).date, entry] as const),
     );
-    expect(updatedGroups).toEqual(groups);
+    expect(after.map((entry) => entry.key)).toEqual(before.map((entry) => entry.key));
     expect(pointsByDate.size).toBe(2);
     expect(pointsByDate.get('2026-05-15')?.datum).toMatchObject({ x: 30, y: 300 });
     expect(pointsByDate.get('2026-06-15')?.datum).toMatchObject({ x: 70, y: 700 });
-    expect(pointsByDate.get('2026-05-15')?.transform).not.toBe(
-      pointsByDate.get('2026-06-15')?.transform,
-    );
+    expect(pointsByDate.get('2026-05-15')?.x).not.toBe(pointsByDate.get('2026-06-15')?.x);
     expect(rebuildCount()).toBe(buildsAfterMount);
     unmount();
   });
@@ -381,16 +447,15 @@ describe('ScatterGraph toggle decoration', () => {
       transitionDuration: 0,
     };
     const { container, rerender, unmount } = mountChart(chartProps);
-    const group = dotGroups(container)[0];
+    const [before] = scatterPoints(container);
     const buildsAfterMount = rebuildCount();
 
     chartProps.data = [datedPoint('2026-06-15', 20, 200)];
     rerender();
 
-    const updatedGroup = dotGroups(container)[0];
-    const datum = (updatedGroup as SVGGElement & { __data__: InferenceData }).__data__;
-    expect(updatedGroup).toBe(group);
-    expect(datum.date).toBe('2026-06-15');
+    const [after] = scatterPoints(container);
+    expect(after.key).toBe(before.key);
+    expect((after.datum as InferenceData).date).toBe('2026-06-15');
     expect(rebuildCount()).toBe(buildsAfterMount);
     unmount();
   });
@@ -400,9 +465,8 @@ describe('ScatterGraph toggle decoration', () => {
     const b200Roofline = container.querySelector<SVGPathElement>(
       '.roofline-path[data-hw-key="b200"]',
     )!;
-    const b200Dot = dotGroups(container, 'b200')[0];
+    const b200Before = scatterPoints(container, 'b200')[0];
     const pathBefore = b200Roofline.getAttribute('d');
-    const transformBefore = b200Dot.getAttribute('transform');
 
     inferenceState.current = {
       ...inferenceState.current,
@@ -411,7 +475,8 @@ describe('ScatterGraph toggle decoration', () => {
     rerender();
 
     expect(b200Roofline.getAttribute('d')).not.toBe(pathBefore);
-    expect(b200Dot.getAttribute('transform')).not.toBe(transformBefore);
+    const b200After = scatterPoints(container, 'b200')[0];
+    expect([b200After.x, b200After.y]).not.toEqual([b200Before.x, b200Before.y]);
     unmount();
   });
 });

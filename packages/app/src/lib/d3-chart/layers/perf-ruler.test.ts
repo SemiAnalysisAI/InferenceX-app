@@ -30,8 +30,6 @@ import {
   type PerfRulerState,
 } from './perf-ruler';
 
-// ── Fixtures ─────────────────────────────────────────
-
 const ISO_X = 100;
 const END_A: PerfRulerEndInput = { py: 50, rawY: 400 };
 const END_B: PerfRulerEndInput = { py: 150, rawY: 197 };
@@ -43,11 +41,6 @@ function makeOpts(overrides?: Partial<PerfRulerRenderOptions>): PerfRulerRenderO
   };
 }
 
-/**
- * Synthetic polyline implementation of the SVGPathElement length API — jsdom
- * has no getTotalLength/getPointAtLength, so intersection tests drive the
- * binary search through this instead of a real path node.
- */
 function polylinePath(vertices: { x: number; y: number }[]): PerfRulerPathLike {
   const lengths: number[] = [0];
   for (let i = 1; i < vertices.length; i++) {
@@ -76,8 +69,6 @@ function polylinePath(vertices: { x: number; y: number }[]): PerfRulerPathLike {
   };
 }
 
-// ── formatPerfRatio ──────────────────────────────────────────────────
-
 describe('formatPerfRatio', () => {
   it('drops to one decimal at 10x and none at 100x', () => {
     expect(formatPerfRatio(10.46)).toBe('10.5x');
@@ -91,8 +82,6 @@ describe('formatPerfRatio', () => {
     expect(formatPerfRatio(-2)).toBe('');
   });
 });
-
-// ── isPerfRulerCurveVisible ────────────────────────────────────────────────
 
 describe('isPerfRulerCurveVisible', () => {
   it('treats legend-hidden curves (opacity 0) as invisible', () => {
@@ -113,8 +102,6 @@ describe('isPerfRulerCurveVisible', () => {
     expect(isPerfRulerCurveVisible('inherit')).toBe(true);
   });
 });
-
-// ── intersectPathAtX ─────────────────────────────────────────────────
 
 describe('intersectPathAtX', () => {
   it('interpolates within the correct segment of a multi-segment curve', () => {
@@ -183,8 +170,6 @@ describe('intersectPathAtX', () => {
   });
 });
 
-// ── computeIsoXRulerGeometry ─────────────────────────────────────────
-
 describe('computeIsoXRulerGeometry', () => {
   it('yields the same ratio regardless of end order (symmetric)', () => {
     const swapped = computeIsoXRulerGeometry(ISO_X, END_B, END_A);
@@ -215,8 +200,6 @@ describe('computeIsoXRulerGeometry', () => {
   });
 });
 
-// ── computePerfRulerLabelLayout ──────────────────────────────────────────────────
-
 describe('computePerfRulerLabelLayout', () => {
   const GEOMETRY = { x: 100, y1: 50, y2: 150, ratioLabel: '2.03x' };
 
@@ -242,8 +225,6 @@ describe('computePerfRulerLabelLayout', () => {
   });
 });
 
-// ── computePerfRulerLabelLayouts ──────────────────────────────────
-
 describe('computePerfRulerLabelLayouts', () => {
   const GEOMETRY = { x: 100, y1: 50, y2: 150, ratioLabel: '2.03x' };
   const OPTS = { chartWidth: 800, chartHeight: 400 };
@@ -264,14 +245,11 @@ describe('computePerfRulerLabelLayouts', () => {
     expect(Math.abs(second!.labelY - first!.labelY)).toBeGreaterThanOrEqual(
       DEFAULT_LABEL_FONT_SIZE + 8,
     );
-    // The nudged label's arrow and × follow it.
     expect(second!.deleteY).toBe(second!.labelY);
     expect(second!.arrowPath).not.toBe(first!.arrowPath);
   });
 
   it('keeps the below-midpoint collision fallback inside a short chart', () => {
-    // midY = 60 in a 100px chart: the above placement clips the top, and the
-    // naive below-midpoint fallback (midY + 46 = 106) would leave the plot.
     const geometry = { x: 100, y1: 40, y2: 80, ratioLabel: '2.03x' };
     const fontSize = DEFAULT_LABEL_FONT_SIZE;
     const layouts = computePerfRulerLabelLayouts([geometry, { ...geometry }], {
@@ -286,9 +264,6 @@ describe('computePerfRulerLabelLayouts', () => {
   });
 
   it('clamps downward nudges at the chart bottom, accepting residual overlap', () => {
-    // Three identical rulers near the top of a short chart: labels stack
-    // DOWNWARD, and the third label's second nudge (118 + 42 = 160) would
-    // escape a 140px chart without the clamp.
     const geometry = { x: 100, y1: 10, y2: 50, ratioLabel: '2.03x' };
     const fontSize = DEFAULT_LABEL_FONT_SIZE;
     const chartHeight = 140;
@@ -301,16 +276,11 @@ describe('computePerfRulerLabelLayouts', () => {
       expect(layout!.labelY - fontSize / 2).toBeGreaterThanOrEqual(4);
       expect(layout!.deleteY).toBe(layout!.labelY);
     }
-    // The first two still resolve their collision; the third accepts overlap
-    // at the clamped bottom rather than leaving the plot.
     expect(layouts[1]!.labelY).toBeGreaterThan(layouts[0]!.labelY);
     expect(layouts[2]!.labelY).toBe(chartHeight - 4 - fontSize / 2);
   });
 });
 
-// ── renderPerfRulers ───────────────────────────────────────────────────
-
-/** Render one ruler (id 1) with its layout computed like the caller does. */
 function renderSingle(
   group: MockSelection,
   geometry: PerfRulerGeometry | null,
@@ -365,8 +335,6 @@ describe('renderPerfRulers', () => {
     expect(drag.attrs['y2']).toBe(150);
     expect(drag.attrs['stroke']).toBe('transparent');
     expect(Number(drag.attrs['stroke-width'])).toBeGreaterThanOrEqual(12);
-    // Its own pointer-events overrides the group-level 'none' so the handle
-    // stays draggable while the visible marks never block clicks.
     expect(drag.styles['pointer-events']).toBe('stroke');
     expect(drag.styles['cursor']).toBe('ew-resize');
   });
@@ -429,7 +397,6 @@ describe('renderPerfRulers', () => {
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements[0].styles['pointer-events']).toBe('none');
-    // …while the big label opts back in so it can reveal the × on hover.
     const label = ruler.elements[0].children.find(
       (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
     )!;
@@ -445,14 +412,12 @@ describe('renderPerfRulers', () => {
     const del = ruler.elements[0].children.find(
       (c) => String(c.attrs['class']) === 'pr-delete no-export',
     )!;
-    // Hidden until hover; excluded from PNG exports via `no-export`.
     expect(del.styles['display']).toBe('none');
     expect(del.styles['pointer-events']).toBe('all');
     expect(del.styles['cursor']).toBe('pointer');
     const classes = String(del.attrs['class']).split(/\s+/u);
     expect(classes).toContain('pr-delete');
     expect(classes).toContain('no-export');
-    // Circular chip + × glyph in contrast colors.
     const bg = del.children.find((c) => String(c.attrs['class']) === 'pr-delete-bg')!;
     expect(bg.tag).toBe('circle');
     expect(Number(bg.attrs['r'])).toBeGreaterThanOrEqual(9);
@@ -477,14 +442,10 @@ describe('renderPerfRulers', () => {
     expect(click).toBeTypeOf('function');
     click!({ stopPropagation: () => stopped++ }, del.datum);
     expect(deleted).toEqual([1]);
-    // The click must not fall through to the chart underneath.
     expect(stopped).toBe(1);
   });
 });
 
-// ── nextPerfRulerState ───────────────────────────────────────
-
-/** Complete one measurement (two clicks) on a state, for test setup. */
 function complete(state: PerfRulerState, a: string, b: string, isoX: number): PerfRulerState {
   return nextPerfRulerState(nextPerfRulerState(state, { curve: a, isoX }), {
     curve: b,
@@ -505,12 +466,10 @@ describe('nextPerfRulerState', () => {
 
   it('starts a NEW ruler on the next click after a completed measurement', () => {
     let state = complete(EMPTY, 'curve-a', 'curve-b', 40);
-    // Clicking curve-a again does NOT retarget ruler 1 — it drafts ruler 2.
     state = nextPerfRulerState(state, { curve: 'curve-a', isoX: 90 });
     expect(state.rulers).toHaveLength(1);
     expect(state.rulers[0].isoX).toBe(40);
     expect(state.draft).toEqual({ curve: 'curve-a', isoX: 90 });
-    // …and completing it appends a second measurement with a fresh id.
     state = nextPerfRulerState(state, { curve: 'curve-c', isoX: 95 });
     expect(state.rulers.map((r) => r.id)).toEqual([1, 2]);
     expect(state.rulers[1]).toEqual({ id: 2, curveA: 'curve-a', curveB: 'curve-c', isoX: 90 });
@@ -522,7 +481,6 @@ describe('nextPerfRulerState', () => {
       state = complete(state, `a${i}`, `b${i}`, i * 10);
     }
     expect(state.rulers).toHaveLength(MAX_PERF_RULERS);
-    // The two oldest (a0/b0, a1/b1) were dropped; ids keep counting up.
     expect(state.rulers[0].curveA).toBe('a2');
     expect(state.rulers.at(-1)!.curveA).toBe(`a${MAX_PERF_RULERS + 1}`);
     expect(state.nextId).toBe(MAX_PERF_RULERS + 3);
@@ -540,9 +498,8 @@ describe('nextPerfRulerState', () => {
     const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 500 });
     const state = nextPerfRulerState(drafted, { curve: 'curve-b', isoX: 510 }, (a, b, isoX) => {
       calls.push([a, b, isoX]);
-      return 120; // curve B's span ends at 120 — clamp pulls the ruler back in.
+      return 120;
     });
-    // The clamp sees the DRAFT's iso-x (measurements complete at the draft).
     expect(calls).toEqual([['curve-a', 'curve-b', 500]]);
     expect(state.rulers).toEqual([{ id: 1, curveA: 'curve-a', curveB: 'curve-b', isoX: 120 }]);
     expect(state.draft).toBeNull();
@@ -551,8 +508,6 @@ describe('nextPerfRulerState', () => {
   it('rejects completion and keeps the draft anchored when the pair has NO overlap', () => {
     const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
     const state = nextPerfRulerState(drafted, { curve: 'curve-b', isoX: 55 }, () => null);
-    // No measurement was appended, no id burned, the draft survives — the
-    // user can pick a different second curve. Same reference: React bails.
     expect(state).toBe(drafted);
     expect(state.rulers).toEqual([]);
     expect(state.draft).toEqual({ curve: 'curve-a', isoX: 40 });
@@ -571,8 +526,6 @@ describe('nextPerfRulerState', () => {
     expect(calls).toBe(0);
   });
 });
-
-// ── movePerfRulerIsoX / deletePerfRuler / clearPerfRulers ───────────────
 
 describe('movePerfRulerIsoX', () => {
   const state = complete(EMPTY_PERF_RULER_STATE, 'curve-a', 'curve-b', 40);
@@ -596,7 +549,6 @@ describe('deletePerfRuler', () => {
     const two = complete(complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40), 'c', 'd', 80);
     const afterDelete = deletePerfRuler(two, 1);
     expect(afterDelete.rulers.map((r) => r.id)).toEqual([2]);
-    // Ids are never reused after a delete.
     expect(afterDelete.nextId).toBe(3);
   });
 });
@@ -611,8 +563,6 @@ describe('clearPerfRulers', () => {
     expect(cleared.nextId).toBe(state.nextId);
   });
 });
-
-// ── prunePerfRulers / perfRulerCurveSet ─────────────────────────────
 
 describe('prunePerfRulers', () => {
   it('removes only rulers whose curves left the data (per ruler)', () => {
@@ -636,13 +586,9 @@ describe('perfRulerCurveSet', () => {
   });
 });
 
-// ── serializePerfRulers / parsePerfRulers (share links) ─────────────
-
 describe('serializePerfRulers / parsePerfRulers', () => {
   const OFFICIAL_A = 'roofline-b200_trt_fp8';
   const OFFICIAL_B = 'roofline-mi355x_sglang_fp4';
-  // Overlay curves carry the unofficial run index; power-envelope curves are
-  // split per date with the encoded date appended (`%2F` from a slash).
   const OVERLAY = 'overlay-roofline-h100_vllm_fp8_run1__2026-09%2F11';
 
   it('round-trips completed rulers, including overlay and date-scoped curve ids', () => {
@@ -664,8 +610,6 @@ describe('serializePerfRulers / parsePerfRulers', () => {
   });
 
   it('round-trips run-specific date-comparison curve ids that contain ~', () => {
-    // GPUGraph series ids stamp the comparison entry onto point.date, so a
-    // run-qualified selection yields `roofline-<date>~r<runId>_<hw>_<prec>`.
     const RUN_A = 'roofline-2026-09-09~r27489075807_b200_fp8';
     const RUN_B = 'roofline-2026-09-09~r27489075808_b200_fp8';
     const state = complete(EMPTY_PERF_RULER_STATE, RUN_A, RUN_B, 55.25);
@@ -676,8 +620,6 @@ describe('serializePerfRulers / parsePerfRulers', () => {
     ]);
   });
 });
-
-// ── pathXExtent ─────────────────────────────────────────────
 
 describe('pathXExtent', () => {
   it('supports paths whose x decreases along their length', () => {
@@ -693,8 +635,6 @@ describe('pathXExtent', () => {
     expect(pathXExtent(polylinePath([{ x: 10, y: 10 }]))).toBeNull();
   });
 });
-
-// ── clampIsoX ───────────────────────────────────────────────
 
 describe('clampIsoX', () => {
   const A = { min: 100, max: 300 };

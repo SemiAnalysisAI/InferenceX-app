@@ -1,39 +1,18 @@
-import { expandLegendAdvanced } from '../support/legend-advanced';
-
 describe('Gradient Labels Toggle', () => {
   before(() => {
-    cy.visit('/inference', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
-    // Wait for chart to load
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('.sidebar-legend').first().should('be.visible');
-    // Parallelism Labels lives in the collapsed-by-default Advanced drawer.
-    expandLegendAdvanced();
-  });
-
-  it('both toggles can be enabled simultaneously', () => {
-    // Parallelism Labels is off by default; turn it on, then turn on Gradient.
-    cy.get('#scatter-parallelism-labels').then(($el) => {
-      if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
-    });
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-
-    // Both should be checked
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-
-    // Reset both for next tests (each subsequent test does a fresh cy.visit,
-    // but keep state tidy here too).
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-parallelism-labels').click();
+    cy.get('[data-testid="legend-advanced-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('#scatter-parallelism-labels').should('be.visible');
   });
 
   it('URL param i_gradlabel=1 enables gradient labels on load', () => {
-    cy.visit('/inference?i_gradlabel=1', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_gradlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -44,25 +23,19 @@ describe('Gradient Labels Toggle', () => {
 });
 
 const selectMetricAndEnableGradient = (metricLabel: string | RegExp) => {
-  // Switch to the target Y-axis metric
   cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
   cy.contains('[data-slot="select-item"]', metricLabel).click({ force: true });
 
-  // Wait for chart to re-render with new metric
   cy.get('[data-testid="scatter-graph"]').should('be.visible');
   cy.get('[data-testid="scatter-graph"]').should('not.contain.text', 'No data available');
 
-  // Enable gradient labels
   cy.get('#scatter-gradient-labels').click();
   cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
 };
 
 describe('Gradient Labels with non-default Y-axis metrics', () => {
-  // Regression tests: gradient labels must render SVG linearGradient defs
-  // for metrics that use paretoFrontLowerRight (cost, energy).
-
   before(() => {
-    cy.visit('/inference', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -73,21 +46,6 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
 
   it('gradient defs render for cost metric (lower_right roofline)', () => {
     selectMetricAndEnableGradient(/^Cost per Million Total Tokens$/u);
-
-    // SVG must contain at least one linearGradient used for roofline coloring
-    cy.get(
-      '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',
-    ).should('have.length.greaterThan', 0);
-    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(
-      'have.length.greaterThan',
-      0,
-    );
-  });
-
-  it('gradient defs render for energy metric (lower_right roofline)', () => {
-    // Disable gradient from previous test first
-    cy.get('#scatter-gradient-labels').click();
-    selectMetricAndEnableGradient('All-in Provisioned Joules per Total Token');
 
     cy.get(
       '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',

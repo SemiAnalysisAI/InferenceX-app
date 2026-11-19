@@ -26,7 +26,6 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-// Rendered outside the App Router, so `useSearchParams` has no context.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
   useSearchParams: () => new URLSearchParams(),
@@ -39,6 +38,12 @@ vi.mock('@/hooks/agentic-workload-explorer/use-trace-version', () => ({
 
 vi.mock('@/hooks/agentic-workload-explorer/use-dashboard-data', () => ({
   useDashboardData: mocks.useDashboardData,
+}));
+
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
 
 import ErrorsPage from '@/components/agentic-workload-explorer/views/errors-view';
@@ -120,7 +125,7 @@ describe('errors page refresh failure', () => {
     expect(normalizedText(alert)).toContain('Reload failed · showing previously loaded data');
     expect(normalizedText(alert)).toContain('refresh gateway timeout');
 
-    const totalErrorsLabel = [...container.querySelectorAll('div')].find(
+    const totalErrorsLabel = [...container.querySelectorAll('dt')].find(
       (element) => normalizedText(element) === 'Total Errors',
     );
     expect(normalizedText(totalErrorsLabel?.parentElement ?? null)).toContain('42');

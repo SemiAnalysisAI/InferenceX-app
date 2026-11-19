@@ -1,21 +1,28 @@
 // @vitest-environment jsdom
+import * as d3 from 'd3';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const exportMocks = vi.hoisted(() => ({ pathname: '/inference', toPng: vi.fn() }));
+const exportMocks = vi.hoisted(() => ({ pathname: '/infx/inference', toPng: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
 vi.mock('@jpinsonneau/html-to-image', () => ({
   toPng: exportMocks.toPng,
   getFontEmbedCSS: undefined,
 }));
 
+import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
+import { renderLayer } from '@/lib/d3-chart/D3Chart/layer-renderer';
+import type { D3ChartProps, RenderContext } from '@/lib/d3-chart/D3Chart/types';
+import { registerChartExportRenderer } from '@/lib/d3-chart/export-registry';
+import { ensureCanvasPointLayer } from '@/lib/d3-chart/layers/canvas-points';
 import {
   getExportCaptureDimensions,
   getExportFontFamily,
   normalizeChartSvgWidthsForExport,
-  useChartExport,
-} from './useChartExport';
+} from '@/lib/export/chart-image-export';
+
+import { useChartExport } from './useChartExport';
 
 describe('useChartExport failure messages', () => {
   let root: Root;
@@ -33,7 +40,7 @@ describe('useChartExport failure messages', () => {
   }
 
   beforeEach(() => {
-    exportMocks.pathname = '/inference';
+    exportMocks.pathname = '/infx/inference';
     exportMocks.toPng.mockReset();
     hideLegend = undefined;
     setIsLegendExpanded.mockReset();
@@ -64,10 +71,9 @@ describe('useChartExport failure messages', () => {
   });
 
   it.each([
-    ['/inference', 'Failed to export image. Please try again.'],
-    ['/zh/inference', '图片导出失败，请重试。'],
+    ['/infx/inference', 'Failed to export image. Please try again.'],
+    ['/zh/infx/inference', '图片导出失败，请重试。'],
   ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
-    // Keep the hook mounted across locale navigation to catch a stale callback.
     exportMocks.pathname = pathname;
     act(() => root.render(createElement(HookProbe)));
     const error = new Error('PNG capture failed');
@@ -88,6 +94,24 @@ describe('useChartExport failure messages', () => {
     expect(current.isExporting).toBe(false);
     expect(exportContainer.childElementCount).toBe(0);
     expect(chart.textContent).toBe('DeepSeek R1');
+  });
+
+  it('stays in the exporting state until the capture settles', async () => {
+    const capture = Promise.withResolvers<string>();
+    exportMocks.toPng.mockReturnValueOnce(capture.promise);
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let pending = Promise.resolve();
+    await act(async () => {
+      pending = current.exportToImage();
+      await vi.waitFor(() => expect(exportMocks.toPng).toHaveBeenCalledOnce());
+    });
+    expect(current.isExporting).toBe(true);
+    await act(async () => {
+      capture.reject(new Error('stop after capture'));
+      await pending;
+    });
+    expect(current.isExporting).toBe(false);
   });
 
   it.each([true, false])(
@@ -149,6 +173,122 @@ describe('useChartExport failure messages', () => {
     expect(exportMocks.toPng).toHaveBeenCalledOnce();
     expect(snapshot!.querySelector('.legend-container')?.textContent).toBe('B200');
     expect(chart.querySelector('.legend-container')?.textContent).toBe('B200');
+  });
+
+  it('draws the points of a canvas scatter chart into the PNG', async () => {
+    chart.innerHTML =
+      '<div class="relative"><div class="relative"><svg data-testid="d3-chart-svg"></svg></div></div>';
+    const svg = chart.querySelector<SVGSVGElement>('svg')!;
+    const margin = { top: 10, right: 10, bottom: 30, left: 40 };
+    const layout = setupChartStructure(svg, {
+      chartId: 'canvas-export',
+      containerWidth: 400,
+      containerHeight: 300,
+      margin,
+      watermark: 'none',
+    });
+    const data = [
+      { id: 'a', x: 1, y: 1, precision: 'fp8' },
+      { id: 'b', x: 3, y: 2, precision: 'fp8' },
+    ];
+    const scales = {
+      xScale: d3.scaleLinear().domain([0, 4]).range([0, layout.width]),
+      yScale: d3.scaleLinear().domain([0, 4]).range([layout.height, 0]),
+    };
+    const props: D3ChartProps<(typeof data)[number]> = {
+      data,
+      chartId: 'canvas-export',
+      margin,
+      watermark: 'none',
+      xScale: { type: 'linear', domain: [0, 4] },
+      yScale: { type: 'linear', domain: [0, 4] },
+      layers: [
+        {
+          type: 'scatter',
+          data,
+          keyFn: (d) => d.id,
+          config: { getColor: () => '#f00' },
+          canvas: ensureCanvasPointLayer,
+        },
+      ],
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    renderLayer(props.layers[0], layout.zoomGroup, scales.xScale, scales.yScale, layout, {
+      layout,
+      ...scales,
+      width: layout.width,
+      height: layout.height,
+      transitionDuration: 0,
+      tooltipElement: document.createElement('div'),
+    } as RenderContext);
+    const unregister = registerChartExportRenderer(svg, (draw) => draw(props, scales));
+    let snapshot: HTMLElement;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      snapshot = element.cloneNode(true) as HTMLElement;
+      throw new Error('stop after capture assertions');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    unregister();
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(svg.querySelector('.dot-group')).toBeNull();
+    expect(
+      [...snapshot!.querySelectorAll('svg .dot-group')].map((dot) => dot.getAttribute('transform')),
+    ).toEqual(data.map((d) => `translate(${scales.xScale(d.x)},${scales.yScale(d.y)})`));
+  });
+
+  it.each([false, true])(
+    'exports the whole plot with scrolling=%s without moving the live chart',
+    async (scrolling) => {
+      const plot =
+        '<div class="flex"><div class="relative"><div class="relative"><svg data-testid="d3-chart-svg"><text>First bar</text><text>Last bar</text></svg></div></div></div>';
+      chart.innerHTML = `<figcaption>Power comparison</figcaption>${scrolling ? `<div data-chart-scroll style="overflow-x: auto">${plot}</div>` : plot}`;
+      const liveScroller = chart.querySelector<HTMLElement>('[data-chart-scroll]');
+      if (liveScroller) liveScroller.scrollLeft = 250;
+      const original = chart.innerHTML;
+      let snapshot: HTMLElement;
+      exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+        snapshot = element.cloneNode(true) as HTMLElement;
+        throw new Error('stop after capture');
+      });
+      vi.spyOn(window, 'alert').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      await act(() => current.exportToImage());
+      expect(exportMocks.toPng).toHaveBeenCalledOnce();
+      expect(snapshot!.textContent).toContain('Power comparison');
+      expect(snapshot!.textContent).toContain('First bar');
+      expect(snapshot!.textContent).toContain('Last bar');
+      const exportedScroller = snapshot!.querySelector<HTMLElement>('[data-chart-scroll]');
+      if (scrolling) {
+        expect(exportedScroller?.style.overflow).toBe('visible');
+        expect(exportedScroller?.scrollLeft).toBe(0);
+      } else expect(exportedScroller).toBeNull();
+      expect(chart.innerHTML).toBe(original);
+      if (liveScroller) expect(liveScroller.scrollLeft).toBe(250);
+    },
+  );
+
+  it('exports the option each dropdown shows, not its first option', async () => {
+    chart.innerHTML = `
+      <select data-testid="power-timeline-concurrency">
+        <option value="">All</option>
+        <option value="4">c4</option>
+        <option value="8">c8</option>
+      </select>`;
+    const live = chart.querySelector('select')!;
+    live.value = '4';
+    let exportedValue: string | undefined;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      exportedValue = element.querySelector('select')?.value;
+      throw new Error('stop after capture');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(exportedValue).toBe('4');
+    expect(live.value).toBe('4');
   });
 });
 

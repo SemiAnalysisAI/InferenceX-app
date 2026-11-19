@@ -9,6 +9,10 @@ Use this skill for the user's InferenceX task and related follow-up questions.
 Choose the relevant CLI command or documented public-view recipe on the user's
 behalf; they can describe the result they want in natural language.
 
+For AgentX interactivity comparisons, historical trends, or efficiency-gain charts,
+read [the P90 definition](../inferencex-api/references/agentic-interactivity.md).
+Use reciprocal P90 full-response ITL, not median interactivity or P90 token rate.
+
 Read [the shared workflow guide](../inferencex-api/SKILL.md), then only the
 cookbook relevant to the task. It covers every existing CLI workflow and utility,
 as well as dashboard views, Pareto boundary queries, and chart/table templates.
@@ -23,6 +27,10 @@ required.
 For direct AgentX presentation requests, [inferencex-to-chart](../inferencex-to-chart/SKILL.md)
 defaults to a chart and [inferencex-to-table](../inferencex-to-table/SKILL.md) defaults
 to tables and CSV. Both use the same shared template and CLI.
+
+For historical throughput gains or modeled cost reductions with source PR/run
+links, use [inferencex-pr-improvements](../inferencex-pr-improvements/SKILL.md).
+It renders the API's baseline-to-best records at fixed interactivity.
 
 If invoked without a task, briefly offer benchmark lookup, token-cost comparison,
 power/AgentX analysis, Pareto frontier/hinterland queries, result provenance,

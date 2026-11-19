@@ -62,7 +62,6 @@ describe('getWallClockBreakdown SQL shape', () => {
     await getWallClockBreakdown(null, null, null, capturingDb(sink));
     const sql = sink[0].sql.toLowerCase().replaceAll(/\s+/gu, ' ');
     expect(sql).toContain('left join request_stats');
-    // ...but such a row can never be read as "the assistant stopped".
     expect(sql).toContain('has_stats and n_tools = 0');
   });
 
@@ -70,7 +69,6 @@ describe('getWallClockBreakdown SQL shape', () => {
     const sink: CompiledQuery[] = [];
     await getWallClockBreakdown(null, 'claude-opus-5', null, capturingDb(sink));
     const sql = sink[0].sql.replaceAll(/\s+/gu, ' ');
-    // The model predicate is projected as model_ok and consumed after lead().
     expect(sql).toMatch(/requests\.model = \$\d+\) AS model_ok/u);
     expect(sql).toContain('WHERE model_ok AND duration_ms IS NOT NULL');
     expect(sink[0].parameters).toContain('claude-opus-5');

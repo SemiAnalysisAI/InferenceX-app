@@ -17,29 +17,18 @@ import {
 } from '@/lib/charts/dynamic-colors';
 import { isDarkTheme } from '@/lib/themes/themes';
 
-/** One (comparison entry, chip config) series of the date comparison view. */
 export interface ComparisonSeries {
   date: string;
   hwKey: string;
-  /** `${date}_${hwKey}`: the key of the `activeDates` toggle set. */
   id: string;
   color: string;
 }
 
-/**
- * Series, run numbers and colours of the date comparison view. GPUGraph and
- * the Power Timeline share them so one (date, chip config) pair reads the
- * same in both displays.
- */
 export function useComparisonSeries(providedRunNumbering?: Map<string, number>) {
   const { selectedGPUs, selectedDateRange, selectedDates } = useInferenceFilters();
   const { highContrast } = useInferenceDisplay();
   const { resolvedTheme } = useTheme();
 
-  // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
-  // and/or specific-run entries); a same-day range endpoint is dropped when that
-  // date also has run entries (resolveComparisonEntries), then sorted earliest →
-  // latest so a day's runs read #1 → #N.
   const gpuDatePairs = useMemo(() => {
     const deduplicated = resolveComparisonEntries(selectedDates, selectedDateRange);
     deduplicated.sort((a, b) => {
@@ -53,9 +42,6 @@ export function useComparisonSeries(providedRunNumbering?: Map<string, number>) 
     return { dates: deduplicated, sortedGPUs };
   }, [selectedDateRange, selectedDates, selectedGPUs]);
 
-  // Run numbers for legend/line labels. Prefer the stable numbering passed by
-  // the parent (shared with the changelog, so labels match it and removed runs
-  // leave a gap); fall back to gap-free numbering of the on-chart series.
   const runNumbering = useMemo(
     () => providedRunNumbering ?? buildRunNumbering(gpuDatePairs.dates),
     [providedRunNumbering, gpuDatePairs.dates],
@@ -69,16 +55,12 @@ export function useComparisonSeries(providedRunNumbering?: Map<string, number>) 
     return ids;
   }, [gpuDatePairs]);
 
-  // High contrast keys off the GPU (not `date_gpu`) so each hardware config
-  // gets exactly one hue; the dates within a config are separated by the
-  // lightness ramp built below rather than by unrelated hues.
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast,
     identifiers: graphIdentifiers,
     hcKeys: gpuDatePairs.sortedGPUs,
   });
 
-  // Dynamic GPU×date color map
   const gpuDateColorMap = useMemo(() => {
     const { dates, sortedGPUs } = gpuDatePairs;
     if (sortedGPUs.length === 0 || dates.length === 0) return {};
@@ -86,9 +68,6 @@ export function useComparisonSeries(providedRunNumbering?: Map<string, number>) 
     return generateGpuDateColors(sortedGPUs, dates.length, theme);
   }, [gpuDatePairs, resolvedTheme]);
 
-  // High-contrast GPU×date color map: one iwanthue hue per GPU, ramped across
-  // the compared dates so a config's runs stay recognisably the same color
-  // while still reading oldest → newest.
   const hcGpuDateColorMap = useMemo(() => {
     const { dates, sortedGPUs } = gpuDatePairs;
     if (!highContrast || sortedGPUs.length === 0 || dates.length === 0) return {};

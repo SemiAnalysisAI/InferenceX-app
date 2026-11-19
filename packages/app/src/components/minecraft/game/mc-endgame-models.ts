@@ -3,7 +3,6 @@ import { boxGeometry } from './mc-models';
 
 export type EndgameModel = 'dragon' | 'crystal' | 'blaze' | 'enderman';
 
-/** Pixel-space cuboids with Java texture UVs; animation pivots stay in world units. */
 export function buildEndgameModel(kind: EndgameModel, texture: THREE.Texture) {
   const object = new THREE.Group();
   const material = new THREE.MeshBasicMaterial({

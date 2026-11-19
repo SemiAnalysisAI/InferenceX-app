@@ -46,14 +46,14 @@ describe('chipLabel', () => {
           prefill_num_workers: 2,
         }),
       ),
-    ).toBe('2xDWDP8 • c=2');
+    ).toBe('2xDWDP8 · c=2');
   });
   it('labels a non-disaggregated multinode point with its one aggregate topology', () => {
-    expect(chipLabel(sibling())).toBe('TP8PP2 • c=2');
+    expect(chipLabel(sibling())).toBe('TP8PP2 · c=2');
   });
 
   it('uses the meaningful aggregate PP when legacy schema halves disagree', () => {
-    expect(chipLabel(sibling({ decode_tp: 8, decode_ep: 1 }))).toBe('TP8PP2 • c=2');
+    expect(chipLabel(sibling({ decode_tp: 8, decode_ep: 1 }))).toBe('TP8PP2 · c=2');
   });
 
   it('uses the shared point-label format for aggregate DCP and PCP', () => {
@@ -66,7 +66,7 @@ describe('chipLabel', () => {
           decode_pcp_size: 1,
         }),
       ),
-    ).toBe('TP8PP2/DCP8 • c=2');
+    ).toBe('TP8PP2/DCP8 · c=2');
   });
 
   it('keeps prefill and decode roles separate only for disaggregated serving', () => {
@@ -84,6 +84,6 @@ describe('chipLabel', () => {
           decode_num_workers: 1,
         }),
       ),
-    ).toBe('1xTP8PP2/DCP2/PCP4+1xTP8/DCP8 • c=2');
+    ).toBe('1xTP8PP2/DCP2/PCP4+1xTP8/DCP8 · c=2');
   });
 });

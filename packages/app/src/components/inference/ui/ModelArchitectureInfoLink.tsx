@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { track } from '@/lib/analytics/analytics';
 import { Badge } from '@/components/ui/badge';
@@ -10,14 +10,6 @@ import { formatParamCount, getModelArchitecture } from '@/lib/catalog/model-arch
 import { type Model, getModelLabel } from '@/lib/catalog/data-mappings';
 import { localePath } from '@/lib/i18n/i18n';
 
-/**
- * Compact replacement for the old full-width "Learn more about the … architecture"
- * banner row: an icon link that sits beside the closed model-selector trigger and
- * deep-links to the model's `/model/[slug]` page. The former banner copy and the
- * architecture badges (MoE/Dense, attention type, param count) move into the
- * tooltip so the dashboard no longer spends a whole row of vertical space on them.
- * Renders nothing for models without a public slug (hidden models).
- */
 export function ModelArchitectureInfoLink({
   model,
   locale,
@@ -26,15 +18,16 @@ export function ModelArchitectureInfoLink({
   locale: 'en' | 'zh';
 }) {
   const entry = getModelSlugEntryForDisplayName(model);
-  if (!entry) return null;
   const arch = getModelArchitecture(model);
+  // Pending model registrations have routes but no sourced architecture article.
+  if (!entry || !arch) return null;
   const label = getModelLabel(model);
   const text =
     locale === 'zh' ? `了解 ${label} 模型架构` : `Learn more about the ${label} architecture`;
   return (
     <TooltipRoot>
       <TooltipTrigger asChild>
-        <Link
+        <IntentPrefetchLink
           href={localePath(`/model/${entry.slug}`, locale)}
           aria-label={text}
           data-testid="model-architecture-link"
@@ -52,7 +45,7 @@ export function ModelArchitectureInfoLink({
             <line x1="3" y1="9" x2="21" y2="9" />
             <line x1="9" y1="9" x2="9" y2="21" />
           </svg>
-        </Link>
+        </IntentPrefetchLink>
       </TooltipTrigger>
       <TooltipContent
         side="top"

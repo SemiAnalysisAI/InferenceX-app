@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { renderCaption } from '@/components/blog/mdx-components';
 
-/** `<Figure caption>` is a plain string prop, so MDX never parses it. `renderCaption`
- *  is what turns `Source: [X](https://…)` credits into real anchors. */
 const anchors = (nodes: ReturnType<typeof renderCaption>) =>
   nodes.filter(isValidElement) as React.ReactElement<{ href: string; children: string }>[];
 

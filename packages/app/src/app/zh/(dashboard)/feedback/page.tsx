@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import FeedbackViewer from '@/components/feedback-viewer/FeedbackViewer';
-import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
+
 import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 export const metadata: Metadata = {
@@ -10,10 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function ZhFeedbackPage() {
-  return (
-    <>
-      <ZhTabIntro tab="feedback" />
-      <FeedbackViewer />
-    </>
-  );
+  return <FeedbackViewer />;
 }

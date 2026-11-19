@@ -37,16 +37,6 @@ function subscribeClientPathname(subscriber: () => void): () => void {
   };
 }
 
-/**
- * The router pathname, corrected for in-place `replaceClientPathname`
- * rewrites. `usePathname` deliberately keeps the server-rendered value after
- * per-model dashboard routes rewrite the URL on a model switch; controls that
- * map the CURRENT address to a destination (the header language toggle) read
- * this instead. The override is honored only while the address bar still
- * matches it, so App Router navigations (which update `routerPathname`) and
- * popstate transitions retire it naturally — and environments where the
- * browser URL is not the route (component tests) keep the router value.
- */
 export function useClientPathname(routerPathname: string): string {
   return useSyncExternalStore(
     subscribeClientPathname,

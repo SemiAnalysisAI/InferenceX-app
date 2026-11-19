@@ -8,31 +8,14 @@ import {
 } from '@/lib/api/api';
 
 interface UseEvalSamplesArgs {
-  /** `eval_results.id` for an ingested run; `<= 0` (typically -1) signals "use live fetch". */
   evalResultId: number | null;
-  /** Required when `evalResultId <= 0`; identifies the GHA artifact to download. */
   liveContext?: EvalSamplesLiveContext | null;
   filter: EvalSamplesFilter;
   offset: number;
   limit: number;
-  /** Shared sample to resolve into its containing page. DB-backed runs only. */
   docId?: number | null;
 }
 
-/**
- * Fetch a paginated slice of eval samples for one eval row.
- *
- * Two backends, picked automatically:
- * - `evalResultId > 0` → `/api/v1/eval-samples` (reads `eval_samples` table)
- * - `evalResultId <= 0` AND `liveContext` provided → `/api/v1/eval-samples-live`
- *   (downloads the matching workflow artifact from GitHub Actions on demand)
- *
- * Both return the same `EvalSamplesResponse` shape so the drawer doesn't need
- * to know which path served it.
- *
- * `keepPreviousData` keeps the prior page rendered while the next page loads,
- * so paging through samples doesn't flash the empty state.
- */
 export function useEvalSamples({
   evalResultId,
   liveContext,

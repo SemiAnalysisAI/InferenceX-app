@@ -9,11 +9,6 @@ import { requestsVisFilter } from './operations';
 import type { Database } from './types';
 import { asOfDate } from './shared/as-of';
 
-/**
- * All visible successful calls establish chronology; selecting a trace version
- * never resets session origins or stretches gaps. Only aggregate histograms
- * leave PostgreSQL. No request bodies, headers or inferred identity links.
- */
 export function sessionReuseQuery(
   vis: string[] | null,
   traceVersion: number | null,

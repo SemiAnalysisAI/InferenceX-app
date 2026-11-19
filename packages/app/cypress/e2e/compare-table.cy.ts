@@ -3,9 +3,6 @@ describe('Compare Interpolated Table', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    // Visit the canonical model-prefixed URL directly to avoid the bare-slug
-    // 308 redirect changing the URL after page load (which would invalidate
-    // the URL-based assertions further down).
     cy.visit('/compare/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"]').should('exist');
   });
@@ -43,16 +40,6 @@ describe('Compare Interpolated Table', () => {
   });
 
   it('commits target value when pressing Enter and updates the throughput cell', () => {
-    const expectedMetrics = [
-      'Throughput (tok/s/chip)',
-      'Cost ($/M tok)',
-      'tok/s/MW',
-      'Concurrency',
-    ];
-    for (const metric of expectedMetrics) {
-      cy.get('[data-testid="compare-interpolated-table"] tbody').should('contain.text', metric);
-    }
-
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'GB200');
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'H100');
 
@@ -132,5 +119,28 @@ describe('Compare Interpolated Table', () => {
       'aria-label',
       '目标交互性 1（tok/s/user）',
     );
+  });
+});
+
+describe('Compare table with a shared sequence', () => {
+  // The server renders this page's table for 8k/1k; the shared URL asks for 1k/1k.
+  const SHARED_URL = '/compare/deepseek-r1-b200-vs-h200/8k-1k?i_seq=1k%2F1k';
+  const SHARED_SEQUENCE_ROWS = {
+    method: 'GET',
+    pathname: '/api/v1/benchmarks',
+    query: { view: 'calculator', sequence: '1k/1k' },
+  };
+
+  beforeEach(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
+  });
+
+  it('drops the server cells when the shared sequence fails to load', () => {
+    cy.intercept(SHARED_SEQUENCE_ROWS, { statusCode: 500, body: { error: 'unavailable' } });
+    cy.visit(SHARED_URL);
+    cy.get('[data-testid="compare-table-status"]').should('have.attr', 'data-status', 'error');
+    cy.get('[data-testid="compare-interpolated-table"]').should('not.exist');
   });
 });

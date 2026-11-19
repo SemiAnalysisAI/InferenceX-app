@@ -296,7 +296,7 @@ Kimi Linear 把 KDA 与全注意力的 Multi-head Latent Attention（MLA）交�
 
 ### KV 吞吐量
 
-KV 吞吐量定义为：在给定序列长度下，KV cache 大小除以 prefill 时间（首 token 时延，Time to First Token）。KV 吞吐量代表了以 PD 分离（PD disaggregation）方式稳定服务一个模型所需的最低带宽，同时也是理解 KV cache 效率的良好代理指标。prefill 时间浓缩了模型架构的效率，随着序列长度增加，我们能分别观察到访存受限与计算受限两种情形。如下表所示，序列长度越长，混合线性注意力的收益越明显。
+KV 吞吐量定义为：在给定序列长度下，KV cache 大小除以 prefill 时间（首 token 时延，Time to First Token）。KV 吞吐量代表了以 PD 分离（PD disaggregation）方式稳定服务一个模型所需的最低带宽，同时也是理解 KV cache 效率的良好代理指标。prefill 时间集中体现了模型架构的效率，随着序列长度增加，我们能分别观察到访存受限与计算受限两种情形。如下表所示，序列长度越长，混合线性注意力的收益越明显。
 
 <Figure
   src="/images/kimi-k3-the-manos-the-mythos-the/kv-throughput-by-sequence-length.png"
@@ -665,7 +665,7 @@ QB 的基本原理与 aux-free 负载均衡一致：根据系统负载动态更�
 
 QB 的做法是：在当前批次的截断阈值和路由结果下，求出一个能让负载近似均衡的偏置，通过求解带约束的优化问题，并把这次更新应用到下一批次。第一个约束是每个 token 恰好被路由到 k 个专家。第二个约束是：一批 m 个 token、每个挑 k 个专家，总共产生 (mk) 次分配；要让负载在 n 个专家间均匀分布，每个专家应处理 _q=mk/n_ 个 token。
 
-每个 token 把加过偏置的 router 分数中第 (k+1) 高的那个作为截断阈值，并据此计算为均衡各专家负载所需的偏置更新量。对每个专家，QB 会把它的 router 分数与所有 token 截断阈值之间的 margin 排序，并把负偏置设为第 q+1 大的 margin，从而恰好留下 q 个 margin 高于阈值。由于 q/m=k/n，这正好是 margin 的 (1-k/n) 分位数，这也是"分位数均衡"名称的由来。
+每个 token 把加过偏置的 router 分数中第 (k+1) 高的那个作为截断阈值，并据此计算为均衡各专家负载所需的偏置更新量。对每个专家，QB 会把它的 router 分数与所有 token 截断阈值之间的 margin 排序，并把负偏置设为第 q+1 大的 margin，从而恰好留下 q 个 margin 高于阈值。由于 q/m=k/n，这正好是 margin 的 (1-k/n) 分位数，这也是“分位数负载均衡”名称的由来。
 
 ## 推理性能
 
@@ -686,7 +686,7 @@ QB 的做法是：在当前批次的截断阈值和路由结果下，求出一�
 <Figure
   src="/images/kimi-k3-the-manos-the-mythos-the/inferencex-agentic-trace-distributions.png"
   alt="agentic 轨迹数据集的分布直方图：每轮输入 token、每轮输出 token、每次请求未命中缓存的输入 token，以及每次会话的轮数"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/zh/agentx)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/zh/infx/agentx)"
 />
 
 对 Kimi K3 来说，Day 0 的 bringup 比 DSv4 更轻松，因为权重发布前的文档和准备工作更充分。合适的镜像和投机解码模型与权重同时发布。
@@ -703,7 +703,7 @@ _相关阅读：[DeepSeekV4 1.6T 从 Day 0 到 Day 43 的性能演进 —— Hua
 
 对 B300 来说，模型可以放进单节点，服务表现良好。扣除权重占用后，GPU HBM 只能容纳 325 万 token。在下图中，吞吐量随批量增大而上升，直到并发超过 8。这大致对应 325 万 token 的 KV cache 预算，此后 cache 开始颠簸（thrash），命中率从理论上的 95% 跌到 `<` 10%。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

@@ -18,7 +18,7 @@ tags:
 
 Qwen3.5 397B 每隔几层就用 GatedDeltaNet 替代常规注意力。GatedDeltaNet 由 MIT 与 NVIDIA Research 提出，其状态存储需求在理论上是常数，而常规注意力是线性增长的，因此相比同等规模的稠密注意力模型，它的存储需求更低。与 Nemotron 那样惨败的端到端模型训练研究不同，NVIDIA Research 在 GDN、LatentMoE 这类被前沿模型采用的基础研究上做得非常出色。
 
-在看结果之前先说明一点测试方法：该模型原生最大上下文长度为 262k token，因此 AgentX 对它回放的是[截断到 256k 的数据集](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k)。这模拟的是在上下文上限较小的模型上频繁触顶、频繁压缩上下文的工作负载，也就是用户实际使用这类模型的方式。
+在看结果之前先说明一点测试方法：该模型原生最大上下文长度为 262k token，因此 AgentX 对它回放的是[截断到 256k 的数据集](https://inferencex.semianalysis.com/infx/agentx/cc-traces-weka-062126-256k)。这模拟的是在上下文上限较小的模型上频繁触顶、频繁压缩上下文的工作负载，也就是用户实际使用这类模型的方式。
 
 ## 差距
 
@@ -26,7 +26,7 @@ Qwen3.5 397B 每隔几层就用 GatedDeltaNet 替代常规注意力。GatedDelta
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
 />
 
 固定引擎这一变量，正是这组对比值得一提的原因。跨引擎的结果总有争论空间，因为不同软件栈的成熟度不同，投入优化的人力也不同；而这里两边都是 SGLang，差距依然是 20 倍。

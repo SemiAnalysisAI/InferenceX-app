@@ -34,7 +34,6 @@ describe('DistributionCard', () => {
     cy.get(
       'line[stroke="#3b82f6"], line[stroke="#22c55e"], line[stroke="#f59e0b"], line[stroke="#ef4444"]',
     ).should('have.length', 8);
-    // One filled bar rect per bin (ChartHover may add a transparent overlay rect).
     cy.get('rect[class*="fill-primary"]').should('have.length', distribution.bins.length);
   });
 
@@ -95,7 +94,7 @@ describe('DistributionCard', () => {
       .and('have.attr', 'aria-valuetext')
       .and('include', 'Range: 0–100 tokens');
 
-    cy.get('[role="tooltip"]').should('be.visible').and('contain.text', 'Count5');
+    cy.get('[role="tooltip"]').should('be.visible').and('contain.text', '5Count');
     cy.get('rect[role="slider"]').type('{rightarrow}').should('have.attr', 'aria-valuenow', '2');
     cy.get('rect[role="slider"]').should('have.attr', 'aria-valuetext').and('include', 'Count: 20');
     cy.get('[role="tooltip"]').should('contain.text', '100–200 tokens');

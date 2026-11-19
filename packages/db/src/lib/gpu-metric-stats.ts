@@ -4,11 +4,6 @@ import {
   type GpuMetricStats,
 } from '../etl/gpu-metrics-csv';
 
-/**
- * Point-cache revisions include this version: bump it whenever full-record metric
- * populations, mappings, units or statistical definitions change. Serving-window
- * metrics do not depend on it.
- */
 export const GPU_STATS_VERSION = 1;
 
 export const STAT_METRIC_COLUMN = {
@@ -37,7 +32,6 @@ export type StoredGpuMetricSample = {
   sampled_at: string | Date;
 } & Record<(typeof STAT_METRIC_COLUMN)[keyof typeof STAT_METRIC_COLUMN], number | null>;
 
-/** Preserve nulls: chart adapters intentionally zero-fill power, statistics inputs must not. */
 export function computeStoredGpuMetricStats(
   rows: readonly StoredGpuMetricSample[],
 ): GpuMetricStats[] {

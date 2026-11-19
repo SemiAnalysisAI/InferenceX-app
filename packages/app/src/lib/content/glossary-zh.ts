@@ -1,3 +1,4 @@
+import { acceleratorTranslations } from './glossary-accelerators-zh';
 import {
   GLOSSARY_CATEGORIES,
   type GlossaryCategory,
@@ -16,19 +17,286 @@ export const GLOSSARY_CATEGORY_LABELS_ZH: Readonly<Record<GlossaryCategory, stri
   Software: '软件栈',
 };
 
-type GlossaryTranslation = Pick<
+export type GlossaryTranslation = Pick<
   GlossaryEntry,
   | 'term'
   | 'aliases'
+  | 'expansion'
   | 'plainEnglish'
   | 'definition'
   | 'explanation'
   | 'significance'
   | 'benchmarkContext'
   | 'measurement'
+  | 'figure'
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
+  ...acceleratorTranslations,
+  'decode-megakernel': {
+    term: 'Decode megakernel',
+    aliases: ['megakernel', '整模型融合 kernel', 'MonoKernel'],
+    plainEnglish:
+      'Decode megakernel 把多个模型层中的操作合并为长时间运行的设备程序，减少 launch 间隙，并让权重传输与计算重叠。',
+    definition:
+      'Decode megakernel 跨算子或跨层融合模型前向计算中的较大部分，显式安排计算、数据搬运，有时也包括集合通信。',
+    explanation:
+      '常规执行会分别为注意力、投影、专家路由等操作启动许多 kernel。Megakernel 可以在计算当前层时预取下一层权重。不同实现的融合范围不同；这个名称并不保证所有算子、通信步骤或请求都在一次 launch 中完成。引擎调度和前缀缓存管理仍可位于融合后的前向路径之外。',
+    significance:
+      '低并发时，短算子之间的 launch 间隙可能让加速器空闲。减少这些间隙能提高交互速度，但长上下文注意力、prefill、缓存传输和高并发吞吐量仍需单独测量。',
+    benchmarkContext:
+      '2026 年 11 月的 TPU AgentX 文章介绍了 SGLang、vLLM 的 megakernel 路径和 AMD 的 MonoKernel。Inferact 将融合前向路径接入 vLLM 的调度及 KV 传输系统；这些结果不意味着整个推理服务只有一个 kernel。',
+  },
+  'kernel-launch-overhead': {
+    term: 'Kernel launch 开销',
+    aliases: [
+      'kernel launch overhead',
+      'launch latency',
+      'kernel 派发开销',
+      'launch-bound execution',
+    ],
+    plainEnglish:
+      'Kernel launch 开销是向设备派发操作所需的工作；算子很短时，派发间隙可能占据 decode 步骤中的相当一部分时间。',
+    definition:
+      'Kernel launch 开销包括主机和运行时提交设备任务的成本，以及派发过程在有效设备操作之间引入的延迟。',
+    explanation:
+      'CPU 侧的 launch 耗时不直接等于加速器空闲时间，因为派发与执行可能重叠。时间线需要区分提交工作、同步、依赖停顿和实际的设备空闲间隙。图重放与融合减少的是不同部分的开销，两者都不会免去启动任务的需要，也不会让内存传输和集合通信变得免费。',
+    significance:
+      '低 batch decode 即使运行在峰值算力很高的设备上，也可能受 launch 限制。仅凭 launch 数量不能推导加速比：剩余 kernel 可能更慢，关键路径也可能转移到内存或通信。',
+    benchmarkContext:
+      'TPU 文章对比了常规 decode 与 megakernel，并引用 AMD 减少 launch 次数的结果。该次数和加速比属于指定模型与测试配置，不能据此建立 launch 数量与每秒 token 数之间的通用换算关系。',
+  },
+  'decode-context-parallelism': {
+    term: 'Decode 上下文并行',
+    aliases: ['DCP', 'decode context parallelism', 'KV 序列切分'],
+    plainEnglish:
+      'Decode 上下文并行把一条序列的 KV cache 分散到多个 rank，每个 rank 读取部分历史，再合并各自的注意力结果。',
+    definition:
+      'Decode 上下文并行沿序列维度切分注意力 KV 状态，并跨参与 rank 合并局部注意力输出及其归一化统计量。',
+    explanation:
+      '当张量并行的 rank 数超过可独立切分的 KV head 数时，这种方式能减少 KV 重复存储，对 MLA 的共享 latent cache 尤其有用。每个 rank 对自己的 token 分片计算注意力，再通过数值正确的归并得到完整结果。名称反映常见优化目标，并非限定只能用于 decode；实现也可以在 prefill 中使用同一套分片缓存。',
+    significance:
+      '切分能增加有效 KV 容量并分摊缓存读取，但也带来通信与归并开销。最合适的并行度取决于上下文长度、注意力结构、拓扑，以及引擎支持的张量并行和 prefill 上下文并行组合。',
+    benchmarkContext:
+      'TPU AgentX 文章介绍了 GLM 和 Kimi K3 的 DCP。K3 在 prefill 阶段也采用分片布局，因此不能看到 DCP 标签就认定 prefill 缓存在各 rank 上完整复制。应比较实际 rank 分组与缓存布局，而不只看缩写。',
+  },
+  'prefill-context-parallelism': {
+    term: 'Prefill 上下文并行',
+    aliases: ['PCP', 'prefill context parallelism', 'prefill 序列切分'],
+    plainEnglish:
+      'Prefill 上下文并行把长 prompt 的新增 token 计算分给多个 rank，不让一个加速器独自处理整条 prompt。',
+    definition:
+      'Prefill 上下文并行把 prompt 的 query-token 计算分配到多个 rank，并交换保持模型注意力语义所需的 key 和 value。',
+    explanation:
+      '一种实现让每个 rank 持有一段 query，并 gather 所需的 key 和 value；另一种让 KV 分块循环传递，避免每个 rank 都保存完整历史。因果注意力中，靠后的 query 能看到更多 token，因此还需要均衡负载。PCP 的计算分工与 DCP 的 KV 存储分工有关，但并不相同，可用组合随引擎和模型而变。',
+    significance:
+      'PCP 可以缩短长 prompt 的处理时间，但额外通信、权重复制或不同并行布局也可能占用原本留给 KV 状态的容量。Prefill 延迟最低的方案，不一定是端到端推理服务的最佳配置。',
+    benchmarkContext:
+      'TPU 文章的 Kimi K3 部分解释了为何该配置在 prefill 中选择 DCP 分片缓存，而没有采用另一种 PCP 配置。这是具体配置下的内存取舍，不是 PCP 与 DCP 永远不能组合使用的规则。',
+  },
+  'attention-head-dimension': {
+    term: '注意力 head dimension',
+    aliases: ['attention head dimension', 'head dimension', 'head_dim', 'head dim', '注意力头维度'],
+    plainEnglish:
+      '注意力 head dimension 是每个注意力头使用的向量宽度，会影响计算量、缓存占用，以及它与加速器矩阵 tile 的匹配程度。',
+    definition:
+      '注意力 head dimension 是每个头的 query、key 或 value 表示的特征宽度；并非所有架构中这几个宽度都相等。',
+    explanation:
+      '矩阵引擎按固定 tile 形状计算，kernel 可以通过 padding、打包或改变布局来适配注意力维度。因此，同一个小于矩阵阵列宽度的 head，在一种布局中可能浪费计算，在另一种映射中却能更充分地利用阵列。Head 数、序列长度、精度、切分方式，以及 query-key 与 value 各自的维度都会影响实际利用率。',
+    significance:
+      '有利于模型质量或 GPU kernel 的维度，在 TPU 上可能需要不同布局。用 head dimension 除以阵列宽度，不能通用地估计整模型吞吐量，甚至不能概括所有注意力矩阵乘法的利用率。',
+    benchmarkContext:
+      'TPU AgentX 文章讨论了 Muse Spark Open 的 head dimension 64，以及模型形状与 TPU 矩阵硬件的匹配。应结合具体 kernel 和布局理解这一例子，不应把维度比直接当作整模型的性能预测。',
+  },
+  hicache: {
+    term: 'HiCache',
+    expansion: '分层 KV 缓存',
+    aliases: ['SGLang HiCache', 'hierarchical KV cache', '分层 KV cache'],
+    plainEnglish:
+      'HiCache 把 SGLang 的前缀缓存扩展到加速器内存之外，在主机内存和可选的存储后端中保留可复用的注意力状态。',
+    definition:
+      'HiCache 是 SGLang 的分层 KV-cache 系统，将基于 radix 的前缀复用扩展到加速器内存、实例私有的主机内存及可选的存储层。',
+    explanation:
+      '该系统记录缓存状态所在的层级，并管理加载、预取与回写。命中主机内存后，仍需把状态传入设备才能用于计算。主机内存属于单个推理实例；跨实例复用需要配置具有相应共享范围的存储后端。具体传输实现和可支持的模型状态取决于服务栈。',
+    significance:
+      '保留更多前缀可减少长多轮负载中的重复 prefill，但缓存命中能否缩短服务时间，还取决于传输延迟、带宽和驱逐策略。高命中率本身不能证明端到端延迟更低。',
+    benchmarkContext:
+      'TPU 文章介绍了 Muse Spark Open 在高并发下通过 TPU-Sync 使用 SGLang HiCache 进行主机 DRAM offload 的配置。这一实测配置并不意味着所有 HiCache 后端或配置都支持相同的加速器与模型组合。',
+  },
+  'decode-admission-control': {
+    term: 'Decode 准入控制',
+    aliases: ['decode admission control', 'decode 并发上限', 'decode 请求限制'],
+    plainEnglish:
+      'Decode 准入控制限制进入 decode worker 的请求数，在已接纳请求的生成速度与排队请求的等待时间之间取舍。',
+    definition:
+      'Decode 准入控制决定何时允许请求占用 decode worker 的活跃处理容量，通常依据请求数或资源上限。',
+    explanation:
+      '请求可能在路由器或引擎中等待，直到合适的 worker 有空位。较低上限可减小活跃 batch、提高单用户生成速度；较高上限则可能借助批处理提高吞吐量。队列所在位置决定等待时间计入哪个延迟区间。路由器的准入上限与客户端并发量不同，也不等于物理 KV 内存上限。',
+    significance:
+      '请求在 worker 外排队时，即使 decode 曲线很快，首 token 仍可能很慢。应在相同到达负载下，结合排队、TTFT、端到端延迟和完成的工作量评估准入策略。',
+    benchmarkContext:
+      'TPU 文章中的 llm-d Qwen3.5 对比调整了每个 decode 主机可接纳的请求数，并明确讨论由此产生的 TTFT 与端到端取舍。因此，decode 最快的点不应被当作完整响应最快的点。',
+  },
+  'kv-cache-affinity': {
+    term: 'KV-cache 亲和性',
+    aliases: [
+      'KV-cache affinity',
+      'cache affinity',
+      'session affinity',
+      'rank-aware routing',
+      '会话亲和性',
+    ],
+    plainEnglish:
+      'KV-cache 亲和性让相关请求回到已经保存其前缀的 worker 或 rank，减少不必要的缓存传输或重复 prefill。',
+    definition:
+      'KV-cache 亲和性是一种路由偏好，让请求复用的状态与被选中处理请求的 worker 或 rank 尽量保持局部性。',
+    explanation:
+      '一台主机可以包含多个数据并行 rank，各自持有独立缓存，因此只选对主机仍可能无法命中所需前缀。策略可以追踪前缀位置，或让会话继续使用原 worker；当该 worker 满载或不可用时，仍允许改派。亲和性是一种偏好，并不保证状态未被驱逐。',
+    significance:
+      '局部性可以提高缓存复用，却也可能让负载集中于少数 worker。调度器需要权衡省下的计算或传输与排队、容量及故障切换成本。会话亲和性与一般的前缀感知路由有所重叠，但不是完全相同的策略。',
+    benchmarkContext:
+      'TPU Qwen3.5 文章将 decode 缓存命中率提升归因于路由到准确的数据并行 rank，也描述了在 decode 主机未满时保持会话绑定的策略，说明缓存局部性与准入控制相互关联。',
+  },
+  'open-loop-benchmark': {
+    term: '开环基准测试',
+    aliases: ['open-loop benchmark', '开环负载测试', '按到达时间驱动的负载'],
+    plainEnglish:
+      '开环基准测试按预定规则发送新请求，不等待先前请求完成，因此能观察请求到达速度超过服务能力时的表现。',
+    definition:
+      '开环基准测试根据外部设定的速率或时间戳序列安排请求到达，而不是等待每个客户端的上一条响应。',
+    explanation:
+      '请求可以等间隔到达，也可以按概率分布生成，或按记录的时间戳回放。服务变慢时，外部负载仍可持续到达，队列随之增长。客户端并发上限或背压可能阻止请求按计划发出，因此必须区分目标速率与实际发送速率。',
+    significance:
+      '闭环客户端会在响应变慢时减少发送请求，可能掩盖过载；开环测试能暴露这类排队问题。结果不仅取决于平均速率，还取决于到达流量的突发程度和测量窗口长度。',
+    benchmarkContext:
+      'AgentX 使用存在依赖关系的闭环智能体会话。其客户端并发量不等于开环请求速率；比较两种负载模型前，应先说明各自的请求到达规则。',
+  },
+  'request-rate': {
+    term: '请求到达速率',
+    aliases: ['request rate', 'arrival rate', 'RPS', '每秒请求数'],
+    plainEnglish:
+      '请求到达速率描述新请求进入系统的速度，不是正在运行的请求数，也不是已经完成的请求数。',
+    definition: '请求到达速率是单位时间内提交或发出的新请求数量，通常以每秒请求数表示。',
+    explanation:
+      '配置中的目标速率、客户端实际发送速率和服务器观察到的到达速率可能不同。网络延迟、客户端限制和背压都会影响请求投递。相同的平均速率既可能对应平稳流量，也可能包含短时突发；不同的 prompt 长度也会带来不同的工作量。',
+    significance:
+      '到达速率描述需求，请求吞吐量描述完成速度。如果需求持续超过处理能力，请求就会积压、失败或超时。只看完成吞吐量，会漏掉过载及其造成的延迟。',
+    benchmarkContext:
+      '应结合序列长度、并发量和到达模型理解负载。AgentX 的客户端数量表示活跃会话数，各会话的请求受前序响应和工具等待影响，并不对应固定的每秒请求数。',
+    measurement: { label: '常用单位', value: '每秒请求数（requests/s）' },
+  },
+  'request-throughput': {
+    term: '请求吞吐量',
+    aliases: ['request throughput', '请求完成速率', '每秒完成请求数'],
+    plainEnglish:
+      '请求吞吐量统计每秒完成多少个请求，token 吞吐量则统计同一时间内系统生成了多少文本。',
+    definition: '请求吞吐量是指定测量窗口内成功完成的请求数除以该窗口的持续时间。',
+    explanation:
+      '短响应和长响应都各算一个完成请求。因此，即使 token 吞吐量相近，请求组成变化也会改变完成速率。应说明失败、超时、warmup 以及跨越测量边界的请求如何计数，不同窗口规则会改变结果。',
+    significance:
+      '更高的完成速率可能只是因为请求更短，并不一定说明系统更快；它也不能证明完成的请求满足延迟目标。有效吞吐量会进一步要求被计入的工作满足明确的服务水平条件。',
+    benchmarkContext:
+      'InferenceX 吞吐量曲线主要比较 token 速率，坐标轴会标明所选归一化方式。不要把每秒 token 数改称每秒请求数，也不要把已完成的 AgentX 请求数当作已完成的智能体会话数。',
+    measurement: { label: '计算关系', value: '请求吞吐量 = 成功完成的请求数 / 测量时长（秒）' },
+  },
+  'request-queue-depth': {
+    term: '请求队列深度',
+    aliases: ['request queue depth', '等待请求数', '待处理请求数', '调度队列'],
+    plainEnglish:
+      '队列深度统计等待服务的请求数；即使加速器一直在生成 token，等待队列也可能持续增长。',
+    definition: '请求队列深度是某一时刻在指定调度或准入边界等待处理的请求数量。',
+    explanation:
+      '前端、路由器和推理引擎可能各自维护队列。服务器导出的等待请求数仅描述其自身边界，不代表客户端所有未完成请求。请求可能在等待计算资源、可用 KV cache 块或合适的 batch。采样得到的队列深度是瞬时数量，不是等待时长。',
+    significance:
+      '队列增长可以解释 prefill kernel 速度未变时 TTFT 为何升高。短时尖峰可能来自子智能体突发请求，持续增长则可能意味着到达速率超过系统接纳工作的能力。',
+    benchmarkContext:
+      'AgentX 数据点详情会在有数据时展示请求队列深度。应同时查看运行中的请求数、KV cache 利用率和吞吐量；跨服务栈比较前，先确认指标由哪个引擎导出。',
+    measurement: { label: '常用单位', value: '采样边界处的等待请求数' },
+  },
+  'queueing-latency': {
+    term: '排队延迟',
+    aliases: ['queueing latency', 'queue latency', '排队时间', '调度等待时间'],
+    plainEnglish: '排队延迟是请求等待可用资源、尚未被服务系统调度执行的时间。',
+    definition: '排队延迟衡量请求进入指定准入或调度队列后，直到被选中执行之前的等待时长。',
+    explanation:
+      '前端等待、引擎准入以及后续调度停顿可能采用不同的计时边界，引用指标时应说明它覆盖哪个区间。客户端观察到的 TTFT 还包含网络传输、prompt 处理和首个 token 的生成时间，因此不能单靠 TTFT 分离出排队时间。',
+    significance:
+      '接近饱和时，即使 kernel 运行速度不变，等待也可能成为响应延迟的主要来源。加速 prefill 不一定能解决队列过载；准入策略、请求组成和可用容量同样影响等待时间。',
+    benchmarkContext:
+      '分析不同并发点的 TTFT 变化时，应结合队列深度及可用的服务端计时指标。不能从客户端 TTFT 中减去一个无关的 prefill 估计值，就把余下部分报告为实测排队延迟。',
+    measurement: { label: '常用单位', value: '排队等待的毫秒数或秒数' },
+  },
+  'kv-working-set': {
+    term: 'KV 工作集',
+    aliases: ['KV working set', 'KV cache 工作集', '活跃 KV 占用'],
+    plainEnglish: 'KV 工作集是在特定时间段内，活跃请求和复用前缀需要使用的注意力状态。',
+    definition: 'KV 工作集是工作负载在指定时间段和存储层级内使用的一组注意力 key、value 状态。',
+    explanation:
+      '其大小取决于上下文长度、并发序列数、共享前缀、缓存精度和模型架构。统计实际驻留内存时，共享块不应按请求数重复计入。已分配的缓存容量还可能包含空闲块，或暂时不属于当前工作集的保留前缀。',
+    significance:
+      '当频繁复用的状态无法全部放入加速器内存时，系统必须传输、驱逐或重新计算这些状态。因此，即使模型权重仍有充足空间，并发增加也可能造成延迟突变。',
+    benchmarkContext:
+      'AgentX 的长会话和重叠分支会给 KV 工作集带来压力。比较吞吐量时应同时查看缓存容量及 offload 策略；仅凭加速器内存总量，无法判断一套配置能保留多少有用状态。',
+  },
+  'kv-cache-eviction': {
+    term: 'KV cache 驱逐',
+    aliases: ['KV cache eviction', '前缀驱逐', '缓存替换'],
+    plainEnglish: 'KV cache 驱逐会从某一缓存层移除保留的注意力状态，把空间交给其他工作使用。',
+    definition: 'KV cache 驱逐按替换策略回收不再保留于某一存储层的注意力状态块。',
+    explanation:
+      '前缀缓存可以丢弃非活跃块，同时保护运行中请求仍在引用的块。替换策略可依据最近访问时间、复用情况和前缀结构。移除加速器上的副本不一定意味着所有副本都已丢失；更低层缓存可能仍保留状态，供之后重新加载。',
+    significance:
+      '如果刚被驱逐的前缀很快再次使用，系统就要支付传输或重算成本。因此，缓存占用率高并不能说明有用状态被有效保留。命中率、复用间隔和工作负载的分支结构有助于解释实际代价。',
+    benchmarkContext:
+      'AgentX 的工具等待和子智能体突发会产生不同的缓存保留需求。应区分非活跃前缀驱逐与执行中请求的抢占，也应区分丢弃状态与将状态 offload 到其他存储层。',
+  },
+  preemption: {
+    term: '请求抢占',
+    aliases: ['request preemption', 'preemption', '请求重算', '调度抢占'],
+    plainEnglish:
+      '抢占会暂停执行中的请求，让其他工作使用资源；被暂停的请求恢复前，有时需要重建注意力状态。',
+    definition:
+      '请求抢占会暂停已调度的请求，并回收其他请求需要的资源；暂停的工作随后按引擎策略恢复。',
+    explanation:
+      'KV cache 空间不足时，服务引擎可能被迫停止已经开始生成的序列。继续执行前，引擎可能重新计算被丢弃的状态，或恢复之前保存的状态。这与驱逐未使用的前缀不同：即使已经输出的 token 仍然有效，活跃请求也会因暂停而延后完成。',
+    significance:
+      '反复抢占会增加工作量，并造成较长的响应停顿。重算期间加速器利用率高，不代表有效输出也保持相同速率。结合抢占次数和请求延迟，可以识别这一性能问题。',
+    benchmarkContext:
+      '并发扫描中交互性或吞吐量突然下降时，应查看引擎遥测和日志。不要假设所有服务栈都导出相同的抢占计数，也不能仅凭 KV cache 利用率高就断言发生了抢占。',
+  },
+  'acceptance-rate': {
+    term: '草稿接受率',
+    aliases: ['draft acceptance rate', 'acceptance rate', '投机接受率', '草稿接受比例'],
+    plainEnglish:
+      '草稿接受率是通过验证的 token 占所提议 token 的比例，不是每次验证输出的 token 数。',
+    definition: '草稿接受率是指定样本中被接受的草稿 token 数除以所提议的草稿 token 总数。',
+    explanation:
+      '接受率是无量纲比例，通常写成百分比；接受长度则统计每次验证的 token 数。草稿长度固定且计数口径一致时，平均接受的草稿长度等于草稿长度乘以接受率。部分引擎会把目标模型额外生成的 token 计入长度，必须另行说明这一口径。',
+    significance:
+      '草稿长度不同时，相同接受率可以对应不同的接受 token 数。接受率和接受长度都不能单独决定加速比；草稿生成、验证成本、批处理方式以及被拒绝的工作同样重要。',
+    benchmarkContext:
+      'AgentX 对合成回放使用外部校准的接受行为。比较两组数值前，应核对草稿长度、speculator、计数口径，以及采用强制接受设置还是自然验证结果。',
+    measurement: {
+      label: '计算关系',
+      value: '草稿接受率 = 被接受的草稿 token 数 / 所提议的草稿 token 数',
+    },
+  },
+  'inter-chunk-latency': {
+    term: '流式 chunk 间延迟',
+    aliases: ['inter-chunk latency', 'ICL', '流式消息间隔', 'chunk 到达间隔'],
+    plainEnglish: '流式 chunk 间延迟衡量相邻消息到达客户端之间的停顿；一条消息可能包含多个 token。',
+    definition: '流式 chunk 间延迟是客户端收到相邻两条符合统计条件的响应 chunk 之间的时间差。',
+    explanation:
+      '服务器可能把多个已生成 token 缓冲到同一个 chunk，尤其是在投机解码或设置流式发送间隔时。因此，chunk 到达间隔不同于按 token 数归一化的解码延迟。即使平均 TPOT 很低，用户仍可能看到文本成批出现，中间夹着较长停顿。',
+    significance:
+      'chunk 计时描述客户端看到的输出平滑程度，既受服务端调度影响，也包含缓冲与传输的效果。chunk 间隔的分位数和逐请求平均 token 延迟的分位数对应不同样本，不能使用同一个指标名称。',
+    benchmarkContext:
+      '应把基于 chunk 的计时与所选 InferenceX 交互性指标分开。比较不同引擎或投机配置的流式结果前，先检查基准客户端对内容 chunk 的筛选规则和 token 计数口径。',
+    measurement: {
+      label: '计算关系',
+      value: 'chunk 间隔 = 当前 chunk 到达时间 - 前一 chunk 到达时间',
+    },
+  },
   engram: {
     term: 'Engram',
     aliases: ['Engram 条件记忆'],
@@ -41,7 +309,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '稀疏访问使大型参数表具备 offload 到 DRAM 的条件。在推理时移除表会改变已经训练好的模型，因此消融不能代替对分别训练、质量匹配的架构进行比较。',
     benchmarkContext:
-      '文章中的 DeepSeek-V4.1-Flash 配置约有 189 GiB 的 Engram 内存占用。DRAM 与 SSD 对比保留了 Engram 功能，只改变服务路径；消融实验回答的则是另一类模型质量问题。',
+      '文章中的 DeepSeek-V4.1-Flash 配置约有 189 GiB 的 Engram 内存占用。DRAM 与 SSD 对比保留了 Engram 功能，只改变服务路径；消融实验回答的则是另一类模型质量问题。Huawei profile 讨论了在第 0 层计算期间，根据 token ID 获取 Engram 数据。DRAM 传输能被隐藏的结果依赖这一调度；较慢的 PCIe SSD 路径可能暴露传输延迟，无法保持相同步骤耗时。',
   },
   'n-gram-embedding': {
     term: 'N-gram embedding',
@@ -91,7 +359,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'Engram 的行地址由 token ID 决定，适合按行稀疏检索。它与 KV cache offloading 不同，后者搬运的是特定请求生成的注意力状态。两者可能竞争同一存储层级，也可能为彼此释放容量。',
     significance:
-      '把参数移出 HBM 可以为 KV cache 腾出空间，或减少每个副本需要的 GPU 数量。但收益必须超过访问成本，并取决于内核、互连、内存分配以及工作负载。',
+      '把参数移出 HBM 可以为 KV cache 腾出空间，或减少每个副本需要的 GPU 数量。但收益必须超过访问成本，并取决于 kernel、互连、内存分配以及工作负载。',
     benchmarkContext:
       '文章报告 B300 的 DRAM offload 配置从 TP4 改为 TP2 后，Pareto 曲线最多改善 1.6x。未经优化的 B200 SSD 路径却落后于 DRAM，说明存储便宜并不直接意味着每 token 成本更低。',
   },
@@ -115,7 +383,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'Embedding prefetch 提前检索指定 embedding 行，使内存访问与使用这些数据之前的模型计算重叠。',
     explanation:
-      'Engram 行地址取决于 token ID，而不是隐藏状态。只要 ID 已经可用，运行时就能确定所需行，无需等中间各层执行完毕。可用于重叠的时间窗口到消费层需要这些数据时结束。',
+      'Engram 行地址取决于 token ID，而不是隐藏状态。只要 ID 已经可用，运行时就能确定所需行，无需等中间各层执行完毕。可用于重叠的时间窗口在后续层需要这些数据时结束。',
     significance:
       'Prefetch 可以隐藏部分延迟，但不会减少传输字节数，也不能消除带宽限制。服务系统仍需分配缓冲区、协调完成状态，并保证不会在检索完成前使用数据。',
     benchmarkContext:
@@ -128,11 +396,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '统一虚拟寻址（UVA）为支持的 CPU 和 GPU 内存分配提供统一虚拟地址空间，但不会让主机内存在物理上等同于 HBM。',
     explanation:
-      '文章中的 Engram 内核通过 UVA 直接读取固定页主机内存，在 GPU 上完成行选择与反量化，从而避开实验性 SSD 实现中显式把行 ID 送往 CPU 的往返过程。',
+      '文章中的 Engram kernel 通过 UVA 直接读取固定页主机内存，在 GPU 上完成行选择与反量化，从而避开实验性 SSD 实现中显式把行 ID 送往 CPU 的往返过程。',
     significance:
       '统一地址空间不意味着自动页面迁移，也不意味着各类内存具有相同带宽。性能仍取决于地址背后的存储介质，以及访问该介质所经过的互连。',
     benchmarkContext:
-      'HBM 和 DRAM 版本使用同一行选择内核，均支持完整 decode graph。SSD 实验改变了执行路径，因此其对比结果不能解释为仅测量存储设备延迟。',
+      'HBM 和 DRAM 版本使用同一行选择 kernel，均支持完整 decode graph。SSD 实验改变了执行路径，因此其对比结果不能解释为仅测量存储设备延迟。',
   },
   'pinned-host-memory': {
     term: '固定页主机内存',
@@ -231,7 +499,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'AI 推理是使用已经训练好的模型处理新输入并生成输出的过程；对大语言模型而言，通常就是处理提示词并生成 token。',
     explanation:
-      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。整个系统的性能还会随配套的软硬件栈而变化。',
+      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行 kernel。整个系统的性能还会随配套的软硬件栈而变化。',
     significance:
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
@@ -247,7 +515,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '一次智能体会话会在模型请求、工具执行和等待之间交替。后续请求通常携带大部分历史对话，因此 prefix cache 和 KV cache 容量会直接影响速度与成本。并行 subagent 还会产生各自具有时间关系和上下文增长过程的请求分支。',
     significance:
-      '固定 input 和 output 长度无法覆盖智能体带来的全部服务压力。长共享前缀会改变 cache 行为，工具等待会让流量呈现突发性，并行分支则会争用推理容量。同一组软硬件在这种请求模式下可能出现不同的性能排序。',
+      '固定输入和输出长度无法覆盖智能体带来的全部服务压力。长共享前缀会改变 cache 行为，工具等待会让流量呈现突发性，并行分支则会争用推理容量。同一组软硬件在这种请求模式下可能出现不同的性能排序。',
     benchmarkContext:
       'InferenceX 使用 AgentX 测量智能体推理。AgentX 与固定序列场景回答不同的容量问题，应分别比较。AgentX 采用闭环会话回放，同一会话中的后续请求会受前一轮完成时间影响。',
   },
@@ -331,9 +599,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '推理引擎就像 AI 服务背后的交通调度员：它安排请求流转，并让芯片在正确时间执行正确任务。',
     definition: '推理引擎是将模型权重和用户请求转化为加速器上生成结果的软件运行时。',
     explanation:
-      '它负责请求调度、连续批处理、KV 缓存分配、分布式执行、内核选择与 token 采样。vLLM、SGLang 和 TensorRT-LLM 即使运行同一模型和芯片，也会因调度器、内核与分布式策略不同而产生不同曲线。',
+      '它负责请求调度、连续批处理、KV 缓存分配、分布式执行、kernel 选择与 token 采样。vLLM、SGLang 和 TensorRT-LLM 即使运行同一模型和芯片，也会因调度器、kernel 与分布式策略不同而产生不同曲线。',
     significance:
-      '引擎版本和配置有时与芯片选择同样重要。一次调度器更新、融合注意力内核或模型专用路径修复，都可能在硬件不变时带来数倍性能变化。',
+      '引擎版本和配置有时与芯片选择同样重要。一次调度器更新、融合注意力 kernel 或模型专用路径修复，都可能在硬件不变时带来数倍性能变化。',
     benchmarkContext:
       'InferenceX 将引擎和容器镜像记录为可复现方案的一部分，因此历史视图能够区分软件进步与芯片代际进步。',
   },
@@ -371,7 +639,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '延迟是请求经历的时间；在流式 LLM 服务中，应区分首 token 等待时间与后续 token 间隔。',
     explanation:
-      '首 token 时间包含排队和预填充，单 token 输出时间反映解码节奏。端到端延迟还受输出长度影响，因此一个汇总数字可能掩盖用户真正感知到的环节。',
+      '首 token 时间包含排队和预填充，每输出 token 时间反映解码节奏。端到端延迟还受输出长度影响，因此一个汇总数字可能掩盖用户真正感知到的环节。',
     significance:
       '降低延迟通常需要更小批次或更多并行资源，这可能降低硬件利用率并提高成本。好的服务设计会先确定延迟服务等级，再在该约束内最大化吞吐量。',
     benchmarkContext:
@@ -396,11 +664,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'TPOT 是流式回答每个新片段之间的间隔；间隔越短，回答看起来越快越顺畅。',
     definition: '每输出 token 时间（TPOT）是首 token 到达后，相邻生成 token 之间的平均时间。',
     explanation:
-      'TPOT 描述流式响应的解码节奏。在忽略单位换算时，它是每用户 token 速率的倒数；20 毫秒/token 约等于 50 tok/s/user。',
+      '一种常见的逐请求算法，是把首个输出到最后输出之间的时长除以首个 token 之后的输出 token 数。流式 chunk 可能包含多个 token，因此应核对客户端对首个 chunk 的计数口径。对同一请求、同一口径而言，20 毫秒/token 对应 50 token/s；跨请求求平均与取倒数的顺序不能互换。',
     significance:
       'TPOT 单独刻画回答流是否顺畅。随着更多请求共享系统，TPOT 通常会变差，即便总吞吐量仍在上升。',
     benchmarkContext:
-      'InferenceX 多使用其倒数 tok/s/user，便于让更高数值代表更好性能；在比较相同并发下的调度器或内核变化时，方案表也会直接列出 TPOT。',
+      'InferenceX 多使用其倒数 tok/s/user，便于让更高数值代表更好性能；在比较相同并发下的调度器或 kernel 变化时，方案表也会直接列出 TPOT。',
     measurement: { label: '换算关系', value: '交互性 ≈ 1000 / TPOT（毫秒）' },
   },
   concurrency: {
@@ -413,7 +681,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '单个并发值只代表一个运行点。生产流量持续变化，在低并发领先的方案，可能在大批次或通信占主导时被其他方案超越。',
     benchmarkContext:
-      'InferenceX 扫描多个并发值以构建吞吐量与交互性曲线，曲线标签会标出每个点的请求数，并显示方案何时饱和或性能坍塌。',
+      'InferenceX 扫描多个并发值以构建吞吐量与交互性曲线。固定序列测试的并发量控制未完成请求数；AgentX 并发量统计智能体客户端，其工具等待和分支会改变同时进行的请求数。两者都不一定等于引擎调度的 batch 大小，也不代表固定的请求到达速率。',
   },
   batching: {
     term: '批处理',
@@ -424,9 +692,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理；随着请求到达或完成，序列会动态加入或退出，无需等待固定批次全部处理完。因此，batch 形状会在 prefill 和 decode 过程中不断变化。',
     significance:
-      '批处理是吞吐量与延迟核心权衡的来源。更大的有效批次能摊薄权重读取和内核启动开销，但通常会增加每位用户的 token 间隔。',
+      '批处理是吞吐量与延迟之间核心权衡的来源。更大的有效批次能摊薄权重读取和 kernel 启动开销，但通常会增加每位用户的 token 间隔。',
     benchmarkContext:
-      '并发量是批处理的输入，并不等同于某个固定内核批大小；并行策略、序列长度、请求完成时机和调度策略都会改变芯片实际看到的批形状。',
+      '并发量是批处理的输入，并不等同于某个固定的批大小；并行策略、序列长度、请求完成时机和调度策略都会改变芯片实际看到的批形状。',
   },
   'pareto-frontier': {
     term: 'Pareto 前沿',
@@ -435,7 +703,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'Pareto 前沿是一条“最佳权衡线”：线上的每个点都值得考虑，因为改善一项指标就必须牺牲另一项。',
     definition: 'Pareto 前沿由不存在另一个测量点能在两个比较维度上都更好的运行点组成。',
     explanation:
-      '在吞吐量与交互性图中，如果另一个点既能处理更多总 token，又能让每个用户更快收到 token，那么原点就被支配；删除所有被支配点后得到有效边界。',
+      '在吞吐量与交互性图中，如果另一个点既能处理更多总 token，又能让每个用户更快收到 token，那么这个点就被支配；删除所有被支配点后得到有效边界。',
     significance:
       '前沿能避免噪声点或调优较差的点扭曲比较，并展示真正的权衡。沿曲线仍不存在普适赢家，最佳点取决于用户最低交互性或最高成本目标。',
     benchmarkContext:
@@ -451,7 +719,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '匹配流式输出速度，可以避免仅因系统以更慢的 token 速率服务更多请求，就把它称为更快。但这并未固定完整的用户体验：首 token 前的等待和整段响应耗时仍需单独比较。',
     benchmarkContext:
-      'InferenceX 文章使用等交互性表格比较硬件、精度和软件；超出实测前沿的值会标记为不可达，而不会向观测区间之外外推。前沿始终建立在吞吐量与交互性之上，每百万 token 成本和每 token 焦耳则由插值得到的吞吐量推导，而不是各自单独做样条：它们都是每芯片常数除以吞吐量，单独插值会破坏两个 knot 之间的这一恒等关系。',
+      'InferenceX 文章使用等交互性表格比较硬件、精度和软件；超出实测前沿的值会标记为不可达，而不会向观测区间之外外推。前沿始终建立在吞吐量与交互性之上，每百万 token 成本和每 token 焦耳则由插值得到的吞吐量推导，而不是各自单独做样条：它们都是每芯片常数除以吞吐量，单独插值会破坏两个插值节点之间的这一恒等关系。',
   },
   'input-output-sequence-length': {
     term: '输入与输出序列长度',
@@ -505,7 +773,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'TCO 比标价更适合跨系统经济性比较，尤其是网络与电力基础设施不同的机架级产品；但它仍是模型，必须连同假设一起阅读。',
     benchmarkContext:
-      'InferenceX 将 SemiAnalysis AI Cloud 的 TCO 输入与实测 tok/s/chip 结合。Rubin 文章区分了两种口径：超大规模采购条件下的自有成本，包含硬件、网络、机房、电力和资本成本的摊销；以及客户支付的三年云服务预留价格。两者是可选的成本基础，不能相加；租赁价格还反映服务商的商业条款。',
+      'InferenceX 将 SemiAnalysis AI Cloud 的 TCO 输入与实测 tok/s/chip 结合。Rubin 文章区分了两种口径：超大规模采购条件下的自有成本，包含硬件、网络、机房、电力和资本成本的摊销；以及客户支付的三年云服务预留价格。两者是二选一的成本口径，不能相加；租赁价格还反映服务商的商业条款。',
   },
   'tokens-per-megawatt': {
     term: '每兆瓦 token 吞吐量',
@@ -562,7 +830,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     aliases: ['prefix caching', '提示词缓存', '自动前缀缓存'],
     plainEnglish:
       '前缀缓存会记住重复开头的处理结果，例如相同系统提示词，让模型下次可以跳过这部分工作。',
-    definition: '当前多个请求以相同 token 序列开头时，前缀缓存会复用已有 KV 缓存状态。',
+    definition: '多个请求以相同 token 序列开头时，前缀缓存会复用已有 KV 缓存状态。',
     explanation:
       '重复系统提示词、共享文档或共同对话前缀可以复用缓存状态。智能体会话持续增长时，前几轮的输出会成为后续输入，可复用前缀也随之增加。但实际命中仍要求相关状态尚未被淘汰且能够访问；缓存淘汰或子智能体的新上下文都可能带来新的 prefill。',
     significance:
@@ -578,9 +846,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '预填充通常偏计算密集，解码则常受内存带宽和通信限制。分离后，两侧可以采用不同芯片数、并行度、批策略和扩缩容方式。',
     significance:
-      '分离可隔离提示词峰值并提升吞吐量或 SLA 稳定性，但也增加路由与 KV 传输开销；网络薄弱或内核不成熟时，它可能反而慢于聚合式服务。',
+      '分离可隔离提示词峰值并提升吞吐量或 SLA 稳定性，但也增加路由与 KV 传输开销；网络薄弱或 kernel 不成熟时，它可能反而慢于聚合式服务。',
     benchmarkContext:
-      'InferenceX 中的 disagg 不是万能开关。应查看预填充/解码 world size、TP/EP 布局、框架、网络域，以及分离前沿真正领先的交互性区间。',
+      'InferenceX 结果中的 disagg 标签说明服务布局，不代表性能高低。应查看预填充/解码 world size、TP/EP 布局、框架、网络域，以及分离前沿真正领先的交互性区间。',
   },
   'speculative-decoding': {
     term: '投机解码',
@@ -594,7 +862,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '加速取决于草稿 token 的接受数量，以及草稿与验证成本。稠密模型和 MoE 的表现可能不同，因为验证多个位置可能激活更多专家权重。',
     benchmarkContext:
-      '在固定序列场景中，投机解码属于曲线标识的一部分，因此启用和未启用 MTP 的测试配置会分别绘制。Agentic 曲线则将投机解码作为数据点级元数据，并将这些点合并到同一条曲线中；每个提示框仍会注明具体方式。这是因为 AgentX 按模型、芯片 SKU 和引擎展示可达到的最佳曲线。由于 AgentX 回放使用合成内容，speculator 接受的 draft token 数并不具有代表性，因此运行时会使用从外部 agentic 编码数据集采集的接受长度，并按模型、speculator、draft 长度和思考模式分别配置。',
+      '在固定序列场景中，投机解码属于曲线标识的一部分，因此启用和未启用 MTP 的测试配置会分别绘制。Agentic 曲线则将投机解码作为数据点级元数据，并将这些点合并到同一条曲线中；每个提示框仍会注明具体方式。这是因为 AgentX 按模型、芯片 SKU 和引擎展示可达到的最佳曲线。由于 AgentX 回放使用合成内容，speculator 接受的 draft token 数并不具有代表性，因此运行时会使用从外部 agentic 编码数据集采集的接受长度，并按模型、speculator、draft 长度和思考模式分别配置。Huawei 执行 profile 区分 DSpark drafting、顺序 token 采样和目标模型验证。Draft block 看起来较短，不能单独证明整个步骤的收益；实际 decode 进度取决于接受的 token 数和全部依赖工作。',
   },
   'multi-token-prediction': {
     term: '多 token 预测',
@@ -666,7 +934,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: '宽专家并行把模型专家铺到大量芯片上，让每张芯片需要保存和移动的专家数据更少。',
     definition: '宽专家并行使用大量加速器 rank 构成 MoE 模型的专家并行组。',
     explanation:
-      '把数百个专家分散到更多 rank，可减少每张芯片需要存储和流式读取的专家权重；更大的同伴组也可形成更高效的专家批次，但 dispatch/combine 流量会扩展。',
+      '把数百个专家分散到更多 rank，可减少每张芯片需要存储和流式读取的专家权重；更大的 rank 组也可形成更高效的专家批次，但 dispatch/combine 流量会扩展。',
     significance:
       'Wide EP 在高带宽 scale-up 网络中最有效。若流量跨越较慢的 scale-out 网络，同样的 all-to-all 可能成为瓶颈并抵消内存侧收益。',
     benchmarkContext:
@@ -675,7 +943,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'all-reduce': {
     term: 'All-reduce',
     aliases: ['全归约'],
-    plainEnglish: 'All-reduce 让每张芯片完成一部分计算，再合并结果并把完整答案发回所有芯片。',
+    plainEnglish: 'All-reduce 让每张芯片完成一部分计算，再合并结果并把合并结果发回所有芯片。',
     definition:
       'All-reduce 是一种集体通信操作：合并所有参与 rank 的值，并把归约结果返回给每个 rank。',
     explanation:
@@ -693,7 +961,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '专家并行 MoE 层先用 all-to-all dispatch 把 token 发往所选专家，再用 combine 把专家输出送回；流量与不均衡程度取决于 token 路由。',
     significance:
-      'All-to-all 比简单点对点传输更苛刻，EP 扩大后容易受网络限制。专用内核会重叠通信与计算并优化 token 打包。',
+      'All-to-all 比简单点对点传输更苛刻，EP 扩大后容易受网络限制。专用 kernel 会重叠通信与计算并优化 token 打包。',
     benchmarkContext:
       '机架级 NVLink 可让 Wide EP 的 all-to-all 留在 scale-up 域内；跨节点 InfiniBand 或 RoCE 方案需要面对远低得多的每芯片 scale-out 带宽。',
   },
@@ -708,7 +976,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '分布式推理会跨越两个域。高频 TP/EP 集体通信尤其适合留在 scale-up 内，较粗粒度请求路由和部分预填充/解码传输则更能容忍 scale-out。',
     benchmarkContext:
-      '芯片名称本身不能描述通信域。八卡节点中的 B200 与 GB200 NVL72 使用相关芯片，却拥有完全不同的 scale-up 组规模。',
+      '系统拓扑决定通信域。八卡节点中的 B200 与 GB200 NVL72 使用相关芯片，却拥有完全不同的 scale-up 组规模。',
   },
   'high-bandwidth-memory': {
     term: '高带宽内存',
@@ -716,11 +984,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'HBM 是紧挨芯片的一小池超高速内存，推理时模型权重和工作数据都要放在这里。',
     definition: '高带宽内存（HBM）是靠近加速器堆叠的内存，其带宽远高于传统服务器内存。',
     explanation:
-      'HBM 存储模型权重、激活、工作区与 KV 缓存。容量决定哪些模型、批大小和并行布局能放入；带宽决定内存受限内核能多快读取这些状态。',
+      'HBM 存储模型权重、激活、工作区与 KV 缓存。容量决定哪些模型、批大小和并行布局能放入；带宽决定内存受限 kernel 能多快读取这些状态。',
     significance:
       'LLM 解码中，每个 token 往往读取的数据远多于计算量，因此 HBM 带宽是主要性能上限；额外容量即使在峰值算力相近时也能支持更高效的方案。',
     benchmarkContext:
-      'InferenceX 硬件比较会区分 HBM 容量与带宽。例如 GB300 的更大容量可容纳 GB200 无法放入的更宽预填充/解码布局。',
+      'InferenceX 硬件比较会区分 HBM 容量与带宽。例如 GB300 的容量更大，即使每芯片带宽相近，也能容纳 GB200 无法放入的更宽预填充/解码布局。',
   },
   'memory-bandwidth': {
     term: '内存带宽',
@@ -728,11 +996,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: '内存带宽就像向芯片计算单元供给数据的管道宽度；管道越宽，计算单元越不容易空等。',
     definition: '内存带宽是数据在加速器内存与计算单元之间传输的速率。',
     explanation:
-      '当移动所需字节比执行算术更耗时，内核就是内存带宽受限。LLM 解码经常处于该状态，因为每一步都要为较少的新 token 计算流式读取模型/专家权重和 KV 缓存。',
+      '当移动所需字节比执行算术更耗时，kernel 就是内存带宽受限。LLM 解码经常处于该状态，因为每一步都要为较少的新 token 计算流式读取模型/专家权重和 KV 缓存。',
     significance:
-      '已经在等待内存的内核不会因更多 tensor-core FLOPS 自动加速。量化、批处理、缓存压缩和专家分片可通过减少字节或摊薄权重读取改善性能。',
+      '已经在等待内存的 kernel 不会因更多 tensor-core FLOPS 自动加速。量化、批处理、缓存压缩和专家分片可通过减少字节或摊薄权重读取改善性能。',
     benchmarkContext:
-      '可谨慎结合并发曲线判断性能区间：小批次可能受启动或带宽限制，大批次则提高算术强度并接近计算饱和。',
+      '可谨慎结合并发曲线判断性能区间：小批次可能受启动或带宽限制，大批次则提高算术强度并接近计算饱和。应注明测量路径和字节统计口径。Blackwell 文章区分 DRAM 带宽、SMEM 填充吞吐量和 L2 流量；multicast 可将同一输入交付给多个目标，不必为每个交付字节都重新读取 HBM。',
   },
   nvlink: {
     term: 'NVLink',
@@ -753,9 +1021,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '量化用更少 bit 保存模型数字，让模型更小、更容易搬运，通常会带来经过控制的精度损失。',
     definition: '量化使用比高精度基线更少的 bit 表示模型权重、激活或缓存值。',
     explanation:
-      '更低精度减少内存占用与传输字节，并可使用更快的低精度 tensor-core 路径。完整方案必须说明量化对象、格式、缩放方式、内核支持和为稳定性保留的高精度运算。',
+      '更低精度减少内存占用与传输字节，并可使用更快的低精度 tensor-core 路径。完整方案必须说明量化对象、格式、缩放方式、kernel 支持和为稳定性保留的高精度运算。',
     significance:
-      '标称格式不保证加速或质量不变；转换质量、校准、异常值、内核成熟度与硬件支持共同决定实际结果。',
+      '标称格式不保证加速或质量不变；转换质量、校准、异常值、kernel 成熟度与硬件支持共同决定实际结果。',
     benchmarkContext:
       'InferenceX 把精度作为一级方案维度，并为代表性配置配套准确性检查。只有模型、工作负载、引擎和质量标准兼容时，FP8、FP4、NVFP4、MXFP4 与 INT4 才能公平比较。',
   },
@@ -765,9 +1033,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'FP8 用紧凑的 8 位格式保存和计算模型数字，可减少内存占用并经常加快推理。',
     definition: 'FP8 是一组八位浮点格式，用于相对 FP16/BF16 降低模型存储、内存流量和计算成本。',
     explanation:
-      '常见 FP8 编码在指数范围与尾数精度之间取舍。服务方案可能将 FP8 用于权重、激活、KV 缓存或部分内核，并配合缩放元数据和更高精度累加。',
+      '常见 FP8 编码在指数范围与尾数精度之间取舍。服务方案可能将 FP8 用于权重、激活、KV 缓存或部分 kernel，并配合缩放元数据和更高精度累加。',
     significance:
-      'FP8 在新一代 NVIDIA 与 AMD 加速器上支持广泛，常作为稳定低精度基线；真实性能取决于端到端内核覆盖，回退操作会抹平理论收益。',
+      'FP8 在新一代 NVIDIA 与 AMD 加速器上支持广泛，常作为稳定低精度基线；真实性能取决于端到端 kernel 覆盖，回退操作会抹平理论收益。',
     benchmarkContext:
       'InferenceX 的 FP8 标签覆盖完整方案，检查点文件名只是其中一项。引擎、注意力后端、KV 缓存格式、芯片代际和 MTP 设置都可能改变曲线。',
   },
@@ -777,7 +1045,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'FP4 只用 4 bit 表示模型数字，能让推理更小更快，但可保留的数值细节也更少。',
     definition: 'FP4 指用于超低精度模型表示与矩阵运算加速的四位浮点格式。',
     explanation:
-      '四位格式相对 FP8 再把权重存储与流量减半左右，但极小数值空间需要精心选择缩放和硬件专用内核；“FP4”可能指不同具体格式，而非统一编码。',
+      '四位格式相对 FP8 再把权重存储与流量减半左右，但极小数值空间需要精心选择缩放和硬件专用 kernel；“FP4”可能指不同具体格式，而非统一编码。',
     significance:
       '对内存受限 LLM 推理，减少权重字节可带来巨大吞吐与容量收益；同时必须检查模型质量与不支持操作，避免精度损失或回退开销。',
     benchmarkContext:
@@ -785,14 +1053,15 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   nvfp4: {
     term: 'NVFP4',
+    expansion: 'NVIDIA 4 位浮点格式',
     aliases: ['NVIDIA FP4'],
     plainEnglish:
-      'NVFP4 是针对 NVIDIA Blackwell 优化的 4 位模型数学格式，目标是少搬数据并利用最快的低精度硬件。',
+      'NVFP4 是针对 NVIDIA Blackwell 优化的 4 位模型数值格式，目标是少搬数据并利用最快的低精度硬件。',
     definition: 'NVFP4 是 NVIDIA 为 Blackwell tensor core 推理设计的块缩放四位浮点量化格式。',
     explanation:
-      '权重和激活使用紧凑 FP4 值，并为小块附加缩放信息。具体检查点、缩放方案和内核路径共同决定模型质量与吞吐量。',
+      '权重和激活使用紧凑 FP4 值，并为小块附加缩放信息。具体检查点、缩放方案和 kernel 路径共同决定模型质量与吞吐量。',
     significance:
-      'NVFP4 可减少权重带宽并启用 Blackwell FP4 计算路径，对大型 MoE 解码尤其有价值；只有引擎端到端支持模型注意力、路由和专家内核时才能兑现收益。',
+      'NVFP4 可减少权重带宽并启用 Blackwell FP4 计算路径，对大型 MoE 解码尤其有价值；只有引擎端到端支持模型注意力、路由和专家 kernel 时才能兑现收益。',
     benchmarkContext:
       'InferenceX 文章在匹配交互性时比较 NVFP4 与 FP8/INT4，并明确模型、工作负载和成本假设，因为单一精度标签并不是公平基准。',
   },
@@ -802,9 +1071,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'MXFP4 让每小组 4 位数字拥有自己的缩放值，使极紧凑的数字仍保留足够可用范围。',
     definition: 'MXFP4 是一种微缩放四位浮点格式，由小块数值共享缩放因子。',
     explanation:
-      '块级缩放让四位值在局部保有可用动态范围，同时维持紧凑存储与传输；硬件和软件必须就块布局、缩放表示与矩阵内核达成一致。',
+      '块级缩放让四位值在局部保有可用动态范围，同时维持紧凑存储与传输；硬件和软件必须就块布局、缩放表示与矩阵 kernel 达成一致。',
     significance:
-      'MXFP4 用于 AMD 及跨厂商低精度路径。实际结果由检查点制备与内核覆盖决定，标称 bit 数无法完整描述。',
+      'MXFP4 用于 AMD 及跨厂商低精度路径。实际结果由检查点制备与 kernel 覆盖决定，标称 bit 数无法完整描述。',
     benchmarkContext:
       'InferenceX 把 MXFP4 记录为完整引擎和硬件方案的一部分。与 NVFP4 或 FP8 比较时，应匹配模型、序列长度、质量要求和交互性目标。',
   },
@@ -828,9 +1097,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '多头潜在注意力把 attention key/value 状态压缩到更低维潜在表示，以减少 KV 缓存大小与内存流量。',
     explanation:
-      'MLA 不为每个历史 token 存储完整的逐头 key/value，而是保存压缩状态，并通过模型专用投影重建或消费所需表示；实现需要专用注意力内核。',
+      'MLA 不为每个历史 token 存储完整的逐头 key/value，而是保存压缩状态，并通过模型专用投影重建或消费所需表示；实现需要专用注意力 kernel。',
     significance:
-      '减少 KV 缓存字节可提高可用上下文长度和并发，并缓解解码带宽压力；内核形状支持与张量并行布局仍会造成巨大性能差异。',
+      '减少 KV 缓存字节可提高可用上下文长度和并发，并缓解解码带宽压力；kernel 形状支持与张量并行布局仍会造成巨大性能差异。',
     benchmarkContext:
       'InferenceX 中多个 DeepSeek 衍生模型使用 MLA。文章会追踪某注意力后端在一种 heads-per-rank 形状高效、另一种形状失败或回退的修复。',
   },
@@ -840,11 +1109,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: '稀疏注意力只回看长上下文中最有用的部分，无需重新检查每个历史 token。',
     definition: '稀疏注意力限制每个 query 可关注的历史 token，避免对全部上下文执行完整注意力。',
     explanation:
-      '稀疏模式可选择局部、压缩、索引或学习得到的上下文子集，降低长序列计算与内存移动；模型架构与运行时必须有匹配的索引器和注意力内核。',
+      '稀疏模式可选择局部、压缩、索引或学习得到的上下文子集，降低长序列计算与内存移动；模型架构与运行时必须有匹配的索引器和注意力 kernel。',
     significance:
-      '稀疏注意力可让超长上下文变得可行，但理论稀疏不保证快速推理；索引构建、不规则访问、内核融合和精度支持决定实际收益。',
+      '稀疏注意力可让超长上下文变得可行，但理论稀疏不保证快速推理；索引构建、不规则访问、kernel 融合和精度支持决定实际收益。',
     benchmarkContext:
-      'InferenceX 跟踪 GLM-5 与 DeepSeek-V4 等模型专用稀疏注意力栈。支持快速变化，因此引擎版本与后端选择是结果的一部分。',
+      'InferenceX 跟踪 GLM-5 与 DeepSeek-V4 等模型专用稀疏注意力栈。支持快速变化，因此引擎版本与后端选择是结果的一部分。在 Ascend 上，被选中的 KV 数据仍须按适合硬件的布局读取。若对齐、传输粒度和索引处理带来额外工作，减少参与注意力的 token 数并不自动等于最小化实际传输量。',
   },
   cuda: {
     term: 'CUDA',
@@ -852,9 +1121,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'CUDA 是让程序在 NVIDIA 芯片上运行的软件工具箱。',
     definition: 'CUDA 是 NVIDIA 的芯片计算平台、编程模型、编译工具链与软件库生态。',
     explanation:
-      'LLM 引擎使用 CUDA 内核和库执行矩阵乘、注意力、集体通信、图捕获、内存管理与融合操作；容器、驱动、CUDA 和芯片架构版本必须兼容。',
+      'LLM 引擎使用 CUDA kernel 和库执行矩阵乘、注意力、集体通信、图捕获、内存管理与融合操作；容器、驱动、CUDA 和芯片架构版本必须兼容。',
     significance:
-      '服务性能取决于芯片之上的软件。新内核、CUDA Graph、编译器专用化和库版本都能在芯片不变时移动基准曲线。',
+      '服务性能取决于芯片之上的软件。新 kernel、CUDA Graph、编译器专用化和库版本都能在芯片不变时移动基准曲线。',
     benchmarkContext:
       'InferenceX 固定容器镜像，从而固定具体 CUDA 栈。历史比较可隔离仅更新引擎镜像对相同硬件与配置的影响。',
   },
@@ -863,11 +1132,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     aliases: ['AMD ROCm'],
     plainEnglish: 'ROCm 是让 AI 和高性能程序在 AMD 芯片上运行的软件工具箱。',
     definition:
-      'ROCm 是 AMD 的开放芯片计算软件平台，包含运行时、编译器、通信库及优化数学和 AI 内核。',
+      'ROCm 是 AMD 的开放芯片计算软件平台，包含运行时、编译器、通信库及优化数学和 AI kernel。',
     explanation:
-      'vLLM 与 SGLang 通过 ROCm、AMD 专用库和内核项目在 Instinct 加速器上运行。模型支持取决于兼容的注意力、MoE、量化、集体通信与图执行路径。',
+      'vLLM 与 SGLang 通过 ROCm、AMD 专用库和 kernel 项目在 Instinct 加速器上运行。模型支持取决于兼容的注意力、MoE、量化、集体通信与图执行路径。',
     significance:
-      '软件成熟度可主导跨厂商推理结果。快速内核与引擎开发已在相同 MI355X 硬件上带来数倍提升，而缺失路径会让强大理论硬件无法发挥。',
+      '软件成熟度可主导跨厂商推理结果。快速 kernel 与引擎开发已在相同 MI355X 硬件上带来数倍提升，而缺失路径会让理论性能强劲的硬件无法发挥。',
     benchmarkContext:
       'InferenceX 保存引擎版本与运行日期，因此能测量 ROCm 随时间的改进；某个时间点的比较不能直接推广到后续软件版本。',
   },
@@ -878,9 +1147,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'vLLM 是开源 LLM 推理与服务引擎，重点提供高吞吐调度、高效 KV 缓存管理和广泛模型/硬件支持。',
     explanation:
-      '其运行时协调连续批处理、分布式 worker、注意力后端、量化内核和 OpenAI 兼容服务；生产方案也可把 vLLM worker 运行在 NVIDIA Dynamo 等编排层之下。',
+      '其运行时协调连续批处理、分布式 worker、注意力后端、量化 kernel 和 OpenAI 兼容服务；生产方案也可把 vLLM worker 运行在 NVIDIA Dynamo 等编排层之下。',
     significance:
-      'vLLM 版本与后端变化可显著改变性能。模型专用 MoE 内核、注意力 dispatch、Wide EP 通信与调度路径都会影响最终曲线。',
+      'vLLM 版本与后端变化可显著改变性能。模型专用 MoE kernel、注意力 dispatch、Wide EP 通信与调度路径都会影响最终曲线。',
     benchmarkContext:
       'InferenceX 把 vLLM 作为一种引擎选择，并固定每个方案的具体镜像。应在模型、精度、工作负载与拓扑一致时比较，而不能把引擎名称当作固定性能等级。',
   },
@@ -891,9 +1160,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'SGLang 是用于快速服务语言模型的开源软件，提供面向复杂 AI 工作负载的调度和优化功能。',
     definition: 'SGLang 是面向高性能 LLM 与多模态推理的开源服务引擎和语言模型编程系统。',
     explanation:
-      '服务运行时包含连续批处理、前缀感知调度、分布式并行、投机解码，以及面向 NVIDIA/AMD 芯片的多种注意力和 MoE 内核后端。',
+      '服务运行时包含连续批处理、前缀感知调度、分布式并行、投机解码，以及面向 NVIDIA/AMD 芯片的多种注意力和 MoE kernel 后端。',
     significance:
-      'SGLang 快速迭代的版本和模型专用内核可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信内核主导。',
+      'SGLang 快速迭代的版本和模型专用 kernel 可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信 kernel 主导。',
     benchmarkContext:
       'InferenceX 会持续重跑固定版本的 SGLang 测试配置。对比不同版本的曲线，可以看出改动对整个运行区间的影响，也能发现单看峰值时容易被掩盖的回归或提升。',
   },
@@ -904,21 +1173,21 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'TensorRT-LLM 是 NVIDIA 用于在 NVIDIA 芯片上编译、优化和服务大语言模型的推理软件栈。',
     explanation:
-      '它提供 NVIDIA 优化内核、量化路径、分布式执行和模型专用优化；既可作为服务后端，也可通过集成让其他引擎使用其衍生内核。',
+      '它提供 NVIDIA 优化 kernel、量化路径、分布式执行和模型专用优化；既可作为服务后端，也可通过集成让其他引擎使用其衍生 kernel。',
     significance:
       '紧密硬件集成可快速支持 Blackwell 与 NVL72 功能，但模型支持和引擎兼容仍与版本相关，因此 TensorRT-LLM 标签必须对应具体容器与方案。',
     benchmarkContext:
-      'InferenceX 同时包含直接 TensorRT-LLM、Dynamo TensorRT-LLM，以及 SGLang/vLLM 使用 TRT-LLM 衍生内核后端的配置。',
+      'InferenceX 同时包含直接 TensorRT-LLM、Dynamo TensorRT-LLM，以及 SGLang/vLLM 使用 TRT-LLM 衍生 kernel 后端的配置。',
   },
   'nvidia-dynamo': {
     term: 'NVIDIA Dynamo',
     aliases: ['Dynamo', '分布式推理框架'],
     plainEnglish:
-      'NVIDIA Dynamo 协调大量芯片 worker，负责路由请求、移动模型记忆，并把读提示词和写答案分配给合适的资源池。',
+      'NVIDIA Dynamo 协调大量芯片 worker，负责路由请求、搬运模型内存中的数据，并把读提示词和写答案分配给合适的资源池。',
     definition:
       'NVIDIA Dynamo 是用于编排请求路由、worker 池、KV 缓存移动和分离式服务的分布式推理框架。',
     explanation:
-      'Dynamo 可把预填充与解码放在独立扩展的池中，并使用 vLLM 或 TensorRT-LLM 作为 worker 运行时。内核仍由这些引擎执行，Dynamo 负责外围数据与控制路径。',
+      'Dynamo 可把预填充与解码放在独立扩展的池中，并使用 vLLM 或 TensorRT-LLM 作为 worker 运行时。kernel 仍由这些引擎执行，Dynamo 负责外围数据与控制路径。',
     significance:
       '机架级性能由单芯片运行时、路由、缓存传输、拓扑感知与池大小共同决定。这些因素决定 Wide EP 和分离式推理能否提升端到端性能。',
     benchmarkContext:
@@ -947,11 +1216,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '每美元总 token 数用每芯片小时产出的总 token 数除以建模得出的每芯片小时全包基础设施成本。',
     explanation:
-      '超大规模云大批量自有硬件和 3 年承诺租赁两个版本分别采用对应的 TCO 每小时成本。Historical Trends 会插值对应的总吞吐量、输入吞吐量或输出吞吐量，再应用每小时成本系数。',
+      '超大规模云厂商批量采购的自有硬件和 3 年承诺租赁两个版本分别采用对应的 TCO 每小时成本。Historical Trends 会插值对应的总吞吐量、输入吞吐量或输出吞吐量，再应用每小时成本系数。',
     significance:
       '该指标衡量硬件和软件的成本效率，因此比较时必须采用相同的模型、工作负载、交互性目标、token 类型和基础设施成本口径。',
     benchmarkContext:
-      'InferenceX 分别提供按超大规模云大批量自有硬件和 3 年承诺租赁成本计算的每美元总 token 数轴，其中超大规模云大批量自有硬件轴是仪表板的默认 Y 轴。每 GPU 小时 token 收入是另一个独立指标，只有它采用标准化 token 售价或 OpenRouter 价格。',
+      'InferenceX 分别提供按两种成本口径计算的每美元总 token 数轴：超大规模云厂商批量采购的自有硬件，以及 3 年承诺租赁；前者是仪表板的默认 Y 轴。每 GPU 小时 token 收入是另一个独立指标，只有它采用标准化 token 售价或 OpenRouter 价格。',
     measurement: { label: '常用单位', value: '每 1 美元 TCO 对应的 token 数（tok/$）' },
   },
   'energy-per-token': {
@@ -975,13 +1244,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish:
       '上下文并行把一条长提示词拆到多颗芯片上，让它们分担读取提示词和扫描注意力状态的工作。',
     definition:
-      '上下文并行把 query token 切分到多个加速器上，用于 prefill 的形式称为 PCP，用于 decode 的形式称为 DCP。',
+      '上下文并行沿序列维度将注意力计算或 KV 状态分布到多个加速器，包括 prefill 上下文并行（PCP）和 decode 上下文并行（DCP）。',
     explanation:
-      'PCP 让每个 rank 处理一段 query，keys 和 values 以环形方式传递，从而并行化计算受限的 prefill，也避免某个 rank 独自承担整条长提示词。DCP 则切分 KV cache 本身，每个 rank 扫描各自分片，再以 flash-decode 方式合并部分注意力结果；由于 decode 受显存带宽限制，并行读取 KV 可以提高可达 token 速率。',
+      'PCP 划分新增 query-token 的计算，并通过 gather 或环形传递交换所需的 key 和 value，具体方式由实现决定。DCP 按 token 位置切分 KV 状态，再合并各 rank 的局部注意力结果和归一化统计量。Prefill 也可以使用 DCP 分片缓存；这些名称描述常见优化目标，并不对应互斥的执行阶段。',
     significance:
-      '张量并行会在每个 rank 上复制完整 KV cache，数据并行注意力则把会话绑定在持有其分片的 rank 上，两者在上下文达到几十万 token 时都难以扩展。上下文并行直接针对这一点，而且收益随输入长度增长，而不是随 batch 大小增长。',
+      '架构有足够多独立 KV head 时，张量并行可以切分这些 head。当 TP 并行度超过 head 数，或模型让多个 head 共享 latent cache 时，重复存储才成为问题。上下文并行可减少这种重复或分摊长 prompt 的计算，其通信与内存取舍取决于具体配置。',
     benchmarkContext:
-      'InferenceX 在数据点提示框和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
+      'InferenceX 将 DCP、PCP 并行度与 TP、EP、DP 一起展示。2026 年 11 月的 TPU AgentX 文章介绍了 GLM 的 DCP，以及 Kimi K3 在 prefill 阶段使用 DCP 的配置。应核对所选引擎、模型和版本的实际支持，不能从旧的厂商支持矩阵推断。',
   },
   'kv-cache-offload': {
     term: 'KV cache offloading',
@@ -1005,7 +1274,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'CPU offloading 将模型参数或 KV cache 放在主机 CPU DRAM，而非加速器 HBM。由服务实现决定采用显式复制，还是让 GPU 直接访问。',
     explanation:
-      'KV cache offloading 通过 LMCache、SGLang HiCache、Mooncake Store、Dynamo KVBM 等系统保存请求相关注意力状态；参数 offload 则把已学习的模型数据放到 DRAM。Engram 文章中的 GPU 内核通过 UVA 直接从固定页主机内存选择并反量化稀疏 embedding 行，同时保留完整 decode graph。两类路径的访问模式不同，应分别说明。',
+      'KV cache offloading 通过 LMCache、SGLang HiCache、Mooncake Store、Dynamo KVBM 等系统保存请求相关注意力状态；参数 offload 则把已学习的模型数据放到 DRAM。Engram 文章中的 GPU kernel 通过 UVA 直接从固定页主机内存选择并反量化稀疏 embedding 行，同时保留完整 decode graph。两类路径的访问模式不同，应分别说明。',
     significance:
       '当并发会话的 KV 工作集总量超过 HBM 时，DRAM offloading 决定了有多少智能体会话仍可恢复。它并非免费容量：在高并发下过度依赖 DRAM 层会增加重载流量，可能把交互性拖到可接受水平之下，所以真正值得回答的问题是这一层什么时候有用，而不是它是否存在。',
     benchmarkContext:
@@ -1019,11 +1288,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'NVMe offloading 把模型参数或可复用 KV cache 放到加速器和主机内存之下的 NVMe SSD 层。参数查表与 KV 前缀恢复是同一存储层级的两种不同用途。',
     explanation:
-      'KV offloading 可以在 DRAM 淘汰后继续保存前缀，Engram offload 则检索已学习的 embedding 行。文章测试了 SSD 支持的内存映射表，其页面可能仍驻留文件系统缓存。未经优化的路径先把行 ID 复制到 CPU，去重并收集行，再传到 GPU。Warm page cache 消除了设备读取，但不能消除这些协调与复制。',
+      'KV offloading 可以在 DRAM 淘汰后继续保存前缀，Engram offload 则检索已学习的 embedding 行。文章测试了 SSD 支持的内存映射表，其页面可能仍驻留文件系统缓存。未经优化的路径先把行 ID 复制到 CPU，去重并收集行，再传到 GPU。处于 warm 状态的页缓存消除了存储读取，但不能消除这些协调与复制。',
     significance:
       'NVMe offloading 实际上延长了长生命周期智能体会话的缓存存活时间，当 agent 需要等待工具、人类或 CI 数分钟时这一点尤为重要。它高度依赖工作负载：如果高并发部署下 DRAM offloading 已经在拖累延迟，更慢的一层也救不回来，因为瓶颈在重载带宽而不是容量。',
     benchmarkContext:
-      '文章的 B200 配置在约 125 tokens/s/user 时，DRAM 每美元约提供 1.21 亿 total tokens，SSD 约为 5200 万。实验未启用 GDS，测量的是完整服务路径而非孤立的 SSD 延迟。该参数 offload 实验不能证明 AgentX 已支持 NVMe KV offloading。',
+      '文章的 B200 配置在约 125 tokens/s/user 时，DRAM 每美元约提供 1.21 亿总 token，SSD 约为 5200 万。实验未启用 GDS，测量的是完整服务路径而非孤立的 SSD 延迟。该参数 offload 实验不能证明 AgentX 已支持 NVMe KV offloading。',
   },
   'kv-cache-manager': {
     term: 'KV cache 管理器',
@@ -1035,7 +1304,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '引擎对外提供 connector 接口，因此 Mooncake Store、LMCache、SGLang HiCache 等管理器可以服务不同运行时。管理器按前缀哈希为 block 建立索引，把它们放在主机 DRAM、本地 NVMe 或远端后端；实际的字节搬运由 Mooncake Transfer Engine、NIXL 等传输引擎完成。同一个引擎内部可以并存多条路径。',
     significance:
-      '一旦工作负载大量复用前缀，这一层的正确性和记账就和内核速度同等重要。混合注意力模型更难处理：一个模型同时携带形状和生命周期都不同的多个 cache group，而假设单一 block 几何结构的 connector 无法描述它们。',
+      '一旦工作负载大量复用前缀，这一层的正确性和记账就和 kernel 速度同等重要。混合注意力模型更难处理：一个模型同时携带形状和生命周期都不同的多个 cache group，而假设单一 block 几何结构的 connector 无法描述它们。',
     benchmarkContext:
       'InferenceX 把 KV offload 引擎记录为运行元数据，并在 AgentX 点详情视图中展示。框架标签给出的是组合而不是单个引擎，因此一套方案会显示为 Mooncake ATOMesh 或 MoRI SGLang，而不只是引擎名。',
   },
@@ -1049,13 +1318,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '在数据并行注意力下，每个 rank 只拥有缓存池的一部分，长会话一旦落到错误的 rank 上就要全部重算，实测命中率会远低于理论上限。仅有亲和性也不够：不加约束的粘性会把负载集中到单个热点 worker，因此缓存均衡也必须进入路由打分。',
     benchmarkContext:
-      '路由位于引擎之外，因此 InferenceX 把它视为方案的一部分：Dynamo vLLM、llm-d vLLM、Mooncake ATOMesh 这类标签同时标明编排层和运行时。它的开销正比于在线前缀的数量和长度，而不是生成的 token 数，所以在内核变快之后，它可能成为 agentic 流量下的瓶颈。',
+      '路由位于引擎之外，因此 InferenceX 把它视为方案的一部分：Dynamo vLLM、llm-d vLLM、Mooncake ATOMesh 这类标签同时标明编排层和运行时。它的开销正比于在线前缀的数量和长度，而不是生成的 token 数，所以在 kernel 变快之后，它可能成为 agentic 流量下的瓶颈。',
   },
   tilert: {
     term: 'TileRT',
     aliases: ['TileRT engine', 'TileRT 引擎'],
     plainEnglish:
-      'TileRT 是面向极低延迟单用户生成的推理运行时，它把模型编译成一个常驻程序，而不是许多次内核启动。',
+      'TileRT 是面向极低延迟单用户生成的推理运行时，它把模型编译成一个常驻程序，而不是许多次 kernel 启动。',
     definition:
       'TileRT 是一款推理引擎，通过取消以单个 kernel 作为执行单元的范式，来实现超低延迟服务。',
     explanation:
@@ -1106,12 +1375,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'acceptance-length': {
     term: '接受长度',
-    aliases: ['acceptance length', 'AL', '接受率'],
+    aliases: ['acceptance length', 'AL', '每次验证接受 token 数'],
     plainEnglish:
-      '接受长度是指每次验证中完整模型实际认可的草稿 token 数，它决定了投机解码是否划算。',
-    definition: '接受长度是目标模型在一次验证中平均接受的投机草稿 token 数量。',
+      '接受长度统计每次验证接受多少 token；引用数值时，需要确认是否包含目标模型额外生成的 token。',
+    definition:
+      '接受长度表示每次验证平均接受的 token 数。部分引擎只统计被接受的草稿 token，另一些会将目标模型额外生成的 token 计入长度。',
     explanation:
-      '只有草稿能通过验证，投机解码才会省时间。接受长度接近 1 意味着起草与验证这套机制白跑了一趟；数值较高则能把一次昂贵的目标模型计算摊薄到多个输出 token 上。该数值取决于 speculator、草稿长度、模型本身以及正在生成的内容。',
+      '更多 token 通过验证，可以把目标模型验证成本分摊到多个输出上，但加速比仍取决于草稿生成和验证成本。只计草稿与计入额外 token 的口径下，接近 1 的数值含义不同。接受长度是 token 数，接受率是比例；比较时必须统一计数口径和草稿长度。',
     significance:
       '正因为接受率取决于内容，基准测试有可能在无意中左右结论。合成或匿名化文本对于在真实语料上训练的 speculator 而言属于分布外数据，实测接受率会朝任一方向偏离生产环境的真实值。',
     benchmarkContext:
@@ -1138,7 +1408,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '分块 prefill 把提示词处理切分为固定大小的 token 分块，由调度器与正在进行的 decode 工作交错执行。',
     explanation:
-      '不切分的 prefill 会占用加速器直到整条提示词处理完，所有正在流式输出的用户都得排在后面。切分之后调度器可以交替执行，让 decode 在分块之间继续推进。分块大小是一个调优旋钮：分块越大 prefill 效率越高，分块越小对 decode 的打断越少。',
+      '不切分的 prefill 会占用加速器直到整条提示词处理完，所有正在流式输出的用户都得排在后面。切分之后调度器可以交替执行，让 decode 在分块之间继续推进。分块大小是一个可调参数：分块越大 prefill 效率越高，分块越小对 decode 的打断越少。',
     significance:
       '这项技术把某一个用户的首 token 问题，转换成对所有人来说小而平稳的开销，通常是更划算的取舍。提示词越长它越重要：单条不切分的十万 token prefill 足以让整套部署卡住。',
     benchmarkContext:
@@ -1156,7 +1426,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '直接看一团原始数据点容易挑选有利结果，因为调优不佳的配置也会贡献一些运营方绝不会选择的点。包络线展示的是每套系统可达的边界，而容量决策正是依据这个形状做出的。',
     benchmarkContext:
-      '这与 HPC 中经典的 roofline 模型不同：后者把可达 FLOPS 与算术强度放在一起，用于判断计算受限还是访存受限，仪表板只借用了“上界”这一图形表达。roofline 方向按指标配置，因此同一批数据点在不同坐标轴下会得到不同的包络。',
+      '这与 HPC 中经典的 roofline 模型不同：后者把可达 FLOPS 与算术强度放在一起，用于判断计算受限还是访存受限，仪表板只借用了“上界”这一图形表达。roofline 方向按指标配置，因此同一批数据点在不同坐标轴下会得到不同的包络。Blackwell 微基准测试文章使用的是经典硬件 roofline，其中包含 shared memory 带宽斜率。这种指令级上限不同于仪表板根据实测点绘制的 Pareto 包络。',
   },
   'arithmetic-intensity': {
     term: '算术强度',
@@ -1168,7 +1438,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '两个阶段受限于芯片的不同部分，这解释了为什么峰值 FLOPS 亮眼的规格书在 decode 上可能令人失望，也解释了 batching 为何有效：把多条序列合并会提高算术强度，因为每次权重读取被更多 token 复用。',
     benchmarkContext:
-      '这一区别解释了数据中反复出现的形态。低交互性的点跑大 batch、算术强度高，接近计算上限；高交互性一端跑小 batch，跟随显存带宽，因此带宽更充裕的硬件常常在这里胜出，尽管其峰值吞吐量更低。',
+      '这一区别解释了数据中反复出现的形态。低交互性的点跑大 batch、算术强度高，接近计算上限；高交互性一端跑小 batch，跟随显存带宽，因此带宽更充裕的硬件常常在这里胜出，尽管其峰值吞吐量更低。引用每字节 FLOPs 时应注明存储边界：HBM、L2 和 SMEM 流量对应不同运算强度。即使按 HBM 计算显示复用充分，Blackwell 某些 MMA 形状仍可能受 SMEM 限制。',
   },
   'prefix-cache-hit-rate': {
     term: '前缀缓存命中率',
@@ -1275,7 +1545,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '在长上下文服务中，这往往比压缩权重更划算，因为高并发下最先耗尽显存的是缓存而不是权重。不同模型对精度的敏感度不同，量化 key 还是 value 也有差别，因此需要实测评估而不能一概而论。',
     benchmarkContext:
-      '缓存精度属于测试配置的一部分，实践中还存在混合布局：有些模型会保留两份位宽不同的缓存缓冲区，分离式传输路径必须把它们成对搬运。阅读显存容量相关的结论时，请连同其背后的缓存格式一起看。',
+      '缓存精度属于测试配置的一部分，实践中还存在混合布局：有些模型会保留两份位宽不同的缓存缓冲区，分离式传输路径必须把它们成对搬运。阅读显存容量相关的结论时，请连同其背后的缓存格式一起看。Huawei profile 展示了 vector 相关路径上的量化工作，以及融合生产者与消费者边界的机会。评估缓存字节数减少的收益时，还须考虑转换成本、布局要求和经过验证的数值质量。',
   },
   'sliding-window-attention': {
     term: '滑动窗口注意力',
@@ -1289,7 +1559,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '有界的开销带来了分配器层面的问题。窗口页不断翻转，而持久的前缀页静止不动；当两者取自同一个池子时，短暂分配往往会把有价值的那份挤出去，于是长会话可能因为短命的窗口状态而丢失昂贵的全注意力历史。',
     benchmarkContext:
-      '这些效应只在多轮流量中出现。单条短提示词既不会让窗口绕过前缀，也不会造成池子争用，因此窗口感知的淘汰、offload 和分叉处理都表现为由 AgentX 推动的引擎工作，而不是定长场景的测试结果。',
+      '这些效应只在多轮流量中出现。单条短提示词既不会超出窗口长度，也不会争用缓存池，因此窗口感知的淘汰、offload 和分叉处理都表现为由 AgentX 推动的引擎工作，而不是定长场景的测试结果。',
   },
   'hybrid-attention': {
     term: '混合注意力',
@@ -1317,7 +1587,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '在长上下文下，节省的存储相当可观，但这种状态改变了缓存的含义：它无法像窗口尾部那样由周围 token 重建，一旦丢弃就只能重放整个序列，因此复用需要显式的检查点机制，而不是普通的 block 复用。',
     benchmarkContext:
-      'InferenceX 服务的模型中已有采用这类层的，引擎对循环状态的检查点与传输支持属于测试配置的一部分。一个模型可以在 day 0 就能被服务，却仍不支持这类状态的复用，表现为重复轮次上出乎意料的高 prefill 开销。',
+      'InferenceX 服务的模型中已有采用这类层的，引擎对循环状态的检查点与传输支持属于测试配置的一部分。一个模型可能在 day-zero 就能提供推理服务，却仍不支持这类状态的复用，表现为重复轮次上出乎意料的高 prefill 开销。',
   },
   nvl72: {
     term: 'NVL72',
@@ -1372,7 +1642,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '由于后端是被选择而不是固定的，kernel 的可用性就变成了可移植性问题。只为某一家厂商后端实现的功能，会让另一方退回通用路径；而在长上下文下，这不是小小的妥协，而是选错了 kernel。',
     benchmarkContext:
-      '所使用的后端属于测试配置的一部分，改动它可以在硬件和引擎版本都不变的情况下推动曲线变化。正是这些 kernel 支持了循环状态的检查点，混合模型才得以参与前缀复用。',
+      '所使用的后端属于测试配置的一部分，改动它可以在硬件和引擎版本都不变的情况下推动曲线变化。正是这些 kernel 支持了循环状态的检查点，混合模型才得以参与前缀复用。Blackwell 文章参考 FlashInfer 注意力 kernel 选择 copy 测试配置，并区分 TMA 与 LDGSTS 路径。部分实现分析明确来自二进制推测，并非公开 kernel 源码已证实的事实。',
   },
   'cuda-graphs': {
     term: 'CUDA graph',
@@ -1412,7 +1682,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'MFU 把硬件能力与软件成熟度区分开：峰值算力巨大但 kernel 不行的芯片，可能输给算力较低但喂得饱运算单元的芯片。硬件不变而 MFU 上升，正是软件进步的特征，而推理性能的大部分收益正来自软件。',
     benchmarkContext:
-      'InferenceX 跟踪的是每颗芯片随时间交付的 token 数而非直接报告 MFU。硬件不变而性能大幅提升的反复出现的模式，例如模型发布数周内的数量级改进，本质上就是软件把利用率追讨回来的过程。',
+      'InferenceX 跟踪的是每颗芯片随时间交付的 token 数而非直接报告 MFU。硬件不变而性能大幅提升的反复出现的模式，例如模型发布数周内的数量级改进，本质上就是软件把利用率找回来的过程。',
   },
   'memory-bound-vs-compute-bound': {
     term: '访存受限与计算受限',
@@ -1425,7 +1695,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '瓶颈资源决定了哪个硬件规格才重要。decode 的访存受限特性解释了为什么每次加速器发布都把 HBM 容量和带宽放在标题上，为什么量化通过减少搬运字节数来加速 decode，以及为什么算力一般但内存很快的芯片能在交互式服务中获胜。',
     benchmarkContext:
-      'InferenceX 对并发做扫描，让系统在两种状态之间移动：低并发 decode 受带宽限制，高并发批处理则推向计算极限。每条吞吐量对交互性曲线的形状，反映了该配置发生状态切换的位置。',
+      'InferenceX 对并发做扫描，让系统在两种状态之间移动：低并发 decode 受带宽限制，高并发批处理则推向计算极限。每条吞吐量对交互性曲线的形状，反映了该配置发生状态切换的位置。内存瓶颈可能位于 SM 内，而不是 HBM。Blackwell 的 SS 与 TS MMA 对比改变了操作数位置，因此分析不同吞吐上限时必须区分存储层级，不能只对比 HBM 峰值带宽与峰值 FLOPs。',
   },
   'gpu-utilization': {
     term: 'GPU 利用率',
@@ -1439,7 +1709,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '集群经济性取决于利用率。批处理和调度做得好的部署与朴素部署之间，同样硬件上每 token 成本常常相差数倍，这正是推理软件和请求路由与芯片本身同样受重视的原因。',
     benchmarkContext:
-      'InferenceX 报告每个交互性水平下每颗芯片的实际交付吞吐量而非利用率百分比，因此引擎、精度和并行方案之间的利用率差异，会直接表现为同一硬件上曲线之间的间距。',
+      'InferenceX 报告每个交互性水平下每颗芯片的实际交付吞吐量而非利用率百分比，因此引擎、精度和并行方案之间的利用率差异，会直接表现为同一硬件上曲线之间的间距。Huawei profile 分别报告 stream 占用时间和任务耗时之和。Stream 重叠及混合任务类型，使这些耗时不能被解读为物理 Cube 或 vector 的独占利用率。Warp 占用率又是另一种指标。',
   },
   'continuous-batching': {
     term: '连续批处理',
@@ -1495,7 +1765,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '草稿质量决定接受长度，接受长度决定加速比。匹配良好的草稿能在小批次下把 decode 速度提高数倍，而不匹配或过于激进的草稿会浪费验证算力，高负载下甚至拖慢服务。',
     benchmarkContext:
-      'InferenceX 记录每个结果背后的投机方法和接受长度，并发布用于复现的黄金接受长度分布，因为不切实际的接受率是基准测试数字脱离生产行为的经典方式。',
+      'InferenceX 记录每个结果背后的投机方法和接受长度，并发布用于复现的基准接受长度分布，因为不切实际的接受率是基准测试数字脱离生产行为的经典方式。',
   },
   'offline-inference': {
     term: '离线推理',
@@ -1506,7 +1776,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '合成数据生成、文档处理、embedding 回填和评估扫描都不在乎单个请求何时返回。调度器因此可以放开手脚：跑内存允许的最大批次、按前缀复用最大化的方式排序请求、把加速器压在吞吐量极限上。在线服务处于同一权衡的另一端，用吞吐量换取每个用户不低于某个交互性下限。',
     significance:
-      '同一套硬件在离线模式与紧延迟模式之间，每美元 token 数可以相差数倍，所以不说明工作点就报每百万 token 价格几乎没有意义。集群常常因此划分成不同的延迟档位。',
+      '同一套硬件在离线模式与低延迟模式之间，每美元 token 数可以相差数倍，所以不说明工作点就报每百万 token 价格几乎没有意义。集群常常因此划分成不同的延迟档位。',
     benchmarkContext:
       'InferenceX 吞吐量对交互性曲线的最右端，即批次最大、单用户速度最低处，近似离线运行。在一条曲线的两端各读一次，就能看到该配置从在线到离线的完整成本区间。',
   },
@@ -1622,7 +1892,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: 'All-gather',
     aliases: ['allgather', '全收集'],
     plainEnglish:
-      'All-gather 是一种群体通信操作，结束时每颗芯片都拿到最初分散在所有芯片上的完整数据。',
+      'All-gather 是一种集合通信操作，结束时每颗芯片都拿到最初分散在所有芯片上的完整数据。',
     definition:
       'All-gather 是一种集合通信操作，每个参与设备贡献自己的分片，所有设备都收到全部分片拼接后的结果。',
     explanation:
@@ -1670,7 +1940,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '常规网络栈在两端都要经过内核缓冲区拷贝数据，消耗 CPU 周期和延迟。RDMA 网卡在已注册的内存区域之间直接传输，GPUDirect 进一步让网卡直接写入加速器的 HBM。InfiniBand 原生内置 RDMA，RoCE 则把同一套语义跑在 Ethernet 上。NCCL、RCCL 等集合通信库，以及分离式服务中的 KV cache 传输路径，都建在这些原语之上。',
     significance:
-      'RDMA 是整个分布式 AI 栈的地板：没有它，跨节点集合通信和缓存传输早在链路跑满之前就会卡在 CPU 上。RoCE 变体让基于 Ethernet 的集群能以更低成本与 InfiniBand 竞争。',
+      'RDMA 是整个分布式 AI 栈的底座：没有它，跨节点集合通信和缓存传输早在链路跑满之前就会卡在 CPU 上。RoCE 变体让基于 Ethernet 的集群能以更低成本与 InfiniBand 竞争。',
     benchmarkContext:
       'InferenceX 的每个多节点结果在集合通信之下都依赖 RDMA 传输，分离式配置还依赖它完成 prefill 到 decode 的 KV 搬运，因此传输层成熟度是区分相似集群结果的因素之一。',
   },
@@ -1692,11 +1962,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: '热设计功耗',
     aliases: ['TDP', '热设计功率包络'],
     plainEnglish:
-      'TDP 是芯片设计上可持续消耗并以热量形式散发的功率，是每份加速器规格表上的标题瓦数。',
+      'TDP 是芯片设计上可持续消耗并以热量形式散发的功率，是每张加速器规格表上最醒目的瓦数。',
     definition:
       '热设计功耗（TDP）是芯片被设计为可持续运行的最大功率包络，其散热系统必须能够持续把这些热量排出。',
     explanation:
-      '现代加速器每颗芯片的功耗在千瓦上下甚至更高，整机柜系统乘上去就是十万瓦量级。只看 TDP 还会低估真实账单：内存、网络、CPU、电源转换损耗和散热开销都叠加在上面，因此每芯片的全部包含功耗明显高于芯片 TDP。数据中心容量按兆瓦出售，这些功率包络直接决定一个场地能容纳多少加速器。',
+      '现代加速器每颗芯片的功耗在千瓦上下甚至更高，整机柜系统乘上去就是十万瓦量级。只看 TDP 还会低估真实账单：内存、网络、CPU、电源转换损耗和散热开销都叠加在上面，因此每芯片的全口径功耗明显高于芯片 TDP。数据中心容量按兆瓦出售，这些功率包络直接决定一个场地能容纳多少加速器。',
     significance:
       '电力已成为 AI 扩建的硬约束，在许多市场甚至排在资本之前。每芯片 TDP 的持续上升迫使行业转向液冷，也让每瓦性能与每美元性能一样，成为比较芯片世代的主要维度。',
     benchmarkContext:
@@ -1713,7 +1983,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'PUE 把芯片级效率与场地经济性连接起来：芯片消耗的每一瓦在电表上都要乘以 PUE。当电力供给卡住 AI 扩建时，场地效率与芯片和软件一样进入竞争计算。',
     benchmarkContext:
-      'InferenceX 每 token 能耗和每兆瓦 token 数背后的全部包含功耗，已按现代 AI 数据中心的 PUE 水平计入场地开销，因此其成本与能耗比较反映的是落地的场地经济性而不是裸芯片瓦数。',
+      'InferenceX 每 token 能耗和每兆瓦 token 数背后的全口径功耗，已按现代 AI 数据中心的 PUE 水平计入场地开销，因此其成本与能耗比较反映的是落地的场地经济性而不是裸芯片瓦数。',
   },
   int8: {
     term: 'INT8',
@@ -1740,7 +2010,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '由于 decode 是访存受限的，削减权重字节数直接加快 token 生成，也让更大的模型装进更少的芯片。仅权重方法让大型开源模型能在普通硬件上运行，在激活量化代价过高时仍是标准方案。',
     benchmarkContext:
-      'InferenceX 在精度标签中区分仅权重配置与全低精度路径，因为 W4A16 配置和 NVFP4 配置对于是哪些硬件单元和带宽预算产生了曲线，做出的是很不一样的声明。',
+      'InferenceX 在精度标签中区分仅权重配置与全低精度路径，因为 W4A16 配置和 NVFP4 配置所体现的硬件单元与带宽预算很不一样。',
   },
   'block-scaling': {
     term: '块缩放',
@@ -1749,11 +2019,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '块缩放是一种量化结构，数值以极低位宽格式存储，每个固定大小的块共享一个较高精度的缩放因子。',
     explanation:
-      '一个 4 位数只能表示少数几个量级，远不足以覆盖模型张量的动态范围。把数值分成 16 或 32 个元素左右的块并附上共享缩放，每个块就能把格式对准自己的量级。MX 标准格式如 MXFP4、MXFP8 使用 2 的幂缩放，NVFP4 则在 16 元素块上使用 FP8 缩放，粒度更细。',
+      '一个 4 位数只能表示少数几个不同的幅值，远不足以覆盖模型张量的动态范围。把数值分成 16 或 32 个元素左右的块并附上共享缩放，每个块就能让格式对准自己的幅值范围。MX 标准格式如 MXFP4、MXFP8 使用 2 的幂缩放，NVFP4 则在 16 元素块上使用 FP8 缩放，粒度更细。',
     significance:
       '块缩放是 FP4 推理世代背后的关键思想：没有每块缩放，4 位浮点对前沿模型根本不可用。缩放格式和块大小的选择，如今是硬件厂商与量化方案之间真正的差异化点。',
     benchmarkContext:
-      'InferenceX 在 Blackwell 和 MI355X 覆盖中的 NVFP4 与 MXFP4 结果都是块缩放格式，精度对比页面很大程度上就是为了展示这些配置相对同硬件 FP8 基线的得失。',
+      'InferenceX 在 Blackwell 和 MI355X 覆盖中的 NVFP4 与 MXFP4 结果都是块缩放格式，精度对比页面很大程度上就是为了展示这些配置相对同硬件 FP8 基线的得失。Blackwell 文章在匹配形状下比较 micro-scaling 与其他指令格式。饱和吞吐量接近，不代表单条指令延迟相同；指令级结果也不能验证模型量化后的准确性。',
   },
   'flash-attention': {
     term: 'FlashAttention',
@@ -1765,7 +2035,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '朴素注意力要把随序列长度平方增长的分数矩阵写入主存再读回，速度由带宽而非算术决定。FlashAttention 把整个计算融合进一个 kernel，让键值块流过片上内存，用在线 softmax 保持结果精确。后续版本和各厂商实现把这一思想扩展到新硬件世代、新头布局和面向推理的 decode 路径。',
     significance:
-      '这个 kernel 家族让长上下文真正可行，把注意力从长序列的主导成本变成可控的一环。它也是单个精心设计的 kernel 能撕动整个行业性能的最经典例子。',
+      '这个 kernel 家族让长上下文真正可行，把注意力从长序列的主导成本变成可控的一环。它也是最经典的例子之一，说明单个精心设计的 kernel 就能左右整个行业的性能。',
     benchmarkContext:
       'InferenceX 测试的所有引擎都依赖这一脉络的融合注意力 kernel，NVIDIA 硬件上经由 FlashInfer，AMD 上经由 AITER，那里的 kernel 改进经常在硬件不变的情况下移动已发布的曲线。',
   },
@@ -1795,10 +2065,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'CUTLASS 是 NVIDIA 教生态使用每一代新 tensor core 的地方，包括 Blackwell 上的 FP4 和 FP8 路径。其模式向引擎扩散的速度，是新芯片多快达到宣称性能的真实变量。',
     benchmarkContext:
-      'InferenceX 在 NVIDIA 硬件上的结果背后，GEMM 和注意力 kernel 大量源于 CUTLASS 衍生代码，引擎镜像里这些库的版本升级是平台追踪到的曲线逐日变化的常见来源。',
+      'InferenceX 在 NVIDIA 硬件上的结果背后，GEMM 和注意力 kernel 大量源于 CUTLASS 衍生代码，引擎镜像里这些库的版本升级是平台追踪到的曲线逐日变化的常见来源。Blackwell 文章通过 CuTe MMA traits 和首选、回退 cluster 示例解释执行作用域与 launch 放置。公开部分在订阅者专享的 CUTLASS 实践讨论前结束，术语链接不会转载后续付费内容。',
   },
   nccl: {
     term: 'NCCL',
+    expansion: 'NVIDIA 集合通信库',
     aliases: ['RCCL', 'NVIDIA 集合通信库'],
     plainEnglish:
       'NCCL 是 NVIDIA 的集合通信库，在集合操作中负责芯片之间的数据搬运，RCCL 是 AMD 的对应实现。',
@@ -1813,6 +2084,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   gemm: {
     term: 'GEMM',
+    expansion: '通用矩阵乘法',
     aliases: ['通用矩阵乘法', 'matrix multiply'],
     plainEnglish: 'GEMM 即通用矩阵乘法，是训练和推理神经网络时占据绝大部分算术量的那一种计算。',
     definition:
@@ -1822,7 +2094,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'GEMM 效率是行业里一切性能主张的地基。在真实服务形状下，尤其是 decode 的细长矩阵上，实际交付与峰值 GEMM 吞吐量的差距，解释了规格表比例为何预测不了基准测试排名。',
     benchmarkContext:
-      'InferenceX 每条曲线背后都是来自 CUTLASS、hipBLASLt 和 Triton 生成代码的 GEMM kernel 堆栈，量化配置最终也站在各厂商在其调度器产生的形状上执行低精度 GEMM 的能力之上。',
+      'InferenceX 每条曲线背后都是来自 CUTLASS、hipBLASLt 和 Triton 生成代码的 GEMM kernel 堆栈，量化配置最终也站在各厂商在其调度器产生的形状上执行低精度 GEMM 的能力之上。Blackwell 指令测试表明，tile 形状、操作数位置和在途 MMA 数量会改变可达吞吐量。饱和指令流没有包含完整 GEMM kernel 的部分 load、同步和 epilogue 成本。',
   },
   'kernel-fusion': {
     term: 'Kernel 融合',
@@ -1836,7 +2108,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '在访存受限的推理中，消除中间流量比提升原始算术能力更值钱，因此融合是引擎手中最可靠的杠杆之一。引擎版本间的提速，很大一部分可以归结为更激进或更精准的融合。',
     benchmarkContext:
-      'InferenceX 配置钉住的引擎镜像在不同版本和硬件后端上的融合库存不同，这是逐日追踪中硬件不变而曲线移动的常见原因：面向新模型和新精度的融合 kernel 落地了。',
+      'InferenceX 配置钉住的引擎镜像在不同版本和硬件后端上的融合 kernel 构成不同，这是逐日追踪中硬件不变而曲线移动的常见原因：面向新模型和新精度的融合 kernel 落地了。Huawei profile 将反复出现的量化边界视为融合机会。移除边界可能减少流量或 launch，但新增存储压力与依赖也可能降低重叠程度，因此被消除任务的耗时之和不等于有保证的步骤耗时节省。',
   },
   tpu: {
     term: 'TPU（张量处理单元）',
@@ -1850,7 +2122,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '这种设计用单芯片峰值换取系统级成本优势。宽矩阵单元、低延迟 torus 网络和编译器驱动的调度，让 Google 的每 token 成本低于规格表的推算；但 tile 几何会惩罚填不满阵列的模型形状。TPU 能否被外部广泛采用，取决于 PyTorch 原生的 TorchTPU 栈能否在 vLLM 和 SGLang 中追平 CUDA 生态。',
     benchmarkContext:
-      'InferenceX Official Preview 发布了首批第三方 TPUv7 结果，在 FP8 聚合服务下与 B200、B300 对比，Ironwood 的每美元性能最高高出 50%。TorchTPU 栈开源后，AgentX 和 TPU 分离式服务的结果也会陆续发布。',
+      '2026 年 9 月的 Official Preview 对比了 FP8 聚合服务下的 TPUv7 与 B200、B300。11 月的后续文章新增 Muse Spark Open、GLM、Qwen3.5 和 Kimi K3 的 TPUv7 AgentX 结果，包括 llm-d 分离式服务。比较两篇文章时，必须区分负载、精度、成本口径和延迟坐标轴。',
   },
   'tpuv7-ironwood': {
     term: 'TPUv7 Ironwood',
@@ -1860,7 +2132,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'TPUv7 Ironwood 是 Google 的加速器，每颗芯片有两个独立计算 die、原生 FP8 硬件、256x256 的 MXU、约为 Trillium 六倍的 HBM 容量，以及 3D torus 结构的 ICI 网络。',
     explanation:
-      'Ironwood 放弃了 TPU v4 和 v5p 的 MegaCore 设计，后者把两个核心融合为共享同一内存空间的单个逻辑设备。Ironwood 的两个 die 各自作为独立逻辑设备运行，通过 die-to-die 链路相连，因此框架看到的是每颗芯片两个设备。每颗芯片有 2 个 TensorCore 和 4 个第三代 SparseCore。pod 的基本单元是 4x4x4 共 64 颗芯片的立方体，再通过光电路交换机拼接成 9,216 颗芯片的 superpod。Ironwood 没有原生 FP4，因此目前与 NVIDIA 的对比两边都使用 FP8。',
+      'Ironwood 放弃了 TPU v4 和 v5p 的 MegaCore 设计，后者把两个核心融合为共享同一内存空间的单个逻辑设备。Ironwood 的两个 die 各自作为独立逻辑设备运行，通过 die-to-die 链路相连，因此框架看到的是每颗芯片两个设备。每颗芯片有 2 个 TensorCore 和 4 个第三代 SparseCore。pod 的基本单元是 4x4x4 共 64 颗芯片的立方体，再通过光电路交换机拼接成 9,216 颗芯片的 superpod。Ironwood 没有原生 FP4 矩阵运算，但服务配置仍可存储量化后的 FP4 权重，并在计算时转换。权重格式与硬件运算支持是不同属性。',
     significance:
       '这是 Google 第一次用可直接购买或租用的芯片，去争夺外部推理负载。仅 Anthropic 就承诺采购超过一百万颗 TPU。在 TPUv8i 加入原生 FP4 之前，只有 FP8 的计算路径限制了它与 Blackwell 的对比范围。',
     benchmarkContext:
@@ -1868,6 +2140,23 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     measurement: {
       label: '每用户 100 tok/s、FP8 8k1k 下的成本',
       value: '每百万 token 0.181 美元，B200 为 0.222 美元，B300 为 0.276 美元',
+    },
+    figure: {
+      images: [
+        {
+          src: '/images/glossary/tpuv7-ironwood-package-photo.webp',
+          width: 780,
+          height: 835,
+          alt: '放在展示台上的 TPUv7 Ironwood 封装照片，下方刻有 Ironwood 字样。',
+        },
+        {
+          src: '/images/glossary/tpuv7-ironwood-package.webp',
+          width: 2000,
+          height: 1279,
+          alt: '同一张照片的标注版：两个计算 die 之间是 die-to-die 边界，两侧各有四个 HBM3E 堆栈，die 上方是 ICI SerDes chiplet，顶部两角各有一个 dummy die。',
+        },
+      ],
+      caption: '来源：SemiAnalysis，[Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
   },
   mxu: {
@@ -1990,7 +2279,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'vLLM 和 SGLang 可以复用上游的模型代码、调度器、continuous batching 和功能逻辑，不必跨 PyTorch 到 JAX 的边界重建。这降低了新模型 bring-up 的成本，让 TPU 朝着与 NVIDIA 同步的 day-0 支持靠近。TorchTPU 将取代即将弃用的 TorchAX。',
     benchmarkContext:
-      'InferenceX Official Preview 中的 TPUv7 结果来自原生 TorchTPU vLLM 栈以 FP8 服务 Qwen3.5 397B。截至 2026 年 9 月初 TorchTPU 仍处于私有测试阶段，预计 10 月中旬 PyTorch Conference 前后开源，届时 SemiAnalysis 会把 TPU 基准测试从 fork 迁移到公开的 InferenceX 仓库。',
+      '2026 年 9 月的预览使用 TorchTPU vLLM 运行 Qwen3.5 FP8，当时服务栈仍处于私有测试阶段。11 月的后续文章已报告 SGLang-TorchTPU 和 vLLM-TorchTPU 的 AgentX 提交，并链接到 Inferact 开源的 Kimi K3 megakernel 复现指南。可用性和模型支持应以带日期的发布及配置为准，而不是沿用此前的 beta 阶段预测。',
   },
   torchax: {
     term: 'TorchAX',
@@ -2021,6 +2310,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   xla: {
     term: 'XLA',
+    expansion: '加速线性代数',
     aliases: ['XLA', 'Accelerated Linear Algebra', 'StableHLO', 'XLA 编译器'],
     plainEnglish:
       'XLA 是把模型计算图编译成 TPU 机器码的编译器，决定每个操作如何切分、补齐、融合和调度。',
@@ -2041,7 +2331,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'JAX 是一个 Python 库，在 NumPy 风格数组上提供 jit、grad、vmap 等可组合的函数变换，经 XLA 编译，是 TPU 的主要第一方框架。',
     explanation:
-      'JAX 程序是函数式的：模型权重和 KV cache 等状态显式传入传出，jax.jit 才能把一步计算追踪成图。这种模型与 XLA 契合，让 JAX 成为 TPU 原语和并行支持最成熟的路径，也是第一个外部 vLLM TPU 后端通过 TorchAX 把 PyTorch 翻译成 JAX、以及 SGLang-JAX 作为独立 JAX 原生引擎存在的原因。TorchTPU 改变了这一关系：PyTorch 成为面向用户的框架，但底层仍可调用 JAX 自定义 kernel 和 Pallas，TPU-Sync 也原生支持 JAX 和 TorchTPU。',
+      'JAX 程序是函数式的：模型权重和 KV cache 等状态显式传入传出，jax.jit 才能把一步计算追踪成图。这种模型与 XLA 契合，让 JAX 成为 TPU 原语和并行支持最成熟的路径。这也是第一个外部 vLLM TPU 后端通过 TorchAX 把 PyTorch 翻译成 JAX、以及 SGLang-JAX 作为独立 JAX 原生引擎得以存在的原因。TorchTPU 改变了这一关系：PyTorch 成为面向用户的框架，但底层仍可调用 JAX 自定义 kernel 和 Pallas，TPU-Sync 也原生支持 JAX 和 TorchTPU。',
     significance:
       '开源推理生态是用 PyTorch 写的。要求引擎跨越 PyTorch 到 JAX 的边界拖慢了 TPU 上的功能对齐和模型 bring-up，因此 Google 把推理栈迁向 PyTorch 原生，同时把 JAX 和 Pallas 保留给 kernel 和内部负载。',
     benchmarkContext:
@@ -2057,9 +2347,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'prefill-decode 分离需要一条快速通路，把完成 prefill 的 KV cache 从一组芯片搬到另一组；KV cache offload 需要 HBM 与主机 DRAM 之间的往返通路。TPU-Sync 同时提供两者。它原生支持 JAX 和 TorchTPU 栈，并支持原生 TPU KV cache DRAM offload，用于 HBM 放不下所有用户 cache 的大模型和中大 batch 场景。Google 内部为 Gemini 运行分离式服务已有多年，对外开放的工作在 Official Preview 发布前几个月才开始，与 llm-d 的 TPU 支持同步推进。',
     significance:
-      '没有传输库，TPU 外部服务只能停留在聚合模式，这正是当前结果所处的位置，也是 GB200 和 GB300 NVL72 分离式服务目前在部分曲线上领先的原因。SemiAnalysis 预期 TPU 上的 Mooncake Store 支持会基于 TPU-Sync 的原语实现。',
+      '传输路径决定搬运已保留状态是否比重新计算更划算。分离式服务要求不同资源池的缓存布局兼容，offload 则需要足够的主机带宽与容量来保留有用前缀。仅有传输库，不能证明完整服务配置更快。',
     benchmarkContext:
-      'InferenceX Official Preview 比较的是 TPUv7 聚合服务与 B200、B300 聚合服务。基于 TPU-Sync 的分离式服务在外部栈中优化完成后，TPUv7 分离式与 GB200、GB300 NVL72 分离式的对比将在后续文章发布。',
+      '2026 年 11 月的 TPU AgentX 文章介绍了 SGLang HiCache 通过 TPU-Sync 进行主机 DRAM offload，以及 Qwen3.5 的 KV 和线性注意力状态 offload。文章也报告了 llm-d 分离式服务结果，不再只是 9 月预览中留待后续测试的计划。',
   },
   'mooncake-store': {
     term: 'Mooncake Store',
@@ -2071,7 +2361,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '通过 P2P 池化，每台主机上的 KV cache 存储被呈现为一个逻辑内存池，任意服务器上的加速器都可以读取其他服务器写入的 cache，而不只是本机的。Mooncake Store 还能跨服务器池化 NVMe，并支持 WEKA、VAST 等分布式文件系统后端。它在 GPU 上已与 vLLM 和 SGLang 配合使用，是业界标准的 offload 存储；Google 正在添加 TPU 支持和 DRAM P2P 池化模式，很可能基于 TPU-Sync 原语实现。',
     significance:
-      '智能体和多轮负载会在大量请求和 sub-agent 突发之间复用长前缀。集群级的池把 KV cache 命中率提升到远超单机 DRAM 所能达到的水平，这是 HBM 耗尽后高并发智能体服务仍然经济的原因。',
+      '智能体和多轮负载会在大量请求和子智能体突发之间复用长前缀。集群级的池把 KV cache 命中率提升到远超单机 DRAM 所能达到的水平，这是 HBM 耗尽后高并发智能体服务仍然经济的原因。',
     benchmarkContext:
       'GPU 上的 AgentX 结果已经依赖 offload 行为，计划中的 AgentX TPU 结果将在 Ironwood 上实际使用 Mooncake Store 和 TPU-Sync。InferenceX Official Preview 把 Mooncake 支持列为分离式服务之后的下一步外部化工作。',
   },
@@ -2085,16 +2375,24 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '单个 vLLM 实例只服务一个副本。生产部署需要一层把每个请求路由到最可能缓存了其前缀的副本，把 prefill 和 decode 拆到不同的池，并独立扩缩这些池。llm-d 提供这种编排，由 Red Hat、Google 等贡献者支持。llm-d 的 TPU 支持是 Google 外部化 prefill-decode 分离工作的一部分，与 TPU-Sync 传输库配套，让外部 TPU 客户能运行 Google 内部为 Gemini 使用的同一种分离式拓扑。',
     significance:
-      '分离式服务和 KV 感知路由是 TPU 剩余每美元性能收益的主要来源，而它们只存在于引擎之上。让这些功能在 Google 之外可用，在广泛使用的编排层中提供 TPU 支持与引擎后端同样重要。',
+      'Prefill 与 decode 分离可以减少长 prefill 对生成的干扰，缓存感知路由则能减少重复计算。路由器的准入策略也会带来排队取舍，应评估完整请求延迟和吞吐量，不能假定 decode 交互速度提高就意味着每个请求都更快。',
     benchmarkContext:
-      'InferenceX 的单节点聚合结果不涉及 llm-d。计划中的 TPUv7 分离式与 GB200、GB300 NVL72 的对比，取决于 llm-d 和 TPU-Sync 的工作在外部栈中落地。',
+      '2026 年 11 月的 TPU AgentX 文章报告了 Qwen3.5 的 llm-d 分离式服务，每台主机 4 颗 TPUv7，每个结果使用 24 至 32 颗芯片。文章区分 decode 交互速度收益与 TTFT、端到端延迟的取舍，并介绍按 rank 感知缓存的路由及 decode 准入限制。',
   },
   'double-buffering': {
     term: '双缓冲',
-    aliases: ['double buffering', 'triple buffering', '三缓冲', '预取流水线', 'DMA 重叠'],
+    aliases: [
+      'double buffering',
+      '多重缓冲',
+      'multiple buffering',
+      'triple buffering',
+      '三缓冲',
+      '预取流水线',
+      'DMA 重叠',
+    ],
     plainEnglish: '双缓冲在芯片还在计算当前数据块时就预取下一块，把内存延迟藏在有效计算之后。',
     definition:
-      '双缓冲是一种 kernel 技术，分配两个片上缓冲区，让向其中一个的 DMA 传输与另一个上的计算重叠；三缓冲把同样的思路扩展为更深的流水线。',
+      '双缓冲是多重缓冲（multiple buffering）中使用两个缓冲区的形式：DMA 向其中一个片上缓冲区传输数据时，kernel 同时在另一个缓冲区上计算，从而隐藏内存延迟。三缓冲把同样的思路扩展为更深的流水线。',
     explanation:
       '在 TPU 上，Pallas kernel 通过在 MXU 处理当前块时把下一块预取进 VMEM 来隐藏 HBM 延迟。两个块必须同时放进 VMEM，因此计算块大小决定了预取能跑多远。SparseCore 上的 ReduceScatter 用双缓冲在传输一个 chunk 的同时累加另一个，把本地归约和 die-to-die 传输与更慢的芯片间流量重叠。grouped matmul 对专家权重做三缓冲，让下一组的权重在当前组计算时已在途。异步 GDN 状态传输使用同样的模式，起初占用了额外 VMEM，直到复用 scratch buffer 才解决。',
     significance:
@@ -2110,7 +2408,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'shape 分桶是为固定的一组张量形状编译 kernel 或计算图，并把每个实际 batch 补齐到最近的桶，以少量浪费换取避免重新编译。',
     explanation:
-      'XLA 等提前编译器针对静态形状特化，推理引擎不可能为每种请求数和序列长度组合编译新程序，因此改用桶。当桶按数百个并发请求调优、而实际只有 4 或 8 个请求在飞行时，元数据按配置的最大值分配，padding token 触发无效的专家计算，调度开销占据主导。TPU 栈现在按活跃请求数对请求元数据分桶，为并发 4 增加专用 attention 桶，降低最小 token 桶，并把 padding token 路由到 0 号专家以免加载额外的专家权重。',
+      'XLA 等提前编译器针对静态形状特化，推理引擎不可能为每种请求数和序列长度组合编译新程序，因此改用桶。当桶按数百个并发请求调优、而实际只有 4 或 8 个请求在途时，元数据按配置的最大值分配，padding token 触发无效的专家计算，调度开销占据主导。TPU 栈现在按活跃请求数对请求元数据分桶，为并发 4 增加专用 attention 桶，降低最小 token 桶，并把 padding token 路由到 0 号专家以免加载额外的专家权重。',
     significance:
       'InferenceX 的工作点正好落在这些低并发上，因此桶的调优直接改变报告的曲线。GPU 上的对应问题是 CUDA graph 的捕获尺寸，TPU 版本更严格，因为 XLA 按形状编译整个计算图。',
     benchmarkContext:
@@ -2152,7 +2450,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'ragged paged attention（RPA）是 TPU 的 Pallas 注意力 kernel，处理通过 block table 寻址的分页 KV cache 中的变长序列，预先计算 page 元数据并在 batch 内流水线化 page 读取。',
     explanation:
-      '一批在飞行的请求长度参差不齐，它们的 KV page 散布在 HBM 各处。kernel 把序列打包在一起，预先计算 page 元数据，并对 page 读取做三缓冲，在减少填充的同时让 MXU 保持满载。布局很关键：原始 kernel 沿 head 维度打包 key 和 value，每设备单个 FP8 KV head 时每个 128 lane tile 有一半浪费。sequence-on-lane 布局把 token 放到 lane 轴、head 维度放到 sublane 轴，可用 page 翻倍，并允许 head dim 为 64。另一项修复把 KV 计算块与预取块分开，让预取流水线有 VMEM 可以跑在 MXU 前面。移除混合模型的 page 尺寸对齐约束后，batched attention 可以使用 256 token 的 page。',
+      '一批在途的请求长度参差不齐，它们的 KV page 散布在 HBM 各处。kernel 把序列打包在一起，预先计算 page 元数据，并对 page 读取做三缓冲，在减少填充的同时让 MXU 保持满载。布局很关键：原始 kernel 沿 head 维度打包 key 和 value，每设备单个 FP8 KV head 时每个 128 lane tile 有一半浪费。sequence-on-lane 布局把 token 放到 lane 轴、head 维度放到 sublane 轴，可用 page 翻倍，并允许 head dim 为 64。另一项修复把 KV 计算块与预取块分开，让预取流水线有 VMEM 可以跑在 MXU 前面。移除混合模型的 page 尺寸对齐约束后，batched attention 可以使用 256 token 的 page。',
     significance:
       '对分页 cache 的注意力计算是 TPU tile 几何与 VMEM 预算冲突最直接的地方。这一个 kernel 中的布局和块大小决策，在硬件不变的情况下让可用 KV 容量、TTFT 和 decode 吞吐量变动了数十个百分点。',
     benchmarkContext:
@@ -2180,7 +2478,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       '在 InferenceX 中，apples-to-apples 对比要求各系统在数值精度、聚合或分离式服务模式、投机解码设置和负载形状上一致，只有硬件及其软件栈不同。',
     explanation:
-      '一边 FP8、一边 FP4 不算 apples to apples，因为 FP4 相对 FP8 有质量损失，每个权重读取的字节也只有一半。一边聚合、一边分离式，则把部署模式的优势混进了结果。单 token 预测对 MTP 在投机解码上也是同样的问题。InferenceX 把这种不匹配的情况称为 apples to bananas，并在标注后照常发布，因为买家确实面临这些选择，但头条结论来自匹配的设置。Ironwood 没有原生 FP4，因此目前公平的对比是 FP8 对 FP8 Blackwell；TPUv8i 将以 FP4 对 FP4 比较。',
+      '一边 FP8、一边 FP4 不算 apples to apples，因为 FP4 相对 FP8 有质量损失，每个权重读取的字节也只有一半。一边聚合、一边分离式，则把部署模式的优势混进了结果。单 token 预测与 MTP 的对比，在投机解码上也是同样的问题。InferenceX 把这种不匹配的情况称为 apples to bananas，并在标注后照常发布，因为买家确实面临这些选择，但头条结论来自匹配的设置。Ironwood 没有原生 FP4，因此目前公平的对比是 FP8 对 FP8 Blackwell；TPUv8i 将以 FP4 对 FP4 比较。',
     significance:
       '大量厂商性能声明建立在不匹配的设置之上。坚持匹配精度和服务模式，才能让每美元性能的比值成为关于芯片的陈述，而不是关于营销幻灯片所选方案的陈述。',
     benchmarkContext:
@@ -2223,7 +2521,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'Ironwood 的多项优化都在把不规则工作从 TensorCore 挪到 SparseCore 上，让稠密单元持续运转。把 ReduceScatter 移到 SparseCore 释放了 TensorCore 的执行时间；把 ragged gather-reduce 路径中的 top-k 权重 gather 移过去之后，DeepSeek-V3 微基准中的 TensorCore 开销从 29 微秒降到 14 微秒。',
     benchmarkContext:
-      'TPU InferenceX 预览把 Qwen3.5 397B 在 8k1k 上的部分收益归因于让 TensorCore 保持空闲：SparseCore 上的专家输入重排把服务吞吐量比原始 kernel 提高了 12%，而一个基于 VMEM 容量推导的阈值会在 SparseCore 卸载反而更慢时，把小集合通信留在 TensorCore 上。',
+      'TPU InferenceX 预览把 Qwen3.5 397B 在 8k1k 上的部分收益归因于让 TensorCore 腾出算力专注于矩阵运算：SparseCore 上的专家输入重排把服务吞吐量比原始 kernel 提高了 12%，而一个基于 VMEM 容量推导的阈值会在 SparseCore 卸载反而更慢时，把小集合通信留在 TensorCore 上。',
   },
   vpu: {
     term: 'VPU（向量处理单元）',
@@ -2333,7 +2631,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'TorchTPU 用 PrivateUse1 暴露一个位于 device="tpu" 上的普通 torch.Tensor，而不是由 JAX 数组支撑的包装对象。PyTorch dispatcher 把 ATen 操作路由到 TPU 后端，后端既可以在 bring-up 和调试时 eager 执行，也可以通过 torch.compile 捕获图。DDP、FSDP2 和 DTensor 等分布式 API 通过同一机制工作。此前的 TorchAX 方案则通过 __torch_dispatch__ 拦截每个操作并翻译成 JAX 调用。',
     significance:
-      '这个后端钩子让"原生"一词有了具体含义。服务引擎可以复用上游的模型代码、调度器、continuous batching 和功能逻辑，不需要 PyTorch 到 JAX 的翻译层，从而降低每个新模型和引擎功能登陆 TPU 的成本。',
+      '这个后端钩子让“原生”一词有了具体含义。服务引擎可以复用上游的模型代码、调度器、continuous batching 和功能逻辑，不需要 PyTorch 到 JAX 的翻译层，从而降低每个新模型和引擎功能登陆 TPU 的成本。',
     benchmarkContext:
       'TPU InferenceX 预览的结果来自基于该后端构建的 TorchTPU vLLM 栈。Google 预计在 10 月中旬的 PyTorch Conference 前后结束私测并开源，之后 SemiAnalysis 会把 TPU 基准测试从自己的 fork 迁移到公开的 InferenceX 仓库。',
   },
@@ -2526,7 +2824,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '主会话可能已有很长的可复用前缀，新分支却可能从全新上下文开始。这些分支会产生重叠的 prefill 和 decode 工作，并暂时扩大 KV cache 工作集。分支的启动时间和依赖关系与请求数量同样重要。',
     significance:
-      '较高的平均缓存命中率可能掩盖某些时段大量新增的 prefill 需求。容量规划还需考虑突发时序、缓存淘汰，以及那些必须完成后主任务才能继续的分支延迟。',
+      '较高的平均缓存命中率可能掩盖某些时段大量新增的 prefill 需求。容量规划还需考虑突发时序、缓存淘汰，以及那些主任务必须等待其完成的分支的延迟。',
     benchmarkContext:
       'Rubin 文章将子智能体突发、多轮会话、长上下文和高前缀复用共同列为工作负载特征。因此，AgentX 比较的是随时间变化的请求模式，而不是由相同提示词组成的恒定批次。',
   },
@@ -2666,9 +2964,10 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
 };
 
-const entries = getAllGlossaryEntries().map((entry) => {
+const entries = getAllGlossaryEntries().map(({ expansion: _englishExpansion, ...entry }) => {
   const translation = translations[entry.slug];
   if (!translation) throw new Error(`Missing Chinese glossary translation: ${entry.slug}`);
+  // The English expansion never carries over: a Chinese title shows one only when translated.
   return { ...entry, ...translation };
 });
 const entriesBySlug: Readonly<Record<string, GlossaryEntry>> = Object.fromEntries(

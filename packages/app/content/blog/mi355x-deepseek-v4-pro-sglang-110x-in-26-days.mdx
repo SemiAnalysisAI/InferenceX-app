@@ -20,7 +20,7 @@ tags:
 
 **31 performance optimization PRs** on the AMD side branch did the heavy lifting in a tight relay: FP4 weight enablement ([#24031](https://github.com/sgl-project/sglang/pull/24031)), TileLang attention indexer for DeepSeek Sparse Attention ([#24033](https://github.com/sgl-project/sglang/pull/24033), [#24050](https://github.com/sgl-project/sglang/pull/24050)), Triton sparse MLA kernel and its later fused-dispatch optimization ([#24930](https://github.com/sgl-project/sglang/pull/24930), [#25878](https://github.com/sgl-project/sglang/pull/25878), [#25977](https://github.com/sgl-project/sglang/pull/25977)), fused multi-head compress / RoPE / Hadamard ([#24355](https://github.com/sgl-project/sglang/pull/24355), [#24727](https://github.com/sgl-project/sglang/pull/24727), [#26014](https://github.com/sgl-project/sglang/pull/26014)), FlyDSL MoE ([#24971](https://github.com/sgl-project/sglang/pull/24971)), fused hash topk ([#24728](https://github.com/sgl-project/sglang/pull/24728)), AITER MHC pre/post, and a half-dozen compressor element-wise kernel fusions. Speed is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -156,7 +156,7 @@ The headline is **12–14x throughput-per-GPU at iso-interactivity from 2026-05-
   caption="MI355X SGLang DeepSeek-V4-Pro (1.6T / 49B active) at ISL 8192 / OSL 1024. Five dates over 26 days from the amd/deepseek_v4 SGLang fork. Point labels denote 8-GPU TP=8 configurations; later dates use DP attention on the high-concurrency arm."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1), pre-filtered to MI355X SGLang DSv4-Pro across the 5 measured dates.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1), pre-filtered to MI355X SGLang DSv4-Pro across the 5 measured dates.
 
 ## What's Next for MI355X DeepSeek-V4-Pro
 
@@ -165,8 +165,8 @@ The headline is **12–14x throughput-per-GPU at iso-interactivity from 2026-05-
 <Figure
   srcLight="/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/specs-radar-light.png"
   srcDark="/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/specs-radar-dark.png"
-  alt="GPU specs radar for MI355X (red) vs B200 SXM (green) from /gpu-specs. MI355X polygon hits 100% on the Memory axis (288 GB, ties with GB300 NVL72) and on FP8 + BF16 TFLOP/s (5,033 / 2,516 — single-GPU ceiling). B200 polygon leads only on the Scale Up BW axis (900 GB/s NVLink 5 vs MI355X's 576 GB/s Infinity Fabric). On FP4 both compress against GB300 NVL72's 15,000 TFLOP/s ceiling. Scale-up-domain axes compress against GB200/GB300 NVL72 at 72 GPUs, so the 8-GPU SKUs both read ~11%."
-  caption="MI355X (red) vs B200 SXM (green) on /gpu-specs. Values normalized per axis to the cross-vendor maximum across all SKUs in the panel. MI355X holds the per-GPU FP8 / BF16 / Memory ceiling; B200 only leads on scale-up bandwidth."
+  alt="GPU specs radar for MI355X (red) vs B200 SXM (green) from /infx/gpu-specs. MI355X polygon hits 100% on the Memory axis (288 GB, ties with GB300 NVL72) and on FP8 + BF16 TFLOP/s (5,033 / 2,516 — single-GPU ceiling). B200 polygon leads only on the Scale Up BW axis (900 GB/s NVLink 5 vs MI355X's 576 GB/s Infinity Fabric). On FP4 both compress against GB300 NVL72's 15,000 TFLOP/s ceiling. Scale-up-domain axes compress against GB200/GB300 NVL72 at 72 GPUs, so the 8-GPU SKUs both read ~11%."
+  caption="MI355X (red) vs B200 SXM (green) on /infx/gpu-specs. Values normalized per axis to the cross-vendor maximum across all SKUs in the panel. MI355X holds the per-GPU FP8 / BF16 / Memory ceiling; B200 only leads on scale-up bandwidth."
 />
 
 | Spec                               | MI355X                     | B200 SXM            | MI355X / B200 |
@@ -203,7 +203,7 @@ For MI355X DSv4-Pro serving today, the 2026-05-21 recipe on `lmsysorg/sglang:v0.
 
 The 31 performance optimization PRs are the work of [Thomas Wang](https://github.com/thomawan) (TileLang attention indexer, FlyDSL MoE, compressor element-wise fusion, attn early-exit with CUDA graph, rmsnorm-quant fusion), [Xinyi Song](https://github.com/xinyiisme) (fused compress-decode, fused RoPE Hadamard, fused hash topk, compressor optimization), [HaiShaw](https://github.com/HaiShaw) (integration coordination + ENV setup), [amd-danli103](https://github.com/amd-danli103) (Triton sparse MLA + fused dispatch), [jacky.cheng](https://github.com/jackylee99) (input_layernorm + FP8 per-group quant fusion, softmax pool, AITER greedy_sample), [kk](https://github.com/kkHuang-amd) (FP4 enablement, MHC perf, fuse_wqkv), [Raiden Makoto](https://github.com/raidenmakoto) (Triton fused store cache), [Xinyu Jiang](https://github.com/xinyujiang) (radix opt), and the broader AMD AI team. Speed of the upstream-to-benchmark loop is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_sglang&i_dates=2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-19%2C2026-05-21%2C2026-04-25&i_prec=fp4%2Cfp8&i_dstart=2026-04-25&i_dend=2026-05-21&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

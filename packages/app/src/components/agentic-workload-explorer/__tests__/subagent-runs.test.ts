@@ -117,13 +117,7 @@ describe('buildRequestRuns', () => {
     ]);
   });
 
-  // ── Claude Code x-claude-code-agent-id (CLI ≥ 2.1.139) ──────────────────
-
   it('collapses requests sharing x-claude-code-agent-id into one run even when labels drift', () => {
-    // Real-world shape from session 886a4fb7…: one Task-spawned general-
-    // purpose sub-agent emits both "General Agent" and "Web Search Agent"
-    // labelled requests across its lifetime. They share one agent-id and
-    // should be ONE group, not two.
     const runs = buildRequestRuns([
       makeReq({
         id: 'r1',
@@ -157,19 +151,11 @@ describe('buildRequestRuns', () => {
     if (run.kind !== 'subagent_group') return;
     expect(run.requests.map((r) => r.id)).toEqual(['r1', 'r2', 'r3', 'r4']);
     expect(run.agentId).toBe('ac0996017289faf76');
-    // The per-request system-prompt label drifts (General Agent ↔ Web Search
-    // Agent) across the agent's life; we don't try to pick one. Always
-    // `Subagent`, suffixed with the agent-id for distinguishability.
     expect(run.baseLabel).toBe('Subagent');
     expect(run.label).toBe('Subagent · 289faf76');
   });
 
   it('keeps a single agent-id run together when main-agent turns interrupt it', () => {
-    // Real scenario: user spawns a sub-agent that runs in the background,
-    // then makes more main-agent requests while it's executing. With the
-    // old algorithm, each contiguous stretch became its own group entry,
-    // so the timeline / conversation view fragmented the agent into N
-    // pieces. Same agent-id should collapse them all into ONE group.
     const runs = buildRequestRuns([
       makeReq({
         id: 'sub-1',
@@ -209,7 +195,7 @@ describe('buildRequestRuns', () => {
       }),
     ]);
 
-    expect(runs).toHaveLength(3); // 1 sub-agent group + 2 main turns
+    expect(runs).toHaveLength(3);
     const kinds = runs.map((r) => r.kind);
     expect(kinds).toEqual(['subagent_group', 'main', 'main']);
     const group = runs.find((r) => r.kind === 'subagent_group');
@@ -218,9 +204,6 @@ describe('buildRequestRuns', () => {
   });
 
   it('splits parallel Claude Code sub-agents by agent-id (interleaved timestamps)', () => {
-    // Two general-purpose agents running concurrently — like the
-    // CUDA/Linux research session — interleave their requests in time.
-    // The agent-id grouper should still split them cleanly.
     const runs = buildRequestRuns([
       makeReq({
         id: 'a-1',
@@ -251,7 +234,6 @@ describe('buildRequestRuns', () => {
     expect(runs).toHaveLength(2);
     expect(runs.every((r) => r.kind === 'subagent_group')).toBe(true);
     const groups = runs.filter((r) => r.kind === 'subagent_group');
-    // Sorted by first-request timestamp.
     expect(groups[0].agentId).toBe('a1032a1c9eb88e0bc');
     expect(groups[0].requests.map((r) => r.id)).toEqual(['a-1', 'a-2']);
     expect(groups[1].agentId).toBe('ac0996017289faf76');
@@ -259,9 +241,6 @@ describe('buildRequestRuns', () => {
   });
 
   it('falls back to the label-only heuristic when agent-id header is absent (backwards compat)', () => {
-    // Pre-2.1.139 Claude Code rows have no agent-id header. The grouping
-    // should behave exactly as it did before this feature — contiguous
-    // same-label runs become one group, distinct labels become separate.
     const runs = buildRequestRuns([
       makeReq({
         id: 'old-1',
@@ -285,7 +264,7 @@ describe('buildRequestRuns', () => {
 
     expect(runs).toHaveLength(2);
     const groups = runs.filter((r) => r.kind === 'subagent_group');
-    expect(groups[0].label).toBe('Explore Agent'); // no agent-id / thread-id suffix
+    expect(groups[0].label).toBe('Explore Agent');
     expect(groups[0].requests.map((r) => r.id)).toEqual(['old-1', 'old-2']);
     expect(groups[1].label).toBe('Plan Agent');
     expect(groups[1].requests.map((r) => r.id)).toEqual(['old-3']);
@@ -308,7 +287,6 @@ describe('buildRequestRuns', () => {
     expect(runs[0].kind).toBe('subagent_group');
     if (runs[0].kind !== 'subagent_group') return;
     expect(runs[0].agentId).toBe('cc-agent-id-aaaaaaaa');
-    // agent-id group → baseLabel is `Subagent`, suffix comes from agentId.
     expect(runs[0].label).toBe('Subagent · aaaaaaaa');
   });
 });
@@ -354,10 +332,6 @@ describe('isClaudeCodeWithAgentIdSupport', () => {
 
 describe('getRequestSubagentLabel', () => {
   it('returns null on CC ≥ 2.1.139 when agent-id header is absent (utility calls)', () => {
-    // Title Generation, Anthropic.ping(), Name Generation etc. — Claude Code
-    // deliberately omits the agent-id header on these to signal "not a real
-    // sub-agent." Even if their system prompt matches a heuristic, they
-    // should NOT be labeled as sub-agents.
     expect(
       getRequestSubagentLabel(
         makeReq({

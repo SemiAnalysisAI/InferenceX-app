@@ -258,12 +258,10 @@ describe('persisted telemetry receipts', () => {
     expect(point.notCollected).toBe(true);
     expect(point.reasons).toEqual(['telemetry_not_collected']);
     expect(point.error).toBeUndefined();
-    // Not a storage miss: nothing was expected, and nothing counts as stored.
     expect(point.storage).toEqual({ status: 'not_collected', expectedSeries: [] });
     expect(notCollected.counts.notCollectedPoints).toBe(1);
     expect(notCollected.counts.storedPoints).toBe(notCollected.points.length - 1);
 
-    // Telemetry files that were present but unparseable stay an ingest failure.
     const failed = await readTelemetryReceipt(sql, run, [
       { ...base, error: 'No parseable telemetry series in gpu_metrics_empty' },
     ]);

@@ -77,7 +77,6 @@ describe('statsCacheKey', () => {
       'traffic',
       'web-search',
       'platform',
-      'session-insights',
       'performance',
       'fast-mode',
     ] satisfies StatsCacheKind[];
@@ -90,6 +89,8 @@ describe('statsCacheKey', () => {
     expect(statsCacheKey('errors', [], 7)).toBe('sc:2:errors:anon:7');
     expect(statsCacheKey('graphs', null, null)).toBe('sc:4:graphs:all:all');
     expect(statsCacheKey('graphs', [], 7)).toBe('sc:4:graphs:anon:7');
+    expect(statsCacheKey('session-insights', null, null)).toBe('sc:2:session-insights:all:all');
+    expect(statsCacheKey('session-insights', [], 7)).toBe('sc:2:session-insights:anon:7');
     for (const kind of wave2AKinds) {
       expect(statsCacheKey(kind, null, null)).toBe(`sc:1:${kind}:all:all`);
       expect(statsCacheKey(kind, [], 7)).toBe(`sc:1:${kind}:anon:7`);
@@ -99,19 +100,19 @@ describe('statsCacheKey', () => {
 
 describe('sessionInsightsHistogram / sessionInsightsPercentiles (route port)', () => {
   it('empty input yields no bins and zeroed percentiles', () => {
-    const { bins, percentiles } = sessionInsightsHistogram([], 30);
+    const { bins, percentiles, total } = sessionInsightsHistogram([], 30);
     expect(bins).toEqual([]);
     expect(percentiles).toEqual({ p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 });
+    expect(total).toBe(0);
   });
 
   it('single distinct value collapses to one [v, v+1) bin', () => {
-    const { bins } = sessionInsightsHistogram([5, 5, 5], 30);
+    const { bins, total } = sessionInsightsHistogram([5, 5, 5], 30);
     expect(bins).toEqual([{ min: 5, max: 6, count: 3 }]);
+    expect(total).toBe(3);
   });
 
   it('builds exactly bucketCount equal-width bins and clips beyond p95+10%', () => {
-    // 100 values 1..100; p95 (nearest-rank) index = floor(0.95*100)=95 -> value 96.
-    // max = 96 + (96-1)*0.1 = 105.5, so nothing is clipped here; all 100 counted.
     const values = Array.from({ length: 100 }, (_, i) => i + 1);
     const { bins } = sessionInsightsHistogram(values, 20);
     expect(bins).toHaveLength(20);
@@ -120,10 +121,7 @@ describe('sessionInsightsHistogram / sessionInsightsPercentiles (route port)', (
     expect(bins[0].min).toBe(1);
   });
 
-  it('clips extreme outliers above the p95+10% ceiling', () => {
-    // 100 values 1..100 plus 5 huge outliers. n=105, p95 index=floor(0.95*105)=99
-    // -> value 100; ceiling = 100 + (100-1)*0.1 = 109.9. The 5 outliers exceed it
-    // and are dropped, so the bins count only the 100 in-range values.
+  it('clips extreme outliers above the p95+10% ceiling but counts them in total', () => {
     const values = [
       ...Array.from({ length: 100 }, (_, i) => i + 1),
       10000,
@@ -132,29 +130,28 @@ describe('sessionInsightsHistogram / sessionInsightsPercentiles (route port)', (
       10000,
       10000,
     ];
-    const { bins } = sessionInsightsHistogram(values, 10);
+    const { bins, total } = sessionInsightsHistogram(values, 10);
     expect(bins).toHaveLength(10);
-    const total = bins.reduce((s, b) => s + b.count, 0);
-    expect(total).toBe(100);
+    const binned = bins.reduce((s, b) => s + b.count, 0);
+    expect(binned).toBe(100);
+    expect(total).toBe(105);
   });
 
   it('percentiles use nearest-rank (matches the old route pct())', () => {
-    const sorted = Array.from({ length: 100 }, (_, i) => i + 1); // 1..100
+    const sorted = Array.from({ length: 100 }, (_, i) => i + 1);
     const p = sessionInsightsPercentiles(sorted);
-    // pct(p) = sorted[min(floor(p/100 * 100), 99)]
-    expect(p.p25).toBe(26); // sorted[25]
-    expect(p.p50).toBe(51); // sorted[50]
-    expect(p.p99).toBe(100); // sorted[min(99,99)]
+    expect(p.p25).toBe(26);
+    expect(p.p50).toBe(51);
+    expect(p.p99).toBe(100);
     expect(Object.keys(p)).toEqual(['p25', 'p50', 'p75', 'p90', 'p95', 'p99']);
   });
 });
 
 describe('percentileCont (matches Postgres percentile_cont interpolation)', () => {
   it('interpolates linearly between ranks', () => {
-    // Reference values from Postgres percentile_cont over {1,2,3,4}.
     const v = [1, 2, 3, 4];
     expect(percentileCont(v, 0)).toBe(1);
-    expect(percentileCont(v, 0.5)).toBeCloseTo(2.5, 12); // (n-1)*p = 1.5 -> 2 + 0.5*(3-2)
+    expect(percentileCont(v, 0.5)).toBeCloseTo(2.5, 12);
     expect(percentileCont(v, 1)).toBe(4);
     expect(percentileCont(v, 0.25)).toBeCloseTo(1.75, 12);
   });
@@ -165,7 +162,7 @@ describe('percentileCont (matches Postgres percentile_cont interpolation)', () =
   });
 
   it('percentiles5 returns the five overview percentiles', () => {
-    const counts = [5, 1, 3, 2, 4]; // unsorted input is sorted internally
+    const counts = [5, 1, 3, 2, 4];
     const p = percentiles5(counts);
     expect(p.p50).toBeCloseTo(3, 12);
     expect(p.p25).toBeCloseTo(2, 12);
@@ -176,8 +173,6 @@ describe('percentileCont (matches Postgres percentile_cont interpolation)', () =
 
 const noop = () => Promise.resolve();
 
-// A Kysely instance that captures compiled SQL instead of hitting a DB — lets
-// us assert the rollup upsert shape + watermark math with no network.
 function capturingDb(
   sink: CompiledQuery[],
   rowSets: readonly (readonly unknown[])[] = [],
@@ -186,7 +181,6 @@ function capturingDb(
     executeQuery: <R>(cq: CompiledQuery): Promise<QueryResult<R>> => {
       const queryIndex = sink.length;
       sink.push(cq);
-      // Test fixtures are paired with query order at this generic Kysely driver boundary.
       const rows = (rowSets[queryIndex] ?? []) as unknown as R[];
       return Promise.resolve({ rows });
     },
@@ -423,9 +417,6 @@ describe('coalesceCompute (P1-b cold-miss stampede fix)', () => {
 
     const p1 = coalesceCompute('k1', compute);
     const p2 = coalesceCompute('k1', compute);
-    // Second call reused the first's in-flight promise instead of invoking
-    // compute again — this is the fix: parallel cold-miss requests for the
-    // same cache key share one compute rather than each running it inline.
     expect(calls).toBe(1);
     expect(p1).toBe(p2);
 
@@ -445,8 +436,6 @@ describe('coalesceCompute (P1-b cold-miss stampede fix)', () => {
     await expect(coalesceCompute('k2', first)).resolves.toBe('first');
     expect(first).toHaveBeenCalledTimes(1);
 
-    // The first call has already settled (and been removed from the map) by
-    // the time this second call starts, so it must run its OWN compute.
     const second = vi.fn(() => Promise.resolve('second'));
     await expect(coalesceCompute('k2', second)).resolves.toBe('second');
     expect(second).toHaveBeenCalledTimes(1);

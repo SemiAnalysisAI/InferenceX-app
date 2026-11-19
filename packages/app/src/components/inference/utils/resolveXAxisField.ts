@@ -14,6 +14,7 @@
  */
 import { withPercentile } from '@/lib/benchmarks/benchmark-transform';
 
+import { isInputMetric as isInputMetricKey } from '../metric-registry';
 import type { AggDataEntry, ChartDefinition } from '../types';
 import type { XAxisMode } from '../hooks/useChartData';
 
@@ -87,9 +88,7 @@ export function resolveXAxisField(
   const serviceField = (field: string) => resolveServiceField(field, opts);
   const naturalX = serviceField(chartDef.x);
 
-  const metricTitle =
-    (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-  const isInputMetric = metricTitle.toLowerCase().includes('input');
+  const isInputMetric = isInputMetricKey(selectedYAxisMetric);
   // Any *_ttft metric counts — the x-axis-mode picker can select any
   // percentile (median/p75/p90/p99) depending on sequence kind.
   const hasTtftOverride =

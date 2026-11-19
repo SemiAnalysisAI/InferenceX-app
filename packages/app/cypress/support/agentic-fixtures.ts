@@ -9,12 +9,6 @@ export function percentileLadder(prefix: string, base: number): Record<string, n
   };
 }
 
-/**
- * Deterministic measured-power telemetry (schema v2, validated) so axis
- * positions are stable across runs. `disagg` adds the role splits — role
- * watts plus the role-local energy scalars behind the
- * Measured Prefill/Decode J-per-token axes.
- */
 export function measuredPowerMetrics(
   concurrency: number,
   opts: { disagg?: boolean } = {},
@@ -41,10 +35,6 @@ export function measuredPowerMetrics(
   };
 }
 
-/**
- * WorkerPower-shaped rows for the pinned-tooltip drilldown. Plain object
- * literals — cypress support files never import types from src.
- */
 export function syntheticWorkers(disagg: boolean) {
   if (!disagg) {
     return [{ role: 'agg', worker_idx: 0, hosts: ['n0'], num_gpus: 8, avg_power_w: 640.2 }];

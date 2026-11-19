@@ -43,13 +43,13 @@ const point: PointMeta = {
 
 describe('cacheReuseHref', () => {
   it('opens the tab under the reader locale and carries the chart state', () => {
-    expect(cacheReuseHref('en')).toBe('/cache-reuse');
-    expect(cacheReuseHref('zh')).toBe('/zh/cache-reuse');
+    expect(cacheReuseHref('en')).toBe('/infx/cache-reuse');
+    expect(cacheReuseHref('zh')).toBe('/zh/infx/cache-reuse');
   });
 
   it('pins a point to its own model, scenario, and configuration', () => {
     const url = new URL(cacheReuseHref('zh', point), 'https://inferencex.test');
-    expect(url.pathname).toBe('/zh/cache-reuse');
+    expect(url.pathname).toBe('/zh/infx/cache-reuse');
     expect(url.searchParams.get('g_model')).toBe('GLM-5.2');
     expect(url.searchParams.get('i_seq')).toBe('agentic-traces');
     expect(url.searchParams.get('i_prec')).toBe('fp4');

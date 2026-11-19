@@ -46,7 +46,7 @@ The most valuable thing AgentX produced in its first months was not the initial 
   caption="Source: SemiAnalysis"
 />
 
-Open source is a core principle for InferenceX and thus, we open more of the stack than most people who use that word. That includes an open frontend, a public database served through an easily consumable REST API **that multiple tier 1 AI lab’s capacity planning teams already consume**, public GitHub Actions CI provenance, [logs](https://inferencex.semianalysis.com/inference/agentic/440193?i_seq=agentic-traces&i_xmode=interactivity&view=logs), and accuracy validation on every single point. Crucially, our benchmark configs mainly track [recipes.vllm.ai](http://recipes.vllm.ai) and [SGLang cookbook](https://docs.sglang.io/cookbook/intro) on upstream images such that we are measuring the performance actual customers are experiencing instead of measuring benchmax’ed images.
+Open source is a core principle for InferenceX and thus, we open more of the stack than most people who use that word. That includes an open frontend, a public database served through an easily consumable REST API **that multiple tier 1 AI lab’s capacity planning teams already consume**, public GitHub Actions CI provenance, [logs](https://inferencex.semianalysis.com/infx/inference/agentic/440193?i_seq=agentic-traces&i_xmode=interactivity&view=logs), and accuracy validation on every single point. Crucially, our benchmark configs mainly track [recipes.vllm.ai](http://recipes.vllm.ai) and [SGLang cookbook](https://docs.sglang.io/cookbook/intro) on upstream images such that we are measuring the performance actual customers are experiencing instead of measuring benchmax’ed images.
 
 In three to four weeks, we will release an AgentX update article. It will cover further optimizations to agentic workloads, plus updated performance results from AMD and Nvidia. It is important to understand that the profile of agentic workloads is updating fast. InferenceX will continue to move swiftly to benchmark the relevant workloads.
 
@@ -114,7 +114,7 @@ The ISL/OSL distribution of _all_ requests among all DeepSeek v4 runs was as fol
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/b5aee8b4-d11a-48d8-823c-1ca53412e689_2048x1253.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&i_seq=agentic-traces&g_runid=32433563482&i_xmode=interactivity&i_label=0&i_e2e_xmetric=)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&i_seq=agentic-traces&g_runid=32433563482&i_xmode=interactivity&i_label=0&i_e2e_xmetric=)"
 />
 
 In general, **it is important to consider both tokens per second per user** (TPS - also known as interactivity) and TTFT, **since these often come at the expense of one another**. For instance, in the graph above, some SKUs achieve very high throughput at decent interactivity, however TTFT is severely degraded. What is an “acceptable” p90 TTFT varies heavily depending on the application. For most production systems serving agentic workloads, you can expect p90 TTFT to be anywhere from 200-5,000ms. Anything over 5-10s is pushing the boundary of what can be considered “online inference.” There are still practical applications for the ultra-high throughput sector of the curve, where latency does not matter and peak system utilization is desirable (batch processing, _very_ long running agents, etc).
@@ -134,7 +134,7 @@ To make matters worse, any increase in throughput at the middle-to-high interact
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/6254047b-173b-4b1b-9f43-2057eb720b05_2048x1200.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=mi355x_atom%2Cmi355x_mori-sglang&i_vendor=AMD&i_linelabel=0&i_metric=y_tpPerGpu)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=mi355x_atom%2Cmi355x_mori-sglang&i_vendor=AMD&i_linelabel=0&i_metric=y_tpPerGpu)"
 />
 
 On e2e latency, ATOM MI355X beats B200 vLLM (it does not beat B300 or B200 SGLang though). The issue with this is that most AI labs in China or the west do not want to use ATOM in production besides 1 small advertising business unit at Alibaba Corp due to tons of missing features. The main Qwen LLM org at baba does not use ATOM in production.
@@ -180,14 +180,14 @@ Note that the 2xDEP8+1xDEP12 GB200 point is significantly closer to the 3xDEP8+1
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
 />
 
 When normalized by TCO, B300 vLLM versus B200 vLLM aggregated performance is quite similar. The main difference being that B300 can “squeeze” out extra throughput, given its 50% increase in HBM capacity over B200.
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
 />
 
 We can further visualize this difference using our server metric visualizations, which are new to AgentX.
@@ -198,7 +198,7 @@ Under the load of 384 concurrent agentic traces, B300 vLLM DEP8 w/ 3TB DRAM via 
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439522)"
 />
 
 With B200 concurrency 196 (all other parameters stay the same), we see only 73% HBM cache hit rate and rely more heavily on DRAM with an offload cache hit rate of nearly 20%. We observe that the HBM KV cache working set size is 22M tokens, roughly half that of B300.
@@ -209,21 +209,21 @@ DRAM KV offloading is typically implemented as a write-through cache, meaning ev
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439967)"
 />
 
 H200 SGLang FP8 is able to serve DeepSeek v4 at low concurrency, and is even competitive with B200/MI355X SGLang from a perf/$ standpoint. However, it cannot compete with the newer SKUs in high throughput scenarios due to lack of HBM.
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/770b205f-12a1-4d34-81a7-fb235742d005_2048x1305.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_sglang%2Ch200_dynamo-sglang%2Cmi355x_sglang)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_sglang%2Ch200_dynamo-sglang%2Cmi355x_sglang)"
 />
 
 Furthermore, the reliance on DRAM KV offloading at higher concurrencies leads to unreasonable latency as the number of users scales.
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
 />
 
 Overall, MI355X performs decently well compared to its main competitors B200 and B300. Performance is most comparable at the lower throughput / lower latency parts of the curve, where only tensor parallelism and more rudimentary kernels are deployed. AMD needs to work on optimizing DEP kernels on MI355X to be more competitive in the high throughput scenarios, especially given the 1.5x HBM over B200.
@@ -232,7 +232,7 @@ Overall, MI355X performs decently well compared to its main competitors B200 and
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
 />
 
 ## Kimi K3 2.8 Trillion Parameters
@@ -277,7 +277,7 @@ Nvidia absolutely destroys all competitors on MiniMax M3 432B. AMD software perf
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
 />
 
 B300 TRT-LLM TP2 owns the M3 crown. There is a lack of DP-attention points as it is non-optimal on M3 since KV cache locality becomes a routing constraint. This is further explained later on. For GB200 at concurrency 40, TP4/EP4/DPA gets 0.60x the throughput of plain TP4 at a >3x p90 TTFT. At concurrency 32 it hits 28.8% of cache vs 96.0% theoretical. Each DP rank owns a private quarter of the pool; a 300k-token session re-landing on the wrong rank recomputes everything. No decode config with EP appears on the M3 frontier, likely as the concurrency is not high enough to balance the loads on all experts.
@@ -292,7 +292,7 @@ No submission currently runs context parallelism, despite P90 ISL of 317k. With 
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
 />
 
 All of Nvidia’s Pareto optimal points include KV offload above concurrency 20, but for AMD none of the Pareto optimal points use KV offload to DRAM. AMD also uses KV offload less than Nvidia on the other models. The reason for this is that GPU-to-CPU transfers for CPU KVCache offloading are highly inefficient on AMD vLLM. The hipMemcpyBatchAsync API was missing until ROCm 7.14. Without hipMemcpyBatchAsync, vLLM’s native Simple CPUOffloading requires doing serialized Memcpy from CPU to GPU instead of batching them into larger message sizes.
@@ -303,14 +303,14 @@ It is also worth mentioning that vLLM performance is very comparable to TRT-LLM 
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
 />
 
 ## Qwen3.5 397B
 
 Qwen3.5 397B uses GatedDeltaNet instead of vanilla attention for every couple of layers. GatedDeltaNet was invented at MIT/Nvidia Research and has a theoretically constant state storage requirement instead of vanilla attention’s linear storage requirements. This means that it has lower storage requirements compared to an equivalent dense attention model. Unlike end to end model training research like the Nemotron disaster, Nvidia Research is great at fundamental research like GDN and LatentMoE which is used on frontier models.
 
-Note that this model’s native max context length is 262k tokens, so we use the [truncated dataset](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k). This simulates a workload on a smaller model where the max context length would be frequently reached with many compactions, how users would actually use this model.
+Note that this model’s native max context length is 262k tokens, so we use the [truncated dataset](https://inferencex.semianalysis.com/infx/agentx/cc-traces-weka-062126-256k). This simulates a workload on a smaller model where the max context length would be frequently reached with many compactions, how users would actually use this model.
 
 Qwen3.5 397B is a strong hold for NVIDIA on SGLang versus SGLang, with over 20x better performance at 90 tok/s/user. There is currently zero competition from AMD for Qwen3.5 SGLang.
 
@@ -318,7 +318,7 @@ Qwen3.5 397B is a strong hold for NVIDIA on SGLang versus SGLang, with over 20x 
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
 />
 
 Again, we observe Nvidia over optimizing for interactivity at the cost of TTFT, especially in the case of TRT-LLM. In the graph above, all of the Nvidia SGLang submissions have much lower p90 TTFT when compared to TRT-LLM.
@@ -327,7 +327,7 @@ Compared to H100, on Qwen3.5, B300 FP4 has 12x better performance per dollar.
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
 />
 
 ## GLM 5.3
@@ -342,7 +342,7 @@ We look forward to AMD’s performance optimizations in the upcoming AgentX upda
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
 />
 
 When looking at ATOM, AMD has better performance per dollar than GB300 NVL72 SGLang and even TRTLLM for some parts of the range of p90 E2E Normalized Interactivity. Great work to the AMD team on these results. Again, we look forward to AMD porting over these optimizations to SGLang. We also are looking forward to NVIDIA quickly optimizing GB300 NVL72 in the coming weeks.
@@ -838,12 +838,12 @@ In the AgentX workload, in order to generate a Pareto frontier, we sweep over th
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/058757ed-531f-4cfb-a1ad-a06b1499ecbd_1360x612.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439239)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439239)"
 />
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/43184e50-b71a-4a48-a569-98d6906cb259_2048x1167.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-13&g_runid=31723588108&i_seq=agentic-traces&i_xmode=interactivity&g_model=MiniMax-M3&i_best=0&i_active=b200_vllm)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-13&g_runid=31723588108&i_seq=agentic-traces&i_xmode=interactivity&g_model=MiniMax-M3&i_best=0&i_active=b200_vllm)"
 />
 
 A final point worth discussing is what metrics are important to consider when evaluating agentic workloads. We believe interactivity (TPS - tokens per second) and time-to-first-token (TTFT) are still important, and these are the industry standard for evaluating SLOs. When viewing AgentX results, it is _extremely important_ to consider both TPS and TTFT together, since there are inference optimizations that can improve one at the cost of the other.
@@ -895,11 +895,11 @@ Then, at runtime we apply these realistic Speculative decoding acceptance length
 
 ## Exploring Agentic Workloads Detailed Telemetry Tutorial
 
-AgentX required more than a new benchmark harness and dataset. [We also spent some time rebuilding parts of the InferenceX visualization to make agentic results easier to explore and digest](https://inferencex.semianalysis.com/inference/agentic/439903). A single AgentX datapoint represents thousands of requests across growing conversations, subagents, warmup periods, cache states, and dynamically changing in-flight load. Due to this, having a single point on a Pareto curve can hide a lot of useful information. As we have said many times - there is never just a one size fits all solution for inference serving.
+AgentX required more than a new benchmark harness and dataset. [We also spent some time rebuilding parts of the InferenceX visualization to make agentic results easier to explore and digest](https://inferencex.semianalysis.com/infx/inference/agentic/439903). A single AgentX datapoint represents thousands of requests across growing conversations, subagents, warmup periods, cache states, and dynamically changing in-flight load. Due to this, having a single point on a Pareto curve can hide a lot of useful information. As we have said many times - there is never just a one size fits all solution for inference serving.
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/46159be7-8b5b-49d7-990f-2ce1cf1217d0_1110x687.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439903)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439903)"
 />
 
 One of our major changes is how we construct the curves themselves. In previous versions of InferenceX, configurations with speculative decoding enabled and disabled were often displayed as separate curves. However, we are now moving away from this approach. The frontend now combines allowed inference optimizations and displays the best available curve for each model, SKU, and inference engine combination. Due to this, individual points along a single curve may use different optimization techniques and configurations, including speculative decoding, disaggregation, or KV cache offload.

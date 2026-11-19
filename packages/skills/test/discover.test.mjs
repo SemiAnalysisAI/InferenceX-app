@@ -259,11 +259,15 @@ test('normalization accepts argv and canonical objects and rejects ambiguous sco
   }
 });
 
+const savedWithAggregate = () => saved([...availability, { ...availability[0], disagg: 'false' }]);
+
 test('availability is fully validated before local pagination', async () => {
-  const get = () => saved([...availability, { ...availability[0], disagg: 'false' }]);
-  await assert.rejects(discover(normalizeArgs(['models', '--limit', '1']), { get }), {
-    code: 'INVALID_RESPONSE',
-  });
+  await assert.rejects(
+    discover(normalizeArgs(['models', '--limit', '1']), { get: savedWithAggregate }),
+    {
+      code: 'INVALID_RESPONSE',
+    },
+  );
 
   const valid = await discover(normalizeArgs(['models', '--limit', '1']), {
     get: () => saved(availability),

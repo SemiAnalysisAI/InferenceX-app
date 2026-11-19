@@ -18,12 +18,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   let content = children;
   if (providerCapabilities.globalFilters) {
-    // `/inference/<model>` pages pin the model from the path. Seeding the
-    // provider (rather than only applying it in an effect) keeps the server
-    // render and first client paint on the right model — `usePathname` is
-    // available during SSR, so hydration agrees. Soft navigations between
-    // model pages don't remount this provider; those are handled by the
-    // pathname-keyed effect inside GlobalFilterProvider.
     content = (
       <GlobalFilterProvider initialModel={inferenceModelForPathname(pathname) ?? undefined}>
         {content}

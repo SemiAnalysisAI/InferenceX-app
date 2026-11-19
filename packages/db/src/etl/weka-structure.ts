@@ -1,21 +1,8 @@
-/**
- * Pure transforms for the HuggingFace cc-traces-weka datasets.
- *
- * Turns a raw conversation record (`{ id, block_size, requests[] }`, where each
- * request is a normal turn or a subagent group) into a compact, flamegraph-ready
- * `structure`: ordered nodes with input split into cached-prefix vs
- * uncached-suffix. The cached split ports `_count_seen_prefix_blocks` from the
- * aiperf weka loader (contiguous leading hash_ids already seen under an infinite
- * KV cache). No DB access — safe to import anywhere and unit-test directly.
- */
-
 export const DEFAULT_BLOCK_SIZE = 64;
-
-// ── Raw record shapes (subset we read) ──────────────────────────────────────
 
 export interface RawWekaRequest {
   t?: number;
-  type?: string; // 'n' | 's'
+  type?: string;
   model?: string;
   in?: number;
   out?: number;
@@ -43,25 +30,17 @@ export interface RawWekaConversation {
   requests?: RawWekaEntry[];
 }
 
-// ── Output structure (stored in dataset_conversations.structure) ─────────────
-
 export interface TurnNode {
   kind: 'turn';
   turnIndex: number;
-  /** Zero-based index in the raw Weka requests array, when this row maps to one. */
   rawIndex?: number;
-  /** Zero-based index within a raw nested request array, when this row maps to one. */
   innerIndex?: number;
-  /** Seconds from the start of the conversation. */
   startS?: number;
-  /** End of the original request interval (`startS + api_time`). */
   endS?: number;
   model?: string;
   in: number;
   out: number;
-  /** Input tokens served from the prefix cache (≤ in). */
   cached: number;
-  /** Input tokens that must be (re)computed (in - cached). */
   uncached: number;
 }
 
@@ -69,11 +48,8 @@ export interface SubagentNode {
   kind: 'subagent';
   label: string;
   agentId?: string;
-  /** Zero-based index of the raw top-level subagent marker. */
   rawIndex?: number;
-  /** Seconds from the start of the conversation. */
   startS?: number;
-  /** Seconds from the start of the conversation. */
   endS?: number;
   durationMs?: number;
   in: number;
@@ -98,12 +74,10 @@ export interface ConversationStructure {
   };
 }
 
-/** Actual model requests in a conversation: main turns plus subagent child turns. */
 export function countConversationRequests(structure: ConversationStructure): number {
   return structure.totals.numTurns + subagentRequestTurns(structure).length;
 }
 
-/** Model requests issued by inner subagents, excluding all parent-agent turns. */
 export function subagentRequestTurns(structure: ConversationStructure): TurnNode[] {
   return structure.nodes.flatMap((node) => (node.kind === 'subagent' ? node.children : []));
 }
@@ -111,10 +85,6 @@ export function subagentRequestTurns(structure: ConversationStructure): TurnNode
 const isSubagent = (e: RawWekaEntry): e is RawWekaSubagent =>
   (e as RawWekaSubagent).type === 'subagent';
 
-/**
- * Count contiguous leading hash_ids already present in `seen`
- * (port of aiperf `_count_seen_prefix_blocks`).
- */
 export function countSeenPrefixBlocks(
   hashIds: readonly number[],
   seen: ReadonlySet<number>,
@@ -127,12 +97,6 @@ export function countSeenPrefixBlocks(
   return hits;
 }
 
-/**
- * Compute the {cached, uncached} input-token split for one request and fold its
- * blocks into `seen`. `cached` is derived from blocks but clamped to the
- * request's effective `in` so cached+uncached === in even when the last block is
- * partial (in = hash_token_count, not always a multiple of blockSize).
- */
 function splitInput(
   req: RawWekaRequest,
   seen: Set<number>,
@@ -164,7 +128,6 @@ function requestEndS(startS: number | undefined, apiTime: number | undefined): n
   return startS + duration;
 }
 
-/** Mirror aiperf's legacy-relative/current-absolute subagent timestamp handling. */
 function subagentRequestStartS(
   entry: RawWekaSubagent,
   request: RawWekaRequest,
@@ -203,12 +166,6 @@ function subagentTimeRange(entry: RawWekaSubagent): { startS?: number; endS?: nu
   };
 }
 
-/**
- * Build the flamegraph structure for one conversation. Main turns share a single
- * accumulating prefix-cache `seen` set; each subagent group runs against a
- * *copy* of the parent `seen` at spawn (its context is separate and is not
- * folded back into the parent), mirroring the weka loader's parent/child split.
- */
 export function buildConversationStructure(
   conv: RawWekaConversation,
   blockSizeOverride?: number,
@@ -227,7 +184,7 @@ export function buildConversationStructure(
   for (const [idx, entry] of (conv.requests ?? []).entries()) {
     if (isSubagent(entry)) {
       const { startS, endS } = subagentTimeRange(entry);
-      const childSeen = new Set(seen); // snapshot at spawn; not merged back
+      const childSeen = new Set(seen);
       const children: TurnNode[] = [];
       let gin = 0;
       let gout = 0;
@@ -311,11 +268,6 @@ export function buildConversationStructure(
     },
   };
 }
-
-// ── Distribution binning (for the dataset-detail cards) ──────────────────────
-// The implementations moved to distribution-stats.ts (generic, dataset-agnostic
-// math); re-exported here because this module is the established import path
-// for the dataset ingest/backfill scripts and the frontend.
 
 export {
   linearHistogram,

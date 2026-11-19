@@ -1,3 +1,4 @@
+import { videoArtifactIdentity } from '@/components/video-benchmark/artifact-identity';
 import { head, list, put, BlobNotFoundError } from '@vercel/blob';
 import { archiveSources, type CIArtifact } from '@/components/video-benchmark/archive';
 import {
@@ -12,15 +13,37 @@ import {
 import { loadFidelityBundle, type FidelityBundle } from '@/components/video-benchmark/fidelity';
 import {
   storedBundle,
+  storedFidelityBundle,
+  withQuality,
   type StoredArtifact,
+  type StoredQuality,
   type StoredSource,
 } from '@/components/video-benchmark/stored';
 import { servingCells } from '@/components/video-benchmark/serving';
+import {
+  isMediaProfile,
+  MEDIA_PROFILES,
+  type DerivedMedia,
+  type MediaProfile,
+} from './video-renditions';
 
-// Media must survive the dashboard cache's prefix-wide purge.
-const PREFIX = 'h3-video-media/v1';
+export const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
+export const approvalPath = (runId: string, artifact: CIArtifact) =>
+  `${PREFIX}/approvals/${runId}/${artifact.name}_${artifact.id}.json`;
+const qualityPath = (runId: string, artifact: CIArtifact) =>
+  `${PREFIX}/quality/${runId}/${artifact.name}_${artifact.id}.json`;
+const renditionsPrefix = `${PREFIX}/renditions/`;
+/** Content-addressed by the derived output, like every other stored object. */
+export const derivedMediaPath = (profile: MediaProfile, outputSha256: string) =>
+  `${PREFIX}/objects/${outputSha256}/${profile}.${MEDIA_PROFILES[profile].extension}`;
+/** The output hash in the receipt path lets one listing resolve every derived media URL. */
+export const derivedReceiptPath = (
+  profile: MediaProfile,
+  sourceSha256: string,
+  outputSha256: string,
+) => `${renditionsPrefix}${sourceSha256}/${profile}/${outputSha256}.json`;
 const sourceSeal = (path: string) => /^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path);
 const legacyTelemetry = (path: string) =>
   /^gpu\/supervisor\/(?:baseline|candidate)\/telemetry\.jsonl$/u.test(path);
@@ -32,10 +55,8 @@ export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
   do {
     const page = await list({ prefix: runPrefix(runId), cursor });
     for (const blob of page.blobs) {
-      const match = /\/(?<name>h3-(?:results|video|fidelity)-\d+-\d+)_(?<id>\d+)\.json$/u.exec(
-        blob.pathname,
-      );
-      if (match?.groups)
+      const match = /\/(?<name>[^/]+)_(?<id>[1-9]\d*)\.json$/u.exec(blob.pathname);
+      if (match?.groups && videoArtifactIdentity(match.groups.name)?.run === runId)
         result.push({
           id: Number(match.groups.id),
           name: match.groups.name,
@@ -58,12 +79,15 @@ async function verifyPublishedSources(bundle: FidelityBundle, signal: AbortSigna
     const id = number(at(reference, 'ci', 'databaseId'));
     const artifactId = number(at(reference, 'artifact', 'id'));
     const name = text(at(reference, 'artifact', 'name'));
+    const identity = videoArtifactIdentity(name);
     if (
       !Number.isSafeInteger(id) ||
       !id ||
       !Number.isSafeInteger(artifactId) ||
       !artifactId ||
-      !new RegExp(`^h3-video-${id}-[1-9]\\d*$`, 'u').test(name)
+      identity?.run !== String(id) ||
+      identity?.attempt !== String(number(at(reference, 'ci', 'runAttempt'))) ||
+      name.startsWith('h3-fidelity-')
     )
       throw new Error('Invalid original fidelity artifact');
     const saved = await readStoredArtifact(String(id), {
@@ -77,7 +101,7 @@ async function verifyPublishedSources(bundle: FidelityBundle, signal: AbortSigna
       throw new Error('Fidelity media requires an already published original source');
     const original = storedBundle(source);
     servingCells(original);
-    const revision = at(original.manifest, 'git_commit');
+    const revision = at(original.manifest, 'ci', 'head_sha') ?? at(original.manifest, 'git_commit');
     if (
       revision !== at(reference, 'ci', 'headSha') ||
       revision !== at(reference, 'artifact', 'workflow_run', 'head_sha') ||
@@ -131,8 +155,6 @@ export async function readStoredArtifact(
     const result: StoredArtifact = await response.json();
     if (result.storageVersion !== 1 || result.runId !== runId || result.artifact.id !== artifact.id)
       throw new Error('Stored artifact identity mismatch');
-    // Serving cells already carry verified power and memory summaries. Older
-    // indexes embedded their full logs; keep those in downloadable assets only.
     for (const source of result.sources)
       source.texts = source.texts.filter(
         ([path]) => path === 'report/index.html' || legacyTelemetry(path) || sourceSeal(path),
@@ -143,7 +165,81 @@ export async function readStoredArtifact(
     throw error;
   }
 }
-async function immutable(
+/** The artifact's separately stored quality attachment, or null before one is published. */
+export async function readStoredQuality(
+  runId: string,
+  artifact: CIArtifact,
+): Promise<StoredQuality | null> {
+  if (!videoStorageEnabled()) return null;
+  let metadata: Awaited<ReturnType<typeof head>>;
+  try {
+    metadata = await head(qualityPath(runId, artifact));
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return null;
+    throw error;
+  }
+  const response = await fetch(metadata.url, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error('Stored quality unavailable');
+  const quality: StoredQuality = await response.json();
+  if (quality.version !== 1 || quality.runId !== runId || quality.artifactId !== artifact.id)
+    throw new Error('Stored quality identity mismatch');
+  return quality;
+}
+
+/**
+ * The stored index with its quality attachment, which is stored apart from the immutable index.
+ * Quality is optional, so a failed quality read still returns the index, marked incomplete so
+ * callers neither cache it nor hide the published media.
+ */
+export async function readPublishedArtifact(
+  runId: string,
+  artifact: CIArtifact,
+): Promise<{ saved: StoredArtifact | null; complete: boolean }> {
+  const [saved, quality] = await Promise.all([
+    readStoredArtifact(runId, artifact),
+    readStoredQuality(runId, artifact).catch(() => undefined),
+  ]);
+  return {
+    saved: saved && quality ? withQuality(saved, quality) : saved,
+    complete: quality !== undefined,
+  };
+}
+
+/** First write wins; a later attachment for the same artifact reads back the stored one. */
+export async function storeVideoQuality(
+  artifact: CIArtifact,
+  quality: StoredQuality,
+  signal: AbortSignal,
+): Promise<StoredQuality> {
+  await immutable(
+    qualityPath(quality.runId, artifact),
+    JSON.stringify(quality),
+    'application/json',
+    signal,
+  );
+  const written = await readStoredQuality(quality.runId, artifact);
+  if (!written) throw new Error('Stored quality readback failed');
+  return written;
+}
+
+/** Content-addressed like candidate media; downloads only when the object is not stored yet. */
+export async function storeReferenceMedia(
+  mediaSha256: string,
+  filename: string,
+  download: () => Promise<Blob>,
+  signal: AbortSignal,
+): Promise<string> {
+  const path = `${PREFIX}/objects/${mediaSha256}/${filename}`;
+  try {
+    const stored = await head(path);
+    return stored.url;
+  } catch (error) {
+    if (!(error instanceof BlobNotFoundError)) throw error;
+  }
+  const uploaded = await immutable(path, await download(), 'video/mp4', signal);
+  return uploaded.url;
+}
+export async function immutable(
   path: string,
   body: Blob | string,
   contentType: string,
@@ -166,6 +262,139 @@ async function immutable(
     }
   }
 }
+
+interface PublicationSource {
+  id: string;
+  kind: 'observation' | 'fidelity';
+  sha256: string;
+  checkoutSha: string;
+}
+
+export interface VideoPublicationReceipt {
+  version: 1;
+  runId: string;
+  artifactId: number;
+  artifactName: string;
+  artifactDigest: string | null;
+  mergeRunId: string | null;
+  sources: PublicationSource[];
+}
+
+function publicationSources(saved: StoredArtifact): PublicationSource[] {
+  if (saved.sources.length === 0) throw new Error('Video publication has no source');
+  return saved.sources
+    .map((source) => {
+      let sha: string;
+      let checkout: string;
+      if (source.kind === 'fidelity') {
+        const bundle = storedFidelityBundle(source);
+        sha = bundle.comparisonSha256;
+        checkout = text(at(bundle.comparison, 'producer', 'git_commit'));
+      } else {
+        const bundle = storedBundle(source);
+        servingCells(bundle);
+        sha = bundle.manifestSha256;
+        checkout = text(at(bundle.manifest, 'git_commit'));
+      }
+      if (!/^[a-f0-9]{64}$/u.test(sha) || !/^[a-f0-9]{40}$/u.test(checkout))
+        throw new Error('Video publication source seal is invalid');
+      return {
+        id: source.id,
+        kind: source.kind === 'fidelity' ? ('fidelity' as const) : ('observation' as const),
+        sha256: sha,
+        checkoutSha: checkout,
+      };
+    })
+    .toSorted((a, b) => a.id.localeCompare(b.id) || a.kind.localeCompare(b.kind));
+}
+
+function expectedReceipt(
+  runId: string,
+  artifact: CIArtifact,
+  saved: StoredArtifact,
+  mergeRunId: string | null,
+): VideoPublicationReceipt {
+  if (
+    saved.runId !== runId ||
+    saved.artifact.id !== artifact.id ||
+    saved.artifact.name !== artifact.name ||
+    (artifact.digest !== undefined && saved.artifact.digest !== artifact.digest)
+  )
+    throw new Error('Stored video source does not match the GitHub artifact');
+  return {
+    version: 1,
+    runId,
+    artifactId: artifact.id,
+    artifactName: artifact.name,
+    artifactDigest: saved.artifact.digest ?? null,
+    mergeRunId,
+    sources: publicationSources(saved),
+  };
+}
+
+export async function readVideoPublication(
+  runId: string,
+  artifact: CIArtifact,
+  saved: StoredArtifact,
+): Promise<VideoPublicationReceipt | null> {
+  if (!videoStorageEnabled()) return null;
+  if (
+    videoArtifactIdentity(artifact.name)?.run !== runId ||
+    !Number.isSafeInteger(artifact.id) ||
+    artifact.id <= 0
+  )
+    throw new Error('Invalid video publication identity');
+  let url: string;
+  try {
+    const metadata = await head(approvalPath(runId, artifact));
+    url = metadata.url;
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return null;
+    throw error;
+  }
+  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error('Video publication receipt unavailable');
+  const receipt: VideoPublicationReceipt = await response.json();
+  if (
+    receipt.mergeRunId !== null &&
+    (typeof receipt.mergeRunId !== 'string' ||
+      !/^[1-9]\d*$/u.test(receipt.mergeRunId) ||
+      !Number.isSafeInteger(Number(receipt.mergeRunId)))
+  )
+    throw new Error('Invalid video publication merge identity');
+  const expected = expectedReceipt(runId, artifact, saved, receipt.mergeRunId);
+  if (JSON.stringify(receipt) !== JSON.stringify(expected))
+    throw new Error('Video publication receipt does not match its stored source');
+  return receipt;
+}
+
+export async function approveVideoPublication(
+  runId: string,
+  artifact: CIArtifact,
+  saved: StoredArtifact,
+  mergeRunId: string | null,
+  signal: AbortSignal,
+): Promise<VideoPublicationReceipt> {
+  const expected = expectedReceipt(runId, artifact, saved, mergeRunId);
+  const existing = await readVideoPublication(runId, artifact, saved);
+  if (existing) {
+    // A manual republish names no merge run; it reuses the approval instead of asserting a new one.
+    if (mergeRunId !== null && JSON.stringify(existing) !== JSON.stringify(expected))
+      throw new Error('Video publication already has a different merge identity');
+    return existing;
+  }
+  await immutable(
+    approvalPath(runId, artifact),
+    JSON.stringify(expected),
+    'application/json',
+    signal,
+  );
+  const written = await readVideoPublication(runId, artifact, saved);
+  if (!written || JSON.stringify(written) !== JSON.stringify(expected))
+    throw new Error('Video publication receipt readback mismatch');
+  return written;
+}
+
 export async function storeVideoArtifact(
   runId: string,
   artifact: CIArtifact,
@@ -234,7 +463,6 @@ export async function storeVideoArtifact(
     artifact: { ...artifact, stored: true },
     sources,
   };
-  // Publish the index last so readers cannot observe partially uploaded bundles.
   await immutable(
     `${runPrefix(runId)}${artifact.name}_${artifact.id}.json`,
     JSON.stringify(result),
@@ -242,4 +470,32 @@ export async function storeVideoArtifact(
     signal,
   );
   return result;
+}
+
+/**
+ * Map each original MP4 SHA256 to its derived media (web rendition, poster) from one listing.
+ * A receipt is written only after its validated upload, so its path alone identifies the
+ * object. The first listed receipt of a profile wins; unknown profiles are ignored.
+ */
+export async function derivedMedia(): Promise<Map<string, DerivedMedia>> {
+  const media = new Map<string, DerivedMedia>();
+  if (!videoStorageEnabled()) return media;
+  let cursor: string | undefined;
+  do {
+    const batch = await list({ prefix: renditionsPrefix, cursor });
+    for (const blob of batch.blobs) {
+      const match =
+        /^h3-video-media\/v1\/renditions\/(?<source>[a-f0-9]{64})\/(?<profile>[^/]+)\/(?<output>[a-f0-9]{64})\.json$/u.exec(
+          blob.pathname,
+        )?.groups;
+      if (!match || !isMediaProfile(match.profile)) continue;
+      const { field } = MEDIA_PROFILES[match.profile];
+      const derived = media.get(match.source) ?? {};
+      if (derived[field]) continue;
+      derived[field] = new URL(`/${derivedMediaPath(match.profile, match.output)}`, blob.url).href;
+      media.set(match.source, derived);
+    }
+    cursor = batch.hasMore ? batch.cursor : undefined;
+  } while (cursor);
+  return media;
 }

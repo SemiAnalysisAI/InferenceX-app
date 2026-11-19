@@ -6,7 +6,6 @@ export const HALO_MUSIC_KEY = 'halo-music';
 export const HALO_MUSIC_EVENT = 'halo-music-toggle';
 export const HALO_MUSIC_SRC = '/decorative/halo/halo-theme.mp3';
 
-/** Music defaults on; only an explicit `false` mutes it. */
 export function haloMusicEnabled(): boolean {
   try {
     return localStorage.getItem(HALO_MUSIC_KEY) !== 'false';
@@ -15,11 +14,6 @@ export function haloMusicEnabled(): boolean {
   }
 }
 
-/**
- * Loops the Halo: Combat Evolved title theme while the Halo theme is mounted.
- * Browsers block autoplay without a gesture, so a blocked start waits for the
- * next pointer or key press. Unmounting (leaving the theme) stops playback.
- */
 export function HaloMusic() {
   useEffect(() => {
     const audio = new Audio(HALO_MUSIC_SRC);

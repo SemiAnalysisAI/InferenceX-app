@@ -1,18 +1,14 @@
-import { getHardwareConfig } from '@/lib/catalog/constants';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
-/**
- * Full dashboard legend text for a hardware key: the base GPU label plus the
- * framework / disagg / spec suffix (e.g. "GB300 NVL72 (Dynamo SGLang, MTP)").
- * Base-only keys have no suffix and collapse to the plain label. Pass `model`
- * (frontend display name) to apply per-model suffix overrides.
- */
-export function hardwareLegendLabel(hwKey: string, model?: string): string {
-  // Same composition the dashboard legend uses (`getDisplayLabel`).
-  return getDisplayLabel(getHardwareConfig(hwKey, model));
+export function hardwareLegendLabel(
+  hwKey: string,
+  model?: string,
+  points: readonly { run_url?: string | null; router_name?: string | null }[] = [],
+): string {
+  return getDisplayLabel(getInferenceHardwareConfig(hwKey, model, points));
 }
 
-/** Trailing parenthesized unit from a registry label, e.g. `(tok/s/gpu)`. */
 export function unitFromLabel(label: string): string | null {
   const match = /\((?<unit>[^()]+)\)\s*$/u.exec(label);
   return match?.groups?.unit ?? null;

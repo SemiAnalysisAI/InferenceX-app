@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import {
+  formatDollars,
   formatDuration,
   formatInteractivity,
   formatNumber,
@@ -19,21 +21,24 @@ import { buildHashMetrics, type HashSourceRow } from '@/lib/agentic-workload-exp
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { TOKEN_SERIES_COLORS as COLORS } from '@/components/agentic-workload-explorer/series-colors';
+import { Button } from '@/components/ui/button';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { chartFont, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { fitLabel, rowChartColumns } from '@/components/agentic-workload-explorer/row-chart-layout';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+import {
+  ShowMoreRows,
+  useRowLimit,
+} from '@/components/agentic-workload-explorer/conversation-view';
 
-const COLORS = {
-  input: '#0ea5e9', // sky-500
-  cacheRead: '#10b981', // emerald-500
-  cacheWrite: '#f59e0b', // amber-500
-  output: '#8b5cf6', // violet-500
-} as const;
-
-// Ratio-mode color bands. Emerald = hash chain length (after padding) matches
-// provider billing within 10%; amber = noticeable drift; rose = significant
-// drift, usually a sign that calibration or padding is off for that model.
 const RATIO_COLORS = {
-  good: '#10b981', // emerald-500
-  warn: '#f59e0b', // amber-500
-  bad: '#f43f5e', // rose-500
+  good: '#10b981',
+  warn: '#f59e0b',
+  bad: '#f43f5e',
 } as const;
 
 const STRINGS = {
@@ -46,8 +51,11 @@ const STRINGS = {
     hashProviderTooltip:
       'Hash chain token count / provider-reported input tokens. 1.0 means the padded chain matches billing.',
     chronological: 'Chronological',
+    modeLabel: 'Cache view',
+    layoutLabel: 'Layout',
     grouped: 'Grouped',
     classifierLike: 'Classifier-like',
+    classifierLikeHint: 'Inferred from the response stop marker',
     expandAll: 'Expand All',
     collapseAll: 'Collapse All',
     classifierLikeSignature: 'Classifier-like response signature',
@@ -91,8 +99,11 @@ const STRINGS = {
     hashProviderTooltip:
       'Hash chain token 数 / provider 上报的 input token 数。1.0 表示填充后的 chain 与计费一致。',
     chronological: '时间顺序',
+    modeLabel: '缓存视图',
+    layoutLabel: '布局',
     grouped: '分组',
     classifierLike: '类分类器',
+    classifierLikeHint: '根据响应的停止标记推断',
     expandAll: '全部展开',
     collapseAll: '全部折叠',
     classifierLikeSignature: '类分类器响应特征',
@@ -162,10 +173,7 @@ function ratioColor(ratio: number): string {
 
 const ROW_HEIGHT = 28;
 const ROW_GAP = 2;
-const LABEL_WIDTH = 180;
-const COST_WIDTH = 70;
-const BAR_LEFT = LABEL_WIDTH + 8;
-const CLASSIFIER_COLOR = '#f97316'; // orange-500
+const CLASSIFIER_COLOR = '#f97316';
 
 type FlamegraphMode = 'api' | 'hash' | 'ratio';
 type FlamegraphLayout = 'chronological' | 'grouped';
@@ -221,25 +229,10 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
     return all;
   });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(800);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: 0 });
+  const containerWidth = dimensions.width;
+  const [rowLimit, , showMoreRows] = useRowLimit(`${mode}-${layout}`);
+  useFontsVersion();
 
   const toggleGroup = useCallback((turn: number) => {
     setExpandedGroups((prev) => {
@@ -270,7 +263,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
   const allLegends = useMemo(() => buildLegendItems(t), [t]);
   const legendItems = allLegends[mode];
 
-  // Build flat list of visible rows with nesting info
   const visibleRows = useMemo(() => {
     const result: {
       key: string;
@@ -417,11 +409,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
     [visibleRows],
   );
 
-  // Ratio-mode x-axis domain. Anchor at [0, 2] so 1.0 sits at the midpoint
-  // of the bar track — undercounted bars come up short of center, overcounted
-  // bars extend past it. Extend past 2 if any outlier (e.g. Web Search Agent
-  // on Haiku 4.5) actually reaches further; we don't clip, so the magnitude
-  // of an overshoot stays readable.
   const maxRatio = useMemo(() => {
     let observed = 0;
     for (const r of visibleRows) {
@@ -430,9 +417,13 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
     return Math.max(2, observed * 1.05);
   }, [visibleRows]);
 
-  const barWidth = containerWidth - BAR_LEFT - COST_WIDTH - 16;
-  const svgHeight = visibleRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
-  const ratioReferenceX = BAR_LEFT + (barWidth > 0 ? barWidth / maxRatio : 0);
+  const columns = rowChartColumns(containerWidth);
+  const barLeft = columns.label + 8;
+  const labelFont = chartFont(CHART_TYPE.axisLabel);
+  const barWidth = containerWidth - barLeft - columns.value - 8;
+  const shownRows = visibleRows.length > rowLimit ? visibleRows.slice(0, rowLimit) : visibleRows;
+  const svgHeight = shownRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
+  const ratioReferenceX = barLeft + (barWidth > 0 ? barWidth / maxRatio : 0);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent, row: (typeof visibleRows)[number]) => {
@@ -465,537 +456,398 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
   }, []);
 
   if (rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground font-mono text-xs">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="h-32">{t.noData}</EmptyState>;
   }
 
   return (
-    <div className="space-y-4">
-      {/* Section header — sticks to the top of the viewport while the chart
-          scrolls beneath. The dashboard <main> has `py-5` (top padding 1.25rem),
-          so we use a negative `top` so the bar lands flush against the global
-          header instead of 20px below it. */}
-      <div className="sticky -top-5 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-2 px-2 pt-5 pb-2 space-y-2 border-b border-border">
-        <div className="flex items-center gap-3">
-          <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.sectionTitle}
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-
-        {/* Legend + group controls */}
+    <Card className="relative">
+      <CardHeader className="sticky top-0 z-20 gap-2 bg-card/95 pb-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <CardTitle>{t.sectionTitle}</CardTitle>
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center border border-border rounded overflow-hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('api');
-                track('agentic_workload_flamegraph_mode_changed', { mode: 'api' });
-              }}
-              className={`text-3xs font-mono px-2 py-1 transition-colors ${
-                mode === 'api'
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.apiCache}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('hash');
-                track('agentic_workload_flamegraph_mode_changed', { mode: 'hash' });
-              }}
-              className={`text-3xs font-mono px-2 py-1 border-l border-border transition-colors ${
-                mode === 'hash'
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.hashBlocks}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('ratio');
-                track('agentic_workload_flamegraph_mode_changed', { mode: 'ratio' });
-              }}
-              title={t.hashProviderTooltip}
-              className={`text-3xs font-mono px-2 py-1 border-l border-border transition-colors ${
-                mode === 'ratio'
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.hashProvider}
-            </button>
-          </div>
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.modeLabel}
+            value={mode}
+            onValueChange={(next) => {
+              setMode(next);
+              track('agentic_workload_flamegraph_mode_changed', { mode: next });
+            }}
+            options={[
+              { value: 'api', label: t.apiCache },
+              { value: 'hash', label: t.hashBlocks },
+              { value: 'ratio', label: t.hashProvider, title: t.hashProviderTooltip },
+            ]}
+          />
           {subagentGroupTurns.length > 0 && (
-            <div className="flex items-center border border-border rounded overflow-hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setLayout('chronological');
-                  track('agentic_workload_flamegraph_layout_changed', { layout: 'chronological' });
-                }}
-                className={`text-3xs font-mono px-2 py-1 transition-colors ${
-                  layout === 'chronological'
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-subtle hover:text-foreground'
-                }`}
-              >
-                {t.chronological}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLayout('grouped');
-                  track('agentic_workload_flamegraph_layout_changed', { layout: 'grouped' });
-                }}
-                className={`text-3xs font-mono px-2 py-1 border-l border-border transition-colors ${
-                  layout === 'grouped'
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-subtle hover:text-foreground'
-                }`}
-              >
-                {t.grouped}
-              </button>
-            </div>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={t.layoutLabel}
+              value={layout}
+              onValueChange={(next) => {
+                setLayout(next);
+                track('agentic_workload_flamegraph_layout_changed', { layout: next });
+              }}
+              options={[
+                { value: 'chronological', label: t.chronological },
+                { value: 'grouped', label: t.grouped },
+              ]}
+            />
           )}
           {legendItems.map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-              <span className="text-3xs font-mono text-muted-foreground">{item.label}</span>
+              <span className="text-xs text-muted-foreground">{item.label}</span>
             </div>
           ))}
-          <div className="flex items-center gap-1.5" title="Inferred from the response stop marker">
+          <div className="flex items-center gap-1.5" title={t.classifierLikeHint}>
             <div
               className="w-2.5 h-2.5 rotate-45 rounded-[1px]"
               style={{ backgroundColor: CLASSIFIER_COLOR }}
             />
-            <span className="text-3xs font-mono text-muted-foreground">{t.classifierLike}</span>
+            <span className="text-xs text-muted-foreground">{t.classifierLike}</span>
           </div>
           {subagentGroupTurns.length > 0 && layout === 'grouped' && (
-            <div className="flex items-center gap-1 ml-auto">
-              <button
+            <div className="ml-auto flex items-center gap-2">
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   expandAll();
                   track('agentic_workload_flamegraph_expand_all');
                 }}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
               >
                 {t.expandAll}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   collapseAll();
                   track('agentic_workload_flamegraph_collapse_all');
                 }}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
               >
                 {t.collapseAll}
-              </button>
+              </Button>
             </div>
           )}
         </div>
-      </div>
+      </CardHeader>
 
-      {/* Chart container */}
-      <div
-        ref={containerRef}
-        className="bg-surface border border-border rounded-md p-4 overflow-x-auto relative"
-      >
-        <svg width={containerWidth - 32} height={svgHeight} className="block">
-          {/* Ratio-mode reference line at 1.0 — spans the full chart height so
-              it's easy to scan whether bars over- or under-shoot the target. */}
-          {mode === 'ratio' && barWidth > 0 && (
-            <>
-              <line
-                x1={ratioReferenceX}
-                y1={0}
-                x2={ratioReferenceX}
-                y2={svgHeight}
-                stroke="currentColor"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                className="text-muted-foreground"
-                opacity={0.6}
-              />
-              <text
-                x={ratioReferenceX + 4}
-                y={10}
-                className="fill-current text-muted-foreground"
-                style={{
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                1.0
-              </text>
-            </>
-          )}
-          {visibleRows.map((row, idx) => {
-            const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
-            const total = getTotal(row);
-            const scale = barWidth > 0 ? barWidth / maxTokens : 0;
+      <CardContent className="overflow-x-auto">
+        <div ref={setContainerRef} className="min-w-0">
+          <svg
+            role="img"
+            aria-label={t.sectionTitle}
+            width={Math.max(0, containerWidth)}
+            height={svgHeight}
+            className="block"
+          >
+            {mode === 'ratio' && barWidth > 0 && (
+              <>
+                <line
+                  x1={ratioReferenceX}
+                  y1={0}
+                  x2={ratioReferenceX}
+                  y2={svgHeight}
+                  stroke="currentColor"
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  className="text-muted-foreground"
+                  opacity={0.6}
+                />
+                <text
+                  x={ratioReferenceX + 4}
+                  y={10}
+                  className="fill-current text-muted-foreground"
+                  style={{
+                    fontSize: px(CHART_TYPE.axisLabel),
+                    fontFamily: CHART_FONT_SANS,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  1.0
+                </text>
+              </>
+            )}
+            {shownRows.map((row, idx) => {
+              const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
+              const total = getTotal(row);
+              const scale = barWidth > 0 ? barWidth / maxTokens : 0;
 
-            const inputW = row.input * scale;
-            const cacheReadW = row.cacheRead * scale;
-            const cacheWriteW = row.cacheWrite * scale;
-            const outputW = row.output * scale;
+              const inputW = row.input * scale;
+              const cacheReadW = row.cacheRead * scale;
+              const cacheWriteW = row.cacheWrite * scale;
+              const outputW = row.output * scale;
 
-            const barX = BAR_LEFT;
-            const segments = [
-              { x: barX, w: inputW, color: COLORS.input },
-              { x: barX + inputW, w: cacheReadW, color: COLORS.cacheRead },
-              { x: barX + inputW + cacheReadW, w: cacheWriteW, color: COLORS.cacheWrite },
-              { x: barX + inputW + cacheReadW + cacheWriteW, w: outputW, color: COLORS.output },
-            ];
+              const barX = barLeft;
+              const segments = [
+                { x: barX, w: inputW, color: COLORS.input },
+                { x: barX + inputW, w: cacheReadW, color: COLORS.cacheRead },
+                { x: barX + inputW + cacheReadW, w: cacheWriteW, color: COLORS.cacheWrite },
+                { x: barX + inputW + cacheReadW + cacheWriteW, w: outputW, color: COLORS.output },
+              ];
 
-            const ratioScale = barWidth > 0 ? barWidth / maxRatio : 0;
-            const ratioW = row.ratio === null ? 0 : row.ratio * ratioScale;
-            const ratioFill = row.ratio === null ? RATIO_COLORS.bad : ratioColor(row.ratio);
+              const ratioScale = barWidth > 0 ? barWidth / maxRatio : 0;
+              const ratioW = row.ratio === null ? 0 : row.ratio * ratioScale;
+              const ratioFill = row.ratio === null ? RATIO_COLORS.bad : ratioColor(row.ratio);
 
-            const labelX = row.indent === 1 ? 20 : 0;
+              const labelX = row.indent === 1 ? 20 : 0;
+              const labelOffset = labelX + (row.isGroup ? 16 : 4);
 
-            function navigateToConversation() {
-              router.push(explorerHref(`/sessions/${sessionId}/conversation#req-${row.requestId}`));
-            }
+              function navigateToConversation() {
+                router.push(
+                  explorerHref(`/sessions/${sessionId}/conversation#req-${row.requestId}`),
+                );
+              }
 
-            return (
-              <g
-                key={row.key}
-                className="cursor-pointer"
-                onClick={row.isGroup ? undefined : navigateToConversation}
-                onMouseMove={(e) => handleMouseMove(e, row)}
-                onMouseLeave={handleMouseLeave}
-              >
-                {/* Indented purple border line for child rows */}
-                {row.indent === 1 && (
-                  <line
-                    x1={8}
-                    y1={y}
-                    x2={8}
-                    y2={y + ROW_HEIGHT}
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    strokeOpacity={0.5}
-                  />
-                )}
+              return (
+                <g
+                  key={row.key}
+                  className="cursor-pointer"
+                  onClick={row.isGroup ? undefined : navigateToConversation}
+                  onMouseMove={(e) => handleMouseMove(e, row)}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {row.indent === 1 && (
+                    <line
+                      x1={8}
+                      y1={y}
+                      x2={8}
+                      y2={y + ROW_HEIGHT}
+                      stroke={COLORS.output}
+                      strokeWidth={2}
+                      strokeOpacity={0.5}
+                    />
+                  )}
 
-                {/* Row label — for groups: triangle toggles expand, label text navigates */}
-                {row.isGroup && (
+                  {row.isGroup && (
+                    <text
+                      x={labelX + 4}
+                      y={y + ROW_HEIGHT / 2}
+                      dominantBaseline="central"
+                      className="fill-current text-muted-foreground cursor-pointer"
+                      style={{
+                        fontSize: px(CHART_TYPE.axisLabel),
+                        fontFamily: CHART_FONT_SANS,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGroup(row.turn);
+                      }}
+                    >
+                      {row.isExpanded ? '\u25BC' : '\u25B6'}
+                    </text>
+                  )}
                   <text
-                    x={labelX + 4}
+                    x={labelOffset}
                     y={y + ROW_HEIGHT / 2}
                     dominantBaseline="central"
-                    className="fill-current text-muted-foreground cursor-pointer"
+                    className={`fill-current hover:underline ${
+                      row.isClassifierLike ? 'text-warning' : 'text-muted-foreground'
+                    }`}
                     style={{
-                      fontSize: '11px',
-                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                      fontSize: px(CHART_TYPE.axisLabel),
+                      fontFamily: CHART_FONT_SANS,
+                      fontVariantNumeric: 'tabular-nums',
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleGroup(row.turn);
+                      navigateToConversation();
                     }}
                   >
-                    {row.isExpanded ? '\u25BC' : '\u25B6'}
+                    {fitLabel(row.label, labelFont, columns.label - labelOffset)}
                   </text>
-                )}
-                <text
-                  x={labelX + (row.isGroup ? 16 : 4)}
-                  y={y + ROW_HEIGHT / 2}
-                  dominantBaseline="central"
-                  className={`fill-current hover:underline ${
-                    row.isClassifierLike ? 'text-orange-500' : 'text-muted-foreground'
-                  }`}
-                  style={{
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigateToConversation();
-                  }}
-                >
-                  {row.label}
-                </text>
 
-                {/* Background track */}
-                <rect
-                  x={barX}
-                  y={y + 2}
-                  width={Math.max(0, barWidth)}
-                  height={ROW_HEIGHT - 4}
-                  rx={3}
-                  className="fill-current"
-                  style={{ color: 'var(--color-border)', opacity: 0.3 }}
-                />
-
-                {/* Token segments — hidden for group header rows (summed bar is misleading) */}
-                {!row.isGroup &&
-                  mode !== 'ratio' &&
-                  segments.map((seg, si) =>
-                    seg.w > 0 ? (
-                      <rect
-                        key={si}
-                        x={seg.x}
-                        y={y + 2}
-                        width={seg.w}
-                        height={ROW_HEIGHT - 4}
-                        rx={
-                          si === 0 && total > 0
-                            ? 3
-                            : si === segments.length - 1 ||
-                                segments.slice(si + 1).every((s) => s.w === 0)
-                              ? 3
-                              : 0
-                        }
-                        fill={seg.color}
-                        opacity={0.85}
-                      >
-                        <title>
-                          {(legendItems as readonly { label: string }[])[si]?.label}:{' '}
-                          {formatNumber(
-                            si === 0
-                              ? row.input
-                              : si === 1
-                                ? row.cacheRead
-                                : si === 2
-                                  ? row.cacheWrite
-                                  : row.output,
-                          )}
-                        </title>
-                      </rect>
-                    ) : null,
-                  )}
-
-                {/* Ratio bar — single bar from 0 to ratio. 1.0 lands at the
-                    dashed reference line (rendered above the row map). Bars
-                    past the line are overcounts; bars short of it are
-                    undercounts. */}
-                {!row.isGroup && mode === 'ratio' && row.ratio !== null && ratioW > 0 && (
                   <rect
                     x={barX}
                     y={y + 2}
-                    width={ratioW}
+                    width={Math.max(0, barWidth)}
                     height={ROW_HEIGHT - 4}
                     rx={3}
-                    fill={ratioFill}
-                    opacity={0.85}
-                  >
-                    <title>
-                      ratio {row.ratio.toFixed(2)} = hash {formatNumber(row.hashTokenCount ?? 0)} /
-                      provider {formatNumber(row.providerInputTotal ?? 0)}
-                    </title>
-                  </rect>
-                )}
+                    className="fill-current"
+                    style={{ color: 'var(--color-border)', opacity: 0.3 }}
+                  />
 
-                {/* Cost label */}
-                <text
-                  x={barX + barWidth + 8}
-                  y={y + ROW_HEIGHT / 2}
-                  dominantBaseline="central"
-                  className="fill-current text-subtle"
-                  style={{
-                    fontSize: '10px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {row.isGroup
-                    ? ''
-                    : mode === 'ratio'
-                      ? row.ratio === null
-                        ? '\u2014'
-                        : row.ratio.toFixed(2)
-                      : row.cost > 0
-                        ? `$${row.cost.toFixed(2)}`
-                        : '\u2014'}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                  {!row.isGroup &&
+                    mode !== 'ratio' &&
+                    segments.map((seg, si) =>
+                      seg.w > 0 ? (
+                        <rect
+                          key={si}
+                          x={seg.x}
+                          y={y + 2}
+                          width={seg.w}
+                          height={ROW_HEIGHT - 4}
+                          rx={
+                            si === 0 && total > 0
+                              ? 3
+                              : si === segments.length - 1 ||
+                                  segments.slice(si + 1).every((s) => s.w === 0)
+                                ? 3
+                                : 0
+                          }
+                          fill={seg.color}
+                          opacity={0.85}
+                        />
+                      ) : null,
+                    )}
 
-        {/* Tooltip — rendered via portal at <body> so it escapes the chart
-            container's `overflow-x-auto` (which per CSS spec also clips on
-            the y-axis). Positioned with `fixed` using viewport coordinates;
-            flips above/below the cursor based on available viewport space. */}
-        {tooltip &&
-          mounted &&
-          createPortal(
-            (() => {
-              const TOOLTIP_MAX_HEIGHT = 180;
-              const TOOLTIP_WIDTH = 240;
-              const vw = window.innerWidth;
-              const vh = window.innerHeight;
-              const placeAbove =
-                tooltip.y >= TOOLTIP_MAX_HEIGHT + 8 || vh - tooltip.y < TOOLTIP_MAX_HEIGHT + 8;
-              const left = Math.max(8, Math.min(tooltip.x + 12, vw - TOOLTIP_WIDTH - 8));
-              return (
-                <div
-                  className="fixed pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-3 py-2 space-y-1"
-                  style={{
-                    left,
-                    top: placeAbove ? tooltip.y - 8 : tooltip.y + 20,
-                    transform: placeAbove ? 'translateY(-100%)' : 'none',
-                  }}
-                >
-                  <div className="text-2xs font-mono font-medium text-foreground">
-                    {tooltip.label}
-                  </div>
-                  {tooltip.isClassifierLike && (
-                    <div className="text-3xs font-mono uppercase tracking-eyebrow text-orange-500">
-                      {t.classifierLikeSignature}
-                    </div>
+                  {!row.isGroup && mode === 'ratio' && row.ratio !== null && ratioW > 0 && (
+                    <rect
+                      x={barX}
+                      y={y + 2}
+                      width={ratioW}
+                      height={ROW_HEIGHT - 4}
+                      rx={3}
+                      fill={ratioFill}
+                      opacity={0.85}
+                    />
                   )}
-                  <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
-                    {tooltip.mode === 'ratio' ? (
-                      <>
-                        {tooltip.ratio === null ? (
-                          <div>{t.noHashChain}</div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: ratioColor(tooltip.ratio) }}
-                            />
-                            <span className="text-foreground">
-                              {t.hashProviderLabel}{' '}
-                              <span className="font-medium">{tooltip.ratio.toFixed(3)}</span>{' '}
-                              <span className="text-subtle">
-                                ({((tooltip.ratio - 1) * 100).toFixed(1)}%)
-                              </span>
-                            </span>
-                          </div>
-                        )}
-                        {tooltip.hashTokenCount !== null && (
-                          <div>
-                            {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
-                          </div>
-                        )}
-                        {tooltip.providerInputTotal !== null && (
-                          <div>
-                            {t.providerInput} {formatNumber(tooltip.providerInputTotal)}{' '}
-                            <span className="text-subtle">{t.providerInputDetail}</span>
-                          </div>
-                        )}
-                        {tooltip.hashBlocks !== null && (
-                          <div>
-                            {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
-                            {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
-                          </div>
-                        )}
-                        <div className="pt-1 border-t border-border">
-                          {t.output} {formatNumber(tooltip.output)} &middot; $
-                          {tooltip.cost.toFixed(4)}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {tooltip.mode === 'api' && (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: COLORS.input }}
-                            />
-                            <span>
-                              {t.apiLegend.input}: {formatNumber(tooltip.input)}
-                            </span>
-                          </div>
-                        )}
-                        {tooltip.cacheRead > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: COLORS.cacheRead }}
-                            />
-                            <span>
-                              {tooltip.mode === 'hash'
-                                ? t.hashLegend.cacheRead
-                                : t.apiLegend.cacheRead}
-                              : {formatNumber(tooltip.cacheRead)}
-                            </span>
-                          </div>
-                        )}
-                        {tooltip.cacheWrite > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: COLORS.cacheWrite }}
-                            />
-                            <span>
-                              {tooltip.mode === 'hash'
-                                ? t.hashLegend.cacheWrite
-                                : t.apiLegend.cacheWrite}
-                              : {formatNumber(tooltip.cacheWrite)}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-sm inline-block"
-                            style={{ backgroundColor: COLORS.output }}
-                          />
-                          <span>
-                            {t.output} {formatNumber(tooltip.output)}
-                          </span>
-                        </div>
-                        <div className="pt-1 border-t border-border">
-                          {t.total} {formatNumber(tooltip.total)} &middot; $
-                          {tooltip.cost.toFixed(4)}
-                        </div>
-                        {tooltip.mode === 'hash' && tooltip.hashBlocks !== null && (
-                          <div>
-                            {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
-                            {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
-                            {tooltip.hashTokenCount !== null && (
-                              <>
-                                {' '}
-                                &middot; {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {(tooltip.ttftMs !== null || tooltip.tpotMs !== null) && (
-                      <div>
-                        TTFT: {tooltip.ttftMs === null ? '—' : formatDuration(tooltip.ttftMs)}{' '}
-                        &middot; TPOT:{' '}
-                        {tooltip.tpotMs === null ? '—' : formatDuration(tooltip.tpotMs)}
-                        {tooltip.tpotMs !== null && (
-                          <> &middot; {formatInteractivity(tooltip.tpotMs)}</>
-                        )}
-                        {(() => {
-                          if (tooltip.mode !== 'api') return null;
-                          const ps = computePrefillSpeed(
-                            tooltip.cacheRead,
-                            tooltip.cacheWrite,
-                            tooltip.ttftMs,
-                          );
-                          return ps === null ? null : (
-                            <>
-                              {' '}
-                              &middot;{' '}
-                              <span className="text-sky-500">{formatPrefillSpeed(ps)}</span>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </div>
+
+                  <text
+                    x={barX + barWidth + 8}
+                    y={y + ROW_HEIGHT / 2}
+                    dominantBaseline="central"
+                    className="fill-current text-muted-foreground"
+                    style={{
+                      fontSize: px(CHART_TYPE.axisLabel),
+                      fontFamily: CHART_FONT_SANS,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {row.isGroup
+                      ? ''
+                      : mode === 'ratio'
+                        ? row.ratio === null
+                          ? '\u2014'
+                          : row.ratio.toFixed(2)
+                        : row.cost > 0
+                          ? formatDollars(row.cost)
+                          : '\u2014'}
+                  </text>
+                </g>
               );
-            })(),
-            document.body,
-          )}
-      </div>
-    </div>
+            })}
+          </svg>
+        </div>
+        <ShowMoreRows
+          shown={shownRows.length}
+          total={visibleRows.length}
+          view="flamegraph"
+          onShowMore={showMoreRows}
+        />
+
+        {tooltip && (
+          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above">
+            <ChartHoverCardBody
+              title={tooltip.label}
+              warning={tooltip.isClassifierLike ? t.classifierLikeSignature : undefined}
+              metrics={
+                tooltip.mode === 'ratio'
+                  ? tooltip.ratio === null
+                    ? []
+                    : [
+                        {
+                          value: tooltip.ratio.toFixed(3),
+                          label: `${t.hashProviderLabel} (${((tooltip.ratio - 1) * 100).toFixed(1)}%)`,
+                          color: ratioColor(tooltip.ratio),
+                        },
+                      ]
+                  : [
+                      ...(tooltip.mode === 'api'
+                        ? [
+                            {
+                              value: formatNumber(tooltip.input),
+                              label: t.apiLegend.input,
+                              color: COLORS.input,
+                            },
+                          ]
+                        : []),
+                      ...(tooltip.cacheRead > 0
+                        ? [
+                            {
+                              value: formatNumber(tooltip.cacheRead),
+                              label:
+                                tooltip.mode === 'hash'
+                                  ? t.hashLegend.cacheRead
+                                  : t.apiLegend.cacheRead,
+                              color: COLORS.cacheRead,
+                            },
+                          ]
+                        : []),
+                      ...(tooltip.cacheWrite > 0
+                        ? [
+                            {
+                              value: formatNumber(tooltip.cacheWrite),
+                              label:
+                                tooltip.mode === 'hash'
+                                  ? t.hashLegend.cacheWrite
+                                  : t.apiLegend.cacheWrite,
+                              color: COLORS.cacheWrite,
+                            },
+                          ]
+                        : []),
+                      {
+                        value: formatNumber(tooltip.output),
+                        label: t.output,
+                        color: COLORS.output,
+                      },
+                    ]
+              }
+              summary={(() => {
+                const parts: string[] = [];
+                if (tooltip.mode === 'ratio') {
+                  if (tooltip.ratio === null) parts.push(t.noHashChain);
+                  if (tooltip.hashTokenCount !== null)
+                    parts.push(`${t.hashTokens} ${formatNumber(tooltip.hashTokenCount)}`);
+                  if (tooltip.providerInputTotal !== null)
+                    parts.push(
+                      `${t.providerInput} ${formatNumber(tooltip.providerInputTotal)} ${t.providerInputDetail}`,
+                    );
+                  if (tooltip.hashBlocks !== null)
+                    parts.push(
+                      `${t.hashBlocksLabel} ${formatNumber(tooltip.cachedHashBlocks ?? 0)} / ${formatNumber(tooltip.hashBlocks)} ${t.cachedSuffix}`,
+                    );
+                  parts.push(
+                    `${t.output} ${formatNumber(tooltip.output)}`,
+                    formatDollars(tooltip.cost),
+                  );
+                } else {
+                  parts.push(
+                    `${t.total} ${formatNumber(tooltip.total)}`,
+                    formatDollars(tooltip.cost),
+                  );
+                  if (tooltip.mode === 'hash' && tooltip.hashBlocks !== null) {
+                    parts.push(
+                      `${t.hashBlocksLabel} ${formatNumber(tooltip.cachedHashBlocks ?? 0)} / ${formatNumber(tooltip.hashBlocks)} ${t.cachedSuffix}`,
+                    );
+                    if (tooltip.hashTokenCount !== null)
+                      parts.push(`${t.hashTokens} ${formatNumber(tooltip.hashTokenCount)}`);
+                  }
+                }
+                if (tooltip.ttftMs !== null || tooltip.tpotMs !== null) {
+                  parts.push(
+                    `TTFT: ${tooltip.ttftMs === null ? '—' : formatDuration(tooltip.ttftMs)}`,
+                    `TPOT: ${tooltip.tpotMs === null ? '—' : formatDuration(tooltip.tpotMs)}`,
+                  );
+                  if (tooltip.tpotMs !== null) parts.push(formatInteractivity(tooltip.tpotMs));
+                  if (tooltip.mode === 'api') {
+                    const ps = computePrefillSpeed(
+                      tooltip.cacheRead,
+                      tooltip.cacheWrite,
+                      tooltip.ttftMs,
+                    );
+                    if (ps !== null) parts.push(formatPrefillSpeed(ps));
+                  }
+                }
+                return parts.join(' · ');
+              })()}
+            />
+          </FloatingTooltip>
+        )}
+      </CardContent>
+    </Card>
   );
 }

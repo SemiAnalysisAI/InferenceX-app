@@ -1,9 +1,9 @@
 'use client';
 
+import { OptionInfo } from '@/components/ui/option-info';
 import { ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { OptionInfo } from '@/components/ui/option-info';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
 import type { PowerTier } from '@/lib/power/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
@@ -40,7 +40,7 @@ const STRINGS = {
     bestPerSku: 'Best per SKU',
     bestPerSkuHint: 'Show the best configuration per chip; turn off to select more',
     bestPerSkuHelp:
-      'Selects the best configuration line for each chip SKU across candidate frameworks using the current chart metrics. Where curves overlap, performance is compared across their shared measured range rather than one peak point. Turning this off asks for confirmation before showing vLLM and SGLang on the same SKU in guarded official views. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
+      'Selects the best configuration line for each chip SKU across candidate frameworks using the current chart metrics. Each curve is scored by the chart area its measured Pareto frontier dominates, so a large lead where values are high outweighs many small leads, and a curve earns nothing where it has no data. Turning this off asks for confirmation before showing vLLM and SGLang on the same SKU in guarded official views. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
     vendor: 'Vendor',
     vendorHelp:
       'Filter by the company that makes the chip, such as NVIDIA, AMD, or Google (TPU). Select one or more vendors; leave the group empty to include all.',
@@ -84,7 +84,7 @@ const STRINGS = {
     bestPerSku: '每个 SKU 仅显示最佳配置',
     bestPerSkuHint: '每款芯片显示最佳配置；关闭后可选择更多配置',
     bestPerSkuHelp:
-      '按当前图表指标，从所有候选框架中为每款芯片选择表现最佳的配置曲线。曲线范围重叠时，会比较共同实测范围内的整体表现，而不是只看单个峰值点。关闭后，受比较规则限制的官方视图会先要求确认，再同时显示同一 SKU 上的 vLLM 和 SGLang。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
+      '按当前图表指标，从所有候选框架中为每款芯片选择表现最佳的配置曲线。每条曲线按其实测 Pareto 前沿在图表中所覆盖的面积计分：在数值较高的区间大幅领先，比多处小幅领先更有分量；没有数据的区间不得分。关闭后，受比较规则限制的官方视图会先要求确认，再同时显示同一 SKU 上的 vLLM 和 SGLang。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
     vendor: '厂商',
     vendorHelp:
       '按芯片制造商筛选，例如 NVIDIA、AMD 或 Google（TPU）。可选择一个或多个厂商；不选则显示全部。',
@@ -119,10 +119,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Vendor pills, in display order. Values must match `HW_REGISTRY` vendors so
- * `pointVendor` can resolve them. Google covers the TPU series (TPU7x).
- */
 const VENDORS = [
   { value: 'NVIDIA', label: 'NVIDIA' },
   { value: 'AMD', label: 'AMD' },
@@ -146,8 +142,6 @@ export function QuickFiltersDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Optional Best per SKU control (scatter chart only) — the chart owns the
-   * toggle logic because overlay mode manages a temporary unified selection. */
   bestPerSku?: { checked: boolean; onCheckedChange: (checked: boolean) => void };
 }) {
   const locale = useLocale();
@@ -214,8 +208,6 @@ export function QuickFiltersDialog({
       })),
       selected: quickFilters.vendors,
     },
-    // A framework lock (embed routes) is not user-editable, so its group is
-    // omitted rather than rendered as a row of disabled pills.
     ...(frameworkOptions.length > 0 && !lockedFrameworks
       ? [
           {
@@ -254,8 +246,6 @@ export function QuickFiltersDialog({
             selected: quickFilters.spec,
           },
         ]),
-    // Shown for agentic too — the options auto-disable when no measured
-    // telemetry exists for the current selection.
     {
       key: 'power' as const,
       label: t.power,
@@ -280,8 +270,6 @@ export function QuickFiltersDialog({
 
   const selectedCount = groups.reduce((count, group) => count + group.selected.length, 0);
 
-  // Every option is a visible toggle: one tap adds or removes it, no dropdown
-  // to open first. Empty selection in a group means "all".
   const handleToggle = (
     category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power' | 'topology',
     value: string,
@@ -330,11 +318,11 @@ export function QuickFiltersDialog({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ListFilter className="size-4 text-brand" />
+            <ListFilter className="size-4 text-muted-foreground" />
             {t.title}
             {selectedCount > 0 && (
               <span
-                className="rounded-full bg-brand/10 px-2 py-0.5 text-2xs font-medium text-brand"
+                className="text-xs font-normal tabular-nums text-muted-foreground"
                 data-testid="quick-filters-selected-count"
               >
                 {selectedCount} {t.selected}
@@ -405,15 +393,14 @@ export function QuickFiltersDialog({
                       key={option.value}
                       type="button"
                       size="sm"
-                      variant={active ? 'default' : 'outline'}
+                      variant={active ? 'brand' : 'outline'}
                       aria-pressed={active}
                       disabled={disabled}
                       title={disabled ? t.noData : undefined}
                       className={cn(
-                        'rounded-full font-normal',
+                        'font-normal',
                         group.key === 'topology' &&
-                          'h-auto min-h-9 max-w-full whitespace-normal break-words rounded-lg py-2 text-left md:h-auto',
-                        active && 'bg-brand hover:bg-brand/90',
+                          'h-auto min-h-9 max-w-full whitespace-normal break-words py-2 text-left md:h-auto',
                       )}
                       data-testid={`quick-filter-${group.key}-${option.value}`}
                       onClick={() => handleToggle(group.key, option.value)}

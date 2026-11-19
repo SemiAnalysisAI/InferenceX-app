@@ -7,10 +7,27 @@ import {
   PURGED_BENCHMARK_POINTS,
   PURGED_RUN_ATTEMPTS,
   PURGED_RUNS,
+  RUN_FRAMEWORK_OVERRIDES,
 } from '../etl/run-overrides';
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it.each([38878624849, 38925660934])(
+    'selects only the whole-run purge for Muse Spark H100 256k corpus run %s',
+    (runId) => {
+      expect(selectRunOverrides(['--run-id', String(runId), '--yes'])).toEqual({
+        runId,
+        conclusions: new Map(),
+        changelogs: [],
+        benchmarks: [],
+        purgedRuns: new Set([runId]),
+        purgedAttempts: new Map(),
+        purgedPoints: [],
+        frameworks: [],
+      });
+    },
+  );
+
   it.each([
     32403083041, 33219708211, 31927376673, 34413290524, 33716849615, 33219706372, 32346724519,
   ])('selects only the whole-run purge for GB300 FP4 TensorRT-LLM AgentX run %s', (runId) => {
@@ -22,6 +39,7 @@ describe('run override selection', () => {
       purgedRuns: new Set([runId]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -36,6 +54,7 @@ describe('run override selection', () => {
         purgedRuns: new Set([runId]),
         purgedAttempts: new Map(),
         purgedPoints: [],
+        frameworks: [],
       });
     },
   );
@@ -49,6 +68,7 @@ describe('run override selection', () => {
       purgedRuns: new Set([35855544139]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -61,6 +81,7 @@ describe('run override selection', () => {
       purgedRuns: new Set([36734492117]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -73,6 +94,7 @@ describe('run override selection', () => {
       purgedRuns: new Set([34819961093]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -85,6 +107,7 @@ describe('run override selection', () => {
       purgedRuns: new Set([34819564154]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -97,6 +120,7 @@ describe('run override selection', () => {
       purgedRuns: new Set([35165441471]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -109,6 +133,20 @@ describe('run override selection', () => {
       purgedRuns: new Set([34926284365]),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
+    });
+  });
+
+  it('selects only the llm-d framework reassignment for TPU v7 Qwen3.5 xPyD run 40744397059', () => {
+    expect(selectRunOverrides(['--run-id', '40744397059'])).toEqual({
+      runId: 40744397059,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set(),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+      frameworks: [expect.objectContaining({ id: 'run-40744397059-llmd-vllm-router' })],
     });
   });
 
@@ -123,6 +161,7 @@ describe('run override selection', () => {
       purgedRuns: new Set(),
       purgedAttempts: new Map(),
       purgedPoints: [],
+      frameworks: [],
     });
   });
 
@@ -142,6 +181,7 @@ describe('run override selection', () => {
       purgedRuns: PURGED_RUNS,
       purgedAttempts: PURGED_RUN_ATTEMPTS,
       purgedPoints: PURGED_BENCHMARK_POINTS,
+      frameworks: RUN_FRAMEWORK_OVERRIDES,
     });
   });
 
@@ -153,6 +193,7 @@ describe('run override selection', () => {
       ...PURGED_RUNS,
       ...PURGED_RUN_ATTEMPTS.keys(),
       ...PURGED_BENCHMARK_POINTS.map((entry) => entry.githubRunId),
+      ...RUN_FRAMEWORK_OVERRIDES.map((entry) => entry.githubRunId),
     ]);
     for (const id of ids) {
       const selected = selectRunOverrides([`--run-id=${id}`]);
@@ -171,6 +212,9 @@ describe('run override selection', () => {
       );
       expect(selected.purgedPoints).toEqual(
         PURGED_BENCHMARK_POINTS.filter((entry) => entry.githubRunId === id),
+      );
+      expect(selected.frameworks).toEqual(
+        RUN_FRAMEWORK_OVERRIDES.filter((entry) => entry.githubRunId === id),
       );
     }
   });

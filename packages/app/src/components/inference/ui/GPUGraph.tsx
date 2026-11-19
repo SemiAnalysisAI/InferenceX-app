@@ -3,6 +3,7 @@
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
@@ -17,21 +18,19 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
+import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
+import { EngineComparisonConflictNotice } from '@/components/inference/ui/engine-comparison-conflict-notice';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { Button } from '@/components/ui/button';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
-import {
-  getInferenceHardwareConfig,
-  getInferenceRunLabel,
-  getOverlayLineLabel,
-} from '@/lib/benchmarks/inference-labels';
+import { getInferenceHardwareConfig, getOverlayLineLabel } from '@/lib/benchmarks/inference-labels';
 import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
-import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
-import { useLogAvailability } from '@/hooks/api/use-log-availability';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type {
@@ -49,12 +48,13 @@ import {
   HIT_AREA_RADIUS,
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
-import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import { computeTooltipPosition, syncPointLabel } from '@/lib/d3-chart/layers/scatter-points';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -75,9 +75,10 @@ import type {
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
-  generateGPUGraphTooltipContent,
-  generateOverlayTooltipContent,
+  buildPointDetails,
+  generateHoverTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { pointLabelText } from '@/components/inference/ui/point-label';
@@ -86,6 +87,10 @@ import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
+import {
+  chartNoticeKey,
+  useDismissedChartNotices,
+} from '@/components/inference/hooks/use-dismissed-chart-notices';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
@@ -119,6 +124,7 @@ import {
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
@@ -136,19 +142,20 @@ const FixedSequenceLogDialog = dynamic(() =>
   ),
 );
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const ReproduceDrawer = dynamic(
+  () =>
+    import('@/components/inference/reproduce/ReproduceDrawer').then(
+      (module) => module.ReproduceDrawer,
+    ),
+  { ssr: false },
+);
 
-// Series id of an unofficial run: `overlay-run<index>_<hwKey>`. Official series
-// ids are `${date}_${hwKey}`, the `activeDates` key.
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
+
 const OVERLAY_SERIES_PREFIX = 'overlay-run';
 
-// Roofline paths in this chart carry the class `roofline-<key>` where key is
-// `${seriesId}_${precision}` (see `renderRooflines`). The perf ruler
-// identifies curves by that class token.
 const ROOFLINE_CLASS_PREFIX = 'roofline-';
 
-// Scales as currently drawn: the base render scales rescaled through the
-// active zoom transform (identity when the chart is not zoomed).
 const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): RenderContext => {
   const transform = d3.zoomTransform(svg);
   if (transform.k === 1 && transform.x === 0 && transform.y === 0) return ctx;
@@ -159,18 +166,18 @@ const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): Rende
   };
 };
 
-// Label text combines the hw config (display label) and the date so
-// both dimensions of the GPU comparison view are legible on the chart,
-// not only the legend. Falls back to the raw hwKey if the config
-// lookup misses (legacy data).
-function hardwareLabelFor(pts: InferenceData[]): string {
+function hardwareLabelFor(pts: InferenceData[], showFrameworkLabel = true): string {
   const hwKey = String(pts[0].hwKey);
   const cfg = getInferenceHardwareConfig(hwKey, pts[0].model, pts);
-  return cfg ? getDisplayLabel(cfg) : hwKey;
+  return cfg ? (showFrameworkLabel ? getDisplayLabel(cfg) : cfg.label) : hwKey;
 }
 
-function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
-  return `${hardwareLabelFor(pts)} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
+function labelTextFor(
+  pts: InferenceData[],
+  numbering: Map<string, number>,
+  showFrameworkLabel: boolean,
+): string {
+  return `${hardwareLabelFor(pts, showFrameworkLabel)} · ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
 const GPU_STRINGS = {
@@ -180,14 +187,15 @@ const GPU_STRINGS = {
     optimalOnly: 'Optimal Only',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    labels: 'Labels',
+    labels: '# of GPUs Label',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
-    resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     noData: 'No data available',
@@ -196,7 +204,7 @@ const GPU_STRINGS = {
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
       'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
   },
   zh: {
     logScale: '对数缩放',
@@ -204,14 +212,15 @@ const GPU_STRINGS = {
     optimalOnly: '仅最优',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    labels: '标签',
+    labels: 'GPU 数量标签',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
+    frameworkLabel: '曲线框架标签',
+    offloadingLabel: 'offload 标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
-    resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     noData: '暂无数据',
@@ -233,6 +242,7 @@ const GPUGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    footer,
     overlayData,
     runNumbering: providedRunNumbering,
   }: ScatterGraphProps) => {
@@ -258,7 +268,10 @@ const GPUGraph = React.memo(
       showConcurrencyLabels,
       highContrast,
       showLineLabels,
+      showOffloadingLabel,
+      showFrameworkLabel,
     } = useInferenceDisplay();
+    const pointLabelsVisible = showPointLabels || useAdvancedLabels || showConcurrencyLabels;
     const {
       setSelectedDates,
       toggleActiveDate,
@@ -272,6 +285,8 @@ const GPUGraph = React.memo(
       setHighContrast,
       selectAllActiveDates,
       setShowLineLabels,
+      setShowOffloadingLabel,
+      setShowFrameworkLabel,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
@@ -299,7 +314,6 @@ const GPUGraph = React.memo(
     const ephemeralUrlState = useEphemeralUrlState();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
-    // A framework lock (embed routes) is not a user filter, so it is not counted.
     const quickFilterCount =
       quickFilters.vendors.length +
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
@@ -326,16 +340,11 @@ const GPUGraph = React.memo(
     const { runNumbering, allGraphs, paletteIdentity, resolveColor, getCssColor } =
       useComparisonSeries(providedRunNumbering);
 
-    // Unofficial runs stay on this chart as their own (run, chip config)
-    // series in the run's colour, next to the compared dates. Same gates as
-    // ScatterGraph: precision, quick filters and overlay hardware selection;
-    // dismissing a run removes its rows from `overlayData`.
     const { runIndexByUrl, unofficialRunInfos, activeOverlayHwTypes } = useUnofficialRun();
     const overlayPoints = useMemo(
       () =>
         (overlayData?.data ?? []).filter(
           (point) =>
-            // Boundary / role siblings are a same-run comparison (see ChartDisplay).
             !point.powerVariant &&
             selectedPrecisions.includes(point.precision) &&
             matchesQuickFilters(point, quickFilters) &&
@@ -358,10 +367,6 @@ const GPUGraph = React.memo(
       [overlayPointSet, overlaySeriesId],
     );
 
-    // Removing a series from the legend should also drop it from the comparison
-    // selection so the config changelog stays in sync (two-way binding). Legend
-    // ids are `${entry}_${gpu}`; strip the gpu suffix to recover the entry. Range
-    // endpoints aren't individual selections, so those fall back to a visibility hide.
     const handleLegendRemove = useCallback(
       (id: string) => {
         const gpu = selectedGPUs.find((g) => id.endsWith(`_${g}`));
@@ -388,11 +393,9 @@ const GPUGraph = React.memo(
       return groups;
     }, [data, selectedPrecisions, overlayPoints, seriesIdOf]);
 
-    // Track which date+GPU combos have actual data points
     const idsWithData = useMemo(() => {
       const ids = new Set<string>();
       for (const key of Object.keys(groupedData)) {
-        // key = "seriesId_precision" — strip last segment
         const lastUnderscore = key.lastIndexOf('_');
         ids.add(key.slice(0, lastUnderscore));
       }
@@ -432,7 +435,6 @@ const GPUGraph = React.memo(
       return keys;
     }, [rooflines, boundaryKeyOf]);
 
-    // Unofficial runs are not date series: the `activeDates` toggles leave them on.
     const activeData = useMemo(
       () =>
         Object.values(groupedData)
@@ -445,7 +447,6 @@ const GPUGraph = React.memo(
       if (hideNonOptimal) return activeData.filter((p) => boundaryPointKeys.has(boundaryKeyOf(p)));
       return activeData;
     }, [activeData, hideNonOptimal, boundaryPointKeys, boundaryKeyOf]);
-    // Official points join the scatter layer; unofficial ones draw as X markers.
     const officialPoints = useMemo(
       () => filteredData.filter((point) => !overlayPointSet.has(point)),
       [filteredData, overlayPointSet],
@@ -455,40 +456,23 @@ const GPUGraph = React.memo(
       [filteredData, overlayPointSet],
     );
 
-    // Keep domains fixed so revealing off-boundary dots cannot move power curves.
     const scaleData = powerEnvelopeMode ? activeData : filteredData;
 
-    // Only official DB-backed points have a benchmark_results id, a persisted
-    // trace and logs; unofficial overlays cannot open those routes.
-    const agenticIds = useMemo(
-      () =>
-        officialPoints.flatMap((point) =>
-          point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)
-            ? [point.id]
-            : [],
-        ),
+    const hasPersistedPoint = useMemo(
+      () => officialPoints.some((point) => isPersistedBenchmarkId(point.id)),
       [officialPoints],
     );
-    const { data: traceAvailability } = useTraceAvailability(agenticIds);
-    const traceAvailabilityRef = useRef(traceAvailability);
-    traceAvailabilityRef.current = traceAvailability;
-
-    // Log availability applies to every persisted official point in the
-    // comparison, including fixed-sequence runs.
-    const persistedPointIds = useMemo(
-      () => officialPoints.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
-      [officialPoints],
-    );
-    const { data: logAvailability } = useLogAvailability(persistedPointIds);
-    const logAvailabilityRef = useRef(logAvailability);
-    logAvailabilityRef.current = logAvailability;
+    const { data: presence } = useBenchmarkPresence(hasPersistedPoint);
+    const presenceRef = useRef(presence);
+    presenceRef.current = presence;
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
+    const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
+    useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
+    useDialogCloseTracking(fixedLogPointId !== null, 'gpu_timeseries_logs_closed');
+    useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
 
-    // Warning annotations for visible series (official and unofficial) with
-    // known upstream issues — same treatment the scatter view gets. Lines here
-    // are colored per (gpu, date) pair, so take the first active pair's color
-    // as the series swatch. Official-preview notices follow official data only.
+    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
         modelLabel,
@@ -529,8 +513,9 @@ const GPUGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations;
+      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
     }, [
+      dismissedNotices,
       modelLabel,
       filteredData,
       officialPoints,
@@ -553,16 +538,28 @@ const GPUGraph = React.memo(
             onLinkClick: (annotation) =>
               annotation.issue &&
               track('inference_known_issue_clicked', {
-                hwKey: annotation.issue.hwKey,
+                gpu: annotation.issue.hwKey,
                 issue: annotation.issue.issueRef,
               }),
+            onDismiss: (annotation) => {
+              track('inference_chart_notice_dismissed', { notice: chartNoticeKey(annotation) });
+              dismissNotice(annotation);
+            },
+            dismissLabel: locale === 'zh' ? '关闭提示' : 'Dismiss notice',
           }),
-          paletteIdentity,
+          `${paletteIdentity}:${[...dismissedNotices].join(',')}`,
         ),
-      [chartId, knownIssueAnnotations, getCssColor, paletteIdentity],
+      [
+        chartId,
+        knownIssueAnnotations,
+        getCssColor,
+        paletteIdentity,
+        dismissNotice,
+        dismissedNotices,
+        locale,
+      ],
     );
 
-    // Compute scale domains
     const xExtent = useMemo(() => {
       if (scaleData.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(scaleData, (d) => d.x) as [number, number];
@@ -595,9 +592,6 @@ const GPUGraph = React.memo(
       () => filteredData.map(pointIdentity).toSorted().join('|'),
       [filteredData, pointIdentity],
     );
-    // Tooltip-only trace availability is deliberately excluded from chart
-    // identity; the long-lived D3 content callback reads its latest value via
-    // traceAvailabilityRef.
     const metricIdentity = useMemo(
       () =>
         [
@@ -624,7 +618,6 @@ const GPUGraph = React.memo(
       ],
     );
 
-    // Color resolver for points/rooflines; an unofficial run keeps its run color.
     const getColor = useMemo(
       () => (d: InferenceData) => {
         if (overlayPointSet.has(d)) return overlayRunColor(overlayRunOf(d));
@@ -653,22 +646,17 @@ const GPUGraph = React.memo(
       [activeDates, rooflines, overlayPointSet],
     );
 
-    // Unofficial-run curves keep the run's dash, as in ScatterGraph.
     const getRooflineDasharray = useCallback(
       (key: string) => {
         const point = rooflines[key]?.[0];
-        return point && overlayPointSet.has(point)
+        if (!point) return null;
+        return overlayPointSet.has(point)
           ? overlayRooflineDasharray(overlayRunOf(point))
-          : null;
+          : (frameworkDasharray(point.hwKey) ?? null);
       },
       [rooflines, overlayPointSet, overlayRunOf],
     );
 
-    // ── Line labels (date along each roofline) ──
-    // One label per (date, hwKey) pair — keys with multiple precisions for the
-    // same combo dedupe down to the longest roofline so the label rides the
-    // line that has the most placement options. Labels track the active filter
-    // (`activeDates`) so removing a series via the legend hides its label too.
     const lineLabelLayer: CustomLayerConfig = useMemo(() => {
       const buildSeries = (): LineLabelSeries<InferenceData>[] => {
         const bestByGraph = new Map<
@@ -683,7 +671,6 @@ const GPUGraph = React.memo(
             bestByGraph.set(graphId, { key, graphId, points });
           }
         }
-        // Runs drawing the same hardware need a run tag on their pills.
         const overlayRunsByHw = new Map<string, Set<number>>();
         for (const { points } of bestByGraph.values()) {
           if (!overlayPointSet.has(points[0])) continue;
@@ -693,7 +680,7 @@ const GPUGraph = React.memo(
         }
         const overlayLabelFor = (points: InferenceData[]) => {
           const info = unofficialRunInfos[overlayRunOf(points[0])];
-          const hardwareLabel = hardwareLabelFor(points);
+          const hardwareLabel = hardwareLabelFor(points, showFrameworkLabel);
           const sharesHardware = (overlayRunsByHw.get(String(points[0].hwKey))?.size ?? 0) > 1;
           return info ? getOverlayLineLabel(hardwareLabel, info, sharesHardware) : hardwareLabel;
         };
@@ -702,7 +689,7 @@ const GPUGraph = React.memo(
           seriesId: graphId,
           label: overlayPointSet.has(points[0])
             ? overlayLabelFor(points)
-            : labelTextFor(points, runNumbering),
+            : labelTextFor(points, runNumbering, showFrameworkLabel),
           color: getRooflineColor(key),
           points,
         }));
@@ -712,61 +699,71 @@ const GPUGraph = React.memo(
         yScale: ContinuousScale,
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ) => {
-        if (!showLineLabels) return [];
+        if (!showLineLabels) return { labels: [], occluders: [] };
         const series = buildSeries();
-        // Both chart types spread labels along their lines with collision
-        // avoidance — endpoint-only placement stacked every label at the
-        // right edge of the e2e latency chart.
-        return placeLineLabels(series, xScale, yScale, {
-          collisionWidth: 160,
-          obstacles: parallelismLabelBoxes(zoomGroup.node()),
-        });
+        const labelKeyByGraph = new Map(series.map((entry) => [entry.seriesId, entry.key]));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(rooflines)) {
+          if (points.length === 0 || !isRooflineVisible(key)) continue;
+          occluders.push({
+            key: labelKeyByGraph.get(seriesIdOf(points[0])) ?? key,
+            points: points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) })),
+          });
+        }
+        return {
+          labels: placeLineLabels(series, xScale, yScale, {
+            collisionWidth: 160,
+            obstacles: parallelismLabelBoxes(zoomGroup.node()),
+          }),
+          occluders,
+        };
       };
 
       return {
         type: 'custom',
         key: 'line-labels',
-        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${paletteIdentity}`,
+        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${showFrameworkLabel}:${paletteIdentity}`,
         render: (zoomGroup, ctx) => {
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.xScale as ContinuousScale,
+            ctx.yScale as ContinuousScale,
             zoomGroup,
-            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale, zoomGroup),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
           const transform = d3.zoomTransform(ctx.layout.svg.node()!);
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            transform.rescaleX(ctx.xScale as ContinuousScale),
+            transform.rescaleY(ctx.yScale as ContinuousScale),
             zoomGroup,
-            placeLabels(
-              transform.rescaleX(ctx.xScale as ContinuousScale),
-              transform.rescaleY(ctx.yScale as ContinuousScale),
-              zoomGroup,
-            ),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
           zoomGroup.selectAll('.line-label').raise();
         },
         onZoom: (zoomGroup, ctx) => {
-          updateRenderedLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
             zoomGroup,
-            placeLabels(
-              ctx.newXScale as ContinuousScale,
-              ctx.newYScale as ContinuousScale,
-              zoomGroup,
-            ),
-            { opacity: showLineLabels ? 0.95 : 0 },
           );
+          updateRenderedLineLabels(zoomGroup, labels, {
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
       };
     }, [
       showLineLabels,
+      showFrameworkLabel,
       rooflines,
       isRooflineVisible,
       getRooflineColor,
@@ -779,43 +776,21 @@ const GPUGraph = React.memo(
       unofficialRunInfos,
     ]);
 
-    // ── Perf ruler (opt-in: click two curves, drag the ruler to any iso-x) ──
-    // Same curve-to-curve ISO-X semantics as ScatterGraph, applied to the
-    // date/chip comparison view: each measurement is two rendered roofline
-    // paths (class tokens `roofline-<seriesId>_<precision>`) plus an
-    // iso-x stored in DATA space so it survives zoom (axis-metric changes
-    // clear rulers; see usePerfRulerAxisReset).
-    // Any two curves may be paired — two dates of the same chip config, two
-    // chip configs on the same date, an unofficial run, or a mix — which is
-    // the point of this view: quantify the multiple between comparison series
-    // at a glance.
     const [perfRulerMode, setPerfRulerMode] = useState(false);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
-    // Changing the x- or y-axis metric clears every ruler: the curves are
-    // redrawn in different units, so a ruler that persisted would measure a
-    // ratio the user never placed. Runs before the draw pass so no stale
-    // ruler ever paints over the new curves.
     usePerfRulerAxisReset(
       perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
       setPerfRulerState,
     );
-    // Draw passes read mode/state through refs so toggling off clears the
-    // rulers in the same pre-paint layout pass (no lingering frame).
     const perfRulerModeRef = useRef(perfRulerMode);
     perfRulerModeRef.current = perfRulerMode;
     const perfRulerStateRef = useRef(perfRulerState);
     perfRulerStateRef.current = perfRulerState;
-    // Live per-ruler iso-x overrides while dragging (committed on drag end).
-    // Cleared in an effect when committed state changes, not per render, so
-    // an unrelated re-render mid-drag cannot snap the dragged ruler back.
     const perfRulerLiveIsoXRef = useRef(new Map<number, number>());
     useLayoutEffect(() => {
       perfRulerLiveIsoXRef.current.clear();
     }, [perfRulerState]);
 
-    // Scales/group from the most recent draw pass — click and drag handlers
-    // convert between pixel and data space with the exact scales the chart
-    // is currently drawn with.
     const perfRulerDrawCtxRef = useRef<{
       zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
       xScale: ContinuousScale;
@@ -823,8 +798,6 @@ const GPUGraph = React.memo(
       width: number;
       height: number;
     } | null>(null);
-    // Forward ref: the drag frame needs to redraw, but drawPerfRuler is
-    // defined below (it also attaches the drag behavior — benign cycle).
     const drawPerfRulerRef = useRef<
       | ((
           zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -836,10 +809,6 @@ const GPUGraph = React.memo(
       | null
     >(null);
 
-    // Completion clamp: the stored iso-x must lie inside the curve pair's
-    // overlapping x range, or the completed ruler could render nowhere (no
-    // line and no drag handle to recover it). Null rejects the measurement
-    // and keeps the draft anchored.
     const clampPerfRulerIsoXToOverlap = useCallback(
       (curveA: string, curveB: string, isoX: number): number | null => {
         const ctx = perfRulerDrawCtxRef.current;
@@ -857,8 +826,6 @@ const GPUGraph = React.memo(
       [],
     );
 
-    // Curve click (widened hit strokes): iso-x is the click's x pixel
-    // through the CURRENT rendered x scale, stored in data space.
     const handlePerfRulerCurveClick = useCallback(
       (curve: string, pixelX: number) => {
         const ctx = perfRulerDrawCtxRef.current;
@@ -876,16 +843,11 @@ const GPUGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // A point click selects its series' curve (a compared date's or an
-    // unofficial run's) at that point's x, including off-boundary measurements.
-    // Ruler-mode clicks measure INSTEAD of pinning the tooltip, so drop the
-    // pin the shared click handler applied just before this callback ran.
     const handlePerfRulerPointClick = useCallback(
       (point: InferenceData) => {
         const ctx = perfRulerDrawCtxRef.current;
         if (!ctx) return;
         const curve = `${ROOFLINE_CLASS_PREFIX}${seriesIdOf(point)}_${point.precision}`;
-        // Single-point series render no roofline path — nothing to measure.
         if (ctx.zoomGroup.select(`.${CSS.escape(curve)}`).empty()) return;
         setPerfRulerState((prev) =>
           nextPerfRulerState(prev, { curve, isoX: point.x }, clampPerfRulerIsoXToOverlap),
@@ -896,26 +858,13 @@ const GPUGraph = React.memo(
       [clampPerfRulerIsoXToOverlap, seriesIdOf],
     );
 
-    // Read by long-lived D3 click closures (official tooltip config + overlay
-    // marker handlers), which are captured at render time — refs over closures.
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
-    // Turning the toggle off clears ALL rulers and any in-progress selection
-    // (the switch handler also clears synchronously; this covers programmatic
-    // mode changes). `clearPerfRulers` bails out with the same reference
-    // when there is nothing to clear.
     useEffect(() => {
       if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
     }, [perfRulerMode]);
 
-    // Invisible widened hit strokes over every rendered roofline path make
-    // the curves themselves clickable in ruler mode. This chart renders
-    // rooflines straight into the zoom group (no `.rooflines-layer` wrapper),
-    // so the hit layer is inserted right after the LAST roofline path: above
-    // the visible strokes, below the dot-groups (which the renderer raises to
-    // the end), so point hover/click behavior is untouched. The layer only
-    // exists while ruler mode is on.
     const syncPerfRulerHitPaths = useCallback(
       (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         let hitLayer = zoomGroup.select<SVGGElement>('.perf-ruler-hits');
@@ -933,8 +882,6 @@ const GPUGraph = React.memo(
           lastRoofline.after(node);
           hitLayer = d3.select(node) as typeof hitLayer;
         } else if (hitLayer.node()!.previousElementSibling !== lastRoofline) {
-          // A data re-render may have appended new roofline paths after the
-          // hit layer; keep the hit strokes directly above every roofline.
           lastRoofline.after(hitLayer.node()!);
         }
         interface HitEntry {
@@ -943,12 +890,8 @@ const GPUGraph = React.memo(
         }
         const entries: HitEntry[] = [];
         for (const node of rooflineNodes) {
-          // The identity token is the curve-specific class, e.g.
-          // `roofline-2026-08-31_MI355X_fp4`.
           const curve = [...node.classList].find((cls) => cls !== 'roofline-path');
           const d = node.getAttribute('d');
-          // Legend hover dims curves to a small non-zero opacity (still
-          // measurable); anything at opacity 0 must not be clickable.
           if (!curve || !d || !isPerfRulerCurveVisible(node.style.opacity)) continue;
           entries.push({ curve, d });
         }
@@ -961,9 +904,6 @@ const GPUGraph = React.memo(
           .attr('fill', 'none')
           .attr('d', (e) => e.d)
           .attr('stroke', 'var(--primary)')
-          // Selected curves get a faint halo as feedback; unselected hit
-          // strokes are fully transparent (`pointer-events: stroke` still
-          // hit-tests the invisible stroke geometry).
           .attr('stroke-opacity', (e) => (selected.has(e.curve) ? 0.18 : 0))
           .attr('stroke-width', 13)
           .style('pointer-events', 'stroke')
@@ -977,11 +917,6 @@ const GPUGraph = React.memo(
       [],
     );
 
-    // Horizontal drag on a ruler line fine-tunes that ruler's iso-x.
-    // rAF-throttled: each frame clamps the pointer x to the curve pair's
-    // overlapping x range, updates the live iso-x, and redraws; the value
-    // commits to React state on drag end. d3.drag stops mousedown
-    // propagation itself, so dragging a ruler never pans the chart.
     const perfRulerDragTargetRef = useRef<{ id: number; pixelX: number } | null>(null);
     const perfRulerDragFrameRef = useRef<number | null>(null);
     const applyPerfRulerDragFrame = useCallback(() => {
@@ -1025,7 +960,6 @@ const GPUGraph = React.memo(
             },
           )
           .on('end', () => {
-            // Flush the pending frame, then commit this ruler's iso-x.
             if (perfRulerDragFrameRef.current !== null) {
               cancelAnimationFrame(perfRulerDragFrameRef.current);
               perfRulerDragFrameRef.current = null;
@@ -1041,10 +975,6 @@ const GPUGraph = React.memo(
       [],
     );
 
-    // Draw (or clear) the hit strokes and all rulers for the current draw
-    // pass. Stable callback: render/zoom passes read mode, rulers, and live
-    // iso-x values through refs, so the custom layer needs no perf-ruler
-    // dependencies and a ruler interaction never rebuilds the chart.
     const drawPerfRuler = useCallback(
       (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -1058,12 +988,6 @@ const GPUGraph = React.memo(
         const state = perfRulerStateRef.current;
         const entries: PerfRulerRenderEntry[] = [];
         if (perfRulerModeRef.current && state.rulers.length > 0) {
-          // Both ends of each ruler are interpolated on the RENDERED paths so
-          // the ruler matches the drawn curves exactly at any zoom level
-          // (rooflines redraw before this layer runs). A ruler whose curve is
-          // missing this frame (legend-hidden series drop their paths in this
-          // chart) or does not span the iso-x draws nothing but KEEPS its
-          // state, so re-showing the series brings it back.
           const geometries: (PerfRulerGeometry | null)[] = state.rulers.map((ruler) => {
             const isoX = perfRulerLiveIsoXRef.current.get(ruler.id) ?? ruler.isoX;
             const pixelX = xScale(isoX);
@@ -1078,7 +1002,6 @@ const GPUGraph = React.memo(
             }
             return ends.length === 2 ? computeIsoXRulerGeometry(pixelX, ends[0], ends[1]) : null;
           });
-          // Lay out all labels together so overlapping labels nudge apart.
           const layouts = computePerfRulerLabelLayouts(geometries, {
             chartWidth: width,
             chartHeight: height,
@@ -1097,9 +1020,6 @@ const GPUGraph = React.memo(
             setPerfRulerState((prev) => deletePerfRuler(prev, id));
           },
         });
-        // (Re)attach the horizontal drag behavior to the (possibly fresh)
-        // drag handles the render pass just joined — their datum (the
-        // render entry) tells the drag which ruler it moves.
         const dragHandles = zoomGroup.selectAll<SVGLineElement, PerfRulerRenderEntry>(
           '.perf-ruler .pr-drag',
         );
@@ -1109,10 +1029,6 @@ const GPUGraph = React.memo(
     );
     drawPerfRulerRef.current = drawPerfRuler;
 
-    // Custom layer: full renders (data/metric passes) redraw the rulers after
-    // the rooflines, and onZoom keeps them glued to the curves during
-    // pan/zoom. Lives inside the zoom group so it is clipped and PNG-exported
-    // like any other mark. Stable identity — it reads everything via refs.
     const perfRulerLayer: CustomLayerConfig = useMemo(
       () => ({
         type: 'custom',
@@ -1137,8 +1053,6 @@ const GPUGraph = React.memo(
       [drawPerfRuler],
     );
 
-    // Render context from the last D3 render — lets the ruler effect redraw
-    // with the same layout/scales the chart was drawn with.
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
     const getDisplaySelection = useCallback(() => {
       const svg = chartRef.current?.getSvgElement?.();
@@ -1148,13 +1062,6 @@ const GPUGraph = React.memo(
       return zoomGroup.empty() ? null : { svg, ctx, zoomGroup };
     }, []);
 
-    // Perf-ruler decorations: refresh the curve hit strokes and redraw all
-    // rulers whenever the mode, ruler state, or the plotted data change.
-    // Narrow mutation scope — only the hit layer and the ruler groups are
-    // touched. Rulers are pruned by DATA existence, not DOM presence: a
-    // series hidden via the legend drops its path from this chart but keeps
-    // its roofline entry, so its rulers survive until the series (a date, a
-    // chip config, or a precision) actually leaves the comparison.
     useLayoutEffect(() => {
       const display = getDisplaySelection();
       if (!display) return;
@@ -1182,7 +1089,6 @@ const GPUGraph = React.memo(
       rooflines,
     ]);
 
-    // Dismiss tooltip when pinned point's series is hidden
     useEffect(() => {
       const handle = chartRef.current;
       const pp = handle?.getPinnedPoint() as InferenceData | null;
@@ -1193,7 +1099,6 @@ const GPUGraph = React.memo(
       if (!visible) handle?.dismissTooltip();
     }, [activeDates, activeOverlayHwTypes]);
 
-    // Dismiss on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
     }, [
@@ -1205,9 +1110,6 @@ const GPUGraph = React.memo(
       overlayData,
     ]);
 
-    // One legend group per unofficial run (grouped legends split on the first
-    // word of `name`), one row per chip config the run draws. Runs are
-    // dismissed from the banner, not the legend.
     const overlayLegendItems = useMemo(() => {
       const bySeries = new Map<string, InferenceData[]>();
       for (const point of overlayPoints) {
@@ -1221,8 +1123,9 @@ const GPUGraph = React.memo(
         return {
           name: `unofficial-run-${info?.id ?? runIndex} ${points[0].hwKey}`,
           hw: id,
-          label: getInferenceRunLabel(`✕ ${hardwareLabelFor(points)}`, points),
+          label: `✕ ${hardwareLabelFor(points)}`,
           color: overlayRunColor(runIndex),
+          lineDasharray: overlayRooflineDasharray(runIndex),
           title: legendT.unofficialTitle(branch),
           isActive: true,
           isRemovable: false,
@@ -1231,16 +1134,77 @@ const GPUGraph = React.memo(
       });
     }, [overlayPoints, overlaySeriesId, overlayRunOf, unofficialRunInfos, legendT]);
 
-    // ── Unofficial-run points: ScatterGraph's X markers in the run color. The
-    // run curves go through the roofline layer; index keys let repeated
-    // observations of one config all draw. ──
-    const attachPowerTraceAction = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(chartRef);
+
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          comparisonDate: true,
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
+          showPowerTelemetry: showPowerTelemetryRef.current,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? presenceRef.current?.trace.has(d.id) === true
+              : false,
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? presenceRef.current?.log.has(d.id) === true
+            : false,
+          locale,
+          color: getColor(d),
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
+    );
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: getColor(d),
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
+          locale,
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
+    );
     const overlayPointsLayer: CustomLayerConfig = useMemo(() => {
       const updateLabels = (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         zoomGroup
           .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
           .each(function (d) {
-            const lines = pointLabelText(d, useAdvancedLabels, showConcurrencyLabels).split('\n');
+            const lines = pointLabelText(
+              d,
+              showPointLabels,
+              useAdvancedLabels,
+              showConcurrencyLabels,
+            ).split('\n');
             d3.select(this)
               .selectAll<SVGTextElement, boolean>('.overlay-label')
               .data([true])
@@ -1251,7 +1215,7 @@ const GPUGraph = React.memo(
               .attr('font-weight', '700')
               .attr('pointer-events', 'none')
               .style('fill', 'var(--foreground)')
-              .style('display', showPointLabels ? '' : 'none')
+              .style('display', pointLabelsVisible ? '' : 'none')
               .selectAll<SVGTSpanElement, string>('tspan')
               .data(lines)
               .join('tspan')
@@ -1265,7 +1229,7 @@ const GPUGraph = React.memo(
       return {
         type: 'custom',
         key: 'overlay-points',
-        displayIdentity: `labels:${showPointLabels}`,
+        displayIdentity: `labels:${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}`,
         render: (zoomGroup, ctx) => {
           const xScale = ctx.xScale as ContinuousScale;
           const yScale = ctx.yScale as ContinuousScale;
@@ -1290,7 +1254,12 @@ const GPUGraph = React.memo(
           marks.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
           marks.select('.overlay-x').attr('stroke', (d) => overlayRunColor(overlayRunOf(d)));
           marks.each(function (d) {
-            renderOffloadHalo(d3.select(this), d, overlayRunColor(overlayRunOf(d)));
+            renderOffloadHalo(
+              d3.select(this),
+              d,
+              overlayRunColor(overlayRunOf(d)),
+              showOffloadingLabel,
+            );
           });
           updateLabels(zoomGroup);
 
@@ -1302,19 +1271,8 @@ const GPUGraph = React.memo(
             hoverPath: xMarkerPath(7, 0.7),
             tooltip,
             handle: chartRef.current,
-            content: (point, pinned) =>
-              overlayData
-                ? generateOverlayTooltipContent({
-                    data: point,
-                    isPinned: pinned,
-                    xLabel,
-                    yLabel,
-                    selectedYAxisMetric,
-                    hardwareConfig: overlayData.hardwareConfig,
-                    overlayData,
-                    locale,
-                  })
-                : '',
+            panel: true,
+            content: (point) => hoverCard(point, true),
             position: (event) => {
               const [mouseX, mouseY] = d3.pointer(event, container);
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -1332,27 +1290,24 @@ const GPUGraph = React.memo(
               hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
             },
             onClick: (point) => {
-              // Ruler mode: the marker measures its run's curve instead of
-              // keeping the tooltip the shared handler just pinned.
               const ruler = perfRulerRef.current;
               if (ruler.mode) {
                 track('gpu_timeseries_data_point_clicked', {
-                  hw: String(point.hwKey),
+                  gpu: String(point.hwKey),
                   x: point.x,
                   y: point.y,
                   overlay: true,
-                  perfRuler: true,
+                  perf_ruler: true,
                 });
                 ruler.onPointClick(point);
                 return;
               }
               track('gpu_timeseries_data_point_clicked', {
-                hw: String(point.hwKey),
+                gpu: String(point.hwKey),
                 x: point.x,
                 y: point.y,
                 overlay: true,
               });
-              attachPowerTraceAction(ctx.tooltipElement, point, true);
             },
           });
         },
@@ -1367,23 +1322,16 @@ const GPUGraph = React.memo(
       };
     }, [
       visibleOverlayPoints,
+      showOffloadingLabel,
       overlayRunOf,
-      overlayData,
       showPointLabels,
+      pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
-      xLabel,
-      yLabel,
-      selectedYAxisMetric,
-      locale,
-      attachPowerTraceAction,
+      hoverCard,
+      getColor,
     ]);
 
-    // Hover dimming animates via the inline `transition: opacity 150ms ease`
-    // onRender puts on dots and rooflines — a single style write per node. A
-    // d3 `.transition()` here would re-write opacity every animation frame,
-    // each write restarting the CSS transition (transitionrun/cancel per node
-    // per frame). Same rationale as ScatterGraph's hover handlers.
     const handleLegendHover = useCallback(
       (seriesId: string) => {
         const svg = chartRef.current?.getSvgElement?.();
@@ -1411,6 +1359,36 @@ const GPUGraph = React.memo(
       root.selectAll('.dot-group, .unofficial-overlay-pt').style('opacity', null);
       root.selectAll('.roofline-path').style('opacity', null);
     }, []);
+
+    const syncOffloadHalos = (group: RenderContext['layout']['zoomGroup']) => {
+      group.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+        renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
+      });
+      group.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (point) {
+        renderOffloadHalo(
+          d3.select(this),
+          point,
+          overlayRunColor(overlayRunOf(point)),
+          showOffloadingLabel,
+        );
+      });
+    };
+
+    const decorateRender = (ctx: RenderContext) => {
+      if (logScale) {
+        const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
+        ctx.layout.yAxisGroup.call(
+          d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
+        );
+      }
+      const group = ctx.layout.zoomGroup;
+      group.selectAll('.point-label').style('fill', 'var(--foreground)');
+      if (pointLabelsVisible) keepPointLabelsInPlot(group);
+      group
+        .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
+        .style('transition', 'opacity 150ms ease');
+      syncOffloadHalos(group);
+    };
 
     if (data.length === 0 && overlayPoints.length === 0) {
       return (
@@ -1448,6 +1426,7 @@ const GPUGraph = React.memo(
               </Button>
             </div>
           </div>
+          {footer}
           <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
@@ -1456,18 +1435,18 @@ const GPUGraph = React.memo(
     const chart = (
       <D3Chart<InferenceData>
         ref={chartRef}
-        // Embeds drop the zoom/pan hint line; the host page has its own caption.
         instructions={minimalChrome ? '' : undefined}
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        displayIdentity={`${showPointLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
+        displayIdentity={`${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${showOffloadingLabel}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
         data={officialPoints}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}
+        footer={footer}
         xScale={{ type: 'linear', domain: xExtent, nice: true }}
         yScale={{ type: logScale ? 'log' : 'linear', domain: yDomain, nice: true }}
         xAxis={{
@@ -1498,12 +1477,13 @@ const GPUGraph = React.memo(
             data: officialPoints,
             config: {
               getColor,
-              hideLabels: !showPointLabels,
+              hideLabels: !pointLabelsVisible,
               // Match ScatterGraph: concurrency (C=) is appended only when the
               // advanced "# Concurrent Sessions" toggle is on, so compare-mode
               // points are annotated the same way as the single-run scatter
               // chart.
-              getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
+              getLabelText: (d) =>
+                pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
               foreground: 'var(--foreground)',
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
@@ -1533,29 +1513,55 @@ const GPUGraph = React.memo(
               );
             }
             // Zoom moves points toward the plot edges; keep their labels inside.
-            if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
+            if (pointLabelsVisible) keepPointLabelsInPlot(ctx.layout.zoomGroup);
           },
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: InferenceData, isPinned: boolean) =>
-            generateGPUGraphTooltipContent({
-              data: d,
-              isPinned,
-              xLabel,
-              yLabel,
-              selectedYAxisMetric,
-              hardwareConfig,
-              showPowerTelemetry: showPowerTelemetryRef.current,
-              runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace: isPersistedBenchmarkId(d.id)
-                ? traceAvailabilityRef.current?.[d.id] === true
-                : false,
-              hasLog: isPersistedBenchmarkId(d.id)
-                ? logAvailabilityRef.current?.[d.id] === true
-                : false,
-              locale,
-            }),
+          content: (d: InferenceData) => hoverCard(d, false),
+          details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+            <PointDetailsPanel
+              details={pointDetails(d, isOverlay)}
+              color={getColor(d)}
+              onClose={close}
+              onAction={(action, event) => {
+                event.stopPropagation();
+                if (action === 'view-power-trace') {
+                  openPowerTrace(event, d, isOverlay);
+                } else if (action === 'view-charts') {
+                  if (!ephemeralUrlState) rememberChartStateInUrl();
+                  track('gpu_timeseries_view_charts_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                  });
+                } else if (action === 'view-power-telemetry') {
+                  setPowerTelemetryPoint(d);
+                  chartRef.current?.dismissTooltip();
+                  track('inference_power_telemetry_opened', {
+                    id: d.id,
+                    gpu: d.hwKey,
+                    conc: d.conc,
+                  });
+                } else if (action === 'reproduce') {
+                  setReproducePoint(d);
+                  chartRef.current?.dismissTooltip();
+                } else if (action === 'view-logs' && typeof d.id === 'number') {
+                  if (d.benchmark_type !== 'agentic_traces') {
+                    event.preventDefault();
+                    setFixedLogPointId(d.id);
+                    chartRef.current?.dismissTooltip();
+                  }
+                  track('gpu_timeseries_view_logs_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                    benchmark_type: d.benchmark_type ?? 'single_turn',
+                  });
+                }
+              }}
+            />
+          ),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
@@ -1569,306 +1575,243 @@ const GPUGraph = React.memo(
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onPointClick: (d: InferenceData) => {
-            // Ruler mode: a point click measures its curve instead of pinning
-            // the tooltip (the handler un-pins what the shared click applied).
             const ruler = perfRulerRef.current;
             if (ruler.mode) {
               track('gpu_timeseries_data_point_clicked', {
                 id: d.id,
-                hw: String(d.hwKey),
+                gpu: String(d.hwKey),
                 x: d.x,
                 y: d.y,
-                perfRuler: true,
+                perf_ruler: true,
               });
               ruler.onPointClick(d);
               return;
             }
             track('gpu_timeseries_data_point_clicked', {
               id: d.id,
-              hw: String(d.hwKey),
+              gpu: String(d.hwKey),
               x: d.x,
               y: d.y,
-            });
-            const tooltipEl = chartRef.current?.getTooltipElement();
-            if (!tooltipEl) return;
-            const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (viewBtn && isPersistedBenchmarkId(d.id)) {
-              viewBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                // Full-document navigation: stamp the chart state onto THIS
-                // history entry first, or Back returns to a bare /inference
-                // that rebuilds from defaults. Skipped in ephemeral scopes
-                // (/model embeds): the store holds the primary dashboard's
-                // state there, not this chart's.
-                if (!ephemeralUrlState) rememberChartStateInUrl();
-                track('gpu_timeseries_view_charts_opened', {
-                  id: d.id,
-                  hwKey: String(d.hwKey),
-                  conc: d.conc,
-                });
-              });
-            }
-            const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
-            if (powerBtn && isPersistedBenchmarkId(d.id)) {
-              powerBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                setPowerTelemetryPoint(d);
-                chartRef.current?.dismissTooltip();
-                track('inference_power_telemetry_opened', {
-                  id: d.id,
-                  hwKey: d.hwKey,
-                  conc: d.conc,
-                });
-              });
-            }
-            const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-            if (logsBtn && typeof d.id === 'number') {
-              logsBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                if (d.benchmark_type !== 'agentic_traces') {
-                  event.preventDefault();
-                  setFixedLogPointId(d.id!);
-                  chartRef.current?.dismissTooltip();
-                }
-                track('gpu_timeseries_view_logs_opened', {
-                  id: d.id,
-                  hwKey: String(d.hwKey),
-                  conc: d.conc,
-                  benchmarkType: d.benchmark_type ?? 'single_turn',
-                });
-              });
-            }
-            attachPowerTraceAction(tooltipEl, d, false);
-            // Pinning updates D3Chart's React state. GPU comparison rebuilds
-            // several inline layer configs on that render, whose cleanup can
-            // briefly hide the otherwise-pinned portal tooltip. Restore its
-            // pinned visibility after that render settles.
-            requestAnimationFrame(() => {
-              const pinnedTooltip = chartRef.current?.getTooltipElement();
-              if (!pinnedTooltip || chartRef.current?.getPinnedPoint() !== d) return;
-              pinnedTooltip.style.opacity = '1';
-              pinnedTooltip.style.display = 'block';
-              pinnedTooltip.style.pointerEvents = 'auto';
             });
           },
           attachToLayer: 1,
         }}
         onDisplayUpdate={(ctx: RenderContext) => {
-          // Point labels are laid out only while visible (a hidden label has
-          // no measurable box), so re-run the plot-bounds constraint once the
-          // display phase has turned them back on.
-          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
-        }}
-        onRender={(ctx: RenderContext) => {
-          // Remembered so the perf-ruler effect can redraw against the same
-          // layout and scales the chart was last drawn with.
-          lastRenderCtxRef.current = ctx;
-          // Apply log tick format on initial render (needs the built scale)
-          if (logScale) {
-            const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<
-              number,
-              number
-            >;
-            ctx.layout.yAxisGroup.call(
-              d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
-            );
-          }
-          // Set foreground color on scatter point labels
-          ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
-          // Strict plot bounding box: a label that would be sliced by the clip
-          // path flips to the other side of its point or slides inward.
-          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
-
-          // CSS transitions for smooth opacity animation on legend hover —
-          // the hover handlers write opacity once and let these animate.
-          ctx.layout.zoomGroup
-            .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
-            .style('transition', 'opacity 150ms ease');
-
-          // The offload halo stays inside the point group, so normal zoom
-          // transforms carry it without a separate update pass.
+          syncOffloadHalos(ctx.layout.zoomGroup);
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
             .each(function (point) {
-              renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
+              syncPointLabel(
+                this,
+                pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
+                'var(--foreground)',
+                !pointLabelsVisible,
+              );
             });
+          // Point labels are laid out only while visible (a hidden label has
+          // no measurable box), so re-run the plot-bounds constraint once the
+          // display phase has turned them back on.
+          if (pointLabelsVisible) keepPointLabelsInPlot(ctx.layout.zoomGroup);
         }}
+        onRender={(ctx: RenderContext) => {
+          lastRenderCtxRef.current = ctx;
+          decorateRender(ctx);
+        }}
+        onExportRender={decorateRender}
         legendElement={
-          <ChartLegend
-            variant="sidebar"
-            grouped={true}
-            disableActiveSort={true}
-            onItemHover={handleLegendHover}
-            onItemHoverEnd={handleLegendHoverEnd}
-            onItemRemove={handleLegendRemove}
-            legendItems={[
-              ...overlayLegendItems,
-              ...allGraphs
-                .filter(({ id }) => idsWithData.has(id))
-                .map(({ date, color, hwKey, id }) => ({
-                  name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
-                  hw: id,
-                  label: comparisonEntryLabel(date, runNumbering),
-                  color,
-                  title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
-                  isActive: activeDates.has(id),
-                  onClick: () => {
-                    toggleActiveDate(id);
-                    track('interactivity_date_toggled', { date, hw: hwKey });
+          <>
+            <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+            <EngineComparisonConflictNotice className="mb-2" />
+            <ChartLegend
+              variant="sidebar"
+              grouped={true}
+              disableActiveSort={true}
+              onItemHover={handleLegendHover}
+              onItemHoverEnd={handleLegendHoverEnd}
+              onItemRemove={handleLegendRemove}
+              legendItems={[
+                ...overlayLegendItems,
+                ...allGraphs
+                  .filter(({ id }) => idsWithData.has(id))
+                  .map(({ date, color, hwKey, id }) => ({
+                    name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
+                    hw: id,
+                    label: comparisonEntryLabel(date, runNumbering),
+                    color,
+                    lineDasharray: frameworkDasharray(hwKey),
+                    title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+                    isActive: activeDates.has(id),
+                    onClick: () => {
+                      toggleActiveDate(id);
+                      track('interactivity_date_toggled', { date, gpu: hwKey });
+                    },
+                  })),
+              ]}
+              isLegendExpanded={isLegendExpanded}
+              onExpandedChange={(expanded) => {
+                setIsLegendExpanded(expanded);
+                track('interactivity_legend_expanded', { enabled: expanded });
+              }}
+              switches={[
+                {
+                  id: 'gpu-log-scale',
+                  label: legendT.logScale,
+                  advanced: true,
+                  checked: logScale,
+                  onCheckedChange: (c) => {
+                    setLogScale(c);
+                    track('interactivity_log_scale_toggled', { enabled: c });
                   },
-                })),
-            ]}
-            isLegendExpanded={isLegendExpanded}
-            onExpandedChange={(expanded) => {
-              setIsLegendExpanded(expanded);
-              track('interactivity_legend_expanded', { expanded });
-            }}
-            switches={[
-              {
-                id: 'gpu-log-scale',
-                label: legendT.logScale,
-                advanced: true,
-                checked: logScale,
-                onCheckedChange: (c) => {
-                  setLogScale(c);
-                  track('interactivity_log_scale_toggled', { enabled: c });
                 },
-              },
-              {
-                id: 'gpu-high-contrast',
-                label: legendT.highContrast,
-                advanced: true,
-                checked: highContrast,
-                onCheckedChange: (c) => {
-                  setHighContrast(c);
-                  track('interactivity_high_contrast_toggled', { enabled: c });
+                {
+                  id: 'gpu-high-contrast',
+                  label: legendT.highContrast,
+                  advanced: true,
+                  checked: highContrast,
+                  onCheckedChange: (c) => {
+                    setHighContrast(c);
+                    track('interactivity_high_contrast_toggled', { enabled: c });
+                  },
                 },
-              },
-              ...(frontierDirection
-                ? [
-                    {
-                      id: 'gpu-hide-non-optimal',
-                      label: legendT.optimalOnly,
-                      checked: hideNonOptimal,
-                      ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
-                      onCheckedChange: (c: boolean) => {
-                        setHideNonOptimal(c);
-                        track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                ...(frontierDirection
+                  ? [
+                      {
+                        id: 'gpu-hide-non-optimal',
+                        label: legendT.optimalOnly,
+                        checked: hideNonOptimal,
+                        ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
+                        onCheckedChange: (c: boolean) => {
+                          setHideNonOptimal(c);
+                          track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                        },
                       },
-                    },
-                  ]
-                : []),
-              {
-                id: 'gpu-point-labels',
-                label: legendT.labels,
-                advanced: true,
-                checked: showPointLabels,
-                onCheckedChange: (c) => {
-                  setShowPointLabels(c);
-                  track('interactivity_point_labels_toggled', { enabled: c });
+                    ]
+                  : []),
+                {
+                  id: 'gpu-point-labels',
+                  label: legendT.labels,
+                  advanced: true,
+                  checked: showPointLabels,
+                  onCheckedChange: (c) => {
+                    setShowPointLabels(c);
+                    track('interactivity_point_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-parallelism-labels',
-                label: legendT.parallelismLabels,
-                advanced: true,
-                checked: useAdvancedLabels,
-                onCheckedChange: (c) => {
-                  setUseAdvancedLabels(c);
-                  track('interactivity_advanced_labels_toggled', { enabled: c });
-                  // Parallelism labels are point labels; turning them on is
-                  // pointless if labels are hidden, so auto-enable Labels.
-                  if (c && !showPointLabels) setShowPointLabels(true);
+                {
+                  id: 'gpu-parallelism-labels',
+                  label: legendT.parallelismLabels,
+                  checked: useAdvancedLabels,
+                  onCheckedChange: (c) => {
+                    setUseAdvancedLabels(c);
+                    track('interactivity_advanced_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-line-labels',
-                label: legendT.lineLabels,
-                advanced: true,
-                checked: showLineLabels,
-                onCheckedChange: (c) => {
-                  setShowLineLabels(c);
-                  track('interactivity_line_labels_toggled', { enabled: c });
+                {
+                  id: 'gpu-line-labels',
+                  label: legendT.lineLabels,
+                  advanced: true,
+                  checked: showLineLabels,
+                  onCheckedChange: (c) => {
+                    setShowLineLabels(c);
+                    track('interactivity_line_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-concurrency-labels',
-                label: legendT.concurrencyLabels,
-                advanced: true,
-                checked: showConcurrencyLabels,
-                onCheckedChange: (c) => {
-                  setShowConcurrencyLabels(c);
-                  track('interactivity_concurrency_labels_toggled', { enabled: c });
-                  // Concurrency is a point-label annotation; turning it on is
-                  // pointless if labels are hidden, so auto-enable Labels.
-                  if (c && !showPointLabels) setShowPointLabels(true);
+                {
+                  id: 'gpu-framework-label',
+                  label: legendT.frameworkLabel,
+                  advanced: true,
+                  checked: showFrameworkLabel,
+                  onCheckedChange: (enabled) => {
+                    setShowFrameworkLabel(enabled);
+                    track('interactivity_framework_label_toggled', { enabled });
+                  },
                 },
-              },
-              {
-                id: 'gpu-perf-ruler',
-                label: legendT.perfRuler,
-                advanced: true,
-                checked: perfRulerMode,
-                infoTooltip: legendT.perfRulerInfo,
-                onCheckedChange: (c: boolean) => {
-                  setPerfRulerMode(c);
-                  // Clear synchronously with the mode flip so the rulers vanish
-                  // in the same layout pass (the effect below also clears, for
-                  // programmatic mode changes).
-                  if (!c) setPerfRulerState(clearPerfRulers);
-                  track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                {
+                  id: 'gpu-concurrency-labels',
+                  label: legendT.concurrencyLabels,
+                  advanced: true,
+                  checked: showConcurrencyLabels,
+                  onCheckedChange: (c) => {
+                    setShowConcurrencyLabels(c);
+                    track('interactivity_concurrency_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-            ]}
-            actions={[
-              ...(perfRulerMode && perfRulerState.rulers.length > 0
-                ? [
-                    {
-                      id: 'gpu-clear-perf-rulers',
-                      label: legendT.clearPerfRulers(perfRulerState.rulers.length),
-                      onClick: () => {
-                        track('gpu_timeseries_perf_ruler_cleared', {
-                          count: perfRulerState.rulers.length,
-                        });
-                        setPerfRulerState(clearPerfRulers);
-                      },
-                    },
-                  ]
-                : []),
-              {
+                {
+                  id: 'gpu-offloading-label',
+                  label: legendT.offloadingLabel,
+                  advanced: true,
+                  checked: showOffloadingLabel,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowOffloadingLabel(checked);
+                    track('interactivity_offloading_label_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'gpu-perf-ruler',
+                  label: legendT.perfRuler,
+                  advanced: true,
+                  checked: perfRulerMode,
+                  infoTooltip: legendT.perfRulerInfo,
+                  onCheckedChange: (c: boolean) => {
+                    setPerfRulerMode(c);
+                    if (!c) setPerfRulerState(clearPerfRulers);
+                    track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                  },
+                },
+              ]}
+              reset={{
                 id: 'gpu-reset-filter',
-                label: legendT.resetFilter,
+                disabled:
+                  quickFilterCount === 0 &&
+                  allGraphs.every(({ id }) => !idsWithData.has(id) || activeDates.has(id)),
                 onClick: () => {
                   selectAllActiveDates();
                   clearQuickFilters();
                   track('gpu_timeseries_reset_filter');
                 },
-              },
-              {
-                id: 'gpu-quick-filters',
-                label: legendT.quickFilters(quickFilterCount),
-                onClick: () => {
-                  setQuickFiltersOpen(true);
-                  track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+              }}
+              actions={[
+                ...(perfRulerMode && perfRulerState.rulers.length > 0
+                  ? [
+                      {
+                        id: 'gpu-clear-perf-rulers',
+                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                        onClick: () => {
+                          track('gpu_timeseries_perf_ruler_cleared', {
+                            count: perfRulerState.rulers.length,
+                          });
+                          setPerfRulerState(clearPerfRulers);
+                        },
+                      },
+                    ]
+                  : []),
+                {
+                  id: 'gpu-quick-filters',
+                  label: legendT.quickFilters(quickFilterCount),
+                  onClick: () => {
+                    setQuickFiltersOpen(true);
+                    track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+                  },
                 },
-              },
-            ]}
-            hideAtomFootnote
-            readOnly={minimalChrome}
-            keyIndicators={
-              <>
-                {fixedLogPointId === null ? null : (
-                  <FixedSequenceLogDialog
-                    pointId={fixedLogPointId}
-                    onOpenChange={(open) => {
-                      if (!open) setFixedLogPointId(null);
-                    }}
-                  />
-                )}
-                <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
-              </>
-            }
-          />
+              ]}
+              hideAtomFootnote
+              readOnly={minimalChrome}
+              collapsible={!minimalChrome}
+              keyIndicators={
+                <>
+                  {fixedLogPointId === null ? null : (
+                    <FixedSequenceLogDialog
+                      pointId={fixedLogPointId}
+                      onOpenChange={(open) => {
+                        if (!open) setFixedLogPointId(null);
+                      }}
+                    />
+                  )}
+                  <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+                </>
+              }
+            />
+          </>
         }
       />
     );
@@ -1882,6 +1825,13 @@ const GPUGraph = React.memo(
             onOpenChange={(open) => {
               if (!open) setPowerTelemetryPoint(null);
             }}
+          />
+        )}
+        {reproducePoint === null ? null : (
+          <ReproduceDrawer
+            point={reproducePoint}
+            source="gpu_graph"
+            onClose={() => setReproducePoint(null)}
           />
         )}
         {chart}

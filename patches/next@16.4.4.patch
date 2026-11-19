@@ -1,0 +1,88 @@
+diff --git a/dist/compiled/react-server-dom-turbopack-experimental/cjs/react-server-dom-turbopack-client.browser.development.js b/dist/compiled/react-server-dom-turbopack-experimental/cjs/react-server-dom-turbopack-client.browser.development.js
+index 28f655e..77d08a0 100644
+--- a/dist/compiled/react-server-dom-turbopack-experimental/cjs/react-server-dom-turbopack-client.browser.development.js
++++ b/dist/compiled/react-server-dom-turbopack-experimental/cjs/react-server-dom-turbopack-client.browser.development.js
+@@ -4031,7 +4031,7 @@
+                       startTime$jscomp$2 = startTime$jscomp$1,
+                       childrenEndTime$jscomp$1 = childrenEndTime$jscomp$0,
+                       error = root.reason;
+-                    if (supportsUserTiming) {
++                    if (supportsUserTiming && 0 <= childrenEndTime$jscomp$1) {
+                       var env = componentInfo$jscomp$2.env,
+                         name = componentInfo$jscomp$2.name,
+                         entryName$jscomp$0 =
+@@ -4294,7 +4294,7 @@
+                     trackIdx$jscomp$4 = trackIdx$jscomp$6,
+                     startTime$jscomp$5 = time,
+                     childrenEndTime$jscomp$3 = childrenEndTime;
+-                  if (supportsUserTiming) {
++                  if (supportsUserTiming && 0 <= childrenEndTime$jscomp$3) {
+                     var env$jscomp$2 = componentInfo$jscomp$4.env,
+                       name$jscomp$1 = componentInfo$jscomp$4.name,
+                       entryName$jscomp$2 =
+diff --git a/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js b/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js
+index f44072a..fbabda1 100644
+--- a/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js
++++ b/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js
+@@ -3993,7 +3993,7 @@
+                       startTime$jscomp$2 = startTime$jscomp$1,
+                       childrenEndTime$jscomp$1 = childrenEndTime$jscomp$0,
+                       error = root.reason;
+-                    if (supportsUserTiming) {
++                    if (supportsUserTiming && 0 <= childrenEndTime$jscomp$1) {
+                       var env = componentInfo$jscomp$2.env,
+                         name = componentInfo$jscomp$2.name,
+                         entryName$jscomp$0 =
+@@ -4256,7 +4256,7 @@
+                     trackIdx$jscomp$4 = trackIdx$jscomp$6,
+                     startTime$jscomp$5 = time,
+                     childrenEndTime$jscomp$3 = childrenEndTime;
+-                  if (supportsUserTiming) {
++                  if (supportsUserTiming && 0 <= childrenEndTime$jscomp$3) {
+                     var env$jscomp$2 = componentInfo$jscomp$4.env,
+                       name$jscomp$1 = componentInfo$jscomp$4.name,
+                       entryName$jscomp$2 =
+diff --git a/dist/compiled/react-server-dom-webpack-experimental/cjs/react-server-dom-webpack-client.browser.development.js b/dist/compiled/react-server-dom-webpack-experimental/cjs/react-server-dom-webpack-client.browser.development.js
+index d7eea0d..24a8f09 100644
+--- a/dist/compiled/react-server-dom-webpack-experimental/cjs/react-server-dom-webpack-client.browser.development.js
++++ b/dist/compiled/react-server-dom-webpack-experimental/cjs/react-server-dom-webpack-client.browser.development.js
+@@ -4036,7 +4036,7 @@
+                       startTime$jscomp$2 = startTime$jscomp$1,
+                       childrenEndTime$jscomp$1 = childrenEndTime$jscomp$0,
+                       error = root.reason;
+-                    if (supportsUserTiming) {
++                    if (supportsUserTiming && 0 <= childrenEndTime$jscomp$1) {
+                       var env = componentInfo$jscomp$2.env,
+                         name = componentInfo$jscomp$2.name,
+                         entryName$jscomp$0 =
+@@ -4299,7 +4299,7 @@
+                     trackIdx$jscomp$4 = trackIdx$jscomp$6,
+                     startTime$jscomp$5 = time,
+                     childrenEndTime$jscomp$3 = childrenEndTime;
+-                  if (supportsUserTiming) {
++                  if (supportsUserTiming && 0 <= childrenEndTime$jscomp$3) {
+                     var env$jscomp$2 = componentInfo$jscomp$4.env,
+                       name$jscomp$1 = componentInfo$jscomp$4.name,
+                       entryName$jscomp$2 =
+diff --git a/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js b/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js
+index 1e443d2..c61e6a1 100644
+--- a/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js
++++ b/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js
+@@ -3998,7 +3998,7 @@
+                       startTime$jscomp$2 = startTime$jscomp$1,
+                       childrenEndTime$jscomp$1 = childrenEndTime$jscomp$0,
+                       error = root.reason;
+-                    if (supportsUserTiming) {
++                    if (supportsUserTiming && 0 <= childrenEndTime$jscomp$1) {
+                       var env = componentInfo$jscomp$2.env,
+                         name = componentInfo$jscomp$2.name,
+                         entryName$jscomp$0 =
+@@ -4261,7 +4261,7 @@
+                     trackIdx$jscomp$4 = trackIdx$jscomp$6,
+                     startTime$jscomp$5 = time,
+                     childrenEndTime$jscomp$3 = childrenEndTime;
+-                  if (supportsUserTiming) {
++                  if (supportsUserTiming && 0 <= childrenEndTime$jscomp$3) {
+                     var env$jscomp$2 = componentInfo$jscomp$4.env,
+                       name$jscomp$1 = componentInfo$jscomp$4.name,
+                       entryName$jscomp$2 =

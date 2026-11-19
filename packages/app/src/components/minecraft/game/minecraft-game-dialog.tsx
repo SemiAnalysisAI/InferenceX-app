@@ -19,12 +19,10 @@ export default function MinecraftGameDialog({ onClose }: { onClose: () => void }
         className="mc-dialog"
         overlayClassName="mc-dialog-overlay"
         onEscapeKeyDown={(event) => {
-          // In-game, Escape closes screens and toggles the pause menu instead of the dialog.
           const host = document.querySelector<EscapeHost>('[data-testid="minecraft-game"]');
           if (host?.mcEscape?.()) event.preventDefault();
         }}
         onPointerDownOutside={(event) => {
-          // Pointer lock and inventory drags can land outside; never close on stray clicks mid-game.
           const host = document.querySelector<HTMLElement>('[data-testid="minecraft-game"]');
           if (host?.dataset.status === 'playing' || host?.dataset.status === 'loading')
             event.preventDefault();

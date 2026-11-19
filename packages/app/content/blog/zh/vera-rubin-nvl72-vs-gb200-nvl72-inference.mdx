@@ -28,7 +28,7 @@ _相关阅读：[Vera Rubin – 极致协同设计：从 Grace Blackwell Oberon 
 
 目前 VR NVL72 的早期指标均来自 CoreWeave，我们尚未独立验证。Nvidia 已承诺在 2026 自然年第三季度前向 InferenceX 提交可验证的数据。Google 预计将在未来几个月内提交 TPUv7 结果，AMD 也已承诺提交 MI455X UALoE72。等这些数据落地后，整个生态系统将获得一份跨系统的客观对比。
 
-在本文中，我们将对照多条基线来拆解 Nvidia 的 Rubin 性能宣称，展示 Rubin 明显领先 Blackwell 的地方，以及领先幅度较薄弱的地方。我们还将基于已有的 Rubin 总拥有成本（TCO）估算来分析其每 TCO 性能。Rubin 及众多其他系统的 TCO 数据来自我们的 [AI TCO 模型，该模型追踪各类 AI 芯片的总拥有成本，涵盖资本开支（capex）、运营开支（opex）及其他各项费用。](https://semianalysis.com/ai-cloud-tco-model/)我们还使用[数据中心模型中的全口径公用电力配置估算（All-in Utility Provisioned Power Estimates）](https://semianalysis.com/datacenter-industry-model/)来考察每瓦性能。
+在本文中，我们将对照多条基线来拆解 Nvidia 的 Rubin 性能宣称，展示 Rubin 明显领先 Blackwell 的地方，以及领先幅度较薄弱的地方。我们还将基于已有的 Rubin 总拥有成本（TCO）估算来分析其每美元 TCO 性能。Rubin 及众多其他系统的 TCO 数据来自我们的 [AI TCO 模型，该模型追踪各类 AI 芯片的总拥有成本，涵盖资本开支（capex）、运营开支（opex）及其他各项费用。](https://semianalysis.com/ai-cloud-tco-model/)我们还使用[数据中心模型中的全口径公用电力配置估算（All-in Utility Provisioned Power Estimates）](https://semianalysis.com/datacenter-industry-model/)来考察每瓦性能。
 
 最后，我们将呈现 [VR NVL72 逐组件构建的物料清单（BoM）。这部分内容收录于即将发布的 SemiAnalysis 物料清单（BoM）模型。](https://semianalysis.com/vr-nvl72-model/)
 
@@ -181,7 +181,7 @@ Feynman 架构的新特性之一是包含稀疏感知的数据搬运操作（spa
 
 昨天，[CoreWeave 发布了他们对 Vera Rubin NVL72 的推理基准测试结果](https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell)，以每单位功耗（MW）的性能（tokens/sec）为单位。我们将拆解其数据中的细微之处，并以我们自己的 InferenceX 2026 年 7 月结果为基线，对比其结果与 Blackwell 的性能。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/zh/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/zh/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -199,7 +199,7 @@ CoreWeave-Nvidia 图表上第一个值得注意的宣称是：在约 150 tok/s/u
 
 - NVFP4 精度
 - 投机解码（使用 MTP）
-- 分离式服务（使用 Dynamo）
+- 分离式推理（使用 Dynamo）
 - 宽专家并行（Wide Expert Parallelism）
 - 基于 TensorRT-LLM
 
@@ -223,7 +223,7 @@ CoreWeave 性能结果的第二个细节是他们使用的是 DeepSeek R1 671B�
 
 有趣的是，CoreWeave 选择 DeepSeek R1 671B 在理论上反而更有利于 Blackwell 基线，而非 Rubin。Rubin 的主要优势在于更大的 HBM 容量、更大的 CPU DRAM 容量和更高的 HBM 带宽，这意味着 Rubin 更适合 Fable 5、Gemini Pro、Kimi K3、Qwen3.8 2.4T 这类多万亿参数模型。
 
-第三点值得注意的是，CoreWeave 只使用了单轮 8k/1k 输入/输出 token。理论上，Agentic Coding 这类多轮长上下文工作负载在 Rubin 上应有更好表现（得益于其更大的 HBM 容量和带宽），但简单的单轮基准测试无法体现这一点。[我们即将推出的 AgentX 基准测试场景由 Weka、LMCache、vLLM/SGLang 社区、Nvidia、AMD 及社区众多伙伴合作打造，将提供真实的 agentic 工作负载来评测推理性能。](https://inferencex.semianalysis.com/zh/agentx/cc-traces-weka-062126)我们鼓励所有人采用这一推理基准测试！
+第三点值得注意的是，CoreWeave 只使用了单轮 8k/1k 输入/输出 token。理论上，Agentic Coding 这类多轮长上下文工作负载在 Rubin 上应有更好表现（得益于其更大的 HBM 容量和带宽），但简单的单轮基准测试无法体现这一点。[我们即将推出的 AgentX 基准测试场景由 Weka、LMCache、vLLM/SGLang 社区、Nvidia、AMD 及社区众多伙伴合作打造，将提供真实的 agentic 工作负载来评测推理性能。](https://inferencex.semianalysis.com/zh/infx/agentx/cc-traces-weka-062126)我们鼓励所有人采用这一推理基准测试！
 
 最后，我们注意到 CoreWeave 的测试是在一台没有 scale-out 网络的预量产机架上完成的。具体来说，CoreWeave 使用的是 Dell 工程样机（Engineering Sample，ES）机架。我们仍然认为这些结果有价值：它们启用了宽 EP 和 PD 分离，用到了 NVL72 的 scale-up 背板，证明其工作良好。这块背板在 GB200 NVL72 Oberon 爬坡期间曾面临诸多可靠性挑战，[我们在加速器模型中有过记录。](https://semianalysis.com/accelerator-hbm-model/)
 
@@ -327,7 +327,7 @@ Rubin 与 2025 年 GB200 NVL72 基线的对比则不同：最大领先出现在�
 
 在区间最顶端，情况依旧。GB200 在 250 tok/s/user 之后没有任何工作点，GB300 在 300 tok/s/user 之后也没有，因此到 350 tok/s/user 时只有 Rubin 还能服务，每百万输出 token 成本为 $4.18。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/zh/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/zh/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

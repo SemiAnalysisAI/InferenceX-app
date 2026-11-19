@@ -1,39 +1,14 @@
-/**
- * Backfill `agentic_trace_replay.chart_series` for rows that are missing it
- * or were computed by an older `CHART_SERIES_VERSION`.
- *
- * The ingest path now computes the time-series inline, but existing rows
- * (and rows whose computation logic has since changed) still need this
- * pass. Run after the agentic schema migration and any time `CHART_SERIES_VERSION`
- * bumps.
- *
- * Strategy:
- *   - Stream rows one at a time (server_metrics_json_gz can decompress
- *     past 500 MB on high-conc TP+EP points — one in memory at a time
- *     avoids OOM).
- *   - Skip rows whose stored version already matches.
- *   - Recompute via the same `computeChartSeries()` helper the ingest
- *     path uses, so behavior cannot drift.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-chart-series
- *     [--limit N]   only process the first N candidate rows
- *     [--force]     recompute every row, even if version already matches
- *     [--shard-count N] split work across N independent processes
- *     [--shard-index N] zero-based shard handled by this process
- *     [--run-id N] only process trace rows linked to one GitHub workflow run
- *     [--yes]       skip the confirmation prompt
- */
-
 import { hasNoSslFlag } from './cli-utils.js';
 import {
   CHART_SERIES_VERSION,
-  computeChartSeries,
+  computeChartData,
   type ChartSeries,
 } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
+import { selectServerMetricsAdapter } from './etl/server-metrics-adapters.js';
+import { cacheHitRatesFromPromptTokenTotals } from './etl/trace-replay-ingest.js';
+import { writeChartSeriesBackfill } from './lib/backfill-chart-series-row.js';
 import {
-  jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
   requireBackfillPayload,
@@ -41,6 +16,7 @@ import {
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
+import { readServerMetricsGz } from './lib/server-metrics-storage.js';
 
 const flags = parseLimitForceFlags();
 const githubRunId = parseRunIdFlag();
@@ -61,11 +37,6 @@ async function main(): Promise<void> {
 
   await runCandidateIdBackfill(
     async () => {
-      // Only rows that actually have a server_metrics blob can produce a
-      // chart_series. Rows without the blob legitimately keep `chart_series`
-      // null and the API serves them via the slow path (which also returns
-      // null because there's no blob to parse — so the page falls into the
-      // "no stored trace_replay blob" branch).
       const runFilter = githubRunId
         ? sql`
             and exists (
@@ -109,13 +80,12 @@ async function main(): Promise<void> {
     async (id) => {
       const [row] = await sql<
         {
-          server_metrics_json_gz: Buffer | null;
           framework: string | null;
           disagg: boolean | null;
           chart_series: ChartSeries | null;
         }[]
       >`
-        select atr.server_metrics_json_gz, atr.chart_series, source.framework, source.disagg
+        select atr.chart_series, source.framework, source.disagg
         from agentic_trace_replay atr
         left join lateral (
           select c.framework, c.disagg
@@ -132,8 +102,8 @@ async function main(): Promise<void> {
         return 'skipped';
       }
 
-      const series = requireBackfillPayload(
-        await computeChartSeries(row.server_metrics_json_gz, {
+      const { series, promptTokenTotals } = requireBackfillPayload(
+        await computeChartData(await readServerMetricsGz(sql, id), {
           framework: row.framework,
           disagg: row.disagg ?? false,
         }),
@@ -149,12 +119,14 @@ async function main(): Promise<void> {
         'hostKvCacheUsage',
       ]);
 
-      await sql`
-        update agentic_trace_replay
-        set chart_series = ${jsonbParam(sql, series)}
-        where id = ${id}
-          and coalesce((chart_series->>'version')::int, -1) <= ${CHART_SERIES_VERSION}
-      `;
+      const atomPd = row.framework === 'mooncake-atom' || row.framework === 'atom-disagg';
+      const trtllmDisagg =
+        (row.disagg ?? false) &&
+        selectServerMetricsAdapter({ framework: row.framework }).id === 'trtllm';
+      const rates =
+        atomPd || trtllmDisagg ? cacheHitRatesFromPromptTokenTotals(promptTokenTotals) : null;
+      const updated = await writeChartSeriesBackfill(sql, id, series, rates);
+      if (!updated) return 'skipped';
       return 'ok';
     },
   );

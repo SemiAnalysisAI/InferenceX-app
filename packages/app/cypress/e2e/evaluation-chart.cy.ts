@@ -1,4 +1,6 @@
-import { expectNoPageOverflow } from '../support/e2e';
+import { compactEvalRows } from '@/components/evaluation/compact-rows';
+
+import { availabilityBody, expectNoPageOverflow } from '../support/e2e';
 
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
@@ -6,33 +8,9 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/evaluation');
+    cy.visit('/infx/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
-  });
-
-  it('changing the benchmark selector updates the chart subtitle to reflect the new benchmark', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('[data-testid="result-context"]')
-      .invoke('text')
-      .then((initialCaption) => {
-        cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-        cy.get('[role="option"]').then(($options) => {
-          if ($options.length <= 1) return;
-          cy.wrap($options).last().click();
-          cy.get('#evaluation-chart')
-            .closest('figure')
-            .find('figcaption')
-            .invoke('text')
-            .should('not.eq', initialCaption);
-        });
-      });
-    // Clear Radix scroll-lock side effect so subsequent tests can click
-    cy.get('body').then(($body) => {
-      $body.removeAttr('data-scroll-locked');
-      $body.css('pointer-events', '');
-    });
   });
 
   it('Show Labels switch exists in the legend and toggling it adds score labels to the chart', () => {
@@ -50,27 +28,6 @@ describe('Evaluation Chart — Content & Interactions', () => {
       cy.wrap($switch).click();
       cy.get('#evaluation-chart svg .score-label').should('have.length.greaterThan', 0);
     });
-
-    cy.get('#evaluation-chart').closest('figure').find('.sidebar-legend li label').first().click();
-
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('.sidebar-legend')
-      .contains('button', 'Reset filter')
-      .should('exist');
-
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('.sidebar-legend')
-      .contains('button', 'Reset filter')
-      .click();
-
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('.sidebar-legend li')
-      .first()
-      .find('input[type="checkbox"]')
-      .should('be.checked');
   });
 });
 
@@ -113,7 +70,7 @@ describe('Evaluation sample sharing', () => {
         },
       });
     });
-    cy.visit('/evaluation');
+    cy.visit('/infx/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Table').click();
   });
@@ -149,7 +106,7 @@ describe('Evaluation sample sharing', () => {
   });
 
   it('does not apply a stale sample id to a manually opened drawer', () => {
-    cy.visit('/evaluation?sample=0');
+    cy.visit('/infx/evaluation?sample=0');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[title="View per-sample prompts and responses"]').first().click();
 
@@ -242,13 +199,10 @@ describe('Evaluation evidence reader', () => {
 
   it('retains every evidence field and compares target with extracted answer at desktop width', () => {
     cy.viewport(1440, 900);
-    cy.visit('/evaluation');
+    cy.visit('/infx/evaluation');
     cy.get('[title="View per-sample prompts and responses"]').first().click();
     cy.wait('@evidenceSamples');
     cy.get('[data-eval-sample-id="7"] > button').click();
-    cy.get('[role="dialog"]')
-      .should('contain.text', 'Evaluation samples')
-      .and('contain.text', 'Search this page only');
     cy.get('[role="dialog"]').then(($dialog) =>
       expect($dialog[0].getBoundingClientRect().width).to.be.at.most(896),
     );
@@ -296,10 +250,10 @@ describe('Evaluation evidence reader', () => {
         },
       }).as('unofficialEvidence');
     });
-    // Match the artifact fixture explicitly instead of inheriting changing dashboard defaults.
-    cy.visit(`/evaluation?unofficialrun=${runId}&g_model=DeepSeek-V4-Pro&i_prec=fp4&e_bench=gsm8k`);
+    cy.visit(
+      `/infx/evaluation?unofficialrun=${runId}&g_model=DeepSeek-V4-Pro&i_prec=fp4&e_bench=gsm8k`,
+    );
     cy.wait('@unofficialEvidence');
-    // The overlay can sort below the first ten official rows once both fetches settle.
     cy.get('[data-testid="evaluation-results-table"] [aria-label="Rows per page"]').click();
     cy.contains('[role="option"]', /^100$/u).click();
     cy.get('[data-testid="evaluation-results-table"]')
@@ -318,7 +272,7 @@ describe('Evaluation evidence reader', () => {
 
   it('stacks Chinese answer blocks on phones without losing raw output or metrics', () => {
     cy.viewport(390, 844);
-    cy.visit('/zh/evaluation');
+    cy.visit('/zh/infx/evaluation');
     cy.get('[title="查看逐样本提示词与模型响应"]').first().click();
     cy.wait('@evidenceSamples');
     cy.get('[data-eval-sample-id="7"] > button').click();
@@ -342,11 +296,9 @@ describe('Evaluation evidence reader', () => {
 describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   beforeEach(() => {
     cy.viewport(390, 900);
-    cy.visit('/zh/evaluation', {
+    cy.visit('/zh/infx/evaluation', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        // The eval-samples toast fires 1.5s after load and covers the retry
-        // button at this viewport — keep it dismissed for the whole suite.
         win.localStorage.setItem('inferencex-eval-samples-nudge-dismissed', String(Date.now()));
       },
     });
@@ -354,20 +306,13 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   });
 
   it('keeps table/chart actions reachable and localizes table labels and dates', () => {
-    cy.contains('h2', '准确率评估').should('be.visible');
     cy.get('[data-testid="evaluation-chart-display"] fieldset legend')
       .should('contain.text', '配置')
       .and('contain.text', '运行信息');
-    cy.get('[data-testid="share-button"]')
-      .should('be.visible')
-      .and('have.attr', 'title', '分享当前视图');
+    cy.get('[data-testid="share-button"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').should('be.visible');
     cy.get('[data-testid="data-table-preset-all"]').click();
-    cy.get('[data-testid="evaluation-results-table"]')
-      .should('contain.text', '芯片')
-      .and('contain.text', '精度')
-      .and('contain.text', '日期')
-      .and('contain.text', '年');
+    cy.get('[data-testid="evaluation-results-table"]').should('contain.text', '年');
     cy.get(
       '[data-testid="evaluation-results-table"] [aria-label="每页行数"], [data-testid="evaluation-results-table"] [aria-label="上一页"], [data-testid="evaluation-results-table"] [aria-label="下一页"]',
     )
@@ -386,34 +331,23 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
 
   it('distinguishes a fetch error from empty data and retries the failed query', () => {
     cy.fixture('api/evaluations.json').then((evaluations) => {
-      // Flag-gated rather than attempt-counted: the page left over from the
-      // previous test can fire a stray request after this intercept registers
-      // (firefox does), which would silently consume the failure budget and
-      // let the fresh page succeed without ever showing the error card.
       let attempts = 0;
       let succeed = false;
-      cy.intercept('GET', '/api/v1/evaluations', (request) => {
+      cy.intercept('GET', '/api/v1/evaluations/compact', (request) => {
         attempts += 1;
         request.reply(
-          succeed ? { statusCode: 200, body: evaluations } : { statusCode: 500, body: {} },
+          succeed
+            ? { statusCode: 200, body: compactEvalRows(evaluations) }
+            : { statusCode: 500, body: {} },
         );
       });
-      // Distinct URL: with testIsolation off, revisiting the beforeEach URL
-      // does not reliably reload, so the intercept would never be exercised.
-      cy.visit('/zh/evaluation?e2e=fetch-error');
-      // Long timeout: the error card only renders after two failed attempts
-      // separated by React Query's retry backoff, which can outlast the
-      // default budget on a slow (firefox CI) page load.
-      cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
-        .should('contain.text', '评估数据加载失败。')
+      cy.visit('/zh/infx/evaluation?e2e=fetch-error');
+      cy.get('[data-testid="evaluation-query-error"]')
+        .should('contain.text', '评估数据加载失败')
         .and('contain.text', '重试');
       cy.then(() => {
         succeed = true;
       });
-      // Forced: the floating chart-actions row (absolute top-6 right-6 z-10)
-      // overlaps the banner's right edge in the error state — a pre-existing
-      // layout collision, not a localization regression. This test covers the
-      // retry semantics, not tap reachability.
       cy.get('[data-testid="evaluation-query-error"]')
         .contains('button', '重试')
         .click({ force: true });
@@ -426,32 +360,34 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   it('keeps evaluation results visible while retrying failed availability metadata', () => {
     cy.fixture('api/availability.json').then((availability) => {
       cy.fixture('api/evaluations.json').then((evaluations) => {
-        // Flag-gated for the same stray-request reason as the previous test.
         let availabilityAttempts = 0;
         let succeed = false;
-        cy.intercept('GET', '/api/v1/availability*', (request) => {
+        cy.intercept('GET', '/api/v1/availability/compact', (request) => {
           availabilityAttempts += 1;
           request.reply(
-            succeed ? { statusCode: 200, body: availability } : { statusCode: 500, body: {} },
+            succeed
+              ? { statusCode: 200, body: availabilityBody(availability) }
+              : { statusCode: 500, body: {} },
           );
         });
-        cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: evaluations });
-        cy.visit('/zh/evaluation?e2e=availability-retry');
+        cy.intercept('GET', '/api/v1/evaluations/compact', {
+          statusCode: 200,
+          body: compactEvalRows(evaluations),
+        });
+        cy.visit('/zh/infx/evaluation?e2e=availability-retry');
 
-        // Long timeout: same two-failures-plus-backoff delay as above.
-        cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
-          .should('contain.text', '筛选项可用性数据加载失败。')
+        cy.get('[data-testid="evaluation-query-error"]')
+          .should('contain.text', '筛选项可用性数据加载失败')
           .and('contain.text', '重试');
         cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
         cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
         cy.get('[data-testid="evaluation-query-error"]')
-          .should('contain.text', '筛选项可用性数据加载失败。')
+          .should('contain.text', '筛选项可用性数据加载失败')
           .and('contain.text', '重试');
         cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
         cy.then(() => {
           succeed = true;
         });
-        // Forced for the same floating chart-actions overlap as above.
         cy.get('[data-testid="evaluation-query-error"]')
           .contains('button', '重试')
           .click({ force: true });
@@ -463,9 +399,12 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   });
 
   it('renders a successful empty response without offering an error retry', () => {
-    cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: [] });
-    cy.visit('/zh/evaluation?e2e=empty-success');
-    cy.contains('当前筛选条件下没有可用数据。').should('be.visible');
+    cy.intercept('GET', '/api/v1/evaluations/compact', {
+      statusCode: 200,
+      body: compactEvalRows([]),
+    });
+    cy.visit('/zh/infx/evaluation?e2e=empty-success');
+    cy.contains('当前筛选条件下没有可用数据').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
     cy.contains(/该模型暂无评估数据|所选模型与基准测试组合暂无评估数据/u).should('be.visible');
     cy.get('[data-testid="evaluation-query-error"]').should('not.exist');

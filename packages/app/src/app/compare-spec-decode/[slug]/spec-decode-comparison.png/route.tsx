@@ -43,7 +43,6 @@ export async function GET(
     getCachedBenchmarks(parsed.model.dbKeys),
     getLogoSrc(),
   ]);
-  // Precision is fixed by the slug, and both sides share it.
   const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
   const sideB: VariantCompareSide = { specMethod: 'none', precision: parsed.precision };
   const { sequence } = pickVariantPairDefaults('spec-decode', rows, parsed.gpu, sideA, sideB);
@@ -103,6 +102,7 @@ export async function GET(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     trackServer('compare_spec_decode_png_render_failed', {
+      route_template: '/compare-spec-decode/[slug]/spec-decode-comparison.png',
       slug,
       model: parsed.model.slug,
       gpu: parsed.gpu,

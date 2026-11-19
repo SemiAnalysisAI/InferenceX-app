@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { createMockGroup } from './test-helpers';
 import { renderErrorBars, updateErrorBarsOnZoom, type ErrorBarConfig } from './error-bars';
 
-// ── Fixtures ─────────────────────────────────────────────────────────
-
 interface TestDatum {
   cx: number;
   yMin: number;
@@ -27,8 +25,6 @@ function makeConfig(overrides?: Partial<ErrorBarConfig<TestDatum>>): ErrorBarCon
     ...overrides,
   };
 }
-
-// ── renderErrorBars ──────────────────────────────────────────────────
 
 describe('renderErrorBars', () => {
   it('creates one group per data item with error-bar class', () => {
@@ -82,14 +78,17 @@ describe('renderErrorBars', () => {
 
   it('stem lines connect yMax to yMin vertically at cx', () => {
     const group = createMockGroup();
-    renderErrorBars(group as any, SAMPLE_DATA, makeConfig());
+    const config = makeConfig();
+    renderErrorBars(group as any, SAMPLE_DATA, config);
 
     const bars = group.selectAll('.error-bar');
     for (let i = 0; i < SAMPLE_DATA.length; i++) {
-      // The stem is the first child line that gets `.select('.eb-stem')` attrs applied.
       const stem = bars.elements[i].children.find((c) => c.attrs['class'] === 'eb-stem')!;
       expect(stem).toBeDefined();
       expect(stem.attrs['stroke']).toBe('#888');
+      expect(stem.attrs['x1']).toBe(config.getCx(SAMPLE_DATA[i]));
+      expect(stem.attrs['y1']).toBe(config.getYMax(SAMPLE_DATA[i]));
+      expect(stem.attrs['y2']).toBe(config.getYMin(SAMPLE_DATA[i]));
     }
   });
 
@@ -145,13 +144,10 @@ describe('renderErrorBars', () => {
   });
 });
 
-// ── updateErrorBarsOnZoom ────────────────────────────────────────────
-
 describe('updateErrorBarsOnZoom', () => {
   it('does not throw on empty group', () => {
     const group = createMockGroup();
     const config = makeConfig();
-    // No error bars rendered — update should be a no-op
     updateErrorBarsOnZoom(group as any, config);
   });
 
@@ -160,7 +156,6 @@ describe('updateErrorBarsOnZoom', () => {
     const config = makeConfig();
     renderErrorBars(group as any, SAMPLE_DATA, config);
 
-    // Call with modified config (simulating new scale-derived accessors)
     const zoomedConfig: ErrorBarConfig<TestDatum> = {
       ...config,
       getCx: (d) => d.cx * 2,
@@ -168,7 +163,6 @@ describe('updateErrorBarsOnZoom', () => {
       getYMax: (d) => d.yMax * 0.5,
     };
 
-    // Should not throw
     updateErrorBarsOnZoom(group as any, zoomedConfig);
   });
 });

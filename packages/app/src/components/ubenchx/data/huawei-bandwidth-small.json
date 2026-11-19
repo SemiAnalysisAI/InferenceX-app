@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "date": "2026-10-30",
+    "cann": "9.2.1",
+    "driver": "25.7.rc1.6",
+    "torch": "2.10.0+cpu",
+    "torchNpu": "2.10.0.post4",
+    "gpu": "Ascend950PR_9579",
+    "boardSerial": "10264J332694",
+    "sizeRangeBytes": [8, 2048],
+    "slotStrideBytes": 4096,
+    "protocol": "copy_only_rotating_pools_graph_v2_strided_small",
+    "cacheQualification": "The allocated span is 512 MiB per pool, but touched payload can fit in cache. Effective small-copy throughput, not cold-HBM bandwidth.",
+    "archiveSha256": "2505e5d93ecedacd67791551a4961684f9dab5c33cf9c0caac6a4190702e3547",
+    "sourceUrl": "https://inferencex.semianalysis.com/data/ubenchx/huawei-950pr-small-20261030.tar.gz"
+  },
+  "overlapChecks": [
+    {
+      "bytes": 4096,
+      "timeMs": 0.0005625806224998087,
+      "bandwidthGbps": 14.561468476463187,
+      "mbuPercent": 0.9100917797789492,
+      "samples": 360,
+      "processMedianMs": [0.0005641034804284573, 0.0005623823089990765, 0.0005625300400424749],
+      "processMedianSpreadPercent": 0.3060500662697141,
+      "publishedBandwidthGbps": 14.365145818460269,
+      "bandwidthChangePercent": 1.3666596948193055
+    },
+    {
+      "bytes": 16384,
+      "timeMs": 0.0006168397085275501,
+      "bandwidthGbps": 53.12239070701213,
+      "mbuPercent": 3.320149419188258,
+      "samples": 360,
+      "processMedianMs": [0.0006111418770160526, 0.0006193230801727623, 0.0006168397085275501],
+      "processMedianSpreadPercent": 1.338674940204565,
+      "publishedBandwidthGbps": 52.59946477588062,
+      "bandwidthChangePercent": 0.9941658786066121
+    }
+  ],
+  "points": [
+    {
+      "size_bytes": 8,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.000465661971247755,
+      "effective_GBps": 0.0343596879022084,
+      "GBps_low": 0.03435001881549058,
+      "GBps_high": 0.03443899346940373,
+      "process_GBps": [0.03443651673434151, 0.03435787123243521, 0.03435490184197506]
+    },
+    {
+      "size_bytes": 16,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.0004651600029319525,
+      "effective_GBps": 0.06879353297424677,
+      "GBps_low": 0.06866455968093385,
+      "GBps_high": 0.06883196882333209,
+      "process_GBps": [0.06866808082338123, 0.06879353297424677, 0.06882162092550738]
+    },
+    {
+      "size_bytes": 32,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.0004641727573471144,
+      "effective_GBps": 0.13787969885561374,
+      "GBps_low": 0.13742192861281918,
+      "GBps_high": 0.13802466198798147,
+      "process_GBps": [0.1380149632340248, 0.13787969885561374, 0.13743491202661823]
+    },
+    {
+      "size_bytes": 64,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.00046655439655296504,
+      "effective_GBps": 0.27435171749682347,
+      "GBps_low": 0.2734358609018909,
+      "GBps_high": 0.27444900147635726,
+      "process_GBps": [0.27441779405892386, 0.27345412531334895, 0.27437030473210156]
+    },
+    {
+      "size_bytes": 128,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.00046632472367491573,
+      "effective_GBps": 0.5489736807917195,
+      "GBps_low": 0.5487841435484148,
+      "GBps_high": 0.5527607456732604,
+      "process_GBps": [0.548869441196977, 0.548889597491958, 0.5527287692098394]
+    },
+    {
+      "size_bytes": 256,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.00046937231672927737,
+      "effective_GBps": 1.0908184862025199,
+      "GBps_low": 1.0902583394987817,
+      "GBps_high": 1.0957890542932882,
+      "process_GBps": [1.090809118540499, 1.0903779068675759, 1.0957079802452019]
+    },
+    {
+      "size_bytes": 512,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.0004926956607960165,
+      "effective_GBps": 2.0783621238831076,
+      "GBps_low": 2.073908870094897,
+      "GBps_high": 2.0821492263860613,
+      "process_GBps": [2.0783621238831076, 2.0741027680898325, 2.082019732397965]
+    },
+    {
+      "size_bytes": 1024,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.0005440767272375524,
+      "effective_GBps": 3.76417497289093,
+      "GBps_low": 3.761510171441055,
+      "GBps_high": 3.7790975932652136,
+      "process_GBps": [3.7629249810948813, 3.7789411632292205, 3.7629666341127437]
+    },
+    {
+      "size_bytes": 2048,
+      "samples": 360,
+      "slots": 131072,
+      "combined_pool_bytes": 1073741824,
+      "amortized_copy_ms": 0.0005521263228729367,
+      "effective_GBps": 7.41859214153539,
+      "GBps_low": 7.407943024986354,
+      "GBps_high": 7.444816408594678,
+      "process_GBps": [7.442115859500033, 7.41859214153539, 7.410086382453208]
+    }
+  ]
+}

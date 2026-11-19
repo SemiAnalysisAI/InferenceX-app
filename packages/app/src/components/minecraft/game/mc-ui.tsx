@@ -19,9 +19,6 @@ type Locale = 'en' | 'zh';
 
 const tr = (locale: Locale, en: string, zh: string) => (locale === 'zh' ? zh : en);
 
-// ---------------------------------------------------------------------------
-// Items
-// ---------------------------------------------------------------------------
 export function iconStyle(icon: IconName | undefined, size: number): CSSProperties {
   const index = icon === undefined ? 0 : (ICON[icon] ?? 0);
   const col = index % ICON_COLUMNS;
@@ -75,9 +72,6 @@ export function ItemStack({ stack, scale }: { stack: Stack; scale: number }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// HUD
-// ---------------------------------------------------------------------------
 export interface ChatLine {
   id: number;
   text: string;
@@ -378,9 +372,6 @@ function blockKey(id: number) {
   return String(id);
 }
 
-// ---------------------------------------------------------------------------
-// Container screens
-// ---------------------------------------------------------------------------
 interface SlotPos {
   ref: SlotRef;
   x: number;
@@ -535,7 +526,6 @@ export function ContainerScreen({
     e.stopPropagation();
     const button = e.button === 2 ? 'right' : 'left';
     if (e.button === 1) {
-      // Middle click in creative clones a full stack.
       const st = game.slot(ref);
       if (game.mode === 'creative' && st && !game.cursor)
         game.cursor = { ...st, count: ITEMS[st.id]?.stack ?? 64 };
@@ -752,7 +742,6 @@ function Tooltip({
   );
 }
 
-/** Steve's front faces cut from the skin, standing in the inventory preview box. */
 function PlayerPreview({ scale }: { scale: number }) {
   const s = scale * 2.2;
   const part = (u: number, v: number, w: number, h: number, x: number, y: number) => (
@@ -956,9 +945,6 @@ function CreativeScreen({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Menu widgets
-// ---------------------------------------------------------------------------
 export function McButton({
   children,
   onClick,
@@ -1091,7 +1077,6 @@ export function McTextField({
 export { tr };
 
 const PANORAMA_FACES = [
-  // Vanilla order: 0 front, 1 right, 2 back, 3 left, 4 up, 5 down.
   'rotateY(0deg)',
   'rotateY(-90deg)',
   'rotateY(180deg)',
@@ -1100,7 +1085,6 @@ const PANORAMA_FACES = [
   'rotateX(90deg)',
 ];
 
-/** Slowly rotating title-screen panorama cube, as in the vanilla client. */
 export function Panorama() {
   return (
     <div className="mc-panorama" aria-hidden="true">

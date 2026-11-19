@@ -73,12 +73,12 @@ describe('localePath', () => {
 describe('isZhPathname', () => {
   it('matches the zh root and zh children', () => {
     expect(isZhPathname('/zh')).toBe(true);
-    expect(isZhPathname('/zh/inference')).toBe(true);
+    expect(isZhPathname('/zh/infx/inference')).toBe(true);
   });
 
   it('does not match English paths or lookalikes', () => {
     expect(isZhPathname('/')).toBe(false);
-    expect(isZhPathname('/inference')).toBe(false);
+    expect(isZhPathname('/infx/inference')).toBe(false);
     expect(isZhPathname('/zhejiang')).toBe(false);
   });
 });
@@ -86,10 +86,10 @@ describe('isZhPathname', () => {
 describe('hasZhSibling', () => {
   it('matches mirrored exact routes', () => {
     expect(hasZhSibling('/')).toBe(true);
-    expect(hasZhSibling('/inference')).toBe(true);
+    expect(hasZhSibling('/infx/inference')).toBe(true);
     expect(hasZhSibling('/overview')).toBe(true);
     expect(hasZhSibling('/about')).toBe(true);
-    expect(hasZhSibling('/collectivex')).toBe(true);
+    expect(hasZhSibling('/colx')).toBe(true);
   });
 
   it.each(DASHBOARD_ROUTES.filter((route) => route.localeMirrored))(
@@ -119,12 +119,12 @@ describe('hasZhSibling', () => {
   });
 
   it('matches datasets, gated tabs, and agentic detail pages', () => {
-    expect(hasZhSibling('/agentx')).toBe(true);
-    expect(hasZhSibling('/agentx/some-set/conversations/abc123')).toBe(true);
-    expect(hasZhSibling('/ai-chart')).toBe(true);
-    expect(hasZhSibling('/current-inferencex-image')).toBe(true);
+    expect(hasZhSibling('/infx/agentx')).toBe(true);
+    expect(hasZhSibling('/infx/agentx/some-set/conversations/abc123')).toBe(true);
+    expect(hasZhSibling('/infx/ai-chart')).toBe(true);
+    expect(hasZhSibling('/infx/current-inferencex-image')).toBe(true);
     expect(hasZhSibling('/feedback')).toBe(true);
-    expect(hasZhSibling('/inference/agentic/42')).toBe(true);
+    expect(hasZhSibling('/infx/inference/agentic/42')).toBe(true);
   });
 
   it('rejects unknown routes', () => {
@@ -135,8 +135,8 @@ describe('hasZhSibling', () => {
 describe('switchLocalePath', () => {
   it('switches English pages to their zh sibling', () => {
     expect(switchLocalePath('/')).toBe('/zh');
-    expect(switchLocalePath('/inference')).toBe('/zh/inference');
-    expect(switchLocalePath('/collectivex')).toBe('/zh/collectivex');
+    expect(switchLocalePath('/infx/inference')).toBe('/zh/infx/inference');
+    expect(switchLocalePath('/colx')).toBe('/zh/colx');
     expect(switchLocalePath('/overview')).toBe('/zh/overview');
     expect(switchLocalePath('/blog/some-post')).toBe('/zh/blog/some-post');
   });
@@ -144,7 +144,7 @@ describe('switchLocalePath', () => {
   it('switches zh pages back to English', () => {
     expect(switchLocalePath('/zh')).toBe('/');
     expect(switchLocalePath('/zh/quotes')).toBe('/quotes');
-    expect(switchLocalePath('/zh/collectivex')).toBe('/collectivex');
+    expect(switchLocalePath('/zh/colx')).toBe('/colx');
     expect(switchLocalePath('/zh/overview')).toBe('/overview');
     expect(switchLocalePath('/zh/blog/some-post')).toBe('/blog/some-post');
   });
@@ -169,14 +169,24 @@ describe('switchLocalePath', () => {
   });
 
   it('switches datasets pages within the language trees', () => {
-    expect(switchLocalePath('/agentx')).toBe('/zh/agentx');
-    expect(switchLocalePath('/zh/agentx/some-set')).toBe('/agentx/some-set');
+    expect(switchLocalePath('/infx/agentx')).toBe('/zh/infx/agentx');
+    expect(switchLocalePath('/zh/infx/agentx/some-set')).toBe('/infx/agentx/some-set');
   });
 
   it('switches model pages within the language trees', () => {
     expect(switchLocalePath('/model')).toBe('/zh/model');
     expect(switchLocalePath('/model/deepseek-r1')).toBe('/zh/model/deepseek-r1');
     expect(switchLocalePath('/zh/model/deepseek-r1')).toBe('/model/deepseek-r1');
+  });
+
+  it('switches hardware results pages within the language trees', () => {
+    const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
+    expect(hasZhSibling('/hardware')).toBe(true);
+    expect(hasZhSibling(`/hardware/${slug}`)).toBe(true);
+    expect(hasZhSibling('/hardware-results')).toBe(false);
+    expect(switchLocalePath('/hardware')).toBe('/zh/hardware');
+    expect(switchLocalePath(`/hardware/${slug}`)).toBe(`/zh/hardware/${slug}`);
+    expect(switchLocalePath(`/zh/hardware/${slug}`)).toBe(`/hardware/${slug}`);
   });
 
   it('falls back to the other homepage for unmirrored paths', () => {

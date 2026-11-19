@@ -35,7 +35,6 @@ const LABELS = {
   },
 } as const;
 
-/** Summarize actual filters, including stale/unknown values so they remain removable. */
 export function quickFilterSummary(filters: QuickFilters, locale: 'en' | 'zh', agentic = false) {
   const labels = LABELS[locale];
   return (Object.keys(filters) as (keyof QuickFilters)[]).flatMap((category) => {

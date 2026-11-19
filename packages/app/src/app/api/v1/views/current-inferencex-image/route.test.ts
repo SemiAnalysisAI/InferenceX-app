@@ -12,11 +12,11 @@ vi.mock('@semianalysisai/inferencex-db/queries/latest-images', () => ({
 vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));
 const image: LatestImageRow = {
-  model: 'dsv4',
+  model: 'dsv41flash',
   hardware: 'b200',
   framework: 'sglang',
   precision: 'fp8',
@@ -39,11 +39,15 @@ const request = (params: Record<string, string> = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.images.mockImplementation(() => Response.json([image, { ...image, disagg: true }]));
-  mocks.releases.mockImplementation(() => Response.json({ sglang: 'v2' }));
+  mocks.releases.mockImplementation(() =>
+    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z', commits: {} } }),
+  );
   mocks.history.mockResolvedValue([
+    { ...image, date: '2026-08-20' },
     image,
-    { ...image, date: '2026-09-18' },
+    { ...image, disagg: true },
     { ...image, hardware: 'h200' },
+    { ...image, spec_method: 'mtp', date: '2026-06-01' },
   ]);
 });
 
@@ -76,14 +80,27 @@ describe('current image selector normalization', () => {
   it('returns the same filtered 90-day series as the UI helper', async () => {
     const response = await GET(request({ hardware: 'b200', includeHistory: 'true' }));
     const body = await response.json();
+    const rows = [image, { ...image, disagg: true }];
     expect(body.ageHistory).toEqual(
-      imageAgeHistory([image, { ...image, date: '2026-09-18' }], '2026-09-19'),
+      imageAgeHistory(rows, [{ ...image, date: '2026-08-20' }, ...rows], '2026-09-19'),
     );
     expect(body.ageHistory).toHaveLength(90);
-    expect(body.ageHistory.at(-1)).toMatchObject({ p90AgeDays: 1, configurationCount: 1 });
+    expect(body.ageHistory.find((p: { date: string }) => p.date === '2026-08-31')).toMatchObject({
+      p90AgeDays: 11,
+      configurationCount: 1,
+    });
     expect(body.params.includeHistory).toBe(true);
     expect(mocks.history).toHaveBeenCalledWith({}, '2026-09-19');
   });
+
+  it.each(['2026-09-19', '2026-08-31'])(
+    'ends history on ageSummary without superseded configurations at asOf=%s',
+    async (asOf) => {
+      const response = await GET(request({ asOf, includeHistory: 'true' }));
+      const body = await response.json();
+      expect(body.ageHistory.at(-1)).toEqual(body.ageSummary);
+    },
+  );
 
   it('rejects invalid history selectors', async () => {
     const response = await GET(request({ includeHistory: 'yes' }));
@@ -92,8 +109,8 @@ describe('current image selector normalization', () => {
   });
 
   it.each([
-    ['model', 'deepseek-v4', 'DeepSeek-V4-Pro'],
-    ['model', ' dEePsEeK-v4-pRo ', 'DeepSeek-V4-Pro'],
+    ['model', 'deepseek-v4.1-flash', 'DeepSeek-V4.1-Flash'],
+    ['model', ' dEePsEeK-v4.1-fLaSh ', 'DeepSeek-V4.1-Flash'],
     ['hardware', ' B200 ', 'b200'],
     ['precision', ' FP8 ', 'fp8'],
     ['spec', ' NONE ', 'none'],
@@ -122,7 +139,7 @@ describe('current image selector normalization', () => {
     expect(body.rows).toHaveLength(2);
     expect(body.rows[0]).toMatchObject({
       ...image,
-      displayModel: 'DeepSeek-V4-Pro',
+      displayModel: 'DeepSeek-V4.1-Flash',
       ageDays: 18,
     });
   });
@@ -135,6 +152,29 @@ describe('current image selector normalization', () => {
     expect(body.params.model).toBe('Future-Model');
     expect(body.rows).toHaveLength(1);
     expect(body.rows[0].model).toBe('Future-Model');
+  });
+
+  it('omits retired Pro and M3 images while retaining Flash and M3.1', async () => {
+    mocks.images.mockImplementation(() =>
+      Response.json([
+        image,
+        { ...image, model: 'dsv4' },
+        { ...image, model: 'minimaxm3' },
+        { ...image, model: 'minimaxm31flash' },
+      ]),
+    );
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.rows.map((row: typeof image) => row.model).sort()).toEqual([
+      'dsv41flash',
+      'minimaxm31flash',
+    ]);
+    const historical = await GET(request({ model: 'deepseek-v4' }));
+    expect(historical.status).toBe(200);
+    expect(await historical.json()).toMatchObject({
+      params: { model: 'DeepSeek-V4-Pro' },
+      rows: [],
+    });
   });
 
   it.each([

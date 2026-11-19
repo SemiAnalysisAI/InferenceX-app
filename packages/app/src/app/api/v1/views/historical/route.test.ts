@@ -19,16 +19,64 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),
 }));
 
 import { GET } from './route';
+import { buildImprovementWaterfall } from '@/components/inference/utils/improvement-waterfall';
+import {
+  groupTrendRowsByDate,
+  buildTrendLines,
+  trendMetricDependencies,
+} from '@/components/inference/hooks/interpolated-trend-core';
+import {
+  buildFrontierHistory,
+  comparisonBuckets,
+  FRONTIER_COMPARISON_BUCKETS,
+  frontierAreas,
+  frontierChapters,
+  frontierRegressions,
+  leadMargins,
+  averageSoftwareGain,
+  commonSoftwareGainRate,
+  softwareGainRates,
+  softwareGainByInteractivity,
+  softwareGains,
+  territoryShares,
+  vendorsAtOtherPrecisions,
+} from '@/components/trends/frontier-history-core';
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'http://localhost'));
 }
+
+it('exposes the same waterfall steps as the dashboard without changing the default series', async () => {
+  const path = '/api/v1/views/historical?model=DeepSeek-R1-0528&metric=tpPerGpu&target=35';
+  const response = await GET(request(`${path}&chart=waterfall`));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.params.chart).toBe('waterfall');
+  expect(body.series.length).toBeGreaterThan(0);
+  for (const series of body.series) {
+    const expected = buildImprovementWaterfall(
+      series.points.map((point: { date: string; value: number; synthetic?: boolean }) => ({
+        ...point,
+        x: 35,
+      })),
+    );
+    expect(
+      series.steps.map(
+        ({ linksAvailable: _links, prLinks: _prs, ...step }: Record<string, unknown>) => step,
+      ),
+    ).toEqual(expected);
+  }
+  const csv = await GET(request(`${path}&chart=waterfall&format=csv`));
+  expect(await csv.text()).toContain('runUrls,prLinks,linksAvailable');
+  const invalid = await GET(request(`${path}&chart=invalid`));
+  expect(invalid.status).toBe(400);
+});
 
 let nextId = 1;
 
@@ -72,7 +120,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
-/** A three-point interactivity curve for one hardware on one snapshot date. */
 function curve(date: string, hardware: string, framework: string, scale = 1): BenchmarkRow[] {
   return [
     [10, 500],
@@ -107,7 +154,105 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
+// Median and P90 disagree on purpose: at target 35, the P90 axis reads
+// 300 → 360 (+60) while the median axis would read ~397 → 476.
+const agenticCurve = (date: string, scale: number) =>
+  [
+    [10, 25, 500],
+    [35, 45, 300],
+    [60, 70, 100],
+  ].map(([p90, median, tput]) =>
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      date,
+      conc: Math.round(640 / p90),
+      metrics: {
+        ...makeRow().metrics,
+        median_intvty: median,
+        p90_intvty: p90,
+        p90_itl: 1 / p90,
+        tput_per_gpu: tput * scale,
+        output_tput_per_gpu: tput * scale,
+      },
+    }),
+  );
+
 describe('GET /api/v1/views/historical', () => {
+  it('matches dashboard history at P90 and rejects the median-only reachable range', async () => {
+    const rows = curve('2026-03-01', 'h200', 'trt').map((row) => ({
+      ...row,
+      benchmark_type: 'agentic_traces' as const,
+      isl: null,
+      osl: null,
+      metrics: {
+        ...row.metrics,
+        p90_full_response_itl: 1 / row.metrics.median_intvty,
+        p90_itl: 1 / (row.metrics.median_intvty * 5),
+        median_intvty: row.metrics.median_intvty * 2,
+        p90_intvty: 999,
+      },
+    }));
+    mockGetAllBenchmarksForHistory.mockResolvedValue(rows);
+    for (const target of [10, 25, 35, 60, 70]) {
+      const response = await GET(
+        request(
+          `/api/v1/views/historical?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&target=${target}&extendToDate=2026-03-01`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.interactivity).toEqual({
+        statistic: 'p90',
+        field: 'p90_intvty',
+        unit: 'tok/s/user',
+      });
+      const { trendLines } = buildTrendLines(
+        groupTrendRowsByDate(rows, {
+          selectedPrecisions: ['fp8'],
+          selectedYAxisMetric: 'y_tpPerGpu',
+          requestedMetrics: ['tpPerGpu'],
+        }),
+        { targetInteractivity: target, trendMetricKey: 'tpPerGpu', extendToDate: '2026-03-01' },
+      );
+      expect(
+        body.series.map((series: { points: { value: number }[] }) =>
+          series.points.map((point) => point.value),
+        ),
+      ).toEqual([...trendLines.values()].map((points) => points.map((point) => point.value)));
+      if (target === 35) expect(body.series[0].points[0].value).toBeCloseTo(300, 10);
+      if (target === 70) expect(body.series).toEqual([]);
+    }
+    const csv = await GET(
+      request(
+        '/api/v1/views/historical?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&target=35&extendToDate=2026-03-01&format=csv',
+      ),
+    );
+    expect(await csv.text()).toContain('35,p90,p90_intvty');
+  });
+
+  it('omits AgentX rows missing P90 latency rather than using supplied rate or median', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValue(
+      curve('2026-03-01', 'h200', 'trt').map((row) => ({
+        ...row,
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics: { ...row.metrics, p90_intvty: 35 },
+      })),
+    );
+    const response = await GET(
+      request(
+        '/api/v1/views/historical?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&target=35',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.interactivity.statistic).toBe('p90');
+    expect(body.series).toEqual([]);
+  });
+
   it('builds interpolated trend lines at the target interactivity', async () => {
     const res = await GET(
       request(
@@ -128,14 +273,52 @@ describe('GET /api/v1/views/historical', () => {
       precisions: ['fp8'],
     });
     expect(body.metric.key).toBe('tpPerGpu');
+    expect(body.interactivity).toEqual({
+      statistic: 'median',
+      field: 'median_intvty',
+      unit: 'tok/s/user',
+    });
 
     expect(body.series.length).toBe(2);
     const h200 = body.series.find((s: { hwKey: string }) => s.hwKey.startsWith('h200'));
     expect(h200.points).toHaveLength(2);
-    // Target 35 sits exactly on a sample point: value equals that point's metric.
     expect(h200.points[0]).toMatchObject({ date: '2026-02-01', value: 300 });
     expect(h200.points[1].date).toBe('2026-03-01');
     expect(body.hwKeysWithData.length).toBe(2);
+  });
+
+  it('applies chipBasis to disaggregated trend lines and rejects unknown values', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValue(
+      curve('2026-02-01', 'gb200', 'dynamo-trt').map((row) => ({
+        ...row,
+        disagg: true,
+        is_multinode: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+      })),
+    );
+    const value = async (chipBasis: string) => {
+      const res = await GET(
+        request(
+          `/api/v1/views/historical?model=DeepSeek-R1-0528&metric=outputTputPerGpu&target=35&extendToDate=2026-02-01&chipBasis=${chipBasis}`,
+        ),
+      );
+      const body = await res.json();
+      expect(body.params.chipBasis).toBe(chipBasis);
+      return body.series[0].points[0].value as number;
+    };
+    const pool = await value('pool');
+    expect(pool).toBeCloseTo(300, 6);
+    expect(await value('total')).toBeCloseTo((pool * 12) / 16, 6);
+
+    const invalid = await GET(
+      request('/api/v1/views/historical?model=DeepSeek-R1-0528&chipBasis=decode'),
+    );
+    expect(invalid.status).toBe(400);
+    const invalidBody = await invalid.json();
+    expect(invalidBody.param).toBe('chipBasis');
   });
 
   it('extends shorter lines to the explicit end date with a synthetic point', async () => {
@@ -187,7 +370,6 @@ describe('GET /api/v1/views/historical', () => {
     );
     const early = await earlyRes.json();
     expect(early.params.end).toBe('2026-02-15');
-    // Only the February snapshot survives; no extension beyond it.
     for (const series of early.series) {
       expect(series.points).toHaveLength(1);
       expect(series.points[0].date).toBe('2026-02-01');
@@ -209,6 +391,26 @@ describe('GET /api/v1/views/historical', () => {
     );
     const resBody = await res.json();
     expect(resBody.params.sequence).toBe('agentic-traces');
+  });
+
+  it('interpolates AgentX trends and waterfall steps at P90 interactivity', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValue([
+      ...agenticCurve('2026-02-01', 1),
+      ...agenticCurve('2026-03-01', 1.2),
+    ]);
+    const res = await GET(
+      request(
+        '/api/v1/views/historical?model=DeepSeek-R1-0528&metric=tpPerGpu&sequence=agentic&target=35&chart=waterfall',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const h200 = body.series.find((series: { hwKey: string }) => series.hwKey.startsWith('h200'));
+    const measured = h200.points.filter((point: { synthetic?: boolean }) => !point.synthetic);
+    expect(measured.map((point: { value: number }) => point.value)).toEqual([300, 360]);
+    const gain = h200.steps.find((step: { kind: string }) => step.kind === 'gain');
+    expect(gain.from).toBeCloseTo(300);
+    expect(gain.delta).toBeCloseTo(60);
   });
 
   it('rejects unknown metrics and out-of-range targets', async () => {
@@ -239,5 +441,146 @@ describe('GET /api/v1/views/historical', () => {
     expect(header).toContain('date');
     expect(header).toContain('value');
     expect(lines.length).toBeGreaterThan(0);
+  });
+});
+
+describe('GET /api/v1/views/historical?chart=frontier', () => {
+  const path = '/api/v1/views/historical?model=DeepSeek-R1-0528&metric=tpPerGpu&chart=frontier';
+
+  it('returns the same frontier history as the dashboard', async () => {
+    const response = await GET(request(path));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const rows = await mockGetAllBenchmarksForHistory();
+    const expected = buildFrontierHistory(rows, {
+      selectedPrecisions: body.params.precisions,
+      selectedYAxisMetric: 'tpPerGpu',
+      metricKey: 'tpPerGpu',
+      requestedMetrics: trendMetricDependencies('tpPerGpu'),
+      higherIsBetter: true,
+      groupBy: 'gpu',
+    });
+    expect(body.params).toMatchObject({ chart: 'frontier', groupBy: 'gpu' });
+    expect(body.series).toEqual([]);
+    expect(body.frontier.dates).toEqual(expected.dates);
+    expect(body.frontier.overtakes).toEqual(expected.overtakes);
+    expect(body.frontier.series.map((s: { key: string }) => s.key)).toEqual(
+      expected.series.map((s) => s.key),
+    );
+    expect(body.frontier.territory.at(-1).shares).toEqual(
+      territoryShares(expected, expected.dates.length - 1),
+    );
+    const areas = frontierAreas(expected);
+    const gains = softwareGains(expected);
+    const buckets = comparisonBuckets(expected, FRONTIER_COMPARISON_BUCKETS);
+    for (const series of body.frontier.series) {
+      expect(series.areas).toEqual(areas.get(series.key));
+      expect(series.softwareGain).toEqual(gains.get(series.key));
+      expect(series.softwareGainByInteractivity).toEqual(
+        softwareGainByInteractivity(expected, series.key, expected.dates.length - 1, buckets),
+      );
+      for (const days of [30, 60, 90])
+        expect(series.softwareGainRate[days]).toEqual(
+          softwareGainRates(expected, days).get(series.key),
+        );
+      expect(series.softwareGainAverage).toEqual(
+        averageSoftwareGain(
+          softwareGainByInteractivity(expected, series.key, expected.dates.length - 1, buckets),
+        ),
+      );
+    }
+    for (const days of [30, 60, 90])
+      expect(body.frontier.commonSoftwareGainRate[days]).toEqual(
+        commonSoftwareGainRate(softwareGainRates(expected, days), expected.dates.length),
+      );
+    expect(body.frontier.comparison).toBeNull();
+    expect(body.frontier.otherPrecisionVendors).toEqual(
+      vendorsAtOtherPrecisions(rows, {
+        selectedPrecisions: body.params.precisions,
+        selectedYAxisMetric: 'tpPerGpu',
+        metricKey: 'tpPerGpu',
+        requestedMetrics: trendMetricDependencies('tpPerGpu'),
+        higherIsBetter: true,
+        groupBy: 'gpu',
+      }),
+    );
+    expect(body.frontier.chapters).toEqual(
+      frontierChapters(
+        expected,
+        expected.series.map((s) => s.key),
+        true,
+      ),
+    );
+    expect(body.frontier.regressions).toEqual(
+      frontierRegressions(
+        expected,
+        expected.dates.length - 1,
+        expected.series.map((s) => s.key),
+      ),
+    );
+  });
+
+  it('groups by configuration on request and rejects unknown groupings', async () => {
+    const response = await GET(request(`${path}&groupBy=config`));
+    const body = await response.json();
+    expect(body.frontier.series.map((s: { key: string }) => s.key).toSorted()).toEqual([
+      'h200_trt',
+      'mi300x_vllm',
+    ]);
+    const invalid = await GET(request(`${path}&groupBy=chip`));
+    expect(invalid.status).toBe(400);
+  });
+
+  it('groups by vendor and compares the requested series like the dashboard', async () => {
+    const response = await GET(request(`${path}&groupBy=vendor&compare=NVIDIA,AMD,Intel`));
+    const body = await response.json();
+    const rows = await mockGetAllBenchmarksForHistory();
+    const expected = buildFrontierHistory(rows, {
+      selectedPrecisions: body.params.precisions,
+      selectedYAxisMetric: 'tpPerGpu',
+      metricKey: 'tpPerGpu',
+      requestedMetrics: trendMetricDependencies('tpPerGpu'),
+      higherIsBetter: true,
+      groupBy: 'vendor',
+    });
+    expect(body.frontier.series.map((s: { key: string }) => s.key)).toEqual(['AMD', 'NVIDIA']);
+    expect(body.frontier.comparison.keys).toEqual(['NVIDIA', 'AMD']);
+    expect(body.frontier.comparison.chapters).toEqual(
+      frontierChapters(expected, ['NVIDIA', 'AMD'], false),
+    );
+    const buckets = comparisonBuckets(expected, FRONTIER_COMPARISON_BUCKETS);
+    expect(body.frontier.comparison.buckets).toEqual(buckets);
+    const last = expected.dates.length - 1;
+    expect(body.frontier.comparison.margins.at(-1).margins).toEqual(
+      leadMargins(expected, last, ['NVIDIA', 'AMD'], buckets),
+    );
+  });
+
+  it('matches the dashboard vendor picker when filtered to one vendor', async () => {
+    const response = await GET(request(`${path}&vendors=AMD`));
+    const body = await response.json();
+    const rows = await mockGetAllBenchmarksForHistory();
+    const all = buildFrontierHistory(rows, {
+      selectedPrecisions: body.params.precisions,
+      selectedYAxisMetric: 'tpPerGpu',
+      metricKey: 'tpPerGpu',
+      requestedMetrics: trendMetricDependencies('tpPerGpu'),
+      higherIsBetter: true,
+      groupBy: 'gpu',
+    });
+    const amd = all.series.filter((series) => series.vendor === 'AMD');
+    expect(amd.length).toBeGreaterThan(0);
+    expect(
+      body.frontier.series.map((s: { key: string; changes: unknown }) => [s.key, s.changes]),
+    ).toEqual(amd.map((series) => [series.key, series.changes]));
+  });
+
+  it('exports one CSV row per frontier vertex and change date', async () => {
+    const response = await GET(request(`${path}&format=csv`));
+    const text = await response.text();
+    expect(text.split('\r\n')[0]).toBe(
+      'series,label,date,interactivity,value,concurrency,precision,measured,runUrl,config,image',
+    );
+    expect(text).toContain('h200,H200');
   });
 });

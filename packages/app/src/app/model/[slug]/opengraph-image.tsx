@@ -41,8 +41,6 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
       subtitle: page.meta.description,
       date: '',
     },
-    // releaseDate is free-form text (may hold multiple versions), so it is
-    // passed through verbatim instead of being date-formatted.
     { dateLabel: `${page.meta.developer} · ${page.meta.releaseDate}` },
   );
 }

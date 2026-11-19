@@ -9,10 +9,6 @@ import {
 import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
 import type { Locale } from '@/lib/i18n/i18n';
 
-// ---------------------------------------------------------------------------
-// Derived enum strings (built once at import time)
-// ---------------------------------------------------------------------------
-
 const MODEL_LIST = Object.entries(DB_MODEL_TO_DISPLAY)
   .map(([k, v]) => `${k}=${v}`)
   .join(', ');
@@ -29,10 +25,6 @@ const GPU_DETAILS = Object.entries(HW_REGISTRY)
 
 const Y_METRIC_LIST = Y_AXIS_METRICS.map((m) => `${m}`).join(', ');
 
-/**
- * System prompt for the LLM that parses user natural language into AiChartSpec(s).
- * Domain context is derived from shared constants so it stays in sync automatically.
- */
 export function buildParsePrompt(locale: Locale = 'en'): string {
   const localeInstruction =
     locale === 'zh'

@@ -4,20 +4,21 @@ import {
   SNAPSHOT_START_ISO,
 } from '@semianalysisai/inferencex-db/proxytrace/shared/as-of';
 
-/**
- * UI helpers for the frozen snapshot. Every chart window and label that used
- * to mean "relative to now" is anchored to the snapshot's as-of time instead,
- * so pages read the same no matter when they are viewed.
- */
+import { localeTag, type Locale } from '@/lib/i18n/i18n';
 
 const DAY_MS = 86_400_000;
 
-const dateFmt = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
-const dateYearFmt = new Intl.DateTimeFormat('en-US', {
+function buildDateFormats(
+  options: Intl.DateTimeFormatOptions,
+): Record<Locale, Intl.DateTimeFormat> {
+  return {
+    en: new Intl.DateTimeFormat(localeTag('en'), options),
+    zh: new Intl.DateTimeFormat(localeTag('zh'), options),
+  };
+}
+
+const dateFmt = buildDateFormats({ month: 'short', day: 'numeric', timeZone: 'UTC' });
+const dateYearFmt = buildDateFormats({
   month: 'short',
   day: 'numeric',
   year: 'numeric',
@@ -30,40 +31,37 @@ const timeFmt = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
 });
 
-/** The snapshot's "now" as a Date (never the viewer's clock). */
 export function snapshotNow(): Date {
   return new Date(AS_OF_MS);
 }
 
-/** Epoch ms of the snapshot's "now". */
 export const SNAPSHOT_NOW_MS = AS_OF_MS;
 
-/** "Sep 26" */
-export function formatSnapshotDate(d: Date | string | number): string {
-  return dateFmt.format(new Date(d));
+export function formatSnapshotDate(d: Date | string | number, locale: Locale = 'en'): string {
+  return dateFmt[locale].format(new Date(d));
 }
 
-/** "08:07" (UTC) */
 export function formatSnapshotClock(d: Date | string | number): string {
   return timeFmt.format(new Date(d));
 }
 
-/** "Sep 25, 14:02 UTC" — absolute replacement for "3h ago" style timestamps. */
-export function formatSnapshotTime(d: Date | string | number): string {
-  return `${formatSnapshotDate(d)}, ${formatSnapshotClock(d)} UTC`;
+export function formatSnapshotTime(d: Date | string | number, locale: Locale = 'en'): string {
+  const sep = locale === 'zh' ? ' ' : ', ';
+  return `${formatSnapshotDate(d, locale)}${sep}${formatSnapshotClock(d)} UTC`;
 }
 
-/** "Jun 8 – Sep 26, 2026" */
-export const SNAPSHOT_RANGE_LABEL = `${dateFmt.format(new Date(SNAPSHOT_START_ISO))} – ${dateYearFmt.format(new Date(AS_OF_ISO))}`;
+export function snapshotRangeLabel(locale: Locale = 'en'): string {
+  return `${dateFmt[locale].format(new Date(SNAPSHOT_START_ISO))} – ${dateYearFmt[locale].format(new Date(AS_OF_ISO))}`;
+}
 
-/** "08:07 UTC" — when the snapshot ends on its last day. */
 export const SNAPSHOT_END_CLOCK = `${formatSnapshotClock(AS_OF_ISO)} UTC`;
 
-/** The snapshot's last UTC day as YYYY-MM-DD (partial day). */
 export const LAST_DAY_ISO = new Date(AS_OF_MS).toISOString().slice(0, 10);
 
-/** The snapshot's last UTC day, which is partial: "Sep 26". */
-export const LAST_DAY_LABEL = formatSnapshotDate(AS_OF_MS);
+export function lastDayLabel(locale: Locale = 'en'): string {
+  return formatSnapshotDate(AS_OF_MS, locale);
+}
 
-/** The last complete UTC day: "Sep 25". */
-export const PREV_DAY_LABEL = formatSnapshotDate(AS_OF_MS - DAY_MS);
+export function prevDayLabel(locale: Locale = 'en'): string {
+  return formatSnapshotDate(AS_OF_MS - DAY_MS, locale);
+}

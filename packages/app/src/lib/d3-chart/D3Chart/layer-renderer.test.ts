@@ -152,6 +152,7 @@ describe('updateLayerForDisplay', () => {
     const point = layout.zoomGroup.select<SVGGElement>('.dot-group');
     const roofline = layout.zoomGroup.select<SVGPathElement>('.roofline-path');
     const pointNode = point.node();
+    const labelNode = point.select('.point-label').node();
     const rooflineNode = roofline.node();
     point.attr('transform', 'translate(123,45)');
     roofline.attr('d', 'M 123 45 L 234 56');
@@ -163,7 +164,6 @@ describe('updateLayerForDisplay', () => {
           ...initialPointLayer.config,
           getColor: () => '#ff0000',
           foreground: '#eeeeee',
-          hideLabels: true,
         },
       },
       layout.zoomGroup,
@@ -183,9 +183,16 @@ describe('updateLayerForDisplay', () => {
     expect(point.attr('transform')).toBe('translate(123,45)');
     expect(roofline.attr('d')).toBe('M 123 45 L 234 56');
     expect(point.select('.visible-shape').attr('fill')).toBe('#ff0000');
+    expect(point.select('.point-label').node()).toBe(labelNode);
     expect(point.select('.point-label').attr('fill')).toBe('#eeeeee');
-    expect(point.select('.point-label').style('display')).toBe('none');
     expect(roofline.attr('stroke')).toBe('#00ff00');
+
+    updateLayerForDisplay(
+      { ...initialPointLayer, config: { ...initialPointLayer.config, hideLabels: true } },
+      layout.zoomGroup,
+      ctx,
+    );
+    expect(point.select('.point-label').empty()).toBe(true);
   });
 
   it('recolors horizontal bars without repeating their join or geometry writes', () => {

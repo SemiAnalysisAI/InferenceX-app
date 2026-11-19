@@ -18,8 +18,29 @@ export function entries(value: Json): [string, Json][] {
 export function number(value: Json): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
+/**
+ * Clip length a plan requests: its `duration_seconds`, or `frame_count / fps` for plans that
+ * request frames (Wan-style specs carry no separate nominal duration).
+ */
+export function generationDuration(generation: Json): number | null {
+  const seconds = number(at(generation, 'duration_seconds'));
+  if (seconds !== null) return seconds > 0 ? seconds : null;
+  const frames = number(at(generation, 'frame_count')),
+    fps = number(at(generation, 'fps'));
+  return frames !== null && fps !== null && frames > 0 && fps > 0 ? frames / fps : null;
+}
 export function text(value: Json): string {
   return typeof value === 'string' ? value : '';
+}
+/** Key-sorted JSON, so two documents compare equal whatever their key order. */
+export function canonical(value: Json): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object')
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
 }
 export function safePath(path: string): string {
   if (
@@ -51,9 +72,14 @@ export interface Bundle {
   checksums: Map<string, string>;
   manifestSha256: string;
 }
+/**
+ * Reads and hashes every SHA256SUMS path that `include` accepts. Skipped paths keep their
+ * sealed checksum, so manifest evidence and media identity checks still bind them.
+ */
 export async function readVerifiedFiles(
   read: (path: string) => Promise<Blob>,
   entryPoint: 'manifest.json' | 'comparison.json',
+  include: (path: string) => boolean = () => true,
 ) {
   const sums = await read('SHA256SUMS');
   if (sums.size > 1024 * 1024) throw new Error('Checksum inventory exceeds 1 MiB');
@@ -70,24 +96,25 @@ export async function readVerifiedFiles(
   const files = new Map<string, Blob>([['SHA256SUMS', sums]]);
   const documents = new Map<string, Json>();
   let total = 0;
-  // ponytail: whole bundles stay in browser memory; stream to storage for bundles above 1 GiB.
   for (const [path, hash] of checksums) {
+    if (!include(path)) continue;
     const blob = await read(path);
     total += blob.size;
     if (blob.size > 512 * 1024 ** 2 || total > 1024 ** 3)
       throw new Error('Bundle exceeds browser memory limit');
     if ((await sha256(blob)) !== hash) throw new Error(`SHA256 mismatch: ${path}`);
     files.set(path, blob);
-    // Supervisor stdout may be empty or truncated when a request is interrupted.
-    // Retain and verify those raw logs without treating them as result documents.
     if (path.endsWith('.json') && !path.endsWith('.stdout.json'))
       documents.set(path, JSON.parse(await blob.text()));
   }
   return { files, documents, checksums };
 }
 
-export async function loadBundle(read: (path: string) => Promise<Blob>): Promise<Bundle> {
-  const { files, documents, checksums } = await readVerifiedFiles(read, 'manifest.json');
+export async function loadBundle(
+  read: (path: string) => Promise<Blob>,
+  include?: (path: string) => boolean,
+): Promise<Bundle> {
+  const { files, documents, checksums } = await readVerifiedFiles(read, 'manifest.json', include);
   const manifest = documents.get('manifest.json') ?? null;
   if (
     at(manifest, 'schema_version') !== 1 ||

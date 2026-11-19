@@ -1,17 +1,8 @@
-/**
- * Shared test helpers for D3 chart layer tests.
- *
- * Since vitest runs in a node environment with no DOM, we provide a mock D3
- * selection that tracks attribute, style, and text calls. The mock supports
- * the full chaining API used by the layer modules: selectAll, data, join,
- * enter, append, exit, remove, merge, select, attr, style, text, each, datum,
- * empty, nodes, transition, duration, on (handlers are recorded on the
- * element, not dispatched — tests can invoke them directly).
- */
+interface MockTextNode {
+  nodeType: 3;
+  nodeValue: string;
+}
 
-// ─── Mock Element ────────────────────────────────────────────────────
-
-/** Attribute/style/text values recorded on a mock element. */
 export interface MockElement {
   tag: string;
   attrs: Record<string, string | number>;
@@ -20,17 +11,61 @@ export interface MockElement {
   children: MockElement[];
   datum: unknown;
   removed: boolean;
-  /** Event handlers recorded by `.on()`, keyed by event type. */
   handlers?: Record<string, (...args: unknown[]) => void>;
+  getAttribute: (name: string) => string | null;
+  setAttribute: (name: string, value: string) => void;
+  removeAttribute: (name: string) => void;
+  style: {
+    getPropertyValue: (name: string) => string;
+    setProperty: (name: string, value: string) => void;
+    removeProperty: (name: string) => void;
+  };
+  readonly firstChild: MockTextNode | null;
+  readonly lastChild: MockTextNode | null;
+}
+
+function assertedValue(value: string): string | number {
+  return value !== '' && String(Number(value)) === value ? Number(value) : value;
 }
 
 function createMockElement(tag: string, datum?: unknown): MockElement {
-  return { tag, attrs: {}, styles: {}, textContent: '', children: [], datum, removed: false };
+  const textNode: MockTextNode = { nodeType: 3, nodeValue: '' };
+  const element: MockElement = {
+    tag,
+    attrs: {},
+    styles: {},
+    textContent: '',
+    children: [],
+    datum,
+    removed: false,
+    getAttribute: (name) => (name in element.attrs ? String(element.attrs[name]) : null),
+    setAttribute: (name, value) => {
+      element.attrs[name] = assertedValue(value);
+    },
+    removeAttribute: (name) => {
+      delete element.attrs[name];
+    },
+    style: {
+      getPropertyValue: (name) => (name in element.styles ? String(element.styles[name]) : ''),
+      setProperty: (name, value) => {
+        element.styles[name] = assertedValue(value);
+      },
+      removeProperty: (name) => {
+        delete element.styles[name];
+      },
+    },
+    get firstChild() {
+      if (element.textContent === '') return null;
+      textNode.nodeValue = element.textContent;
+      return textNode;
+    },
+    get lastChild() {
+      return element.firstChild;
+    },
+  };
+  return element;
 }
 
-// ─── Child store ─────────────────────────────────────────────────────
-
-/** Persistent child store keyed by (parent, selector). Survives across calls. */
 const childStores = new WeakMap<
   MockElement,
   Map<string, { elements: MockElement[]; data: unknown[] }>
@@ -41,13 +76,11 @@ function getChildStore(parent: MockElement) {
   return childStores.get(parent)!;
 }
 
-// ─── Public interface ────────────────────────────────────────────────
-
 export interface MockSelection<Datum = unknown> {
   elements: MockElement[];
-  /** @internal */ _data: Datum[];
-  /** @internal */ _parent?: MockElement;
-  /** @internal */ _selector?: string;
+  _data: Datum[];
+  _parent?: MockElement;
+  _selector?: string;
 
   attr: (
     name: string,
@@ -78,23 +111,14 @@ export interface MockSelection<Datum = unknown> {
   on: (type: string, listener: (...args: unknown[]) => void) => MockSelection<Datum>;
 }
 
-// ─── Entry point ─────────────────────────────────────────────────────
-
-/** Build a mock selection backed by a fresh root group element. */
 export function createMockGroup(): MockSelection {
   const root = createMockElement('g');
   return makeSel([root], [undefined as any]);
 }
 
-/**
- * Mock `d3.select(this)` for use inside `.each()` callbacks.
- * Returns a single-element selection wrapping the given MockElement.
- */
 export function mockD3Select(el: MockElement): MockSelection {
   return makeSel([el], [el.datum]);
 }
-
-// ─── Core builder ────────────────────────────────────────────────────
 
 function makeSel<D>(
   elements: MockElement[],
@@ -107,8 +131,6 @@ function makeSel<D>(
     _data: data,
     _parent: parent,
     _selector: selector,
-
-    // ── Attribute / style / text ──
 
     attr(name: string, value: any) {
       for (let i = 0; i < elements.length; i++) {
@@ -134,11 +156,6 @@ function makeSel<D>(
       return sel;
     },
 
-    // ── selectAll ──
-    // Returns children matching the selector from the first parent element.
-    // Crucially, the returned selection remembers its `_parent` so that a
-    // subsequent `.data().join()` can create new children under the right parent.
-
     selectAll<D2 = D>(childSelector: string): MockSelection<D2> {
       const parentEl = elements[0];
       if (!parentEl) return makeSel<D2>([], [], undefined, childSelector);
@@ -150,13 +167,8 @@ function makeSel<D>(
         const liveData = entry.data.filter((_, i) => !entry.elements[i].removed) as D2[];
         return makeSel<D2>(live, liveData, parentEl, childSelector);
       }
-      // No existing children — return empty selection that knows its parent.
       return makeSel<D2>([], [], parentEl, childSelector);
     },
-
-    // ── select ──
-    // Finds first matching child for each element in the selection.
-    // Used by patterns like `merged.select('.eb-stem').attr(...)`.
 
     select(childSelector: string): MockSelection<D> {
       const resultEls: MockElement[] = [];
@@ -176,9 +188,6 @@ function makeSel<D>(
       return makeSel(resultEls, resultData, undefined, childSelector);
     },
 
-    // ── data ──
-    // Creates a data-bound selection. Uses the parent from `selectAll`.
-
     data<D2>(newData: D2[], _keyFn?: (d: D2) => string): MockSelection<D2> {
       const parentEl = sel._parent ?? elements[0];
       const selectorStr = sel._selector ?? '.item';
@@ -187,11 +196,8 @@ function makeSel<D>(
       const store = getChildStore(parentEl);
       const existing = store.get(selectorStr)?.elements.filter((e) => !e.removed) ?? [];
 
-      // The UPDATE selection holds only elements with a datum (by index,
-      // like d3) — surplus elements belong to exit(), not update/merge.
       const bound = makeSel(existing.slice(0, newData.length), newData, parentEl, selectorStr);
 
-      // Override enter/exit/join on the data-bound selection.
       bound.enter = () => {
         const enterData = newData.slice(existing.length);
         return makeEnterSel(parentEl, enterData, selectorStr);
@@ -219,7 +225,6 @@ function makeSel<D>(
       return bound as any;
     },
 
-    // ── join (fallback when not overridden by data) ──
     join(tag: string): MockSelection<D> {
       const parentEl = sel._parent ?? elements[0];
       if (!parentEl) return makeSel([], [] as D[], undefined, sel._selector);
@@ -238,7 +243,6 @@ function makeSel<D>(
       return makeSel(newEls, currentData, parentEl, selectorStr);
     },
 
-    // ── enter ──
     enter(): MockSelection<D> {
       const parentEl = sel._parent ?? elements[0];
       if (!parentEl) return makeSel([], [] as D[]);
@@ -249,7 +253,6 @@ function makeSel<D>(
       return makeEnterSel(parentEl, enterData, selectorStr);
     },
 
-    // ── exit ──
     exit(): MockSelection<D> {
       const parentEl = sel._parent ?? elements[0];
       if (!parentEl) return makeSel([], [] as D[]);
@@ -260,7 +263,6 @@ function makeSel<D>(
       return makeSel(exitEls, [] as any, parentEl, selectorStr);
     },
 
-    // ── append ──
     append(tag: string): MockSelection<D> {
       const newEls: MockElement[] = [];
       const allData = sel._data;
@@ -272,7 +274,6 @@ function makeSel<D>(
       return makeSel(newEls, allData, sel._parent, sel._selector);
     },
 
-    // ── remove ──
     remove(): MockSelection<D> {
       for (const el of elements) {
         el.removed = true;
@@ -280,14 +281,12 @@ function makeSel<D>(
       return sel;
     },
 
-    // ── merge ──
     merge(other: MockSelection<D>): MockSelection<D> {
       const mergedEls = [...other.elements, ...elements];
       const mergedData = [...other._data, ...sel._data] as D[];
       return makeSel(mergedEls, mergedData, sel._parent, sel._selector);
     },
 
-    // ── each ──
     each(fn: (this: unknown, d: D, i: number) => void): MockSelection<D> {
       for (let i = 0; i < elements.length; i++) {
         fn.call(elements[i], data[i], i);
@@ -295,7 +294,6 @@ function makeSel<D>(
       return sel;
     },
 
-    // ── datum ──
     datum<D2>(d: D2): MockSelection<D2> {
       for (const el of elements) {
         el.datum = d;
@@ -308,9 +306,6 @@ function makeSel<D>(
       );
     },
 
-    // ── on ──
-    // Records the handler on each element (keyed by event type) without
-    // dispatching — tests can look it up and invoke it directly.
     on(type: string, listener: (...args: unknown[]) => void): MockSelection<D> {
       for (const el of elements) {
         el.handlers ??= {};
@@ -319,7 +314,6 @@ function makeSel<D>(
       return sel;
     },
 
-    // ── Utility ──
     empty: () => elements.length === 0,
     nodes: () => elements,
     node: () => elements[0] ?? null,
@@ -331,13 +325,10 @@ function makeSel<D>(
   return sel;
 }
 
-// ─── Enter selection ─────────────────────────────────────────────────
-
 function makeEnterSel<D>(parent: MockElement, enterData: D[], selector: string): MockSelection<D> {
   const placeholders = enterData.map((d) => createMockElement('placeholder', d));
   const sel = makeSel(placeholders, enterData, parent, selector);
 
-  // Override append: creates real elements and registers them in the child store.
   sel.append = (tag: string): MockSelection<D> => {
     const store = getChildStore(parent);
     const existing = store.get(selector) ?? { elements: [], data: [] };
@@ -357,22 +348,14 @@ function makeEnterSel<D>(parent: MockElement, enterData: D[], selector: string):
   return sel;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────
-
-/**
- * Cast a d3.Selection (or any value) to MockSelection for test assertions.
- * Avoids TS2339 when accessing `.elements` on typed d3 return values.
- */
 // biome-ignore lint: test-only utility
 export function asMock<D = unknown>(sel: any): MockSelection<D> {
   return sel as MockSelection<D>;
 }
 
-/** Find first child (recursively in direct children) matching a class selector. */
 function findChildBySelector(el: MockElement, selector: string): MockElement | undefined {
   const selectorClass = selector.startsWith('.') ? selector.slice(1) : selector;
 
-  // Check child store entries first (they're keyed by selector)
   const store = getChildStore(el);
   for (const [key, entry] of store.entries()) {
     if (key === selector && entry.elements.length > 0) {
@@ -381,8 +364,6 @@ function findChildBySelector(el: MockElement, selector: string): MockElement | u
     }
   }
 
-  // Fall back to scanning children by class attribute (breadth-first:
-  // direct children win over nested descendants, like d3's `select`).
   for (const child of el.children) {
     if (child.removed) continue;
     const classes = String(child.attrs['class'] || '').split(/\s+/u);

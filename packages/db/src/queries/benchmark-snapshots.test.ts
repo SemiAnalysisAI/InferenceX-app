@@ -70,34 +70,24 @@ async function seed() {
     VALUES (1, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'mtp', false, 8, 8, 8, 8),
       (2, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'mtp', true, 4, 8, 4, 8),
       (3, 'glm5.2', 'gb300', 'sglang', 'fp4', 'none', false, 8, 8, 8, 8),
-      (4, 'glm5.2', 'gb300', 'dynamo-trt', 'fp8', 'none', false, 8, 8, 8, 8);`);
+      (4, 'glm5.2', 'gb300', 'dynamo-trt', 'fp8', 'none', false, 8, 8, 8, 8),
+      (5, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'none', false, 8, 8, 8, 8);`);
   await addRun(1, { githubId: 33219706372 });
   await addPoint(1, 1, 1, 1, { offload: 'off', image: 'trt:rc22' });
   await addRun(11, { githubId: 34413290524 });
   for (const [i, conc] of [1, 20, 30, 60, 227, 260].entries()) await addPoint(i + 2, 11, 2, conc);
-  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
 }
 const CURVE_MODEL = 'glm5.2';
 interface CurveEntry {
   scope: string;
   point: string;
-  /** Producer run of the point: `CurvePoint.workflowRunId` is `wr.id` per point, SQL `workflow_run_id`. */
   run: number;
-  /** Snapshot run of the scope: SQL `curve_workflow_run_id` (migration 014 `snapshot_workflow_run_id`). */
   snapshot: number;
 }
 const byEntry = (a: CurveEntry, b: CurveEntry) =>
   a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
-/** The preflight's own stored-point loader, restricted to one model; no run has GitHub id 0. */
 const loadCurvePoints = () => loadStoredCurvePoints(sql, [CURVE_MODEL], 0);
-/**
- * publishedCurve has no SQL execution of its own, so this is the only place the TypeScript
- * projection and both PostgreSQL read paths are held to one answer. The TypeScript snapshot
- * id is the first selected point of a scope, which assertCurvePreserved reports as
- * previous_snapshot_workflow_run_id.
- */
 async function expectSameCurve(state: string) {
-  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
   const projected = [...publishedCurve(await loadCurvePoints())]
     .flatMap(([scope, points]) =>
       points.map((point) => ({
@@ -133,10 +123,12 @@ beforeAll(async () => {
   for (const name of migrations.filter((filename) => filename < '014_'))
     await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   await seed();
-  const legacyRows = await getLatestBenchmarks(sql, 'glm5.2');
-  legacyCount = legacyRows.length;
-  await db.exec(readFileSync(new URL('014_agentic_curve_snapshots.sql', dir), 'utf8'));
-  await db.exec(readFileSync(new URL('015_power_provenance.sql', dir), 'utf8'));
+  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+  const [legacy] = await sql`SELECT count(*)::int AS count FROM latest_benchmarks lb
+    JOIN configs c ON c.id = lb.config_id WHERE c.model = 'glm5.2'`;
+  legacyCount = Number(legacy.count);
+  for (const name of migrations.filter((filename) => filename >= '014_'))
+    await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   const retained = await db.query<{ count: number }>(
     'SELECT count(*)::int AS count FROM benchmark_results',
   );
@@ -160,12 +152,9 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       ids(await getAllBenchmarksForHistory(sql, 'glm5.2', null, null, 'agentic_traces')),
     ).toEqual([1, ...currentIds]);
   });
-  it('retains power audits in materialized and dated snapshots without reviving replaced points', async () => {
+  it('retains power audits in maintained and dated snapshots without reviving replaced points', async () => {
     await sql`UPDATE benchmark_results SET power_invalid_reasons = '["sampling_gap_exceeded"]'::jsonb,
       power_audit = '{"expected_gpu_count":16}'::jsonb WHERE id IN (1, 2)`;
-    await db.exec(
-      readFileSync(new URL('../../migrations/015_power_provenance.sql', import.meta.url), 'utf8'),
-    );
     for (const rows of [
       await getLatestBenchmarks(sql, 'glm5.2'),
       await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11'),
@@ -205,7 +194,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   });
   it('keeps mixed AGG/disagg and offload points submitted in the same sweep', async () => {
     await addPoint(8, 11, 1, 2, { offload: 'off' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([...currentIds, 8]);
   });
   it('reconstructs append-only chains across point properties with producer provenance', async () => {
@@ -213,7 +201,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addPoint(8, 12, 1, 300, { offload: 'off' });
     await addRun(13, { append: true });
     await addPoint(9, 13, 2, 400);
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     const rows = await getLatestBenchmarks(sql, 'glm5.2');
     expect(ids(rows)).toEqual([...currentIds, 8, 9]);
     expect(rows.every((r) => Number(r.curve_workflow_run_id) === 13)).toBe(true);
@@ -267,7 +254,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       await addPoint(id, 21, config, conc, { image, fingerprint });
     await sql`UPDATE benchmark_results SET metrics = metrics || '{"power_valid":1}'::jsonb
       WHERE workflow_run_id = 21`;
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
 
     const rows = await getLatestBenchmarks(sql, 'kimik3');
     expect(ids(rows)).toEqual([
@@ -362,7 +348,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       });
     await sql`UPDATE benchmark_results SET metrics = metrics || '{"power_valid":1}'::jsonb
       WHERE workflow_run_id = 31`;
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
 
     const rows = await getLatestBenchmarks(sql, 'kimik3');
     expect(rows).toHaveLength(35);
@@ -375,7 +360,7 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   });
   it('stops append-only inheritance at an image change or new full snapshot', async () => {
     await addRun(12, { append: true });
-    await addPoint(8, 12, 1, 300, { offload: 'off', image: 'trt:rc27' });
+    await addPoint(8, 12, 2, 300, { image: 'trt:rc27' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([8]);
     await addRun(13);
     await addPoint(9, 13, 2, 400, { image: 'trt:rc27' });
@@ -383,10 +368,53 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addPoint(10, 14, 2, 500, { image: 'trt:rc27' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([9, 10]);
   });
+  it('extends a mixed AGG/disagg curve when each shared topology keeps its image', async () => {
+    await addRun(12);
+    for (const [id, config, conc, image] of [
+      [8, 1, 1, 'agg:a'],
+      [9, 1, 4, 'agg:a'],
+      [10, 1, 16, 'agg:a'],
+      [11, 2, 2884, 'disagg:d'],
+      [12, 2, 4096, 'disagg:d'],
+      [13, 2, 7480, 'disagg:d'],
+    ] as const)
+      await addPoint(id, 12, config, conc, { image });
+    await addRun(13, { append: true });
+    await addPoint(14, 13, 1, 32, { image: 'agg:a' });
+    await addPoint(15, 13, 2, 1228, { image: 'disagg:d' });
+    const curve = [8, 9, 10, 11, 12, 13, 14, 15];
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 13))).toEqual(curve);
+    await expectSameCurve('append-only run extends a mixed-image AGG/disagg curve');
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual(curve);
+
+    await addRun(14, { append: true });
+    await addPoint(16, 14, 1, 64, { image: 'agg:b' });
+    await addPoint(17, 14, 2, 8192, { image: 'disagg:d' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([16, 17]);
+    await expectSameCurve('an AGG image change stops the mixed-image chain');
+  });
+  it('checks each older run against every topology image already in the chain', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { image: 'agg:y' });
+    await addPoint(9, 12, 2, 2884, { image: 'disagg:z' });
+    await addRun(13, { append: true });
+    await addPoint(10, 13, 2, 4096, { image: 'disagg:z' });
+    await addRun(14, { append: true });
+    await addPoint(11, 14, 1, 16, { image: 'agg:x' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([10, 11]);
+    await expectSameCurve('an AGG image change two runs back stops the chain');
+  });
+  it('treats AgentX speculative-decoding variants as one image line', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { image: 'agg:a' });
+    await addRun(13, { append: true });
+    await addPoint(9, 13, 5, 4, { image: 'agg:b' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 13))).toEqual([9]);
+    await expectSameCurve('a non-MTP image change stops the chain');
+  });
   it('preserves accepted rows regardless of overall workflow conclusion', async () => {
     await addRun(12, { conclusion: 'failure' });
     await addPoint(8, 12, 1, 1, { offload: 'off' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8]);
     expect(
@@ -396,7 +424,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   it('ignores runs without successful result rows', async () => {
     await addRun(12);
     await addPoint(8, 12, 1, 1, { error: 'benchmark failed' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual(currentIds);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual(currentIds);
     expect(await getBenchmarksForRun(sql, 'glm5.2', 12)).toEqual([]);
@@ -404,16 +431,15 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   it('uses the latest stored attempt as before', async () => {
     await addRun(12, { githubId: 34413290524, attempt: 2 });
     await addPoint(8, 12, 1, 1, { offload: 'off' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8]);
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 34413290524))).toEqual([8]);
   });
   it.each([null, 'mixed'])(
-    'does not inherit across an incomplete or mixed image: %s',
+    'does not inherit across an incomplete or mixed image within a topology: %s',
     async (image) => {
       await addRun(12, { append: true });
-      await addPoint(8, 12, 1, 300, { image });
+      await addPoint(8, 12, 2, 300, { image });
       if (image === 'mixed') await addPoint(9, 12, 2, 400);
       expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual(
         image === null ? [8] : [8, 9],
@@ -431,7 +457,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addPoint(9, 1, 4, 1);
     await addPoint(10, 1, 1, 1, { type: 'single_turn', isl: 1024, osl: 1024, offload: 'off' });
     await addPoint(11, 11, 2, 1, { type: 'single_turn', isl: 1024, osl: 1024 });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([...currentIds, 8, 9, 10, 11]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11'))).toEqual([
       ...currentIds,
@@ -450,13 +475,9 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', true))).toEqual([8]);
   });
   it('projects the same curve in TypeScript as latest_benchmarks and the dated query', async () => {
-    // Configs 1 (AGG, prefill_tp 8, offload off) and 2 (disagg, prefill_tp 4, offload on)
-    // share one agentic scope, so run 11 replaces point 1; sglang and fp8 keep their own scopes.
     await addPoint(100, 1, 3, 1);
     await addPoint(101, 1, 4, 1);
     await expectSameCurve('agentic scope collapses topology and offload variants');
-    // recipe_fingerprint is point identity. A new fingerprint at conc 1 sits next to
-    // point 2 while the repeated recipe-3 fingerprint at conc 20 replaces point 3.
     await addRun(12, { append: true });
     await addPoint(8, 12, 2, 1, { fingerprint: 'alternate-recipe' });
     await addPoint(9, 12, 2, 20, { fingerprint: 'recipe-3' });
@@ -464,12 +485,9 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(13, { append: true });
     await addPoint(10, 13, 1, 300, { offload: 'off' });
     await expectSameCurve('same-image append-only chain inherits earlier points');
-    // Run 14 shares run 13's date but started earlier, so run 13 stays the seed despite
-    // the lower id; run 14 is a full snapshot, so the chain ends there.
     await addRun(14, { date: '2026-09-13', started: '2026-09-13T06:00:00Z' });
     await addPoint(11, 14, 2, 500);
     await expectSameCurve('same-date tie resolved by run_started_at');
-    // A NULL run_started_at ranks after both timed same-date runs and is never reached.
     await addRun(15, { date: '2026-09-13', append: true });
     await sql`UPDATE workflow_runs SET run_started_at = NULL WHERE id = 15`;
     await addPoint(12, 15, 2, 600);
@@ -477,8 +495,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(16, { append: true });
     await addPoint(13, 16, 2, 700, { image: 'trt:rc27' });
     await expectSameCurve('image mismatch stops the chain');
-    // image_count > 1: a mixed-image run publishes only itself as the seed and is not
-    // inherited as an older run even though min(image) equals the root image.
     await addRun(17, { append: true });
     await addPoint(14, 17, 2, 800, { image: 'trt:rc27' });
     await addPoint(15, 17, 2, 900, { image: 'trt:rc28' });
@@ -486,8 +502,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(18, { append: true });
     await addPoint(16, 18, 2, 1000, { image: 'trt:rc27' });
     await expectSameCurve('mixed-image older run is not inherited');
-    // images_complete: one NULL image keeps image_count = 1 yet blocks the chain in
-    // both positions.
     await addRun(19, { append: true });
     await addPoint(17, 19, 2, 1100, { image: 'trt:rc27' });
     await addPoint(18, 19, 2, 1200, { image: null });
@@ -498,6 +512,41 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(21, { date: '2026-09-20', githubId: 20, attempt: 2 });
     await addPoint(20, 21, 2, 1400, { image: 'trt:rc27' });
     await expectSameCurve('newer attempt supersedes the older attempt');
+  });
+  it('keeps every point of a run whose rows carry different dates', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { offload: 'off' });
+    await addPoint(9, 12, 1, 2, { offload: 'off' });
+    await sql`UPDATE benchmark_results SET date = '2026-09-11' WHERE id = 9`;
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8, 9]);
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8, 9]);
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([8, 9]);
+  });
+  it('keeps stored curve lines equal to a full rebuild after every kind of write', async () => {
+    const lines = () => sql`SELECT * FROM benchmark_curve_run_lines
+      ORDER BY workflow_run_id, date, curve_scope::text`;
+    const expectRebuilt = async (write: string) => {
+      const maintained = await lines();
+      await sql`SELECT refresh_benchmark_curve_run_lines(array(SELECT id FROM workflow_runs))`;
+      expect(maintained, write).toEqual(await lines());
+    };
+    await expectRebuilt('inserts');
+    expect(await lines()).toHaveLength(2);
+    await sql`UPDATE benchmark_results SET image = 'trt:rc27' WHERE id = 3`;
+    await expectRebuilt('image change');
+    await sql`UPDATE benchmark_results SET error = 'failed' WHERE id = 4`;
+    await expectRebuilt('point marked failed');
+    await sql`UPDATE benchmark_results SET offload_mode = 'off' WHERE id = 5`;
+    await expectRebuilt('offload change');
+    await addRun(12);
+    await sql`UPDATE benchmark_results SET workflow_run_id = 12 WHERE id = 6`;
+    await expectRebuilt('point moved to another run');
+    await sql`UPDATE configs SET precision = 'fp8' WHERE id = 1`;
+    await expectRebuilt('config change');
+    await sql`DELETE FROM benchmark_results WHERE id = 7`;
+    await expectRebuilt('delete');
+    await sql`TRUNCATE benchmark_results CASCADE`;
+    expect(await lines()).toEqual([]);
   });
 });
 

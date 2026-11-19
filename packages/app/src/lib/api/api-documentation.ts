@@ -29,6 +29,8 @@ import { operations as fleetViews } from '../views-api/docs/fleet';
 import { operations as gpuSpecsViews } from '../views-api/docs/gpu-specs';
 import { operations as historicalViews } from '../views-api/docs/historical';
 import { operations as inferenceViews } from '../views-api/docs/inference';
+import { operations as modelArchitectureViews } from '../views-api/docs/model-architectures';
+import { operations as operatorXViews } from '../views-api/docs/operatorx';
 import { operations as optionsViews } from '../views-api/docs/options';
 import { operations as overviewViews } from '../views-api/docs/overview';
 import { operations as rankingsViews } from '../views-api/docs/rankings';
@@ -241,23 +243,31 @@ const powerMetricDescriptions: Readonly<Record<(typeof POWER_METRIC_KEYS)[number
   avg_util_pct: 'Mean per-GPU utilization percentage (0-100) during the load window.',
   avg_mem_used_mb: 'Mean per-GPU memory used in MB during the load window.',
   cpu_power_valid:
-    'NVL72 CPU-side leg verdict, independent of power_valid: 1 = the Grace-side (and module, when present) keys were integrated over the validated window with full socket coverage; 0 = the leg failed and no CPU-side keys are emitted; absent = the run had no CPU-side leg. Ingest withholds the CPU-side keys unless this verdict is 1, and power_valid = 0 does not remove them. GPU power and energy never change because of this verdict.',
+    'CPU-side leg verdict (NVL72 Grace sockets or single-node AMD EPYC RAPL packages), independent of power_valid: 1 = the CPU-side (and module, when present) keys were integrated over the validated window with full socket coverage; 0 = the leg failed and no CPU-side keys are emitted; absent = the run had no CPU-side leg. Ingest withholds the CPU-side keys unless this verdict is 1, and power_valid = 0 does not remove them. GPU power and energy never change because of this verdict.',
   avg_cpu_socket_power_w:
-    'Mean over Grace sockets of each socket’s window-mean Grace-side power in watts (Grace CPU + LPDDR5X, ACPI hwmon Grace Power Socket sensor) over the same validated window as GPU energy. NVL72 only.',
+    'Mean over Grace sockets of each socket’s window-mean Grace-side power in watts (ACPI hwmon Grace Power Socket sensor, which NVIDIA defines only as the Grace socket power; modeled as the CPU and SysIO rails, LPDDR5X and socket regulation) over the same validated window as GPU energy. On single-node AMD rows (power_audit.cpu.sensor_kind = rapl_package) it is instead each EPYC package’s RAPL energy-counter power, which has no DRAM domain.',
   avg_total_cpu_power_w:
-    'Sum over every Grace socket in the deployment of window-mean Grace-side power in watts; dividing by avg_cpu_socket_power_w recovers the socket count (two per compute tray). NVL72 only.',
+    'Sum over every CPU socket in the deployment of window-mean socket power in watts (Grace side on NVL72, RAPL package on single-node AMD); dividing by avg_cpu_socket_power_w recovers the socket count (two per compute tray or AMD host).',
   total_cpu_energy_j:
-    'Grace-side energy in joules integrated over the validated window across every socket. Additive to total_gpu_energy_j, never included in it.',
+    'CPU-side energy in joules (Grace side on NVL72, RAPL package on single-node AMD) integrated over the validated window across every socket. Additive to total_gpu_energy_j, never included in it.',
   avg_total_module_power_w:
     'Sum over sockets of window-mean compute-module power in watts (Grace + its Blackwell GPUs + HBM + LPDDR5X + regulator loss, ACPI hwmon Module Power Socket sensor); emitted only when the module sensor exists on every socket. It already contains the GPU-board watts, so do not add avg_total_gpu_power_w to it.',
   total_module_energy_j:
     'Compute-module energy in joules over the validated window across every socket; emitted with avg_total_module_power_w and includes the GPU energy.',
+  avg_total_cpu_rail_power_w:
+    'Sum over Grace sockets of window-mean CPU core rail power in watts (ACPI CPU Power Socket sensor, no SysIO); emitted only when every socket reports a gap-free rail. A breakdown inside avg_total_cpu_power_w, not additive to it. NVL72 only.',
+  total_cpu_rail_energy_j:
+    'CPU core rail energy in joules over the validated window across every socket; emitted with avg_total_cpu_rail_power_w and already included in total_cpu_energy_j.',
+  avg_total_cpu_sysio_power_w:
+    'Sum over Grace sockets of window-mean SysIO rail power in watts (ACPI SysIO Power Socket sensor); emitted only when every socket reports a gap-free rail. A breakdown inside avg_total_cpu_power_w, not additive to it. NVL72 only.',
+  total_cpu_sysio_energy_j:
+    'SysIO rail energy in joules over the validated window across every socket; emitted with avg_total_cpu_sysio_power_w and already included in total_cpu_energy_j.',
 };
 const benchmarkMetricsSchema: ApiSchema = {
   type: 'object',
   additionalProperties: numberSchema,
   description:
-    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. On disaggregated rows tput_per_gpu divides by every chip, input_tput_per_gpu by prefill chips and output_tput_per_gpu by decode chips, for fixed-sequence and agentic runs alike. Agentic disaggregated rows also keep the original per-total-chip rates from the producer as input_tput_per_total_gpu and output_tput_per_total_gpu. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
   properties: Object.fromEntries(
     POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
       key,
@@ -281,10 +291,14 @@ const powerAuditSchema: ApiSchema = {
     cpu: {
       type: 'object',
       properties: {
-        sensor_kind: { type: 'string', enum: ['module', 'grace_socket', 'dcgm_cpu_rail'] },
+        sensor_kind: {
+          type: 'string',
+          enum: ['module', 'grace_socket', 'dcgm_cpu_rail', 'rapl_package'],
+        },
         source: {
           ...stringSchema,
-          description: 'Collector that produced the CPU-side samples: acpi (hwmon) or dcgm.',
+          description:
+            'Collector that produced the CPU-side samples: acpi (hwmon), dcgm, or rapl (AMD EPYC package energy counter).',
         },
         expected_sockets: integerSchema,
         observed_sockets: integerSchema,
@@ -293,12 +307,12 @@ const powerAuditSchema: ApiSchema = {
       },
       additionalProperties: true,
       description:
-        'NVL72 CPU-side leg provenance emitted alongside cpu_power_valid: the sensor kind that fed the Grace-side keys (module preferred over grace_socket over dcgm_cpu_rail), its collector, expected vs. observed Grace sockets (two per compute tray), stored sample rows, and the leg’s reason codes (empty when valid). Absent on runs without the CPU-side leg.',
+        'CPU-side leg provenance emitted alongside cpu_power_valid: the sensor kind that fed the CPU-side keys (on NVL72, module preferred over grace_socket over dcgm_cpu_rail; rapl_package on single-node AMD EPYC hosts), its collector, expected vs. observed sockets (two per compute tray or AMD host), stored sample rows, and the leg’s reason codes (empty when valid). Absent on runs without the CPU-side leg.',
     },
   },
   additionalProperties: true,
   description:
-    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source names the validation document: a relative path within the source run artifact bundle or, on AgentX rows whose retained window ingest or backfill recovered, the alias power_validation_<stem>_conc<N>.json for LOGS/agentic/conc_<N>/power_validation.json in the power_audit_<stem> artifact (such rows carry only source and the window bounds); observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. cpu carries the NVL72 CPU-side leg’s provenance when that leg ran. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
+    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source names the validation document: a relative path within the source run artifact bundle or, on AgentX rows whose retained window ingest or backfill recovered, the alias power_validation_<stem>_conc<N>.json for LOGS/agentic/conc_<N>/power_validation.json in the power_audit_<stem> artifact (such rows carry only source and the window bounds); observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. cpu carries the CPU-side leg’s provenance (NVL72 or single-node AMD) when that leg ran. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
 };
 const workerPowerSchema = objectSchemaWithOptional(
   {
@@ -479,6 +493,16 @@ const evaluationsSchema = arraySchema(
     model: stringSchema,
     precision: stringSchema,
     spec_method: stringSchema,
+    spec_algorithm: {
+      ...nullableStringSchema,
+      description:
+        'Speculative algorithm recorded by a benchmark result for the same config and workflow run, or null when none was recorded.',
+    },
+    spec_draft_model: {
+      ...nullableStringSchema,
+      description:
+        'Draft model recorded alongside spec_algorithm ("native" for built-in heads), or null when none was recorded.',
+    },
     disagg: booleanSchema,
     is_multinode: booleanSchema,
     prefill_tp: integerSchema,
@@ -640,6 +664,7 @@ const collectiveXDatasetSchema = objectSchema(
         generated_at: { type: 'string', format: 'date-time' },
         conclusion: nullableStringSchema,
         source_sha: stringSchema,
+        source_repository: stringSchema,
         requested_cases: integerSchema,
         terminal_cases: integerSchema,
         measured_cases: integerSchema,
@@ -654,7 +679,13 @@ const collectiveXDatasetSchema = objectSchema(
         kv_requested_cases: integerSchema,
         kv_measured_cases: integerSchema,
       },
-      ['kv_requested_cases', 'kv_measured_cases', 'swap_requested_cases', 'swap_measured_cases'],
+      [
+        'source_repository',
+        'kv_requested_cases',
+        'kv_measured_cases',
+        'swap_requested_cases',
+        'swap_measured_cases',
+      ],
     ),
     coverage: arraySchema(anyObjectSchema),
     series: arraySchema(anyObjectSchema),
@@ -695,6 +726,7 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
     run_attempt: integerSchema,
     generated_at: { type: 'string', format: 'date-time' },
     conclusion: nullableStringSchema,
+    source_repository: stringSchema,
     covered_skus: arraySchema(stringSchema),
     requested_cases: integerSchema,
     measured_cases: integerSchema,
@@ -711,7 +743,7 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
       measured: integerSchema,
     }),
   },
-  ['kv_cases', 'swap_cases'],
+  ['source_repository', 'kv_cases', 'swap_cases'],
 );
 const percentileSchema = objectSchema({
   mean: numberSchema,
@@ -723,7 +755,7 @@ const percentileSchema = objectSchema({
   n: integerSchema,
 });
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
-const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
+const idListSchema: ApiSchema = { type: 'string', pattern: String.raw`^\d+(,\d+)*$` };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
 const safePositiveIdSchema: ApiSchema = { ...positiveIdSchema, maximum: Number.MAX_SAFE_INTEGER };
 
@@ -764,8 +796,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     id: 'collectivex',
     title: text('CollectiveX', 'CollectiveX'),
     description: text(
-      'Versioned collective communication sweep results and run discovery.',
-      '带版本的集合通信扫描结果与运行发现数据。',
+      'Versioned collective communication benchmark results, one run per results upload.',
+      '带版本的集合通信基准测试结果，每次结果上传对应一次运行。',
     ),
   },
   {
@@ -778,6 +810,20 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   },
 ];
 
+// OperatorX remains a page-bff, recorded in api-route-catalog.ts rather than
+// published OpenAPI. Its hardware[].reference normalization basis, bandwidth
+// assumptions, cross-backend argument alignment (fastest successful backend per
+// hardware/case, with measurements[].backend provenance), and workload-resolved
+// chart defaults, optional distribution quantiles and per-hardware/shared-cohort roofline
+// median/best summaries with precision/hardware/normalization/cohort selectors are
+// documented in docs/operatorx.md. Ingest-time compact run
+// projections are fetched in one revision-aware bulk query, preserving response
+// and source identities; legacy fallback and
+// partial-read cache behavior are documented there as well. Timeline references
+// share one raw read per run, with at most four concurrent runs; reference order,
+// revision checks, null/known behavior and error contracts are preserved. Merged
+// comparisons may use a revision-keyed shared Blob cache; scope invalidation awaits
+// deletion and partial/concurrently replaced generations remain uncached.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,
@@ -791,8 +837,10 @@ export const apiOperations: readonly ApiOperation[] = [
     ...overviewViews,
     ...rankingsViews,
     ...compareViews,
+    ...operatorXViews,
   ]),
   ...extensionViews,
+  ...modelArchitectureViews,
 
   {
     id: 'get-pareto',
@@ -908,8 +956,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With runId, read its logical stored snapshot, including same-image predecessors for append-only runs. Cannot accompany date or exact. Only literal true/false accepted.',
-        '与 runId 一起读取该运行已存储的逻辑快照；append-only 运行包含此前相同镜像的数据。不能同时提供 date 或 exact。仅接受字面值 true/false。',
+        'With runId, read its logical stored snapshot. Append-only runs include predecessors whose shared topologies keep the same image. Cannot accompany date or exact. Only literal true/false accepted.',
+        '与 runId 一起读取该运行已存储的逻辑快照；append-only 运行还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。不能同时提供 date 或 exact。仅接受字面值 true/false。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1009,8 +1057,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
-      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. TPU tooltips and point-detail headers omit GitHub run links; API run_url remains the original producer URL. Official preview results published outside CI carry their source page as run_url, or null. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。TPU 提示框和数据点详情页头部不显示 GitHub 运行链接，API 的 run_url 仍保留来源运行的原始 URL。非 CI 发布的官方预览结果以其来源页面作为 run_url，或为 null。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1020,8 +1068,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'string',
-        'Display model name.',
-        '展示模型名称。',
+        'Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3, and supports 8k/1k and agentic-traces. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected.',
+        '展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开，支持 8k/1k 和 agentic-traces。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。',
         { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
         'DeepSeek-R1-0528',
       ),
@@ -1030,8 +1078,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'date',
-        'Latest data on or before YYYY-MM-DD, unless exact is true.',
-        'YYYY-MM-DD 当日或之前的最新数据，exact 为 true 时仅限当日。',
+        'Latest data on or before this calendar date (YYYY-MM-DD), unless exact is true. An empty value means the latest data; any other value, such as latest, yields 400.',
+        '返回该日期（YYYY-MM-DD）当日或之前的最新数据，exact 为 true 时仅限当日。空值表示最新数据；不是有效日期的取值（如 latest）返回 400。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1040,8 +1088,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'Set true to require the supplied date exactly.',
-        '设为 true 时严格匹配所给日期。',
+        'Set true to require the supplied date exactly. Only true and false are accepted.',
+        '设为 true 时严格匹配所给日期。仅接受 true 或 false。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1050,8 +1098,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'integer',
-        'Numeric GitHub Actions run ID. Non-numeric values are ignored.',
-        'GitHub Actions 数字运行 ID。非数字值会被忽略。',
+        'Positive integer GitHub Actions run ID. Other values yield 400.',
+        'GitHub Actions 运行 ID，须为正整数。其他取值返回 400。',
         positiveIdSchema,
         123456789,
       ),
@@ -1060,8 +1108,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With a numeric runId, return that run’s logical snapshot, including same-image predecessors for append-only runs.',
-        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照包含此前使用相同镜像的数据。',
+        'With a numeric runId, return that run’s logical snapshot. Append-only runs include predecessors whose shared topologies keep the same image. Only true and false are accepted, and true requires runId.',
+        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。仅接受 true 或 false，且为 true 时必须提供 runId。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1070,8 +1118,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power.',
-        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。',
+        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power. Other values yield 400 Unknown view.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。其他取值返回 400 Unknown view。',
         { type: 'string', enum: ['calculator'] },
         'calculator',
       ),
@@ -1105,8 +1153,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator.',
-        '模型缺失或不受支持、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。',
+        'A query parameter is malformed, so nothing is read from the database: the model is missing or unsupported, date is not a YYYY-MM-DD calendar date, exact or exactRun is not true or false, runId is not a positive integer, exactRun=true has no runId, view is not calculator, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator. Unknown parameters are ignored.',
+        '查询参数格式错误，请求不会读取数据库：模型缺失或不受支持、date 不是 YYYY-MM-DD 格式的有效日期、exact 或 exactRun 不是 true 或 false、runId 不是正整数、exactRun=true 但未提供 runId、view 不是 calculator、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。未知参数会被忽略。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -1208,8 +1256,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/workflow-info',
     summary: text('Read workflow provenance', '读取工作流溯源信息'),
     description: text(
-      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage. Omit date for all dates.',
-      '返回工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。省略 date 时返回所有日期的数据。',
+      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage for one date. date is required.',
+      '返回指定日期的工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。date 为必填参数。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1217,10 +1265,10 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'date',
         'query',
-        false,
+        true,
         'date',
-        'Optional YYYY-MM-DD filter.',
-        '可选的 YYYY-MM-DD 筛选条件。',
+        'Required YYYY-MM-DD date.',
+        '必填的 YYYY-MM-DD 日期。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1260,8 +1308,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'date is not YYYY-MM-DD.',
-        'date 不是 YYYY-MM-DD。',
+        'date is missing or not YYYY-MM-DD.',
+        '缺少 date，或 date 不是 YYYY-MM-DD。',
         PUBLIC_API_ERRORS.invalidDate,
       ),
       errorResponse(
@@ -1297,6 +1345,8 @@ export const apiOperations: readonly ApiOperation[] = [
           model: 'dsr1',
           precision: 'fp8',
           spec_method: 'none',
+          spec_algorithm: null,
+          spec_draft_model: null,
           disagg: false,
           is_multinode: false,
           prefill_tp: 8,
@@ -1384,7 +1434,11 @@ export const apiOperations: readonly ApiOperation[] = [
         'CSV workload list',
         'Comma-separated <isl>x<osl> token pairs.',
         '以逗号分隔的 <isl>x<osl> token 组合。',
-        { type: 'string', default: '1024x1024,8192x1024', pattern: '^\\d+x\\d+(,\\d+x\\d+)*$' },
+        {
+          type: 'string',
+          default: '1024x1024,8192x1024',
+          pattern: String.raw`^\d+x\d+(,\d+x\d+)*$`,
+        },
         '1024x1024,8192x1024',
       ),
       parameter(
@@ -1498,7 +1552,7 @@ export const apiOperations: readonly ApiOperation[] = [
       errorResponse(
         '400',
         'A model, date, view, format, workload, tier, weight, or alpha value is invalid.',
-        '模型、日期、视图、格式、负载、档位、权重或 alpha 值无效。',
+        '模型、日期、视图、格式、工作负载、档位、权重或 alpha 值无效。',
         'Invalid tiers: expected comma-separated positive numbers',
       ),
       errorResponse(
@@ -1568,18 +1622,37 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/framework-releases',
     summary: text('Read latest framework releases', '读取最新框架版本'),
     description: text(
-      'Returns the latest non-draft, non-prerelease GitHub release tag for vLLM and SGLang. A null value means the upstream lookup had no usable release.',
-      '返回 vLLM 和 SGLang 最新的非草稿、非预发布 GitHub 版本标签。null 表示上游查询没有可用版本。',
+      'Returns the highest-versioned non-draft, non-prerelease engine release (tag starting with v) among the 20 most recent GitHub releases for vLLM and SGLang, with its publish time. commits maps each unversioned nightly commit in an active benchmark image to its GitHub compare status against that release; behind means the commit is an ancestor of the release. Commits GitHub cannot resolve are omitted. A null value means the upstream lookup had no usable release.',
+      '返回 vLLM 和 SGLang 最近 20 个 GitHub release 中版本号最高的非草稿、非预发布引擎版本（标签以 v 开头）及其发布时间。commits 列出当前基准测试镜像中不带版本号的 nightly commit，以及 GitHub 比较该 commit 与此 release 的结果；behind 表示该 commit 是此 release 的祖先提交。GitHub 无法解析的 commit 不会列出。null 表示上游查询没有可用版本。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
       success(
-        'Framework keys mapped to release tags or null.',
-        '框架键映射到版本标签或 null。',
-        mapSchema(nullableStringSchema),
-        { vllm: 'v0.10.2', sglang: 'v0.4.10' },
+        'Framework keys mapped to the release tag, ISO 8601 publish time and nightly commit statuses, or null.',
+        '框架键映射到版本标签、ISO 8601 发布时间和 nightly commit 比较结果；无可用版本时为 null。',
+        mapSchema({
+          oneOf: [
+            objectSchema({
+              tag: stringSchema,
+              publishedAt: { type: 'string', format: 'date-time' },
+              commits: mapSchema({
+                type: 'string',
+                enum: ['ahead', 'behind', 'diverged', 'identical'],
+              }),
+            }),
+            { type: 'null' },
+          ],
+        }),
+        {
+          vllm: {
+            tag: 'v0.10.2',
+            publishedAt: '2026-08-01T12:00:00Z',
+            commits: { af7f9488c2210d67: 'behind', e68efc685ab1: 'diverged' },
+          },
+          sglang: { tag: 'v0.4.10', publishedAt: '2026-07-28T09:30:00Z', commits: {} },
+        },
       ),
       errorResponse('500', 'The release lookup failed.', '版本查询失败。', 'Internal server error'),
     ],
@@ -1899,8 +1972,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多平台扫描分别保留各 GPU 池的独立结果。',
+      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. series[].library_version is the backend build the case ran (null where the result recorded none). Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result. Each series carries maturity (candidate when no serving engine can select the configuration), and components.pair_period is the chained steady-state period, the headline latency.',
+      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。series[].library_version 为该 case 运行的后端构建版本（结果未记录时为 null）。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。 每个序列带有 maturity（candidate 表示目前没有推理引擎可以选用该配置），components.pair_period 为连续成对的稳态周期，即主延迟指标。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -1918,17 +1991,17 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Latest CollectiveX run, coverage, series, and optional KV cases.',
-        '最新的 CollectiveX 运行记录、覆盖情况、序列，以及可能存在的 KV 测试用例。',
+        'Latest CollectiveX run, coverage, series and swap_blocks results. The kv-transfer suite was archived on 2026-11-10; kv is empty unless the stored run still carries KV cases.',
+        '最新的 CollectiveX 运行记录、覆盖情况、序列和 swap_blocks 结果。kv-transfer 套件已于 2026-11-10 归档；除非已存储的运行仍包含 KV 用例，否则 kv 为空。',
         collectiveXDatasetSchema,
         {
           version: 1,
           run: {
-            run_id: '123456789',
+            run_id: '1792089351',
             run_attempt: 1,
-            generated_at: '2026-08-08T03:00:00Z',
+            generated_at: '2026-10-15T18:35:51Z',
             conclusion: 'success',
-            source_sha: '0123456789abcdef',
+            source_sha: 'e65c9045320c78f1fb86200802aceafa0c6310d8',
             requested_cases: 12,
             terminal_cases: 12,
             measured_cases: 10,
@@ -1938,8 +2011,8 @@ export const apiOperations: readonly ApiOperation[] = [
             terminal_points: 48,
             measured_points: 40,
             covered_skus: ['h200_sxm'],
-            kv_requested_cases: 4,
-            kv_measured_cases: 4,
+            kv_requested_cases: 0,
+            kv_measured_cases: 0,
           },
           coverage: [],
           series: [],
@@ -1955,21 +2028,9 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '404',
-        'No stored or discoverable run exists.',
-        '没有已存储或可发现的运行。',
+        'No run is stored for the version.',
+        '该版本下没有已存储的运行。',
         'Not found',
-      ),
-      errorResponse(
-        '502',
-        'Upstream sweep discovery is unavailable and no stored fallback exists.',
-        '上游扫描发现不可用，且没有已存储的回退数据。',
-        'Unavailable',
-      ),
-      errorResponse(
-        '503',
-        'Upstream sweep processing is temporarily unavailable.',
-        '上游扫描处理暂时不可用。',
-        'Unavailable',
       ),
       errorResponse(
         '500',
@@ -1988,8 +2049,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs',
     summary: text('List CollectiveX runs', '列出 CollectiveX 运行'),
     description: text(
-      'Returns progressively discovered run summaries. discovery_complete=false means clients may poll while older runs are still being discovered.',
-      '返回逐步发现的运行汇总。discovery_complete=false 表示仍在发现更早的运行，客户端可以轮询。',
+      'Returns every stored run summary, newest upload first. Only uploads with at least one measured result are runs, and covered_skus lists only pools with a measured result. Runs are ingested ahead of reads, so discovery_complete is always true; the field is kept for existing clients.',
+      '按上传时间从新到旧返回全部已存储的运行汇总。只有至少包含一个已测量结果的上传才构成运行，covered_skus 只列出有已测量结果的资源池。运行在读取前即已导入，因此 discovery_complete 始终为 true；保留该字段是为了兼容现有客户端。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2007,8 +2068,8 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Version, run summaries, and discovery state.',
-        '版本、运行汇总和发现状态。',
+        'Version, run summaries, and discovery_complete (always true).',
+        '版本、运行汇总以及 discovery_complete（始终为 true）。',
         objectSchema({
           version: integerSchema,
           runs: arraySchema(collectiveRunSummarySchema),
@@ -2018,9 +2079,9 @@ export const apiOperations: readonly ApiOperation[] = [
           version: 1,
           runs: [
             {
-              run_id: '123456789',
+              run_id: '1792089351',
               run_attempt: 1,
-              generated_at: '2026-08-08T03:00:00Z',
+              generated_at: '2026-10-15T18:35:51Z',
               conclusion: 'success',
               covered_skus: ['h200_sxm'],
               requested_cases: 12,
@@ -2028,7 +2089,7 @@ export const apiOperations: readonly ApiOperation[] = [
               requested_points: 48,
               terminal_points: 48,
               terminal_counts: { measured: 40, unsupported: 8, failed: 0 },
-              kv_cases: { requested: 4, measured: 4 },
+              kv_cases: { requested: 0, measured: 0 },
             },
           ],
           discovery_complete: true,
@@ -2041,18 +2102,6 @@ export const apiOperations: readonly ApiOperation[] = [
         'Unknown version',
       ),
       errorResponse(
-        '502',
-        'Discovery failed and no stored run list exists.',
-        '发现失败，且没有已存储的运行列表。',
-        'Unavailable',
-      ),
-      errorResponse(
-        '503',
-        'Discovery is temporarily unavailable.',
-        '发现暂时不可用。',
-        'Unavailable',
-      ),
-      errorResponse(
         '500',
         'The stored run list query failed.',
         '已存储运行列表查询失败。',
@@ -2063,14 +2112,91 @@ export const apiOperations: readonly ApiOperation[] = [
     curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs?version=1`,
   },
   {
+    id: 'list-collectivex-changelog',
+    group: 'collectivex',
+    method: 'GET',
+    path: '/api/v1/collectivex/changelog',
+    summary: text('List CollectiveX changelog entries', '列出 CollectiveX 变更记录'),
+    description: text(
+      'Returns the InferenceX collectivex/perf-changelog.yaml entries linked to stored runs, newest first: one row per run and entry, with the pair-period p50 before and after for every selected case that run changed. An entry is omitted for a run that changed none of its selected cases.',
+      '按从新到旧返回已关联到已存储运行的 InferenceX collectivex/perf-changelog.yaml 记录：每个运行与记录一行，并附上该运行改变的每个被选中用例在之前和之后的 pair-period p50。若某次运行未改变某条记录选中的任何用例，则不返回该行。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'version',
+        'query',
+        true,
+        'enum',
+        'CollectiveX contract version.',
+        'CollectiveX 契约版本。',
+        { type: 'integer', enum: [...COLLECTIVEX_VERSIONS] },
+        COLLECTIVEX_VERSIONS.at(-1) ?? 1,
+      ),
+    ],
+    responses: [
+      success(
+        'Version and linked changelog entries.',
+        '版本与已关联的变更记录。',
+        objectSchema({
+          version: integerSchema,
+          entries: arraySchema(
+            objectSchema({
+              run_id: stringSchema,
+              entry_index: integerSchema,
+              pr_number: integerSchema,
+              pr_link: stringSchema,
+              date: stringSchema,
+              pools: arraySchema(stringSchema),
+              selectors: anyObjectSchema,
+              description: stringSchema,
+              changes: arraySchema(anyObjectSchema),
+            }),
+          ),
+        }),
+        {
+          version: 1,
+          entries: [
+            {
+              run_id: '1793344844',
+              entry_index: 14,
+              pr_number: 4674,
+              pr_link: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4674',
+              date: '2026-10-30',
+              pools: ['mi300x'],
+              selectors: { backends: ['uccl-ep'], modes: ['low-latency'], precisions: ['fp8'] },
+              description: "Model uccl-ep's in-kernel FP8 cast exactly in low-latency mode.",
+              changes: [],
+            },
+          ],
+        },
+      ),
+      errorResponse(
+        '400',
+        'version is missing or unsupported.',
+        'version 缺失或不受支持。',
+        'Unknown version',
+      ),
+      errorResponse(
+        '500',
+        'The changelog query failed.',
+        '变更记录查询失败。',
+        'Internal server error',
+      ),
+    ],
+    responseShapeName: 'CollectiveXChangelog',
+    curlUrl: `${API_BASE_URL}/api/v1/collectivex/changelog?version=1`,
+  },
+  {
     id: 'get-collectivex-run',
     group: 'collectivex',
     method: 'GET',
     path: '/api/v1/collectivex/runs/{runId}',
     summary: text('Read a CollectiveX run', '读取 CollectiveX 运行'),
     description: text(
-      'Returns one positive numeric run ID as a versioned CollectiveX dataset, discovering and ingesting it on demand when possible.',
-      '按正整数运行 ID 返回带版本的 CollectiveX 数据集，并在可能时按需发现和导入。',
+      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. Each series carries maturity (candidate when no serving engine can select the configuration), and components.pair_period is the chained steady-state period, the headline latency.',
+      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。 每个序列带有 maturity（candidate 表示目前没有推理引擎可以选用该配置），components.pair_period 为连续成对的稳态周期，即主延迟指标。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2080,10 +2206,10 @@ export const apiOperations: readonly ApiOperation[] = [
         'path',
         true,
         'integer',
-        'Positive GitHub Actions run ID.',
-        'GitHub Actions 正整数运行 ID。',
+        'Positive run ID: the upload time in epoch seconds, below 10^10.',
+        '正整数运行 ID：上传时间的 Unix 秒级时间戳，小于 10^10。',
         positiveIdSchema,
-        123456789,
+        1792089351,
       ),
       parameter(
         'version',
@@ -2104,11 +2230,11 @@ export const apiOperations: readonly ApiOperation[] = [
         {
           version: 1,
           run: {
-            run_id: '123456789',
+            run_id: '1792089351',
             run_attempt: 1,
-            generated_at: '2026-08-08T03:00:00Z',
+            generated_at: '2026-10-15T18:35:51Z',
             conclusion: 'success',
-            source_sha: '0123456789abcdef',
+            source_sha: 'e65c9045320c78f1fb86200802aceafa0c6310d8',
             requested_cases: 12,
             terminal_cases: 12,
             measured_cases: 10,
@@ -2118,8 +2244,8 @@ export const apiOperations: readonly ApiOperation[] = [
             terminal_points: 48,
             measured_points: 40,
             covered_skus: ['h200_sxm'],
-            kv_requested_cases: 4,
-            kv_measured_cases: 4,
+            kv_requested_cases: 0,
+            kv_measured_cases: 0,
           },
           coverage: [],
           series: [],
@@ -2133,23 +2259,11 @@ export const apiOperations: readonly ApiOperation[] = [
         'version 或 runId 无效。',
         'Unknown version or run id',
       ),
-      errorResponse('404', 'The run does not exist.', '该运行不存在。', 'Not found'),
-      errorResponse(
-        '502',
-        'The run cannot be fetched from the upstream source.',
-        '无法从上游来源获取该运行。',
-        'Unavailable',
-      ),
-      errorResponse(
-        '503',
-        'Upstream processing is temporarily unavailable.',
-        '上游处理暂时不可用。',
-        'Unavailable',
-      ),
+      errorResponse('404', 'The run is not stored.', '该运行未存储。', 'Not found'),
       errorResponse('500', 'The run query failed.', '运行查询失败。', 'Internal server error'),
     ],
     responseShapeName: 'CollectiveXDataset',
-    curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs/123456789?version=1`,
+    curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs/1792089351?version=1`,
   },
   {
     id: 'get-agentic-aggregates',
@@ -2377,8 +2491,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/request-timeline',
     summary: text('Read a request timeline', '读取请求时间线'),
     description: text(
-      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing.',
-      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。',
+      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved (decompressed for clients whose Accept-Encoding excludes gzip, and without an ETag). Once a timeline has been copied to the content-addressed CDN store, clients that accept gzip get a 307 redirect to those exact gzip bytes, served as Content-Type application/gzip without Content-Encoding, so decompress the body yourself (for example curl -L ... | gunzip). Legacy timelines retain the same response shape.',
+      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录（若客户端的 Accept-Encoding 不含 gzip，则解压后返回，且不带 ETag）。时间线复制到按内容寻址的 CDN 存储后，接受 gzip 的客户端会收到 307 重定向，指向完全相同的 gzip 字节，其 Content-Type 为 application/gzip 且没有 Content-Encoding，需要自行解压（例如 curl -L ... | gunzip）。旧版时间线的响应结构不变。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2485,8 +2599,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log',
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
-      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment.',
-      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。',
+      'Returns one stored file for a benchmark result ID: a .log/.out file or a launch file such as recipe.lock.yaml. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
+      '返回某个基准测试结果 ID 对应的一份已存储文件：.log/.out 文件，或 recipe.lock.yaml 等启动文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2579,6 +2693,12 @@ export const apiOperations: readonly ApiOperation[] = [
         'Not found',
       ),
       errorResponse(
+        '413',
+        'The file exceeds the size limit for a complete read (16 MiB, JSON body with bytes and maxBytes) or a download (512 MiB, plain-text body).',
+        '文件超过完整读取（16 MiB，JSON 响应体包含 bytes 和 maxBytes）或下载（512 MiB，纯文本响应体）的大小上限。',
+        'Log file is 951652286 bytes, above the 16777216-byte limit for this mode. Read it with offset and limit, or stream it with download=1.',
+      ),
+      errorResponse(
         '500',
         'The server log query failed.',
         '服务器日志查询失败。',
@@ -2595,8 +2715,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-search',
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
-      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files.',
-      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。',
+      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. Launch files such as recipe.lock.yaml are not searched. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
+      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索，不搜索 recipe.lock.yaml 等启动文件。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2649,6 +2769,7 @@ export const apiOperations: readonly ApiOperation[] = [
             }),
           ),
           truncated: booleanSchema,
+          incomplete: booleanSchema,
         }),
         {
           id: 421,
@@ -2663,9 +2784,16 @@ export const apiOperations: readonly ApiOperation[] = [
             },
           ],
           truncated: false,
+          incomplete: false,
         },
       ),
       errorResponse('400', 'The search parameters are invalid.', '搜索参数无效。', 'Invalid query'),
+      errorResponse(
+        '504',
+        'The search exceeded its time budget.',
+        '搜索超时。',
+        'Search timed out. Try a more specific term.',
+      ),
       errorResponse(
         '500',
         'The complete-log search failed.',
@@ -2683,8 +2811,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-files',
     summary: text('List stored benchmark log files', '列出已存储的基准测试日志文件'),
     description: text(
-      'Lists every .log and .out filename retained from the matching server-log artifact. Paths are returned relative to the artifact root, with the primary file first.',
-      '列出匹配服务器日志产物中保留的所有 .log 和 .out 文件名。路径相对于产物根目录返回，主文件排在首位。',
+      'Lists every file retained from the matching server-log artifact: each .log and .out file, plus the launch files srtctl and the engines write (recipe.lock.yaml, srtctl config.yaml, fingerprint_<role>_w<N>.json, trtllm_config_*.yaml, SGLang *_config.json and benchmark_command.txt). Paths are returned relative to the artifact root, with the primary log file first. Bundles ingested before launch files were kept list only logs until they are backfilled.',
+      '列出匹配服务器日志产物中保留的所有文件：每个 .log 和 .out 文件，以及 srtctl 和推理引擎写出的启动文件（recipe.lock.yaml、srtctl 的 config.yaml、fingerprint_<role>_w<N>.json、trtllm_config_*.yaml、SGLang 的 *_config.json 和 benchmark_command.txt）。路径相对于产物根目录返回，主日志文件排在首位。早于此改动导入的文件集合在完成回填前只包含日志文件。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2702,8 +2830,8 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Artifact-relative .log/.out filenames.',
-        '相对于产物根目录的 .log/.out 文件名。',
+        'Artifact-relative log and launch filenames.',
+        '相对于产物根目录的日志和启动文件名。',
         arraySchema(stringSchema),
         ['results/server.log', 'results/benchmark.log', 'results/router.log'],
       ),
@@ -2728,6 +2856,181 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responseShapeName: 'ServerLogFileNames',
     curlUrl: `${API_BASE_URL}/api/v1/server-log-files?id=421`,
+  },
+  {
+    id: 'get-reproduce',
+    group: 'diagnostics',
+    method: 'GET',
+    path: '/api/v1/reproduce',
+    summary: text('Read how a benchmark result was produced', '读取基准测试结果的复现信息'),
+    description: text(
+      'Returns the stored configuration of one benchmark result, its producing workflow run, and the launch facts its stored logs record. config is identical to the stored config the dashboard Reproduce drawer shows. logs.launch lists the services, workers, frontends and benchmark command with each exact environment and command line that srtctl wrote to its sweep log (first 2 MiB); it is null for runs launched without srtctl. logs.engine has the arguments vLLM or SGLang printed at startup and the NCCL, CUDA (NCCL build) and TensorRT-LLM versions found in the first 1 MiB of one engine log. logs.config_files holds the srtctl recipe (config.yaml, recipe.lock.yaml) and engine config files saved with the logs, deduplicated by content; logs.fingerprints summarizes each worker fingerprint (GPU, driver, CUDA toolkit, NCCL, Python, OS, framework build); logs.benchmark_command is the benchmark client command. Bundles stored before these files were kept have empty lists. logs is null when no log bundle is stored. Nothing is inferred from the configuration.',
+      '返回某个基准测试结果的已存储配置、产生该结果的工作流运行，以及其已存储日志中记录的启动信息。config 与仪表盘复现抽屉中显示的已存储配置完全一致。logs.launch 列出 srtctl 写入 sweep 日志（前 2 MiB）的各个服务、worker、前端和基准测试命令，以及每一项的完整环境变量和命令行；未使用 srtctl 启动的运行该字段为 null。logs.engine 包含 vLLM 或 SGLang 启动时输出的参数，以及在某个引擎日志前 1 MiB 中找到的 NCCL、CUDA（NCCL 构建版本）和 TensorRT-LLM 版本。logs.config_files 包含随日志保存的 srtctl 配置方案（config.yaml、recipe.lock.yaml）和引擎配置文件，内容相同的文件只保留一份；logs.fingerprints 汇总每个 worker 的环境指纹（GPU、驱动、CUDA 工具包、NCCL、Python、操作系统和框架构建版本）；logs.benchmark_command 为基准测试客户端命令。在开始保存这些文件之前存储的文件集合，对应列表为空。没有已存储日志时 logs 为 null。所有信息均不从配置推断。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'id',
+        'query',
+        true,
+        'integer',
+        'Positive safe-integer benchmark result ID.',
+        '基准结果 ID，必须为正安全整数。',
+        safePositiveIdSchema,
+        447975,
+      ),
+    ],
+    responses: [
+      success(
+        'Stored config, producing run, and recorded launch facts.',
+        '已存储的配置、产生结果的运行，以及记录的启动信息。',
+        objectSchema({
+          id: integerSchema,
+          config: anyObjectSchema,
+          run: objectSchema({
+            github_run_id: integerSchema,
+            run_attempt: integerSchema,
+            head_sha: nullableStringSchema,
+            run_url: nullableStringSchema,
+            created_at: nullableStringSchema,
+          }),
+          logs: {
+            oneOf: [
+              objectSchema({
+                files: arraySchema(stringSchema),
+                launch_file: nullableStringSchema,
+                engine_file: nullableStringSchema,
+                launch: { oneOf: [anyObjectSchema, { type: 'null' }] },
+                engine: { oneOf: [anyObjectSchema, { type: 'null' }] },
+                config_files: arraySchema(objectSchema({ file: stringSchema, text: stringSchema })),
+                fingerprints: arraySchema(anyObjectSchema),
+                benchmark_command: nullableStringSchema,
+              }),
+              { type: 'null' },
+            ],
+          },
+        }),
+        {
+          id: 447975,
+          config: {
+            model: 'DeepSeek-V4.1-Flash',
+            hardware: 'gb200',
+            framework: 'vllm',
+            precision: 'fp4',
+            spec_decoding: 'mtp',
+            spec_algorithm: 'dspark',
+            spec_draft_model: 'native',
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            conc: 64,
+            disagg: false,
+            is_multinode: false,
+            physical_chips: 4,
+            topology: { tp: 4, ep: 4, dp_attention: true, dcp_size: 1, pcp_size: 1 },
+            offload_mode: 'off',
+            kv_offloading: 'none',
+            router_name: 'vllm-router',
+            router_version: '0.1.14',
+            image:
+              'vllm/vllm-openai:cu134-nightly-cf5cea2da37d3dfed27d2e0aa3041c3e553c2d57@sha256:78d6583c2d9c63d69e4250733eb0aacaa30d9afd4f867b65f1b7f1f51e20da4a',
+            recipe_fingerprint: '8b7b90a18a1fcbbc5089c61b154762795be20f836e31c0ef38b4000d7808e779',
+            date: '2026-11-11',
+            run_url:
+              'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42626988505/attempts/1',
+          },
+          run: {
+            github_run_id: 42626988505,
+            run_attempt: 1,
+            head_sha: '64c53a235e02f2686eb7cde3b20e754613cf07a6',
+            run_url:
+              'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42626988505/attempts/1',
+            created_at: '2026-11-11 04:20:48+00',
+          },
+          logs: {
+            files: [
+              'results/benchmark.log',
+              'srt-single-node-logs/logs/sweep_32572.log',
+              'srt-single-node-logs/logs/watchtower-navy-cn07_agg_w0.out',
+            ],
+            launch_file: 'srt-single-node-logs/logs/sweep_32572.log',
+            engine_file: 'srt-single-node-logs/logs/watchtower-navy-cn07_agg_w0.out',
+            launch: {
+              container: 'vllm_vllm-openai_cu134-nightly-cf5cea2d_sha256_78d6583c.sqsh',
+              srtctl_version: '2.66.2.post0+gacfb4dcc3.d20261109',
+              recipe: 'dsv41flash-fp4-gb200-vllm-agentic_dep4_0',
+              resources: {
+                nodes: '1 (host)',
+                cpu: 'ARM CPU implementer 0x41 part 0xd4f (144 logical, aarch64)',
+                gpus: '4 backend / 4 configured (4/node, gb200)',
+              },
+              steps: [
+                {
+                  kind: 'worker',
+                  role: 'agg',
+                  index: 0,
+                  hosts: ['host'],
+                  env: 'NCCL_CUMEM_ENABLE=1 VLLM_USE_V2_MODEL_RUNNER=1',
+                  command: 'vllm serve deepseek-ai/DeepSeek-V4.1-Flash --data-parallel-size 4',
+                },
+              ],
+            },
+            engine: {
+              engine_args: {
+                source: 'vllm-non-default-args',
+                args: { model_tag: 'deepseek-ai/DeepSeek-V4.1-Flash', data_parallel_size: 4 },
+              },
+              versions: { nccl: '2.32.3', cuda: '13.4', tensorrt_llm: null },
+            },
+            config_files: [
+              {
+                file: 'srt-single-node-logs/config.yaml',
+                text: 'schema: 2\nname: dsv41flash-fp4-gb200-vllm-agentic_dep4_0\n',
+              },
+            ],
+            fingerprints: [
+              {
+                file: 'srt-single-node-logs/logs/fingerprint_agg_w0.json',
+                hostname: 'watchtower-navy-cn07',
+                os: 'Ubuntu 24.04.5 LTS',
+                arch: 'aarch64',
+                cpu: 'ARM CPU implementer 0x41 part 0xd4f (architecture 8, variant 0x0, revision 0)',
+                gpu: 'NVIDIA GB200',
+                gpu_count: 4,
+                driver: '580.126.20',
+                cuda: '13.4.92',
+                nccl: '2.30.7',
+                python: '3.12.3',
+                frameworks: { vllm: '0.33.0rc1.dev1030+gcf5cea2da.d20261108.cu134' },
+              },
+            ],
+            benchmark_command:
+              'agentx profile --url http://10.30.1.109:8000 --model deepseek-ai/DeepSeek-V4.1-Flash --concurrency 64',
+          },
+        },
+      ),
+      errorResponse(
+        '400',
+        'id is missing or invalid.',
+        'id 缺失或无效。',
+        PUBLIC_API_ERRORS.idRequired,
+      ),
+      errorResponse(
+        '404',
+        'No benchmark result has this ID.',
+        '不存在该 ID 的基准结果。',
+        PUBLIC_API_ERRORS.notFound,
+      ),
+      errorResponse(
+        '500',
+        'The reproduce query failed.',
+        '复现信息查询失败。',
+        PUBLIC_API_ERRORS.internal,
+      ),
+    ],
+    responseShapeName: 'ReproduceRecord',
+    curlUrl: `${API_BASE_URL}/api/v1/reproduce?id=447975`,
   },
   {
     id: 'get-log-availability',
@@ -2824,14 +3127,180 @@ export const apiOperations: readonly ApiOperation[] = [
     curlUrl: `${API_BASE_URL}/api/v1/trace-availability?ids=421,422`,
   },
   {
+    id: 'get-gpu-metrics-point-stats',
+    group: 'diagnostics',
+    method: 'GET',
+    path: '/api/v1/gpu-metrics-point/stats',
+    summary: text('Read power load-swing statistics', '读取功耗负载波动统计'),
+    description: text(
+      'Load-swing statistics of the PowerX power trace recorded while one benchmark point ran, from the stored one-second buckets of the per-GPU mean: peak, min, idle floor (P5 before the serving window), window mean, P5/P95, largest 1 s and 5 s change, ramp up/down per second and volatility (std ÷ mean), with the recorded serving window and the count of telemetry gaps that were skipped rather than bridged. One entry per linked power series (a single-node artifact, or one validation window of a sweep bundle). The same function serves the PowerX Over time view. scale=nvl72 multiplies by 72 into kW per rack as an upper bound that assumes every GPU swings together. format=csv returns the per-second trace instead. Every read checks the live telemetry revision; responses are no-store.',
+      '一个基准测试点运行期间记录的 PowerX 功耗曲线的负载波动统计，基于已存的每 GPU 均值一秒桶：峰值、最小值、空闲底线（服务窗口前的 P5）、窗口均值、P5/P95、最大 1 秒与 5 秒变化、每秒上升/下降速率以及波动率（标准差 ÷ 均值），并附记录的服务窗口和被跳过（而非补插）的遥测间断数。每个关联功耗序列（单节点产物，或 sweep bundle 的一个验证窗口）各一条。PowerX 的“随时间变化”视图使用同一函数。scale=nvl72 乘以 72 换算为每机架 kW，是假设全部 GPU 同步波动的上限。format=csv 改为返回逐秒曲线。每次读取都核对实时遥测版本；响应为 no-store。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'id',
+        'query',
+        true,
+        'integer',
+        'Positive safe-integer benchmark result ID.',
+        '正安全整数基准结果 ID。',
+        safePositiveIdSchema,
+        445805,
+      ),
+      parameter(
+        'format',
+        'query',
+        false,
+        'enum',
+        'json returns the statistics; csv returns the per-second trace (artifact, source, t_s, since_serving_s, in_validated_window, w_per_gpu or kw_per_nvl72_rack).',
+        'json 返回统计；csv 返回逐秒曲线（artifact、source、t_s、since_serving_s、in_validated_window、w_per_gpu 或 kw_per_nvl72_rack）。',
+        { type: 'string', enum: ['json', 'csv'], default: 'json' },
+        'json',
+      ),
+      parameter(
+        'scale',
+        'query',
+        false,
+        'enum',
+        'gpu: W per GPU (the per-GPU mean of each bucket). nvl72: × 72 in kW per NVL72 rack, an upper bound that assumes all GPUs swing together; volatility is unchanged.',
+        'gpu：每 GPU 瓦数（每桶的每 GPU 均值）。nvl72：× 72 换算为每 NVL72 机架 kW，假设全部 GPU 同步波动的上限；波动率不变。',
+        { type: 'string', enum: ['gpu', 'nvl72'], default: 'gpu' },
+        'gpu',
+      ),
+    ],
+    responses: [
+      success(
+        'Statistics per linked power series, with definitions and caveats.',
+        '各关联功耗序列的统计，附定义与注意事项。',
+        objectSchema({
+          benchmarkResultId: safePositiveIdSchema,
+          apiVersion: { type: 'string', enum: ['v1'] },
+          scale: { type: 'string', enum: ['gpu', 'nvl72'] },
+          unit: { type: 'string', enum: ['W per GPU', 'kW per NVL72 rack'] },
+          gpusPerRack: integerSchema,
+          definitions: mapSchema(stringSchema),
+          caveats: arraySchema(stringSchema),
+          series: arraySchema(
+            objectSchema({
+              artifact: stringSchema,
+              source: nullableStringSchema,
+              gpuCount: integerSchema,
+              window: {
+                oneOf: [
+                  objectSchema({ startSeconds: numberSchema, endSeconds: numberSchema }),
+                  { type: 'null' },
+                ],
+              },
+              stats: objectSchema({
+                unit: stringSchema,
+                sampleIntervalSeconds: numberSchema,
+                sampleCount: integerSchema,
+                windowSampleCount: integerSchema,
+                preServingSampleCount: integerSchema,
+                gapCount: integerSchema,
+                peak: numberSchema,
+                min: numberSchema,
+                idleFloor: nullableNumberSchema,
+                mean: nullableNumberSchema,
+                p5: nullableNumberSchema,
+                p95: nullableNumberSchema,
+                maxDelta1s: numberSchema,
+                maxDelta5s: numberSchema,
+                rampUpPerSecond: numberSchema,
+                rampDownPerSecond: numberSchema,
+                volatility: nullableNumberSchema,
+              }),
+            }),
+          ),
+        }),
+        {
+          benchmarkResultId: 445805,
+          apiVersion: 'v1',
+          scale: 'gpu',
+          unit: 'W per GPU',
+          gpusPerRack: 72,
+          definitions: {
+            peak_min_delta_ramp: 'whole run, per-GPU mean of each one-second bucket',
+            mean_p5_p95_volatility: 'validated serving window only',
+            idle_floor: 'P5 of the samples before the serving window starts',
+            ramp: 'largest change over a 5-second span divided by that span',
+            gaps: 'buckets more than 1.5× the sample interval apart are counted and never bridged',
+          },
+          caveats: [
+            'One-second DCGM samples; sub-second swings are not captured.',
+            'Single node or NVL72 rack, inference only.',
+            'The NVL72 scale multiplies the per-GPU trace by 72 and assumes every GPU swings together, so it is an upper bound on rack-level swings.',
+          ],
+          series: [
+            {
+              artifact: 'gpu_metrics_dsv4pro_8k1k_fp4_vllm_tp8_c64',
+              source: null,
+              gpuCount: 8,
+              window: { startSeconds: 212, endSeconds: 1407 },
+              stats: {
+                unit: 'W per GPU',
+                sampleIntervalSeconds: 1,
+                sampleCount: 1480,
+                windowSampleCount: 1196,
+                preServingSampleCount: 212,
+                gapCount: 0,
+                peak: 1012.4,
+                min: 141.2,
+                idleFloor: 143.8,
+                mean: 871.5,
+                p5: 744.1,
+                p95: 968.3,
+                maxDelta1s: 318.6,
+                maxDelta5s: 612.9,
+                rampUpPerSecond: 122.6,
+                rampDownPerSecond: 97.4,
+                volatility: 0.071,
+              },
+            },
+          ],
+        },
+        [
+          {
+            mediaType: 'text/csv',
+            schema: stringSchema,
+            example:
+              'artifact,source,t_s,since_serving_s,in_validated_window,w_per_gpu\r\ngpu_metrics_dsv4pro_8k1k_fp4_vllm_tp8_c64,,0,-212,0,143.8',
+          },
+        ],
+      ),
+      errorResponse(
+        '400',
+        'id is missing or not a positive safe integer, or format / scale is not an allowed value.',
+        'id 缺失或不是正安全整数，或 format / scale 不是允许的值。',
+        PUBLIC_API_ERRORS.idRequired,
+      ),
+      errorResponse(
+        '404',
+        'The point has no linked telemetry or no usable power series.',
+        '该数据点没有关联遥测或没有可用的功耗序列。',
+        PUBLIC_API_ERRORS.notFound,
+      ),
+      errorResponse(
+        '500',
+        'The telemetry lookup failed.',
+        '遥测查询失败。',
+        PUBLIC_API_ERRORS.internal,
+      ),
+    ],
+    responseShapeName: 'GpuMetricsPointLoadSwingStats',
+    curlUrl: `${API_BASE_URL}/api/v1/gpu-metrics-point/stats?id=445805`,
+  },
+  {
     id: 'get-trace-histograms',
     group: 'diagnostics',
     method: 'GET',
     path: '/api/v1/trace-histograms',
     summary: text('Read trace histograms', '读取跟踪直方图'),
     description: text(
-      'Returns input and output token count arrays for each benchmark result ID. IDs are deduplicated and at most 200 are accepted.',
-      '按基准结果 ID 返回输入和输出 token 计数数组。ID 会去重，最多接受 200 个。',
+      'Returns input and output token count arrays for each benchmark result ID. IDs are deduplicated and at most 200 are accepted. Once a response has been copied to the content-addressed CDN store, clients that accept gzip get a 307 redirect to the gzip of the same JSON, served as Content-Type application/gzip without Content-Encoding, so decompress the body yourself.',
+      '按基准结果 ID 返回输入和输出 token 计数数组。ID 会去重，最多接受 200 个。响应复制到按内容寻址的 CDN 存储后，接受 gzip 的客户端会收到 307 重定向，指向相同 JSON 的 gzip，其 Content-Type 为 application/gzip 且没有 Content-Encoding，需要自行解压。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2883,8 +3352,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-server-metrics',
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
-      'Returns point metadata, including prefill/decode TP, EP, DP attention, worker counts, physical GPU counts and recipe_fingerprint for cache-reuse links, and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
-      '返回数据点元数据（含 prefill/decode TP、EP、DP attention、worker 数、物理 GPU 数及 recipe_fingerprint，用于缓存复用链接），以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。',
+      'Returns point metadata, including prefill/decode TP, EP, DP attention, worker counts, physical GPU counts and recipe_fingerprint for cache-reuse links, and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected. TokenSpeed exports device KV utilization and running/waiting request gauges; unavailable cache-hit and token-throughput measurements remain empty. Disaggregated TRT-LLM aggregate prompt and cache-hit series exclude identified decode endpoints; per-source drilldowns retain their own measurements.',
+      '返回数据点元数据（含 prefill/decode TP、EP、DP attention、worker 数、物理 GPU 数及 recipe_fingerprint，用于缓存复用链接），以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。TokenSpeed 提供设备 KV 使用率以及运行中和排队请求数；未提供的缓存命中率和 token 吞吐量指标保留为空。分离式 TRT-LLM 的聚合 prompt 和缓存命中率序列不计入已识别的 decode 端点；按来源查看时，仍保留各端点自身的测量值。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -3029,8 +3498,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. CollectiveX uses short refresh windows, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。CollectiveX 使用较短的刷新窗口，框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. /api/v1/benchmarks is the exception: the shared cache compresses it, so its ETag and Vary headers come from that cache. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses, including /api/v1/views/collectivex, stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。/api/v1/benchmarks 例外：由共享缓存负责压缩，因此其 ETag 和 Vary 头由该缓存决定。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应（包括 /api/v1/views/collectivex）会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
       ),
     },
     {
@@ -3057,8 +3526,8 @@ const overview = {
       id: 'benchmark-row',
       title: text('BenchmarkRow', 'BenchmarkRow'),
       description: text(
-        'Configuration fields sit beside a metrics map. Time metrics are seconds. Throughput fields ending in _per_gpu retain their legacy names but measure tokens per second per physical chip, including TPUs. num_prefill_gpu and num_decode_gpu count physical chips independently of logical TP; aggregate engines may mirror one count in both columns, so only disaggregated counts should be summed. Optional metrics.dp records data parallelism when supplied. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
-        '配置字段与 metrics 映射位于同一层级，时间指标以秒为单位。以 _per_gpu 结尾的吞吐量字段保留历史名称，实际表示每颗物理芯片每秒处理的 token 数，TPU 也使用此单位。num_prefill_gpu 和 num_decode_gpu 表示物理芯片数，与逻辑 TP 独立；聚合部署可能在两列中重复记录同一芯片数，只有分离式部署才应将两列相加。可选字段 metrics.dp 记录产物中提供的数据并行度。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
+        'Configuration fields sit beside a metrics map. Time metrics are seconds. Throughput fields ending in _per_gpu retain their legacy names but measure tokens per second per physical chip, including TPUs. num_prefill_gpu and num_decode_gpu count physical chips independently of logical TP; aggregate engines may mirror one count in both columns, so sum them only for disaggregated rows with nonzero prefill_num_workers and decode_num_workers or unequal counts; legacy disaggregated rows without workers (2025-09-29 to 2025-12-05) mirror the deployment size in both columns too. Optional metrics.dp records data parallelism when supplied. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
+        '配置字段与 metrics 映射位于同一层级，时间指标以秒为单位。以 _per_gpu 结尾的吞吐量字段保留历史名称，实际表示每颗物理芯片每秒处理的 token 数，TPU 也使用此单位。num_prefill_gpu 和 num_decode_gpu 表示物理芯片数，与逻辑 TP 独立；聚合部署可能在两列中重复记录同一芯片数；只有 prefill_num_workers 与 decode_num_workers 均非零、或两列数值不同的分离式部署才应将两列相加；2025-09-29 至 2025-12-05 期间未记录 worker 的旧分离式数据同样在两列中重复记录整套部署的芯片数。可选字段 metrics.dp 记录产物中提供的数据并行度。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
       ),
       shape: 'BenchmarkRows',
       example: benchmarkExample[0],
@@ -3067,8 +3536,8 @@ const overview = {
       id: 'measured-power',
       title: text('Measured power', '实测功率'),
       description: text(
-        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, avg_total_gpu_power_w, total_gpu_energy_j, p75_power_w, p75_total_gpu_power_w, p90_power_w, p90_total_gpu_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent means no validation verdict is available in this response. Legacy rows can lack the field, but absence alone establishes neither the reason, the measurement age, nor invalidity. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons lists producer reason codes. power_audit optionally carries measurement-window bounds, device and sample counts, producer identity and the retained audit reference on valid and invalid rows. Missing audit metadata does not establish the measurement age or validity. NVL72 (GB200/GB300) rows may add Grace-side and compute-module keys integrated over the same window: avg_cpu_socket_power_w, avg_total_cpu_power_w, total_cpu_energy_j, and avg_total_module_power_w / total_module_energy_j when the module sensor exists on every socket. cpu_power_valid is their own tri-state verdict, independent of power_valid: the CPU-side keys are withheld on cpu_power_valid != 1, not on power_valid, and power_audit.cpu records the sensor kind, collector, socket coverage and reason codes. A module reading already contains the GPU-board watts. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
-        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、avg_total_gpu_power_w、total_gpu_energy_j、p75_power_w、p75_total_gpu_power_w、p90_power_w、p90_total_gpu_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示当前响应未提供验证结论。旧数据可能缺少该字段，但仅凭字段缺失，既无法判断缺失原因，也无法判断数据新旧或测量是否无效。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 列出生产端的原因码。power_audit 可在有效与无效行上提供测量窗口、设备和采样数量、生产端标识及保留的审计产物引用。缺少审计信息不能证明测量的新旧或有效性。NVL72（GB200/GB300）数据行可能附带 Grace 侧和计算模块指标，它们在同一测量窗口内积分：avg_cpu_socket_power_w、avg_total_cpu_power_w、total_cpu_energy_j，以及在每个 socket 都有模块传感器时的 avg_total_module_power_w / total_module_energy_j。cpu_power_valid 是这些指标独立于 power_valid 的三态验证结论：CPU 侧指标仅在 cpu_power_valid != 1 时被清除，与 power_valid 无关；power_audit.cpu 记录传感器类型、采集来源、socket 覆盖情况和原因码。模块读数已包含 GPU 板卡功耗。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, avg_total_gpu_power_w, total_gpu_energy_j, p75_power_w, p75_total_gpu_power_w, p90_power_w, p90_total_gpu_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent means no validation verdict is available in this response. Legacy rows can lack the field, but absence alone establishes neither the reason, the measurement age, nor invalidity. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons lists producer reason codes. power_audit optionally carries measurement-window bounds, device and sample counts, producer identity and the retained audit reference on valid and invalid rows. Missing audit metadata does not establish the measurement age or validity. NVL72 (GB200/GB300) rows may add Grace-side and compute-module keys integrated over the same window: avg_cpu_socket_power_w, avg_total_cpu_power_w, total_cpu_energy_j, avg_total_module_power_w / total_module_energy_j when the module sensor exists on every socket, and the CPU core and SysIO rail breakdowns avg_total_cpu_rail_power_w / total_cpu_rail_energy_j and avg_total_cpu_sysio_power_w / total_cpu_sysio_energy_j when every socket reports them. The rails are inside the Grace-side total; never add them to it. Single-node AMD MI300X/MI325X/MI355X rows may add only avg_cpu_socket_power_w, avg_total_cpu_power_w and total_cpu_energy_j, read from the EPYC RAPL package energy counter (sensor_kind rapl_package), which has no DRAM domain. cpu_power_valid is their own tri-state verdict, independent of power_valid: the CPU-side keys are withheld on cpu_power_valid != 1, not on power_valid, and power_audit.cpu records the sensor kind, collector, socket coverage and reason codes. A module reading already contains the GPU-board watts. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
+        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、avg_total_gpu_power_w、total_gpu_energy_j、p75_power_w、p75_total_gpu_power_w、p90_power_w、p90_total_gpu_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示当前响应未提供验证结论。旧数据可能缺少该字段，但仅凭字段缺失，既无法判断缺失原因，也无法判断数据新旧或测量是否无效。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 列出生产端的原因码。power_audit 可在有效与无效行上提供测量窗口、设备和采样数量、生产端标识及保留的审计产物引用。缺少审计信息不能证明测量的新旧或有效性。NVL72（GB200/GB300）数据行可能附带 Grace 侧和计算模块指标，它们在同一测量窗口内积分：avg_cpu_socket_power_w、avg_total_cpu_power_w、total_cpu_energy_j，在每个 socket 都有模块传感器时的 avg_total_module_power_w / total_module_energy_j，以及在每个 socket 都上报相应供电轨时的 CPU 核心轨和 SysIO 轨分项 avg_total_cpu_rail_power_w / total_cpu_rail_energy_j、avg_total_cpu_sysio_power_w / total_cpu_sysio_energy_j。供电轨分项已包含在 Grace 侧总功耗内，不能再与之相加。单节点 AMD MI300X/MI325X/MI355X 数据行可能附带的 CPU 侧指标仅有 avg_cpu_socket_power_w、avg_total_cpu_power_w 和 total_cpu_energy_j，均来自 EPYC 的 RAPL 封装能耗计数器（sensor_kind 为 rapl_package）；该计数器没有 DRAM 域。cpu_power_valid 是这些指标独立于 power_valid 的三态验证结论：CPU 侧指标仅在 cpu_power_valid != 1 时被清除，与 power_valid 无关；power_audit.cpu 记录传感器类型、采集来源、socket 覆盖情况和原因码。模块读数已包含 GPU 板卡功耗。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
       ),
       shape: 'BenchmarkRows',
       example: {
@@ -3121,6 +3590,21 @@ const quickstartText = {
   },
 } as const;
 
+/** Prose type labels and placeholder examples; schema type names stay as identifiers. */
+const PARAMETER_TEXT_ZH: Record<string, string> = {
+  'CSV list': 'CSV 列表',
+  'CSV number list': 'CSV 数字列表',
+  'CSV GPU list': 'CSV GPU 列表',
+  'CSV workload list': 'CSV 工作负载列表',
+  'comma-separated integers': '逗号分隔的整数',
+  'Exact key returned in serviceSources': 'serviceSources 中返回的完整键',
+};
+
+function localizeParameterText<T>(value: T, locale: ApiDocumentationLocale): T | string {
+  if (locale !== 'zh' || typeof value !== 'string') return value;
+  return PARAMETER_TEXT_ZH[value] ?? value;
+}
+
 function localizeOperation(
   operation: ApiOperation,
   locale: ApiDocumentationLocale,
@@ -3131,6 +3615,8 @@ function localizeOperation(
     description: operation.description[locale],
     parameters: operation.parameters.map((item) => ({
       ...item,
+      type: localizeParameterText(item.type, locale),
+      example: localizeParameterText(item.example, locale),
       description: item.description[locale],
     })),
     responses: operation.responses.map((item) => ({

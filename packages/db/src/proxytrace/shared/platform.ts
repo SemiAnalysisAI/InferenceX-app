@@ -17,11 +17,6 @@ export const PLATFORM_OS_ALIASES = {
 
 export type PlatformOs = keyof typeof PLATFORM_OS_ALIASES;
 
-/**
- * Normalize an SDK/CLI platform label without guessing. Version suffixes in
- * Codex-style user agents are ignored; unrecognized operating systems stay
- * unknown instead of being folded into Linux.
- */
 export function normalizePlatformOs(value: string | null | undefined): PlatformOs | null {
   if (!value) return null;
   const key = value.trim().toLowerCase();

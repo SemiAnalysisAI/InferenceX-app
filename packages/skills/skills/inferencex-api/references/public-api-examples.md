@@ -36,9 +36,13 @@ The versioned CLI can list supported capabilities and public model scopes with
 `inferencex discover capabilities` and `inferencex discover models`, and it lists
 observed configurations for one model with `inferencex discover configs --model
 <display selector or DB model key>`. See the [CLI contract](cli.md). Prefer those
-commands for coverage questions (which hardware, frameworks, precisions or dates
-exist); use the recipes below when the answer needs metric values or an API
-operation that has no formal evidence-bundle command.
+commands to resolve missing selectors. Their stdout contains normalized
+projections and source hashes, not the original response bodies. For coverage
+questions (which hardware, frameworks, precisions or dates exist), exclusion
+counts, metric values, or operations without a formal evidence-bundle command,
+use the recipes below and derive the answer from the saved complete responses.
+Reuse an existing bundle's retained response when it already contains the needed
+population; a later capture is a separate observation.
 
 ## Basic benchmark lookup
 

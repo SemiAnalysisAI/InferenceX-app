@@ -1,9 +1,5 @@
 import * as T from 'three';
 
-// Physically based city materials. Surface albedo comes from CC0 Poly Haven
-// scans; windows, lane markings and crosswalks are procedural so they stay
-// crisp at any distance and never repeat visibly.
-
 export const TEXTURES = [
   'asphalt',
   'asphalt_n',
@@ -56,14 +52,13 @@ export async function loadTextures(
   return out;
 }
 
-/** Shared uniforms updated once per frame. */
 export const SHARED = {
   uTime: { value: 0 },
   uNight: { value: 0 },
   uWet: { value: 0 },
 };
 
-const NOISE = /* glsl */ `
+const NOISE = `
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float gNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -90,7 +85,6 @@ function worldVarying(shader: T.WebGLProgramParametersWithUniforms) {
   );
 }
 
-/** Terrain: blends ground classes from the 4 m OSM land-cover raster. */
 export function terrainMaterial(
   tex: TextureSet,
   ground: T.DataTexture,
@@ -163,10 +157,6 @@ export function terrainMaterial(
   return m;
 }
 
-/**
- * Roads. Attributes: uv (across 0..1, along metres), aRoad (width, lanes,
- * style, oneway), aJunction (signed distance to nearest junction, clear radius).
- */
 export function roadMaterial(tex: TextureSet) {
   const m = new T.MeshStandardMaterial({
     color: '#ffffff',
@@ -275,7 +265,6 @@ export function roadMaterial(tex: TextureSet) {
   return m;
 }
 
-/** Raised concrete sidewalks and curbs; world-projected pavement texture. */
 export function sidewalkMaterial(tex: TextureSet) {
   const m = new T.MeshStandardMaterial({
     color: '#ffffff',
@@ -302,13 +291,6 @@ export function sidewalkMaterial(tex: TextureSet) {
   return m;
 }
 
-/**
- * Building facades. Attributes: uv (metres along the wall segment, metres above base),
- * aB (segment length, style, seed, building height), color (base paint).
- * Styles: 0 Victorian / Edwardian, 1 masonry commercial, 2 glass tower,
- * 3 warehouse / pier shed, 4 civic stone, 5 office campus, 6 concrete mid-rise,
- * 7 bay window, 8 trim. Style + 20 marks a roof.
- */
 export function buildingMaterial(tex: TextureSet) {
   const m = new T.MeshStandardMaterial({
     color: '#ffffff',
@@ -457,7 +439,6 @@ export function buildingMaterial(tex: TextureSet) {
   return m;
 }
 
-/** Bay water: animated scrolling normals with environment reflections. */
 export function waterMaterial(tex: TextureSet) {
   const n = tex.water_n;
   const m = new T.MeshStandardMaterial({

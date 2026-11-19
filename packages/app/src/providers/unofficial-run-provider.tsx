@@ -9,20 +9,23 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
 
-import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
-import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { type Model, Sequence } from '@/lib/catalog/data-mappings';
+import { ApiRequestError } from '@/lib/api/api-request-error';
 
-import chartDefinitions from '@/components/inference/metric-registry';
+import type * as UnofficialChartDataModule from './unofficial-chart-data';
+import type { UnofficialChartData } from './unofficial-chart-data';
 
 interface UnofficialRunInfo {
   id: number;
@@ -35,14 +38,6 @@ interface UnofficialRunInfo {
   status: string;
   isNonMainBranch: boolean;
 }
-
-type UnofficialChartData = Record<
-  string,
-  {
-    e2e: { data: InferenceData[]; gpus: HardwareConfig };
-    interactivity: { data: InferenceData[]; gpus: HardwareConfig };
-  }
->;
 
 interface UnofficialRunResponse {
   runInfos: UnofficialRunInfo[];
@@ -94,6 +89,8 @@ export interface UnofficialRunContextType {
     model: Model,
     sequence: Sequence,
     chartType: 'e2e' | 'interactivity',
+    tokenBasis?: TokenBasis,
+    chipBasis?: ChipBasis,
   ) => {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
@@ -115,42 +112,11 @@ export function useUnofficialRun() {
   }
   return context;
 }
-/** Registers derived chart availability; the provider reducer owns reconciliation. */
 export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): void {
   const { reconcileOverlayScope } = useUnofficialRun();
   useEffect(() => {
     if (input) reconcileOverlayScope(input);
   }, [input, reconcileOverlayScope]);
-}
-
-export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData {
-  const groups = new Map<string, BenchmarkRow[]>();
-  for (const row of benchmarks) {
-    const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-    const sequence = rowToSequence(row);
-    if (!sequence) continue;
-    const key = `${displayModel}_${sequence}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(row);
-  }
-
-  const result: UnofficialChartData = {};
-  for (const [key, rows] of groups) {
-    // Overlay points are always priced on the external basis here;
-    // `processOverlayChartDataWithClipping` reprices them to the selected
-    // basis at render time, so seeding them with the app default would
-    // double-apply the internal/external ratio.
-    const { chartData, hardwareConfig } = transformBenchmarkRows(rows, 'median', 'external');
-    const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
-    const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
-      (d) => d.chartType === 'interactivity',
-    );
-    result[key] = {
-      e2e: { data: chartData[e2eIdx] ?? [], gpus: hardwareConfig },
-      interactivity: { data: chartData[interactivityIdx] ?? [], gpus: hardwareConfig },
-    };
-  }
-  return result;
 }
 
 export function parseAvailableModelsAndSequences(
@@ -159,12 +125,12 @@ export function parseAvailableModelsAndSequences(
   if (!chartData) return [];
 
   const result: AvailableModelSequence[] = [];
-  const allModels = Object.values(Model);
   const allSequences = Object.values(Sequence);
   for (const key of Object.keys(chartData)) {
     const lastUnderscoreIndex = key.lastIndexOf('_');
     if (lastUnderscoreIndex === -1) continue;
-    const model = allModels.find((candidate) => candidate === key.slice(0, lastUnderscoreIndex));
+    // An unregistered model keeps its raw prefix as its identity, see isRegisteredModel.
+    const model = key.slice(0, lastUnderscoreIndex) as Model;
     const sequence = allSequences.find(
       (candidate) => candidate === key.slice(lastUnderscoreIndex + 1),
     );
@@ -184,7 +150,6 @@ export function parseAvailableModelsAndSequences(
   return result;
 }
 
-/** Canonicalize the first unofficial-run URL value without changing server validation policy. */
 export function parseUnofficialRunIds(search: string): string[] {
   const params = new URLSearchParams(search);
   for (const [key, value] of params) {
@@ -353,12 +318,16 @@ async function fetchUnofficialRuns(
   ids: string[],
   signal: AbortSignal,
 ): Promise<UnofficialRunResponse> {
-  const response = await fetch(`/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`, {
-    cache: 'no-store',
-    signal,
-  });
-  const data = (await response.json()) as Partial<UnofficialRunResponse> & { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Failed to fetch unofficial run');
+  const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
+  // Default cache mode: the route's Cache-Control already keeps in-progress
+  // runs fresh, and `no-store` would make every load bypass the CDN copy.
+  const response = await fetch(url, { signal });
+  const data = (await response.json()) as Partial<UnofficialRunResponse> & {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new ApiRequestError(data.error || 'Failed to fetch unofficial run', response.status, url);
+  }
   return selectUnofficialRunResponse(
     {
       runInfos: Array.isArray(data.runInfos) ? data.runInfos : [],
@@ -390,13 +359,39 @@ export function UnofficialRunProvider({
     refetchOnMount: 'always',
   });
 
-  const unofficialRunInfos = query.data?.runInfos ?? EMPTY_UNOFFICIAL_RUN_INFOS;
+  const [chartDataModule, setChartDataModule] = useState<typeof UnofficialChartDataModule | null>(
+    null,
+  );
+  const hasRunIds = runIds.length > 0;
+  useEffect(() => {
+    if (hasRunIds && !chartDataModule)
+      void import('./unofficial-chart-data').then(setChartDataModule);
+  }, [hasRunIds, chartDataModule]);
+  const runData = chartDataModule ? query.data : undefined;
+
+  const unofficialRunInfos = runData?.runInfos ?? EMPTY_UNOFFICIAL_RUN_INFOS;
   const unofficialRunInfo = unofficialRunInfos[0] ?? null;
-  const unofficialBenchmarkRows = query.data?.benchmarks ?? null;
-  const unofficialEvalRows = query.data?.evaluations ?? null;
+  const unofficialBenchmarkRows = runData?.benchmarks ?? null;
+  const unofficialEvalRows = runData?.evaluations ?? null;
   const unofficialChartData = useMemo(
-    () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows) : null),
+    () =>
+      unofficialBenchmarkRows && chartDataModule
+        ? chartDataModule.buildChartData(unofficialBenchmarkRows)
+        : null,
+    [unofficialBenchmarkRows, chartDataModule],
+  );
+  // Non-default token and chip bases are built on first request and kept per row set.
+  const overlayVariantCache = useMemo(
+    () => new Map<string, UnofficialChartData>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [unofficialBenchmarkRows],
+  );
+  const unofficialUncachedChartData = useMemo(
+    () =>
+      unofficialBenchmarkRows && chartDataModule
+        ? chartDataModule.buildChartData(unofficialBenchmarkRows, 'uncached')
+        : null,
+    [unofficialBenchmarkRows, chartDataModule],
   );
   const availableModelsAndSequences = useMemo(
     () => parseAvailableModelsAndSequences(unofficialChartData),
@@ -466,13 +461,34 @@ export function UnofficialRunProvider({
   }, [unofficialRunInfos]);
 
   const getOverlayData = useCallback(
-    (model: Model, sequence: Sequence, chartType: 'e2e' | 'interactivity') => {
-      const chartGroup = unofficialChartData?.[`${model}_${sequence}`];
+    (
+      model: Model,
+      sequence: Sequence,
+      chartType: 'e2e' | 'interactivity',
+      tokenBasis: TokenBasis = 'total',
+      chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
+    ) => {
+      let source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      if (chipBasis !== DEFAULT_CHIP_BASIS && unofficialBenchmarkRows && chartDataModule) {
+        const key = `${tokenBasis}:${chipBasis}`;
+        source = overlayVariantCache.get(key) ?? null;
+        if (!source) {
+          source = chartDataModule.buildChartData(unofficialBenchmarkRows, tokenBasis, chipBasis);
+          overlayVariantCache.set(key, source);
+        }
+      }
+      const chartGroup = source?.[`${model}_${sequence}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
     },
-    [unofficialChartData],
+    [
+      unofficialChartData,
+      unofficialUncachedChartData,
+      unofficialBenchmarkRows,
+      chartDataModule,
+      overlayVariantCache,
+    ],
   );
 
   const resetOverlaySelection = useCallback(() => {
@@ -485,7 +501,7 @@ export function UnofficialRunProvider({
     dispatchSelection({ type: 'selection', official, overlay });
   }, []);
 
-  const loading = runIds.length > 0 && query.isFetching;
+  const loading = hasRunIds && (query.isFetching || !chartDataModule);
   const error = query.error instanceof Error ? query.error.message : null;
 
   const contextValue = useMemo<UnofficialRunContextType>(
@@ -540,7 +556,6 @@ export function UnofficialRunProvider({
   );
 }
 
-/** Allows dashboard navigation to own banner placement while the provider owns its state. */
 export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
   const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
   return (

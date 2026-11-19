@@ -64,7 +64,6 @@ interface ChronologicalStatLeaf {
   isSubagent: boolean;
 }
 
-/** Restore request chronology after buildRequestRuns collapses agent-id groups. */
 export function flattenStatRowsChronologically(rows: StatRow[]): ChronologicalStatLeaf[] {
   const leaves: ChronologicalStatLeaf[] = [];
   for (const row of rows) {

@@ -1,6 +1,7 @@
 import { GET as releases } from '@/app/api/v1/framework-releases/route';
 import { GET as images } from '@/app/api/v1/latest-images/route';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { mergeDistinctRows } from '@semianalysisai/inferencex-db/lib/distinct-by';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { getImageAgeObservations } from '@semianalysisai/inferencex-db/queries/latest-images';
 import {
   imageAgeHistory,
@@ -9,7 +10,9 @@ import {
 } from '@/components/latest-image/image-age';
 import {
   daysSince,
-  getActualLatestTag,
+  earliestSubmission,
+  firstSubmissionDates,
+  getActualLatestRelease,
   imageRowDisplayModel,
   imageRowSequence,
   isActiveImageRow,
@@ -29,11 +32,12 @@ import {
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
-import { readResponse } from '@/lib/views-api/source';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
 const readHistory = cachedQuery(
-  (asOf: string) => getImageAgeObservations(getDb(), asOf),
+  async (asOf: string) =>
+    mergeDistinctRows(await readEachDb((sql) => getImageAgeObservations(sql, asOf))),
   'image-age-observations-v1',
   { blobOnly: true },
 );
@@ -57,8 +61,10 @@ export function GET(request: NextRequest) {
       parseEnumParam(s.get('includeHistory'), 'includeHistory', ['true', 'false'], 'false') ===
       'true';
     const [raw, releaseData] = await Promise.all([
-      readResponse<LatestImageRow[]>(await images()),
-      readResponse<FrameworkReleases>(await releases()),
+      readResponse<LatestImageRow[]>(await images(sourceRequest(request, '/api/v1/latest-images'))),
+      readResponse<FrameworkReleases>(
+        await releases(sourceRequest(request, '/api/v1/framework-releases')),
+      ),
     ]);
     const active = raw.filter(isActiveImageRow);
     // The image catalog also exposes new model names before they enter the registry.
@@ -70,30 +76,26 @@ export function GET(request: NextRequest) {
     const sequences = sequenceOptionsForModel(active, model);
     const sequence = resolveSelectedSequence(sequences, s.get('sequence') ?? 'agentic-traces');
     const filters = { model, precision, spec, hardware, nodeType, frameworks, sequence };
+    const firstSubmitted = firstSubmissionDates(raw);
     const rows = active
       .filter((row) => matchesImageFilters(row, filters))
       .toSorted((a, b) => a.date.localeCompare(b.date))
       .map((row) => {
         const ageDays = daysSince(row.date, new Date(`${asOf}T00:00:00Z`));
-        const actualLatest = getActualLatestTag(row.framework, releaseData);
+        const release = getActualLatestRelease(row.framework, releaseData);
         return {
           ...row,
           displayModel: imageRowDisplayModel(row),
           sequence: imageRowSequence(row),
           ageDays,
-          actualLatest,
-          outdated: isOutdated(row.image, actualLatest),
+          actualLatest: release?.tag ?? null,
+          outdated: isOutdated(row.image, release, earliestSubmission(firstSubmitted, row)),
           staleAgentx: isStaleAgentx(row.benchmark_type, ageDays),
         };
       });
     const observations = includeHistory ? await readHistory(asOf) : [];
-    const history = includeHistory
-      ? imageAgeHistory(
-          observations.filter((row) => matchesImageFilters(row, filters)),
-          asOf,
-        )
-      : undefined;
-    return cachedJson({
+    const history = includeHistory ? imageAgeHistory(rows, observations, asOf) : undefined;
+    return cachedJson(request, {
       apiVersion: 'v1',
       view: 'current-inferencex-image',
       params: { ...filters, asOf, includeHistory },

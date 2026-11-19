@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
@@ -17,6 +11,8 @@ import {
 } from '@/components/live-seo/run-page-sections';
 import { JsonLd } from '@/components/seo/json-ld';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { scenarioLabel } from '@/lib/live-seo/rankings';
 import {
   getRunPageEntry,
@@ -28,8 +24,13 @@ import {
   type RunPageEntry,
 } from '@/lib/live-seo/run-pages';
 import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -55,24 +56,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRunPageData(entry.slug);
   const title = runPageTitle(entry);
-  const description = `${data ? statLedDescription(entry, data) : runPageDescription(entry)} ${SUPPORTERS_LINE}`;
+  const description = clampMetaDescription(
+    data ? statLedDescription(entry, data) : runPageDescription(entry),
+    'en',
+  );
   const url = `${SITE_URL}/run/${entry.slug}`;
   return {
     title,
     description,
     keywords: runPageKeywords(entry),
     authors: [{ name: AUTHOR_NAME }],
-    // Valid slugs without benchmark data render an empty state; keep those
-    // out of the index (the sitemap already excludes them).
     ...(data?.hasData ? {} : { robots: { index: false, follow: true } }),
     alternates: enAlternates(`/run/${entry.slug}`),
-    openGraph: { title: `${title} | ${SITE_NAME}`, description, url, type: 'article' },
-    twitter: {
-      card: 'summary_large_image',
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
-      creator: AUTHOR_HANDLE,
-    },
+      url,
+      locale: 'en',
+      type: 'article',
+    }),
   };
 }
 
@@ -208,7 +210,7 @@ export default async function RunPage({ params }: Props) {
         label: `${entry.model.seoName} deep dive: architecture, evals, and performance`,
       },
       { href: `/chips/${entry.chip.slug}`, label: `${entry.chip.title} specs and pricing` },
-      { href: '/inference', label: 'Interactive inference dashboard' },
+      { href: getDashboardRoute('inference').path, label: 'Interactive inference dashboard' },
     ],
   };
 

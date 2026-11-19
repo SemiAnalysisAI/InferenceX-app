@@ -105,7 +105,7 @@ export function GET(request: NextRequest) {
 
     if (format === 'csv') return csvResponse(overviewViewCsvRows(payload, tier));
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'overview',
       apiVersion: 'v1',
       generatedAt: overviewViewGeneratedAt(data),

@@ -19,7 +19,6 @@ const STRINGS = {
   zh: { mute: '关闭 Halo 音乐', unmute: '播放 Halo 音乐' },
 } as const;
 
-/** Header music toggle, rendered only by the Halo-gated lazy wrapper. */
 export function HaloToggles() {
   const t = STRINGS[useLocale()];
   const [musicOn, setMusicOn] = useState(true);
@@ -36,9 +35,7 @@ export function HaloToggles() {
     setMusicOn(next);
     try {
       localStorage.setItem(HALO_MUSIC_KEY, String(next));
-    } catch {
-      // Private mode: the toggle still applies to this page view.
-    }
+    } catch {}
     window.dispatchEvent(new CustomEvent(HALO_MUSIC_EVENT));
     track('halo_music_toggled', { enabled: next });
   }

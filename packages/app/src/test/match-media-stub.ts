@@ -2,10 +2,6 @@ import { vi } from 'vitest';
 
 type Listener = () => void;
 
-/**
- * Controllable `window.matchMedia` for jsdom tests. `set()` flips a query and
- * notifies its `change` listeners, like a viewport resize would.
- */
 export function stubMatchMedia(initial: Record<string, boolean> = {}) {
   const state: Record<string, boolean> = { ...initial };
   const listeners = new Map<string, Set<Listener>>();

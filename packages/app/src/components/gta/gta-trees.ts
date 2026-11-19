@@ -2,10 +2,6 @@ import * as T from 'three';
 
 import { mergeSimple } from './gta-actors';
 
-// Street trees built from a photographic leaf-spray texture (taken from the
-// GTA ficus asset) on dense alpha-tested cards, with canopy-shaped normals so
-// they shade like a volume. Palms use a generated frond texture.
-
 function rng(seed: number) {
   let s = seed >>> 0 || 1;
   return () => {
@@ -36,7 +32,6 @@ export interface TreeSpec {
 }
 
 export const TREE_SPECS: TreeSpec[] = [
-  // London plane / ficus street tree
   {
     height: 9,
     trunk: 3,
@@ -47,7 +42,6 @@ export const TREE_SPECS: TreeSpec[] = [
     tint: [0.62, 0.78, 0.45],
     seed: 3,
   },
-  // Young street tree
   {
     height: 6.5,
     trunk: 2.4,
@@ -58,7 +52,6 @@ export const TREE_SPECS: TreeSpec[] = [
     tint: [0.66, 0.8, 0.48],
     seed: 11,
   },
-  // Broad park tree
   {
     height: 12,
     trunk: 3.4,
@@ -75,7 +68,6 @@ export function makeTree(spec: TreeSpec, leaf: T.Texture) {
   const rand = rng(spec.seed);
   const group = new T.Group();
   const centre = new T.Vector3(0, spec.trunk + spec.radius * spec.squash * 0.9, 0);
-  // Trunk and primary branches.
   const wood: T.BufferGeometry[] = [];
   const top = new T.Vector3((rand() - 0.5) * 0.4, spec.trunk, (rand() - 0.5) * 0.4);
   wood.push(
@@ -100,7 +92,6 @@ export function makeTree(spec: TreeSpec, leaf: T.Texture) {
   trunk.castShadow = true;
   trunk.receiveShadow = true;
   group.add(trunk);
-  // Leaf cards.
   const pos: number[] = [],
     nor: number[] = [],
     uv: number[] = [],
@@ -111,7 +102,6 @@ export function makeTree(spec: TreeSpec, leaf: T.Texture) {
     p = new T.Vector3(),
     n = new T.Vector3();
   for (let i = 0; i < spec.cards; i++) {
-    // Points biased toward the canopy surface.
     const u = rand() * 2 - 1,
       th = rand() * Math.PI * 2;
     const rr = rand() ** 0.35;
@@ -138,7 +128,6 @@ export function makeTree(spec: TreeSpec, leaf: T.Texture) {
       n.normalize();
       nor.push(n.x, n.y, n.z);
       uv.push(cx + 0.5, cy + 0.5);
-      // Inner cards are darker (self shadowing).
       const ao = 0.55 + 0.45 * rr;
       col.push(spec.tint[0] * shade * ao, spec.tint[1] * shade * ao, spec.tint[2] * shade * ao);
     }
@@ -167,7 +156,6 @@ export function makeTree(spec: TreeSpec, leaf: T.Texture) {
   return group;
 }
 
-/** Canvas frond texture: a midrib with drooping leaflets on transparent background. */
 function frondTexture() {
   const c = document.createElement('canvas');
   c.width = 128;

@@ -3,7 +3,6 @@ import {
   type BenchmarkCurveInput,
 } from '@semianalysisai/inferencex-constants';
 
-/** Fields needed to select one workflow run for a rendered benchmark series. */
 export interface BenchmarkSeriesRow extends BenchmarkCurveInput {
   date: string;
   workflow_run_id?: number;
@@ -21,7 +20,8 @@ export const benchmarkCurveWorkflowRunId = (row: BenchmarkSeriesRow): number | u
 export const benchmarkCurveRunStartedAt = (row: BenchmarkSeriesRow): string | null | undefined =>
   row.curve_run_started_at ?? row.run_started_at;
 
-const seriesKey = (row: BenchmarkSeriesRow): string =>
+/** One benchmark configuration: the unit whose latest sweep represents it in a snapshot. */
+export const seriesKey = (row: BenchmarkSeriesRow): string =>
   row.benchmark_type === 'agentic_traces'
     ? benchmarkCurveScope(row)
     : JSON.stringify([
@@ -51,14 +51,14 @@ function isWinningRun(row: BenchmarkSeriesRow, winner: BenchmarkSeriesRow): bool
   );
 }
 
-/** Keep only the newest date for each chart series and, for agentic, one workflow run. */
 export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: T[]): T[] {
   const winnerPerGroup = new Map<string, T>();
-  for (const row of rows) {
-    const key = seriesKey(row);
-    const current = winnerPerGroup.get(key);
+  const keys = rows.map(seriesKey);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const current = winnerPerGroup.get(keys[i]);
     if (!current || benchmarkCurveDate(row) > benchmarkCurveDate(current)) {
-      winnerPerGroup.set(key, row);
+      winnerPerGroup.set(keys[i], row);
       continue;
     }
     if (
@@ -66,17 +66,16 @@ export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: 
       row.benchmark_type === 'agentic_traces' &&
       isLaterRun(row, current)
     ) {
-      winnerPerGroup.set(key, row);
+      winnerPerGroup.set(keys[i], row);
     }
   }
-  return rows.filter((row) => {
-    const winner = winnerPerGroup.get(seriesKey(row));
+  return rows.filter((row, i) => {
+    const winner = winnerPerGroup.get(keys[i]);
     if (!winner || benchmarkCurveDate(row) !== benchmarkCurveDate(winner)) return false;
     return row.benchmark_type !== 'agentic_traces' || isWinningRun(row, winner);
   });
 }
 
-/** For historical views, keep one agentic workflow run per series on each calendar date. */
 export function dedupeAgenticHistoryRuns<T extends BenchmarkSeriesRow>(rows: T[]): T[] {
   const winnerPerDateAndSeries = new Map<string, T>();
   for (const row of rows) {

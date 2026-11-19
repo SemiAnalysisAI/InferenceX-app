@@ -68,6 +68,11 @@
       "id": "tco-tail-latency",
       "family": "tco",
       "prompt": "Our production requirement is P99 inter-token latency below 20 ms. We can rent B200 at $3.60 per GPU-hour or MI355X at $1.80 per GPU-hour.\n\nUsing existing InferenceX DeepSeek-V4-Pro data for an 8192-input, 1024-output workload, determine whether either option meets that requirement and compare costs where the evidence supports it. Explain any missing evidence."
+    },
+    {
+      "id": "pr-improvements-live",
+      "family": "discovery",
+      "prompt": "Using existing InferenceX data, make a waterfall chart and a spreadsheet-ready CSV showing how DeepSeek-V4-Pro on B200 with SGLang and FP4 improved over its available AgentX history at a fixed interactivity of 35 tok/s/user. Include the original benchmark-run links and any matching PR links, save the complete response evidence, and explain what the chart does and does not establish. Do not run a benchmark."
     }
   ],
   "execution": {

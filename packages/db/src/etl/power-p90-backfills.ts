@@ -1,4 +1,3 @@
-/** Replayed original schema-2 power audits; sources and hashes: docs/data/power-p90-backfill.json. */
 import type { BenchmarkPointBackfill } from './run-overrides';
 
 type P90BackfillGroup = Pick<

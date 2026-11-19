@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import 'katex/dist/katex.min.css';
-
 import { BlogPostContent } from '@/components/blog/blog-post-content';
+import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
 import {
   blogDescription,
@@ -41,16 +40,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = blogDescription(meta);
 
   return {
-    // `absolute` keeps a short " | InferenceX" suffix instead of the long
-    // "%s | InferenceX by SemiAnalysis" root template, leaving more room for
-    // the headline before Google truncates the SERP title.
     title: { absolute: `${meta.title} | ${SITE_NAME}` },
     description,
     keywords: meta.tags,
     authors: [{ name: AUTHOR_NAME }],
     alternates: {
       canonical: `${SITE_URL}/blog/${slug}`,
-      // hreflang to the Chinese translation when one exists under content/blog/zh/.
       ...(hasZhTranslation(slug) && { languages: languageAlternates(`/blog/${slug}`) }),
     },
     openGraph: {
@@ -82,7 +77,7 @@ export default async function BlogPostPage({ params }: Props) {
   const adjacent = getAdjacentPosts(slug);
   const related = getRelatedPosts(slug, getAllPosts());
   const headings = extractHeadings(raw);
-  const { content } = await compileBlogMdx(raw);
+  const { content, hasMath } = await compileBlogMdx(raw);
 
   const jsonLd = buildBlogPostingJsonLd(meta, raw);
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd(slug, meta.title);
@@ -91,6 +86,7 @@ export default async function BlogPostPage({ params }: Props) {
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
+      {hasMath && <KatexStyles />}
       <BlogPostContent
         locale="en"
         meta={meta}

@@ -94,7 +94,6 @@ export const MODEL_NAMES = [
 ] as const;
 export const LOAD_STEPS = MODEL_NAMES.length + 2;
 
-/** Realistic factory paint colours (sRGB). */
 export const PAINTS = [
   '#f1f1ef',
   '#1c1d20',
@@ -188,7 +187,6 @@ export async function createCityRenderer(
   scene.add(city);
   const camera = new T.PerspectiveCamera(55, 1, 0.4, 24000);
 
-  // Sky, sun and image-based lighting.
   const sky = new Sky();
   sky.scale.setScalar(20000);
   const su = sky.material.uniforms;
@@ -238,7 +236,6 @@ export async function createCityRenderer(
   sirens.forEach((l) => scene.add(l));
   scene.fog = new T.FogExp2('#c9d6df', 0.00022);
 
-  // Post-processing: MSAA scene target, ambient occlusion, bloom, tone mapping.
   const rt = new T.WebGLRenderTarget(1, 1, {
     type: T.HalfFloatType,
     samples: quality === 'high' ? 4 : 2,
@@ -282,7 +279,6 @@ export async function createCityRenderer(
   ]);
   let disposed = false;
 
-  // ---------- static city
   const groundTex = new T.DataTexture(
     world.groundMap.data as Uint8Array,
     world.groundMap.width,
@@ -335,7 +331,6 @@ export async function createCityRenderer(
     city.add(units);
   }
 
-  // ---------- trees, props, parked cars (instanced around the camera)
   const leafTex = tex.leaf;
   const treeSets = [
     new InstancedSet(makeTree(TREE_SPECS[0], leafTex), 1800),
@@ -422,7 +417,6 @@ export async function createCityRenderer(
     for (const s of [...parkedNear, ...parkedFar]) s.end();
   }
 
-  // ---------- dynamic actors
   const playerCar = { name: '', obj: null as ReturnType<typeof instantiateCar> | null, paint: -1 };
   const traffic: { key: string; car: ReturnType<typeof instantiateCar> }[] = [];
   const police: ReturnType<typeof instantiateCar>[] = [];
@@ -458,7 +452,6 @@ export async function createCityRenderer(
   city.add(marker);
 
   const carObj = (model0: TrafficModel | CarName, paint: number) => {
-    // The Primo export has a broken body transform; the Asea shares its role.
     const model = (model0 === 'primo' ? 'asea' : model0) as CarName;
     const colour =
       model === 'taxi'
@@ -471,7 +464,6 @@ export async function createCityRenderer(
     return c;
   };
 
-  // ---------- atlas (Los Santos flight explorer)
   let atlasLoaded = false;
   let helicopter: T.Object3D | null = null;
   atlas.add(new T.HemisphereLight('#dfefff', '#6b5a48', 2.2));
@@ -481,7 +473,6 @@ export async function createCityRenderer(
   atlas.background = new T.Color('#b5d7e4');
   atlas.fog = new T.Fog('#b5d7e4', 6000, 17000);
 
-  // ---------- camera rig
   const tmp = new T.Vector3();
   const look = new T.Vector3();
   const camPos = new T.Vector3();
@@ -501,7 +492,6 @@ export async function createCityRenderer(
   }
 
   function collide(from: T.Vector3, to: T.Vector3) {
-    // Pull the camera in front of any building wall between the target and the camera.
     const d = from.distanceTo(to);
     const steps = Math.ceil(d / 0.8);
     for (let i = 1; i <= steps; i++) {
@@ -562,7 +552,6 @@ export async function createCityRenderer(
     fog.density = s.fog ? 0.0042 : 0.00022;
     fog.color.set(s.fog ? '#b9c0c4' : day > 0.5 ? '#ccd3d7' : day > 0.05 ? '#d9b49a' : '#1a2233');
     renderer.toneMappingExposure = s.fog ? 0.75 : 0.62 + day * 0.2 + (1 - day) * 0.4;
-    // Player vehicle.
     if (playerCar.name !== s.vehicle || playerCar.paint !== s.paint) {
       if (playerCar.obj) city.remove(playerCar.obj.root);
       playerCar.obj = carObj(s.vehicle, s.paint);
@@ -572,7 +561,6 @@ export async function createCityRenderer(
     const pc = playerCar.obj!;
     pc.root.position.set(s.car.x, s.car.y, s.car.z);
     pc.root.rotation.set(0, s.car.angle + Math.PI, 0);
-    // Body roll from sliding and pitch from acceleration.
     pc.root.rotateZ(T.MathUtils.clamp(-s.car.slip * 0.012, -0.06, 0.06));
     pc.update(s.car.spin, -s.car.steer * 0.55);
     michael.root.visible = s.onFoot;
@@ -583,7 +571,6 @@ export async function createCityRenderer(
       michael.root.rotation.y = p.angle;
       michael.pose(p.stride, Math.abs(p.speed), s.elapsed);
     }
-    // Traffic.
     s.traffic.forEach((t, i) => {
       const key = `${t.model}:${t.paint}`;
       if (!traffic[i] || traffic[i].key !== key) {
@@ -614,7 +601,6 @@ export async function createCityRenderer(
     });
     for (let i = s.police.length; i < police.length; i++) police[i].root.visible = false;
     for (let i = siren; i < 2; i++) sirens[i].intensity = 0;
-    // Pedestrians.
     s.peds.forEach((p, i) => {
       const model = p.model % PED_MODELS.length;
       if (!peds[i] || peds[i].model !== model) {
@@ -631,14 +617,12 @@ export async function createCityRenderer(
       r.pose(p.stride, Math.abs(p.speed), s.elapsed + i, p.down > 0);
     });
     for (let i = s.peds.length; i < peds.length; i++) peds[i].rig.root.visible = false;
-    // Mission marker.
     const goal = target(world, s);
     marker.visible = Boolean(goal) && s.phase === 'driving';
     if (goal) {
       marker.position.set(goal.x, world.surface(goal.x, goal.z), goal.z);
       beam.material.opacity = 0.28 + Math.sin(s.elapsed * 3) * 0.08;
     }
-    // Camera.
     const focus = s.onFoot ? s.player : s.car;
     const fy = s.onFoot ? s.player.y : s.car.y;
     const a = focus.angle;
@@ -693,7 +677,6 @@ export async function createCityRenderer(
     else camera.position.lerp(camPos, s.onFoot ? 0.25 : 0.18);
     camera.lookAt(camLook);
     snap = false;
-    // Instanced clutter follows the camera.
     fillClock++;
     if (
       lastFill.distanceTo(new T.Vector2(camera.position.x, camera.position.z)) > 18 ||
@@ -702,7 +685,6 @@ export async function createCityRenderer(
       fillClock = 0;
       fillInstances(camera.position.x, camera.position.z);
     }
-    // Shadow frustum centred on the focus, snapped to texels to avoid shimmering.
     const texel = (S * 2) / shadowSize;
     const sx = Math.round(focus.x / texel) * texel,
       sz = Math.round(focus.z / texel) * texel;
@@ -710,11 +692,9 @@ export async function createCityRenderer(
     sun.target.position.set(sx, fy, sz);
     sun.position.set(sx + light.x * 1200, fy + light.y * 1200, sz + light.z * 1200);
     sun.target.updateMatrixWorld();
-    // Headlights at night.
     headlights.intensity = !s.onFoot && day < 0.4 ? 120 : 0;
     headlights.position.set(s.car.x + Math.sin(a) * 2, s.car.y + 0.9, s.car.z + Math.cos(a) * 2);
     headTarget.position.set(s.car.x + Math.sin(a) * 30, s.car.y, s.car.z + Math.cos(a) * 30);
-    // Keep the sky dome centred on the viewer, even 6 km south in San Jovano.
     sky.position.set(camera.position.x, 0, camera.position.z);
     sky.updateMatrixWorld();
     if (options.post === false) renderer.render(scene, camera);

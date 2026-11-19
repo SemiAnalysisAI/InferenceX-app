@@ -11,10 +11,6 @@ import {
 } from './persistence';
 import type { NudgeDismissal } from './types';
 
-// ---------------------------------------------------------------------------
-// Storage mocks
-// ---------------------------------------------------------------------------
-
 function makeMockStorage() {
   const store = new Map<string, string>();
   return {
@@ -39,10 +35,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-
-// ---------------------------------------------------------------------------
-// isDismissed / markDismissed / clearDismissal
-// ---------------------------------------------------------------------------
 
 describe('session dismissal', () => {
   const strategy: NudgeDismissal = { type: 'session' };
@@ -140,10 +132,6 @@ describe('timed dismissal', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// markShown — show-time persistence (only fires for cooldown-on-show types)
-// ---------------------------------------------------------------------------
-
 describe('markShown', () => {
   const oneWeek = 7 * 24 * 60 * 60 * 1000;
 
@@ -176,10 +164,6 @@ describe('markShown', () => {
     expect(Number(stored)).toBeGreaterThan(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// isPermanentlySuppressed / markPermanentlySuppressed
-// ---------------------------------------------------------------------------
 
 describe('permanent suppress', () => {
   const key = 'inferencex-starred';
@@ -215,10 +199,6 @@ describe('permanent suppress', () => {
     expect(dispatchSpy).not.toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// isWithinSchedule
-// ---------------------------------------------------------------------------
 
 describe('isWithinSchedule', () => {
   it('returns true when no schedule provided', () => {

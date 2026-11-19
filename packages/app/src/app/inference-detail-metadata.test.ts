@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateMetadata as enAgenticMetadata } from './(dashboard)/inference/agentic/[id]/page';
-import { generateMetadata as enLogMetadata } from './(dashboard)/inference/logs/[id]/page';
-import { generateMetadata as zhAgenticMetadata } from './zh/(dashboard)/inference/agentic/[id]/page';
-import { generateMetadata as zhLogMetadata } from './zh/(dashboard)/inference/logs/[id]/page';
+import { generateMetadata as enAgenticMetadata } from './(dashboard)/infx/inference/agentic/[id]/page';
+import { generateMetadata as enLogMetadata } from './(dashboard)/infx/inference/logs/[id]/page';
+import { generateMetadata as zhAgenticMetadata } from './zh/(dashboard)/infx/inference/agentic/[id]/page';
+import { generateMetadata as zhLogMetadata } from './zh/(dashboard)/infx/inference/logs/[id]/page';
 
 const params = Promise.resolve({ id: '206885' });
 
@@ -14,8 +14,8 @@ describe('inference detail metadata', () => {
     expect(en.robots).toMatchObject({ index: false });
     expect(zh.robots).toMatchObject({ index: false });
     expect(en.alternates?.languages).toMatchObject({
-      en: expect.stringContaining('/inference/logs/206885'),
-      'zh-CN': expect.stringContaining('/zh/inference/logs/206885'),
+      en: expect.stringContaining('/infx/inference/logs/206885'),
+      'zh-CN': expect.stringContaining('/zh/infx/inference/logs/206885'),
     });
     expect(zh.alternates?.languages).toEqual(en.alternates?.languages);
     expect(zh.openGraph).toMatchObject({ locale: 'zh_CN' });

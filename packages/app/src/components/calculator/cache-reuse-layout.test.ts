@@ -16,7 +16,6 @@ describe('verticalLabelMode', () => {
   });
 
   it('turns every label sideways once one percentage is wider than the column', () => {
-    // A 20-bar sweep at desktop width leaves ~34px columns: "35.1%" spills over.
     expect(verticalLabelMode(34, ['5.0%', '35.1%'], FONT)).toBe('rotated');
   });
 

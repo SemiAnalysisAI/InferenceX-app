@@ -1,3 +1,5 @@
+import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-point-registry';
+
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
 const openReplayDialog = () => {
@@ -18,9 +20,6 @@ const setReplayScrubber = (v: number) =>
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-// Combined "<last-x-tick>|<last-y-tick>" signature so a change in EITHER axis is
-// detected. The run can grow in x, y, or both between frames, so asserting on
-// the y-axis alone would falsely fail when only x expands.
 const replayAxisExtent = () =>
   cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => replayAxisExtentFrom($svg[0]));
 
@@ -34,7 +33,7 @@ const replayAxisExtentFrom = (svg: Element) => {
 
 const visitChineseReplay = () => {
   cy.viewport(390, 900);
-  cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+  cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -43,174 +42,111 @@ const visitChineseReplay = () => {
 };
 
 describe('Inference Replay', () => {
-  before(() => {
+  beforeEach(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
-  });
-
-  it('opens the replay preview modal from the MP4 menu item', () => {
     openReplayDialog();
-    // Assert the dialog itself is visible. ChartDisplay now opens the launcher
-    // via an imperative ref; the optional-chain `?.open()` would silently
-    // no-op if the ref ever failed to attach, so this guards against that.
-    cy.get('[data-testid="replay-dialog-chart-0"]').should('be.visible');
     cy.get('[data-testid="replay-panel-chart-0"]').should('exist');
-    cy.get('[data-testid="replay-panel-chart-0"]').then(($panel) => {
-      const text = $panel.text();
-      const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;
-      const hasMessage = /Loading benchmark history|Not enough history/u.test(text) || hasControls;
-      expect(hasMessage).to.equal(true);
-    });
   });
 
   it('advances the date overlay and scrubber when Play is pressed', () => {
-    // The committed fixture has multiple dates; loading cannot count as a pass.
     cy.get('[data-testid="replay-play-pause"]').scrollIntoView().should('be.visible');
-    // Rewind first: earlier tests in this file (and failed retry attempts —
-    // testIsolation is off) leave the playhead wherever they stopped, and a
-    // playhead at the end would turn Play into a restart-from-zero whose
-    // scrubber value can never exceed the recorded start.
     cy.get('[data-testid="replay-reset"]').click();
     cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
     cy.get('[data-testid="replay-date-overlay"]')
       .invoke('text')
       .then((startDate) => {
         cy.get('[data-testid="replay-play-pause"]').click();
-        // Poll both signals BEFORE pausing, each with headroom for the
-        // slowest path. Scrubber: reduced motion (the chromium e2e launch
-        // flag) steps discretely at 1.2s per date, so any fixed wait
-        // shorter than one step fails deterministically. Date overlay: the
-        // continuous path (Firefox has no reduced-motion flag) commits
-        // scrubber ticks every few ms but only flips the label when the
-        // eased playhead crosses a whole segment — pausing as soon as the
-        // scrubber moves would freeze the label on the first date forever.
-        // The timeout must ride on .invoke: a cy.get timeout does not
-        // extend the retries of chained queries.
         cy.get('[data-testid="replay-scrubber"]')
-          .invoke({ timeout: 10_000 }, 'val')
+          .invoke('val')
           .should((endVal) => {
             expect(Number(endVal)).to.be.greaterThan(0);
           });
         cy.get('[data-testid="replay-date-overlay"]')
-          .invoke({ timeout: 10_000 }, 'text')
+          .invoke('text')
           .should((endDate) => {
             expect(endDate).not.to.equal(startDate);
           });
-        // Park paused at the origin so later tests start from a known frame.
         cy.get('[data-testid="replay-reset"]').click();
         cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
       });
   });
 
   it('re-renders the replay frame when a parent-chart toggle changes', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      // Rooflines only draw once a hw/precision group has >1 visible point,
-      // so move off frame 0 — the earliest date can render a single point.
-      setReplayScrubber(1_000_000); // clamps to the scrubber max → last frame
-      cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
-      // Capture the SVG path data for the first roofline as a stable signature.
-      cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
-        .first()
-        .invoke('attr', 'd')
-        .then((beforeD) => {
-          // The parent chart's controls sit behind the dialog, and any outside
-          // interaction closes it — so close, toggle log scale on the parent,
-          // and reopen instead of force-clicking through the overlay.
-          cy.get('body').type('{esc}');
-          cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
-          cy.get('[data-testid="chart-figure"]')
-            .first()
-            .within(() => {
-              cy.get('[data-testid="legend-advanced-toggle"]').then(($toggle) => {
-                if ($toggle.attr('aria-expanded') !== 'true') cy.wrap($toggle).click();
-              });
-              cy.get('[data-testid="scatter-log-scale"]').click();
-            });
-          openReplayDialog();
-          setReplayScrubber(1_000_000);
-          cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
-          cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
-            .first()
-            .invoke('attr', 'd')
-            .should((afterD) => {
-              expect(afterD).not.to.equal(beforeD);
-            });
-        });
-    });
+    setReplayScrubber(1_000_000);
+    cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+    cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
+      .first()
+      .invoke('attr', 'd')
+      .then((beforeD) => {
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
+        expandLegendAdvanced();
+        cy.get('[data-testid="scatter-log-scale"]').first().click();
+        openReplayDialog();
+        setReplayScrubber(1_000_000);
+        cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+        cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
+          .first()
+          .invoke('attr', 'd')
+          .should((afterD) => {
+            expect(afterD).not.to.equal(beforeD);
+          });
+      });
   });
 
   it('renders line labels in the foreground during replay', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      // Enable line labels inside the replay panel (scoped — the parent chart
-      // renders the same control behind the dialog).
-      cy.get('[data-testid="replay-panel-chart-0"]').within(() => {
-        expandLegendAdvanced();
-        cy.get('[data-testid="scatter-line-labels"]').then(($el) => {
-          if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
-        });
+    cy.get('[data-testid="replay-panel-chart-0"]').within(() => {
+      expandLegendAdvanced();
+      cy.get('[data-testid="scatter-line-labels"]').then(($el) => {
+        if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
       });
-      cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label').should(
-        'have.length.greaterThan',
-        0,
-      );
-      // The shared-renderer foreground raise must apply to the replay chart too.
-      cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
-        const svg = $svg[0];
-        const dots = svg.querySelectorAll('.dot-group');
-        const labels = svg.querySelectorAll('g.line-label');
-        if (dots.length === 0 || labels.length === 0) return;
-        const lastDot = dots.item(dots.length - 1)!;
-        const firstLabel = labels.item(0)!;
-        expect(
-          lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
-          'replay line label follows the scatter points (foreground)',
-        ).to.be.greaterThan(0);
-      });
+    });
+    cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
+      const svg = $svg[0];
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
+      const firstLabel = svg.querySelector('g.line-label');
+      expect(points, 'replay scatter point layer exists').to.not.equal(null);
+      expect(firstLabel, 'replay line labels exist').to.not.equal(null);
+      expect(
+        points!.compareDocumentPosition(firstLabel!) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'replay line label follows the scatter points (foreground)',
+      ).to.be.greaterThan(0);
     });
   });
 
   it('Fixed axes stay constant across frames; toggling off refits per frame', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-scrubber"]').length === 0) {
-        cy.log('Replay history fixture has < 2 dates; skipping fixed-axes check');
-        return;
-      }
-      // Fixed axes is the default — the extent is the whole-run box, so the first
-      // and last frame share the same axes (this is the feature's core invariant,
-      // independent of which axis the frontier grows along).
-      cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
+    setReplayScrubber(0);
+    cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+    replayAxisExtent().then((fixedAtStart) => {
+      setReplayScrubber(1_000_000);
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+      cy.get('[data-testid="replay-panel-chart-0"] svg').should(($svg) => {
+        expect(
+          replayAxisExtentFrom($svg[0]),
+          'fixed axes are identical at the first and last frame',
+        ).to.equal(fixedAtStart);
+      });
+
+      cy.get('[data-testid="replay-fixed-axes"]').click();
       setReplayScrubber(0);
       cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
-      replayAxisExtent().then((fixedAtStart) => {
-        setReplayScrubber(1_000_000); // clamps to the scrubber max → last frame
-        cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
-        cy.get('[data-testid="replay-panel-chart-0"] svg').should(($svg) => {
+      cy.get('[data-testid="replay-panel-chart-0"] svg')
+        .should(($svg) => {
           expect(
             replayAxisExtentFrom($svg[0]),
-            'fixed axes are identical at the first and last frame',
-          ).to.equal(fixedAtStart);
-        });
-
-        // Turn fixed axes off → the first frame refits to just that frame's
-        // (smaller) frontier, so the extent differs from the whole-run box in
-        // at least one axis (compared as an x|y pair, not y alone).
-        cy.get('[data-testid="replay-fixed-axes"]').click();
-        setReplayScrubber(0);
-        cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
-        cy.get('[data-testid="replay-panel-chart-0"] svg')
-          .should(($svg) => {
-            expect(
-              replayAxisExtentFrom($svg[0]),
-              'per-frame axes at the first frame differ from the whole-run fixed extent',
-            ).not.to.equal(fixedAtStart);
-          })
-          .then(() => cy.get('[data-testid="replay-fixed-axes"]').click());
-      });
+            'per-frame axes at the first frame differ from the whole-run fixed extent',
+          ).not.to.equal(fixedAtStart);
+        })
+        .then(() => cy.get('[data-testid="replay-fixed-axes"]').click());
     });
   });
 });
@@ -275,7 +211,7 @@ describe('Inference Replay — Simplified Chinese', () => {
       });
       visitChineseReplay();
       cy.get('[data-testid="replay-history-query-error"]')
-        .should('contain.text', '基准测试历史加载失败。')
+        .should('contain.text', '基准测试历史加载失败')
         .and('contain.text', '重试');
       cy.then(() => {
         attemptsBeforeRetry = attempts;
@@ -283,8 +219,6 @@ describe('Inference Replay — Simplified Chinese', () => {
       });
       cy.get('[data-testid="replay-history-query-error"]').contains('button', '重试').click();
       cy.get('[data-testid="replay-history-query-error"]').should('not.exist');
-      // The dialog scrolls internally at 390px — the controls row can sit
-      // below the fold, so bring it into view before asserting visibility.
       cy.get('[data-testid="replay-play-pause"]').scrollIntoView().should('be.visible');
       cy.then(() => expect(attempts).to.be.greaterThan(attemptsBeforeRetry));
     });

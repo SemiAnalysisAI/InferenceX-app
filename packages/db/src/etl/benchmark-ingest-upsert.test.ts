@@ -2,7 +2,12 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
-import { bulkIngestBenchmarkRows, type BenchmarkPersistenceInput } from './benchmark-ingest';
+import { getBenchmarkPresence } from '../queries/benchmark-presence';
+import {
+  bulkIngestBenchmarkRows,
+  insertServerLog,
+  type BenchmarkPersistenceInput,
+} from './benchmark-ingest';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -62,12 +67,6 @@ async function ingest(...rows: BenchmarkPersistenceInput[]) {
   return stored.rows.map((r) => r.power_audit);
 }
 
-/**
- * AgentX provenance is derived from the telemetry bundle and attached to the
- * per-job row before insert; no result row carries it. The upsert therefore
- * keeps it when the incoming agentic row has none (aggregate copy, re-ingest)
- * while every other lane stays artifact-authoritative.
- */
 describe('bulkIngestBenchmarkRows — power_audit on conflict', () => {
   it('keeps an agentic audit across a copy without one and lets a carried audit replace it', async () => {
     expect(await ingest(row({ powerAudit: AUDIT }))).toEqual([AUDIT]);
@@ -116,5 +115,19 @@ describe('bulkIngestBenchmarkRows — linked trace metrics', () => {
       });
       expect(stored?.trace_replay_id).toBe(linked ? 1 : null);
     }
+  });
+});
+
+describe('insertServerLog', () => {
+  it('publishes log presence for the rows it links', async () => {
+    const { insertedIds } = await bulkIngestBenchmarkRows(
+      sql,
+      [row({ conc: 1 }), row({ conc: 2 }), row({ conc: 4 })],
+      1,
+      '2026-09-11',
+    );
+    expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [] });
+    await insertServerLog(sql, insertedIds, 'log');
+    expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [1, 3] });
   });
 });

@@ -99,8 +99,6 @@ const subagent = (children: TurnNode[], extra: Partial<SubagentNode> = {}): Suba
 });
 
 describe('resolveDeepLinkTarget', () => {
-  // Node layout mirroring a real Weka conversation: raw entries
-  //   0: turn, 1: subagent (2 children), 2: turn
   const withRawIndexes: StructureNode[] = [
     turn(0, { rawIndex: 0 }),
     subagent([turn(1, { rawIndex: 1, innerIndex: 0 }), turn(2, { rawIndex: 1, innerIndex: 1 })], {
@@ -109,7 +107,6 @@ describe('resolveDeepLinkTarget', () => {
     }),
     turn(3, { rawIndex: 2 }),
   ];
-  // The same conversation as stored by the pre-rawIndex ingest (fields absent).
   const legacy: StructureNode[] = [
     turn(0),
     subagent([turn(1), turn(2)], { agentId: 'subagent_001_abcd1234' }),
@@ -128,9 +125,6 @@ describe('resolveDeepLinkTarget', () => {
   });
 
   it('falls back to node array position for structures ingested before rawIndex existed', () => {
-    // One node per raw entry means position === raw index, so the deep link
-    // must still resolve exactly (regression: it previously returned null and
-    // the flamegraph neither scrolled nor highlighted anything).
     expect(resolveDeepLinkTarget(legacy, { raw: 2, turn: 1 })).toEqual({
       rowKey: 't-2',
       expandGroup: null,
@@ -151,7 +145,6 @@ describe('resolveDeepLinkTarget', () => {
   it('returns null for out-of-range raw coordinates instead of guessing', () => {
     expect(resolveDeepLinkTarget(legacy, { raw: 9 })).toBeNull();
     expect(resolveDeepLinkTarget(legacy, { raw: 1, inner: 5 })).toBeNull();
-    // raw pointing at a subagent marker without inner does not match a turn.
     expect(resolveDeepLinkTarget(legacy, { raw: 1 })).toBeNull();
   });
 
@@ -222,8 +215,8 @@ describe('buildRowOverlaps and computeBraceLayout', () => {
   it('brackets parallel main turns and spans a non-member row as pass-through', () => {
     const nodes: StructureNode[] = [
       turn(0, { startS: 0, endS: 10 }),
-      turn(1), // untimed — sits inside the bracket span without being a member
-      turn(2, { startS: 5, endS: 30 }), // overlaps turn 0 and turn 3
+      turn(1),
+      turn(2, { startS: 5, endS: 30 }),
       turn(3, { startS: 28, endS: 40 }),
     ];
     const overlaps = buildRowOverlaps(nodes);
@@ -231,7 +224,6 @@ describe('buildRowOverlaps and computeBraceLayout', () => {
 
     const rows = buildVisibleRows(nodes, new Set(), overlaps);
     const layout = computeBraceLayout(rows);
-    // Two overlap groups sharing rows 0–2 and 2–3 need two side-by-side lanes.
     expect(layout.laneCount).toBe(2);
     expect(layout.overflowLanes).toBe(0);
     const roles = layout.rowSegs.map((segs) =>

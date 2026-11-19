@@ -44,7 +44,7 @@ With HiSparse, SGLang greatly boosts throughput at high concurrency and long con
 
 In our realtime benchmark board InferenceX, GB300 delivers the lowest modeled serving cost in our comparison at a response speed of 150 tokens per second. GB300 handles more tokens per GPU, and its higher hourly cost still leaves it ahead of GB200 on cost efficiency. The GB300 result uses Dynamo-TRT-LLM, while the GB200 result uses Dynamo-SGLang.
 
-We use the [September 28 AgentX snapshot](https://inferencex.semianalysis.com/inference/glm-5-3?g_model=GLM-5.2&g_rundate=2026-09-28&i_seq=agentic-traces&i_prec=fp4%2Cfp8&i_pctl=p90&i_best=0&i_optimal=1&i_metric=y_costh&i_xmode=interactivity) results to help illustrate the serving implications of GLM-5.3. We estimate costs using InferenceX’s model of owning and operating infrastructure at hyperscaler scale. Total tokens include input and generated output, including cached input history reused across turns. Streaming speed is measured using p90 interactivity; time to first token is evaluated separately.
+We use the [September 28 AgentX snapshot](https://inferencex.semianalysis.com/infx/inference/glm-5-3?g_model=GLM-5.2&g_rundate=2026-09-28&i_seq=agentic-traces&i_prec=fp4%2Cfp8&i_pctl=p90&i_best=0&i_optimal=1&i_metric=y_costh&i_xmode=interactivity) results to help illustrate the serving implications of GLM-5.3. We estimate costs using InferenceX’s model of owning and operating infrastructure at hyperscaler scale. Total tokens include input and generated output, including cached input history reused across turns. Streaming speed is measured using p90 interactivity; time to first token is evaluated separately.
 
 At 150 tokens per second, GB200 costs approximately $0.044 per million total tokens, compared with $0.049 for MI355X running ATOM. That is about 12% lower cost at the same streaming-speed target. These values are estimated from the measured curves, rather than from a separate test at exactly 150 tokens per second.
 
@@ -87,7 +87,7 @@ These B200 results show how much reuse can happen outside of GPU memory. When co
 <Figure
   src="/images/sparse-savings-persistent-demand-inside-glm53/b200-cache-reuse.png"
   alt="B200 GPU and host-memory prompt cache reuse by concurrency"
-  caption="Source: SemiAnalysis InferenceX; InferenceX B200 rows [440962](https://inferencex.semianalysis.com/inference/agentic/440962), [440961](https://inferencex.semianalysis.com/inference/agentic/440961), and [440959](https://inferencex.semianalysis.com/inference/agentic/440959); [workflow run 33683520699](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33683520699/attempts/1)"
+  caption="Source: SemiAnalysis InferenceX; InferenceX B200 rows [440962](https://inferencex.semianalysis.com/infx/inference/agentic/440962), [440961](https://inferencex.semianalysis.com/infx/inference/agentic/440961), and [440959](https://inferencex.semianalysis.com/infx/inference/agentic/440959); [workflow run 33683520699](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33683520699/attempts/1)"
 />
 
 Beyond cache management, changes to how the serving engine executes prefill and decoding can also change performance. Two separate GLM-5.2 studies illustrate this:

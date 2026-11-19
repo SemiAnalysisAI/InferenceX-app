@@ -4,7 +4,9 @@ import katex, { type KatexOptions } from 'katex';
 import { SKIP, visitParents } from 'unist-util-visit-parents';
 import type { VFile } from 'vfile';
 
-type Options = Omit<KatexOptions, 'displayMode' | 'throwOnError'>;
+type Options = Omit<KatexOptions, 'displayMode' | 'throwOnError'> & {
+  onMath?: () => void;
+};
 type HastNode = Parameters<typeof toText>[0];
 type Root = Extract<HastNode, { type: 'root' }>;
 type ElementContent = Extract<HastNode, { type: 'element' }>['children'][number];
@@ -18,13 +20,8 @@ function parseKaTeXHtml(html: string): ElementContent[] {
 const EMPTY_OPTIONS: Readonly<Options> = {};
 const EMPTY_CLASSES: readonly unknown[] = [];
 
-/**
- * Render the math nodes produced by remark-math with the app's direct KaTeX version.
- * rehype-katex 7 is intentionally not used because it pins KaTeX 0.16 and emits
- * layout classes that do not match the KaTeX 0.18 stylesheet.
- */
 export function rehypeKatex(options?: Readonly<Options> | null) {
-  const settings = options ?? EMPTY_OPTIONS;
+  const { onMath, ...settings } = options ?? EMPTY_OPTIONS;
 
   return (tree: Root, file: VFile) => {
     visitParents(tree, 'element', (element, parents) => {
@@ -53,6 +50,7 @@ export function rehypeKatex(options?: Readonly<Options> | null) {
       }
 
       if (!parent) return;
+      onMath?.();
 
       const value = toText(scope, { whitespace: 'pre' });
       let result: ElementContent[];

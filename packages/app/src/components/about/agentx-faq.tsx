@@ -1,9 +1,16 @@
 import Link from 'next/link';
 
-import { Card } from '@/components/ui/card';
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
+import {
+  ARTICLE_H2_CLASS,
+  ARTICLE_H3_CLASS,
+  READING_LINK_CLASS,
+  READING_SECTION_CLASS,
+  READING_TEXT_CLASS,
+} from '@/components/ui/reading-layout';
 import { AgentXQuickstartCallout } from '@/components/datasets/agentx-quickstart';
 import { AGENTX_QUICKSTART, AGENTX_ROUTING } from '@/lib/agentx/quickstart';
+import { cn } from '@/lib/shared/utils';
 
 type Locale = 'en' | 'zh';
 
@@ -35,7 +42,7 @@ const CONTENT: Record<
   }
 > = {
   en: {
-    title: 'AgentX: How the Benchmark Works',
+    title: 'How the AgentX Benchmark Works',
     intro: [
       'AgentX measures inference the way a coding agent actually uses a model: long, multi-turn sessions with shared prefixes, pauses between turns, parallel subagents, and repeated KV-cache reuse. It is a scenario in AIPerf built around public agentic-coding traces and a fixed replay recipe, so results from different serving stacks can be compared on the same workload.',
       "This FAQ explains the benchmark's operating model, the settings that protect comparability, and the deployment details most likely to affect a run.",
@@ -160,7 +167,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       'Thanks to the AIPerf team for implementing and documenting the scenario, and to Callan Fox and Weka for the underlying agentic-coding trace work.',
   },
   zh: {
-    title: 'AgentX：基准测试的工作原理',
+    title: 'AgentX 基准测试的工作原理',
     intro: [
       'AgentX 按照编码智能体实际使用模型的方式衡量推理性能。这类会话持续时间长、轮次多，会共享前缀并在轮次之间停顿；多个子智能体还可能并行运行，KV cache 也会被反复复用。AgentX 是 AIPerf 中的一种测试场景：它按照固定配置回放公开的智能体编码轨迹，使不同服务栈能够在同一工作负载下进行比较。',
       '本 FAQ 介绍该基准测试的运行方式、确保结果可比的配置，以及最容易影响测试结果的部署细节。',
@@ -188,7 +195,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         bullets: [
           '开启 streaming，以便测量首 token 延迟（TTFT）和 token 间延迟（ITL）。',
           'ignore_eos:true 要求服务器生成指定长度的输出，而不是提前停止。',
-          '保留原始轮次间延迟；仅将整个系统的全局空闲时间限制在 10 秒以内。',
+          '保留原始轮次间延迟；仅将全局空闲时间限制在 10 秒以内。',
           'first_turn_prefix cache busting 为每次回放的会话加入唯一首轮标记，避免虚假的跨会话 cache hit，同时保留会话内部的 cache 复用。',
           '有效测试至少运行 900 秒，默认运行 1,800 秒。',
           '正式测量前通过 warmup 建立深层 prefix。',
@@ -228,7 +235,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       {
         title: '如何确认负载生成器（load generator）不是瓶颈？',
         paragraphs: [
-          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数或负载生成器主机。',
+          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数，或再加一台负载生成器主机。',
           '--show-trace-timing 可以区分等待连接池中空闲连接的时间与等待服务器返回首字节的时间。worker 的 CPU 使用率正常且连接池阻塞很少，才有充分依据认为瓶颈位于服务器端。',
         ],
       },
@@ -288,89 +295,69 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
   const content = CONTENT[locale];
 
   return (
-    <section id="agentx" className="scroll-mt-24">
-      <Card>
-        <h2 className="text-lg font-semibold mb-2">{content.title}</h2>
+    <section id="agentx" className={READING_SECTION_CLASS}>
+      <h2 className={ARTICLE_H2_CLASS}>{content.title}</h2>
+      <div className="mt-4 flex flex-col gap-4">
         {content.intro.map((paragraph) => (
-          <p key={paragraph} className="mb-3 max-w-prose leading-relaxed text-muted-foreground">
+          <p key={paragraph} className={READING_TEXT_CLASS}>
             {paragraph}
           </p>
         ))}
+      </div>
 
-        <div className="mt-6">
-          <AgentXQuickstartCallout locale={locale} />
-        </div>
+      <div className="mt-10">
+        <AgentXQuickstartCallout locale={locale} />
+      </div>
 
-        <div className="mt-6 divide-y divide-border/60">
-          {content.sections.map((section) => (
-            <div
-              key={section.title}
-              data-testid="agentx-faq-section"
-              className="grid gap-3 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8"
-            >
-              <h3 className="font-semibold">{section.title}</h3>
-              <div className="min-w-0 max-w-prose space-y-3">
-                {section.paragraphs?.map((paragraph) => (
-                  <p key={paragraph} className="text-sm leading-relaxed text-muted-foreground">
-                    {paragraph}
-                  </p>
-                ))}
-                {section.bullets && (
-                  <ul className="ml-5 list-disc space-y-2 text-sm leading-relaxed text-muted-foreground">
-                    {section.bullets.map((bullet) => (
-                      <li key={bullet}>{bullet}</li>
-                    ))}
-                  </ul>
-                )}
-                {section.code && (
-                  <CopyableCodeBlock locale={locale} label={section.title}>
-                    {section.code}
-                  </CopyableCodeBlock>
-                )}
-              </div>
-            </div>
+      {content.sections.map((section) => (
+        <div key={section.title} data-testid="agentx-faq-section" className="mt-10 space-y-4">
+          <h3 className={ARTICLE_H3_CLASS}>{section.title}</h3>
+          {section.paragraphs?.map((paragraph) => (
+            <p key={paragraph} className={READING_TEXT_CLASS}>
+              {paragraph}
+            </p>
           ))}
+          {section.bullets && (
+            <ul className={cn(READING_TEXT_CLASS, 'ml-5 list-disc space-y-2')}>
+              {section.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          )}
+          {section.code && (
+            <CopyableCodeBlock locale={locale} label={section.title}>
+              {section.code}
+            </CopyableCodeBlock>
+          )}
         </div>
+      ))}
 
-        <div className="mt-8 max-w-prose border-t border-border pt-6 leading-relaxed">
-          <h3 className="font-semibold mb-2">{content.creditsTitle}</h3>
-          <p className="text-sm italic text-muted-foreground mb-2">{content.adapted}</p>
-          <p className="text-sm text-muted-foreground mb-3">{content.authority}</p>
-          <ul className="ml-5 list-disc space-y-1 text-sm">
-            <li>
-              <Link
-                className="text-brand hover:underline"
-                href={SOURCE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {content.sourceLabel}
-              </Link>
-            </li>
-            <li>
-              <Link
-                className="text-brand hover:underline"
-                href={UPSTREAM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {content.upstreamLabel}
-              </Link>
-            </li>
-            <li>
-              <Link
-                className="text-brand hover:underline"
-                href={REPOSITORY_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {content.repositoryLabel}
-              </Link>
-            </li>
+      <div className="mt-10 space-y-4">
+        <h3 className={ARTICLE_H3_CLASS}>{content.creditsTitle}</h3>
+        <div className={cn(READING_TEXT_CLASS, 'space-y-4')}>
+          <p>{content.adapted}</p>
+          <p>{content.authority}</p>
+          <ul className="ml-5 list-disc space-y-2">
+            {[
+              [SOURCE_URL, content.sourceLabel],
+              [UPSTREAM_URL, content.upstreamLabel],
+              [REPOSITORY_URL, content.repositoryLabel],
+            ].map(([href, label]) => (
+              <li key={href}>
+                <Link
+                  className={READING_LINK_CLASS}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {label}
+                </Link>
+              </li>
+            ))}
           </ul>
-          <p className="text-sm text-muted-foreground mt-3">{content.thanks}</p>
+          <p>{content.thanks}</p>
         </div>
-      </Card>
+      </div>
     </section>
   );
 }

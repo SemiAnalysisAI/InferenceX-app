@@ -1,16 +1,3 @@
-/**
- * Static ubenchX TPC Skyline data: measured TPC per GPC groupings.
- *
- * Source: ubenchX/gpc_query in SemiAnalysisAI/InferenceX (ported from
- * microbench-blackwell tools/gpc_query.cu). Each run lists TPCs per GPC, sorted
- * descending, as printed by the tool; the order carries no physical GPC index.
- *
- * To add a GPU, append one entry below and paste the tool's output line into
- * `tpcsPerGpc`. The table rows, GPC/SM counts, and the /api/v1/views/ubenchx
- * `test=tpc-skyline` response are all derived from this record; nothing else
- * needs to change. Use a GPU_SPECS name as the key, matching the other tests.
- */
-
 export interface TpcSkylineRun {
   readonly gpu: string;
   readonly driver: string;
@@ -18,14 +5,12 @@ export interface TpcSkylineRun {
   readonly container: string;
   readonly date: string;
   readonly sourceUrl: string;
-  /** TPCs per GPC, sorted descending. */
   readonly tpcsPerGpc: readonly number[];
 }
 
 const SOURCE_URL = 'https://github.com/SemiAnalysisAI/InferenceX/tree/main/ubenchX/gpc_query';
 const CONTAINER = 'nvidia/cuda:13.0.3-devel-ubuntu24.04';
 
-/** GPU keys in display order; keys match GPU_SPECS names used by the other ubenchX tests. */
 export const TPC_SKYLINE_RUNS: Record<string, TpcSkylineRun> = {
   'H100 SXM': {
     gpu: 'NVIDIA H100 80GB HBM3',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Model, MODEL_OPTIONS } from '../catalog/data-mappings';
+import { isModelVisible, Model, MODEL_OPTIONS } from '../catalog/data-mappings';
 import {
   DEFAULT_ROUTE_MODEL,
   defaultRouteModel,
@@ -10,7 +10,6 @@ import {
   modelRoutePathnameRewrite,
   modelRouteAvailableForTab,
   modelRoutesForTab,
-  pathWithSearchParams,
   modelRouteSlug,
   parseModelRoutePathname,
   resolveModelRouteSlug,
@@ -32,9 +31,6 @@ describe('MODEL_ROUTES registry', () => {
   });
 
   it('keeps the default route model in lockstep with the g_model URL default', () => {
-    // The pathname rewrite treats a bare /calculator or /historical as
-    // DEFAULT_ROUTE_MODEL; if the app-wide default drifted, plain page loads
-    // would rewrite the URL.
     expect(PARAM_DEFAULTS.g_model).toBe(DEFAULT_ROUTE_MODEL);
   });
 
@@ -47,9 +43,6 @@ describe('MODEL_ROUTES registry', () => {
     ]);
     expect(defaultRouteModel('calculator')).toBe(DEFAULT_ROUTE_MODEL);
     expect(defaultRouteModel('historical')).toBe(DEFAULT_ROUTE_MODEL);
-    // The estimator only plots agentic traces, and Kimi K3 is the model with
-    // the widest agentic hardware coverage; the page seeds its provider from
-    // this same helper.
     expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
     expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
     for (const tab of MODEL_ROUTE_TABS) {
@@ -84,51 +77,55 @@ describe('resolveModelRouteSlug', () => {
 
 describe('parseModelRoutePathname', () => {
   it('parses bare and slugged English tab paths', () => {
-    expect(parseModelRoutePathname('/calculator')).toEqual({
+    expect(parseModelRoutePathname('/infx/calculator')).toEqual({
       tab: 'calculator',
       zh: false,
       slug: null,
+      filters: [],
     });
-    expect(parseModelRoutePathname('/historical/kimi-k3')).toEqual({
+    expect(parseModelRoutePathname('/infx/historical/kimi-k3')).toEqual({
       tab: 'historical',
       zh: false,
       slug: 'kimi-k3',
+      filters: [],
     });
   });
 
   it('parses /zh siblings', () => {
-    expect(parseModelRoutePathname('/zh/calculator/deepseek-r1')).toEqual({
+    expect(parseModelRoutePathname('/zh/infx/calculator/deepseek-r1')).toEqual({
       tab: 'calculator',
       zh: true,
       slug: 'deepseek-r1',
+      filters: [],
     });
-    expect(parseModelRoutePathname('/zh/historical')).toEqual({
+    expect(parseModelRoutePathname('/zh/infx/historical')).toEqual({
       tab: 'historical',
       zh: true,
       slug: null,
+      filters: [],
     });
   });
 
   it('rejects other routes and deeper paths', () => {
     expect(parseModelRoutePathname('/')).toBeNull();
-    expect(parseModelRoutePathname('/inference')).toBeNull();
+    expect(parseModelRoutePathname('/infx/inference')).toBeNull();
     expect(parseModelRoutePathname('/compare/kimi-k3-b200-vs-mi355x')).toBeNull();
-    expect(parseModelRoutePathname('/historical/kimi-k3/extra')).toBeNull();
+    expect(parseModelRoutePathname('/infx/historical/kimi-k3/extra')).toBeNull();
     expect(parseModelRoutePathname('/calculatorx')).toBeNull();
   });
 });
 
 describe('routeModelForPathname', () => {
   it('maps slugged paths (including aliases) to models', () => {
-    expect(routeModelForPathname('/historical/kimi-k3')).toBe(Model.Kimi_K3);
-    expect(routeModelForPathname('/zh/calculator/deepseek-r1')).toBe(Model.DeepSeek_R1);
-    expect(routeModelForPathname('/calculator/glm')).toBe(Model.GLM_5);
+    expect(routeModelForPathname('/infx/historical/kimi-k3')).toBe(Model.Kimi_K3);
+    expect(routeModelForPathname('/zh/infx/calculator/deepseek-r1')).toBe(Model.DeepSeek_R1);
+    expect(routeModelForPathname('/infx/calculator/glm')).toBe(Model.GLM_5);
   });
 
   it('returns null for bare tabs, unknown slugs, and non-model routes', () => {
-    expect(routeModelForPathname('/historical')).toBeNull();
-    expect(routeModelForPathname('/historical/not-a-model')).toBeNull();
-    expect(routeModelForPathname('/inference')).toBeNull();
+    expect(routeModelForPathname('/infx/historical')).toBeNull();
+    expect(routeModelForPathname('/infx/historical/not-a-model')).toBeNull();
+    expect(routeModelForPathname('/infx/inference')).toBeNull();
     expect(routeModelForPathname(null)).toBeNull();
     expect(routeModelForPathname(undefined)).toBeNull();
   });
@@ -136,64 +133,68 @@ describe('routeModelForPathname', () => {
 
 describe('modelRoutePathnameRewrite', () => {
   it('rewrites slugged paths when the model changes', () => {
-    expect(modelRoutePathnameRewrite('/historical/kimi-k3', Model.DeepSeek_R1)).toBe(
-      '/historical/deepseek-r1',
+    expect(modelRoutePathnameRewrite('/infx/historical/kimi-k3', Model.DeepSeek_R1)).toBe(
+      '/infx/historical/deepseek-r1',
     );
-    expect(modelRoutePathnameRewrite('/zh/calculator/kimi-k3', Model.MiniMax_M3)).toBe(
-      '/zh/calculator/minimax-m3',
+    expect(modelRoutePathnameRewrite('/zh/infx/calculator/kimi-k3', Model.MiniMax_M3)).toBe(
+      '/zh/infx/calculator/minimax-m3',
     );
   });
 
   it('rewrites bare paths only for non-default models', () => {
-    expect(modelRoutePathnameRewrite('/calculator', DEFAULT_ROUTE_MODEL)).toBeNull();
-    expect(modelRoutePathnameRewrite('/calculator', Model.Kimi_K3)).toBe('/calculator/kimi-k3');
-    // Per-tab default: the profit estimator's bare path means Kimi K3, so the
-    // app-wide default model is the one that gets a slug there.
-    expect(modelRoutePathnameRewrite('/profit-estimator', Model.Kimi_K3)).toBeNull();
-    expect(modelRoutePathnameRewrite('/zh/profit-estimator', Model.Kimi_K3)).toBeNull();
-    expect(modelRoutePathnameRewrite('/profit-estimator', DEFAULT_ROUTE_MODEL)).toBe(
-      `/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+    expect(modelRoutePathnameRewrite('/infx/calculator', DEFAULT_ROUTE_MODEL)).toBeNull();
+    expect(modelRoutePathnameRewrite('/infx/calculator', Model.Kimi_K3)).toBe(
+      '/infx/calculator/kimi-k3',
+    );
+    expect(modelRoutePathnameRewrite('/infx/profit-estimator', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/zh/infx/profit-estimator', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/infx/profit-estimator', DEFAULT_ROUTE_MODEL)).toBe(
+      `/infx/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
     );
     expect(
       modelRoutePathnameRewrite(
-        `/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+        `/infx/profit-estimator/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
         Model.Kimi_K3,
       ),
-    ).toBe('/profit-estimator/kimi-k3');
-    expect(modelRoutePathnameRewrite('/zh/historical', Model.Kimi_K3)).toBe(
-      '/zh/historical/kimi-k3',
+    ).toBe('/infx/profit-estimator/kimi-k3');
+    expect(modelRoutePathnameRewrite('/zh/infx/historical', Model.Kimi_K3)).toBe(
+      '/zh/infx/historical/kimi-k3',
     );
   });
 
   it('keeps the slugged path when switching to the default model', () => {
-    expect(modelRoutePathnameRewrite('/historical/kimi-k3', DEFAULT_ROUTE_MODEL)).toBe(
-      `/historical/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
+    expect(modelRoutePathnameRewrite('/infx/historical/kimi-k3', DEFAULT_ROUTE_MODEL)).toBe(
+      `/infx/historical/${modelRouteSlug(DEFAULT_ROUTE_MODEL)}`,
     );
   });
 
   it('returns null when the path already matches', () => {
-    expect(modelRoutePathnameRewrite('/historical/kimi-k3', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/infx/historical/kimi-k3', Model.Kimi_K3)).toBeNull();
   });
 
   it('never rewrites non-model routes or unknown slugs', () => {
-    expect(modelRoutePathnameRewrite('/inference', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/infx/inference', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/', Model.Kimi_K3)).toBeNull();
-    expect(modelRoutePathnameRewrite('/historical/not-a-model', Model.Kimi_K3)).toBeNull();
+    expect(modelRoutePathnameRewrite('/infx/historical/not-a-model', Model.Kimi_K3)).toBeNull();
   });
 });
 
 describe('modelRoutesForTab', () => {
-  it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash on the profit estimators and every model elsewhere', () => {
+  it('serves the supported agentic models on both profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
-      // `MODEL_ROUTES` order (the dashboard selector's), not allow-list order.
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
-        Model.DeepSeek_V4_Pro,
         Model.DeepSeek_V4_1_Flash,
+        Model.GLM_5_2,
+        Model.Muse_Spark_Open,
+        Model.DeepSeek_V4_Pro,
         Model.Kimi_K3,
         Model.MiniMax_M3,
-        Model.GLM_5_2,
       ]);
       expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(false);
+      expect(modelRouteAvailableForTab(tab, Model.Muse_Spark_Open)).toBe(true);
+      expect(
+        modelRoutesForTab(tab).find((route) => route.model === Model.Muse_Spark_Open)?.slug,
+      ).toBe('muse-spark-open');
       expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);
       expect(modelRouteAvailableForTab(tab, Model.MiniMax_M3)).toBe(true);
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.MiniMax_M3)?.slug).toBe(
@@ -203,14 +204,10 @@ describe('modelRoutesForTab', () => {
       expect(
         modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_Pro)?.slug,
       ).toBe('deepseek-v4');
-      // V4.1 Flash is its own architecture and DB bucket, so it gets its own
-      // slug rather than joining the V4 Pro page.
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_1_Flash)).toBe(true);
       expect(
         modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_1_Flash)?.slug,
       ).toBe('deepseek-v41-flash');
-      // GLM 5.2 and 5.3 share one data bucket; the slug follows the current
-      // release, as on the rest of the site, and `glm-5-2` 308s to it.
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.GLM_5_2)?.slug).toBe(
         'glm-5-3',
       );
@@ -220,14 +217,17 @@ describe('modelRoutesForTab', () => {
           route: expect.objectContaining({ slug: 'glm-5-3' }),
         }),
       );
-      // DeepSeek V4 Pro is the app-wide default but not the estimators'; its
-      // slugged page stays indexable there instead of folding into the bare path.
       expect(defaultRouteModel(tab)).toBe(Model.Kimi_K3);
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_R1)).toBe(false);
       expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);
     }
     for (const tab of ['calculator', 'historical'] as const) {
-      expect(modelRoutesForTab(tab)).toEqual(MODEL_ROUTES);
+      expect(modelRoutesForTab(tab)).toEqual(
+        MODEL_ROUTES.filter((route) => isModelVisible(route.model)),
+      );
+      expect(modelRoutesForTab(tab).some((route) => route.model === Model.GLM_5_3_Flash)).toBe(
+        false,
+      );
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(true);
     }
   });
@@ -236,23 +236,7 @@ describe('modelRoutesForTab', () => {
 describe('modelRoutePath', () => {
   it('builds canonical English paths for both tabs', () => {
     for (const tab of MODEL_ROUTE_TABS) {
-      expect(modelRoutePath(tab, 'kimi-k3')).toBe(`/${tab}/kimi-k3`);
+      expect(modelRoutePath(tab, 'kimi-k3')).toBe(`/infx/${tab}/kimi-k3`);
     }
-  });
-});
-
-describe('pathWithSearchParams', () => {
-  it('returns the bare path when there are no params', () => {
-    expect(pathWithSearchParams('/calculator/kimi-k26', {})).toBe('/calculator/kimi-k26');
-  });
-
-  it('keeps share-link params, including repeated keys and reserved characters', () => {
-    expect(
-      pathWithSearchParams('/calculator/kimi-k26', {
-        i_seq: '8k/1k',
-        unofficialruns: ['a', 'b'],
-        missing: undefined,
-      }),
-    ).toBe('/calculator/kimi-k26?i_seq=8k%2F1k&unofficialruns=a&unofficialruns=b');
   });
 });

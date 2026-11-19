@@ -1,3 +1,6 @@
+import { cache } from 'react';
+
+import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -22,16 +25,21 @@ export interface ComparePageDerivedData {
   interactivityRange: { min: number; max: number };
   oldest?: string;
   newest?: string;
-  /** Full-shape rows limited to the fixed GPU pair for scoped chart hydration. */
   initialPairBenchmarkRows: BenchmarkRow[];
 }
 
+/**
+ * Rows embedded in the compare page HTML to seed the chart and table. Only the
+ * page's default sequence is sent; the chart fetches the full model rows when
+ * the reader switches to another sequence. A null sequence (no pair data)
+ * keeps every row so the seed still covers whatever the client selects.
+ */
 export function initialCompareBenchmarkRows(
-  slugModel: string,
-  effectiveModel: string,
   pairRows: BenchmarkRow[],
-): BenchmarkRow[] | undefined {
-  return effectiveModel === slugModel ? pairRows : undefined;
+  sequence: string | null,
+): BenchmarkRow[] {
+  if (!sequence) return pairRows;
+  return pairRows.filter((row) => rowToSequence(row) === sequence);
 }
 
 async function loadComparePairRows(
@@ -78,32 +86,30 @@ function buildComparePageDerivedData(
   };
 }
 
-/**
- * Assemble the compact server-owned comparison payload from one cached,
- * pair-filtered row set. Selector transforms stay pure and cheap per request;
- * caching them separately would either nest unstable_cache calls or duplicate
- * the full pair payload in every sequence/precision entry.
- */
-export async function getComparePageDerivedData(
-  dbModelKeys: readonly string[],
-  a: string,
-  b: string,
-  requestedSequence?: string | null,
-  requestedPrecision?: string | null,
-  fallbackSequence?: string | null,
-): Promise<ComparePageDerivedData> {
-  const keys = [...dbModelKeys];
-  const pairRowsLoader = FIXTURES_MODE ? loadComparePairRows : getCachedComparePairRows;
-  const initialPairBenchmarkRows = await pairRowsLoader(keys, a, b);
-  return {
-    ...buildComparePageDerivedData(
+const readPagePairRows = cache((dbModelKeys: readonly string[], a: string, b: string) =>
+  (FIXTURES_MODE ? loadComparePairRows : getCachedComparePairRows)([...dbModelKeys], a, b),
+);
+
+export const getComparePageDerivedData = cache(
+  async (
+    dbModelKeys: readonly string[],
+    a: string,
+    b: string,
+    requestedSequence?: string | null,
+    requestedPrecision?: string | null,
+    fallbackSequence?: string | null,
+  ): Promise<ComparePageDerivedData> => {
+    const initialPairBenchmarkRows = await readPagePairRows(dbModelKeys, a, b);
+    return {
+      ...buildComparePageDerivedData(
+        initialPairBenchmarkRows,
+        a,
+        b,
+        requestedSequence ?? null,
+        requestedPrecision ?? null,
+        fallbackSequence ?? null,
+      ),
       initialPairBenchmarkRows,
-      a,
-      b,
-      requestedSequence ?? null,
-      requestedPrecision ?? null,
-      fallbackSequence ?? null,
-    ),
-    initialPairBenchmarkRows,
-  };
-}
+    };
+  },
+);

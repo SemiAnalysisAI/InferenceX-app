@@ -7,10 +7,7 @@ import {
   overviewServingSeriesKey,
   type OverviewServingSeriesRow,
 } from '@/lib/overview/overview-data';
-import {
-  supportsChartTokenMetric,
-  type TokenMetricType,
-} from '@/lib/benchmarks/supplemental-benchmarks';
+import type { TokenMetricType } from '@/lib/benchmarks/token-metric-support';
 /**
  * Chart x-axis variant selected by the dropdown in the Chart panel. The
  * inference provider and ChartDisplay import this single definition.
@@ -31,6 +28,21 @@ export const X_AXIS_MODES: readonly XAxisMode[] = [
  */
 export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
   return mode === 'e2e-normalized-interactivity';
+}
+
+/**
+ * Date the main benchmarks query asks for. The latest run date maps to `''`, so it shares the key
+ * the chart reads before availability resolves. A pinned run keeps its date.
+ */
+export function chartBenchmarkQueryDate(
+  selectedRunDate: string | undefined,
+  latestAvailableDate: string | undefined,
+  asOfRunId: string | undefined,
+): string | undefined {
+  if (asOfRunId) return selectedRunDate ?? '';
+  return selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
+    ? ''
+    : selectedRunDate;
 }
 
 /** Build deduplicated comparison dates, excluding the main run date. */
@@ -166,10 +178,16 @@ export function applyScopeFilters(
   return scoped;
 }
 
-/** Apply snapshot-scoped metric support using the source date, not its display date. */
+/** A source that publishes only output throughput stores output_tput_per_gpu without tput_per_gpu. */
 export function supportsPointTokenMetric(
-  point: Pick<InferenceData, 'hwKey' | 'date' | 'actualDate'>,
+  point: Pick<InferenceData, 'rawMetricKeys'>,
   tokenType: TokenMetricType,
 ): boolean {
-  return supportsChartTokenMetric(String(point.hwKey), point.actualDate ?? point.date, tokenType);
+  const keys = point.rawMetricKeys;
+  return (
+    tokenType === 'output' ||
+    keys === undefined ||
+    keys.includes('tput_per_gpu') ||
+    !keys.includes('output_tput_per_gpu')
+  );
 }

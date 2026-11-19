@@ -67,12 +67,16 @@ describe('objective Chinese guard', () => {
       'src/app/zh/page.tsx',
       'src/app/(dashboard)/feedback/page.tsx',
       'src/app/zh/(dashboard)/feedback/page.tsx',
-      'src/app/agentx/[slug]/page.tsx',
-      'src/app/zh/agentx/[slug]/page.tsx',
+      'src/app/infx/agentx/[slug]/page.tsx',
+      'src/app/zh/infx/agentx/[slug]/page.tsx',
     ];
 
     it.each([
-      ['missing Chinese page', (file: string) => !file.includes('zh/agentx'), '/agentx/[slug]'],
+      [
+        'missing Chinese page',
+        (file: string) => !file.includes('zh/infx/agentx'),
+        '/infx/agentx/[slug]',
+      ],
       ['orphan Chinese page', () => true, '/orphan'],
     ])('reports a %s', (_name, keep, route) => {
       const pages = complete.filter(keep);
@@ -177,6 +181,9 @@ describe('objective Chinese guard', () => {
 
     it.each([
       ['content/blog/post.mdx', '# Exact\n', '# Changed\n', 1],
+      ['content/blog/zh/post.mdx', '# 旧\n', '# 新\n', 0],
+      ['packages/app/content/hardware/results.mdx', '# Exact\n', '# Changed\n', 1],
+      ['packages/app/content/hardware/zh/results.mdx', '# 旧\n', '# 新\n', 0],
       ['src/copy.test.ts', base, 'anything', 0],
       ['src/plumbing.ts', 'export const x = 1;', 'export const x = 2;', 0],
       [

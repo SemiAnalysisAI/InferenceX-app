@@ -136,20 +136,23 @@ describe('runPerIdBackfill', () => {
     });
     expect(seen).toEqual([1, 2, 3]);
     expect(process.exitCode).toBeUndefined();
-    // Two ✓ lines (skipped rows do not log) plus the summary line.
     const logged = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
     expect(logged.filter((l) => l.includes('✓')).length).toBe(2);
     expect(logged.at(-1)).toContain('=== backfill complete: 2 ok, 0 failed');
   });
 
-  it('counts throws as failures and sets exitCode = 1', async () => {
-    await runPerIdBackfill([1, 2], (id) =>
-      id === 1 ? Promise.reject(new Error('boom')) : Promise.resolve('ok'),
-    );
+  it('keeps going after a failure, lists every failed id, and sets exitCode = 1', async () => {
+    const seen: number[] = [];
+    await runPerIdBackfill([1, 2, 3], (id) => {
+      seen.push(id);
+      return id === 2 ? Promise.resolve('ok') : Promise.reject(new Error(`boom ${id}`));
+    });
+    expect(seen).toEqual([1, 2, 3]);
     expect(process.exitCode).toBe(1);
     const logged = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
-    expect(logged.at(-1)).toContain('=== backfill complete: 1 ok, 1 failed');
-    expect(vi.mocked(console.error).mock.calls[0]?.[0]).toContain('✗ id=1: boom');
+    expect(logged.at(-1)).toContain('=== backfill complete: 1 ok, 2 failed');
+    const errors = vi.mocked(console.error).mock.calls.map((c) => String(c[0]));
+    expect(errors).toEqual(['  ✗ id=1: boom 1', '  ✗ id=3: boom 3', '  failed ids: 1, 3']);
   });
 });
 

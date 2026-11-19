@@ -1,0 +1,46 @@
+import type { Metadata } from 'next';
+
+import { AgentXMethodologyArticle } from '@/components/datasets/agentx-methodology-article';
+import { JsonLd } from '@/components/seo/json-ld';
+import { ARTICLE_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
+import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
+
+const DESCRIPTION =
+  'AgentX 如何将自愿采集的编码智能体 trace 转换为回放图，并统一 KV cache warmup 与基准测试配置。';
+
+export const metadata: Metadata = {
+  title: 'AgentX 测试方法',
+  description: DESCRIPTION,
+  alternates: zhAlternates(`${AGENTX_ROUTE.path}/methodology`),
+  ...socialMetadata({
+    title: 'AgentX 测试方法 | InferenceX',
+    description: DESCRIPTION,
+    url: `${SITE_URL}/zh${AGENTX_ROUTE.path}/methodology`,
+    locale: 'zh',
+  }),
+};
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: 'AgentX 测试方法',
+  description: DESCRIPTION,
+  url: `${SITE_URL}/zh${AGENTX_ROUTE.path}/methodology`,
+  inLanguage: ZH_LANG_TAG,
+  isPartOf: { '@type': 'WebSite', name: 'InferenceX', url: SITE_URL },
+};
+
+export default function AgentXMethodologyPageZh() {
+  return (
+    <main className="relative">
+      <JsonLd data={jsonLd} />
+      <div className={cn(ARTICLE_PAGE_CLASS, 'pt-4 lg:pt-8')}>
+        <AgentXMethodologyArticle locale="zh" />
+      </div>
+    </main>
+  );
+}

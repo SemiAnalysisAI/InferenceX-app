@@ -1,5 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 export const SERVER_LOG_CHUNK_SIZE = 64 * 1024;
 const STALE_TIME_MS = 5 * 60 * 1000;
 
@@ -23,13 +25,14 @@ async function fetchServerLogChunk(
     offset: String(offset),
     limit: String(SERVER_LOG_CHUNK_SIZE),
   });
-  const response = await fetch(`/api/v1/server-log?${params}`, { signal });
+  const url = `/api/v1/server-log?${params}`;
+  const response = await fetch(url, { signal });
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`server-log ${response.status}`);
+  if (!response.ok)
+    throw new ApiRequestError(`server-log ${response.status}`, response.status, url);
   return (await response.json()) as ServerLogChunk;
 }
 
-/** Incrementally fetch immutable server-log chunks for one benchmark point. */
 export function useServerLog(
   id: number | null,
   fileName: string | null,

@@ -5,7 +5,6 @@ import type { Sql } from './db-utils.js';
 
 export const ATOM_KV_BLOCKS_METRIC = 'atom:kv_cache_blocks_total';
 
-/** ATOM already sums independent DP pools; phase/endpoint copies are not extra pools. */
 export function atomKvCacheBlocksFromMetricPhases(
   profiling: MetricsMap,
   warmup: MetricsMap,
@@ -17,7 +16,6 @@ export function atomKvCacheBlocksFromMetricPhases(
         const value = slice.avg;
         if (value === undefined || value === 0) continue;
         if (!Number.isSafeInteger(value) || value < 0) return null;
-        // A resized/restarted pool cannot be represented by one constant ceiling.
         if (blocks !== null && value !== blocks) return null;
         blocks = value;
       }
@@ -26,7 +24,6 @@ export function atomKvCacheBlocksFromMetricPhases(
   return blocks;
 }
 
-/** Use the resolved scheduler block size, not the pre-normalization CLI value. */
 export function atomKvCachePoolTokensFromServerLog(
   serverLog: string,
   allocatedBlocks: number,
@@ -40,7 +37,6 @@ export function atomKvCachePoolTokensFromServerLog(
     if (!blockSize || !poolBlocks || Number(poolBlocks.groups!.blocks) <= 0) return null;
     const dcp = /\bdcp=(?<width>\d+)(?=[ ,)])/u.exec(line);
     if (line.includes('dcp=') && !dcp) return null;
-    // DCP stores one shard per rank; TP replicas do not multiply capacity.
     const next = Number(blockSize.groups!.size) * (dcp ? Number(dcp.groups!.width) : 1);
     if (!Number.isSafeInteger(next) || next <= 0 || (scale !== null && scale !== next)) {
       return null;
@@ -51,22 +47,9 @@ export function atomKvCachePoolTokensFromServerLog(
   return tokens !== null && Number.isSafeInteger(tokens) ? tokens : null;
 }
 
-/**
- * Characters scanned per regex call. PostgreSQL's regex engine expands text to
- * 4-byte wide chars and refuses any single allocation over 1 GiB, so matching
- * against a whole multi-hundred-MiB server log (LMCache runs) fails with
- * `invalid memory alloc request size`. 64 MiB of chars stays at 256 MiB.
- */
 export const CAPACITY_SCAN_CHUNK_CHARS = 64 * 1024 * 1024;
-/** Trailing overlap so a capacity line split by a chunk boundary is whole in the next chunk. */
 export const CAPACITY_SCAN_OVERLAP_CHARS = 4096;
 
-/**
- * Pull only the startup capacity lines out of `server_logs.server_log`,
- * scanning fixed-size chunks so the log never has to fit in one regex buffer.
- * Lines must be newline-terminated inside the chunk, which discards partial
- * lines at a chunk edge; the overlap re-scans them whole from the next chunk.
- */
 export async function collectAtomCapacityLines(
   sql: Sql | TransactionSql,
   serverLogId: number,
@@ -104,7 +87,6 @@ export async function collectAtomCapacityLines(
   }
 }
 
-/** Share the exact ingestion/backfill write, reading only compact startup lines from SQL. */
 export async function updateAtomKvCachePoolTokens(
   sql: Sql | TransactionSql,
   benchmarkIds: readonly number[],

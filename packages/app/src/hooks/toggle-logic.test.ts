@@ -4,9 +4,6 @@ import { computeToggle } from '@/hooks/useTogglableSet';
 
 const ALL = new Set(['a', 'b', 'c']);
 
-// ===========================================================================
-// computeToggle
-// ===========================================================================
 describe('computeToggle', () => {
   describe('when all items are active (solo behavior)', () => {
     it('solos the toggled item when all are active', () => {
@@ -24,12 +21,6 @@ describe('computeToggle', () => {
     });
   });
 
-  // Clicking an active entry always isolates it, even from a partial
-  // selection. Solo used to require EVERY item to be active, which made it
-  // unreachable wherever something starts deselected — on the agentic chart
-  // the engine guard switches SGLang off on load, so the first legend click
-  // removed the entry instead of isolating it. Removing one entry has its own
-  // control (the X on a legend row).
   describe('when some (but not all/one) items are active', () => {
     it('solos the clicked active item', () => {
       const prev = new Set(['a', 'b']);
@@ -67,17 +58,14 @@ describe('computeToggle', () => {
   describe('edge cases', () => {
     it('handles single-item allItems set: toggle on → solo = same, toggle off → restore = same', () => {
       const singleAll = new Set(['x']);
-      // all active, toggle 'x' → solo 'x' (same as all)
       const result1 = computeToggle(new Set(['x']), 'x', singleAll);
       expect(result1).toEqual(new Set(['x']));
     });
 
     it('handles two-item allItems set: solo then restore', () => {
       const twoAll = new Set(['a', 'b']);
-      // all active → solo 'a'
       const step1 = computeToggle(new Set(['a', 'b']), 'a', twoAll);
       expect(step1).toEqual(new Set(['a']));
-      // solo 'a' → restore all
       const step2 = computeToggle(step1, 'a', twoAll);
       expect(step2).toEqual(twoAll);
     });
@@ -85,23 +73,23 @@ describe('computeToggle', () => {
     it('does not mutate the previous set', () => {
       const prev = new Set(['a', 'b']);
       computeToggle(prev, 'c', ALL);
-      expect(prev).toEqual(new Set(['a', 'b'])); // unchanged
+      expect(prev).toEqual(new Set(['a', 'b']));
     });
 
     it('does not mutate the allItems set', () => {
       const allCopy = new Set(ALL);
       computeToggle(new Set(['a']), 'a', ALL);
-      expect(ALL).toEqual(allCopy); // unchanged
+      expect(ALL).toEqual(allCopy);
     });
 
     it('full cycle: all → solo → add → re-solo → restore', () => {
-      const s1 = computeToggle(new Set(['a', 'b', 'c']), 'a', ALL); // solo a
+      const s1 = computeToggle(new Set(['a', 'b', 'c']), 'a', ALL);
       expect(s1).toEqual(new Set(['a']));
-      const s2 = computeToggle(s1, 'b', ALL); // add b
+      const s2 = computeToggle(s1, 'b', ALL);
       expect(s2).toEqual(new Set(['a', 'b']));
-      const s3 = computeToggle(s2, 'a', ALL); // clicking a active entry re-solos
+      const s3 = computeToggle(s2, 'a', ALL);
       expect(s3).toEqual(new Set(['a']));
-      const s4 = computeToggle(s3, 'a', ALL); // restore all (only a active)
+      const s4 = computeToggle(s3, 'a', ALL);
       expect(s4).toEqual(ALL);
     });
   });
@@ -113,7 +101,6 @@ describe('computeToggle', () => {
     });
 
     it('returns allItems (empty) when prev has one item and that item is toggled off with empty allItems', () => {
-      // prev.size === 1 && isActive → restore all → returns allItems (empty set)
       const result = computeToggle(new Set(['a']), 'a', new Set());
       expect(result).toEqual(new Set());
     });
@@ -121,10 +108,8 @@ describe('computeToggle', () => {
 
   describe('item not in allItems', () => {
     it('solos when prev equals allItems size, even if toggled item is not in allItems', () => {
-      // allAreActive check is purely size-based, not membership-based
       const allItems = new Set(['a', 'b']);
-      const prev = new Set(['a', 'x']); // same size as allItems but different members
-      // 'x' is active and allAreActive (by size), so → solo
+      const prev = new Set(['a', 'x']);
       const result = computeToggle(prev, 'x', allItems);
       expect(result).toEqual(new Set(['x']));
     });
@@ -141,15 +126,12 @@ describe('computeToggle', () => {
     it('always returns a new Set instance (never the same reference as prev)', () => {
       const allItems = new Set(['a', 'b', 'c']);
 
-      // solo case
       const prev1 = new Set(['a', 'b', 'c']);
       expect(computeToggle(prev1, 'a', allItems)).not.toBe(prev1);
 
-      // add case
       const prev2 = new Set(['a']);
       expect(computeToggle(prev2, 'b', allItems)).not.toBe(prev2);
 
-      // remove case
       const prev3 = new Set(['a', 'b']);
       expect(computeToggle(prev3, 'a', allItems)).not.toBe(prev3);
     });

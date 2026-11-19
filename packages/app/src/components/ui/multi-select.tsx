@@ -4,6 +4,7 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { track } from '@/lib/analytics/analytics';
+import { matchesSearch } from '@/lib/shared/search-match';
 import { cn } from '@/lib/shared/utils';
 import {
   CONTROL_MIN_HEIGHT,
@@ -14,6 +15,7 @@ import {
   CONTROL_SEARCH_CLEAR_STYLE,
 } from './control-styles';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { useOptionIntent } from './option-intent';
 
 const STRINGS = {
   en: {
@@ -46,16 +48,12 @@ interface MultiSelectOption {
   disabled?: boolean;
   title?: string;
   testId?: string;
-  /** Optional leading visual (e.g. a brand logo) rendered before the label. */
   icon?: React.ReactNode;
-  /** Optional trailing visual (e.g. a NEW pill) rendered after the label. */
   badge?: React.ReactNode;
 }
 
 export interface MultiSelectSection {
-  /** Stable key for React list rendering */
   id: string;
-  /** Section header (plain text or small composite UI) */
   header?: React.ReactNode;
   options: MultiSelectOption[];
 }
@@ -73,13 +71,14 @@ interface MultiSelectProps {
   placeholder?: string;
   size?: 'sm' | 'default';
   className?: string;
+  /** Classes for the dropdown panel, e.g. a width wider than the trigger. */
+  contentClassName?: string;
   disabled?: boolean;
-  maxSelections?: number; // Maximum number of items that can be selected
-  minSelections?: number; // Minimum number of items that must be selected
+  maxSelections?: number;
+  minSelections?: number;
   showClearAll?: boolean;
   searchable?: boolean;
   plainSelectedText?: boolean;
-  /** Keep selected chips on one scrollable row in compact filter panels. */
   wrapSelectedChips?: boolean;
   showSelectionSummary?: boolean;
   searchPlaceholder?: string;
@@ -88,6 +87,10 @@ interface MultiSelectProps {
   clearSearchLabel?: string;
   selectedSuffix?: string;
   minimumPrefix?: string;
+  /** Display a retained selection without adding it to the available options. */
+  missingSelectedOption?: (value: string) => MultiSelectOption;
+  /** Called with the value an option would select once the user shows intent toward it. */
+  onOptionIntent?: (value: string[]) => void;
 }
 
 function MultiSelect({
@@ -103,6 +106,7 @@ function MultiSelect({
   placeholder,
   size = 'default',
   className,
+  contentClassName,
   disabled = false,
   maxSelections,
   minSelections,
@@ -117,6 +121,8 @@ function MultiSelect({
   clearSearchLabel,
   selectedSuffix,
   minimumPrefix,
+  missingSelectedOption,
+  onOptionIntent,
 }: MultiSelectProps) {
   const t = STRINGS[useLocale()];
   const resolvedPlaceholder = placeholder ?? t.placeholder;
@@ -145,7 +151,7 @@ function MultiSelect({
     (nextOpen: boolean) => {
       if (!nextOpen && isOpen) {
         if (searchUsedRef.current) {
-          track('multi_select_searched', { query: searchStateRef.current });
+          track('multi_select_searched', { query_length: searchStateRef.current.length });
           searchUsedRef.current = false;
         }
         setSearch('');
@@ -170,10 +176,6 @@ function MultiSelect({
           event.target === document.body ||
           event.target === document.documentElement)
       ) {
-        // Radix dialogs listen at document capture. Handle this nested menu
-        // first so Escape does not also dismiss the surrounding dialog.
-        // A disabled/replaced option can leave focus on the document body;
-        // Escape must still dismiss the open menu in that state.
         event.preventDefault();
         event.stopPropagation();
         setIsOpen(false);
@@ -193,8 +195,6 @@ function MultiSelect({
 
     if (isOpen) {
       window.addEventListener('keydown', handleEscape, true);
-      // Capture-phase pointerdown closes this menu before other dropdown triggers
-      // process the same interaction, enabling smooth one-click handoff.
       document.addEventListener('pointerdown', handlePointerDownOutside, true);
       document.addEventListener('focusin', handleFocusOutside);
     }
@@ -208,13 +208,12 @@ function MultiSelect({
 
   React.useEffect(() => {
     if (!isOpen) return;
-    // Focus only on opening, not on a controlled parent's value update.
     if (searchableRef.current) searchRef.current?.focus();
     else {
       const firstOption = contentRef.current?.querySelector<HTMLButtonElement>(
         '[role="option"]:not(:disabled)',
       );
-      (firstOption ?? contentRef.current)?.focus();
+      optionIntent.focusQuietly(firstOption ?? contentRef.current);
     }
   }, [isOpen]);
 
@@ -227,9 +226,8 @@ function MultiSelect({
 
   const filteredSections = React.useMemo(() => {
     if (!sections?.length) return null;
-    const lower = search.toLowerCase();
     const filterOpts = (opts: MultiSelectOption[]) =>
-      search ? opts.filter((opt) => opt.label.toLowerCase().includes(lower)) : opts;
+      search ? opts.filter((opt) => matchesSearch(opt.label, search)) : opts;
 
     return sections.map((section) => ({
       ...section,
@@ -243,44 +241,40 @@ function MultiSelect({
     }
     const opts = flatOptions;
     if (!search) return opts;
-    const lower = search.toLowerCase();
-    return opts.filter((opt) => opt.label.toLowerCase().includes(lower));
+    return opts.filter((opt) => matchesSearch(opt.label, search));
   }, [filteredSections, flatOptions, search]);
 
-  const handleToggle = (optionValue: string) => {
+  /** The value choosing `optionValue` produces, or null when it changes nothing. */
+  const toggledValue = (optionValue: string): string[] | null => {
     if (disabled || flatOptions.find((option) => option.value === optionValue)?.disabled) {
-      return;
+      return null;
     }
-
-    const isSelected = value.includes(optionValue);
-
-    if (isSelected) {
-      if (minSelections !== undefined && value.length <= minSelections) {
-        return;
-      }
-      const newValue = value.filter((v) => v !== optionValue);
-      track('multi_select_deselected', { value: optionValue });
-      onChange?.(newValue);
-      setIsOpen(false);
-      triggerRef.current?.focus();
-      return;
+    if (value.includes(optionValue)) {
+      return minSelections !== undefined && value.length <= minSelections
+        ? null
+        : value.filter((v) => v !== optionValue);
     }
-
     if (maxSelections !== undefined && value.length >= maxSelections) {
-      // Single-select mode should replace the previous value in one click.
-      if (maxSelections === 1) {
-        const newValue = [optionValue];
-        track('multi_select_selected', { value: optionValue });
-        onChange?.(newValue);
-        setIsOpen(false);
-        triggerRef.current?.focus();
-        return;
-      }
-      return;
+      return maxSelections === 1 ? [optionValue] : null;
     }
+    return [...value, optionValue];
+  };
 
-    const newValue = [...value, optionValue];
-    track('multi_select_selected', { value: optionValue });
+  const optionIntent = useOptionIntent(
+    isOpen,
+    onOptionIntent &&
+      ((optionValue) => {
+        const next = toggledValue(optionValue);
+        if (next) onOptionIntent(next);
+      }),
+  );
+
+  const handleToggle = (optionValue: string) => {
+    const newValue = toggledValue(optionValue);
+    if (!newValue) return;
+    track(value.includes(optionValue) ? 'multi_select_deselected' : 'multi_select_selected', {
+      value: optionValue,
+    });
     onChange?.(newValue);
     setIsOpen(false);
     triggerRef.current?.focus();
@@ -313,9 +307,10 @@ function MultiSelect({
     onChange?.([]);
   };
 
-  // Preserve the order of selected values, not the order of options
   const selectedOptions = value.map(
-    (val) => flatOptions.find((opt) => opt.value === val) ?? { value: val, label: val },
+    (val) =>
+      flatOptions.find((opt) => opt.value === val) ??
+      missingSelectedOption?.(val) ?? { value: val, label: val },
   );
   const selectedLabels = selectedOptions.map((opt) => opt.label);
 
@@ -355,6 +350,7 @@ function MultiSelect({
         title={option.title}
         data-testid={option.testId}
         data-slot="select-item"
+        {...optionIntent.optionProps(option.value, toggledValue(option.value) !== null)}
         onClick={() => handleToggle(option.value)}
         onKeyDown={(event) => {
           const direction =
@@ -387,7 +383,7 @@ function MultiSelect({
         <span className="absolute right-2 flex size-3.5 items-center justify-center">
           {isSelected && <CheckIcon className="size-4 text-primary" />}
         </span>
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 flex-1 items-center gap-2">
           {option.icon}
           {option.label}
           {option.badge}
@@ -448,7 +444,7 @@ function MultiSelect({
                 <span
                   key={value[index]}
                   data-slot="select-chip"
-                  className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
+                  className="bg-foreground/[0.08] text-foreground inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
                   {selectedOptions[index]?.icon}
                   <span className="min-w-0 truncate" title={label}>
@@ -465,7 +461,7 @@ function MultiSelect({
                       }
                     }}
                     className={cn(
-                      'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
+                      'hover:bg-foreground/10 rounded-sm cursor-pointer transition-colors',
                       (disabled || isMinReached) && 'hidden',
                     )}
                     aria-label={`${t.removePrefix}${label}`}
@@ -517,6 +513,7 @@ function MultiSelect({
           data-slot="select-content"
           className={cn(
             'bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 absolute z-[120] mt-1 flex max-h-72 w-full origin-top flex-col overflow-hidden rounded-md border shadow-md',
+            contentClassName,
           )}
         >
           <div className="min-h-0 p-1 space-y-1 overflow-y-auto custom-scrollbar">

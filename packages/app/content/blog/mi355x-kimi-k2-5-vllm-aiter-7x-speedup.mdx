@@ -20,7 +20,7 @@ However, their most impressive achievement was how fast they were able to move t
 
 One of the most consistent criticisms we've leveled at AMD Kimi K2.5 inference through [InferenceXv2](https://inferencex.semianalysis.com/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper) is composability. MI355X silicon on CDNA4 is competitive with B200 at the tensor-core level, but AMD's ROCm and vLLM path does not always expose that capability. This is particularly visible on newer frontier MoE models where the inference performance recipes are still maturing.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -76,7 +76,7 @@ The "up to 15x" headline sits at 337 tok/s/GPU, where v0.16's broken latency flo
   caption="MI355X Kimi K2.5 MXFP4 8k/1k Pareto frontier. vLLM 0.16 (Mar 1 baseline) vs vLLM 0.18 (Mar 26)."
 />
 
-You can find the live version of this chart [here](https://inferencex.semianalysis.com/inference?g_rundate=2026-04-20&g_runid=24695468813&g_model=Kimi-K2.5&i_gpus=mi355x_vllm&i_dstart=2026-03-01&i_dend=2026-03-26) pre-filtered to Kimi K2.5 on MI355X vLLM across Mar 1 to Mar 26.
+You can find the live version of this chart [here](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-04-20&g_runid=24695468813&g_model=Kimi-K2.5&i_gpus=mi355x_vllm&i_dstart=2026-03-01&i_dend=2026-03-26) pre-filtered to Kimi K2.5 on MI355X vLLM across Mar 1 to Mar 26.
 
 ## Speed Is the Moat
 
@@ -86,7 +86,7 @@ AMD has already shown it can ship production disagg on its own stack. The MI355X
 
 And this is why update cadence showcased by our benchmarks matter so much. A point-in-time MI355X vs B200 comparison run on March 1 would have said MI355X was 10x behind and roughly unusable. However, data from a mere 25 days later proves that MI355X is within striking distance of B200 single-node.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

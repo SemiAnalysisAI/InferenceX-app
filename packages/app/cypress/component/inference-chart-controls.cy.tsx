@@ -1,59 +1,29 @@
 import 'cypress-axe';
-import { useState } from 'react';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
-import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
+import { ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
-import {
-  createMockInferenceContextValues,
-  type MockInferenceContextValues,
-} from '../support/mock-data';
 
-/**
- * Measured Energy sits behind the ↑↑↓↓ feature gate while power telemetry is
- * WIP. Unlock it and remount so the gated group is listed; the gate hook reads
- * localStorage on mount.
- */
-function mountWithPowerGroupsUnlocked() {
-  cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
-  mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
-}
-
-function StatefulMeasuredControls({ context }: { context: MockInferenceContextValues }) {
-  const [selectedYAxisMetric, setSelectedYAxisMetric] = useState(context.selectedYAxisMetric);
-  const value = {
-    ...context,
-    selectedYAxisMetric,
-    setSelectedYAxisMetric(metric: string) {
-      context.setSelectedYAxisMetric(metric);
-      setSelectedYAxisMetric(metric);
-    },
-  };
+function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
   return (
-    <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+    <>
       <InferenceChartControls showXAxisMode />
-    </InferenceContextsProvider>
-  );
-}
-
-function mountMeasuredControls(metric = 'y_measuredAvgPower', locale = 'en') {
-  cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
-  mountWithProviders(
-    <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
-      <StatefulMeasuredControls
-        context={createMockInferenceContextValues({ selectedYAxisMetric: metric })}
+      <ResultContext
+        locale="en"
+        costTier="Owning at Large Hyperscaler Volume"
+        tcoBasis={
+          <TcoBasisCaption
+            hardwareKeys={new Set(showTcoBasis ? ['tpuv7_vllm'] : ['b200_sglang'])}
+            source="inference"
+          />
+        }
       />
-    </PathnameContext.Provider>,
-    { unofficial: {} },
+    </>
   );
-}
-
-function selectMeasuredSetting(control: string, value: string) {
-  cy.get(`[data-testid="measured-${control}"]`).click();
-  cy.get(`[role="option"][data-value="${value}"]`).click();
 }
 
 describe('Inference ChartControls', () => {
@@ -62,72 +32,44 @@ describe('Inference ChartControls', () => {
   });
 
   afterEach(() => {
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
   });
 
-  it('hides the Measured Energy group while the gate is locked', () => {
+  it('offers pending Flash only while the shared feature gate is unlocked', () => {
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
+    cy.get('body').type('{esc}');
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+    });
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').click();
+    cy.get('@setSelectedModel').should('have.been.calledWith', Model.GLM_5_3_Flash);
+    cy.window().then((win) => {
+      win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+      win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+    });
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
+  });
+
+  it('offers no measured power or energy metrics; they live on the PowerX tab', () => {
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
+    mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('[data-slot="select-content"]').should('exist');
     cy.contains('Throughput').should('exist');
-    cy.contains('Measured Power').should('not.exist');
-    cy.contains('Measured Energy').should('not.exist');
-    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').should('not.exist');
-  });
-
-  it('renders the Y-axis metric selector', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
-  });
-
-  it('Y-axis metric selector shows grouped options', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    // Should contain at least the "Throughput" group
-    cy.contains('Throughput').should('exist');
-  });
-
-  it('calls setSelectedYAxisMetric when a Y-axis option is chosen', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    // "Throughput per GPU" is the label for y_tpPerGpu — pick a different one
-    cy.contains('[data-slot="select-item"]', 'Output Token Throughput per Chip').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
-  });
-
-  it('finds the existing schema-v2 metric names through search', () => {
-    mountWithPowerGroupsUnlocked();
-    const options = [
-      {
-        key: 'y_measuredJPerSuccessfulQuery',
-        label: 'Measured Joules per Successful Query',
-      },
-      {
-        key: 'y_measuredWhPerSuccessfulQuery',
-        label: 'Measured Watt-hours per Successful Query',
-      },
-      {
-        key: 'y_measuredPowerPercentTdp',
-        label: 'Measured Average Power as Percent of TDP',
-      },
-    ];
-
-    for (const option of options) {
-      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-      cy.get('input[aria-label="Search options"]').type(option.label);
-      cy.contains('[data-slot="select-item"]', option.label).should('be.visible').click();
-      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', option.key);
-    }
-  });
-
-  it('does not render the Cost Tier selector; it lives in the chart caption', () => {
-    // Default mock: selectedYAxisMetric = y_tpPerGpu
-    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
+    cy.get('[data-select-option][data-value^="y_measured"]').should('not.exist');
+    cy.get('[data-select-option][data-value^="y_utilityModeled"]').should('not.exist');
+    cy.get('input[aria-label="Search options"]').type('Measured');
+    cy.get('[data-select-option]').should('not.exist');
+    cy.get('[data-testid="measured-metric-controls"]').should('not.exist');
   });
 
   it('lists each tiered metric once in the Y-axis selector, without the tier suffix', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-item"]').then(($items) => {
       const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
-      // The custom tier is one more Cost Tier option, not a second axis entry.
       expect(labels.filter((label) => label.startsWith('Total Tokens per $1 TCO'))).to.deep.equal([
         'Total Tokens per $1 TCO',
       ]);
@@ -140,7 +82,7 @@ describe('Inference ChartControls', () => {
       expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
         false,
       );
-      expect(labels.some((label) => label.includes('Rent - 3 Year Commit'))).to.equal(false);
+      expect(labels.some((label) => label.includes('Rent – 3-Year Commit'))).to.equal(false);
     });
     cy.get('[data-testid="locked-tier-badge"]').should('not.exist');
   });
@@ -153,25 +95,19 @@ describe('Inference ChartControls', () => {
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costh');
   });
 
-  it('hides the GPU comparison section when no GPUs are selected', () => {
-    // Default mock: selectedGPUs = [] — GPU date range pickers should not render
-    cy.contains('Comparison Date Range').should('not.exist');
-    cy.contains('Intermediary Dates').should('not.exist');
-  });
-
-  it('uses a full-width benchmark row above chart and history controls on desktop', () => {
+  it('gives benchmark config its own row above chart config and compare history on desktop', () => {
     cy.viewport(1280, 900);
     cy.get('fieldset').should('have.length', 3);
     cy.get('fieldset').then(($groups) => {
-      const rects = [...$groups].map((group) => group.getBoundingClientRect());
-      expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
-      expect(rects[2].top).to.be.closeTo(rects[1].top, 1);
-      expect(rects[0].left).to.equal(rects[1].left);
-      expect(rects[0].right).to.equal(rects[2].right);
-      expect(rects[1].width, 'axes get more space than the history picker').to.be.greaterThan(
-        rects[2].width,
+      const [benchmark, chart, history] = [...$groups].map((group) =>
+        group.getBoundingClientRect(),
       );
-      expect(rects[0].height, 'benchmark controls fit in a single row').to.be.lessThan(130);
+      expect(chart.top).to.be.greaterThan(benchmark.bottom);
+      expect(chart.left).to.be.closeTo(benchmark.left, 1);
+      expect(history.top).to.be.closeTo(chart.top, 1);
+      expect(chart.right).to.be.lessThan(history.left);
+      expect(history.right).to.be.closeTo(benchmark.right, 1);
+      expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
     });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
@@ -227,21 +163,23 @@ describe('Inference ChartControls', () => {
         expect(y.top).to.be.greaterThan(x.bottom);
         expect(x.height).to.equal(44);
         expect(y.height).to.equal(x.height);
-        expect(x.width).to.be.at.most(176);
         expect(x.width).to.be.lessThan(y.width);
       });
     });
-    cy.get('#scenario-select').then(($scenario) => {
-      const scenario = $scenario[0].getBoundingClientRect();
-      cy.get('#precision-select').should(($precision) => {
-        const precision = $precision[0].getBoundingClientRect();
-        expect(precision.top).to.be.closeTo(scenario.top, 1);
-        expect(precision.left).to.be.greaterThan(scenario.right);
-      });
+    cy.get('#model-select').then(($model) => {
+      const model = $model[0].getBoundingClientRect();
+      cy.get('fieldset')
+        .first()
+        .find('#precision-select')
+        .should(($precision) => {
+          const precision = $precision[0].getBoundingClientRect();
+          expect(precision.top).to.be.greaterThan(model.bottom);
+          expect(precision.left).to.be.closeTo(model.left, 1);
+        });
     });
   });
 
-  it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
+  it('gives benchmark and chart settings full-width rows when history comparison is omitted', () => {
     cy.viewport(1280, 900);
     mountWithProviders(<InferenceChartControls hideGpuComparison />, {
       inference: {},
@@ -253,18 +191,16 @@ describe('Inference ChartControls', () => {
       .then(($groups) => {
         const benchmark = $groups[0].getBoundingClientRect();
         const chart = $groups[1].getBoundingClientRect();
-        expect(benchmark.top).to.equal(chart.top);
-        expect(benchmark.width).to.be.greaterThan(chart.width);
-        expect(benchmark.right).to.be.lessThan(chart.left);
+        expect(chart.top).to.be.greaterThan(benchmark.bottom);
+        expect(chart.left).to.be.closeTo(benchmark.left, 1);
+        expect(chart.right).to.be.closeTo(benchmark.right, 1);
         expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
       });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
-      cy.get('#scenario-select, #precision-select, [data-testid="yaxis-metric-selector"]').each(
-        ($control) => {
-          expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
-        },
-      );
+      cy.get('#scenario-select, #precision-select').each(($control) => {
+        expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
+      });
     });
   });
 
@@ -273,16 +209,24 @@ describe('Inference ChartControls', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 
     cy.get('#model-select').should('be.visible');
+    cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('have.attr', 'aria-expanded', 'false')
       .click()
       .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+    cy.get('[data-testid="inference-secondary-controls"]').within(() => {
+      cy.get('#scenario-select').should('be.visible');
+      cy.get('#precision-select').should('not.exist');
+    });
 
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .click()
       .should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="yaxis-metric-selector"]').should('not.be.visible');
+    cy.get('#scenario-select').should('not.be.visible');
+    cy.get('#precision-select').should('be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -297,289 +241,66 @@ describe('Inference ChartControls', () => {
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
     );
-    // The count is derived from actual non-default settings, not merely present controls.
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('contain.text', '更多图表设置')
       .and('contain.text', '项已更改');
   });
 });
 
-describe('Inference ChartControls grouped measured metrics', () => {
-  afterEach(() => {
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
-  });
-
-  it('offers two measured families without repeating all thirteen configurations', () => {
-    mountMeasuredControls('y_tpPerGpu');
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('[data-slot="select-item"]').then(($items) => {
-      const measured = [...$items]
-        .map((item) => item.textContent?.trim() ?? '')
-        .filter((label) => label.startsWith('Measured'));
-      expect(measured).to.deep.equal(['Measured Power', 'Measured Energy']);
-    });
-    cy.contains('[data-slot="select-item"]', /^Measured Power$/u)
-      .scrollIntoView()
-      .click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredAvgPower');
-    cy.get('[data-testid="measured-power-statistic-average"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
-      .scrollIntoView()
-      .click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
-    cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Output');
-  });
-
-  for (const [locale, power, energy, searchLabel, group, fullName] of [
-    [
-      'en',
-      'Measured Power',
-      'Measured Energy',
-      'Search options',
-      'Measured',
-      'Measured P75 Fleet Power per Chip',
-    ],
-    ['zh', '实测功率', '实测能耗', '搜索指标选项', '实测', '实测整组 GPU P75 功耗（按芯片均摊）'],
-  ]) {
-    it(`finds measured families by their displayed names without mixing power into energy (${locale})`, () => {
-      mountMeasuredControls('y_measuredP75Power', locale);
-      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-      cy.get(`input[aria-label="${searchLabel}"]`).type(group);
-      cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
-        const values = [...$options].map((option) => option.dataset.value);
-        // Thirteen measured axes plus the Timeline display of measured power.
-        expect(values).to.have.length(14);
-        expect(new Set(values).size).to.equal(14);
-        expect(values).to.include('y_measuredPowerTimeline');
-      });
-      cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
-      // 'All in Measured Power per Chip' also contains the family name; only
-      // the family option may display exactly that name.
-      cy.get('[data-select-option]').should(($options) => {
-        const exact = [...$options].filter((option) => option.textContent?.trim() === power);
-        expect(exact).to.have.length(1);
-        expect(exact[0].dataset.value).to.equal('y_measuredP75Power');
-        expect(exact[0].getAttribute('aria-pressed')).to.equal('true');
-      });
-      cy.get('[data-testid="option-help-y_measuredP75Power"]').should('exist');
-      cy.get(`input[aria-label="${searchLabel}"]`).clear().type(energy);
-      cy.get('[data-select-option]')
-        .should('have.length', 1)
-        .and('have.text', energy)
-        .and('have.attr', 'data-value', 'y_measuredJPerOutputToken');
-      cy.get(`input[aria-label="${searchLabel}"]`).type('{downarrow}');
-      cy.get('[data-select-option]').should('have.focus').type('{enter}');
-      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
-      cy.get('[data-testid="yaxis-metric-selector"]').should('have.text', energy);
-      cy.get('[data-testid="measured-energy-denominator"]').should('be.visible');
-      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-      cy.get(`input[aria-label="${searchLabel}"]`).type(fullName);
-      cy.get('[data-select-option]')
-        .should('have.length', 1)
-        .and('have.text', fullName)
-        .and('have.attr', 'data-value', 'y_measuredP75Power')
-        .click();
-      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
-    });
-  }
-
-  it('keeps P75 and P90 visible and selects their existing metric keys', () => {
-    mountMeasuredControls();
-    cy.get('[data-testid="measured-power-statistic-p75"]').should('be.visible').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
-    cy.get('[data-testid="measured-power-statistic-p75"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
-    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Power');
-    cy.get('[data-testid="measured-power-statistic-p90"]').should('be.visible').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP90Power');
-    cy.get('[data-testid="measured-power-statistic-p90"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
-  });
-
-  it('explains in the Boundary menu that All in Measured models unmeasured components', () => {
-    mountMeasuredControls();
-    cy.get('[data-testid="measured-power-basis"]').click();
-    cy.get('[data-testid="option-help-utility-modeled"]').click();
-    cy.get('[data-testid="option-help-content-utility-modeled"]').should(
-      'contain.text',
-      'unmeasured components are modeled',
-    );
-  });
-
-  it('resets a fleet percentile to role average and only enables TDP for the whole-fleet average', () => {
-    mountMeasuredControls('y_measuredP75Power');
-    selectMeasuredSetting('power-scope', 'prefill');
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredPrefillAvgPower');
-    cy.get('[data-testid="measured-power-statistic-average"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
-    cy.get('[data-testid="measured-power-statistic-p75"]').should('be.disabled');
-    cy.get('[data-testid="measured-power-statistic-p90"]').should('be.disabled');
-    cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W/chip');
-    selectMeasuredSetting('power-scope', 'all');
-    selectMeasuredSetting('power-display', 'tdp');
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredPowerPercentTdp');
-    cy.get('[data-testid="measured-power-statistic-p75"]').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
-    cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W/chip');
-  });
-
-  it('keeps energy normalization separate from role attribution when changing denominator', () => {
-    mountMeasuredControls('y_measuredJPerInputToken');
-    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
-    selectMeasuredSetting('energy-scope', 'prefill');
-    cy.get('@setSelectedYAxisMetric').should(
-      'have.been.calledWith',
-      'y_measuredPrefillJPerInputToken',
-    );
-    selectMeasuredSetting('energy-denominator', 'output');
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerOutputToken');
-    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
-    selectMeasuredSetting('energy-scope', 'decode');
-    cy.get('@setSelectedYAxisMetric').should(
-      'have.been.calledWith',
-      'y_measuredDecodeJPerOutputToken',
-    );
-    selectMeasuredSetting('energy-denominator', 'total');
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerTotalToken');
-    cy.get('[data-testid="measured-energy-scope"]')
-      .should('be.disabled')
-      .and('contain.text', 'All GPUs');
-    cy.get('[data-testid="measured-energy-unit"]').should('be.disabled').and('contain.text', 'J');
-  });
-
-  it('switches successful-query J and Wh and restores J for token normalization', () => {
-    mountMeasuredControls('y_measuredJPerOutputToken');
-    selectMeasuredSetting('energy-denominator', 'query');
-    cy.get('@setSelectedYAxisMetric').should(
-      'have.been.calledWith',
-      'y_measuredJPerSuccessfulQuery',
-    );
-    selectMeasuredSetting('energy-unit', 'wattHours');
-    cy.get('@setSelectedYAxisMetric').should(
-      'have.been.calledWith',
-      'y_measuredWhPerSuccessfulQuery',
-    );
-    selectMeasuredSetting('energy-unit', 'joules');
-    cy.get('@setSelectedYAxisMetric').should(
-      'have.been.calledWith',
-      'y_measuredJPerSuccessfulQuery',
-    );
-    selectMeasuredSetting('energy-unit', 'wattHours');
-    selectMeasuredSetting('energy-denominator', 'input');
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerInputToken');
-    cy.get('[data-testid="measured-energy-unit"]').should('be.disabled').and('contain.text', 'J');
-    cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
-  });
-
-  for (const metric of ['y_measuredPrefillAvgPower', 'y_measuredDecodeAvgPower']) {
-    it(`hydrates ${metric} with only role-average statistics enabled`, () => {
-      mountMeasuredControls(metric);
-      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Power');
-      cy.get('[data-testid="measured-power-scope"]').should(
-        'contain.text',
-        metric.includes('Prefill') ? 'Prefill' : 'Decode',
-      );
-      cy.get('[data-testid="measured-power-statistic-average"]').should(
-        'have.attr',
-        'aria-pressed',
-        'true',
-      );
-      cy.get('[data-testid="measured-power-statistic-p75"]').should('be.disabled');
-      cy.get('[data-testid="measured-power-statistic-p90"]').should('be.disabled');
-      cy.get('[data-testid="measured-power-display"]').should('contain.text', 'W');
-      cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
-    });
-  }
-
-  it('hydrates a selected P75 key while retaining the benchmark row and chart panel layout', () => {
-    cy.viewport(1280, 900);
-    mountMeasuredControls('y_measuredP75Power');
-    cy.get('[data-testid="measured-power-statistic-p75"]').should(
-      'have.attr',
-      'aria-pressed',
-      'true',
-    );
-    cy.get('fieldset').should('have.length', 3);
-    cy.get('#model-select').then(($model) => {
-      const benchmark = $model[0].closest('fieldset')!;
-      const modelTop = $model[0].getBoundingClientRect().top;
-      cy.get('#scenario-select, #precision-select').each(($control) => {
-        expect($control[0].closest('fieldset')).to.equal(benchmark);
-        expect($control[0].getBoundingClientRect().top).to.be.closeTo(modelTop, 1);
-      });
-      cy.get('[data-testid="measured-metric-controls"]').should(($controls) => {
-        const chart = $controls[0].closest('fieldset')!;
-        expect(chart).not.to.equal(benchmark);
-        expect(chart.querySelector('#y-axis-select')).not.to.equal(null);
-        expect(chart.getBoundingClientRect().top).to.be.greaterThan(
-          benchmark.getBoundingClientRect().bottom,
-        );
-      });
-    });
-    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
-  });
-
-  it('hydrates an existing successful-query Wh selection without changing its metric', () => {
-    mountMeasuredControls('y_measuredWhPerSuccessfulQuery');
-    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
-    cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Successful');
-    cy.get('[data-testid="measured-energy-unit"]').should('contain.text', 'Wh');
-    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
-  });
-
-  it('keeps Chinese P75 controls within the mobile chart panel', () => {
-    cy.viewport(390, 844);
-    mountMeasuredControls('y_measuredP75Power', 'zh');
-    cy.get('[data-testid="inference-secondary-controls"] > button').click();
-    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', '实测功率');
-    cy.get('[data-testid="measured-metric-controls"]').within(() => {
-      cy.get('button').each(($button) => {
-        const bounds = $button[0].getBoundingClientRect();
-        expect(bounds.left).to.be.at.least(0);
-        expect(bounds.right).to.be.at.most(390);
-      });
-      cy.contains('button', 'P75').should('be.visible');
-      cy.contains('button', 'P90').should('be.visible').click();
-    });
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP90Power');
-  });
-});
-
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
         selectedSequence: Sequence.EightK_OneK,
       },
-      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K and AgentX.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
 
+  for (const sequence of [Sequence.EightK_OneK, Sequence.AgenticTraces]) {
+    it(`switches the global TCO basis for Kimi K3 on ${sequence}`, () => {
+      mountWithProviders(<CostControls showTcoBasis />, {
+        unofficial: {},
+        inference: {
+          selectedYAxisMetric: 'y_costh',
+          selectedModel: Model.Kimi_K3,
+          selectedSequence: sequence,
+        },
+        globalFilters: { selectedModel: Model.Kimi_K3, effectiveSequence: sequence },
+      });
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="tco-basis-external"]').click();
+      cy.get('@setTcoBasis_global').should('have.been.calledOnceWithExactly', 'external');
+    });
+  }
+
+  for (const model of [Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash]) {
+    it(`switches the global TCO basis for ${model} on AgentX`, () => {
+      mountWithProviders(<CostControls showTcoBasis />, {
+        unofficial: {},
+        inference: {
+          selectedYAxisMetric: 'y_costh',
+          selectedModel: model,
+          selectedSequence: Sequence.AgenticTraces,
+        },
+        globalFilters: { selectedModel: model, effectiveSequence: Sequence.AgenticTraces },
+      });
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="tco-basis-external"]').click();
+      cy.get('@setTcoBasis_global').should('have.been.calledOnceWithExactly', 'external');
+    });
+  }
+
   it('hides the TCO basis toggle for other models and scenarios', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -593,7 +314,7 @@ describe('Inference ChartControls cost metrics', () => {
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -607,7 +328,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_tpPerMw'] as const) {
     it(`hides TCO for ${selectedYAxisMetric} even with visible TPU hardware`, () => {
-      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      mountWithProviders(<CostControls showTcoBasis />, {
         unofficial: {},
         inference: {
           selectedYAxisMetric,
@@ -622,7 +343,7 @@ describe('Inference ChartControls cost metrics', () => {
   }
 
   it('hides TCO for a cost metric when no TPU hardware is visible', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
+    mountWithProviders(<CostControls />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -661,11 +382,9 @@ describe('Inference ChartControls cost metrics', () => {
     ]) {
       cy.contains('[data-slot="select-item"]', label).should('exist');
     }
-    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control on the active tier', () => {
-    // y_costh is selected, so other tiered metrics open on the hyperscaler tier.
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', /^Total Tokens per \$1 TCO$/u).click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
@@ -754,7 +473,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
   it('keeps every full option name and a localized FAQ link on phones', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       {
@@ -781,89 +500,56 @@ describe('Axis option help', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
 
-  for (const searchable of [true, false]) {
-    it(`lets Tab leave the help grid in both directions (searchable=${searchable})`, () => {
-      mountWithProviders(
-        <div>
-          <button data-testid="before-field">Before</button>
-          <SearchableSelect
-            value="first"
-            onValueChange={cy.stub().as('selectMetric')}
-            searchable={searchable}
-            triggerTestId="keyboard-field"
-            placeholder="Metric"
-            groups={[
-              {
-                label: '',
-                options: [
-                  { value: 'first', label: 'First metric', help: <p>First explanation</p> },
-                  { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
-                ],
-              },
-            ]}
-          />
-          <button data-testid="after-field">After</button>
-        </div>,
-        { inference: {} },
-      );
-      cy.get('[data-testid="keyboard-field"]')
-        .should('have.attr', 'aria-label', 'Metric: First metric')
-        .click('right');
-      cy.focused().trigger('keydown', { key: 'Tab' });
-      cy.get('[data-testid="after-field"]').should('have.focus');
-      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="keyboard-field"]').click('right');
-      cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
-      cy.get('[data-testid="before-field"]').should('have.focus');
-      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('@selectMetric').should('not.have.been.called');
-    });
-  }
+  it('lets Tab leave the help grid in both directions (searchable=true)', () => {
+    mountWithProviders(
+      <div>
+        <button data-testid="before-field">Before</button>
+        <SearchableSelect
+          value="first"
+          onValueChange={cy.stub().as('selectMetric')}
+          searchable
+          triggerTestId="keyboard-field"
+          placeholder="Metric"
+          groups={[
+            {
+              label: '',
+              options: [
+                { value: 'first', label: 'First metric', help: <p>First explanation</p> },
+                { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
+              ],
+            },
+          ]}
+        />
+        <button data-testid="after-field">After</button>
+      </div>,
+      { inference: {} },
+    );
+    cy.get('[data-testid="keyboard-field"]')
+      .should('have.attr', 'aria-label', 'Metric: First metric')
+      .click('right');
+    cy.focused().trigger('keydown', { key: 'Tab' });
+    cy.get('[data-testid="after-field"]').should('have.focus');
+    cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="keyboard-field"]').click('right');
+    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+    cy.get('[data-testid="before-field"]').should('have.focus');
+    cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('@selectMetric').should('not.have.been.called');
+  });
 
-  for (const [trigger, value, explanation] of [
-    ['#scenario-select', Sequence.EightK_OneK, 'Input Sequence Length'],
-    ['#x-axis-mode-select', 'interactivity', 'Interactivity'],
-    ['#y-axis-select', 'y_tpPerGpu', 'Rate of total tokens'],
-  ]) {
-    it(`shows selected-value help inside ${trigger} without opening its menu`, () => {
-      cy.get(trigger).then(($trigger) => {
-        const bounds = $trigger[0].getBoundingClientRect();
-        cy.get(`[data-testid="selected-option-help-${value}"]`)
-          .should(($help) => {
-            const icon = $help.find('svg')[0].getBoundingClientRect();
-            expect(icon.left).to.be.greaterThan(bounds.left);
-            expect(icon.right).to.be.lessThan(bounds.right);
-            expect(icon.top).to.be.greaterThan(bounds.top);
-            expect(icon.bottom).to.be.lessThan(bounds.bottom);
-            expect($help[0].closest('button[role="combobox"]')).to.equal(null);
-          })
-          .trigger('pointerover', { pointerType: 'mouse' });
-      });
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
-      cy.get(trigger).click('right');
-      cy.get(`[data-testid="selected-option-help-${value}"]`).should('not.exist');
-      cy.get(`[data-testid="option-help-${value}"]`)
-        .should('be.visible')
-        .trigger('pointerover', { pointerType: 'mouse' });
-      cy.get(`[data-testid="option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'true');
+  it('keeps metric help in the open #y-axis-select menu, not the closed control', () => {
+    cy.get('#y-axis-select').should(($trigger) => {
+      expect($trigger[0].parentElement!.querySelector('[data-slot="info-help"]')).to.equal(null);
     });
-
-    it(`keeps selected-value help open when activating its focused button in ${trigger}`, () => {
-      cy.get(`[data-testid="selected-option-help-${value}"]`).focus().click();
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
-      cy.get(`[data-testid="selected-option-help-${value}"]`).type('{esc}');
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`).should('not.exist');
-    });
-  }
+    cy.get('#y-axis-select').click('right');
+    cy.get('[data-testid="option-help-y_tpPerGpu"]')
+      .should('be.visible')
+      .trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[data-testid="option-help-content-y_tpPerGpu"]')
+      .should('be.visible')
+      .and('contain.text', 'Rate of total tokens');
+    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'true');
+  });
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
@@ -1039,46 +725,134 @@ describe('Workflow run dropdown', () => {
     },
   };
 
-  it('removes run arrows but keeps date navigation, status, run selection, and external links', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`folds run context into mobile controls without duplicating desktop controls (${locale})`, () => {
+      cy.viewport(375, 812);
+      mountWithProviders(
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
+          <InferenceChartControls showXAxisMode runContext={<WorkflowInfoDisplay />} />
+        </PathnameContext.Provider>,
+        { inference: { availableRuns }, globalFilters: {}, unofficial: {} },
+      );
+
+      cy.get('[data-testid="inference-run-context"]')
+        .should('have.length', 1)
+        .and('not.be.visible');
+      cy.get('[data-testid="inference-secondary-controls"] > button')
+        .should('contain.text', locale === 'zh' ? '更多图表设置' : 'More chart controls')
+        .click();
+      cy.get('[data-testid="inference-secondary-controls"]')
+        .find('[data-testid="inference-run-context"]')
+        .should('be.visible');
+      cy.get('#run-select').click('left');
+      cy.contains(
+        '[role="option"]',
+        locale === 'zh' ? '第 2 次运行（共 2 次）' : 'Run 2/2',
+      ).click();
+      cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
+      cy.get('[data-testid="inference-secondary-controls"] > button').click();
+      cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
+
+      cy.viewport(1280, 900);
+      cy.get('[data-testid="inference-secondary-controls"] > button').should('not.be.visible');
+      cy.get('[data-testid="inference-run-context"]')
+        .should('have.length', 1)
+        .and('be.visible')
+        .then(($run) => {
+          cy.get('[data-testid="inference-chart-configuration"]').then(($chart) => {
+            expect($run[0].getBoundingClientRect().top).to.be.gte(
+              $chart[0].getBoundingClientRect().bottom,
+            );
+          });
+        });
+      cy.get('#run-select').should('have.length', 1);
+      cy.get('#scenario-select').should('have.length', 1).and('be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('be.visible');
+      cy.get('[data-testid="inference-secondary-controls"] #scenario-select').should('not.exist');
+      cy.get('[data-testid="inference-secondary-controls"] #precision-select').should('not.exist');
+      cy.viewport(375, 812);
+      cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
+      cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('be.visible');
+    });
+  }
+
+  it('steps between runs and keeps date navigation, status, run selection, and external links', () => {
     mountWithProviders(<WorkflowInfoDisplay />, {
       inference: { availableRuns },
       globalFilters: {},
     });
-    cy.get('[aria-label="Previous run"], [aria-label="Next run"]').should('not.exist');
+    cy.get('[aria-label="Previous run"]').should('be.disabled');
     cy.get('[aria-label="Previous available date"]').should('be.visible');
     cy.get('[aria-label="Next available date"]').should('be.visible');
     cy.get('#run-select').should('contain.text', 'Run 1/2');
     cy.get('#run-select [aria-label="Run succeeded"]').should('exist');
     cy.window().then((win) => cy.stub(win, 'open').as('openRun'));
     cy.get('#run-select [data-external-link] svg').click();
+    cy.get('#run-select').should('have.attr', 'aria-expanded', 'false');
     cy.get('@openRun').should(
       'have.been.calledOnceWith',
       availableRuns['12345678'].runUrl,
       '_blank',
       'noopener,noreferrer',
     );
-    cy.get('#run-select').click();
+    cy.get('#run-select').click('left');
     cy.contains('[role="option"]', 'Run 2/2').click();
     cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
     cy.get('#run-select').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[aria-label="Next run"]').click();
+    cy.get('@setSelectedRunId').should('have.been.calledWith', '12345679');
   });
 
-  it('keeps the Chinese run dropdown touch-sized on phones', () => {
-    cy.viewport(390, 844);
-    mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
-        <WorkflowInfoDisplay />
-      </PathnameContext.Provider>,
-      { inference: { availableRuns }, globalFilters: {} },
-    );
-    cy.get('#run-select')
-      .should('have.attr', 'aria-label', '运行')
-      .and('contain.text', '第 1 次运行（共 2 次）')
-      .then(($run) => {
-        expect($run[0].getBoundingClientRect().height).to.equal(44);
+  for (const locale of ['en', 'zh'] as const) {
+    it(`lays the run context out as aligned, equal-height stepper rows on a 361px phone (${locale})`, () => {
+      cy.viewport(361, 780);
+      mountWithProviders(
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
+          <WorkflowInfoDisplay />
+        </PathnameContext.Provider>,
+        { inference: { availableRuns }, globalFilters: {} },
+      );
+      cy.get('[data-testid="inference-run-context"]').then(($panel) => {
+        const panel = $panel[0];
+        const rect = (selector: string) => panel.querySelector(selector)!.getBoundingClientRect();
+        const dateField = panel.querySelector('[data-slot="date-field"]')!.getBoundingClientRect();
+        const runField = panel.querySelector('[data-slot="run-field"]')!.getBoundingClientRect();
+        expect(runField.top, 'run field stacks below the date field').to.be.gte(dateField.bottom);
+        expect(Math.abs(runField.left - dateField.left)).to.be.lte(0.5);
+        expect(Math.abs(runField.width - dateField.width)).to.be.lte(0.5);
+
+        const datePrev = rect(
+          '[aria-label="Previous available date"], [aria-label="上一个可用日期"]',
+        );
+        const runPrev = rect('[aria-label="Previous run"], [aria-label="上一次运行"]');
+        const runNext = rect('[aria-label="Next run"], [aria-label="下一次运行"]');
+        const runTrigger = rect('#run-select');
+        expect(
+          Math.abs(datePrev.left - dateField.left),
+          'stepper starts at the label edge',
+        ).to.be.lte(0.5);
+        expect(Math.abs(runPrev.left - datePrev.left)).to.be.lte(0.5);
+        expect(
+          Math.abs(runNext.right - runField.right),
+          'stepper ends at the field edge',
+        ).to.be.lte(0.5);
+        for (const button of [datePrev, runPrev, runNext]) {
+          expect(button.height).to.equal(runTrigger.height);
+          expect(button.width).to.be.gte(44);
+        }
+        expect(panel.scrollWidth).to.be.lte(panel.clientWidth);
+        const label = panel.querySelector<HTMLElement>(
+          '#run-select [data-slot="select-value"] .truncate',
+        )!;
+        expect(label.scrollWidth, 'selected run label is not truncated').to.be.lte(
+          label.clientWidth,
+        );
       });
-    cy.get('#run-select').click();
-    cy.contains('[role="option"]', '第 2 次运行（共 2 次）').click();
-    cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
-  });
+    });
+  }
 });

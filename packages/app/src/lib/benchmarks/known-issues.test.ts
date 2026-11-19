@@ -43,8 +43,6 @@ describe('runIdFromRunUrl', () => {
   });
 });
 
-// pointMatchesIssue holds the real matching logic; matchKnownConfigIssues just
-// wraps it in a model filter + dedup, so the behavior matrix lives here.
 describe('pointMatchesIssue', () => {
   it('matches each affected run of a run-scoped issue and nothing else', () => {
     for (const run_url of [GB300_AFFECTED_URL, GB300_AFFECTED_URL_FEB5]) {

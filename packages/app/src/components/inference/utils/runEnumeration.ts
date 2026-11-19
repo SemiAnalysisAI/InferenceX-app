@@ -1,47 +1,21 @@
-/**
- * Enumerates the workflow runs that produced benchmark data for the currently
- * selected model / GPU / precision on a given date. This is the single source of
- * truth for "how many runs are on this date" used by both the changelog (to render
- * a block per run) and the chart (to expand a plain-date selection into per-run
- * series).
- *
- * It is intentionally DATA-driven (keyed off `runConfigs`, which comes from the
- * benchmark rows) rather than changelog-driven: a run can ship data without a
- * changelog entry, and that newest run is exactly the one the plain-date "latest"
- * view shows — so enumerating from changelog entries alone would silently drop it.
- *
- * Runs are scoped to the selected GPUs using the canonical {@link getHardwareKey}.
- * Fixed-sequence MTP variants stay distinct; agentic MTP and non-MTP points map
- * to the same series, exactly as the chart keys them.
- */
-
 import type { AggDataEntry } from '@/components/inference/types';
 import type { RunConfigRow } from '@/lib/api/api';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
 
 export interface DataRun {
-  /** GitHub run id (string). */
   runId: string;
-  /** ISO-8601 start time (or created_at fallback); orders runs chronologically. */
   runStartedAt: string;
-  /** Workflow run URL, when known. */
   runUrl?: string;
-  /** Head commit sha, for the Git Commit link. */
   headSha?: string;
 }
 
 export interface RunScope {
-  /** DB model keys for the selected display model, e.g. ['minimaxm3']. */
   modelDbKeys: string[];
-  /** Selected GPU hw keys, e.g. ['mi300x_vllm']. */
   selectedGPUs: string[];
-  /** Selected DB precisions, e.g. ['fp8']. */
   selectedPrecisions: string[];
-  /** Scenario currently rendered by the chart. */
   benchmarkType: 'single_turn' | 'agentic_traces';
 }
 
-/** The hw key a runConfig maps to, built the same way the chart builds series keys. */
 function runConfigHwKey(rc: RunConfigRow, benchmarkType: 'single_turn' | 'agentic_traces'): string {
   return getHardwareKey({
     hw: rc.hardware,
@@ -52,11 +26,6 @@ function runConfigHwKey(rc: RunConfigRow, benchmarkType: 'single_turn' | 'agenti
   } as unknown as AggDataEntry);
 }
 
-/**
- * Distinct runs that produced data for the selected config on a date, earliest
- * first. De-duplicated by run id; ordered by start time so the #1/#2/#3 the UI
- * assigns read in the order the runs actually happened.
- */
 export function dataRunsForDate(runConfigs: RunConfigRow[], scope: RunScope): DataRun[] {
   const { modelDbKeys, selectedGPUs, selectedPrecisions, benchmarkType } = scope;
   const precSet = new Set(selectedPrecisions);

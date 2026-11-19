@@ -29,7 +29,6 @@ function assertAllMetricStats(samples: GpuMetricSample[], rows: GpuMetricRow[]) 
     for (const [index, row] of actual.entries()) {
       expect(row.gpuIndex).toBe(expected[index].gpuIndex);
       expect(row.count).toBe(expected[index].count);
-      // ETL sums sorted samples while the live reader sums recording order.
       for (const field of ['min', 'max', 'mean', 'median', 'p95', 'p99', 'stddev'] as const) {
         expect(row[field], `${key}.${field}`).toBeCloseTo(expected[index][field], 10);
       }
@@ -48,7 +47,6 @@ describe('storedGpuStatsForMetric', () => {
     const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-stats-dst-'));
     const originalTimezone = process.env.TZ;
     try {
-      // 02:30 does not exist here, so a local-time parse lands it on the next row's 03:30.
       process.env.TZ = 'America/Los_Angeles';
       fs.writeFileSync(path.join(artifactDir, 'gpu_metrics.csv'), csv);
       const [prepared] = prepareGpuMetricsArtifact({
@@ -60,7 +58,6 @@ describe('storedGpuStatsForMetric', () => {
         '2026-03-08T03:30:00.000Z',
       ]);
       const live = parseCsvData(csv);
-      // Raw stamps stay unzoned; the live route applies the collector's context offset.
       expect(live.map((row) => row.timestamp)).toEqual([
         '2026/03/08 02:30:00.000',
         '2026/03/08 03:30:00.000',
@@ -82,7 +79,6 @@ describe('storedGpuStatsForMetric', () => {
       '2026/09/21 00:00:00, 0, 0 W, N/A, 120 MHz, 3996 MHz, 0 %, 0 %',
       '2026/09/21 00:00:01, 0, 912.1 W, 61, 1965 MHz, 3996 MHz, 98 %, 74 %',
       '2026/09/21 00:00:02, 0, 187.8 W, 35, 120 MHz, 3996 MHz, 0 %, 0 %',
-      // Conflicting stop-time flush must not change the first reading.
       '2026/09/21 00:00:02, 0, 999 W, 90, 120 MHz, 3996 MHz, 0 %, 0 %',
     ].join('\n');
     const samples = parseGpuMetricsCsv(csv)!.samples.slice(0, 3);

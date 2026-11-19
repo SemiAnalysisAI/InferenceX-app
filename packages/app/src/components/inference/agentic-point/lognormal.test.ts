@@ -14,7 +14,6 @@ describe('logHistogram', () => {
     expect(histogram).not.toBeNull();
     expect(histogram!.counts.reduce((a, b) => a + b, 0)).toBe(4);
     expect(histogram!.edges).toHaveLength(4);
-    // Equal ratios between edges is what "equal width in log space" means.
     const ratios = histogram!.edges.slice(1).map((edge, i) => edge / histogram!.edges[i]!);
     for (const ratio of ratios) expect(ratio).toBeCloseTo(10, 6);
   });
@@ -66,7 +65,6 @@ describe('logTicks', () => {
   });
 
   it('drops a decade that would print on top of an endpoint label', () => {
-    // 95 sits just below 100; both labels would collide at the axis origin.
     const ticks = logTicks(95, 100_000);
     expect(ticks[0]).toBe(95);
     expect(ticks).not.toContain(100);
@@ -74,7 +72,6 @@ describe('logTicks', () => {
   });
 
   it('always ends at the data maximum, even when the last decade crowds it', () => {
-    // 10,200 is a hair above 10,000: the decade must yield, not the endpoint.
     const ticks = logTicks(10, 10_200);
     expect(ticks.at(-1)).toBe(10_200);
     expect(ticks).not.toContain(10_000);

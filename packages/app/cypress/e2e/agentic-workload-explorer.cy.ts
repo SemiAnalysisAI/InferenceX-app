@@ -1,9 +1,5 @@
-// The Agentic Workload Explorer reads a separate ProxyTrace snapshot database
-// that is not available in CI, so its page-owned API is stubbed with small
-// responses captured from the snapshot (cypress/fixtures/agentic-workload-explorer).
 const API = '/api/v1/agentic-workload-explorer';
 
-// Synthetic daily rollup: deterministic coverage without the private snapshot DB.
 function stubTrends() {
   const days = ['2026-09-23', '2026-09-24', '2026-09-25'];
   cy.intercept('GET', `${API}/trends?*`, {
@@ -58,12 +54,12 @@ describe('Agentic Workload Explorer', () => {
   beforeEach(stubExplorerApi);
 
   it('renders the overview inside the dashboard shell and navigates to sessions', () => {
-    cy.visit('/agentic-workload-explorer');
+    cy.visit('/infx/agentic-workload-explorer');
     cy.wait('@overview');
-    cy.get('[data-testid="agentic-workload-explorer"]')
-      .should('contain.text', 'Agentic Workload Explorer')
-      .and('contain.text', 'Frozen snapshot');
-    // The explorer has its own section nav, so the dashboard tab strip is hidden.
+    cy.get('[data-testid="agentic-workload-explorer"]').should(
+      'contain.text',
+      'Agentic Workload Explorer',
+    );
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
     cy.get('nav[aria-label="Agentic Workload Explorer sections"]')
@@ -73,22 +69,27 @@ describe('Agentic Workload Explorer', () => {
     cy.get('nav[aria-label="Agentic Workload Explorer sections"]')
       .contains('a', 'Sessions')
       .click();
-    cy.location('pathname').should('eq', '/agentic-workload-explorer/sessions');
+    cy.location('pathname').should('eq', '/infx/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
-    cy.get('a[href^="/agentic-workload-explorer/sessions/"]').should('have.length.at.least', 1);
+    cy.get('a[href^="/infx/agentic-workload-explorer/sessions/"]').should(
+      'have.length.at.least',
+      1,
+    );
 
-    cy.visit('/zh/agentic-workload-explorer/sessions');
+    cy.visit('/zh/infx/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
-    cy.get('[data-testid="agentic-workload-explorer"]').should('contain.text', '冻结快照');
     cy.get('nav[aria-label="Agentic Workload Explorer 分区"]')
       .contains('a', '会话')
       .should('have.attr', 'aria-current', 'page');
-    cy.get('a[href^="/zh/agentic-workload-explorer/sessions/"]').should('have.length.at.least', 1);
+    cy.get('a[href^="/zh/infx/agentic-workload-explorer/sessions/"]').should(
+      'have.length.at.least',
+      1,
+    );
   });
 
   it('renders shared D3 layers and supports shared zoom, reset and expansion', () => {
     stubTrends();
-    cy.visit('/agentic-workload-explorer/trends');
+    cy.visit('/infx/agentic-workload-explorer/trends');
     cy.wait('@trends');
     cy.get('[data-testid="d3-chart-svg"]').should('have.length', 6);
     cy.get('.stacked-segment').should('have.length', 6);
@@ -126,7 +127,7 @@ describe('Agentic Workload Explorer', () => {
   it('keeps the shared version selector keyboard-accessible on Chinese mobile pages', () => {
     stubTrends();
     cy.viewport(375, 900);
-    cy.visit('/zh/agentic-workload-explorer/trends');
+    cy.visit('/zh/infx/agentic-workload-explorer/trends');
     cy.wait('@trends');
     cy.get('[role="combobox"]').first().focus().type('{enter}');
     cy.get('[role="option"]').should('have.length.at.least', 2);

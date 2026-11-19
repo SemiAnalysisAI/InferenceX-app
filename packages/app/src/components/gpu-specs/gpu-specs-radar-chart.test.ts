@@ -62,7 +62,6 @@ describe('normalizeGpuData', () => {
   it('the GPU with the highest value in a metric gets 1.0', () => {
     const result = normalizeGpuData(GPU_SPECS, RADAR_METRICS);
 
-    // For each metric, at least one GPU should have a normalized value of 1.0
     for (let i = 0; i < RADAR_METRICS.length; i++) {
       const nonNullValues = result.map((r) => r.values[i]).filter((v): v is number => v !== null);
       if (nonNullValues.length > 0) {
@@ -102,18 +101,15 @@ describe('normalizeGpuData', () => {
   });
 
   it('handles single GPU input correctly', () => {
-    const singleGpu = [GPU_SPECS[0]]; // H100 SXM
+    const singleGpu = [GPU_SPECS[0]];
     const result = normalizeGpuData(singleGpu, RADAR_METRICS);
     expect(result).toHaveLength(1);
-    // With single GPU, non-null values normalize to value/max(value, 1)
-    // Values >= 1 normalize to 1.0, values < 1 stay as-is (due to floor of 1)
     for (const val of result[0].values) {
       if (val !== null) {
         expect(val).toBeGreaterThan(0);
         expect(val).toBeLessThanOrEqual(1);
       }
     }
-    // FP8 for H100 is 1979, which is >> 1, so should normalize to 1.0
     const fp8Idx = RADAR_METRICS.findIndex((m) => m.key === 'fp8');
     expect(result[0].values[fp8Idx]).toBeCloseTo(1, 5);
   });
@@ -129,18 +125,15 @@ describe('normalizeGpuData', () => {
 
     const result = normalizeGpuData(GPU_SPECS, RADAR_METRICS);
 
-    // H100 has 80 GB, which should be the smallest memory value
     const h100 = result.find((r) => r.gpu.name === 'H100 SXM');
     expect(h100).toBeDefined();
     expect(h100!.values[memIdx]).toBeGreaterThan(0);
     expect(h100!.values[memIdx]).toBeLessThan(1);
 
-    // MI355X's 288 GB is the fleet max, so it normalizes to 1.0
     const mi355x = result.find((r) => r.gpu.name === 'MI355X');
     expect(mi355x).toBeDefined();
     expect(mi355x!.values[memIdx]).toBeCloseTo(1, 5);
 
-    // GB300 NVL72 carries 278 GB usable (288 physical)
     const gb300 = result.find((r) => r.gpu.name === 'GB300 NVL72');
     expect(gb300).toBeDefined();
     expect(gb300!.values[memIdx]).toBeCloseTo(278 / 288, 5);
@@ -152,15 +145,12 @@ describe('normalizeGpuData', () => {
 
     const result = normalizeGpuData(GPU_SPECS, RADAR_METRICS);
 
-    // MI355X has fp8=5033 which is the actual max
     const mi355x = result.find((r) => r.gpu.name === 'MI355X');
     const h100 = result.find((r) => r.gpu.name === 'H100 SXM');
     expect(mi355x).toBeDefined();
     expect(h100).toBeDefined();
 
-    // MI355X should be at 1.0 (the max)
     expect(mi355x!.values[fp8Idx]).toBeCloseTo(1, 5);
-    // H100 should be proportionally lower: 1979/5033 ≈ 0.393
     expect(h100!.values[fp8Idx]!).toBeLessThan(0.5);
     expect(h100!.values[fp8Idx]!).toBeGreaterThan(0.3);
   });

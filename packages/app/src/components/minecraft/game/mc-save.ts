@@ -65,7 +65,6 @@ export interface SaveData extends SavedDimension {
   player: Record<string, number | boolean | string>;
   inventory: (Stack | null)[];
   selected: number;
-  /** Chunk key → base64 of [uint16 index, uint8 id, uint8 meta] records. */
   edits: Record<string, string>;
   furnaces: Record<string, Furnace>;
   chests: Record<string, (Stack | null)[]>;
@@ -206,8 +205,6 @@ export function serialize(game: Game, meta: WorldMeta): SaveData {
   const dimensions: Partial<Record<Dimension, SavedDimension>> = {};
   for (const [dimension, state] of game.dimensions)
     if (dimension !== game.dimension) dimensions[dimension] = serializeDimension(state);
-  // Fold any open crafting grid and the cursor into the saved inventory, as closing
-  // the screen would; whatever does not fit is saved as dropped items below.
   const inventory = game.inventory.map((s) => (s ? { ...s } : null));
   for (const s of [...game.craftGrid, game.cursor]) {
     if (!s) continue;
@@ -279,9 +276,7 @@ function restoreDimension(game: Game, data: SavedDimension) {
   for (const [key, text] of Object.entries(data.edits ?? {})) {
     try {
       edits.set(Number(key), decodeEdits(text));
-    } catch {
-      /* skip corrupt chunk */
-    }
+    } catch {}
   }
   game.world.loadEdits(edits);
   for (const [key, f] of Object.entries(data.furnaces ?? {}))
@@ -366,9 +361,7 @@ export function deleteWorld(id: string) {
   try {
     localStorage.removeItem(WORLD_PREFIX + id);
     writeList(listWorlds().filter((w) => w.id !== id));
-  } catch {
-    /* storage unavailable */
-  }
+  } catch {}
 }
 
 export function newWorldMeta(

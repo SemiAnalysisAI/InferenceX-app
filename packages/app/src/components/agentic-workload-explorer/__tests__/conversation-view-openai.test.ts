@@ -12,7 +12,6 @@ function openaiResponsesRequest(overrides: Partial<Req> = {}): Req {
     timestamp: '2026-04-24T00:00:00Z',
     model: 'gpt-5.4',
     requestBody: {
-      // OpenAI Responses API uses `input[]`, not Anthropic's `messages[]`
       input: [
         {
           type: 'message',
@@ -218,8 +217,6 @@ describe('buildConversationTree — OpenAI Responses normalization', () => {
     const assistant = nodes.find((n) => n.type === 'assistant');
     expect(assistant).toBeDefined();
     expect(assistant!.content).toBe('[content stripped]');
-    // Stats land on the only emitted assistant node so the row's cost/timing
-    // line is rendered (see MessageRow's `inputTokens === null` early return).
     expect(assistant!.inputTokens).toBe(30);
     expect(assistant!.outputTokens).toBe(10);
     expect(assistant!.ttftMs).toBe(120);

@@ -100,7 +100,6 @@ export async function loadAssets(base = ASSET_BASE): Promise<Assets> {
   };
 }
 
-/** Colour stored without colour-space conversion (the whole pipeline works in display space). */
 const rgb = (r: number, g: number, b: number) =>
   new THREE.Color().setRGB(r, g, b, THREE.LinearSRGBColorSpace);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -111,10 +110,7 @@ const tileOrigin = (tile: number): [number, number] => [
   Math.floor(tile / ATLAS_COLUMNS) * 16,
 ];
 
-// ---------------------------------------------------------------------------
-// Shaders
-// ---------------------------------------------------------------------------
-const TERRAIN_VERTEX = /* glsl */ `
+const TERRAIN_VERTEX = `
 attribute vec2 auv;
 attribute vec4 alight;
 uniform float uTime;
@@ -146,7 +142,7 @@ void main() {
 }
 `;
 
-const TERRAIN_FRAGMENT = /* glsl */ `
+const TERRAIN_FRAGMENT = `
 uniform sampler2D uAtlas;
 uniform float uDaylight;
 uniform float uGamma;
@@ -174,14 +170,14 @@ void main() {
 }
 `;
 
-const SKY_VERTEX = /* glsl */ `
+const SKY_VERTEX = `
 varying vec3 vDir;
 void main() {
   vDir = normalize(position);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
-const SKY_FRAGMENT = /* glsl */ `
+const SKY_FRAGMENT = `
 uniform vec3 uTop;
 uniform vec3 uHorizon;
 uniform vec3 uSunDir;
@@ -199,7 +195,7 @@ void main() {
 }
 `;
 
-const PARTICLE_VERTEX = /* glsl */ `
+const PARTICLE_VERTEX = `
 attribute vec2 aTile;
 attribute vec3 aInfo;
 uniform float uScale;
@@ -213,7 +209,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }
 `;
-const PARTICLE_FRAGMENT = /* glsl */ `
+const PARTICLE_FRAGMENT = `
 uniform sampler2D uAtlas;
 uniform vec2 uAtlasSize;
 varying vec2 vTile;
@@ -232,9 +228,6 @@ void main() {
 }
 `;
 
-// ---------------------------------------------------------------------------
-// Geometry helpers
-// ---------------------------------------------------------------------------
 function chunkGeometry(m: MeshData) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(m.position, 3));
@@ -254,7 +247,6 @@ function chunkGeometry(m: MeshData) {
 
 const SHADE = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
 
-/** A unit cube textured like a block, centred on the origin. */
 function blockCube(id: number, meta: number) {
   const def = BLOCKS[id];
   const g = new THREE.BoxGeometry(1, 1, 1);
@@ -272,7 +264,6 @@ function blockCube(id: number, meta: number) {
   return g;
 }
 
-/** Flat item sprite extruded one pixel deep, like vanilla held and dropped items. */
 function extrudedTile(tile: number, pixels: Uint8ClampedArray) {
   const [tx, ty] = tileOrigin(tile);
   const opaque = (x: number, y: number) =>
@@ -301,7 +292,6 @@ function extrudedTile(tile: number, pixels: Uint8ClampedArray) {
   };
   const U = (px: number) => (tx + px) / ATLAS_W;
   const V = (py: number) => (ty + py) / ATLAS_H;
-  // Front and back faces cover the whole tile (alpha tested).
   quad(
     [-0.5, 0.5, t / 2],
     [0.5, 0.5, t / 2],
@@ -355,7 +345,6 @@ function extrudedTile(tile: number, pixels: Uint8ClampedArray) {
   return g;
 }
 
-/** Which tile an item renders with when it is not a full cube. */
 function itemTile(id: string): number | null {
   const named = TILE[`item_${id}` as TileName];
   if (named !== undefined) return named;
@@ -364,7 +353,6 @@ function itemTile(id: string): number | null {
   return null;
 }
 
-/** Items held or dropped as small cubes (full blocks) rather than flat sprites. */
 function isCubeItem(id: string) {
   const def = ITEMS[id];
   if (def?.block === undefined) return false;
@@ -372,9 +360,6 @@ function isCubeItem(id: string) {
   return render === 'cube' || (render === 'box' && def.block !== B.cactus);
 }
 
-// ---------------------------------------------------------------------------
-// Particles
-// ---------------------------------------------------------------------------
 interface Particle {
   x: number;
   y: number;
@@ -385,7 +370,6 @@ interface Particle {
   life: number;
   maxLife: number;
   size: number;
-  /** Atlas pixel origin of a 4x4 texture fragment, or -1 for smoke. */
   tu: number;
   tv: number;
   gravity: number;
@@ -458,7 +442,6 @@ export class Renderer {
   private width = 1;
   private height = 1;
   private elapsed = 0;
-  /** Distance-sorted chunk keys waiting for geometry. */
   meshQueue = 0;
   chunksRendered = 0;
 
@@ -504,7 +487,6 @@ export class Renderer {
       side: THREE.DoubleSide,
     });
 
-    // Sky dome, sun, moon and stars live in their own scene rendered first.
     this.skyUniforms = {
       uTop: { value: rgb(0.47, 0.65, 1) },
       uHorizon: { value: rgb(0.75, 0.85, 1) },
@@ -554,7 +536,6 @@ export class Renderer {
     );
     this.skyScene.add(this.stars);
 
-    // Clouds.
     const cloudTex = assets.clouds;
     this.clouds = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
@@ -572,7 +553,6 @@ export class Renderer {
     this.clouds.renderOrder = 2;
     this.scene.add(this.clouds);
 
-    // Block selection outline and crack overlay.
     this.outline = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
       new THREE.LineBasicMaterial({
@@ -599,7 +579,6 @@ export class Renderer {
     this.crack.visible = false;
     this.scene.add(this.crack);
 
-    // Particles.
     this.particleGeometry = new THREE.BufferGeometry();
     this.particleGeometry.setAttribute(
       'position',
@@ -635,12 +614,10 @@ export class Renderer {
       vertexColors: true,
     });
 
-    // Player model for third person.
     this.playerModel = buildModel('steve', assets.skins.steve);
     this.playerModel.root.visible = false;
     this.scene.add(this.playerModel.root);
 
-    // First-person hand.
     this.handMaterial = new THREE.MeshBasicMaterial({
       map: assets.atlas,
       alphaTest: 0.5,
@@ -666,9 +643,6 @@ export class Renderer {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Chunks
-  // -------------------------------------------------------------------------
   private neighborsLit(cx: number, cz: number) {
     const chunks = this.game.world.chunks;
     for (let dz = -1; dz <= 1; dz++)
@@ -679,7 +653,6 @@ export class Renderer {
     return true;
   }
 
-  /** Rebuild dirty chunk meshes near the player within a time budget (ms). */
   private worldEpoch = -1;
 
   updateChunks(budgetMs: number) {
@@ -715,7 +688,6 @@ export class Renderer {
       built++;
     }
     this.meshQueue = pending.length - built;
-    // Drop meshes for unloaded chunks and hide distant ones.
     let rendered = 0;
     for (const [key, m] of this.chunkMeshes) {
       const c = world.chunks.get(key);
@@ -764,14 +736,10 @@ export class Renderer {
     }
   }
 
-  /** Number of chunks with geometry (for the loading screen). */
   get meshedChunks() {
     return this.chunkMeshes.size;
   }
 
-  // -------------------------------------------------------------------------
-  // Particles
-  // -------------------------------------------------------------------------
   addBreakParticles(x: number, y: number, z: number, id: number) {
     const def = BLOCKS[id];
     if (!def || def.render === 'none') return;
@@ -802,7 +770,6 @@ export class Renderer {
         }
   }
 
-  /** Small crumbs while mining. */
   addHitParticle(x: number, y: number, z: number, face: number, id: number) {
     const def = BLOCKS[id];
     if (!def || this.particles.length >= MAX_PARTICLES) return;
@@ -907,9 +874,6 @@ export class Renderer {
     this.particleGeometry.setDrawRange(0, w);
   }
 
-  // -------------------------------------------------------------------------
-  // Lighting helpers
-  // -------------------------------------------------------------------------
   brightnessAt(x: number, y: number, z: number) {
     const l = this.game.world.getLight(Math.floor(x), Math.floor(y), Math.floor(z));
     const sky = lightCurve((l >> 4) / 15) * daylight(this.game.time);
@@ -919,9 +883,6 @@ export class Renderer {
     return lerp(b, 1 - (1 - b) ** 3, g);
   }
 
-  // -------------------------------------------------------------------------
-  // Entities
-  // -------------------------------------------------------------------------
   private cachedGeometry(key: string, build: () => THREE.BufferGeometry) {
     let g = this.geometryCache.get(key);
     if (!g) {
@@ -1179,15 +1140,11 @@ export class Renderer {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // First-person hand
-  // -------------------------------------------------------------------------
   private updateHand(alpha: number, dt: number) {
     const game = this.game;
     const held = game.held;
     const key = held ? held.id : '';
     if (game.selected !== this.lastSelected || key !== this.lastHeldId) {
-      // Lower and raise the hand when switching items.
       if (this.lastSelected !== -1) this.equip = 1;
       this.lastSelected = game.selected;
       this.lastHeldId = key;
@@ -1230,7 +1187,6 @@ export class Renderer {
     o.scale.setScalar(1);
     const equipDrop = -this.equip * 0.6;
     if (!held) {
-      // Bare arm, vanilla-like placement in the lower right.
       root.position.set(
         0.62 - sq * 0.3,
         -0.55 + equipDrop + Math.sin(Math.sqrt(swing) * Math.PI * 2) * 0.2,
@@ -1264,9 +1220,6 @@ export class Renderer {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Frame
-  // -------------------------------------------------------------------------
   render(alpha: number, dt: number, options: RenderOptions) {
     const game = this.game;
     const p = game.player;
@@ -1275,7 +1228,6 @@ export class Renderer {
     const day = daylight(time);
     const dayF = Math.max(0, Math.min(1, (day - 0.2) / 0.8));
 
-    // Camera.
     const ex = lerp(p.px, p.x, alpha);
     const ey = lerp(p.py, p.y, alpha) + game.eyeHeight;
     const ez = lerp(p.pz, p.z, alpha);
@@ -1295,7 +1247,6 @@ export class Renderer {
       cam.rotation.z += -Math.sin(t * t * t * t * Math.PI) * 0.2;
     }
     if (p.dead) cam.rotation.z = 0.6;
-    // FOV: sprint and flight widen the view.
     let targetFov = options.fov;
     if (p.sprinting) targetFov *= 1.15;
     if (p.flying) targetFov *= 1.05;
@@ -1307,7 +1258,6 @@ export class Renderer {
     if (options.thirdPerson !== 0) {
       const back = options.thirdPerson === 1 ? 1 : -1;
       const [lx, ly, lz] = game.lookVector();
-      // Pull the camera back but stop at blocks.
       const hit = raycast(game.world, ex, ey, ez, -lx * back, -ly * back, -lz * back, 4);
       const dist = hit ? Math.max(0.3, hit.distance - 0.3) : 4;
       cam.position.set(ex - lx * back * dist, ey - ly * back * dist, ez - lz * back * dist);
@@ -1329,7 +1279,6 @@ export class Renderer {
       for (const mat of m.materials) mat.color.copy(c);
     }
 
-    // Sky colours.
     const sunAngle = ((time % DAY) / DAY) * Math.PI * 2;
     const sunDir = new THREE.Vector3(Math.cos(sunAngle), Math.sin(sunAngle), 0.15).normalize();
     const top = rgb(lerp(0.01, 0.47, dayF), lerp(0.015, 0.65, dayF), lerp(0.04, 1, dayF));
@@ -1340,7 +1289,6 @@ export class Renderer {
     this.skyUniforms.uSunDir.value.copy(sunDir);
     this.skyUniforms.uGlowAmount.value = glow * 0.8;
     let fogColor = horizon.clone();
-    // Looking toward a sunset tints the fog.
     const [lx, , lz] = game.lookVector();
     const facing = Math.max(0, lx * sunDir.x + lz * sunDir.z);
     fogColor.lerp(rgb(0.95, 0.55, 0.3), glow * facing * 0.5);
@@ -1364,7 +1312,6 @@ export class Renderer {
       fogNear = 0;
       fogFar = 1.5;
     }
-    // Rain-free caves: fade the horizon when deep underground.
     if (ey < 50 && !p.eyesInWater) {
       const under = Math.min(1, (50 - ey) / 20);
       fogColor.lerp(rgb(0.02, 0.02, 0.03), under);
@@ -1379,7 +1326,6 @@ export class Renderer {
     this.fog.color.copy(fogColor);
     this.fog.near = fogNear;
     this.fog.far = fogFar;
-    // Texture animation: water every 2 ticks, lava every 3.
     const waterFrame = Math.floor(game.ticks / 2) % 8;
     const lavaFrame = Math.floor(game.ticks / 3) % 8;
     const [w0x, w0y] = tileOrigin(TILE.water_frame0);
@@ -1389,7 +1335,6 @@ export class Renderer {
     const [lxx, lyy] = tileOrigin(TILE.lava_frame0 + lavaFrame);
     u.uLavaOffset.value.set(lxx - l0x, lyy - l0y);
 
-    // Sun, moon, stars follow the sky camera.
     this.skyCamera.rotation.copy(cam.rotation);
     this.skyCamera.fov = cam.fov;
     this.skyCamera.updateProjectionMatrix();
@@ -1411,7 +1356,6 @@ export class Renderer {
       this.skyUniforms.uHorizon.value.lerp(rgb(0.02, 0.02, 0.03), underground);
     }
 
-    // Clouds drift slowly to the west.
     const cloudSize = Math.max(256, rd * 4);
     const cm = this.clouds;
     cm.visible = options.clouds && !p.eyesInWater && game.dimension === 'overworld';
@@ -1426,7 +1370,6 @@ export class Renderer {
       rgb(lerp(0.12, 1, dayF), lerp(0.12, 1, dayF), lerp(0.15, 1, dayF)),
     );
 
-    // Selection outline and crack overlay.
     const target = game.target;
     if (target && !p.dead) {
       const box = selectionBox(target.id, game.world.getMeta(target.x, target.y, target.z));
@@ -1471,7 +1414,6 @@ export class Renderer {
     this.particleMaterial.uniforms.uScale.value =
       (this.height / (2 * Math.tan((cam.fov * Math.PI) / 360))) * this.renderer.getPixelRatio();
 
-    // Draw: sky, world, hand.
     const r = this.renderer;
     r.setClearColor(fogColor, 1);
     r.clear(true, true, true);
@@ -1545,7 +1487,6 @@ function lerpAngle(a: number, b: number, t: number) {
   return a + d * t;
 }
 
-/** Quick check used by the UI: whether a world cell blocks the view (for third-person). */
 export function isOpaqueAt(game: Game, x: number, y: number, z: number) {
   return BLOCKS[game.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z))].opaque;
 }

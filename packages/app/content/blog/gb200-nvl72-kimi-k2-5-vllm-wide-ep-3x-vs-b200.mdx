@@ -18,7 +18,7 @@ tags:
 
 NVIDIA's GB200 NVL72 running Dynamo vLLM peaks at 12,587 tok/s/GPU on Kimi K2.5 NVFP4 8k/1k, while the best B200 single node vLLM recipe peaks at 4,021 tok/s/GPU on the same workload. That is a 3.13x advantage in peak throughput per GPU. NVL72's rack scale NVLink fabric lets decode run with wide expert parallelism up to Decode EP 16 on the tested recipes, with the peak at Decode EP 8 on an 8 GPU decode pool. B200 tops out at Decode EP 4 on the best measured recipe. Past that, the expert all to all starts hitting scale out fabric latencies.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -78,7 +78,7 @@ GB200 NVL72 sits on a roughly flat ~12,580 tok/s/GPU plateau across the 23 to 36
   caption="Kimi K2.5 NVFP4 8k/1k Pareto frontier. GB200 NVL72 Dynamo vLLM (2026-04-07) vs B200 vLLM (2026-03-27). Runs are 11 days apart."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=Kimi-K2.5&g_rundate=2026-04-07&g_runid=24100518225), pre-filtered to Kimi K2.5 on April 7th.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=Kimi-K2.5&g_rundate=2026-04-07&g_runid=24100518225), pre-filtered to Kimi K2.5 on April 7th.
 
 ## vLLM Wide EP on NVL72
 
@@ -92,7 +92,7 @@ B200 delivers around 4k tok/s/GPU at 30 tok/s/user on a 16 GPU pool. The TP 4, E
 
 GB200 NVL72 delivers 12.5k tok/s/GPU at 23 to 36 tok/s/user across concurrency 2,048 to 4,096. The tested single node B200 recipes have no comparable operating point.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

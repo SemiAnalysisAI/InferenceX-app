@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   ConversationView,
   buildConversationTree,
@@ -16,14 +16,14 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    exitReplay: '⏹ Exit Replay',
-    replay: '▶ Replay',
+    exitReplay: 'Exit Replay',
+    replay: 'Replay',
     loadingRequests: (loaded: number, total: number) =>
       `Loading all requests (${loaded} / ${total})...`,
   },
   zh: {
-    exitReplay: '⏹ 退出回放',
-    replay: '▶ 回放',
+    exitReplay: '退出回放',
+    replay: '回放',
     loadingRequests: (loaded: number, total: number) => `加载全部请求中 (${loaded} / ${total})…`,
   },
 };
@@ -48,7 +48,6 @@ export default function ConversationPage() {
   const pendingTargetRef = useRef<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Build tree and extract timestamps when in replay mode
   const tree = useMemo(
     () => (replayMode ? buildConversationTree(requests) : []),
     [replayMode, requests],
@@ -60,7 +59,6 @@ export default function ConversationPage() {
         if (node.kind === 'message') {
           return new Date(node.timestamp).getTime();
         }
-        // subagent_group
         return new Date(node.startTime).getTime();
       }),
     [tree],
@@ -70,7 +68,6 @@ export default function ConversationPage() {
 
   const replay = useSessionReplay(nodeCount, timestamps);
 
-  // Load all data when replay mode is activated
   const handleEnableReplay = useCallback(async () => {
     setReplayMode(true);
     if (requests.length < total) {
@@ -91,7 +88,6 @@ export default function ConversationPage() {
     setAllLoaded(false);
   }, [replay]);
 
-  // Check if data finished loading (e.g., loaded by layout scroll)
   useEffect(() => {
     if (!replayMode || allLoaded || requests.length < total) return;
 
@@ -102,7 +98,6 @@ export default function ConversationPage() {
     return () => cancelAnimationFrame(frame);
   }, [replayMode, allLoaded, requests.length, total]);
 
-  // Auto-scroll to keep latest revealed message visible during playback
   useEffect(() => {
     if (replayMode && replay.isPlaying && lastNodeRef.current) {
       lastNodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -119,7 +114,6 @@ export default function ConversationPage() {
     return () => window.removeEventListener('hashchange', syncHash);
   }, []);
 
-  // Scroll to hash target after requests load/render (e.g., from waterfall click).
   useEffect(() => {
     const targetId = getHashTargetId(targetHash);
     if (!targetId) return;
@@ -134,7 +128,6 @@ export default function ConversationPage() {
           clearTimeout(highlightTimerRef.current);
         }
         el.classList.remove('waterfall-highlight');
-        // Restart the animation when navigating to a request that was just highlighted.
         void el.offsetWidth;
         el.classList.add('waterfall-highlight');
         highlightTimerRef.current = setTimeout(() => {
@@ -169,59 +162,53 @@ export default function ConversationPage() {
   );
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        {/* Replay toggle button */}
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => {
-              track('agentic_workload_replay_toggled', { enabled: !replayMode });
-              if (replayMode) handleDisableReplay();
-              else handleEnableReplay();
-            }}
-            className={`flex items-center gap-1.5 px-2 py-1 text-2xs font-mono border rounded-md transition-colors ${
-              replayMode
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20'
-                : 'bg-surface hover:bg-surface-hover border-border text-subtle hover:text-foreground'
-            }`}
-          >
-            {replayMode ? t.exitReplay : t.replay}
-          </button>
-          {loadingAll && (
-            <span className="flex items-center gap-1.5 text-2xs font-mono text-subtle">
-              <span className="h-3 w-3 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
-              {t.loadingRequests(requests.length, total)}
-            </span>
-          )}
-        </div>
-
-        {/* Replay controls bar */}
-        {replayReady && (
-          <div className="mb-3">
-            <ReplayControls
-              isPlaying={replay.isPlaying}
-              currentIndex={replay.currentIndex}
-              total={nodeCount}
-              speed={replay.speed}
-              onToggle={replay.toggle}
-              onSpeedChange={replay.setSpeed}
-              onSeek={replay.seekTo}
-              onReset={replay.reset}
-            />
-          </div>
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          aria-pressed={replayMode}
+          onClick={() => {
+            track('agentic_workload_replay_toggled', { enabled: !replayMode });
+            if (replayMode) handleDisableReplay();
+            else handleEnableReplay();
+          }}
+        >
+          {replayMode ? t.exitReplay : t.replay}
+        </Button>
+        {loadingAll && (
+          <span className="flex items-center gap-1.5 text-2xs tabular-nums text-muted-foreground">
+            <span className="h-3 w-3 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
+            {t.loadingRequests(requests.length, total)}
+          </span>
         )}
+      </div>
 
-        {/* Conversation view */}
-        <div>
-          <ConversationView
-            requests={requests}
-            visibleNodeCount={replayReady ? replay.currentIndex : undefined}
-            reversed={replayMode ? false : Boolean(reversed)}
+      {replayReady && (
+        <div className="mb-3">
+          <ReplayControls
+            isPlaying={replay.isPlaying}
+            currentIndex={replay.currentIndex}
+            total={nodeCount}
+            speed={replay.speed}
+            onToggle={replay.toggle}
+            onSpeedChange={replay.setSpeed}
+            onSeek={replay.seekTo}
+            onReset={replay.reset}
           />
-          {/* Scroll anchor for auto-scroll during playback */}
-          <div ref={lastNodeRef} />
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <div>
+        <ConversationView
+          requests={requests}
+          visibleNodeCount={replayReady ? replay.currentIndex : undefined}
+          reversed={replayMode ? false : Boolean(reversed)}
+          targetRequestId={getHashTargetId(targetHash)?.slice('req-'.length) ?? null}
+        />
+        <div ref={lastNodeRef} />
+      </div>
+    </div>
   );
 }

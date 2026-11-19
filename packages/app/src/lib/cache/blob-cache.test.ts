@@ -1,37 +1,61 @@
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock @vercel/blob
-vi.mock('@vercel/blob', () => ({
+vi.mock('@vercel/blob', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   del: vi.fn(),
-  head: vi.fn(),
+  get: vi.fn(),
   list: vi.fn(),
   put: vi.fn(),
 }));
 
-import { blobGet, blobSet, blobPurge } from './blob-cache';
-import { del, head, list, put } from '@vercel/blob';
+import { blobGet, blobGetBytes, blobSet, blobPurge } from './blob-cache';
+import {
+  BlobServiceRateLimited,
+  del,
+  get,
+  list,
+  put,
+  type GetBlobResult,
+  type ListBlobResult,
+  type PutBlobResult,
+} from '@vercel/blob';
+
+// Only the fields blobPurge reads; the full list() result also carries sizes and dates.
+function listPage(count: number): ListBlobResult {
+  return {
+    blobs: Array.from({ length: count }, (_, i) => ({
+      url: `https://blob.example.com/${i}.json`,
+      pathname: `test-cache/${i}.json`,
+    })),
+    hasMore: false,
+    cursor: '',
+  } as unknown as ListBlobResult;
+}
 
 const mockDel = vi.mocked(del);
-const mockHead = vi.mocked(head);
+const mockGet = vi.mocked(get);
 const mockList = vi.mocked(list);
 const mockPut = vi.mocked(put);
 
-// Save original env
+function stored(body: Uint8Array): GetBlobResult {
+  return {
+    statusCode: 200,
+    stream: new Response(new Uint8Array(body)).body!,
+  } as unknown as GetBlobResult;
+}
+
 const originalEnv = { ...process.env };
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.BLOB_READ_WRITE_TOKEN = 'test-token-123';
   process.env.BLOB_CACHE_PREFIX = 'test-cache';
-
-  // Default: global fetch returns valid JSON
-  vi.stubGlobal('fetch', vi.fn());
 });
 
 afterEach(() => {
   process.env.BLOB_READ_WRITE_TOKEN = originalEnv.BLOB_READ_WRITE_TOKEN;
   process.env.BLOB_CACHE_PREFIX = originalEnv.BLOB_CACHE_PREFIX;
-  vi.unstubAllGlobals();
 });
 
 describe('graceful no-op when credentials missing', () => {
@@ -47,7 +71,7 @@ describe('graceful no-op when credentials missing', () => {
 
   it('blobSet no-ops when BLOB_READ_WRITE_TOKEN is missing', async () => {
     delete process.env.BLOB_READ_WRITE_TOKEN;
-    await blobSet('key', 'value');
+    await blobSet('key', '"value"');
     expect(mockPut).not.toHaveBeenCalled();
   });
 
@@ -58,121 +82,89 @@ describe('graceful no-op when credentials missing', () => {
 });
 
 describe('blobGet', () => {
-  it('returns parsed JSON on cache hit', async () => {
-    const data = { models: ['llama', 'gpt4'], count: 2 };
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/mykey.json' } as any);
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(data),
-    } as Response);
+  it('reads the compressed body with a single get() and returns its JSON text', async () => {
+    const json = JSON.stringify({ models: ['llama', 'gpt4'], label: '基准' });
+    mockGet.mockResolvedValue(stored(brotliCompressSync(json)));
 
-    const result = await blobGet('mykey');
-    expect(result).toEqual(data);
-    expect(mockHead).toHaveBeenCalledWith('test-cache/mykey.json');
-    expect(globalThis.fetch).toHaveBeenCalledWith('https://blob.example.com/test-cache/mykey.json');
+    expect(await blobGet('bench:llama:2025-01-01')).toBe(json);
+    expect(mockGet).toHaveBeenCalledExactlyOnceWith('test-cache/bench:llama:2025-01-01.json.br', {
+      access: 'public',
+    });
   });
 
-  it('returns null when head() throws (cache miss)', async () => {
-    mockHead.mockRejectedValue(new Error('not found'));
-
-    const result = await blobGet('missing');
-    expect(result).toBeNull();
+  it('returns null when the blob does not exist', async () => {
+    mockGet.mockResolvedValue(null);
+    expect(await blobGet('missing')).toBeNull();
   });
 
-  it('returns null when fetch response is not ok', async () => {
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/bad.json' } as any);
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-    } as Response);
-
-    const result = await blobGet('bad');
-    expect(result).toBeNull();
+  it('returns null when get() throws', async () => {
+    mockGet.mockRejectedValue(new Error('Failed to fetch blob: 503 Service Unavailable'));
+    expect(await blobGet('down')).toBeNull();
   });
 
-  it('returns null when fetch throws a network error', async () => {
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/net.json' } as any);
-    vi.mocked(globalThis.fetch).mockRejectedValue(new Error('network error'));
+  it('returns null for a truncated body instead of partial JSON', async () => {
+    const body = brotliCompressSync(JSON.stringify({ rows: Array.from({ length: 5000 }, String) }));
+    mockGet.mockResolvedValue(stored(body.subarray(0, -8)));
+    expect(await blobGet('truncated')).toBeNull();
+  });
+});
 
-    const result = await blobGet('net');
-    expect(result).toBeNull();
+describe('blobGetBytes', () => {
+  it('returns the stored bytes unchanged from the exact key', async () => {
+    const body = new Uint8Array([9, 0, 255, 7]);
+    mockGet.mockResolvedValue(stored(body));
+    expect(await blobGetBytes('generation/g/k.response.br')).toEqual(body);
+    expect(mockGet).toHaveBeenCalledExactlyOnceWith('test-cache/generation/g/k.response.br', {
+      access: 'public',
+    });
   });
 
-  it('returns null when json parsing fails', async () => {
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/corrupt.json' } as any);
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.reject(new SyntaxError('Unexpected token')),
-    } as unknown as Response);
-
-    const result = await blobGet('corrupt');
-    expect(result).toBeNull();
-  });
-
-  it('constructs path using prefix and key with .json extension', async () => {
-    mockHead.mockRejectedValue(new Error('miss'));
-
-    await blobGet('bench:llama:2025-01-01');
-    expect(mockHead).toHaveBeenCalledWith('test-cache/bench:llama:2025-01-01.json');
+  it('treats a non-200 answer as a miss', async () => {
+    mockGet.mockResolvedValue({ statusCode: 304, stream: null } as unknown as GetBlobResult);
+    expect(await blobGetBytes('stale')).toBeNull();
   });
 });
 
 describe('blobSet', () => {
-  it('puts JSON data with correct options', async () => {
-    mockPut.mockResolvedValue({} as any);
-    const data = { benchmarks: [1, 2, 3] };
+  it('stores the JSON brotli-compressed under the .json.br path', async () => {
+    mockPut.mockResolvedValue({} as PutBlobResult);
+    const json = JSON.stringify({ benchmarks: [1, 2, 3], label: '基准' });
 
-    await blobSet('my-data', data);
+    await blobSet('my-data', json);
 
-    expect(mockPut).toHaveBeenCalledWith('test-cache/my-data.json', JSON.stringify(data), {
+    const [path, body, options] = mockPut.mock.calls[0]!;
+    expect(path).toBe('test-cache/my-data.json.br');
+    expect(brotliDecompressSync(body as Buffer).toString('utf8')).toBe(json);
+    expect(options).toEqual({
       access: 'public',
       addRandomSuffix: false,
-      contentType: 'application/json',
+      contentType: 'application/octet-stream',
     });
-  });
-
-  it('serializes complex nested objects', async () => {
-    mockPut.mockResolvedValue({} as any);
-    const nested = { a: { b: { c: [1, 'two', null] } } };
-
-    await blobSet('nested', nested);
-
-    const [, body] = mockPut.mock.calls[0];
-    expect(JSON.parse(body as string)).toEqual(nested);
-  });
-
-  it('handles string data', async () => {
-    mockPut.mockResolvedValue({} as any);
-
-    await blobSet('version', 'v1.2.3');
-
-    const [, body] = mockPut.mock.calls[0];
-    expect(body).toBe('"v1.2.3"');
-  });
-
-  it('handles null data', async () => {
-    mockPut.mockResolvedValue({} as any);
-
-    await blobSet('empty', null);
-
-    const [, body] = mockPut.mock.calls[0];
-    expect(body).toBe('null');
   });
 
   it('swallows "already exists" error from put (race condition)', async () => {
     mockPut.mockRejectedValue(new Error('This blob already exists'));
 
-    await expect(blobSet('racy-key', { x: 1 })).resolves.toBeUndefined();
+    await expect(blobSet('racy-key', '{"x":1}')).resolves.toBeUndefined();
   });
 
   it('rethrows non-"already exists" errors', async () => {
     mockPut.mockRejectedValue(new Error('Network timeout'));
 
-    await expect(blobSet('fail-key', { x: 1 })).rejects.toThrow('Network timeout');
+    await expect(blobSet('fail-key', '{"x":1}')).rejects.toThrow('Network timeout');
   });
 });
 
 describe('blobPurge', () => {
+  it('restricts scoped purges to their exact key subtree', async () => {
+    mockList.mockResolvedValue({ blobs: [], hasMore: false, cursor: '' } as any);
+    expect(await blobPurge('operatorx/deployment/')).toBe(0);
+    expect(mockList).toHaveBeenCalledWith({
+      prefix: 'test-cache/operatorx/deployment/',
+      cursor: undefined,
+    });
+  });
+
   it('deletes all blobs in a single page and returns count', async () => {
     mockList.mockResolvedValue({
       blobs: [
@@ -228,6 +220,63 @@ describe('blobPurge', () => {
     expect(mockDel).toHaveBeenCalledTimes(3);
   });
 
+  it('keeps blobs under the excluded key subtrees', async () => {
+    mockList.mockResolvedValue({
+      blobs: [
+        { url: 'https://blob.example.com/a.json', pathname: 'test-cache/db:v2:a.json' },
+        { url: 'https://blob.example.com/o.json', pathname: 'test-cache/operatorx/ns/cmp.json' },
+        { url: 'https://blob.example.com/b.json', pathname: 'test-cache/operatorxish.json' },
+      ],
+      hasMore: false,
+      cursor: '',
+    } as any);
+    mockDel.mockResolvedValue(undefined as any);
+
+    const deleted = await blobPurge('', ['operatorx/']);
+
+    expect(deleted).toBe(2);
+    expect(mockDel).toHaveBeenCalledWith([
+      'https://blob.example.com/a.json',
+      'https://blob.example.com/b.json',
+    ]);
+  });
+
+  it('keeps blobs uploaded at or after the cutoff', async () => {
+    const cutoff = new Date('2026-11-05T12:00:00Z');
+    mockList.mockResolvedValue({
+      blobs: [
+        {
+          url: 'https://blob.example.com/old.json',
+          pathname: 'test-cache/generation/g1/a.json',
+          uploadedAt: new Date('2026-11-05T11:59:59.999Z'),
+        },
+        {
+          url: 'https://blob.example.com/at.json',
+          pathname: 'test-cache/generation/g2/a.json',
+          uploadedAt: cutoff,
+        },
+        {
+          url: 'https://blob.example.com/new.json',
+          pathname: 'test-cache/generation/g2/b.json',
+          uploadedAt: new Date('2026-11-05T12:00:01Z'),
+        },
+        {
+          url: 'https://blob.example.com/kept.json',
+          pathname: 'test-cache/operatorx/ns/cmp.json',
+          uploadedAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      ],
+      hasMore: false,
+      cursor: '',
+    } as unknown as ListBlobResult);
+    mockDel.mockResolvedValue(undefined);
+
+    const deleted = await blobPurge('', ['operatorx/'], cutoff);
+
+    expect(deleted).toBe(1);
+    expect(mockDel).toHaveBeenCalledExactlyOnceWith(['https://blob.example.com/old.json']);
+  });
+
   it('returns 0 when no blobs exist', async () => {
     mockList.mockResolvedValue({
       blobs: [],
@@ -259,5 +308,57 @@ describe('blobPurge', () => {
 
     expect(deleted).toBe(1);
     expect(mockDel).toHaveBeenCalledTimes(1);
+  });
+
+  describe('large and rate-limited purges', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('deletes a full list page in batches of at most 100 blobs', async () => {
+      mockList.mockResolvedValue(listPage(250));
+      mockDel.mockResolvedValue(undefined);
+
+      expect(await blobPurge()).toBe(250);
+      expect(mockDel.mock.calls.map(([urls]) => (urls as string[]).length)).toEqual([100, 100, 50]);
+    });
+
+    it('waits for the retry-after window and resends the rate-limited batch', async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(listPage(150));
+      mockDel
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new BlobServiceRateLimited(60))
+        .mockResolvedValue(undefined);
+
+      const purge = blobPurge();
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(mockDel).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await purge).toBe(150);
+      expect(mockDel).toHaveBeenCalledTimes(3);
+      expect(mockDel.mock.calls[2]![0]).toEqual(mockDel.mock.calls[1]![0]);
+    });
+
+    it('fails after three rate-limit waits instead of outliving the function', async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(listPage(10));
+      mockDel.mockRejectedValue(new BlobServiceRateLimited(60));
+
+      const purge = blobPurge();
+      const outcome = expect(purge).rejects.toBeInstanceOf(BlobServiceRateLimited);
+      await vi.advanceTimersByTimeAsync(180_000);
+      await outcome;
+      expect(mockDel).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not retry errors other than rate limiting', async () => {
+      mockList.mockResolvedValue(listPage(10));
+      mockDel.mockRejectedValue(new Error('store suspended'));
+
+      await expect(blobPurge()).rejects.toThrow('store suspended');
+      expect(mockDel).toHaveBeenCalledTimes(1);
+    });
   });
 });

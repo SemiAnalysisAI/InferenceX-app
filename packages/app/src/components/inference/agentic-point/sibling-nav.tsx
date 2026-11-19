@@ -16,9 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/shared/utils';
 import { track } from '@/lib/analytics/analytics';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const HW_LABELS: Record<string, string> = {
   b200: 'B200',
@@ -62,7 +65,6 @@ function frameworkLabel(fw: string) {
   return fw;
 }
 
-/** Short label for a sibling chip: parallelism + concurrency. */
 export function chipLabel(s: BenchmarkSibling): string {
   const usePrefill =
     !s.disagg &&
@@ -81,7 +83,6 @@ export function chipLabel(s: BenchmarkSibling): string {
   const aggregatePcp = s.disagg
     ? undefined
     : meaningfulParallelismSize(s.prefill_pcp_size, s.decode_pcp_size);
-  // Same parallelism labeler the chart points use (TP/EP/TEP/DEP/DPA…).
   const parallel = parallelismLabel({
     tp: usePrefill ? s.prefill_tp : s.decode_tp,
     ep: usePrefill ? s.prefill_ep : s.decode_ep,
@@ -119,8 +120,8 @@ export function chipLabel(s: BenchmarkSibling): string {
     decodeDpAttention: s.decode_dp_attention,
     decodeNumWorkers: s.decode_num_workers,
   });
-  const offload = s.offload_mode === 'on' ? ' • off=ON' : '';
-  return `${parallel} • c=${s.conc}${offload}`;
+  const offload = s.offload_mode === 'on' ? ' · off=ON' : '';
+  return `${parallel} · c=${s.conc}${offload}`;
 }
 
 type SortMode = 'default' | 'conc' | 'parallelism' | 'tput' | 'requests';
@@ -137,9 +138,9 @@ const SIBLING_STRINGS = {
     pointCount: (count: number) => `${count} point${count === 1 ? '' : 's'} in this run`,
     sortBy: 'Sort by',
     sortAria: 'Sort points',
-    previous: 'prev',
+    previous: 'Previous',
     previousAria: 'Previous point',
-    next: 'next',
+    next: 'Next',
     nextAria: 'Next point',
     noTrace: 'No stored trace data',
   },
@@ -164,9 +165,6 @@ const SIBLING_STRINGS = {
 
 const SORT_VALUES: SortMode[] = ['default', 'conc', 'parallelism', 'tput', 'requests'];
 
-// Group key for the "parallelism" sort: ep first (so TP/EP1 sorts ahead of
-// EP/TEP/DEP groups), then tp, then dp-attention, then disagg — every config
-// of one parallelism lands together, ordered by concurrency within.
 const parallelRank = (
   s: BenchmarkSibling,
 ): [number, number, number, number, number, number, number, number] => {
@@ -189,10 +187,8 @@ function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSi
   if (mode === 'conc') {
     out.sort((a, b) => a.conc - b.conc);
   } else if (mode === 'tput') {
-    // Highest throughput/GPU first; rows missing the metric sink to the end.
     out.sort((a, b) => (b.tput_per_gpu ?? -Infinity) - (a.tput_per_gpu ?? -Infinity));
   } else if (mode === 'requests') {
-    // Most total requests first; rows missing the metric sink to the end.
     out.sort((a, b) => (b.total_requests ?? -Infinity) - (a.total_requests ?? -Infinity));
   } else {
     out.sort((a, b) => {
@@ -201,7 +197,6 @@ function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSi
       for (let i = 0; i < ra.length; i++) {
         if (ra[i] !== rb[i]) return ra[i] - rb[i];
       }
-      // Within a parallelism group: offload off before on, then concurrency.
       const oa = a.offload_mode === 'on' ? 1 : 0;
       const ob = b.offload_mode === 'on' ? 1 : 0;
       return oa - ob || a.conc - b.conc;
@@ -220,13 +215,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   const t = SIBLING_STRINGS[locale];
   const sortOptions = SORT_VALUES.map((value) => ({ value, label: t.sortOptions[value] }));
   const agenticBase = isZhPathname(pathname)
-    ? `${ZH_PREFIX}/inference/agentic`
-    : '/inference/agentic';
-  // Persist the sort in the URL so clicking a point (which remounts this
-  // component on the new route) keeps the chosen order instead of resetting.
-  // Read it once from the URL on mount — this component only renders after the
-  // client-side siblings query resolves, so `window` is always available here
-  // (no SSR/hydration mismatch). Matches the app's window-based url-state read.
+    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}/agentic`
+    : `${getDashboardRoute('inference').path}/agentic`;
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     if (typeof window === 'undefined') return 'default';
     const v = new URLSearchParams(window.location.search).get('sort');
@@ -235,12 +225,10 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
 
   const sorted = useMemo(() => sortSiblings(siblings, sortMode), [siblings, sortMode]);
 
-  // prev/next follow the displayed (sorted) order so navigation matches the row.
   const currentIdx = sorted.findIndex((s) => s.is_current);
   const prev = currentIdx > 0 ? sorted[currentIdx - 1] : null;
   const next = currentIdx !== -1 && currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
 
-  // Carry the active sort through every point-to-point link.
   const hrefFor = (id: number) =>
     sortMode === 'default' ? `${agenticBase}/${id}` : `${agenticBase}/${id}?sort=${sortMode}`;
 
@@ -261,7 +249,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             : sku.date}
         </span>
       </div>
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">{t.sortBy}</span>
           <Select
@@ -270,8 +258,6 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               const mode = v as SortMode;
               setSortMode(mode);
               track('agentic_siblings_sorted', { mode });
-              // Mirror into the URL (replace, no history spam) so a refresh —
-              // and the next point's mount — keep the chosen order.
               if (currentId !== undefined) {
                 const href =
                   mode === 'default'
@@ -282,7 +268,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             }}
           >
             <SelectTrigger
-              className="h-7 w-[10rem] text-xs"
+              size="sm"
+              className="w-40 text-xs"
               aria-label={t.sortAria}
               data-testid="sibling-sort-select"
             >
@@ -297,59 +284,69 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             </SelectContent>
           </Select>
         </div>
-        <button
-          type="button"
-          disabled={!prev}
-          onClick={() => {
-            if (prev) {
-              track('agentic_siblings_navigated', { direction: 'prev', targetId: prev.id });
-              router.push(hrefFor(prev.id));
-            }
-          }}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/40 hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={t.previousAria}
-        >
-          <ChevronLeft className="size-3.5" /> {t.previous}
-        </button>
-        <div className="flex items-center gap-1 flex-wrap">
-          {sorted.map((s) => {
-            const active = s.is_current;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  if (!active) {
-                    track('agentic_siblings_navigated', { direction: 'chip', targetId: s.id });
-                    router.push(hrefFor(s.id));
-                  }
-                }}
-                className={`px-2 py-1 rounded-md text-xs border transition-colors ${
-                  active
-                    ? 'border-primary bg-primary text-primary-foreground font-medium'
-                    : 'border-border/40 text-foreground hover:bg-accent'
-                } ${s.has_trace ? '' : 'opacity-60'}`}
-                title={s.has_trace ? undefined : t.noTrace}
-              >
-                {chipLabel(s)}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={!prev}
+            onClick={() => {
+              if (prev) {
+                track('agentic_siblings_navigated', { direction: 'prev', target_id: prev.id });
+                router.push(hrefFor(prev.id));
+              }
+            }}
+            aria-label={t.previousAria}
+          >
+            <ChevronLeft />
+            {t.previous}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={!next}
+            onClick={() => {
+              if (next) {
+                track('agentic_siblings_navigated', { direction: 'next', target_id: next.id });
+                router.push(hrefFor(next.id));
+              }
+            }}
+            aria-label={t.nextAria}
+          >
+            {t.next}
+            <ChevronRight />
+          </Button>
         </div>
-        <button
-          type="button"
-          disabled={!next}
-          onClick={() => {
-            if (next) {
-              track('agentic_siblings_navigated', { direction: 'next', targetId: next.id });
-              router.push(hrefFor(next.id));
-            }
-          }}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/40 hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={t.nextAria}
-        >
-          {t.next} <ChevronRight className="size-3.5" />
-        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {sorted.map((s) => {
+          const active = s.is_current;
+          return (
+            <Button
+              key={s.id}
+              type="button"
+              variant="outline"
+              size="xs"
+              aria-current={active ? 'page' : undefined}
+              onClick={() => {
+                if (!active) {
+                  track('agentic_siblings_navigated', { direction: 'chip', target_id: s.id });
+                  router.push(hrefFor(s.id));
+                }
+              }}
+              className={cn(
+                'font-normal tabular-nums',
+                !s.has_trace && 'text-muted-foreground',
+                active &&
+                  'border-primary bg-primary font-medium text-foreground hover:bg-primary hover:text-foreground dark:border-primary dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary dark:hover:text-primary-foreground',
+              )}
+              title={s.has_trace ? undefined : t.noTrace}
+            >
+              {chipLabel(s)}
+            </Button>
+          );
+        })}
       </div>
     </div>
   );

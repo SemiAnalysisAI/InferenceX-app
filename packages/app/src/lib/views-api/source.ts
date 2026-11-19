@@ -1,5 +1,6 @@
 import { GET as unofficial } from '@/app/api/unofficial-run/route';
-import { GET as benchmarks } from '@/app/api/v1/benchmarks/route';
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
+import { loadBenchmarks, parseBenchmarksQuery } from '@/lib/benchmarks/benchmarks-endpoint.server';
 import {
   buildGpuGroups,
   resolveRowPrecisions,
@@ -28,7 +29,11 @@ import {
 
 export { CALCULATOR_PERCENTILE_VALUES, matchesHardware };
 
-/** Call only fixed, first-party GET handlers. No caller-controlled host or fetch URL. */
+/**
+ * Call only fixed, first-party GET handlers. No caller-controlled host or fetch URL.
+ * The request carries no Accept-Encoding, so cachedJson answers with plain JSON:
+ * direct handler calls never get fetch's transparent content decoding.
+ */
 export function sourceRequest(
   request: NextRequest,
   path: string,
@@ -42,13 +47,6 @@ export function sourceRequest(
 
 export function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw new ViewsUpstreamError(response.status);
-  // Direct route calls do not get fetch's transparent content decoding.
-  // cachedJson emits compressed bytes, even when called without an HTTP hop.
-  if (response.headers.get('Content-Encoding') === 'gzip' && response.body) {
-    return new Response(
-      response.body.pipeThrough(new DecompressionStream('gzip')),
-    ).json() as Promise<T>;
-  }
   return response.json() as Promise<T>;
 }
 
@@ -70,6 +68,8 @@ export function selection(search: URLSearchParams, fallback = Sequence.AgenticTr
 }
 export type ViewSelection = Omit<ReturnType<typeof selection>, 'precisions'> & {
   precisions: string[];
+  /** Only views that list `chipBasis` set it; the rest keep the per-pool default. */
+  chipBasis?: ChipBasis;
 };
 
 export function comparisonSelections(search: URLSearchParams) {
@@ -93,21 +93,24 @@ export function comparisonSelections(search: URLSearchParams) {
 }
 
 export async function benchmarkRows(
-  request: NextRequest,
   params: Pick<ViewSelection, 'model' | 'date' | 'runId'>,
   options: { exactDate?: boolean } = {},
 ): Promise<BenchmarkRow[]> {
-  return readResponse(
-    await benchmarks(
-      sourceRequest(request, '/api/v1/benchmarks', {
-        model: params.model,
-        date: params.date,
-        exact: options.exactDate && !params.runId ? 'true' : undefined,
-        runId: params.runId,
-        exactRun: params.runId ? 'true' : undefined,
-      }),
-    ),
-  );
+  const search = Object.entries({
+    model: params.model,
+    date: params.date,
+    exact: options.exactDate && !params.runId ? 'true' : undefined,
+    runId: params.runId,
+    exactRun: params.runId ? 'true' : undefined,
+  }).filter((entry): entry is [string, string] => entry[1] !== undefined);
+  const query = parseBenchmarksQuery(new URLSearchParams(search));
+  if (query instanceof Response) throw new ViewsUpstreamError(query.status);
+  try {
+    return await loadBenchmarks(query);
+  } catch (error) {
+    console.error('Error fetching benchmarks:', error);
+    throw new ViewsUpstreamError(500);
+  }
 }
 
 // Extensions retain raw telemetry for modeled-power estimates and carry overlay
@@ -122,7 +125,7 @@ export async function calculatorGroups(
     includeOverlay?: boolean;
   } = {},
 ) {
-  const rows = await benchmarkRows(request, params, sourceOptions);
+  const rows = await benchmarkRows(params, sourceOptions);
   // Comparisons reuse the primary overlay rows for precision resolution only.
   const overlayRows = sourceOptions.overlayRows ?? (await unofficialRows(request));
   const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions, overlayRows);

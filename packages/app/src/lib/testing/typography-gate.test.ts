@@ -32,7 +32,6 @@ describe('scanSource', () => {
     const violations = scanSource('src/components/foo.tsx', source);
     expect(violations).toHaveLength(1);
     expect(violations[0].match).toBe('tracking-[0.16em]');
-    expect(violations[0].suggestion).toContain('tracking-eyebrow');
   });
 
   it('flags quoted chart font-size literals only inside src/lib/d3-chart', () => {

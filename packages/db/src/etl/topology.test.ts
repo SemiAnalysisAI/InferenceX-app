@@ -4,7 +4,6 @@ import { mapAggEvalRow, mapEvalRow } from './eval-mapper';
 import { configCacheKey } from './config-cache';
 import { createSkipTracker } from './skip-tracker';
 
-// The producer's aggregate eval schema mirrors one engine into both role fields.
 const aggregate = {
   is_multinode: false,
   tp: 4,

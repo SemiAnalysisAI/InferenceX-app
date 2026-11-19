@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
 vi.mock('../cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fetch: () => Promise<unknown>) => fetch,
 }));
 
@@ -18,7 +18,7 @@ describe('cachedReadRoute fixture mode', () => {
       logLabel: 'fixture contract',
     });
 
-    const response = await GET();
+    const response = await GET(new Request('https://example.test/api/v1/example'));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ source: 'fixture' });
     expect(fetch).not.toHaveBeenCalled();

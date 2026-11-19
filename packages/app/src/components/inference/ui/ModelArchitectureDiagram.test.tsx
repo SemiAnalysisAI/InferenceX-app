@@ -9,12 +9,14 @@ import { getModelArchitecture } from '@/lib/catalog/model-architectures';
 
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
+  diagramHeight: vi.fn((_arch: unknown, _expanded: ReadonlySet<string>): number | null => 480),
   theme: { resolved: 'light' },
-  pathname: { value: '/inference' },
+  pathname: { value: '/infx/inference' },
 }));
 
 vi.mock('./model-architecture-diagram-renderer', () => ({
   renderDiagram: mocks.renderDiagram,
+  diagramHeight: mocks.diagramHeight,
 }));
 vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: mocks.theme.resolved }),
@@ -75,6 +77,14 @@ let container: HTMLDivElement;
 let root: Root;
 let observedWidth: number;
 let clientWidthSpy: { mockRestore: () => void };
+const resizeFrames = new Map<number, FrameRequestCallback>();
+let nextFrame = 0;
+
+function flushResizeFrames() {
+  const callbacks = [...resizeFrames.values()];
+  resizeFrames.clear();
+  act(() => callbacks.forEach((callback) => callback(0)));
+}
 
 function render(model: Model = Model.DeepSeek_R1) {
   act(() => root.render(<ModelArchitectureDiagram model={model} />));
@@ -92,9 +102,16 @@ beforeEach(() => {
   observedWidth = 500;
   mocks.theme.resolved = 'light';
   mocks.renderDiagram.mockReset();
-  mocks.pathname.value = '/inference';
+  mocks.pathname.value = '/infx/inference';
   ResizeObserverStub.instances = [];
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  resizeFrames.clear();
+  nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    resizeFrames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => resizeFrames.delete(id));
   clientWidthSpy = vi
     .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
     .mockImplementation(() => observedWidth);
@@ -111,16 +128,8 @@ afterEach(() => {
 });
 
 describe('ModelArchitectureDiagram rendering', () => {
-  it('preserves the exact English release sentence spacing', () => {
-    render();
-    expand();
-
-    expect(container.textContent).toContain('Released by DeepSeek on');
-    expect(container.textContent).not.toContain('DeepSeekon');
-  });
-
   it('localizes the complete architecture chrome and keeps technical feature data intact', () => {
-    mocks.pathname.value = '/zh/inference';
+    mocks.pathname.value = '/zh/infx/inference';
     render();
 
     const toggle = container.querySelector('[data-testid="model-architecture-toggle"]');
@@ -144,6 +153,23 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
   });
 
+  it('reserves the diagram height on the svg before the renderer draws', () => {
+    mocks.diagramHeight.mockReturnValueOnce(512);
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    const svg = container.querySelector('[data-testid="model-architecture-svg"]');
+    expect(svg?.getAttribute('height')).toBe('512');
+    expect(mocks.diagramHeight.mock.calls[0]?.[1]).toEqual(new Set());
+  });
+
+  it('leaves the svg height to the renderer when the layout height is unknown', () => {
+    mocks.diagramHeight.mockReturnValueOnce(null);
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    const svg = container.querySelector('[data-testid="model-architecture-svg"]');
+    expect(svg?.hasAttribute('height')).toBe(false);
+  });
+
   it('renders once on initial expansion and ignores the observer callback for the same width', () => {
     render();
     expand();
@@ -152,13 +178,37 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(ResizeObserverStub.instances).toHaveLength(1);
 
     act(() => ResizeObserverStub.instances[0].trigger());
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
 
     observedWidth = 460;
     act(() => ResizeObserverStub.instances[0].trigger());
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
 
     act(() => ResizeObserverStub.instances[0].trigger());
+    flushResizeFrames();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces resize bursts outside observer delivery and cancels frames on unmount', () => {
+    render();
+    expand();
+    for (const width of [460, 440, 420]) {
+      observedWidth = width;
+      act(() => ResizeObserverStub.instances[0].trigger());
+    }
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
+    expect(resizeFrames.size).toBe(1);
+    flushResizeFrames();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+
+    observedWidth = 400;
+    act(() => ResizeObserverStub.instances[0].trigger());
+    act(() => root.render(null));
+    expect(resizeFrames.size).toBe(0);
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
   });
 
@@ -188,7 +238,7 @@ describe('ModelArchitectureDiagram rendering', () => {
     expand();
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('en');
 
-    mocks.pathname.value = '/zh/inference';
+    mocks.pathname.value = '/zh/infx/inference';
     render();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');

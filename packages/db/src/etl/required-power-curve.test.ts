@@ -55,7 +55,6 @@ describe('pure projected publication curve', () => {
       ).toThrow('shrink');
   });
   it('projects a same-attempt re-ingest, a newer attempt and an older attempt the way the write would', () => {
-    // Run 7 attempt 1 is stored with conc 1 and 16; its workflow row has id 70.
     const stored = [point(7, 1, { workflowRunId: 70 }), point(7, 16, { workflowRunId: 70 })];
     const attempts = [{ id: 70, runAttempt: 1 }];
     const incoming = [{ identity: { ...identity, conc: 1 }, image: 'same-image' }];
@@ -69,7 +68,6 @@ describe('pure projected publication curve', () => {
         runStartedAt: '2026-09-30T00:00:00Z',
         appendOnly,
       });
-    // Same attempt: only the re-ingested identity is replaced, and it keeps its stored date.
     const same = project(1, true);
     expect(concs(same.proposed)).toEqual([
       [16, 70],
@@ -79,9 +77,7 @@ describe('pure projected publication curve', () => {
       date: '2026-09-07',
       appendOnly: true,
     });
-    // A newer attempt supersedes every stored point of the run.
     expect(concs(project(2).proposed)).toEqual([[1, Number.MAX_SAFE_INTEGER]]);
-    // An attempt older than the stored one publishes nothing new.
     expect(concs(project(0).proposed)).toEqual([
       [1, 70],
       [16, 70],

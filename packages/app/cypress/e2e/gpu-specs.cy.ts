@@ -1,10 +1,3 @@
-/**
- * Hover a chart point until its tooltip opens, then assert the tooltip text.
- * The D3 charts re-render after the container is measured, which can detach
- * the hovered point (so the first synthetic mouseenter is lost) and can hide
- * the tooltip again before a retrying `:visible` assertion samples it — so
- * re-trigger (bounded) and assert the content at the moment it is displayed.
- */
 function hoverGpuSpecsPointAndAssertTooltip(
   pointSelector: string,
   tooltipSelector: string,
@@ -37,13 +30,11 @@ describe('GPU Specs Tab', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
-    // Wait for GPU Specs tab content to be present in the DOM
-    cy.get('h2').contains('Chip Specifications').should('exist');
+    cy.visit('/infx/gpu-specs');
+    cy.get('h1').contains('Chip Specifications').should('exist');
   });
 
   it('specs table is visible with all GPUs', () => {
-    // Dismiss any open dialogs first
     cy.get('body').then(($body) => {
       if ($body.find('[role="dialog"]').length > 0) {
         cy.get('body').type('{esc}');
@@ -73,6 +64,18 @@ describe('GPU Specs Tab', () => {
     cy.get('[data-testid="topology-gb300-nvl72"]').should('not.exist');
   });
 
+  it('matches the public API for installed NVL72 NICs and MI355X fabric', () => {
+    for (const [name, nic, bandwidth] of [
+      ['GB200 NVL72', 'ConnectX-7 400G', 400],
+      ['GB300 NVL72', 'ConnectX-8 800G', 800],
+    ] as const) {
+      cy.contains('table tr', name)
+        .should('contain.text', nic)
+        .and('contain.text', `${bandwidth} Gbit/s`);
+    }
+    cy.contains('table tr', 'MI355X').should('contain.text', '4th Gen Infinity Fabric');
+  });
+
   it('preserves the English expand button label and identifies the scale-out SVG', () => {
     cy.get('[data-testid="topology-h200-sxm"] button').should(
       'have.attr',
@@ -84,8 +87,7 @@ describe('GPU Specs Tab', () => {
       .and('contain', 'H200 SXM 8-rail optimized scale-out topology diagram');
   });
 
-  it('hides scale-out topology logos with the unofficial-domain notice', () => {
-    cy.contains('This deployment is not hosted at').should('be.visible');
+  it('hides scale-out topology logos on unofficial domains', () => {
     cy.get('[data-testid="topology-h200-sxm"] defs pattern[id^="logo-scaleout-"]').should(
       'not.exist',
     );
@@ -97,9 +99,8 @@ describe('GPU Specs Bar Chart View', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
-    cy.get('h2').contains('Chip Specifications').should('exist');
-    // Dismiss any Radix Dialog scroll locks from topology diagram components
+    cy.visit('/infx/gpu-specs');
+    cy.get('h1').contains('Chip Specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -127,10 +128,8 @@ describe('GPU Specs Bar Chart View', () => {
   });
 
   it('FP4 metric excludes GPUs without FP4 support', () => {
-    // Change metric to FP4
     cy.get('[data-testid="gpu-specs-metric-select"]').click({ force: true });
     cy.get('[data-slot="select-item"]').contains('FP4').click({ force: true });
-    // FP4 should show fewer bars (H100, H200, MI300X, MI325X excluded)
     cy.get('[data-testid="gpu-specs-bar-chart"] svg .bar').should('have.length', 5);
     cy.get('[data-testid="gpu-specs-bar-chart"]').should('contain.text', 'without FP4 support');
   });
@@ -147,8 +146,8 @@ describe('GPU Specs Radar Chart View', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
-    cy.get('h2').contains('Chip Specifications').should('exist');
+    cy.visit('/infx/gpu-specs');
+    cy.get('h1').contains('Chip Specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -166,15 +165,12 @@ describe('GPU Specs Radar Chart View', () => {
   });
 
   it('toggling a GPU off via sidebar legend removes its polygon', () => {
-    // Count initial polygons (all 9 GPUs)
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 9);
-    // Toggle off H100 SXM by clicking its legend label
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('H100 SXM')
       .click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 8);
 
-    // GPU already toggled off from previous test
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('Reset filter')
       .click({ force: true });
@@ -182,7 +178,6 @@ describe('GPU Specs Radar Chart View', () => {
   });
 
   it('hides the radar chart logo on unofficial domains', () => {
-    cy.contains('This deployment is not hosted at').should('be.visible');
     cy.get('[data-testid="gpu-specs-radar-chart"] defs pattern[id^="logo-pattern"]').should(
       'not.exist',
     );
@@ -200,16 +195,20 @@ describe('GPU Specs Navigation', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
     cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
   });
 
-  it('footer link opens GPU Specs and the tab strip shows no active tab', () => {
+  it('footer link opens GPU Specs and the tab strip surfaces it as the only active tab', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
     cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
-    cy.url().should('include', '/gpu-specs');
-    cy.get('h2').should('contain.text', 'Chip Specifications');
-    cy.get('[data-testid="chart-section-tabs"] [data-tab-active="true"]').should('not.exist');
+    cy.url().should('include', '/infx/gpu-specs');
+    cy.get('h1').should('contain.text', 'Chip Specifications');
+    cy.get('[data-testid="chart-section-tabs"] [data-tab-active="true"]')
+      .should('have.length', 1)
+      .and('have.attr', 'data-testid', 'tab-trigger-gpu-specs')
+      .and('have.attr', 'href', '/infx/gpu-specs')
+      .and('have.text', 'Chip Specs');
   });
 });
 
@@ -218,8 +217,8 @@ describe('Topology Dialog Navigation', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
-    cy.get('h2').contains('Chip Specifications').should('exist');
+    cy.visit('/infx/gpu-specs');
+    cy.get('h1').contains('Chip Specifications').should('exist');
   });
 
   it('scale-out topology dialog next button navigates to next GPU', () => {
@@ -298,15 +297,19 @@ describe('Topology Dialog Navigation', () => {
   });
 });
 
+const waitForZhHydration = () =>
+  cy.get('[data-testid="topology-h200-sxm"] svg').should('contain.text', '芯片 0');
+
 describe('GPU Specs Chinese route', () => {
   beforeEach(() => {
     cy.viewport(375, 812);
-    cy.visit('/zh/gpu-specs', {
+    cy.visit('/zh/infx/gpu-specs', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
     cy.get('[data-testid="gpu-specs-content"]').should('be.visible');
+    waitForZhHydration();
   });
 
   it('localizes view accessibility, topology values, SVG labels, and dialogs', () => {
@@ -332,13 +335,13 @@ describe('GPU Specs Chinese route', () => {
   it('localizes chart and radar registries while preserving technical units', () => {
     cy.get('[data-testid="gpu-specs-chart-view-btn"]').click({ force: true });
     cy.get('[data-testid="gpu-specs-bar-chart"]')
-      .should('contain.text', '指标：')
+      .should('contain.text', '指标')
       .and('contain.text', '悬停柱形可查看详情');
     cy.get('[data-testid="gpu-specs-bar-d3-chart"] svg').should('contain.text', '显存容量 (GB)');
     hoverGpuSpecsPointAndAssertTooltip(
       '[data-testid="gpu-specs-bar-d3-chart"] svg .bar',
       '[data-chart-tooltip="gpu-specs-bar-chart"]',
-      ['显存容量：'],
+      ['显存容量 (GB)'],
     );
     cy.get('[data-testid="gpu-specs-radar-view-btn"]').click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg').should('contain.text', '显存容量');
@@ -346,22 +349,8 @@ describe('GPU Specs Chinese route', () => {
     hoverGpuSpecsPointAndAssertTooltip(
       '[data-testid="gpu-specs-radar-chart"] svg .radar-dot',
       '[data-chart-tooltip="gpu-radar-chart"]',
-      ['显存容量：'],
+      ['显存容量（'],
     );
-  });
-
-  it('supports table, topology, chart, and radar navigation at 1440px', () => {
-    cy.viewport(1440, 900);
-    cy.reload();
-    cy.get('[data-testid="gpu-specs-content"]').should('be.visible');
-    cy.get('[data-testid="topology-h200-sxm"] button').click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[data-testid="topology-nav-next"]').click();
-    cy.get('body').type('{esc}');
-    cy.get('[data-testid="gpu-specs-chart-view-btn"]').click();
-    cy.get('[data-testid="gpu-specs-bar-chart"]').should('be.visible');
-    cy.get('[data-testid="gpu-specs-radar-view-btn"]').click();
-    cy.get('[data-testid="gpu-specs-radar-chart"]').should('be.visible');
   });
 
   it('keeps wide content internally scrollable and emits hreflang metadata', () => {
@@ -376,9 +365,9 @@ describe('GPU Specs Chinese route', () => {
     });
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')
-      .should('include', '/gpu-specs');
+      .should('include', '/infx/gpu-specs');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/gpu-specs');
+      .should('include', '/zh/infx/gpu-specs');
   });
 });

@@ -1,10 +1,13 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
+  formatDollars,
   formatDuration,
   formatInteractivity,
   formatNumber,
@@ -17,6 +20,8 @@ import { type ContentBlock } from '@/lib/agentic-workload-explorer/subagent';
 import { normalizeDashboardTrace } from '@semianalysisai/inferencex-db/proxytrace/shared/adapters';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface RequestData {
   id: string;
@@ -51,7 +56,6 @@ interface RequestData {
   isFastMode: boolean | null;
   privacyMode?: 'anon' | 'full';
   hashIds: string[] | null;
-  /** Block count when hashIds weren't loaded (fetched on demand instead). */
   hashCount?: number;
   hashTokenCount: number | null;
   subagentLabel: string | null;
@@ -61,9 +65,6 @@ interface RequestData {
   metadata: Record<string, unknown> | null;
 }
 
-// -- Content helpers ---------------------------------------------------------
-
-/** @visibleForTesting */
 export function extractTextFromContent(content: string | ContentBlock[] | undefined): string {
   if (!content) return '';
   if (typeof content === 'string') return content;
@@ -76,29 +77,22 @@ export function extractTextFromContent(content: string | ContentBlock[] | undefi
       return JSON.stringify(b.text);
     });
 
-  // If all text blocks are stripped, show one marker
   if (texts.every((t) => t === null)) {
     return texts.length > 0 ? '[content stripped]' : '';
   }
   return texts.filter((t) => t !== null).join('\n');
 }
 
-/** @visibleForTesting */
 export function stripSystemReminders(text: string): string {
   return text.replaceAll(/<system-reminder>[\s\S]*?<\/system-reminder>/gu, '').trim();
 }
 
-/** Pull the core pipeline stages from metadata. */
 function extractProcessors(metadata: Record<string, unknown> | null): string[] | null {
   const raw = metadata?.pipeline;
   if (!Array.isArray(raw)) return null;
   const ids = raw.filter((v): v is string => typeof v === 'string');
   return ids.length > 0 ? ids : null;
 }
-
-// -- Tree structure ----------------------------------------------------------
-// We build a list of "ConversationNode" items. Each node is either a
-// top-level message or a subagent group that contains its own messages.
 
 export interface MessageNode {
   kind: 'message';
@@ -155,15 +149,12 @@ export type ConversationNode = MessageNode | SubagentGroupNode;
 
 export function buildConversationTree(requests: RequestData[]): ConversationNode[] {
   const nodes: ConversationNode[] = [];
-  // Normalize OpenAI Responses bodies to the Anthropic shape
-  // before tagging/parsing — everything downstream assumes messages[] + content[].
   const normalizedRequests = requests.map((req) => normalizeDashboardTrace(req));
 
   for (const run of buildRequestRuns(normalizedRequests)) {
     if (run.kind === 'subagent_group') {
       nodes.push(buildSubagentGroupNode(run));
     } else {
-      // Main agent request — extract only the latest turn's messages
       const messages = parseRequestMessages(run.req, true);
       nodes.push(...messages);
     }
@@ -217,13 +208,6 @@ function buildSubagentGroupNode(
   };
 }
 
-/**
- * Parse a single request into MessageNodes.
- * For main agent: only extract the last user message + response (to avoid
- * re-showing the entire conversation history on each turn).
- * For subagents: extract only the latest turn to avoid repeating the growing
- * conversation history (each request carries prior tool calls + the original prompt).
- */
 function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageNode[] {
   const nodes: MessageNode[] = [];
   const body = req.requestBody;
@@ -241,14 +225,12 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
 
   const messages = body.messages;
 
-  // Build request context (system prompt, message count, tools)
   const requestContext = {
     system: Array.isArray(body.system) ? body.system : undefined,
     messageCount: messages.length,
     tools: Array.isArray(body.tools) ? body.tools : undefined,
   };
 
-  // Extract user message(s)
   const userMessages = onlyLastTurn
     ? messages.filter((m) => m.role === 'user').slice(-1)
     : messages.filter((m) => m.role === 'user');
@@ -282,27 +264,12 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
     isFirstNode = false;
   }
 
-  // Note: we intentionally skip the request message history (prior assistant
-  // tool_use and user tool_result blocks) to avoid showing the subagent's
-  // growing conversation history. Each request's response content is shown
-  // separately below.
-
-  // Extract response content
   const responseContent = req.responseBody?.body?.content;
   const stopReason = req.responseBody?.body?.stop_reason as string | null;
 
   if (responseContent && Array.isArray(responseContent)) {
-    // Codex Responses commonly interleaves text runs with reasoning/function_call
-    // items. We emit one node per run/block, so the suffix has to disambiguate
-    // them within a single request — a static `-response` collides on the second
-    // text run and React warns about duplicate keys.
     let textIdx = 0;
     let thinkingIdx = 0;
-    // Track which response-derived nodes were appended so we can stamp the
-    // request's usage/cost/timing on the most informative one *after* the
-    // response is fully parsed. Without deferring we'd attribute the billed
-    // numbers to the model's preamble ("I'll pull from official sources…")
-    // instead of the substantive final answer.
     const responseNodeIndices: number[] = [];
     const trackPush = (node: Omit<MessageNode, 'requestId' | 'isRequestAnchor'>) => {
       pushNode(node);
@@ -320,7 +287,6 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
       hashIds: null,
     };
 
-    // Flush accumulated consecutive text blocks into a single assistant node
     const flushText = (textParts: string[]) => {
       if (textParts.length === 0) return;
       const merged = textParts.join('').trim();
@@ -346,12 +312,9 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
         if (typeof block.text === 'string' && block.text) {
           pendingText.push(block.text);
         } else if (block.text === null) {
-          // Anon-stripped assistant text. Emit a placeholder so the message
-          // node still renders (and carries the request's stats).
           pendingText.push('[content stripped]');
         }
       } else {
-        // Non-text block breaks the run — flush accumulated text first
         flushText(pendingText);
         pendingText = [];
 
@@ -388,12 +351,8 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
         }
       }
     }
-    // Flush any trailing text blocks
     flushText(pendingText);
 
-    // Attribute the request's billing/timing to the most informative response
-    // node — preferring the last assistant text (the answer), and otherwise
-    // the last emitted node (e.g. when the response is purely tool_use).
     if (responseNodeIndices.length > 0) {
       let target = responseNodeIndices.at(-1)!;
       for (let k = responseNodeIndices.length - 1; k >= 0; k--) {
@@ -422,40 +381,94 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
   return nodes;
 }
 
-// -- Styles ------------------------------------------------------------------
-
+// Message kinds read from their label. User turns sit one surface step up, thinking is dashed.
 const typeStyles: Record<string, { label: string; color: string; border: string; bg: string }> = {
   user: {
     label: 'User',
-    color: 'text-blue-400',
-    border: 'border-blue-500/30',
-    bg: 'bg-blue-500/5',
+    color: 'text-foreground',
+    border: 'border-border/30',
+    bg: 'bg-muted/20',
   },
   assistant: {
     label: 'Assistant',
     color: 'text-foreground',
-    border: 'border-border',
+    border: 'border-border/30',
     bg: 'bg-card',
   },
   tool_use: {
     label: 'Tool Call',
-    color: 'text-indigo-400',
-    border: 'border-indigo-500/30',
-    bg: 'bg-indigo-500/5',
+    color: 'text-muted-foreground',
+    border: 'border-border/30',
+    bg: 'bg-card',
   },
   tool_result: {
     label: 'Tool Result',
-    color: 'text-emerald-400',
-    border: 'border-emerald-500/30',
-    bg: 'bg-emerald-500/5',
+    color: 'text-muted-foreground',
+    border: 'border-border/30',
+    bg: 'bg-card',
   },
   thinking: {
     label: 'Thinking',
-    color: 'text-amber-400',
-    border: 'border-amber-500/30',
-    bg: 'bg-amber-500/5',
+    color: 'text-muted-foreground',
+    border: 'border-dashed border-border/30',
+    bg: 'bg-card',
   },
 };
+
+export const ROW_PAGE_SIZE = 50;
+
+const ROW_STRINGS = {
+  en: {
+    showMore: (n: string) => `Show ${n} more`,
+    hidden: (n: string) => `(${n} hidden)`,
+  },
+  zh: {
+    showMore: (n: string) => `再显示 ${n} 条`,
+    hidden: (n: string) => `（还有 ${n} 条隐藏）`,
+  },
+};
+
+export function useRowLimit(resetKey?: unknown): [number, (n: number) => void, () => void] {
+  const [limit, setLimit] = useState(ROW_PAGE_SIZE);
+  useEffect(() => setLimit(ROW_PAGE_SIZE), [resetKey]);
+  const showMore = useCallback(() => setLimit((l) => l + ROW_PAGE_SIZE), []);
+  return [limit, setLimit, showMore];
+}
+
+export function ShowMoreRows({
+  shown,
+  total,
+  view,
+  onShowMore,
+}: {
+  shown: number;
+  total: number;
+  view: string;
+  onShowMore: () => void;
+}) {
+  const locale = useLocale();
+  const t = ROW_STRINGS[locale];
+  const hidden = total - shown;
+  if (hidden <= 0) return null;
+  return (
+    <div className="flex justify-center py-3">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          track('agentic_workload_session_rows_expanded', { view, shown, total });
+          onShowMore();
+        }}
+      >
+        {t.showMore(Math.min(ROW_PAGE_SIZE, hidden).toLocaleString(locale))}
+        <span className="tabular-nums text-muted-foreground">
+          {t.hidden(hidden.toLocaleString(locale))}
+        </span>
+      </Button>
+    </div>
+  );
+}
 
 const STRINGS = {
   en: {
@@ -467,7 +480,7 @@ const STRINGS = {
       thinking: 'Thinking',
     } as Record<string, string>,
     noConversationData: 'No conversation data to display',
-    searchPlaceholder: 'Search messages, tool calls, content...',
+    searchPlaceholder: 'Search messages and tool calls',
     search: 'Search',
     noMatches: (query: string) => `No matches for “${query}”`,
     requestDivider: 'request',
@@ -475,7 +488,7 @@ const STRINGS = {
     cached: 'cached',
     newCache: 'new',
     hashIdsLabel: (count: number) => `hash_ids [${count} blocks]`,
-    hashIdsFailed: 'Failed to load hash_ids — collapse and expand to retry.',
+    hashIdsFailed: 'Failed to load hash_ids. Collapse and expand to retry.',
     hashIdsLoading: 'Loading…',
     requestContext: 'Request Context',
     messagesInHistory: (n: number) => ` · ${n} messages in history`,
@@ -492,8 +505,8 @@ const STRINGS = {
     tokenIn: 'in:',
     tokenOut: 'out:',
     tok: 'tok',
-    cacheReadLabel: 'cache_read',
-    cacheCreateLabel: 'cache_create',
+    cacheReadLabel: 'Cache Read',
+    cacheCreateLabel: 'Cache create',
   },
   zh: {
     typeLabels: {
@@ -504,7 +517,7 @@ const STRINGS = {
       thinking: '思考',
     } as Record<string, string>,
     noConversationData: '无对话数据',
-    searchPlaceholder: '搜索消息、工具调用、内容…',
+    searchPlaceholder: '搜索消息和工具调用',
     search: '搜索',
     noMatches: (query: string) => `未找到“${query}”的匹配项`,
     requestDivider: '请求',
@@ -512,13 +525,13 @@ const STRINGS = {
     cached: '缓存命中',
     newCache: '新写入',
     hashIdsLabel: (count: number) => `hash_ids [${count} 个块]`,
-    hashIdsFailed: '加载 hash_ids 失败——收起后重新展开即可重试。',
+    hashIdsFailed: '加载 hash_ids 失败。收起后重新展开即可重试。',
     hashIdsLoading: '加载中…',
     requestContext: '请求上下文',
     messagesInHistory: (n: number) => ` · 历史消息 ${n} 条`,
     nTools: (n: number) => ` · ${n} 个工具`,
     systemPromptSuffix: ' · system prompt',
-    systemPromptHeading: 'System Prompt',
+    systemPromptHeading: '系统提示词',
     toolsHeading: (n: number) => `工具 (${n})`,
     showToolDefs: '查看工具定义',
     showLess: '收起',
@@ -529,12 +542,10 @@ const STRINGS = {
     tokenIn: '输入:',
     tokenOut: '输出:',
     tok: 'tok',
-    cacheReadLabel: 'cache_read',
-    cacheCreateLabel: 'cache_create',
+    cacheReadLabel: '缓存读取',
+    cacheCreateLabel: '缓存创建',
   },
 };
-
-// -- Components --------------------------------------------------------------
 
 function nodeMatchesQuery(node: ConversationNode, q: string): boolean {
   if (node.kind === 'message') {
@@ -542,7 +553,6 @@ function nodeMatchesQuery(node: ConversationNode, q: string): boolean {
       node.content.toLowerCase().includes(q) || (node.toolName?.toLowerCase().includes(q) ?? false)
     );
   }
-  // subagent group: check label and children
   if (node.label.toLowerCase().includes(q)) return true;
   return node.children.some(
     (c) => c.content.toLowerCase().includes(q) || (c.toolName?.toLowerCase().includes(q) ?? false),
@@ -553,18 +563,20 @@ export function ConversationView({
   requests,
   visibleNodeCount,
   reversed,
+  targetRequestId,
 }: {
   requests: RequestData[];
   visibleNodeCount?: number;
   reversed?: boolean;
+  targetRequestId?: string | null;
 }) {
   const t = STRINGS[useLocale()];
   const tree = buildConversationTree(requests);
   const [query, setQuery] = useState('');
+  useSearchTracking('agentic_workload_conversation_searched', query);
   const [showSearch, setShowSearch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cmd/Ctrl+F to open search
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
@@ -587,41 +599,43 @@ export function ConversationView({
     [tree, q],
   );
   const sliced = visibleNodeCount === undefined ? filtered : filtered.slice(0, visibleNodeCount);
-  const displayNodes = reversed ? [...sliced].toReversed() : sliced;
+  const allNodes = reversed ? [...sliced].toReversed() : sliced;
+  const [rowLimit, , showMoreRows] = useRowLimit(q);
+  const targetIndex = targetRequestId
+    ? allNodes.findIndex(
+        (node) =>
+          node.kind === 'message' && node.isRequestAnchor && node.requestId === targetRequestId,
+      )
+    : -1;
+  const paged = visibleNodeCount === undefined;
+  const shownCount = paged ? Math.max(rowLimit, targetIndex + 1) : allNodes.length;
+  const displayNodes = shownCount < allNodes.length ? allNodes.slice(0, shownCount) : allNodes;
 
   if (tree.length === 0) {
-    return <p className="text-sm text-muted-foreground py-8 text-center">{t.noConversationData}</p>;
+    return (
+      <EmptyState bare className="py-8">
+        {t.noConversationData}
+      </EmptyState>
+    );
   }
 
   return (
     <div className="space-y-1">
-      {/* Search bar — hidden during replay mode */}
       {visibleNodeCount === undefined && (
         <div className="flex items-center gap-2 mb-2">
           {showSearch ? (
             <div className="flex-1 relative">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              <Search
+                className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t.searchPlaceholder}
-                className="w-full text-xs font-mono bg-background border border-border rounded-md pl-8 pr-8 py-1.5 text-foreground placeholder:text-subtle focus:outline-none focus:border-foreground/30 transition-colors"
+                className="h-11 w-full rounded-md border border-input bg-background pl-8 pr-8 text-xs text-foreground placeholder:text-muted-foreground transition-colors focus:border-foreground/30 focus:outline-none md:h-8"
               />
               {query && (
                 <button
@@ -629,63 +643,38 @@ export function ConversationView({
                     track('agentic_workload_conversation_search_cleared');
                     setQuery('');
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-subtle hover:text-foreground"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <X className="size-3.5" aria-hidden="true" />
                 </button>
               )}
             </div>
           ) : (
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={() => {
-                track('agentic_workload_conversation_search_toggled', { open: true });
+                track('agentic_workload_conversation_search_toggled', { enabled: true });
                 setShowSearch(true);
                 requestAnimationFrame(() => inputRef.current?.focus());
               }}
-              className="flex items-center gap-1.5 px-2 py-1 text-2xs font-mono text-subtle hover:text-foreground border border-border rounded-md hover:bg-surface-hover transition-colors"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              <Search aria-hidden="true" />
               {t.search}
-              <kbd className="text-3xs text-subtle border border-border rounded px-1 py-px ml-1">
+              <kbd className="rounded-sm border border-border/30 px-1 text-3xs leading-4 text-muted-foreground">
                 ⌘F
               </kbd>
-            </button>
+            </Button>
           )}
           {showSearch && q && (
-            <span className="text-3xs font-mono text-subtle shrink-0">
+            <span className="text-3xs tabular-nums text-muted-foreground shrink-0">
               {filtered.length} / {tree.length}
             </span>
           )}
         </div>
       )}
 
-      {/* Results */}
       {displayNodes.map((node, idx) => {
         const isAnchor = node.kind === 'message' && node.isRequestAnchor === true;
         const showDivider = idx > 0 && isAnchor;
@@ -700,51 +689,50 @@ export function ConversationView({
           </Fragment>
         );
       })}
+      <ShowMoreRows
+        shown={displayNodes.length}
+        total={allNodes.length}
+        view="conversation"
+        onShowMore={showMoreRows}
+      />
       {q && filtered.length === 0 && (
-        <p className="text-xs text-muted-foreground py-6 text-center font-mono">
-          {t.noMatches(query)}
-        </p>
+        <p className="text-xs text-muted-foreground py-6 text-center">{t.noMatches(query)}</p>
       )}
     </div>
   );
 }
 
 function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlight?: string }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [expanded, setExpanded] = useState(true);
 
-  const timeRange =
-    formatTime(group.startTime) === formatTime(group.endTime)
-      ? formatTime(group.startTime)
-      : `${formatTime(group.startTime)} – ${formatTime(group.endTime)}`;
+  const startLabel = formatTime(group.startTime, locale);
+  const endLabel = formatTime(group.endTime, locale);
+  const timeRange = startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`;
 
   return (
-    <div className="rounded-md border border-purple-500/30 bg-purple-500/5">
-      {/* Group header */}
+    <div>
       <button
         onClick={() => {
           track('agentic_workload_conversation_subagent_toggled', {
-            expanded: !expanded,
+            enabled: !expanded,
             label: group.label,
           });
           setExpanded(!expanded);
         }}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-purple-500/10 transition-colors"
+        className="w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-4 py-3 text-left hover:bg-muted/40 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-          <span className="text-xs font-medium text-purple-400">{group.label}</span>
-          <Badge
-            variant="outline"
-            className="text-xs py-0 h-5 border-purple-500/30 text-purple-400"
-          >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-foreground">{group.label}</span>
+          <Badge variant="outline" className="text-xs py-0 h-5">
             {t.requestBadge(group.requestCount)}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground tabular-nums">
             {formatNumber(group.totalInputTokens)}/{formatNumber(group.totalOutputTokens)} tok
           </span>
           {(group.totalCacheRead > 0 || group.totalCacheCreation > 0) && (
-            <span className="text-xs text-cyan-400 font-mono">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {group.totalCacheRead > 0 && `${formatNumber(group.totalCacheRead)} ${t.cached}`}
               {group.totalCacheRead > 0 && group.totalCacheCreation > 0 && ' · '}
               {group.totalCacheCreation > 0 &&
@@ -752,19 +740,21 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="ml-auto flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {group.totalCost > 0 && (
-            <span className="font-mono text-emerald-400">{formatCost(group.totalCost)}</span>
+            <span className="tabular-nums">{formatDollars(group.totalCost)}</span>
           )}
-          <span className="font-mono">{formatDuration(group.totalDurationMs)}</span>
+          <span className="tabular-nums">{formatDuration(group.totalDurationMs)}</span>
           <span>{timeRange}</span>
-          <span>{expanded ? '▲' : '▼'}</span>
+          <ChevronDown
+            className={`size-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
         </div>
       </button>
 
-      {/* Expanded children */}
       {expanded && (
-        <div className="border-t border-purple-500/20 ml-4 pl-4 border-l-2 border-l-purple-500/20 py-2 pr-4 space-y-1">
+        <div className="ml-4 pl-4 border-l border-border/30 py-2 pr-4 space-y-1">
           {group.children.map((child, idx) => {
             const showDivider = idx > 0 && child.isRequestAnchor === true;
             return (
@@ -784,19 +774,13 @@ function RequestDivider() {
   const t = STRINGS[useLocale()];
   return (
     <div className="flex items-center gap-2 my-2" role="separator" aria-label="next request">
-      <div className="h-px flex-1 bg-border" />
-      <span className="text-3xs font-mono uppercase tracking-eyebrow-wide text-subtle">
-        {t.requestDivider}
-      </span>
-      <div className="h-px flex-1 bg-border" />
+      <div className="h-px flex-1 bg-border/30" />
+      <span className="text-xs text-muted-foreground font-medium">{t.requestDivider}</span>
+      <div className="h-px flex-1 bg-border/30" />
     </div>
   );
 }
 
-/**
- * Collapsed hash_ids list. When the session was loaded without hash_ids (the
- * conversation tab), the list is fetched for this one request on first expand.
- */
 function HashIdsDetails({
   requestId,
   hashIds,
@@ -828,10 +812,10 @@ function HashIdsDetails({
 
   return (
     <details className="mt-2" onToggle={onToggle}>
-      <summary className="text-3xs font-mono text-cyan-400 cursor-pointer hover:text-cyan-300">
+      <summary className="text-3xs font-mono text-muted-foreground cursor-pointer hover:text-foreground">
         {t.hashIdsLabel(count)}
       </summary>
-      <div className="text-3xs font-mono text-cyan-400/70 mt-1 break-all leading-relaxed">
+      <div className="text-3xs font-mono text-muted-foreground mt-1 break-all leading-relaxed">
         {loaded ? `[${loaded.join(', ')}]` : state === 'error' ? t.hashIdsFailed : t.hashIdsLoading}
       </div>
     </details>
@@ -847,7 +831,8 @@ function MessageRow({
   compact?: boolean;
   highlight?: string;
 }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const style = typeStyles[msg.type] || typeStyles.assistant;
 
   return (
@@ -856,9 +841,7 @@ function MessageRow({
       data-request-id={msg.requestId}
       className={`rounded-md border ${style.border} ${style.bg} ${compact ? 'px-3 py-2' : 'px-4 py-3'} scroll-mt-20`}
     >
-      {/* Header. The badge cluster can get long (pipeline processors etc.) —
-          let it wrap and keep the metrics block from being pushed off-screen. */}
-      <div className="flex items-start justify-between gap-x-3 mb-1.5">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-1.5">
         <div className="flex items-center gap-2 flex-wrap gap-y-1 min-w-0">
           <span className={`text-xs font-medium ${style.color}`}>
             {t.typeLabels[msg.type] ?? style.label}
@@ -869,44 +852,33 @@ function MessageRow({
             </Badge>
           )}
           {msg.model && !compact && (
-            <span className="text-xs text-muted-foreground font-mono">{msg.model}</span>
+            <span className="text-xs text-muted-foreground">{msg.model}</span>
           )}
           {msg.fastMode && (
-            <Badge
-              variant="outline"
-              className="text-xs py-0 h-5 border-orange-500/30 text-orange-400"
-            >
+            <Badge variant="outline" className="text-xs py-0 h-5">
               fast
             </Badge>
           )}
           {msg.is1mContext && (
-            <Badge
-              variant="outline"
-              className="text-xs py-0 h-5 border-sky-500/30 text-sky-400 font-mono"
-            >
+            <Badge variant="outline" className="text-xs py-0 h-5 tabular-nums">
               1M
             </Badge>
           )}
-          {msg.isRequestAnchor &&
-            msg.processors?.map((p) => (
-              <Badge
-                key={p}
-                variant="outline"
-                className="text-xs py-0 h-5 border-violet-500/30 text-violet-400 font-mono"
-              >
-                {p}
-              </Badge>
-            ))}
+          {msg.isRequestAnchor && msg.processors && msg.processors.length > 0 && (
+            <span className="text-xs font-mono text-muted-foreground">
+              {msg.processors.join(' · ')}
+            </span>
+          )}
           {msg.stopReason && msg.stopReason !== 'end_turn' && (
             <Badge variant="outline" className="text-xs py-0 h-5">
               {msg.stopReason}
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0 flex-wrap justify-end gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-start gap-x-3 gap-y-1 text-xs text-muted-foreground sm:justify-end">
           <TokenInfo msg={msg} />
           {msg.ttftMs !== null && (
-            <span className="font-mono">TTFT {formatDuration(msg.ttftMs)}</span>
+            <span className="tabular-nums">TTFT {formatDuration(msg.ttftMs)}</span>
           )}
           {(() => {
             const ps = computePrefillSpeed(
@@ -915,23 +887,21 @@ function MessageRow({
               msg.ttftMs,
             );
             return ps === null ? null : (
-              <span className="font-mono text-sky-500">{formatPrefillSpeed(ps)}</span>
+              <span className="tabular-nums">{formatPrefillSpeed(ps)}</span>
             );
           })()}
           {msg.tpotMs !== null && (
-            <span className="font-mono">{formatInteractivity(msg.tpotMs)}</span>
+            <span className="tabular-nums">{formatInteractivity(msg.tpotMs)}</span>
           )}
           {msg.durationMs !== null && (
-            <span className="font-mono">E2E {formatDuration(msg.durationMs)}</span>
+            <span className="tabular-nums">E2E {formatDuration(msg.durationMs)}</span>
           )}
-          <span>{formatTime(msg.timestamp)}</span>
+          <span>{formatTime(msg.timestamp, locale)}</span>
         </div>
       </div>
 
-      {/* Request context (system prompt, message history, tools) */}
       {msg.requestContext && <RequestContextBlock context={msg.requestContext} />}
 
-      {/* Content */}
       {msg.type === 'tool_use' ? (
         <ToolCallContent name={msg.toolName} input={msg.toolInput} />
       ) : msg.type === 'tool_result' ? (
@@ -940,9 +910,6 @@ function MessageRow({
         <TextContent text={msg.content} type={msg.type} highlight={highlight} />
       )}
 
-      {/* Hash IDs — only shown for anon traces. Full-mode traces also carry
-          hash blocks for debugging, but we keep them out of the UI to avoid
-          duplicating information already visible in the redacted body. */}
       {msg.privacyMode !== 'full' && (msg.hashIds?.length ?? msg.hashCount ?? 0) > 0 && (
         <HashIdsDetails
           requestId={msg.requestId}
@@ -973,7 +940,7 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
 
   return (
     <details className="mb-2">
-      <summary className="text-3xs font-mono text-muted-foreground cursor-pointer hover:text-foreground">
+      <summary className="text-3xs text-muted-foreground cursor-pointer hover:text-foreground">
         {t.requestContext}
         {context.messageCount > 1 && t.messagesInHistory(context.messageCount)}
         {hasTools && t.nTools(context.tools!.length)}
@@ -982,24 +949,24 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
       <div className="mt-2 space-y-2">
         {hasSystem && (
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-amber-400 mb-1">
+            <div className="text-xs font-medium text-muted-foreground mb-1">
               {t.systemPromptHeading}
             </div>
-            <pre className="text-xs font-mono bg-amber-500/5 border border-amber-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
+            <pre className="text-xs font-mono bg-muted/40 rounded-md p-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
               {systemTexts!.join('\n\n---\n\n')}
             </pre>
           </div>
         )}
         {hasTools && (
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-indigo-400 mb-1">
+            <div className="text-xs font-medium text-muted-foreground mb-1">
               {t.toolsHeading(context.tools!.length)}
             </div>
             <details>
-              <summary className="text-3xs font-mono text-muted-foreground cursor-pointer">
+              <summary className="text-3xs text-muted-foreground cursor-pointer">
                 {t.showToolDefs}
               </summary>
-              <pre className="text-xs font-mono bg-indigo-500/5 border border-indigo-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
+              <pre className="text-xs font-mono bg-muted/40 rounded-md p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
                 {JSON.stringify(context.tools, null, 2)}
               </pre>
             </details>
@@ -1019,7 +986,7 @@ function HighlightText({ text, query }: { text: string; query?: string }) {
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === query.toLowerCase() ? (
-          <mark key={i} className="bg-amber-500/30 text-foreground rounded-sm px-px">
+          <mark key={i} className="bg-primary/25 text-foreground rounded-sm px-px">
             {part}
           </mark>
         ) : (
@@ -1043,9 +1010,7 @@ function TextContent({
   const [expanded, setExpanded] = useState(false);
 
   if (text === null) {
-    return (
-      <div className="text-xs font-mono text-muted-foreground italic">{t.contentStripped}</div>
-    );
+    return <div className="text-xs text-muted-foreground">{t.contentStripped}</div>;
   }
   if (!text) return null;
   if (typeof text !== 'string') {
@@ -1055,11 +1020,6 @@ function TextContent({
   const truncated = text.length > maxPreview;
   const displayText = truncated && !expanded ? `${text.slice(0, maxPreview)}...` : text;
 
-  // Render markdown for user/assistant messages so code fences, lists, headers
-  // etc. display structurally instead of as raw syntax. Skip when there's an
-  // active search highlight (the highlighter doesn't compose with the markdown
-  // AST) and for `thinking` blocks (model output of structured reasoning we
-  // already truncate aggressively — markdown adds little there).
   const useMarkdown = !highlight && (type === 'user' || type === 'assistant');
 
   return (
@@ -1068,10 +1028,10 @@ function TextContent({
         <button
           type="button"
           onClick={() => {
-            track('agentic_workload_conversation_text_toggled', { expanded: !expanded });
+            track('agentic_workload_conversation_text_toggled', { enabled: !expanded });
             setExpanded((value) => !value);
           }}
-          className="text-3xs font-mono text-subtle hover:text-foreground uppercase tracking-eyebrow"
+          className="text-xs text-muted-foreground hover:text-foreground font-medium"
         >
           {expanded ? t.showLess : t.showFull(formatNumber(text.length))}
         </button>
@@ -1097,9 +1057,7 @@ function MarkdownText({ text }: { text: string }) {
           h1: ({ children }) => <h1 className="text-base font-semibold mt-3 mb-1.5">{children}</h1>,
           h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-1.5">{children}</h2>,
           h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
-          h4: ({ children }) => (
-            <h4 className="text-xs font-semibold uppercase tracking-wide mt-2 mb-1">{children}</h4>
-          ),
+          h4: ({ children }) => <h4 className="text-xs font-medium mt-2 mb-1">{children}</h4>,
           ul: ({ children }) => (
             <ul className="list-disc list-outside pl-5 mb-2 space-y-0.5">{children}</ul>
           ),
@@ -1108,7 +1066,7 @@ function MarkdownText({ text }: { text: string }) {
           ),
           li: ({ children }) => <li>{children}</li>,
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-border pl-3 text-muted-foreground italic mb-2">
+            <blockquote className="border-l-2 border-border/30 pl-3 text-muted-foreground mb-2">
               {children}
             </blockquote>
           ),
@@ -1117,23 +1075,23 @@ function MarkdownText({ text }: { text: string }) {
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="text-sky-400 hover:underline underline-offset-2"
+              className="text-brand underline-offset-2 hover:underline"
             >
               {children}
             </a>
           ),
-          hr: () => <hr className="my-3 border-border" />,
+          hr: () => <hr className="my-3 border-border/30" />,
           table: ({ children }) => (
             <div className="overflow-x-auto mb-2">
               <table className="text-xs font-mono border-collapse">{children}</table>
             </div>
           ),
           th: ({ children }) => (
-            <th className="border border-border bg-surface px-2 py-1 text-left font-semibold">
+            <th className="border border-border/30 bg-card px-2 py-1 text-left font-semibold">
               {children}
             </th>
           ),
-          td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
+          td: ({ children }) => <td className="border border-border/30 px-2 py-1">{children}</td>,
           code({ className, children, ...props }) {
             const isBlock = /language-/u.test(className ?? '');
             if (isBlock) {
@@ -1144,16 +1102,13 @@ function MarkdownText({ text }: { text: string }) {
               );
             }
             return (
-              <code
-                className="font-mono text-xs px-1 py-px rounded bg-surface border border-border"
-                {...props}
-              >
+              <code className="font-mono text-xs px-1 py-px rounded-sm bg-muted/50" {...props}>
                 {children}
               </code>
             );
           },
           pre: ({ children }) => (
-            <pre className="text-xs font-mono bg-surface border border-border rounded p-2.5 overflow-x-auto mb-2 whitespace-pre">
+            <pre className="text-xs font-mono bg-muted/40 rounded-md p-2.5 overflow-x-auto mb-2 whitespace-pre">
               {children}
             </pre>
           ),
@@ -1185,12 +1140,12 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
       <div className="space-y-1">
         <div className="text-sm font-mono text-muted-foreground">{String(input.file_path)}</div>
         {input.old_string !== null && (
-          <pre className="text-xs font-mono bg-red-500/10 text-red-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-xs font-mono bg-destructive/10 text-destructive rounded-md p-2 overflow-x-auto max-h-32 overflow-y-auto">
             {String(input.old_string)}
           </pre>
         )}
         {input.new_string !== null && (
-          <pre className="text-xs font-mono bg-emerald-500/10 text-emerald-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-xs font-mono bg-success/10 text-success rounded-md p-2 overflow-x-auto max-h-32 overflow-y-auto">
             {String(input.new_string)}
           </pre>
         )}
@@ -1200,7 +1155,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 
   if (name === 'Bash' && input.command) {
     return (
-      <pre className="text-sm font-mono bg-muted/50 rounded p-2 overflow-x-auto">
+      <pre className="text-sm font-mono bg-muted/50 rounded-md p-2 overflow-x-auto">
         $ {String(input.command)}
       </pre>
     );
@@ -1215,7 +1170,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
             <summary className="text-xs text-muted-foreground cursor-pointer">
               {t.nLines(String(input.content).split('\n').length)}
             </summary>
-            <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
+            <pre className="text-xs font-mono bg-muted/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
               {String(input.content)}
             </pre>
           </details>
@@ -1233,11 +1188,10 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
     );
   }
 
-  // Default: show JSON
   return (
     <details>
       <summary className="text-xs text-muted-foreground cursor-pointer">{t.parameters}</summary>
-      <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
+      <pre className="text-xs font-mono bg-muted/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
         {JSON.stringify(input, null, 2)}
       </pre>
     </details>
@@ -1247,9 +1201,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 function ToolResultContent({ content, isError }: { content: string | unknown; isError?: boolean }) {
   const t = STRINGS[useLocale()];
   if (content === null) {
-    return (
-      <div className="text-xs font-mono text-muted-foreground italic">{t.contentStripped}</div>
-    );
+    return <div className="text-xs text-muted-foreground">{t.contentStripped}</div>;
   }
   if (!content) return null;
   if (typeof content !== 'string') {
@@ -1261,13 +1213,13 @@ function ToolResultContent({ content, isError }: { content: string | unknown; is
   return (
     <details open={!truncated}>
       <summary
-        className={`text-xs font-mono ${isError ? 'text-red-400' : 'text-muted-foreground'} ${truncated ? 'cursor-pointer' : 'list-none'} whitespace-pre-wrap break-words`}
+        className={`text-xs font-mono ${isError ? 'text-destructive' : 'text-muted-foreground'} ${truncated ? 'cursor-pointer' : 'list-none'} whitespace-pre-wrap break-words`}
       >
         {truncated ? `${content.slice(0, maxPreview)}...` : content}
       </summary>
       {truncated && (
         <pre
-          className={`text-xs font-mono ${isError ? 'text-red-400' : 'text-muted-foreground'} mt-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap`}
+          className={`text-xs font-mono ${isError ? 'text-destructive' : 'text-muted-foreground'} mt-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap`}
         >
           {content}
         </pre>
@@ -1288,11 +1240,6 @@ function is1MContext(headers: Record<string, string> | null): boolean {
   return beta.includes('context-1m-');
 }
 
-function formatCost(cost: number): string {
-  if (cost < 0.01) return `<$0.01`;
-  return `$${cost.toFixed(3)}`;
-}
-
 function TokenInfo({ msg }: { msg: MessageNode }) {
   const t = STRINGS[useLocale()];
   if (msg.inputTokens === null && msg.outputTokens === null) return null;
@@ -1303,19 +1250,19 @@ function TokenInfo({ msg }: { msg: MessageNode }) {
   const cost = msg.costUsd;
 
   return (
-    <span className="font-mono flex items-center gap-1.5">
+    <span className="flex items-center gap-1.5 tabular-nums">
       {hasCache ? (
         <>
           <span className="text-muted-foreground">
             {t.tokenIn} {formatNumber(msg.inputTokens || 0)}
           </span>
           {cacheRead > 0 && (
-            <span className="text-cyan-400">
+            <span>
               +{formatNumber(cacheRead)} {t.cacheReadLabel}
             </span>
           )}
           {cacheCreation > 0 && (
-            <span className="text-amber-400">
+            <span>
               +{formatNumber(cacheCreation)} {t.cacheCreateLabel}
             </span>
           )}
@@ -1328,7 +1275,7 @@ function TokenInfo({ msg }: { msg: MessageNode }) {
           {formatNumber(msg.inputTokens || 0)}/{formatNumber(msg.outputTokens || 0)} {t.tok}
         </span>
       )}
-      {cost !== null && <span className="text-emerald-400">{formatCost(cost)}</span>}
+      {cost !== null && <span>{formatDollars(cost)}</span>}
     </span>
   );
 }

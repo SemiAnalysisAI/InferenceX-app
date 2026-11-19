@@ -32,7 +32,6 @@ const gb300 = (overrides: Partial<InferenceData>) =>
     run_url: `${RUN}/35319969159/attempts/1`,
     ...overrides,
   });
-// Interactivity (higher is better) against J/output token (lower is better).
 const official = [
   point({ id: 1, conc: 128, x: 31.6, y: 0.824 }),
   point({ id: 2, conc: 1, x: 186.9, y: 9.065 }),
@@ -40,7 +39,6 @@ const official = [
   gb300({ id: 4, conc: 4, x: 172.2, y: 4.634 }),
   gb300({ id: 5, conc: 64, x: 72.2, y: 1.311 }),
 ];
-// Faster and cheaper than GB300 c1, so the overlay point displaces it.
 const overlay = [
   point({
     id: 0,
@@ -58,7 +56,7 @@ const frontier = globalParetoFrontier(eligible, true, false);
 function mountPanel() {
   cy.viewport(1280, 1000);
   mountWithProviders(
-    <PathnameContext.Provider value="/inference">
+    <PathnameContext.Provider value="/infx/inference">
       <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
         <FrontierPointsPanel
           chartId="frontier-test"

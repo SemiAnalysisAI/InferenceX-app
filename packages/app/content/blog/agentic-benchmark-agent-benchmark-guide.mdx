@@ -19,7 +19,7 @@ That distinction changes the workload. A conventional inference benchmark can se
 
 AgentX is InferenceX's open benchmark for this workload. It converts privacy-preserving shapes from opt-in coding-agent traces into deterministic AIPerf replays, then compares complete hardware and software serving configurations across concurrent agent clients.
 
-<DashboardCTA href="/inference?i_seq=agentic-traces">
+<DashboardCTA href="/infx/inference?i_seq=agentic-traces">
   Compare live AgentX inference results →
 </DashboardCTA>
 
@@ -112,7 +112,7 @@ AgentX v1.0 contains 393 published sessions selected from opt-in Claude Code tra
   caption="AgentX v1.0 request distributions. The median request has 142,016 input tokens and 444 output tokens."
 />
 
-The full variant retains contexts up to 1M tokens. The 256K variant removes requests above its context cap while preserving the timing and subagent overlap of the requests that remain. The [AgentX methodology](/agentx/methodology) publishes the dataset rules, figures, and source links.
+The full variant retains contexts up to 1M tokens. The 256K variant removes requests above its context cap while preserving the timing and subagent overlap of the requests that remain. The [AgentX methodology](/infx/agentx/methodology) publishes the dataset rules, figures, and source links.
 
 ## Benchmark controls that make comparisons valid
 
@@ -179,7 +179,7 @@ Agentic inference exposes several bottlenecks that fixed prompt batches can unde
 - **Long-context kernels:** Attention, sparse attention, normalization, and graph-capture choices can behave differently across varying sequence lengths.
 - **Speculative decoding:** Acceptance controls and scheduler lifetime affect both throughput and interactivity.
 
-The [AgentX optimization tracker](/agentx/optimizations) documents concrete changes in vLLM, SGLang, TensorRT-LLM, ATOM, Dynamo, and KV-cache systems that were exposed by this workload.
+The [AgentX optimization tracker](/infx/agentx/optimizations) documents concrete changes in vLLM, SGLang, TensorRT-LLM, ATOM, Dynamo, and KV-cache systems that were exposed by this workload.
 
 ## How to compare AgentX results
 
@@ -203,7 +203,7 @@ AgentX can measure serving capacity, responsiveness, cache reuse, memory pressur
 
 AgentX cannot tell whether the model wrote correct code, selected the right tool, followed a business policy, or completed the source task. The synthetic payload deliberately removes those semantics. Use a task evaluation for agent quality and AgentX for inference performance. Keep the scores separate because they describe different systems questions.
 
-<DashboardCTA href="/inference?i_seq=agentic-traces">
+<DashboardCTA href="/infx/inference?i_seq=agentic-traces">
   Explore the AgentX throughput-interactivity frontier →
 </DashboardCTA>
 

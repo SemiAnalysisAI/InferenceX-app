@@ -1,5 +1,3 @@
-/* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
-
 .csgo-scene {
   position: fixed;
   inset: 0;
@@ -64,7 +62,6 @@
   border-top-color: var(--primary);
 }
 
-.csgo .circuit-bg,
 .csgo .autumn-leaves,
 html[data-inferencex-embed] .csgo-scene {
   display: none;

@@ -3,7 +3,6 @@ import { configCacheKey } from './config-cache';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';
 
-/** Minimal valid meta_env.json for eval ZIPs. */
 function makeMeta(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -19,7 +18,6 @@ function makeMeta(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid results JSON for eval ZIPs. */
 function makeResults(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     lm_eval_version: '0.4.7',
@@ -39,7 +37,6 @@ function makeResults(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid flat row from agg_eval_all.json. */
 function makeAggRow(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -60,6 +57,16 @@ function makeAggRow(overrides: Record<string, any> = {}): Record<string, any> {
 }
 
 describe('mapEvalRow', () => {
+  it('reassigns the framework for a registered run framework override', () => {
+    const meta = makeMeta({ infmax_model_prefix: 'qwen3.5', hw: 'tpuv7', precision: 'fp8' });
+    const [overridden] = mapEvalRow(meta, makeResults(), createSkipTracker(), 40744397059);
+    expect(overridden.config.framework).toBe('llmd-vllm');
+    const [otherRun] = mapEvalRow(meta, makeResults(), createSkipTracker(), 40744397060);
+    expect(otherRun.config.framework).toBe('vllm');
+    const [noRun] = mapEvalRow(meta, makeResults(), createSkipTracker());
+    expect(noRun.config.framework).toBe('vllm');
+  });
+
   it('maps valid meta + results to EvalParams array', () => {
     const tracker = createSkipTracker();
     const result = mapEvalRow(makeMeta(), makeResults(), tracker);
@@ -291,6 +298,27 @@ describe('mapEvalRow', () => {
   });
 });
 
+function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
+  return makeAggRow({
+    hw: 'B300',
+    framework: 'dynamo-trt',
+    is_multinode: true,
+    tp: 4,
+    ep: 1,
+    dp_attention: 'true',
+    prefill_tp: 4,
+    prefill_ep: 1,
+    prefill_dp_attention: 'true',
+    prefill_num_workers: 7,
+    decode_tp: 8,
+    decode_ep: 8,
+    decode_dp_attention: 'true',
+    decode_num_workers: 1,
+    conc: 3072,
+    ...overrides,
+  });
+}
+
 describe('mapAggEvalRow', () => {
   it('maps a valid agg row to EvalParams', () => {
     const tracker = createSkipTracker();
@@ -357,28 +385,6 @@ describe('mapAggEvalRow', () => {
   });
 
   describe('v2 schema (disagg / multinode)', () => {
-    /** Row carrying the v2 prefill/decode fields produced by disagg CI runs. */
-    function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
-      return makeAggRow({
-        hw: 'B300',
-        framework: 'dynamo-trt',
-        is_multinode: true,
-        tp: 4,
-        ep: 1,
-        dp_attention: 'true',
-        prefill_tp: 4,
-        prefill_ep: 1,
-        prefill_dp_attention: 'true',
-        prefill_num_workers: 7,
-        decode_tp: 8,
-        decode_ep: 8,
-        decode_dp_attention: 'true',
-        decode_num_workers: 1,
-        conc: 3072,
-        ...overrides,
-      });
-    }
-
     it('reads prefill_*/decode_* instead of top-level tp/ep', () => {
       const tracker = createSkipTracker();
       const result = mapAggEvalRow(makeV2Row(), tracker);
@@ -425,8 +431,6 @@ describe('mapAggEvalRow', () => {
         tracker,
       );
 
-      // dynamo-* / mori-* canonicals carry disagg semantics via their name — the
-      // standalone disagg signal (workers, multinode) is moot under these frameworks.
       expect(result!.config.disagg).toBe(true);
     });
 
@@ -505,7 +509,6 @@ describe('mapAggEvalRow', () => {
         tracker,
       )!.config;
 
-      // Any difference in the natural-key fields is enough to separate configs.
       expect(configCacheKey(a)).not.toBe(configCacheKey(b));
     });
   });

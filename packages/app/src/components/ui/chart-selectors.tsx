@@ -8,6 +8,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { NewBadge } from '@/components/ui/new-badge';
+import { CaptionField } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -29,23 +30,25 @@ import {
   getSequenceCategoryForModel,
   getSequenceLabel,
   groupByCategory,
+  isRegisteredModel,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
     model: 'Model',
     modelTooltip: 'The language model being benchmarked.',
-    newModel: 'NEW',
+    newModel: 'New',
     islOsl: 'ISL / OSL',
     islOslTooltip:
       'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
     scenario: 'Scenario',
     scenarioTooltip:
       'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). The Agentic scenario replays real agentic workloads with variable inputs/outputs.',
-    agenticScenarioTooltip: 'Realistic Long Context Multi Turn Agentic Workload with Sub Agents.',
-    agenticScenarioLearnMore: 'Learn More Here',
+    agenticScenarioTooltip: 'Realistic Long-Context, Multi-Turn Agentic Workload with Sub-Agents',
+    agenticScenarioLearnMore: 'Learn More',
     latencyPercentile: 'Latency Percentile',
     latencyPercentileTooltip:
       'Percentile of the latency distribution used for the chart x-axis on agentic runs.',
@@ -61,6 +64,9 @@ const STRINGS = {
     deprecatedModelReason: 'Model is no longer actively benchmarked.',
     deprecatedSequenceReason:
       'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
+    unregisteredModels: 'Unregistered models',
+    unregisteredModelReason:
+      'Only present in an unofficial run. InferenceX has no registry entry for it, so it is shown by its raw model prefix.',
   },
   zh: {
     model: '模型',
@@ -73,7 +79,7 @@ const STRINGS = {
     scenarioTooltip:
       '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic 场景回放具有可变输入/输出的真实智能体工作负载。',
     agenticScenarioTooltip: '真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。',
-    agenticScenarioLearnMore: '点此了解更多',
+    agenticScenarioLearnMore: '了解更多',
     latencyPercentile: '延迟分位数',
     latencyPercentileTooltip: '用于智能体运行图表 X 轴的延迟分布分位数。',
     precision: '精度',
@@ -87,6 +93,9 @@ const STRINGS = {
     deprecated: '已弃用',
     deprecatedModelReason: '该模型已不再进行活跃基准测试。',
     deprecatedSequenceReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
+    unregisteredModels: '未注册模型',
+    unregisteredModelReason:
+      '仅出现在非官方运行中。InferenceX 的模型注册表中尚无该模型，因此直接显示其原始模型前缀。',
   },
 } as const;
 
@@ -115,9 +124,6 @@ function CategorySectionTitle({
   );
 }
 
-// Full-color creator logo beside each model name, in the dropdown rows and
-// the closed trigger alike. `ModelLogo` renders nothing for models without
-// a configured logo, so rows degrade to plain text instead of breaking.
 const toOption = (model: string, badge?: ReactNode) => ({
   value: model,
   label: getModelLabel(model as Model),
@@ -133,18 +139,15 @@ interface ModelSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availableModels: string[];
   'data-testid'?: string;
-  /**
-   * Optional affordance rendered beside the closed trigger (outside the
-   * dropdown) — e.g. the
-   * model-architecture deep-dive link on the inference dashboard.
-   */
   trailing?: ReactNode;
-  /**
-   * Models whose dropdown rows carry a NEW pill (localized). The inference
-   * dashboard passes the featured AgentX set; surfaces that don't highlight
-   * new models simply omit the prop.
-   */
   newModels?: ReadonlySet<string>;
+  /**
+   * Extra details right-aligned on each model's row, e.g. its history and vendors. When set,
+   * the dropdown panel widens beyond the trigger so the details have room.
+   */
+  modelDetails?: ReadonlyMap<string, ReactNode>;
+  /** Called with a model once the user shows intent toward its option. */
+  onOptionIntent?: (value: Model) => void;
 }
 
 export function ModelSelector({
@@ -157,14 +160,22 @@ export function ModelSelector({
   'data-testid': testId,
   trailing,
   newModels,
+  modelDetails,
+  onOptionIntent,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
-  const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
+  const groups = groupByCategory(availableModels.filter(isRegisteredModel), (m) =>
+    getModelCategory(m),
+  );
+  const unregistered = availableModels.filter((m) => !isRegisteredModel(m));
   const optionFor = (model: string) =>
     toOption(
       model,
-      newModels?.has(model) ? (
-        <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>
+      newModels?.has(model) || modelDetails?.has(model) ? (
+        <>
+          {newModels?.has(model) && <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>}
+          {modelDetails?.get(model)}
+        </>
       ) : undefined,
     );
   const sections = [
@@ -211,6 +222,21 @@ export function ModelSelector({
           },
         ]
       : []),
+    ...(unregistered.length > 0
+      ? [
+          {
+            id: 'unregistered',
+            header: (
+              <CategorySectionTitle
+                id="unregistered"
+                label={t.unregisteredModels}
+                reason={t.unregisteredModelReason}
+              />
+            ),
+            options: unregistered.map(optionFor),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -220,6 +246,7 @@ export function ModelSelector({
         <div className="min-w-0 flex-1">
           <MultiSelect
             sections={sections}
+            missingSelectedOption={toOption}
             value={[value]}
             onChange={(values) => {
               const next = values[0];
@@ -229,6 +256,7 @@ export function ModelSelector({
             }}
             open={open}
             onOpenChange={onOpenChange}
+            onOptionIntent={onOptionIntent && ((values) => onOptionIntent(values[0] as Model))}
             triggerId={id}
             triggerTestId={testId}
             placeholder={t.model}
@@ -238,6 +266,7 @@ export function ModelSelector({
             searchable
             plainSelectedText
             showSelectionSummary={false}
+            contentClassName={modelDetails ? 'w-[min(44rem,calc(100vw-2rem))]' : undefined}
           />
         </div>
         {trailing}
@@ -253,7 +282,6 @@ interface SequenceSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so per-model scenario retirements group as Deprecated. */
   model?: Model | null;
   'data-testid'?: string;
 }
@@ -332,26 +360,21 @@ export function SequenceSelector({
 }
 
 interface ScenarioSelectorProps {
+  variant?: 'field' | 'caption';
   id?: string;
   value: string;
   onChange: (value: Sequence) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so retired scenarios carry the correct status in their labels. */
   model?: Model | null;
   'data-testid'?: string;
+  /** Called with a scenario once the user shows intent toward its option. */
+  onOptionIntent?: (value: Sequence) => void;
 }
 
-/**
- * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
- * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
- * framing only applies to the fixed-seq subset).
- *
- * A single selected scenario stays visible in the same control, disabled when
- * there is no alternative workload to choose.
- */
 export function ScenarioSelector({
+  variant = 'field',
   id = 'scenario-select',
   value,
   onChange,
@@ -360,6 +383,7 @@ export function ScenarioSelector({
   availableSequences,
   model,
   'data-testid': testId,
+  onOptionIntent,
 }: ScenarioSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -368,8 +392,7 @@ export function ScenarioSelector({
   const fixedGroups = groupByCategory(fixedSeq, (s) =>
     getSequenceCategoryForModel(s as Sequence, model),
   );
-  if (availableSequences.length === 0) return null;
-  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  if (availableSequences.length <= 1) return null;
   const scenarioLabel = (seq: string) => {
     const label = getSequenceLabel(seq as Sequence, locale);
     return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
@@ -384,7 +407,7 @@ export function ScenarioSelector({
         <p>
           {t.agenticScenarioTooltip}{' '}
           <a
-            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
+            href={locale === 'zh' ? `/zh${AGENTX_ROUTE.path}` : AGENTX_ROUTE.path}
             className="underline underline-offset-2"
             data-testid="scenario-agentic-info-link"
             onClick={() => track('selector_scenario_agentx_link')}
@@ -402,34 +425,65 @@ export function ScenarioSelector({
       ),
   });
 
+  const select = (
+    <SearchableSelect
+      size={variant === 'caption' ? 'sm' : undefined}
+      className={variant === 'caption' ? 'w-auto max-w-full text-xs' : undefined}
+      value={value}
+      initialLabel={scenarioLabel(value)}
+      contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
+      placeholder={t.scenario}
+      triggerId={id}
+      triggerTestId={testId}
+      searchable={false}
+      onValueChange={(v) => {
+        track('selector_scenario_changed', { scenario: v });
+        onChange(v as Sequence);
+      }}
+      open={open}
+      onOpenChange={onOpenChange}
+      onOptionIntent={onOptionIntent && ((v) => onOptionIntent(v as Sequence))}
+      groups={[
+        { label: '', options: agentic.map(toScenarioOption) },
+        {
+          label: t.fixedSequenceLength,
+          options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
+        },
+      ].filter((group) => group.options.length > 0)}
+    />
+  );
+
+  // The chart footer's controls row: a standard small control whose label is only read by
+  // screen readers and printed in exported images, like the cost tier and TCO basis beside it.
+  if (variant === 'caption') {
+    return (
+      <CaptionField
+        label={t.scenario}
+        value={scenarioLabel(value)}
+        hideLabel
+        control={
+          <span className="inline-flex items-center gap-0.5">
+            {select}
+            <InfoHelp
+              label={scenarioLabel(value)}
+              value={value}
+              triggerTestId={`selected-option-help-${value}`}
+              contentTestId={`selected-option-help-content-${value}`}
+            >
+              {toScenarioOption(value).help}
+            </InfoHelp>
+          </span>
+        }
+        controlId={id}
+        testId="result-context-scenario"
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <SearchableSelect
-        key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
-        disabled={isOnlySelectedScenario}
-        value={value}
-        initialLabel={scenarioLabel(value)}
-        contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
-        placeholder={t.scenario}
-        triggerId={id}
-        triggerTestId={testId}
-        searchable={false}
-        onValueChange={(v) => {
-          track('selector_scenario_changed', { scenario: v });
-          onChange(v as Sequence);
-        }}
-        open={isOnlySelectedScenario ? false : open}
-        onOpenChange={onOpenChange}
-        groups={[
-          // Agentic is already named in its row, so it needs no repeated heading.
-          { label: '', options: agentic.map(toScenarioOption) },
-          {
-            label: t.fixedSequenceLength,
-            options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
-          },
-        ].filter((group) => group.options.length > 0)}
-      />
+      {select}
     </div>
   );
 }
@@ -441,11 +495,6 @@ interface PercentileSelectorProps {
   'data-testid'?: string;
 }
 
-/**
- * Latency percentile selector for agentic-trace charts. The selected value
- * rewrites the chart x-axis metric from `median_*` to `{percentile}_*`, so
- * picking p99 plots p99 e2e latency / interactivity instead of the median.
- */
 export function PercentileSelector({
   id = 'percentile-select',
   value,
@@ -490,12 +539,10 @@ interface PrecisionSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availablePrecisions: string[];
   'data-testid'?: string;
+  /** Called with the precisions an option would select once the user shows intent toward it. */
+  onOptionIntent?: (value: string[]) => void;
 }
 
-/**
- * Precision multi-select. Keep a single selected precision visible in the same
- * disabled control so benchmark context and geometry remain consistent.
- */
 export function PrecisionSelector({
   id = 'precision-select',
   value,
@@ -504,6 +551,7 @@ export function PrecisionSelector({
   onOpenChange,
   availablePrecisions,
   'data-testid': testId,
+  onOptionIntent,
 }: PrecisionSelectorProps) {
   const t = STRINGS[useLocale()];
 
@@ -518,6 +566,8 @@ export function PrecisionSelector({
         <MultiSelect
           key={isOnlySelectedPrecision ? 'fixed' : 'selectable'}
           disabled={isOnlySelectedPrecision}
+          plainSelectedText={isOnlySelectedPrecision}
+          className={isOnlySelectedPrecision ? 'disabled:opacity-100' : undefined}
           options={availablePrecisions.map((p) => ({
             value: p,
             label: getPrecisionLabel(p as Precision),
@@ -526,6 +576,7 @@ export function PrecisionSelector({
           onChange={onChange}
           open={isOnlySelectedPrecision ? false : open}
           onOpenChange={onOpenChange}
+          onOptionIntent={onOptionIntent}
           triggerId={id}
           triggerTestId={testId}
           placeholder=""

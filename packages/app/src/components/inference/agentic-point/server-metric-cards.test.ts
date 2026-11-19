@@ -21,7 +21,7 @@ describe('localizeThroughputSeriesName', () => {
   });
 
   it('localizes the offload halo key while preserving the exact English label', () => {
-    expect(offloadHaloLabel('en')).toBe('KV offload ON');
+    expect(offloadHaloLabel('en')).toBe('KV offload on');
     expect(offloadHaloLabel('zh')).toBe('KV offload 已开启');
   });
 });

@@ -16,7 +16,7 @@ import {
 } from './chart-shared';
 import { layoutChartLegend } from './chart-legend';
 import { logHistogram, logTicks, positiveValues } from './lognormal';
-import { quantile } from './time-series-math';
+import { niceAxis, quantile } from './time-series-math';
 
 const PAD = CHART_PAD;
 
@@ -26,6 +26,8 @@ const GUIDES = [
   { label: 'p90', q: 0.9, color: PERCENTILE_COLORS.p90 },
   { label: 'p95', q: 0.95, color: PERCENTILE_COLORS.p95 },
 ] as const;
+
+type Percentile = (typeof GUIDES)[number]['label'];
 
 const STRINGS = {
   en: {
@@ -53,26 +55,16 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Bar histogram of per-request sequence lengths with vertical p50/p75/p90/p95
- * guide lines. Designed for the detail-page card — fills its container width
- * via `viewBox` + 100% width.
- *
- * Bins are uniform in ln(value), not in value: ISL/OSL span orders of magnitude,
- * so linear bins pile nearly every request into the leftmost few and stretch a
- * near-empty tail across the rest of the axis. On a log axis the same roughly
- * lognormal data reads as an ordinary bell instead.
- *
- * Hover shows the bin range + count + cumulative percentile.
- */
 export function Distribution({
   values,
   unit,
+  percentiles,
   width = 720,
   height = 260,
 }: {
   values: readonly number[];
   unit: string;
+  percentiles?: readonly Percentile[];
   width?: number;
   height?: number;
 }) {
@@ -88,21 +80,18 @@ export function Distribution({
     return {
       sorted: positive.toSorted((a, b) => a - b),
       histogram,
-      // Zero-token requests are real but unplottable on a log axis; they are
-      // reported under the chart rather than silently folded into bin one.
       excluded: values.length - positive.length,
     };
   }, [values]);
 
   if (!computed) {
-    return <ChartEmpty height={height} />;
+    return <ChartEmpty width={W} height={height} />;
   }
   const { sorted, histogram, excluded } = computed;
   const { counts, edges, lnMin, lnMax } = histogram;
 
-  // Wrap the legend, then grow the viewBox and bottom padding by the same
-  // amount so the plot area is untouched (see TimeSeriesChart).
-  const legendEntries: ChartLegendEntry[] = GUIDES.map(({ label, q, color }) => ({
+  const guides = percentiles ? GUIDES.filter(({ label }) => percentiles.includes(label)) : GUIDES;
+  const legendEntries: ChartLegendEntry[] = guides.map(({ label, q, color }) => ({
     label: `${label} ${fmtCount(quantile(sorted, q))}`,
     color,
     swatch: 'dashed-line',
@@ -120,7 +109,7 @@ export function Distribution({
   const max = edges.at(-1)!;
   const nBins = counts.length;
 
-  const yMax = Math.max(...counts, 1);
+  const { top: yMax, ticks: yTickVals } = niceAxis(Math.max(...counts, 1), { integer: true });
 
   const lnSpan = lnMax - lnMin;
   const xScale = (v: number) =>
@@ -130,14 +119,11 @@ export function Distribution({
 
   const fmt = fmtCount;
 
-  // Hover: report the bin range under cursor, its count, and what percentile
-  // the bin's midpoint represents in the empirical distribution.
   const resolve = (fraction: number) => {
     const binIdx = Math.min(nBins - 1, Math.max(0, Math.floor(fraction * nBins)));
     const binLo = edges[binIdx]!;
     const binHi = edges[binIdx + 1]!;
     const count = counts[binIdx] ?? 0;
-    // Cumulative % at the bin's right edge.
     let cumCount = 0;
     for (let i = 0; i <= binIdx; i++) cumCount += counts[i] ?? 0;
     const cumPct = (cumCount / sorted.length) * 100;
@@ -149,8 +135,7 @@ export function Distribution({
     return { items };
   };
 
-  const xTickVals = logTicks(min, max);
-  const yTickVals = Array.from({ length: 5 }, (_, i) => (yMax * i) / 4);
+  const xTickVals = logTicks(min, max, innerW);
 
   return (
     <div className="w-full">
@@ -159,7 +144,6 @@ export function Distribution({
         {t.logScale}
       </div>
       <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
-        {/* y-axis gridlines + labels */}
         {yTickVals.map((v, i) => {
           const y = yScale(v);
           return (
@@ -177,7 +161,7 @@ export function Distribution({
                 y={y + 3}
                 fontSize={10}
                 fill="currentColor"
-                opacity={0.55}
+                opacity={0.7}
                 textAnchor="end"
               >
                 {fmt(v)}
@@ -186,7 +170,6 @@ export function Distribution({
           );
         })}
 
-        {/* Bars */}
         {counts.map((c, i) => {
           const h = (Math.min(c, yMax) / yMax) * innerH;
           const x = PAD.left + i * barW;
@@ -204,8 +187,7 @@ export function Distribution({
           );
         })}
 
-        {/* Percentile guide lines */}
-        {GUIDES.map(({ q, color }) => {
+        {guides.map(({ q, color }) => {
           const v = quantile(sorted, q);
           const x = xScale(v);
           return (
@@ -223,7 +205,6 @@ export function Distribution({
           );
         })}
 
-        {/* X axis */}
         <line
           x1={PAD.left}
           x2={PAD.left + innerW}
@@ -253,7 +234,7 @@ export function Distribution({
           y={H - legend.extraHeight - 22}
           fontSize={11}
           fill="currentColor"
-          opacity={0.55}
+          opacity={0.7}
           textAnchor="middle"
         >
           {t.valueAxis(unit)}
@@ -263,14 +244,13 @@ export function Distribution({
           y={(H - legend.extraHeight) / 2}
           fontSize={11}
           fill="currentColor"
-          opacity={0.55}
+          opacity={0.7}
           textAnchor="middle"
           transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
         >
           {t.countAxis}
         </text>
 
-        {/* Percentile legend chips */}
         <ChartLegend
           entries={legendEntries}
           layout={legend}

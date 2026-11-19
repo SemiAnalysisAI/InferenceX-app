@@ -1,20 +1,11 @@
-/**
- * Persist one gpu_metrics artifact: series metadata, full-resolution samples,
- * and links to the benchmark points it covers.
- *
- * Idempotency: a series is identified by (workflow run, artifact name, CSV
- * path). Re-ingesting an identical CSV, sidecars and sample count only refreshes
- * the point links; a source change, or `replace`, replaces the samples atomically.
- */
-
 import fs from 'node:fs';
 
 import type postgres from 'postgres';
 
+import { storeGpuSampleBlob } from '../queries/gpu-sample-blobs.js';
 import { sha256Hex } from './benchmark-artifacts.js';
 import type { Sql } from './db-utils.js';
 
-/** Either a pooled client or the transaction handle passed to `sql.begin` callbacks. */
 type TxLike = Sql | postgres.TransactionSql;
 import {
   parseGpuMetricsCsv,
@@ -39,14 +30,12 @@ import {
   parseMultinodePowerSamples,
 } from './multinode-power-samples.js';
 
-/** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
 
 function uniqueSamples(samples: readonly GpuMetricSample[]): GpuMetricSample[] {
   const seen = new Set<string>();
   return samples.filter((sample) => {
     const key = `${sample.gpuIndex}:${sample.timestampMs}`;
-    // nvidia-smi can repeat the final sample when the monitor stops and flushes.
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -71,12 +60,6 @@ export interface GpuMetricsIngestResult {
   seriesSkipped: number;
 }
 
-/**
- * One series per host from the multinode power bundle. The deployment-wide
- * CSV is hashed once, so every host series of one upload shares its source sha.
- * The `#<hostname>` fragment keeps the
- * (run, artifact, file) identity unique per host.
- */
 function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   const validations = readPowerAuditValidations(artifact.artifactDir, artifact.artifactName);
@@ -117,15 +100,6 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
   return prepared;
 }
 
-/**
- * Parse every CSV in an extracted artifact; refuse a partly readable CSV set.
- * Without usable nvidia-smi/amd-smi CSVs, fall back to the multinode power bundle.
- */
-/**
- * Whether the artifact holds any telemetry file: a GPU metrics CSV or a
- * multinode power samples bundle. Sidecars alone (for example a power audit
- * written by a sweep with power collection off) are not telemetry.
- */
 export function gpuMetricsArtifactHoldsTelemetry(artifact: GpuMetricsArtifact): boolean {
   return (
     walkFiles(artifact.artifactDir, isGpuMetricsCsvPath).length > 0 ||
@@ -136,8 +110,6 @@ export function gpuMetricsArtifactHoldsTelemetry(artifact: GpuMetricsArtifact): 
 export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   const unreadable: string[] = [];
-  // Bundle-level sidecars depend only on the artifact, so read them once and
-  // share them across every CSV of the bundle.
   const bundle = artifact.artifactName.startsWith('power_audit_')
     ? {
         validations: readPowerAuditValidations(artifact.artifactDir, artifact.artifactName),
@@ -226,11 +198,6 @@ async function insertSampleBatch(
   `;
 }
 
-/**
- * Upsert one prepared series and link it to `benchmarkResultIds`. Returns the
- * series id and how many sample rows were written (0 when the CSV, sidecars,
- * and unique sample count are unchanged and `replace` is not set).
- */
 export function upsertGpuMetricSeries(
   sql: Sql,
   input: {
@@ -238,7 +205,6 @@ export function upsertGpuMetricSeries(
     artifactName: string;
     series: PreparedGpuMetricSeries;
     benchmarkResultIds: readonly number[];
-    /** Rewrite unchanged series too: a parser fix alters values, not the source. */
     replace?: boolean;
   },
 ): Promise<{
@@ -272,7 +238,6 @@ export function upsertGpuMetricSeries(
     let replaced = false;
     if (existing.length > 0) {
       seriesId = Number(existing[0]!.id);
-      // A parser or deduplication change can alter the count of an unchanged CSV.
       if (
         !replace &&
         existing[0]!.csv_sha256 === series.csvSha256 &&
@@ -323,6 +288,12 @@ export function upsertGpuMetricSeries(
           series.samples.slice(offset, offset + SAMPLE_BATCH_SIZE),
         );
       }
+      if (process.env.GPU_SAMPLE_BLOBS === '1') {
+        const blob = await storeGpuSampleBlob(tx, seriesId);
+        if (blob.status === 'skipped') {
+          console.warn(`    gpu_metric_sample_blobs ${seriesId}: ${blob.reason}; reads use rows`);
+        }
+      }
     }
 
     if (benchmarkResultIds.length > 0) {
@@ -337,12 +308,6 @@ export function upsertGpuMetricSeries(
   });
 }
 
-/**
- * Read and persist every CSV of one artifact for one set of points.
- * Writes telemetry tables and point links only; benchmark-row provenance is
- * attached by the caller that owns the point set (CI before insert, the
- * backfill after this call stores and links every series).
- */
 export async function ingestGpuMetricsArtifact(
   sql: Sql,
   input: {
@@ -351,6 +316,7 @@ export async function ingestGpuMetricsArtifact(
     benchmarkResultIds: readonly number[];
     expectedRunArtifacts?: readonly string[];
     replace?: boolean;
+    replacePointLinks?: boolean;
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
@@ -399,6 +365,13 @@ export async function ingestGpuMetricsArtifact(
         and artifact_name = ${input.artifact.artifactName}
         and not (id = any(${sql.array(result.seriesIds)}::bigint[]))
     `;
+    if (input.replacePointLinks && input.benchmarkResultIds.length > 0) {
+      await sql`
+        delete from benchmark_result_gpu_metrics
+        where benchmark_result_id = any(${sql.array([...input.benchmarkResultIds])}::bigint[])
+          and not (series_id = any(${sql.array(result.seriesIds)}::bigint[]))
+      `;
+    }
   }
   return result;
 }

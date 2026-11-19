@@ -1,15 +1,3 @@
-/**
- * Server-side helpers shared between the `/compare` and `/compare-per-dollar`
- * SSR routes. Extracted from `app/compare/[slug]/page.tsx` (PR #351, PR #382)
- * when the second route was added so the two pages share:
- *
- *   - a single `getCachedBenchmarks` blob slot keyed by dbKeys (one cache
- *     entry per model bucket regardless of which route triggered the fetch),
- *   - the same fixtures / live-database ladder,
- *   - the same summary, GPUDataPoint construction, interpolation pipeline,
- *     and JSON-LD shape — with a `variant` knob that swaps the headline
- *     framing between the latency+throughput view and the per-dollar view.
- */
 import {
   AUTHOR_NAME,
   AUTHOR_URL,
@@ -34,42 +22,22 @@ import {
   compareModelDisplayLabel,
   compareModelSeoName,
 } from '@/lib/compare/compare-slug';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  emptyCompareTableData,
+  fmtCost,
+  fmtTput,
+} from '@/lib/compare/compare-table-view';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
+import { clampMetaDescription, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export { getCachedBenchmarks };
 
-// ---------------------------------------------------------------------------
-// URL-param validators (shared by both routes' overrides)
-// ---------------------------------------------------------------------------
-
-export const KNOWN_MODELS = new Set([
-  'Llama-3.3-70B-Instruct-FP8',
-  'Llama-3.1-70B-Instruct-FP8-KV',
-  'DeepSeek-R1-0528',
-  'gpt-oss-120b',
-  'Qwen-3.5-397B-A17B',
-  'Qwen3.8-Flash-Next',
-  'Qwen3.8-27B',
-  'Qwen3.8-27B-Eager',
-  'Kimi-K2.5',
-  'Kimi-K3',
-  'MiniMax-M2.5',
-  'MiniMax-M3',
-  'GLM-5',
-  'GLM-5.2',
-  'DeepSeek-V4-Pro',
-  'DeepSeek-V4.1-Flash',
-]);
-export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
-/**
- * Three-sentence framing shown above the narrative when a compare page is
- * rendering the agentic workload. The agentic scenario is a different kind of
- * measurement from a fixed-sequence run, and a reader who arrived from a GPU
- * query ("b200 vs b300") has no reason to know that yet — so say it once,
- * here, and hand off to /agentx for the rest.
- */
 export interface AgenticScenarioIntro {
   paragraph: string;
   linkLabel: string;
@@ -80,18 +48,8 @@ export const AGENTIC_SCENARIO_INTRO: AgenticScenarioIntro = {
   paragraph:
     'AgentX replays real coding-agent sessions rather than fixed-length prompts, so context grows turn over turn and most of each request is served from cache instead of being recomputed. That turns the comparison into a systems question: KV transfer between nodes, prefix-aware routing, and cache capacity all move the curve alongside raw chip throughput. Fixed-sequence workloads stay the clean baseline for kernel and silicon performance, so the two scenarios answer different questions about the same hardware.',
   linkLabel: 'Learn more about AgentX',
-  href: '/agentx',
+  href: AGENTX_ROUTE.path,
 };
-
-export function pickString(value: string | string[] | undefined): string | undefined {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value[0];
-  return undefined;
-}
-
-// ---------------------------------------------------------------------------
-// Pair summary (JSON-LD additionalProperty)
-// ---------------------------------------------------------------------------
 
 export interface PairSummary {
   hardware: string;
@@ -124,11 +82,6 @@ export function summarize(rows: BenchmarkRow[], hw: string): PairSummary {
   };
 }
 
-// ---------------------------------------------------------------------------
-// GPUDataPoint construction + interpolation pipeline
-// ---------------------------------------------------------------------------
-
-/** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
 const computeGpuCost = (costPerHour: number, tps: number) =>
   costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
 
@@ -153,7 +106,7 @@ export function buildGpuDataPoints(
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelPower: false });
     const hwKey = getHardwareKey(entry);
     if (!getHardwareConfig(hwKey)) continue;
 
@@ -203,7 +156,7 @@ function buildAgenticGpuDataPoints(
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelPower: false });
     const hwKey = getHardwareKey(entry);
     if (!getHardwareConfig(hwKey)) continue;
 
@@ -255,93 +208,21 @@ function buildGpuDataPointsForSequence(
   return islOsl ? buildGpuDataPoints(rows, hw, islOsl.isl, islOsl.osl, precision) : [];
 }
 
-function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number } | null {
-  if (pts.length === 0) return null;
-  let min = Infinity;
-  let max = -Infinity;
-  for (const p of pts) {
-    if (p.interactivity < min) min = p.interactivity;
-    if (p.interactivity > max) max = p.interactivity;
-  }
-  return { min, max };
-}
-
-/** Pre-compute interpolated table data for the GPU pair at 3 interactivity
- *  targets (25th, 50th, 75th percentile) within the overlapping range. */
 export function computeCompareTableData(
   rows: BenchmarkRow[],
   a: string,
   b: string,
   sequence: string | null,
   precision: string | null,
-): {
-  defaultTargets: number[];
-  ssrRows: SsrInterpolatedRow[];
-  interactivityRange: { min: number; max: number };
-} {
-  const empty = { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
-  if (!sequence || !precision) return empty;
+): CompareTableData {
+  if (!sequence || !precision) return emptyCompareTableData();
 
-  const pointsA = buildGpuDataPointsForSequence(rows, a, sequence, precision);
-  const pointsB = buildGpuDataPointsForSequence(rows, b, sequence, precision);
-
-  if (pointsA.length === 0 && pointsB.length === 0) return empty;
-
-  const rangeA = interactivityRangeOf(pointsA);
-  const rangeB = interactivityRangeOf(pointsB);
-
-  let globalMin: number, globalMax: number;
-  if (rangeA && rangeB) {
-    globalMin = Math.max(rangeA.min, rangeB.min);
-    globalMax = Math.min(rangeA.max, rangeB.max);
-    if (globalMin >= globalMax) {
-      globalMin = Math.min(rangeA.min, rangeB.min);
-      globalMax = Math.max(rangeA.max, rangeB.max);
-    }
-  } else {
-    const r = rangeA ?? rangeB!;
-    globalMin = r.min;
-    globalMax = r.max;
-  }
-
-  const interactivityRange = {
-    min: Math.ceil(globalMin),
-    max: Math.floor(globalMax),
-  };
-
-  const span = globalMax - globalMin;
-  const defaultTargets =
-    span > 0
-      ? [
-          Math.round(globalMin + span * 0.25),
-          Math.round(globalMin + span * 0.5),
-          Math.round(globalMin + span * 0.75),
-        ]
-      : [Math.round(globalMin)];
-
-  const ssrRows: SsrInterpolatedRow[] = defaultTargets.map((target) => ({
-    target,
-    a:
-      pointsA.length > 0
-        ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
-        : null,
-    b:
-      pointsB.length > 0
-        ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
-        : null,
-  }));
-
-  return { defaultTargets, ssrRows, interactivityRange };
+  return compareTableDataFromPoints(
+    buildGpuDataPointsForSequence(rows, a, sequence, precision),
+    buildGpuDataPointsForSequence(rows, b, sequence, precision),
+  );
 }
 
-/** Sample the same interpolated cost curve used for the comparison table for
- * server-rendered image assets. More samples make the static PNG read like the
- * interactive roofline without requiring browser-based chart capture.
- *
- * `includeTargets` are merged into the even sampling grid so callers can
- * guarantee the curve has exact samples at specific targets (e.g. the plotted
- * comparison dots), making it safe to partition the curve into solid /
- * dashed segments without interpolation gaps at the boundary. */
 export function computeCompareImageRows(
   rows: BenchmarkRow[],
   a: string,
@@ -380,10 +261,6 @@ export function computeCompareImageRows(
         : null,
   }));
 }
-
-// ---------------------------------------------------------------------------
-// JSON-LD graph
-// ---------------------------------------------------------------------------
 
 export function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
   const meta = HW_REGISTRY[key];
@@ -432,29 +309,32 @@ export function jsonLdEntryFor(key: string, summary: PairSummary, position: numb
   };
 }
 
-/** Variant determines the ItemList/Dataset headline framing in JSON-LD.
- *  `'full'` is the /compare page's latency+throughput+cost framing.
- *  `'per-dollar'` is the /compare-per-dollar page's cost-efficiency framing. */
 export type CompareJsonLdVariant = 'full' | 'per-dollar';
 
-// ---------------------------------------------------------------------------
-// Plain-English table narrative
-// ---------------------------------------------------------------------------
+/** Ratios of 3 or more read as "N×"; a percentage like "20939%" is unreadable. */
+export const LARGE_RATIO = 3;
 
-/** Format cost as $X.XX or $X.X depending on magnitude. */
-export function fmtCost(v: number): string {
-  if (v >= 10) return `$${v.toFixed(1)}`;
-  return `$${v.toFixed(2)}`;
+export function fmtRatioTimes(ratio: number): string {
+  return ratio >= 10 ? `${Math.round(ratio)}×` : `${ratio.toFixed(1)}×`;
 }
 
-/** Round a ratio (always ≥ 1) into a percentage delta, e.g. 1.3 → "30%". */
 export function fmtPctDelta(ratio: number): string {
   return `${Math.round((ratio - 1) * 100)}%`;
 }
 
-/** Deterministic 32-bit-ish string hash. Used to pick a template variant
- *  per (page, row) without `Math.random()` so SSR + hydration agree and the
- *  same URL renders the same prose every request. */
+/** "42% more tok/s/chip" below {@link LARGE_RATIO}, "4.7× the tok/s/chip" from there up. */
+export function fmtMore(ratio: number, noun: string): string {
+  return ratio >= LARGE_RATIO
+    ? `${fmtRatioTimes(ratio)} the ${noun}`
+    : `${fmtPctDelta(ratio)} more ${noun}`;
+}
+
+export function fmtPctLower(costRatio: number): string {
+  const pct = (1 - 1 / costRatio) * 100;
+  // Integer rounding would print "100% cheaper" for a side that still costs something.
+  return pct >= 99.5 ? `${Math.floor(pct * 10) / 10}%` : `${Math.round(pct)}%`;
+}
+
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
@@ -463,9 +343,6 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
-/** Bucket the target into low / middle / high segment of the benchmarked
- *  range. Used by templates that say things like "Near the low end" or
- *  "At the upper edge" so the same prose array doesn't all read identically. */
 export function bandFor(
   target: number,
   range: { min: number; max: number },
@@ -500,7 +377,7 @@ export interface FullBoth {
   bLabel: string;
   cheaper: string;
   faster: string;
-  costRatio: number | null; // null when tied or zero-guarded
+  costRatio: number | null;
   tputRatio: number | null;
   costTied: boolean;
   tputTied: boolean;
@@ -519,23 +396,19 @@ export const BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
   high: 'toward the upper edge',
 };
 
-// ---------------------------------------------------------------------------
-// /compare-per-dollar variant — both GPUs, no tie, non-zero costs
-// ---------------------------------------------------------------------------
-
 const PER_DOLLAR_BOTH_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} costs ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} costs ${fmtCost(i.bCost)}. ${i.cheaper} is ${fmtPctDelta(i.ratio)} more cost-efficient at this operating point.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} costs ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} costs ${fmtCost(i.bCost)}. ${i.cheaper} delivers ${fmtMore(i.ratio, 'tokens per dollar')} at this operating point.`,
   (i) =>
-    `${i.cheaper} edges ${i.pricier} at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.cheaperCost)} per million tokens versus ${fmtCost(i.pricierCost)}, a ${fmtPctDelta(i.ratio)} cost-per-token gap.`,
+    `${i.cheaper} edges ${i.pricier} at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.cheaperCost)} per million tokens versus ${fmtCost(i.pricierCost)}, a ${fmtPctLower(i.ratio)} lower cost per token.`,
   (i) =>
-    `Push ${i.modelLabel} to ${i.target} tok/s/user and ${i.aLabel} lands at ${fmtCost(i.aCost)} per million tokens against ${i.bLabel}'s ${fmtCost(i.bCost)} — ${i.cheaper} pulls ahead by ${fmtPctDelta(i.ratio)}.`,
+    `Push ${i.modelLabel} to ${i.target} tok/s/user and ${i.aLabel} lands at ${fmtCost(i.aCost)} per million tokens against ${i.bLabel}'s ${fmtCost(i.bCost)} — ${i.cheaper} costs ${fmtPctLower(i.ratio)} less.`,
   (i) =>
-    `${i.aLabel}: ${fmtCost(i.aCost)} per million tokens. ${i.bLabel}: ${fmtCost(i.bCost)}. Both at ${i.target} tok/s/user on ${i.modelLabel}, with ${i.cheaper} ${fmtPctDelta(i.ratio)} cheaper.`,
+    `${i.aLabel}: ${fmtCost(i.aCost)} per million tokens. ${i.bLabel}: ${fmtCost(i.bCost)}. Both at ${i.target} tok/s/user on ${i.modelLabel}, with ${i.cheaper} ${fmtPctLower(i.ratio)} cheaper.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band — at ${i.target} tok/s/user — ${i.aLabel} runs ${fmtCost(i.aCost)} per million tokens on ${i.modelLabel} while ${i.bLabel} runs ${fmtCost(i.bCost)}. ${i.cheaper} is the cheaper choice by ${fmtPctDelta(i.ratio)}.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band — at ${i.target} tok/s/user — ${i.aLabel} runs ${fmtCost(i.aCost)} per million tokens on ${i.modelLabel} while ${i.bLabel} runs ${fmtCost(i.bCost)}. ${i.cheaper} is the cheaper choice by ${fmtPctLower(i.ratio)}.`,
   (i) =>
-    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtPctDelta(i.ratio)} more total tokens per dollar.`,
+    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtMore(i.ratio, 'total tokens per dollar')}.`,
 ];
 
 const PER_DOLLAR_TIED_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
@@ -576,21 +449,17 @@ const PER_DOLLAR_SINGLE_TEMPLATES: ((args: {
     `Only ${i.presentLabel} has cost data at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.presentCost)} per million tokens. ${i.missingLabel} is unmeasured at this target.`,
 ];
 
-// ---------------------------------------------------------------------------
-// /compare 'full' variant — both GPUs, mentions cost AND throughput
-// ---------------------------------------------------------------------------
-
 function fullSummary(i: FullBoth): string {
   const costPart = i.costTied
     ? 'cost per token is essentially tied'
     : i.costRatio === null
       ? null
-      : `${i.cheaper} is ${fmtPctDelta(i.costRatio)} cheaper per token`;
+      : `${i.cheaper} is ${fmtPctLower(i.costRatio)} cheaper per token`;
   const tputPart = i.tputTied
     ? 'throughput per chip is essentially tied'
     : i.tputRatio === null
       ? null
-      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/chip`;
+      : `${i.faster} delivers ${fmtMore(i.tputRatio, 'tok/s/chip')}`;
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
@@ -599,17 +468,17 @@ function fullSummary(i: FullBoth): string {
 
 const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
+    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${fmtTput(i.bValue)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
   (i) =>
-    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
+    `${i.aLabel} posts ${fmtTput(i.aValue)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${fmtTput(i.bValue)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/chip, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Costs per million tokens land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
   (i) =>
-    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
+    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${fmtTput(i.aValue)} / ${fmtTput(i.bValue)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
   (i) =>
-    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${i.aValue.toFixed(0)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${i.bValue.toFixed(0)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
+    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${fmtTput(i.aValue)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${fmtTput(i.bValue)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
 ];
 
 const FULL_SINGLE_TEMPLATES: ((args: {
@@ -621,43 +490,18 @@ const FULL_SINGLE_TEMPLATES: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${fmtTput(i.presentValue)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
   (i) =>
-    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
+    `${i.presentLabel} hits ${fmtTput(i.presentValue)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
   (i) =>
-    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
+    `${i.presentLabel}: ${fmtTput(i.presentValue)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
 ];
 
-/** Pick template `rowIndex` in the rotation starting from a per-page hash
- *  offset. Within a single page, paragraphs 0/1/2 always pick three
- *  *consecutive* templates from the pool (never repeating each other), while
- *  the page-level seed picks where in the rotation to start — so different
- *  pages get different starting templates. Avoids the birthday-problem
- *  collisions that pickTemplate alone produces when sampling N times from a
- *  pool of size M near N. */
 export function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {
   const start = hashStr(pageSeed) % arr.length;
   return arr[(start + rowIndex) % arr.length];
 }
 
-/** Per-route prose summary of the interpolated table — one paragraph per
- *  default interactivity target. Server-rendered into the page HTML so
- *  crawlers and screen-readers get a plain-English read of every operating
- *  point. Returns an empty array when there's no data (caller falls back to
- *  the empty-state UI).
- *
- *  Template selection is deterministic: the same (model, GPU pair, row index,
- *  variant) seed always picks the same template, so SSR and any subsequent
- *  render agree on prose. Different pages pick different templates from the
- *  pool, so the catalog reads with variety instead of repeating the same
- *  sentence shape on every URL.
- *
- *  The returned prose anchors to the SSR'd default model / sequence /
- *  precision — i.e. the slug's canonical operating point. The chart and
- *  interpolated table beneath the narrative re-render on client-side filter
- *  changes; the narrative does not. The caller adds a "(default selection)"
- *  caveat after the last paragraph so a reader who fiddles with the chart
- *  controls sees that the narrative is fixed to the slug's defaults. */
 export function compareTableNarrative(
   variant: CompareJsonLdVariant,
   modelLabel: string,
@@ -669,10 +513,6 @@ export function compareTableNarrative(
   if (ssrRows.length === 0) return [];
 
   const range = `${interactivityRange.min}–${interactivityRange.max} tok/s/user`;
-  // Page-level seed: stable across renders, varies by (route variant, model,
-  // GPU pair). Template selection rotates by rowIndex from this seed so the
-  // 3 paragraphs on a single page never duplicate templates with each other,
-  // and different pages pick different starting points in the rotation.
   const pageSeed = `${variant}|${modelLabel}|${aLabel}|${bLabel}`;
   const paragraphs: string[] = [];
 
@@ -740,7 +580,6 @@ export function compareTableNarrative(
       continue;
     }
 
-    // 'full' variant
     if (a && b) {
       const costOk = a.cost > 0 && b.cost > 0;
       const tputOk = a.value > 0 && b.value > 0;
@@ -789,49 +628,30 @@ export function compareTableNarrative(
   return paragraphs;
 }
 
-// ---------------------------------------------------------------------------
-// SEO meta description — stat-led, ≤155 chars, per (model, GPU pair)
-// ---------------------------------------------------------------------------
-
-/** The single interpolated head-to-head stat surfaced in the meta description.
- *  `tputPct` / `costPct` are 0 when that dimension is within ~1% (a tie). */
 export interface CompareStat {
   aLabel: string;
   bLabel: string;
   gpuLabel: string;
   faster: string;
   slower: string;
-  /** Throughput-per-GPU advantage of `faster` over `slower`, as a whole
-   *  percent (0 when the two are within 1%). */
   tputPct: number;
   cheaper: string;
   pricier: string;
-  /** Cost-per-token advantage of `cheaper` over `pricier`, as a whole percent
-   *  (0 when the two are within 1%). */
   costPct: number;
 }
 
-/** Does a row carry a real, comparable data point for both GPUs? */
 function statRowUsable(row: SsrInterpolatedRow): boolean {
   return Boolean(
     row.a && row.b && row.a.value > 0 && row.b.value > 0 && row.a.cost > 0 && row.b.cost > 0,
   );
 }
 
-/** Pick the representative interpolated row for the meta description — the
- *  default (middle) interactivity target if it has data for both GPUs, else
- *  the first target that does. Returns null when no target has a comparable
- *  pair (sparse-data pairs fall back to boilerplate). */
 function pickCompareStatRow(rows: SsrInterpolatedRow[]): SsrInterpolatedRow | null {
   const mid = rows[Math.floor(rows.length / 2)];
   if (mid && statRowUsable(mid)) return mid;
   return rows.find(statRowUsable) ?? null;
 }
 
-/** Language-agnostic head-to-head stat for the meta description, computed at
- *  the default interactivity target. Shared by the English `compareMetaDescription`
- *  and its Chinese port so both surface the same numbers. Returns null when the
- *  pair has no comparable interpolated data. */
 export function computeCompareStat(
   a: string,
   b: string,
@@ -866,23 +686,10 @@ export function computeCompareStat(
   };
 }
 
-/** Length cap for meta descriptions — Google truncates SERP snippets past
- *  ~155–160 chars, so every branch below must stay at or under this. */
-export const META_DESCRIPTION_MAX = 155;
-
-/** First candidate that fits within `max`, or undefined if none do. */
 function firstUnder(candidates: string[], max: number): string | undefined {
   return candidates.find((c) => c.length <= max);
 }
 
-/** Stat-led, ≤155-char meta description for a `/compare/<slug>` page. Leads
- *  with the differentiating throughput / cost delta at the default interactivity
- *  target (the actual reason a searcher clicks) instead of the boilerplate that
- *  was identical across ~360 pages. Falls back to a compact, still-≤155-char
- *  boilerplate sentence when the pair has thin / degenerate data.
- *
- *  A trailing brand clause is dropped down a ladder (full → short → none) so a
- *  long GPU-pair / model name never pushes the description over the cap. */
 export function compareMetaDescription(
   model: CompareModelSlug,
   a: string,
@@ -892,7 +699,6 @@ export function compareMetaDescription(
   const modelName = compareModelSeoName(model);
   const gpuLabel = compareDisplayLabel(a, b);
 
-  // Boilerplate fallback ladder — progressively shorter so one always fits.
   const fallback =
     firstUnder(
       [
@@ -901,8 +707,8 @@ export function compareMetaDescription(
         `${gpuLabel} inference benchmark on ${modelName} from ${SITE_NAME} by ${AUTHOR_NAME}.`,
         `${gpuLabel} inference benchmark on ${modelName}.`,
       ],
-      META_DESCRIPTION_MAX,
-    ) ?? `${gpuLabel} inference benchmark`.slice(0, META_DESCRIPTION_MAX);
+      META_DESCRIPTION_MAX.en,
+    ) ?? clampMetaDescription(`${gpuLabel} inference benchmark on ${modelName}.`, 'en');
 
   const stat = computeCompareStat(a, b, ssrRows);
   if (!stat) return fallback;
@@ -920,7 +726,7 @@ export function compareMetaDescription(
   if (tputClause && costClause) core = `${tputClause}; ${costClause}.`;
   else if (tputClause) core = `${tputClause}.`;
   else if (costClause) core = `${costClause} on ${modelName}.`;
-  else return fallback; // both dimensions within 1% — nothing differentiating to lead with
+  else return fallback;
 
   return (
     firstUnder(
@@ -929,18 +735,11 @@ export function compareMetaDescription(
         `${core} Verified open-source ${SITE_NAME} benchmarks.`,
         core,
       ],
-      META_DESCRIPTION_MAX,
+      META_DESCRIPTION_MAX.en,
     ) ?? fallback
   );
 }
 
-// ---------------------------------------------------------------------------
-// Master-index helpers (shared by /compare and /compare-per-dollar)
-// ---------------------------------------------------------------------------
-
-/** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Used by the
- *  master index ledes on both /compare and /compare-per-dollar so the
- *  enumeration stays consistent if a model is added or removed. */
 export function formatModelList(models: CompareModelSlug[]): string {
   const labels = models.map((m) => m.label);
   if (labels.length === 0) return 'no models';
@@ -957,18 +756,11 @@ export interface VendorBucketEntry {
 }
 
 export interface VendorBuckets {
-  /** Cross-vendor pairs (NVIDIA × AMD). */
   cross: VendorBucketEntry[];
-  /** Both sides NVIDIA. */
   nvidia: VendorBucketEntry[];
-  /** Both sides AMD. */
   amd: VendorBucketEntry[];
 }
 
-/** Split (a, b) GPU pairs into vendor buckets for the index grid. The caller
- *  wraps these entries with its own group headings / descriptions / route
- *  prefix — keeps the sorting + bucketing + slug-building in one place so the
- *  two index pages can't drift on those mechanics. */
 export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair[]): VendorBuckets {
   const nvidia: VendorBucketEntry[] = [];
   const amd: VendorBucketEntry[] = [];
@@ -991,9 +783,6 @@ export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair
   return { cross, nvidia, amd };
 }
 
-/** Breadcrumb trail for a compare slug page. Emitted alongside the main
- *  Dataset/ItemList JSON-LD so Google can render the Home → Compare → A vs B
- *  trail in search results. Variant chooses /compare vs /compare-per-dollar. */
 export function buildBreadcrumbJsonLd(
   variant: CompareJsonLdVariant,
   pairLabel: string,
@@ -1013,8 +802,6 @@ export function buildBreadcrumbJsonLd(
   };
 }
 
-/** Pick the oldest and newest benchmark dates among rows whose hardware matches
- *  the compared pair — used to populate Dataset.datePublished / dateModified. */
 export function dateRangeForPair(
   rows: BenchmarkRow[],
   a: string,
@@ -1041,12 +828,8 @@ export function buildJsonLd(
   summaryB: PairSummary,
   ssrRows: SsrInterpolatedRow[],
   imageUrl?: string,
-  /** ISO date of oldest benchmark row contributing to this dataset. */
   datePublished?: string,
-  /** ISO date of newest benchmark row — drives Google Dataset Search freshness. */
   dateModified?: string,
-  /** Display model name accepted by /api/v1/benchmarks?model=…, used to wire the
-   *  Dataset's `distribution: DataDownload` to a real machine-readable export. */
   modelApiKey?: string,
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
@@ -1093,15 +876,15 @@ export function buildJsonLd(
           { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label} comparison at ${row.target} tok/s/user interactivity`,
+        description: `${aLabel} vs ${bLabel} throughput, cost per million tokens, tok/s/MW and concurrency for ${model.label} at ${row.target} tok/s/user interactivity, measured by InferenceX CI.`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   return {

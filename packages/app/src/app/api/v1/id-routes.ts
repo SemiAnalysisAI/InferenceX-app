@@ -12,7 +12,7 @@ import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/api/pu
  * Both preserve the v1 error contract: 400 with `{error}` for bad params,
  * 404 `{error: 'Not found'}` when a single-id lookup misses, and 500
  * `{error: 'Internal server error'}` (with a console.error) on query failure.
- * Success payloads go through `cachedJson` for CDN caching + gzip.
+ * Success payloads go through `cachedJson` for CDN caching + compression.
  */
 
 /**
@@ -55,7 +55,7 @@ export function idsQueryRoute<T>(options: {
     const ids = parseIdsParam(request, maxIds);
     if (ids instanceof NextResponse) return ids;
     try {
-      return cachedJson(await fetch(ids));
+      return cachedJson(request, await fetch(ids));
     } catch (error) {
       console.error(`Error fetching ${logLabel}:`, error);
       return publicApiError(PUBLIC_API_ERRORS.internal, 500);
@@ -77,7 +77,7 @@ export function idQueryRoute<T>(options: {
     try {
       const data = await fetch(id);
       if (!data) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
-      return cachedJson(data);
+      return cachedJson(request, data);
     } catch (error) {
       console.error(`Error fetching ${logLabel}:`, error);
       return publicApiError(PUBLIC_API_ERRORS.internal, 500);

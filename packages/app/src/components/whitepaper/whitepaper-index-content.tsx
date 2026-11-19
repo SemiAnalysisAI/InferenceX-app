@@ -4,6 +4,8 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
+import { Stat } from '@/components/ui/stat';
 import type { Locale } from '@/lib/i18n/i18n';
 import {
   buildWhitepaperIndexJsonLd,
@@ -12,7 +14,9 @@ import {
   WHITEPAPER_COPY,
   whitepaperCopy,
   whitepaperDetailPath,
+  whitepaperTagLabel,
 } from '@/lib/content/whitepapers';
+import { cn } from '@/lib/shared/utils';
 
 import { WhitepaperCard, WhitepaperPdfButton, WhitepaperReadLink } from './whitepaper-links';
 
@@ -23,15 +27,12 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
   return (
     <main className="relative" data-testid="whitepaper-index-page">
       <JsonLd data={buildWhitepaperIndexJsonLd(locale)} />
-      <div className="container mx-auto flex flex-col gap-8 px-4 pb-16 lg:gap-10 lg:px-8">
-        <header className="flex flex-col gap-3 pt-4 lg:pt-8">
-          <Eyebrow as="p" wide>
-            {t.indexEyebrow}
-          </Eyebrow>
-          <Heading as="h1" level="page" className="text-balance">
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-8 lg:gap-10')}>
+        <header className="flex flex-col gap-3">
+          <Heading as="h1" level="reading">
             {t.indexTitle}
           </Heading>
-          <p className="max-w-prose text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
+          <p className="max-w-measure text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
         </header>
 
         {papers.length === 0 ? (
@@ -54,7 +55,7 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
                       width={1275}
                       height={1650}
                       sizes="(min-width: 1024px) 144px, 112px"
-                      className="w-28 shrink-0 self-start rounded-md border border-border/60 shadow-md shadow-black/20 transition-transform duration-200 group-hover:-translate-y-0.5 lg:w-36"
+                      className="w-28 shrink-0 self-start rounded-md border border-border/30 shadow-sm lg:w-36"
                     />
                   }
                 >
@@ -76,22 +77,17 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
                       <span>{t.pages(paper.pageCount)}</span>
                     </p>
                     <dl
-                      className="flex flex-wrap gap-x-6 gap-y-2 border-y border-border/40 py-3"
+                      className="flex flex-wrap gap-x-6 gap-y-2 border-y border-border/30 py-3"
                       data-testid="whitepaper-card-kpis"
                     >
                       {copy.kpis.map((kpi) => (
-                        <div key={kpi.label} className="flex flex-col-reverse">
-                          <dt className="text-xs text-muted-foreground">{kpi.label}</dt>
-                          <dd className="text-lg font-bold tabular-nums text-foreground">
-                            {kpi.value}
-                          </dd>
-                        </div>
+                        <Stat key={kpi.label} label={kpi.label} value={kpi.value} />
                       ))}
                     </dl>
                     <ul className="flex flex-wrap gap-1.5" aria-label={t.tags}>
                       {paper.tags.map((tag) => (
                         <li key={tag}>
-                          <Badge variant="outline">{tag}</Badge>
+                          <Badge variant="secondary">{whitepaperTagLabel(tag, locale)}</Badge>
                         </li>
                       ))}
                     </ul>

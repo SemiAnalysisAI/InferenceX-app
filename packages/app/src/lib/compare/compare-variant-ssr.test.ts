@@ -18,10 +18,6 @@ import {
   variantCompareNarrativeZh,
 } from './compare-variant-ssr-zh';
 
-// ---------------------------------------------------------------------------
-// Stub helpers
-// ---------------------------------------------------------------------------
-
 let nextStubId = 1;
 
 function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
@@ -57,10 +53,8 @@ function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-// Fixture with two precisions (fp8, bf16) and mtp/none spec methods on one hw.
 function variantRows(): BenchmarkRow[] {
   return [
-    // FP8, no spec decode, various concurrency
     stubRow({
       hardware: 'h200',
       precision: 'fp8',
@@ -93,7 +87,6 @@ function variantRows(): BenchmarkRow[] {
       metrics: { tput_per_gpu: 200, median_intvty: 40 },
       date: '2026-03-15',
     }),
-    // BF16, no spec decode
     stubRow({
       hardware: 'h200',
       precision: 'bf16',
@@ -126,7 +119,6 @@ function variantRows(): BenchmarkRow[] {
       metrics: { tput_per_gpu: 120, median_intvty: 40 },
       date: '2026-03-15',
     }),
-    // FP8 with MTP (speculative decoding)
     stubRow({
       hardware: 'h200',
       precision: 'fp8',
@@ -161,10 +153,6 @@ const MODEL_SLUG = {
   label: 'DeepSeek R1',
   seoName: 'DeepSeek R1',
 };
-
-// ---------------------------------------------------------------------------
-// pickVariantPairDefaults
-// ---------------------------------------------------------------------------
 
 describe('pickVariantPairDefaults', () => {
   it('precision: picks the sequence with the most overlapping variants', () => {
@@ -204,10 +192,6 @@ describe('pickVariantPairDefaults', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// computeVariantCompareTableData
-// ---------------------------------------------------------------------------
-
 describe('computeVariantCompareTableData', () => {
   it('returns rows with both sides for a precision comparison', () => {
     const result = computeVariantCompareTableData(
@@ -219,7 +203,6 @@ describe('computeVariantCompareTableData', () => {
     );
     expect(result.ssrRows.length).toBeGreaterThan(0);
     expect(result.interactivityRange.min).toBeLessThan(result.interactivityRange.max);
-    // At least one row should have both sides
     const bothSides = result.ssrRows.filter((r) => r.a && r.b);
     expect(bothSides.length).toBeGreaterThan(0);
   });
@@ -247,10 +230,6 @@ describe('computeVariantCompareTableData', () => {
     expect(result.defaultTargets).toEqual([]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// computeVariantCompareImageRows
-// ---------------------------------------------------------------------------
 
 describe('computeVariantCompareImageRows', () => {
   it('returns 17 evenly-spaced samples for precision comparison', () => {
@@ -280,10 +259,6 @@ describe('computeVariantCompareImageRows', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// summarizeVariantSide
-// ---------------------------------------------------------------------------
-
 describe('summarizeVariantSide', () => {
   it('summarizes fp8 side', () => {
     const s = summarizeVariantSide(variantRows(), 'h200', { precision: 'fp8' });
@@ -299,10 +274,6 @@ describe('summarizeVariantSide', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// dateRangeForVariantPair
-// ---------------------------------------------------------------------------
-
 describe('dateRangeForVariantPair', () => {
   it('returns the date range covering both sides', () => {
     const dr = dateRangeForVariantPair(
@@ -315,10 +286,6 @@ describe('dateRangeForVariantPair', () => {
     expect(dr.newest).toBe('2026-03-15');
   });
 });
-
-// ---------------------------------------------------------------------------
-// variantCompareNarrative
-// ---------------------------------------------------------------------------
 
 function makeNarrativeRows() {
   return [
@@ -404,7 +371,6 @@ describe('variantCompareNarrative', () => {
       range,
     );
     expect(result.length).toBeGreaterThan(0);
-    // Deterministic: same inputs produce same output
     const result2 = variantCompareNarrative(
       'precision',
       'DeepSeek R1',
@@ -415,7 +381,6 @@ describe('variantCompareNarrative', () => {
       range,
     );
     expect(result).toEqual(result2);
-    // Precision kind mentions quantization/evaluation
     expect(result.some((p) => /quantization|evaluation|accuracy|precision/i.test(p))).toBe(true);
   });
 
@@ -431,7 +396,6 @@ describe('variantCompareNarrative', () => {
       range,
     );
     expect(result.length).toBeGreaterThan(0);
-    // Spec-decode kind mentions speculative decoding/draft tokens
     expect(result.some((p) => /speculative|draft/i.test(p))).toBe(true);
   });
 
@@ -441,10 +405,6 @@ describe('variantCompareNarrative', () => {
     ).toEqual([]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// variantCompareNarrativeZh
-// ---------------------------------------------------------------------------
 
 describe('variantCompareNarrativeZh', () => {
   it('returns Chinese prose for precision kind', () => {
@@ -458,7 +418,6 @@ describe('variantCompareNarrativeZh', () => {
       { min: 10, max: 40 },
     );
     expect(result.length).toBeGreaterThan(0);
-    // Contains Chinese characters
     expect(result.some((p) => /[一-鿿]/.test(p))).toBe(true);
   });
 
@@ -478,10 +437,6 @@ describe('variantCompareNarrativeZh', () => {
     expect(result.join('')).not.toContain('Off');
   });
 });
-
-// ---------------------------------------------------------------------------
-// buildVariantJsonLd
-// ---------------------------------------------------------------------------
 
 describe('buildVariantJsonLd', () => {
   const summary = {
@@ -541,14 +496,12 @@ describe('buildVariantJsonLd', () => {
     );
     expect(ld['@context']).toBe('https://schema.org');
     const graph = ld['@graph'] as Record<string, unknown>[];
-    expect(graph.length).toBe(2); // ItemList + Dataset
+    expect(graph.length).toBe(2);
     const itemList = graph[0] as Record<string, unknown>;
     expect(itemList['@type']).toBe('ItemList');
-    // Side labels in ListItems
     const elements = itemList.itemListElement as { item: { name: string } }[];
     expect(elements[0].item.name).toBe('FP8');
     expect(elements[1].item.name).toBe('BF16');
-    // Name mentions precision
     expect(String(itemList.name)).toContain('Precision comparison');
   });
 
@@ -569,10 +522,6 @@ describe('buildVariantJsonLd', () => {
     expect(String(itemList.name)).toContain('Speculative decoding comparison');
   });
 });
-
-// ---------------------------------------------------------------------------
-// buildVariantJsonLdZh
-// ---------------------------------------------------------------------------
 
 describe('buildVariantJsonLdZh', () => {
   const summary = {
@@ -631,10 +580,6 @@ describe('buildVariantJsonLdZh', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// buildVariantBreadcrumbJsonLd
-// ---------------------------------------------------------------------------
-
 describe('buildVariantBreadcrumbJsonLd', () => {
   it('builds precision breadcrumb with correct index URL', () => {
     const bc = buildVariantBreadcrumbJsonLd('precision', 'FP8 vs BF16', 'https://example.com/test');
@@ -655,10 +600,6 @@ describe('buildVariantBreadcrumbJsonLd', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// buildVariantBreadcrumbJsonLdZh
-// ---------------------------------------------------------------------------
-
 describe('buildVariantBreadcrumbJsonLdZh', () => {
   it('uses /zh/ prefixed URLs and Chinese labels', () => {
     const bc = buildVariantBreadcrumbJsonLdZh(
@@ -667,8 +608,8 @@ describe('buildVariantBreadcrumbJsonLdZh', () => {
       'https://example.com/zh/test',
     );
     const items = bc.itemListElement as { name: string; item: string }[];
-    expect(items[0].name).toBe('首页'); // 首页
-    expect(items[1].name).toBe('精度对比'); // 精度对比
+    expect(items[0].name).toBe('首页');
+    expect(items[1].name).toBe('精度对比');
     expect(items[1].item).toContain('/zh/compare-precision');
   });
 
@@ -679,7 +620,7 @@ describe('buildVariantBreadcrumbJsonLdZh', () => {
       'https://example.com/zh/test',
     );
     const items = bc.itemListElement as { name: string; item: string }[];
-    expect(items[1].name).toBe('投机解码对比'); // 投机解码对比
+    expect(items[1].name).toBe('投机解码对比');
     expect(items[1].item).toContain('/zh/compare-spec-decode');
   });
 });

@@ -20,7 +20,7 @@ When normalized by [total cost of ownership](/glossary/total-cost-of-ownership),
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
 />
 
 The interesting part is not the summary number, it is what the AgentX server telemetry shows underneath it.
@@ -31,14 +31,14 @@ Under the load of 384 concurrent agentic traces, B300 vLLM DEP8 with 3TB of DRAM
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439522)"
 />
 
 With B200 at concurrency 196, all other parameters unchanged, the picture inverts. The HBM cache hit rate falls to 73% and the deployment leans much harder on DRAM, with an [offload](/glossary/kv-cache-offload) cache hit rate of nearly 20%. The HBM KV cache working set size here is 22 million tokens, roughly half that of B300.
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439967)"
 />
 
 ## Why the offload tier needs headroom
@@ -55,7 +55,7 @@ The failure mode is instructive: the reliance on DRAM KV offloading at higher co
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
 />
 
 ---

@@ -1,38 +1,59 @@
-/**
- * Catalog of AgentX points that have a stored telemetry blob.
- *
- * `/inference/agentic/<id>` only renders something useful when the row has an
- * `agentic_trace_replay` blob behind it, so this is the authoritative list of
- * detail pages that exist. There are hundreds of such rows — far too many to
- * list one card each — so the catalog collapses them to one entry per
- * (model, hardware, framework, precision) config and links to a representative
- * point. The detail page ships a sibling navigator, so landing on one point of
- * a config is enough to reach the rest of that config's concurrencies.
- *
- * Representative point = latest date, then highest throughput per GPU (the
- * headline point on that config's curve), with the id as a final tiebreak so
- * the choice is deterministic across requests.
- */
-
 import type { DbClient } from '../connection.js';
 
 export interface AgenticCatalogEntry {
-  /** `benchmark_results.id` of the representative point for this config. */
   id: number;
   model: string;
   hardware: string;
   framework: string;
   precision: string;
-  /** Trace-backed points in this config, i.e. detail pages reachable from it. */
   points: number;
-  /** Lowest and highest client concurrency measured with a stored trace. */
   minConc: number;
   maxConc: number;
-  /** Most recent benchmark date in this config (YYYY-MM-DD). */
   latestDate: string;
 }
 
-export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEntry[]> {
+export interface AgenticCatalogGroup extends AgenticCatalogEntry {
+  tputPerGpu: number | null;
+}
+
+export async function getAgenticCatalog(dbs: readonly DbClient[]): Promise<AgenticCatalogEntry[]> {
+  return mergeAgenticCatalogGroups(await Promise.all(dbs.map(readAgenticCatalogGroups)));
+}
+
+function outranks(a: AgenticCatalogGroup, b: AgenticCatalogGroup): boolean {
+  if (a.latestDate !== b.latestDate) return a.latestDate > b.latestDate;
+  if (a.tputPerGpu !== b.tputPerGpu) {
+    if (a.tputPerGpu === null || b.tputPerGpu === null) return b.tputPerGpu === null;
+    return a.tputPerGpu > b.tputPerGpu;
+  }
+  return a.id < b.id;
+}
+
+export function mergeAgenticCatalogGroups(
+  parts: readonly (readonly AgenticCatalogGroup[])[],
+): AgenticCatalogEntry[] {
+  const merged = new Map<string, AgenticCatalogGroup>();
+  for (const part of parts) {
+    for (const group of part) {
+      const key = JSON.stringify([group.model, group.hardware, group.framework, group.precision]);
+      const seen = merged.get(key);
+      if (!seen) {
+        merged.set(key, group);
+        continue;
+      }
+      const representative = outranks(group, seen) ? group : seen;
+      merged.set(key, {
+        ...representative,
+        points: seen.points + group.points,
+        minConc: Math.min(seen.minConc, group.minConc),
+        maxConc: Math.max(seen.maxConc, group.maxConc),
+      });
+    }
+  }
+  return [...merged.values()].map(({ tputPerGpu: _tputPerGpu, ...entry }) => entry);
+}
+
+async function readAgenticCatalogGroups(sql: DbClient): Promise<AgenticCatalogGroup[]> {
   const rows = (await sql`
     with traced as (
       select
@@ -44,7 +65,7 @@ export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEn
       from benchmark_results br
       join configs c on c.id = br.config_id
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
-      where atr.profile_export_jsonl_gz is not null
+      where (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0)
     ),
     ranked as (
       select
@@ -61,7 +82,7 @@ export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEn
       window w as (partition by model, hardware, framework, precision)
     )
     select id, model, hardware, framework, precision,
-           points, min_conc, max_conc, latest_date
+           points, min_conc, max_conc, latest_date, tput_per_gpu
     from ranked
     where rn = 1
     order by model, hardware, framework, precision
@@ -75,6 +96,7 @@ export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEn
     min_conc: number;
     max_conc: number;
     latest_date: string;
+    tput_per_gpu: number | null;
   }[];
 
   return rows.map((r) => ({
@@ -87,5 +109,6 @@ export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEn
     minConc: Number(r.min_conc),
     maxConc: Number(r.max_conc),
     latestDate: r.latest_date,
+    tputPerGpu: r.tput_per_gpu === null ? null : Number(r.tput_per_gpu),
   }));
 }

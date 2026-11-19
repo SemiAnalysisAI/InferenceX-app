@@ -1,6 +1,6 @@
 ---
-title: 'B200 NVFP4 对比 H200 INT4 运行 Kimi K2.5/K2.6：性价比提升高达 2.95 倍'
-subtitle: '在 vLLM 8K/1K 工作负载下，B200 NVFP4 路径在 30–90 tok/s/user 推理区间内每百万 tokens 成本比 H200 INT4 低 2.71x–2.95x，比同一 B200 硬件上的 INT4 低 2.45x–2.74x。三个因素——B200 的 HBM 带宽、HBM 容量和 NVFP4 张量核心——可清晰分解该优势'
+title: 'B200 NVFP4 对比 H200 INT4 运行 Kimi K2.5/K2.6：每美元性能最高达 2.95 倍'
+subtitle: '在 vLLM 8K/1K 工作负载下，B200 NVFP4 路径在 30–90 tok/s/user 推理区间内每百万 tokens 成本比 H200 INT4 低 2.71x–2.95x，比同一 B200 硬件上的 INT4 低 2.45x–2.74x。该优势可清晰分解为三个因素——B200 的 HBM 带宽、HBM 容量和 NVFP4 张量核心'
 seoDescription: '在 vLLM 8K/1K 下，B200 NVFP4 运行 Kimi K2.5/K2.6 每 token 成本比 H200 INT4 最多低 2.95 倍，覆盖 30–90 tok/s/user 全区间。'
 date: '2026-05-26'
 publishDate: '2026-05-26'
@@ -20,7 +20,7 @@ Kimi K2.5 和 K2.6 是 xAI Cursor Composer 2 和 Composer 2.5 背后的开源权
 
 两款 SKU 均运行相同的 `vllm/vllm-openai:v0.21.0` 容器。差距来自硬件和精度。B200 的 FP8 dense 吞吐量是 H200 的 2.27 倍（4,500 vs 1,979 TFLOP/s）、HBM 带宽 1.67 倍（8 vs 4.8 TB/s）、NVLink Scale-up 带宽 2.00 倍（900 vs 450 GB/s 单向）。在 FP4 轴上 H200 完全空白——Hopper SM90 没有 FP4 张量核心，[官方数据表](https://resources.nvidia.com/en-us-data-center-overview/gtc24-h200-datasheet)止步于 FP8。B200 的 NVFP4 核心提供 9,000 TFLOP/s。实测的约 3 倍 token 成本差距，就是这些硅片比值在折算 B200 1.38 倍 TCO 溢价（$1.95 vs $1.41/GPU/hr，来源于 [SemiAnalysis AI Cloud TCO 模型](https://newsletter.semianalysis.com/p/ai-cloud-economics)）之后的呈现。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -33,7 +33,7 @@ Kimi K2.5 和 K2.6 是 xAI Cursor Composer 2 和 Composer 2.5 背后的开源权
 
 ## Kimi K2.5 / K2.6 模型架构及下游 Cursor Composer 2.5 模型
 
-[Kimi K2.5](https://huggingface.co/moonshotai/Kimi-K2.5)（发布于 2026-01-27）和 [Kimi K2.6](https://huggingface.co/moonshotai/Kimi-K2.6)（发布于 2026-04-20）共享原始 Kimi K2 骨干网络：**1.0T 参数的 MoE，每个 token 激活 32B 参数**，**DeepSeek 风格的 top-8-of-385 专家路由，跨 61 个 Transformer 层（1 个 dense 块 + 60 个 MoE 块）**，**Multi-head Latent Attention（MLA）**、SwiGLU、**YaRN RoPE**，163,840 词汇量，以及 **256K 上下文窗口**（262,144 tokens）。HF 检查点为 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)——两者是在同一预训练架构上的后训练优化，因此**本文中的每一个推理结果都同样适用于这两个版本**。
+[Kimi K2.5](https://huggingface.co/moonshotai/Kimi-K2.5)（发布于 2026-01-27）和 [Kimi K2.6](https://huggingface.co/moonshotai/Kimi-K2.6)（发布于 2026-04-20）共享原始 Kimi K2 骨干网络：**1.0T 参数的 MoE，每个 token 激活 32B 参数**，**DeepSeek 风格的 top-8-of-385 专家路由，跨 61 个 Transformer 层（1 个 dense 块 + 60 个 MoE 块）**，**Multi-head Latent Attention（MLA）**、SwiGLU、**YaRN RoPE**，163,840 token 的词表，以及 **256K 上下文窗口**（262,144 tokens）。HF 检查点为 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)——两者是在同一预训练架构上的后训练优化，因此**本文中的每一个推理结果都同样适用于这两个版本**。
 
 <Figure
   srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/kimi-k2-architecture-light.png"
@@ -48,13 +48,13 @@ Kimi K2.5 和 K2.6 是 xAI Cursor Composer 2 和 Composer 2.5 背后的开源权
 
 ## 纸面规格
 
-NVIDIA B200 SXM（Blackwell，2025）vs NVIDIA H200 SXM（Hopper，2024）——两者均为 NVIDIA，均运行 vLLM，均部署在 8-GPU NVLink 域中。下方雷达图（chart）将每个轴归一化到 [`/gpu-specs`](/gpu-specs) 中的跨厂商最大值，因此可见多边形在 GB200 NVL72 / GB300 NVL72 设定上限的轴上被压缩（Scale Up Domain Memory + 带宽在 72-GPU 节点规模下），FP4 轴由 GB300 NVL72 的 15,000 TFLOP/s 主导——B200 的 9,000 TFLOP/s 在该轴上约为 60%。
+NVIDIA B200 SXM（Blackwell，2025）vs NVIDIA H200 SXM（Hopper，2024）——两者均为 NVIDIA，均运行 vLLM，均部署在 8-GPU NVLink 域中。下方雷达图（chart）将每个轴归一化到 [`/infx/gpu-specs`](/infx/gpu-specs) 中的跨厂商最大值，因此可见多边形在 GB200 NVL72 / GB300 NVL72 设定上限的轴上被压缩（Scale Up Domain Memory + 带宽在 72-GPU 节点规模下），FP4 轴由 GB300 NVL72 的 15,000 TFLOP/s 主导——B200 的 9,000 TFLOP/s 在该轴上约为 60%。
 
 <Figure
   srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-dark.png"
-  alt="GPU 规格雷达图对比 H200 SXM（深绿色）和 B200 SXM（浅绿色），来自 /gpu-specs。B200 在每个单 GPU 轴上都填充了更大面积，Memory 轴除外（约 60% vs H200 约 45%——两者均被 MI355X 288 GB 上限压缩）。B200 最显著的优势：Mem BW（100%，H200 约 55%）、Scale Up BW（100%，H200 约 50%）、BF16 + FP8 TFLOP/s（约 85%，H200 约 35%）。H200 在 FP4 轴上为 0%，因为 Hopper 没有 FP4 张量核心。"
-  caption="B200 SXM（浅绿色）vs H200 SXM（深绿色）的 /gpu-specs 对比。各轴归一化至跨厂商所有 SKU 的最大值。B200 在每个单 GPU 轴上领先 H200；FP4 轴差距无穷大——H200 为 0%，因为 Hopper 没有 FP4 张量核心路径。Scale-up Domain 轴被 GB200/GB300 NVL72 的 72-GPU 节点规模压缩，因此两款 8-GPU SKU 均约为 11%。"
+  alt="GPU 规格雷达图对比 H200 SXM（深绿色）和 B200 SXM（浅绿色），来自 /infx/gpu-specs。B200 在每个单 GPU 轴上都填充了更大面积，Memory 轴除外（约 60% vs H200 约 45%——两者均被 MI355X 288 GB 上限压缩）。B200 最显著的优势：Mem BW（100%，H200 约 55%）、Scale Up BW（100%，H200 约 50%）、BF16 + FP8 TFLOP/s（约 85%，H200 约 35%）。H200 在 FP4 轴上为 0%，因为 Hopper 没有 FP4 张量核心。"
+  caption="B200 SXM（浅绿色）vs H200 SXM（深绿色）的 /infx/gpu-specs 对比。各轴归一化至跨厂商所有 SKU 的最大值。B200 在每个单 GPU 轴上领先 H200；FP4 轴差距无穷大——H200 为 0%，因为 Hopper 没有 FP4 张量核心路径。Scale-up Domain 轴被 GB200/GB300 NVL72 的 72-GPU 节点规模压缩，因此两款 8-GPU SKU 均约为 11%。"
 />
 
 | 规格                              | H200 SXM            | B200 SXM            | B200 / H200 |
@@ -144,13 +144,13 @@ NVIDIA B200 SXM（Blackwell，2025）vs NVIDIA H200 SXM（Hopper，2024）——
   caption="Kimi K2.5/K2.6（1T 总参数，32B 激活参数），vLLM，ISL 8192 / OSL 1024，单 NVIDIA 节点。来源：SemiAnalysis InferenceX，2026-05-19。数据点标签标注每个配置的 GPU 数量。"
 />
 
-[在线图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm)，已预筛选为 2026-05-19 测试中 B200 + H200 上的 vLLM Kimi K2.5/K2.6 FP4 和 INT4 对比。
+[在线图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm)，已预筛选为 2026-05-19 测试中 B200 + H200 上的 vLLM Kimi K2.5/K2.6 FP4 和 INT4 对比。
 
 ## 致谢
 
-Kimi K2.5 和 K2.6 是 [Moonshot AI](https://www.moonshot.ai/) 的工作成果，权重发布于 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)。Blackwell 上的 vLLM NVFP4 路径是 [vLLM 项目](https://github.com/vllm-project/vllm)以及 NVIDIA TensorRT-LLM / AITER 内核团队的工作成果，vLLM 链接了他们的 FP4 MoE 内核。持续基准测试由 SemiAnalysis 在 InferenceX 上执行。速度就是护城河。
+Kimi K2.5 和 K2.6 是 [Moonshot AI](https://www.moonshot.ai/) 的工作成果，权重发布于 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)。Blackwell 上的 vLLM NVFP4 路径是 [vLLM 项目](https://github.com/vllm-project/vllm)以及 NVIDIA TensorRT-LLM / AITER kernel 团队的工作成果，vLLM 链接了他们的 FP4 MoE kernel。持续基准测试由 SemiAnalysis 在 InferenceX 上执行。速度就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -195,7 +195,7 @@ Kimi K2.5 和 K2.6 是 [Moonshot AI](https://www.moonshot.ai/) 的工作成果�
       "name": "Kimi K2.5 / K2.6 推理还有哪些未覆盖的方向？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "四个方向。第一，AMD MI355X 目前还没有 K2.5 / K2.6 的 InferenceX 方案；一旦内核覆盖到位，相同的精度解锁论证应同样适用（MI355X 有 10,066 TFLOP/s FP4 张量核心，略高于 B200）。第二，PD 分离式推理（AMD 上的 mori-sglang、NVIDIA Dynamo）是下一个约 1.5 倍的提升杠杆，目前 InferenceX 循环中还没有 K2 的方案。第三，GB200 NVL72 和 GB300 NVL72 的机架级宽 Expert Parallelism 路径尚未为 K2.5 / K2.6 接入，尽管 384 专家的架构天然适配。第四，本文测量的是 8K / 1K；32K / 2K 和 128K / 2K 的 agentic 工具调用工作负载会在 KV 缓存压力开始对 256K 上下文窗口模型产生影响后重新排列曲线。"
+        "text": "四个方向。第一，AMD MI355X 目前还没有 K2.5 / K2.6 的 InferenceX 方案；一旦 kernel 覆盖到位，相同的精度解锁论证应同样适用（MI355X 有 10,066 TFLOP/s FP4 张量核心，略高于 B200）。第二，PD 分离式推理（AMD 上的 mori-sglang、NVIDIA Dynamo）是下一个约 1.5 倍的提升杠杆，目前 InferenceX 循环中还没有 K2 的方案。第三，GB200 NVL72 和 GB300 NVL72 的机架级宽 Expert Parallelism 路径尚未为 K2.5 / K2.6 接入，尽管 384 专家的架构天然适配。第四，本文测量的是 8K / 1K；32K / 2K 和 128K / 2K 的 agentic 工具调用工作负载会在 KV 缓存压力开始对 256K 上下文窗口模型产生影响后重新排列曲线。"
       }
     }
   ]

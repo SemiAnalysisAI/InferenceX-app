@@ -1,7 +1,6 @@
+import { availabilityBody } from '../support/e2e';
 import { assertShareLinkParams } from '../support/share-link';
-
-// Deterministic intercepted rows exercise the validated/historical power UI:
-// one row has power_valid=1 and one has no validation verdict.
+import { expectHwKeyPoints, visiblePoints } from '../support/scatter-points';
 
 const POWER_MODEL = 'dsv4';
 const POWER_DATE = '2026-08-20';
@@ -35,9 +34,7 @@ const powerMetrics = (conc: number): Record<string, number> => {
 };
 
 const powerConfigs = [
-  // Legacy telemetry: measured watts without a producer verdict.
   { hardware: 'b200', framework: 'vllm', power: { avg_power_w: 560 } },
-  // Certified telemetry: explicit power_valid=1 verdict.
   { hardware: 'mi300x', framework: 'sglang', power: { power_valid: 1, avg_power_w: 685.5 } },
 ];
 
@@ -82,14 +79,19 @@ const powerBenchmarks = powerConfigs.flatMap((config) =>
   })),
 );
 
-function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks) {
-  cy.intercept('GET', '/api/v1/availability', { body: powerAvailability }).as('availability');
+function visitCertifiedPowerChart(
+  extraParams = '',
+  benchmarks = powerBenchmarks,
+  page: '/infx/inference' | '/pwx' = '/pwx',
+) {
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(powerAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
+  cy.visit(`${page}?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
@@ -97,25 +99,19 @@ function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
-const MEASURED_POWER_OPTION = 'Measured Power';
 const MEASURED_POWER_TITLE = 'Measured Average Power per Chip';
 const TOKENS_PER_DOLLAR_TITLE = 'Total Tokens per $1 TCO';
 
-const assertYAxisMetric = (option: string, title: string) => {
-  cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', option);
+const assertChartTitle = (title: string) => {
   cy.get('[data-testid="chart-figure"] h2').should('contain.text', title);
 };
 
-const visiblePowerPoints = () =>
-  cy.get<SVGGElement>('.dot-group').filter((_, element) => element.style.opacity !== '0');
+const expectVisiblePowerPoints = (count: number) =>
+  cy.scatterPoints().should((points) => expect(visiblePoints(points)).to.have.length(count));
 
 describe('Validated vs historical measured power', () => {
   beforeEach(() => {
-    // Firefox can defer resize notifications while the Radix metric menu
-    // changes layout. Keep the chart assertions active; ignore only this
-    // browser-generated delivery notification, not application exceptions.
     cy.on('uncaught:exception', (error) => {
-      // Cypress wraps the original error in the second paragraph.
       if (
         error.message.split('\n\n')[1]?.trim() ===
         '> ResizeObserver loop completed with undelivered notifications.'
@@ -126,34 +122,24 @@ describe('Validated vs historical measured power', () => {
   });
 
   it('filters validated and historical measured points via Quick Filters', () => {
-    visitCertifiedPowerChart();
+    // PowerX opens on Energy per token; the Validated / Historical filter is tested on the
+    // power scatter the article links to.
+    visitCertifiedPowerChart('&i_metric=y_measuredAvgPower');
+    assertChartTitle(MEASURED_POWER_TITLE);
 
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Measured Power')
-      .scrollIntoView()
-      .should('be.visible')
-      .click();
-    cy.get('[data-slot="select-content"]').should('not.exist');
-
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
     cy.get('[data-testid="quick-filter-power-legacy"]').should('be.enabled');
-    cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
-    cy.get('[data-testid="quick-filter-power-legacy"]').should('contain.text', 'Historical');
-    cy.get('[data-testid="measured-power-help"]').click();
-    cy.contains('Both are shown by default.').should('be.visible');
-    cy.get('body').type('{esc}');
 
     cy.get('[data-testid="quick-filter-power-certified"]').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', false);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
-    cy.screenshot('certified-only-filter', { capture: 'viewport' });
 
     cy.contains('button', 'Clear filters').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
@@ -163,17 +149,14 @@ describe('Validated vs historical measured power', () => {
       'false',
     );
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
+    expectHwKeyPoints('b200', true);
   });
 
   it('restores a shared i_power=certified link with the toggle pre-selected', () => {
-    // Note: filter writes live in the in-memory share-link store (the address
-    // bar is deliberately stripped after load — see url-state.ts), so the
-    // durable observable behavior is the restore direction tested here.
     visitCertifiedPowerChart('&i_metric=y_measuredAvgPower&i_power=certified');
 
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
+    expectHwKeyPoints('mi300x', true);
+    expectHwKeyPoints('b200', false);
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-power-certified"]').should(
@@ -184,41 +167,20 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
   });
 
-  it('opens a shared i_power link without i_metric on the measured power scatter', () => {
-    visitCertifiedPowerChart('&i_power=certified');
-
-    assertYAxisMetric(MEASURED_POWER_OPTION, MEASURED_POWER_TITLE);
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
-    assertShareLinkParams({ i_power: 'certified', i_metric: null });
-  });
-
   it('keeps an explicit tokens-per-dollar metric next to a power tier filter', () => {
-    visitCertifiedPowerChart('&i_metric=y_tokensPerDollarH&i_power=certified');
+    visitCertifiedPowerChart(
+      '&i_metric=y_tokensPerDollarH&i_power=certified',
+      powerBenchmarks,
+      '/infx/inference',
+    );
 
-    assertYAxisMetric(TOKENS_PER_DOLLAR_TITLE, TOKENS_PER_DOLLAR_TITLE);
-    assertShareLinkParams({ i_metric: 'y_tokensPerDollarH', i_power: 'certified' });
-  });
-
-  it('moves the default chart to measured power when Validated turns on, not when cleared', () => {
-    visitCertifiedPowerChart();
-    assertYAxisMetric(TOKENS_PER_DOLLAR_TITLE, TOKENS_PER_DOLLAR_TITLE);
-
-    cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filter-power-certified"]').click();
-    cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
-    assertYAxisMetric(MEASURED_POWER_OPTION, MEASURED_POWER_TITLE);
-
-    cy.contains('button', 'Clear filters').click();
-    cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
-    assertYAxisMetric(MEASURED_POWER_OPTION, MEASURED_POWER_TITLE);
-    cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
-
-    assertShareLinkParams({ i_metric: 'y_measuredAvgPower', i_power: null });
+    cy.location('pathname').should('eq', '/infx/inference');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', TOKENS_PER_DOLLAR_TITLE);
+    assertChartTitle(TOKENS_PER_DOLLAR_TITLE);
+    assertShareLinkParams({ i_metric: null, i_power: 'certified' });
   });
 
   it('uses Optimal Only for measured markers while preserving the power boundary', () => {
-    // Each chip has two boundary vertices and one lower-power interior point.
     const curveBenchmarks = powerBenchmarks.map((row) => ({
       ...row,
       metrics: {
@@ -229,9 +191,8 @@ describe('Validated vs historical measured power', () => {
     const powerView = '&i_metric=y_measuredAvgPower&i_best=0';
     visitCertifiedPowerChart(`${powerView}&i_optimal=1`, curveBenchmarks);
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-    visiblePowerPoints().should('have.length', 4);
+    expectVisiblePowerPoints(4);
 
-    // Let the initial ResizeObserver update reach the SVG before saving geometry.
     cy.get<SVGSVGElement>('[data-testid="d3-chart-svg"]').should(($svg) => {
       const svg = $svg[0];
       expect(svg.getBoundingClientRect().width, 'chart matches its container width').to.equal(
@@ -255,14 +216,14 @@ describe('Validated vs historical measured power', () => {
         expect(geometry.every((path) => path && !path.includes('NaN'))).to.equal(true);
 
         cy.get('#scatter-hide-non-optimal').click();
-        visiblePowerPoints().should('have.length', 6);
+        expectVisiblePowerPoints(6);
         cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
         cy.get<SVGPathElement>('.roofline-path').should(($current) => {
           expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
         });
 
         cy.get('#scatter-hide-non-optimal').click();
-        visiblePowerPoints().should('have.length', 4);
+        expectVisiblePowerPoints(4);
         cy.get<SVGPathElement>('.roofline-path').should(($current) => {
           expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
         });
@@ -270,6 +231,6 @@ describe('Validated vs historical measured power', () => {
 
     visitCertifiedPowerChart(`${powerView}&i_optimal=0`, curveBenchmarks);
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
-    visiblePowerPoints().should('have.length', 6);
+    expectVisiblePowerPoints(6);
   });
 });

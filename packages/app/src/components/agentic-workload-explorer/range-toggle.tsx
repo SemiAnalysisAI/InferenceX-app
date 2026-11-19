@@ -7,12 +7,10 @@ export interface RangeOption<T extends string> {
   id: T;
   label: string;
   title?: string;
-  /** Chinese label/title for /zh pages; falls back to the English value. */
   labelZh?: string;
   titleZh?: string;
 }
 
-/** Compact button row for picking a chart's time range. */
 export function RangeToggle<T extends string>({
   value,
   options,
@@ -45,23 +43,23 @@ export const DAY_RANGES: RangeOption<DayRange>[] = [
   {
     id: '7d',
     label: '7D',
-    title: "Snapshot's final 7 days",
+    title: 'Final 7 days',
     labelZh: '7 天',
-    titleZh: '快照最后 7 天',
+    titleZh: '最后 7 天',
   },
   {
     id: '14d',
     label: '14D',
-    title: "Snapshot's final 14 days",
+    title: 'Final 14 days',
     labelZh: '14 天',
-    titleZh: '快照最后 14 天',
+    titleZh: '最后 14 天',
   },
   {
     id: '30d',
     label: '30D',
-    title: "Snapshot's final 30 days",
+    title: 'Final 30 days',
     labelZh: '30 天',
-    titleZh: '快照最后 30 天',
+    titleZh: '最后 30 天',
   },
 ];
 

@@ -1,12 +1,8 @@
-/**
- * CSV data generation helpers for each chart type.
- * These functions convert chart-specific data structures into
- * { headers, rows } suitable for csv-export.ts.
- *
- * Inference export includes benchmark summary fields beyond the currently
- * plotted x/y axes.
- */
-
+import { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import {
+  allInMeasuredStatusLabel,
+  inferenceTableYValue,
+} from '@/components/inference/utils/inference-table-data';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
 import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
@@ -29,23 +25,17 @@ function nestedMetric(point: InferenceData, path: string): number | '' {
   const value = point[key as keyof InferenceData];
   if (nestedKey && typeof value === 'object' && value !== null && nestedKey in value) {
     const nestedValue = (value as Record<string, unknown>)[nestedKey];
-    return typeof nestedValue === 'number' ? nestedValue : '';
+    return typeof nestedValue === 'number' && Number.isFinite(nestedValue) ? nestedValue : '';
   }
-  return typeof value === 'number' ? value : '';
+  return typeof value === 'number' && Number.isFinite(value) ? value : '';
 }
 
-/** Preserve a real zero while leaving source metrics that were not measured blank. */
 function benchmarkMetric(point: InferenceData, key: string): number | '' {
   if (point.rawMetricKeys && !point.rawMetricKeys.includes(key)) return '';
   const value = point[key as keyof InferenceData];
   return typeof value === 'number' ? value : '';
 }
 
-/**
- * Generate CSV data from inference scatter/GPU chart data points.
- * Exports benchmark summary metrics regardless of which axes are currently
- * plotted. Visible unofficial-run rows are appended after official rows.
- */
 export function inferenceChartToCsv(
   data: InferenceData[],
   model: string,
@@ -54,12 +44,11 @@ export function inferenceChartToCsv(
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
-  // A power comparison (`i_pcompare`) appends boundary / role clones of the
-  // plotted points; name each row's series so the export stays unambiguous.
   const allPoints = [...data, ...overlayData];
   const powerCompare = inferPowerCompare(allPoints);
   const showPowerSeries = powerCompare !== 'none';
   const plottedMetric = displayedMetrics ? `y_${displayedMetrics.yPath.split('.')[0]}` : '';
+  const showAllInMeasured = isAllInMeasuredConfigKey(plottedMetric);
   const headers = [
     'Model',
     'ISL',
@@ -71,49 +60,41 @@ export function inferenceChartToCsv(
     'TP',
     'Concurrency',
     'Date',
-    // Throughput
     'Throughput/Chip (tok/s)',
     'Output Throughput/Chip (tok/s)',
     'Input Throughput/Chip (tok/s)',
-    // Latency — TTFT
     'Mean TTFT (s)',
     'Median TTFT (s)',
     'P99 TTFT (s)',
     'Std TTFT (s)',
-    // Latency — TPOT
     'Mean TPOT (s)',
     'Median TPOT (s)',
     'P99 TPOT (s)',
     'Std TPOT (s)',
-    // Interactivity
     'Mean Interactivity (tok/s/user)',
     'Median Interactivity (tok/s/user)',
     'P99 Interactivity (tok/s/user)',
     'Std Interactivity (tok/s/user)',
-    // ITL
     'Mean ITL (s)',
     'Median ITL (s)',
     'P99 ITL (s)',
     'Std ITL (s)',
-    // E2E Latency
     'Mean E2E Latency (s)',
     'Median E2E Latency (s)',
     'P99 E2E Latency (s)',
     'Std E2E Latency (s)',
-    // Disaggregated
     'Disaggregated',
     'Num Prefill Chips',
     'Num Decode Chips',
     'Spec Decoding',
-    // Parallelism
     'EP',
     'DP Attention',
     'Is Multinode',
-    // Provenance (especially important when unofficial-run rows are included)
     'Run URL',
     'Physical Chips',
     'DP',
     ...(showPowerSeries ? ['Power Series'] : []),
+    ...(showAllInMeasured ? ['Measured GPU Power (W/chip)', 'All-in Estimate Status'] : []),
   ];
 
   const displayedColumns = displayedMetrics
@@ -121,9 +102,14 @@ export function inferenceChartToCsv(
         {
           header: displayedMetrics.yHeader,
           value: (point: InferenceData) =>
-            point.powerVariant ? point.y : nestedMetric(point, displayedMetrics.yPath),
+            point.powerVariant
+              ? (inferenceTableYValue(point) ?? '')
+              : nestedMetric(point, displayedMetrics.yPath),
         },
-        { header: displayedMetrics.xHeader, value: (point: InferenceData) => point.x },
+        {
+          header: displayedMetrics.xHeader,
+          value: (point: InferenceData) => (Number.isFinite(point.x) ? point.x : ''),
+        },
       ].filter(
         (column, index, columns) =>
           !headers.includes(column.header) &&
@@ -180,6 +166,9 @@ export function inferenceChartToCsv(
         d.physicalChips ?? d.tp,
         d.dp ?? '',
         ...(showPowerSeries ? [powerSeriesLabel(d, plottedMetric, powerCompare, 'en')] : []),
+        ...(showAllInMeasured
+          ? [d.measuredAvgPower?.y ?? '', allInMeasuredStatusLabel(d, plottedMetric.slice(2), 'en')]
+          : []),
       ];
       row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
       return row;
@@ -188,28 +177,6 @@ export function inferenceChartToCsv(
   return { headers, rows };
 }
 
-/**
- * Generate CSV data from reliability chart data.
- */
-export function reliabilityChartToCsv(
-  data: {
-    model: string;
-    modelLabel: string;
-    successRate: number;
-    n_success: number;
-    total: number;
-  }[],
-): CsvData {
-  const headers = ['Chip Model', 'Chip Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'];
-
-  const rows = data.map((d) => [d.modelLabel, d.model, d.successRate, d.n_success, d.total]);
-
-  return { headers, rows };
-}
-
-/**
- * Generate CSV data from evaluation chart data.
- */
 export function evaluationChartToCsv(
   data: {
     configLabel: string;
@@ -277,10 +244,6 @@ export function evaluationChartToCsv(
   return { headers, rows };
 }
 
-/**
- * Generate CSV data from TCO calculator interpolated results.
- * Takes a label resolver so the GPU column shows display names.
- */
 export function calculatorChartToCsv(
   results: {
     resultKey: string;
@@ -337,15 +300,12 @@ export function calculatorChartToCsv(
   return { headers, rows };
 }
 
-/**
- * Generate CSV data from historical trend interpolated data.
- * Flattens the Map<groupKey, TrendDataPoint[]> into rows with GPU labels.
- */
 export function historicalTrendToCsv(
   trendLines: Map<string, TrendDataPoint[]>,
   lineConfigs: { id: string; label: string; precision?: string }[],
   metricLabel: string,
   targetInteractivity: number,
+  interactivityStatistic: 'median' | 'p90' = 'median',
 ): CsvData {
   const headers = [
     'Chip',
@@ -353,9 +313,9 @@ export function historicalTrendToCsv(
     'Precision',
     'Date',
     metricLabel,
-    'Interactivity (tok/s/user)',
+    `${interactivityStatistic === 'p90' ? 'P90 ' : ''}Interactivity (tok/s/user)`,
     'Synthetic',
-    'Target Interactivity (tok/s/user)',
+    `Target ${interactivityStatistic === 'p90' ? 'P90 ' : ''}Interactivity (tok/s/user)`,
   ];
 
   const configById = new Map(lineConfigs.map((c) => [c.id, c]));
@@ -382,10 +342,6 @@ export function historicalTrendToCsv(
   return { headers, rows };
 }
 
-/**
- * Generate CSV data from submission volume rows.
- * Exports daily datapoint counts per hardware key.
- */
 export function submissionsVolumeToCsv(volume: SubmissionVolumeRow[]): CsvData {
   const headers = ['Date', 'Hardware', 'Datapoints'];
 

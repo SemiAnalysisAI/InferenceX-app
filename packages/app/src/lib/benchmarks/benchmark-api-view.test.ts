@@ -49,9 +49,6 @@ describe('toCalculatorBenchmarkRows', () => {
   });
 
   it('keeps time to first token at the percentiles the calculator pages read', () => {
-    // The First-Token Limits page caps rows on TTFT through this same view;
-    // without these the page would have nothing to cap. p99 stays out like the
-    // other p99 latency metrics.
     const [row] = toCalculatorBenchmarkRows(
       [
         {
@@ -86,11 +83,6 @@ describe('toCalculatorBenchmarkRows', () => {
   });
 
   it('keeps all three cache tiers — the trim cannot know which one a row will use', () => {
-    // `measuredCacheHitRate` picks between external and CPU per row, so the allowlist
-    // has to pass all three through or the choice is made for it by the trim.
-    // `pricingCacheHitRate` additionally falls back to the theoretical ceiling on
-    // GB300 rows with no server measurement, so that survives too.
-    // This runs on every calculator response, agentic included.
     const cached = toCalculatorBenchmarkRows(
       [
         {

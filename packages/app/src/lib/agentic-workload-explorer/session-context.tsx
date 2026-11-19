@@ -21,7 +21,6 @@ export interface SessionRequest {
   isStreaming: boolean;
   isFastMode: boolean | null;
   hashIds: string[] | null;
-  /** Block count when hashIds weren't loaded (fetched on demand instead). */
   hashCount?: number;
   hashTokenCount: number | null;
   privacyMode: 'anon' | 'full';

@@ -268,7 +268,7 @@ export function validateQualification(
     for (const entry of nativeAcceptance) for (const item of entry.cases) counts[item.status] += 1;
     assert.deepEqual(
       counts,
-      { passed: 0, failed: 0, not_run: 26 },
+      { passed: 0, failed: 0, not_run: CASE_IDS.length * 2 },
       'Native report exception case totals differ',
     );
     nativeReportException = {

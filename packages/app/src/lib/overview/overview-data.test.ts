@@ -17,7 +17,7 @@ import {
   applyOverviewRowScope,
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
-  buildOverviewModelSummary,
+  buildOverviewModelSummary as buildSummary,
   OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_ROW_SCOPE,
   overviewRowHasAnyCost,
@@ -40,6 +40,11 @@ import {
 
 let nextId = 1;
 
+// These fixtures exercise frontier math at 50, independently of the page's default SLO.
+const buildOverviewModelSummary = (
+  ...[model, rows, tier = 50, ...rest]: Parameters<typeof buildSummary>
+) => buildSummary(model, rows, tier, ...rest);
+
 const JULY_2026_HYPERSCALER_TCO = {
   b200: 1.73,
   gb200: 1.86,
@@ -47,9 +52,6 @@ const JULY_2026_HYPERSCALER_TCO = {
   mi355x: 1.5,
 } as const;
 
-// `output_tput_per_gpu` is deliberately a constant decoy on most rows: the
-// overview's cost basis is TOTAL tokens (`tput_per_gpu`), so any expectation
-// below would collapse to the 123 decoy if the code read output tokens.
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
     id: nextId++,
@@ -83,7 +85,6 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/** One frontier point per tier for a single configuration (total tok/s/GPU). */
 function frontier(
   totals: [number, number, number, number],
   overrides: Partial<BenchmarkRow> = {},
@@ -97,7 +98,6 @@ function frontier(
   );
 }
 
-/** Frontier at explicit [interactivity, total tput] knots — for clamped/unreachable tiers. */
 function frontierAt(
   points: [number, number][],
   overrides: Partial<BenchmarkRow> = {},
@@ -111,7 +111,6 @@ function frontierAt(
   );
 }
 
-/** AgentX trace-replay row: tier axis is P90 interactivity (1/p90_itl). */
 function agenticRow(
   p90Interactivity: number,
   p90E2eLatency: number,
@@ -162,14 +161,14 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it.each([
-    [undefined, 'hardware'],
+    [undefined, '30d'],
     ['hardware', 'hardware'],
     ['7d', '7d'],
     ['30d', '30d'],
     ['60d', '60d'],
     ['90d', '90d'],
     [['30d'], '30d'],
-    ['unknown', 'hardware'],
+    ['unknown', '30d'],
   ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
     expect(resolveOverviewComparisonMode(raw)).toBe(expected);
   });
@@ -211,8 +210,6 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it('prices from HW_REGISTRY costh — not the retail costr tier', () => {
-    // b200: costh 1.73 vs costr 3.70 — the two tiers disagree, so a costr
-    // regression cannot pass this assertion.
     expect(overviewCostPerMtok('b200', 7200)).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
       9,
@@ -236,8 +233,6 @@ describe('overview engine scope and scenario selection', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, rows, 50, 'community');
     const byHardware = Object.fromEntries(summary.platforms.map((p) => [p.hardware, p]));
 
-    // Expected $/GPU/hr from HW_REGISTRY costh — b200 1.73, mi355x 1.50,
-    // gb300 2.31.
     expect(byHardware.b200.costPerMtok).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
       6,
@@ -389,8 +384,6 @@ describe('overview engine scope and scenario selection', () => {
       50,
     );
 
-    // The reads that back the matrix must exist, or the assertion below passes
-    // vacuously on an empty payload.
     expect(page.models.some((model) => model.platforms.some((p) => p.read.config !== null))).toBe(
       true,
     );
@@ -501,7 +494,7 @@ describe('overview engine scope and scenario selection', () => {
     });
   });
 
-  it('normalizes disaggregated total throughput by all deployed GPUs before interpolation', () => {
+  it('interpolates disaggregated rows on their stored per-deployed-GPU total throughput', () => {
     const summary = buildOverviewModelSummary(Model.DeepSeek_V4_Pro, [
       row({
         hardware: 'gb300',
@@ -540,11 +533,61 @@ describe('overview engine scope and scenario selection', () => {
       }),
     ]);
 
+    // Between the 5,169 (24P+8D) and 3,249 (16P+8D) knots, not a further
+    // decode ÷ total rescaling of them.
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: 1224.393,
+      value: 4546.165,
       boundary: 'interpolated',
       evidenceTopologies: ['24P+8D', '16P+8D'],
     });
+  });
+
+  // `tput_per_gpu` is already total tok/s ÷ (prefill + decode) GPUs, as produced by
+  // InferenceX (`total_token_throughput / total_gpus`). Scaling it by decode ÷ total
+  // again divided disaggregated throughput twice and overstated its cost.
+  it('prices disaggregated single-turn rows on the stored per-deployed-GPU total throughput', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      row({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        precision: Precision.FP4,
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 12,
+        num_decode_gpu: 8,
+        metrics: { median_intvty: 50, tput_per_gpu: 16200, output_tput_per_gpu: 2400 },
+      }),
+    ]);
+    const gb300 = summary.platforms.find((p) => p.hardware === 'gb300')!;
+
+    expect(gb300.read.value).toBe(16200);
+    expect(gb300.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (16200 * 3600),
+      9,
+    );
+  });
+
+  it('prices disaggregated AgentX rows on the stored per-deployed-GPU total throughput', () => {
+    // Shape of a production Qwen3.5 GB300 12P+8D AgentX row:
+    // total_tput_tps 2,627,360 over 20 GPUs = tput_per_gpu 131,368.
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, [
+      agenticRow(50, 25, 131_368, 2_100, {
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 12,
+        num_decode_gpu: 8,
+      }),
+    ]);
+    const gb300 = summary.platforms.find((p) => p.hardware === 'gb300')!;
+
+    expect(summary.scenario).toBe('agentx');
+    expect(gb300.read.value).toBe(131_368);
+    expect(gb300.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (131_368 * 3600),
+      9,
+    );
   });
 
   it('does not normalize aggregated multinode rows with duplicated P/D counts', () => {
@@ -565,7 +608,7 @@ describe('overview engine scope and scenario selection', () => {
     });
   });
 
-  it('normalizes disaggregated rows even when they run on one node', () => {
+  it('reads single-node disaggregated rows on their stored per-deployed-GPU total throughput', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([16200, 13500, 10800, 8100], {
         hardware: 'gb300',
@@ -578,7 +621,7 @@ describe('overview engine scope and scenario selection', () => {
     ]);
 
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read).toMatchObject({
-      value: 9000,
+      value: 13500,
       evidenceTopologies: ['4P+8D'],
     });
   });
@@ -1176,11 +1219,6 @@ describe('overview platform selection', () => {
   });
 
   it('reads AgentX tiers from every measured point, not just the E2E frontier', () => {
-    // The second point is dominated on total tokens (8100 < 9000) and slower on
-    // E2E (25 > 20). Until #736 the E2E frontier dropped it, leaving only the
-    // interactivity-40 point, which cannot reach the tier-50 read — so the tier
-    // came back null. That gating was removed deliberately, so the point now
-    // stands and the read lands on it exactly.
     const summary = buildOverviewModelSummary(Model.GLM_5_2, [
       agenticRow(40, 20, 9000, 500, { hardware: 'b200', conc: 8 }),
       agenticRow(50, 25, 8100, 900, { hardware: 'b200', conc: 12 }),
@@ -1231,17 +1269,33 @@ describe('overview platform selection', () => {
   });
 });
 
+const overviewPage = (tier?: 30 | 50 | 75 | 100) =>
+  assembleOverviewPageData(
+    {
+      [Model.Qwen3_5]: [
+        ...frontier([10800, 9000, 7200, 3600], {
+          hardware: 'mi355x',
+          precision: Precision.FP4,
+        }),
+        ...frontier([9900, 8100, 7650, 6300], { hardware: 'mi355x', precision: Precision.FP8 }),
+        ...frontier([10800, 9000, 7200, 5400], { hardware: 'b200', precision: Precision.FP8 }),
+      ],
+    },
+    tier,
+  ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
+
 describe('tier-parameterized overview', () => {
-  it('resolves the tier query value and falls back to 50', () => {
+  it('resolves the tier query value and falls back to 100', () => {
     expect(resolveOverviewTier('100')).toBe(100);
+    expect(resolveOverviewTier('50')).toBe(50);
     expect(resolveOverviewTier(['75', '30'])).toBe(75);
-    expect(resolveOverviewTier('40')).toBe(50);
-    expect(resolveOverviewTier('')).toBe(50);
-    expect(resolveOverviewTier(undefined)).toBe(50);
+    expect(resolveOverviewTier('40')).toBe(100);
+    expect(resolveOverviewTier('')).toBe(100);
+    expect(resolveOverviewTier(undefined)).toBe(100);
   });
 
-  it('stamps the displayed tier on the page and defaults to 50, down to empty models', () => {
-    expect(assembleOverviewPageData({}).tier).toBe(50);
+  it('stamps the displayed tier on the page and defaults to 100, down to empty models', () => {
+    expect(assembleOverviewPageData({}).tier).toBe(100);
     const page = assembleOverviewPageData({}, 75);
     expect(page.tier).toBe(75);
     expect(page.models[0]?.platforms[0]?.read.tier).toBe(75);
@@ -1299,28 +1353,13 @@ describe('tier-parameterized overview', () => {
   });
 
   it('re-selects each platform independently at the displayed tier', () => {
-    const page = (tier?: 30 | 50 | 75 | 100) =>
-      assembleOverviewPageData(
-        {
-          [Model.Qwen3_5]: [
-            ...frontier([10800, 9000, 7200, 3600], {
-              hardware: 'mi355x',
-              precision: Precision.FP4,
-            }),
-            ...frontier([9900, 8100, 7650, 6300], { hardware: 'mi355x', precision: Precision.FP8 }),
-            ...frontier([10800, 9000, 7200, 5400], { hardware: 'b200', precision: Precision.FP8 }),
-          ],
-        },
-        tier,
-      ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
-
-    const at50 = headlinePairOf(page(), 'mi355x-vs-b200');
+    const at50 = headlinePairOf(overviewPage(50), 'mi355x-vs-b200');
     expect(at50?.candidate.precision).toBe(Precision.FP4);
     expect(at50?.candidate.read.value).toBe(9000);
     expect(at50?.baseline.precision).toBe(Precision.FP8);
     expect(at50?.baseline.read.value).toBe(9000);
 
-    const at100 = headlinePairOf(page(100), 'mi355x-vs-b200');
+    const at100 = headlinePairOf(overviewPage(100), 'mi355x-vs-b200');
     expect(at100?.candidate.precision).toBe(Precision.FP4);
     expect(at100?.candidate.read.value).toBe(3600);
     expect(at100?.baseline.precision).toBe(Precision.FP8);
@@ -1328,31 +1367,21 @@ describe('tier-parameterized overview', () => {
   });
 });
 
-// Drift guard: runs the real assembler over the e2e fixture; expectations are
-// engine-derived, never eyeballed. Contract drift fails here, not in overview.cy.ts.
 describe('assembleOverviewPageData over the overview-rows fixture', () => {
   it('serves every matrix cell state through the real builder', () => {
     const page = assembleOverviewPageData(
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
+      50,
     );
 
-    // Curated scenarios: Qwen3.5 gets both rows; Kimi K3 and GLM are
-    // AgentX-only. Kimi K2.5 is absent — deprecated models are not default
-    // models, and the matrix is built from DEFAULT_MODELS.
-    // Qwen3.8-Flash-Next is curated AgentX-only, like Kimi K3 and GLM: the
-    // model is benchmarked on agentic traces, so it must not claim a
-    // fixed-sequence row it will never fill. MiniMax M3 and DeepSeek V4 Pro
-    // are AgentX-only by retirement: their single-turn 8k1k sweeps stopped on
-    // 2026-08-04 (InferenceX#2493) and after 2026-09-08 (InferenceX#2728), so
-    // the matrix must not keep rows that never refresh. AgentX rows group
-    // above the 8K/1K row, each group in MODEL_CONFIG declaration order.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
-      `${Model.DeepSeek_V4_Pro}/agentx`,
+      `${Model.Muse_Spark_Open}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
-      `${Model.Kimi_K3}/agentx`,
-      `${Model.MiniMax_M3}/agentx`,
+      `${Model.Kimi_K3_1_Pro}/agentx`,
+      `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
+      `${Model.GLM_5_3_Flash}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,
       `${Model.Qwen3_5}/single_turn_8k1k`,
     ]);
@@ -1360,12 +1389,14 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(page).not.toHaveProperty('datasetThroughDate');
     expect(page.tier).toBe(50);
 
-    // DeepSeek (AgentX): only each series' latest-date sweep survives. B300
-    // and MI355X therefore have no exact @50 read; GB200's independent FP8
-    // remains visible. GB300's points are single-node and multi-node
-    // aggregate deployments, so they must not be interpolated into one
-    // synthetic serving curve.
-    const deepseek = page.models.find(
+    const allModelsPage = assembleOverviewPageData(
+      overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
+      50,
+      'community',
+      'b200',
+      'all',
+    );
+    const deepseek = allModelsPage.models.find(
       (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'agentx',
     )!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
@@ -1392,17 +1423,13 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(dsGb300.candidate.read.evidenceTopologies).toEqual([]);
     expect(dsGb300.candidate.missingReason).toBe('no_exact_at_tier');
 
-    // DeepSeek's retired single-turn 8k1k scenario gets no matrix row even
-    // though historical 8K/1K rows would still be queryable.
     expect(
       page.models.some(
         (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'single_turn_8k1k',
       ),
     ).toBe(false);
 
-    // MiniMax: the platform result remains visible when B200 has no AgentX
-    // data — priced, but with no percentage baseline (the UI's ∞ badge state).
-    const minimax = page.models.find(
+    const minimax = allModelsPage.models.find(
       (m) => m.model === Model.MiniMax_M3 && m.scenario === 'agentx',
     )!;
     const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
@@ -1414,7 +1441,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     );
     expect(mmGb300.candidate.costVsReferencePct).toBeNull();
 
-    // Qwen: MI355X independently falls back to FP8 while B200 and B300 use FP4.
     const qwen = page.models.find(
       (m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k',
     )!;
@@ -1440,11 +1466,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(qwenB300.baseline.precision).toBe(Precision.FP4);
     expect(qwenB300.baseline.read.value).toBeCloseTo(6602.344);
 
-    // Standard-decode-only rows remain visible as explicitly labelled
-    // fallbacks: Qwen's GB300 slice has no speculative read, so the platform
-    // resolves to its STP row rather than reporting missing data. Each platform
-    // is selected independently, so the B200 baseline still picks its own
-    // best (speculative) read.
     const qwenGb300 = headlinePairOf(qwen, 'gb300-vs-b200')!;
     expect(qwenGb300.candidate.precision).toBe(Precision.FP8);
     expect(qwenGb300.candidate.read).toMatchObject({
@@ -1453,7 +1474,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     });
     expect(qwenGb300.candidate.missingReason).toBeNull();
 
-    // GLM's AgentX fixture lacks valid P90 metrics, so it cannot produce a tier read.
     const glm = page.models.find((m) => m.model === Model.GLM_5_2)!;
     const glmB300 = headlinePairOf(glm, 'b300-vs-b200')!;
     expect(glmB300.candidate.read.value).toBeNull();
@@ -1485,6 +1505,10 @@ describe('overview model scope', () => {
     const page = assembleOverviewPageData({});
     expect(new Set(page.models.map((m) => m.model))).toEqual(new Set(DEFAULT_MODELS));
     expect(page.modelScope).toBe('default');
+    expect(page.models.some((m) => m.model === Model.MiniMax_M3)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.DeepSeek_V4_Pro)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.Kimi_K3)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.MiniMax_M3_1_Flash)).toBe(true);
   });
 
   it("appends maintenance then deprecated rows after defaults under scope 'all'", () => {
@@ -1493,7 +1517,13 @@ describe('overview model scope', () => {
     expect(orderedUniqueModels).toEqual([
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
-      ...DEPRECATED_MODELS,
+      Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
+      Model.MiniMax_M3,
+      ...[...DEPRECATED_MODELS].filter(
+        (model) =>
+          model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro && model !== Model.Kimi_K3,
+      ),
     ]);
     expect(page.modelScope).toBe('all');
   });
@@ -1501,10 +1531,12 @@ describe('overview model scope', () => {
   it('stamps each model summary with its category', () => {
     const page = assembleOverviewPageData({}, 50, 'community', 'b200', 'all');
     const categoryOf = (model: Model) => page.models.find((m) => m.model === model)?.category;
-    expect(categoryOf(Model.DeepSeek_V4_Pro)).toBe('default');
+    expect(categoryOf(Model.DeepSeek_V4_Pro)).toBe('deprecated');
     expect(categoryOf(Model.DeepSeek_R1)).toBe('maintenance');
     expect(categoryOf(Model.GLM_5)).toBe('deprecated');
     expect(categoryOf(Model.GptOss)).toBe('deprecated');
+    expect(categoryOf(Model.MiniMax_M3)).toBe('deprecated');
+    expect(categoryOf(Model.Kimi_K3)).toBe('deprecated');
   });
 
   it('forwards the model scope through the historical assembler', () => {
@@ -1514,7 +1546,13 @@ describe('overview model scope', () => {
     expect(orderedUniqueModels).toEqual([
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
-      ...DEPRECATED_MODELS,
+      Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
+      Model.MiniMax_M3,
+      ...[...DEPRECATED_MODELS].filter(
+        (model) =>
+          model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro && model !== Model.Kimi_K3,
+      ),
     ]);
     expect(page.modelScope).toBe('all');
   });
@@ -1527,8 +1565,6 @@ describe('overview row scope', () => {
     targetDate: '2026-07-04',
     earliestDate: '2026-06-04',
   } as const;
-  // Only Qwen3.5 posts rows, so exactly one summary can be comparable and every
-  // other default row is dead weight in the 30-day matrix.
   const currentRows = {
     [Model.Qwen3_5]: frontier([12000, 10000, 8000, 6000], {
       hardware: 'mi355x',
@@ -1587,7 +1623,6 @@ describe('overview row scope', () => {
     const dropped = page.models.filter((m) => !overviewRowHasHistoricalChange(m));
     const stillPriced = dropped.filter((m) => m.platforms.some((p) => p.costPerMtok !== null));
 
-    // The default must keep them; only the opt-in scope may remove them.
     expect(applyOverviewRowScope(page, 'all').models).toEqual(expect.arrayContaining(stillPriced));
     for (const summary of stillPriced) {
       expect(applyOverviewRowScope(page, 'changed').models).not.toContain(summary);
@@ -1599,8 +1634,6 @@ describe('overview row scope', () => {
     const scoped = applyOverviewRowScope(page, 'changed');
 
     expect(scoped.models).toHaveLength(page.models.length);
-    // Carried, not cleared: the page rebuilds its own URL from this data, so
-    // clearing it here is what dropped the 30-day filter on a tab switch back.
     expect(scoped.rowScope).toBe('changed');
     expect(scoped.unchangedRowCount).toBe(0);
   });
@@ -1622,9 +1655,6 @@ describe('overview hardware row scope', () => {
     targetDate: '2026-07-04',
     earliestDate: '2026-06-04',
   } as const;
-  // Only Qwen3.5 posts rows, and only on MI355X. That makes it the row the
-  // filter has to reason about carefully: it prices a platform while the
-  // default B200 reference prices nothing, so it has a cost but no delta.
   const currentRows = {
     [Model.Qwen3_5]: frontier([12000, 10000, 8000, 6000], {
       hardware: 'mi355x',
@@ -1670,9 +1700,6 @@ describe('overview hardware row scope', () => {
   });
 
   it('keeps a row priced only on a platform the reference never reached', () => {
-    // The tempting predicate — "has a delta against the reference" — would drop
-    // this row, deleting a cost that appears nowhere else, and would hide a
-    // different set of rows for every reference the reader picks.
     const scoped = applyOverviewHardwareRowScope(hardwarePage(), 'priced');
     const kept = scoped.models.filter((m) => m.model === Model.Qwen3_5);
 

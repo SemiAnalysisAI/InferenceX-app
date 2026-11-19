@@ -1,22 +1,16 @@
 import type { TraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 
-/** One server-metric series that can be drawn over the chip telemetry chart. */
 export interface OverlaySource {
   key: string;
   label: { en: string; zh: string };
   unit: string;
   color: string;
-  /** Seconds-from-trace-start samples, already in display units. */
   points: (metrics: TraceServerMetrics) => { t: number; value: number }[];
 }
 
 const percent = (points: readonly { t: number; value: number }[]) =>
   points.map((p) => ({ t: p.t, value: p.value * 100 }));
 
-/**
- * Menu of overlay candidates, in display order. Only sources whose series is
- * non-empty for the point are offered (see `availableOverlaySources`).
- */
 export const OVERLAY_SOURCES: readonly OverlaySource[] = [
   {
     key: 'decodeTps',
@@ -69,7 +63,6 @@ export const OVERLAY_SOURCES: readonly OverlaySource[] = [
   },
 ];
 
-/** Sources that have at least one sample for this point, in menu order. */
 export function availableOverlaySources(
   metrics: TraceServerMetrics | null | undefined,
 ): OverlaySource[] {

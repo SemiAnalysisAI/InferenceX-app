@@ -5,7 +5,9 @@
  * PowerX explorer keyed by run ID), and the series linked to one benchmark
  * point (the per-point detail tab). Samples are returned as flat rows with
  * ISO timestamps so the existing D3 charts consume them unchanged. Per-GPU
- * statistics are computed from the stored samples on every read.
+ * statistics are computed from the stored samples on every read. A series
+ * with a current `gpu_metric_sample_blobs` row (migration 022) reads its
+ * samples from that blob, which decodes to exactly the rows the table yields.
  */
 
 import {
@@ -15,6 +17,7 @@ import {
 } from '../lib/gpu-metric-stats';
 
 import type { DbClient } from '../connection.js';
+import { decodeGpuSampleBlob, GPU_SAMPLE_BLOB_FORMAT_VERSION } from '../lib/gpu-sample-blob';
 import {
   gpuMetricsRunCoverage,
   type GpuMetricSeriesCoverageRow,
@@ -26,8 +29,7 @@ export interface GpuMetricSampleRow {
   index: number;
   power?: number;
   /**
-   * Absent when the collector did not sample the metric (the multinode DCGM
-   * power bundle scrapes power only), so readers can tell "not collected"
+   * Absent when the collector did not sample the metric, so readers can tell "not collected"
    * from a genuine zero reading.
    */
   temperature?: number;
@@ -108,7 +110,9 @@ export interface GpuMetricsRunSelection {
 // 64 MiB response cap, while a 1.25M-sample run needs ~25 sequential pages, not 125.
 export const SAMPLE_PAGE_SIZE = 50_000;
 
-interface RawSeriesRow {
+const SAMPLE_BLOB_QUERY_BYTES = 16 * 1024 * 1024;
+
+export interface RawSeriesRow {
   id: number | string;
   artifact_name: string;
   file_name: string;
@@ -132,8 +136,17 @@ interface RawSeriesVersionRow {
   ingested_at: string | Date;
 }
 
-interface RawSampleRow extends StoredGpuMetricSample {
+export interface RawSampleRow extends StoredGpuMetricSample {
   series_id: number | string;
+}
+
+interface RawBlobRow extends RawSeriesVersionRow {
+  has_blob: boolean;
+  data: Uint8Array | null;
+}
+
+export interface SampleReadOptions {
+  sampleBlobs?: boolean;
 }
 
 const isoString = (value: string | Date): string =>
@@ -154,10 +167,11 @@ export class TelemetrySnapshotChangedError extends Error {
 
 const MAX_SNAPSHOT_ATTEMPTS = 3;
 
-const seriesVersionKey = (row: RawSeriesVersionRow): string =>
+/** Changes whenever `upsertGpuMetricSeries` replaces the series. */
+export const seriesVersionKey = (row: RawSeriesVersionRow): string =>
   `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}`;
 
-async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
+export async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await read();
@@ -169,7 +183,7 @@ async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
   }
 }
 
-function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
+function toSampleRow(raw: StoredGpuMetricSample): GpuMetricSampleRow {
   return {
     timestamp: isoString(raw.sampled_at),
     index: Number(raw.gpu_index),
@@ -191,7 +205,7 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
 }
 
 /** Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
-async function readSeriesRows(
+export async function readSeriesRows(
   sql: DbClient,
   scope:
     | {
@@ -239,13 +253,10 @@ async function readSeriesRows(
   `) as unknown as RawSeriesRow[];
 }
 
-async function loadSeriesDetails(
+export async function readSqlSampleRows(
   sql: DbClient,
-  seriesRows: readonly RawSeriesRow[],
-): Promise<GpuMetricSeries[]> {
-  if (seriesRows.length === 0) return [];
-  const ids = seriesRows.map((row) => Number(row.id));
-
+  ids: readonly number[],
+): Promise<Map<number, RawSampleRow[]>> {
   const sampleRows: RawSampleRow[] = [];
   let cursor: RawSampleRow | undefined;
   for (;;) {
@@ -277,29 +288,95 @@ async function loadSeriesDetails(
       Number(a.gpu_index) - Number(b.gpu_index),
   );
 
-  // The series and sample pages use separate autocommit queries (the DbClient has
-  // no transaction), so a re-ingest can commit between them. The writer replaces
-  // samples and the series row in one transaction and stamps `ingested_at`. An
-  // unchanged key after the sample read proves both belong to the same series version.
-  const versionRows = (await sql`
-    select id, csv_sha256, sample_count, ingested_at
-    from gpu_metric_series
-    where id = any(${ids}::bigint[])
-  `) as unknown as RawSeriesVersionRow[];
-  const versionKeys = new Set(versionRows.map(seriesVersionKey));
-  if (
-    versionRows.length !== seriesRows.length ||
-    !seriesRows.every((row) => versionKeys.has(seriesVersionKey(row)))
-  ) {
-    throw new TelemetrySnapshotChangedError(ids);
-  }
-
   const samplesBySeries = new Map<number, RawSampleRow[]>();
   for (const sample of sampleRows) {
     const id = Number(sample.series_id);
     const bucket = samplesBySeries.get(id);
     if (bucket) bucket.push(sample);
     else samplesBySeries.set(id, [sample]);
+  }
+  return samplesBySeries;
+}
+
+async function readBlobSamples(
+  sql: DbClient,
+  ids: readonly number[],
+): Promise<{
+  samples: Map<number, StoredGpuMetricSample[]>;
+  versionRows: RawSeriesVersionRow[] | null;
+}> {
+  const samples = new Map<number, StoredGpuMetricSample[]>();
+  let versionRows: RawSeriesVersionRow[] | null = null;
+  let pending = [...ids];
+  for (let query = 0; pending.length > 0; query++) {
+    let rows: RawBlobRow[];
+    try {
+      rows = (await sql`
+        select id, csv_sha256, sample_count, ingested_at, has_blob,
+          case when has_blob and (running = bytes or running <= ${SAMPLE_BLOB_QUERY_BYTES})
+            then data end as data
+        from (
+          select s.id, s.csv_sha256, s.sample_count, s.ingested_at, b.data,
+            b.series_id is not null as has_blob,
+            coalesce(octet_length(b.data), 0) as bytes,
+            sum(coalesce(octet_length(b.data), 0)) over (order by s.id) as running
+          from gpu_metric_series s
+          left join gpu_metric_sample_blobs b on b.series_id = s.id
+            and b.format_version = ${GPU_SAMPLE_BLOB_FORMAT_VERSION}
+            and b.ingested_at = s.ingested_at
+          where s.id = any(${pending}::bigint[])
+        ) blobs
+      `) as unknown as RawBlobRow[];
+    } catch (error) {
+      if (query === 0 && (error as { code?: unknown } | null)?.code === '42P01') {
+        return { samples, versionRows: null };
+      }
+      throw error;
+    }
+    versionRows = query === 0 ? rows : null;
+    pending = [];
+    for (const row of rows) {
+      if (row.data) samples.set(Number(row.id), decodeGpuSampleBlob(row.data));
+      else if (row.has_blob) pending.push(Number(row.id));
+    }
+  }
+  return { samples, versionRows };
+}
+
+export async function loadSeriesDetails(
+  sql: DbClient,
+  seriesRows: readonly RawSeriesRow[],
+  { sampleBlobs = true }: SampleReadOptions = {},
+): Promise<GpuMetricSeries[]> {
+  if (seriesRows.length === 0) return [];
+  const ids = seriesRows.map((row) => Number(row.id));
+
+  const blobs = sampleBlobs
+    ? await readBlobSamples(sql, ids)
+    : { samples: new Map<number, StoredGpuMetricSample[]>(), versionRows: null };
+  const sqlIds = ids.filter((id) => !blobs.samples.has(id));
+  const samplesBySeries: Map<number, StoredGpuMetricSample[]> =
+    sqlIds.length > 0 ? await readSqlSampleRows(sql, sqlIds) : new Map();
+  for (const [id, samples] of blobs.samples) samplesBySeries.set(id, samples);
+
+  // The series and sample pages use separate autocommit queries (the DbClient has
+  // no transaction), so a re-ingest can commit between them. The writer replaces
+  // samples and the series row in one transaction and stamps `ingested_at`. An
+  // unchanged key after the sample read proves both belong to the same series version.
+  const versionRows =
+    sqlIds.length === 0 && blobs.versionRows
+      ? blobs.versionRows
+      : ((await sql`
+          select id, csv_sha256, sample_count, ingested_at
+          from gpu_metric_series
+          where id = any(${ids}::bigint[])
+        `) as unknown as RawSeriesVersionRow[]);
+  const versionKeys = new Set(versionRows.map(seriesVersionKey));
+  if (
+    versionRows.length !== seriesRows.length ||
+    !seriesRows.every((row) => versionKeys.has(seriesVersionKey(row)))
+  ) {
+    throw new TelemetrySnapshotChangedError(ids);
   }
 
   return seriesRows.map((row) => {
@@ -330,26 +407,9 @@ async function loadSeriesDetails(
   });
 }
 
-/**
- * Stored telemetry for one GitHub Actions run (latest attempt), optionally scoped
- * before reading samples. View selection also returns the full artifact-name inventory.
- * Returns null when the run is unknown or has no stored series, so callers can
- * fall back to the live GitHub artifacts for in-flight runs.
- */
-export function getGpuMetricsForRun(
-  sql: DbClient,
-  githubRunId: number,
-  selection: GpuMetricsRunSelection = {},
-): Promise<GpuMetricsRunPayload | null> {
-  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId, selection));
-}
-
-async function readGpuMetricsForRun(
-  sql: DbClient,
-  githubRunId: number,
-  selection: GpuMetricsRunSelection,
-): Promise<GpuMetricsRunPayload | null> {
-  const runRows = (await sql`
+/** Latest attempt of a GitHub run, with whether it stores any telemetry. */
+export async function readLatestRun(sql: DbClient, githubRunId: number) {
+  const rows = (await sql`
     select id, github_run_id, run_attempt, name, date, html_url, head_branch, head_sha,
       conclusion, status, created_at,
       exists (select 1 from gpu_metric_series s where s.workflow_run_id = workflow_runs.id)
@@ -372,7 +432,47 @@ async function readGpuMetricsForRun(
     created_at: string | Date | null;
     has_series: boolean;
   }[];
-  const run = runRows[0];
+  return rows[0];
+}
+
+export function toWorkflowRun(
+  run: NonNullable<Awaited<ReturnType<typeof readLatestRun>>>,
+): GpuMetricsRunPayload['workflowRun'] {
+  return {
+    id: Number(run.id),
+    githubRunId: Number(run.github_run_id),
+    runAttempt: Number(run.run_attempt),
+    name: run.name,
+    date: isoString(run.date).slice(0, 10),
+    htmlUrl: run.html_url,
+    headBranch: run.head_branch,
+    headSha: run.head_sha,
+    conclusion: run.conclusion,
+    status: run.status,
+    createdAt: run.created_at ? isoString(run.created_at) : null,
+  };
+}
+
+/**
+ * Stored telemetry for one GitHub Actions run (latest attempt), optionally scoped
+ * before reading samples. View selection also returns the full artifact-name inventory.
+ * Returns null when the run is unknown or has no stored series, so callers can
+ * fall back to the live GitHub artifacts for in-flight runs.
+ */
+export function getGpuMetricsForRun(
+  sql: DbClient,
+  githubRunId: number,
+  selection: GpuMetricsRunSelection = {},
+): Promise<GpuMetricsRunPayload | null> {
+  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId, selection));
+}
+
+async function readGpuMetricsForRun(
+  sql: DbClient,
+  githubRunId: number,
+  selection: GpuMetricsRunSelection,
+): Promise<GpuMetricsRunPayload | null> {
+  const run = await readLatestRun(sql, githubRunId);
   if (!run?.has_series) return null;
 
   const coverageRows = (await sql`
@@ -425,19 +525,7 @@ async function readGpuMetricsForRun(
   }
 
   return {
-    workflowRun: {
-      id: Number(run.id),
-      githubRunId: Number(run.github_run_id),
-      runAttempt: Number(run.run_attempt),
-      name: run.name,
-      date: isoString(run.date).slice(0, 10),
-      htmlUrl: run.html_url,
-      headBranch: run.head_branch,
-      headSha: run.head_sha,
-      conclusion: run.conclusion,
-      status: run.status,
-      createdAt: run.created_at ? isoString(run.created_at) : null,
-    },
+    workflowRun: toWorkflowRun(run),
     series,
     coverage: gpuMetricsRunCoverage(coverageRows),
     ...(artifactNames === undefined ? {} : { artifactNames }),
@@ -453,18 +541,20 @@ export interface GpuMetricsPointPayload {
 export function getGpuMetricsForPoint(
   sql: DbClient,
   benchmarkResultId: number,
+  options: SampleReadOptions = {},
 ): Promise<GpuMetricsPointPayload | null> {
-  return withConsistentSnapshot(() => readGpuMetricsForPoint(sql, benchmarkResultId));
+  return withConsistentSnapshot(() => readGpuMetricsForPoint(sql, benchmarkResultId, options));
 }
 
 async function readGpuMetricsForPoint(
   sql: DbClient,
   benchmarkResultId: number,
+  options: SampleReadOptions,
 ): Promise<GpuMetricsPointPayload | null> {
   const seriesRows = await readSeriesRows(sql, { benchmarkResultId });
   if (seriesRows.length === 0) return null;
   return {
     benchmarkResultId,
-    series: await loadSeriesDetails(sql, seriesRows),
+    series: await loadSeriesDetails(sql, seriesRows, options),
   };
 }

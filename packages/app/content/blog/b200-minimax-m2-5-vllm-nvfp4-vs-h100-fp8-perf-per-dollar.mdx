@@ -20,7 +20,7 @@ On MiniMax-M2.5 8K/1K with vLLM, NVIDIA's NVFP4 checkpoint of MiniMax-M2.5 on B2
 
 The 8.2x factors cleanly at the peak. At 110 tok/s/user, **B200 vLLM FP8 delivers 2.94x better performance per dollar than H100 vLLM FP8** — the Blackwell generation step alone, riding on the same `MiniMaxAI/MiniMax-M2.5` checkpoint and the same vLLM build on both SKUs. **Swapping the B200 weights to `nvidia/MiniMax-M2.5-NVFP4` stacks another 2.77x** — the precision step alone, unlocked by [vllm-project/vllm #36307](https://github.com/vllm-project/vllm/pull/36307) which added a **modular variant** of the trtllm-gen FP8 MoE kernel so MiniMax's non-standard routing method can finally use it. 2.94 × 2.77 ≈ 8.14. The precision step widens with interactivity (1.65x at 22 → 2.77x at 110) because the trtllm-gen kernel's headroom over the older triton path opens up as the GEMM ceiling becomes the binding constraint.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -50,13 +50,13 @@ The quality context is what makes the serving cost-per-token story matter. A **1
 
 ## On-Paper H100 vs B200 Specs
 
-Before the recipes, the hardware. H100 SXM (Hopper, 2023) and B200 SXM (Blackwell, 2025) sit two generations apart. The radar below normalizes each axis to the maximum across every NVIDIA + AMD SKU in [`/gpu-specs`](/gpu-specs) — so the visible H100 and B200 polygons compress against axes where GB200/GB300 NVL72 set the ceiling (notably scale-up domain memory and scale-up domain memory bandwidth, which scale with the rack-scale 72-GPU NVLink domain).
+Before the recipes, the hardware. H100 SXM (Hopper, 2023) and B200 SXM (Blackwell, 2025) sit two generations apart. The radar below normalizes each axis to the maximum across every NVIDIA + AMD SKU in [`/infx/gpu-specs`](/infx/gpu-specs) — so the visible H100 and B200 polygons compress against axes where GB200/GB300 NVL72 set the ceiling (notably scale-up domain memory and scale-up domain memory bandwidth, which scale with the rack-scale 72-GPU NVLink domain).
 
 <Figure
   srcLight="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-dark.png"
-  alt="Radar chart comparing H100 SXM and B200 SXM on memory, memory bandwidth, FP4/FP8/BF16 TFLOP/s, scale-up bandwidth, scale-up domain memory, and scale-up domain memory bandwidth. Axes normalized to the max across all GPUs in /gpu-specs."
-  caption="H100 SXM vs B200 SXM on the InferenceX /gpu-specs radar. Axes normalized to the cross-vendor maximum on each metric (e.g. FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%; scale-up domain memory and bandwidth maxes are set by GB200/GB300 NVL72's 72-GPU NVLink domain, so the H100 and B200 8-GPU domains both read low). H100 reads 0% on FP4 because Hopper has no FP4 tensor cores."
+  alt="Radar chart comparing H100 SXM and B200 SXM on memory, memory bandwidth, FP4/FP8/BF16 TFLOP/s, scale-up bandwidth, scale-up domain memory, and scale-up domain memory bandwidth. Axes normalized to the max across all GPUs in /infx/gpu-specs."
+  caption="H100 SXM vs B200 SXM on the InferenceX /infx/gpu-specs radar. Axes normalized to the cross-vendor maximum on each metric (e.g. FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%; scale-up domain memory and bandwidth maxes are set by GB200/GB300 NVL72's 72-GPU NVLink domain, so the H100 and B200 8-GPU domains both read low). H100 reads 0% on FP4 because Hopper has no FP4 tensor cores."
 />
 
 Absolute values for the two SKUs in this benchmark:
@@ -183,7 +183,7 @@ B200 NVFP4's perf/$ lift over H100 climbs **monotonically from 3.96x at 22 tok/s
   caption="MiniMax-M2.5 (230B / 10B active) at ISL 8192 / OSL 1024. vLLM on both H100 and B200. Point labels denote tensor and expert parallelism per config (e.g. TEP2 = TP=2 + EP=2, TP4 = TP=4 dense). The B200 NVFP4 frontier spans TP=1/2/4/8 recipes; the B200 FP8 frontier spans TP=2 and TP=4; H100 FP8 is TP=8."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1), pre-filtered to MiniMax-M2.5 vLLM on H100 + B200 for the 2026-05-22 run. [Live cost view](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_metric=y_costh&i_linelabel=1&i_advlabel=1) of the same comparison.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1), pre-filtered to MiniMax-M2.5 vLLM on H100 + B200 for the 2026-05-22 run. [Live cost view](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_metric=y_costh&i_linelabel=1&i_advlabel=1) of the same comparison.
 
 ## What's Next for Blackwell on MiniMax-M2.5
 
@@ -197,7 +197,7 @@ For MiniMax-M2.5 serving on vLLM today, B200 NVFP4 is the cheaper choice by 4x�
 
 [Wei Zhao](https://github.com/wzhao18) at NVIDIA merged the [trtllm FP8 MoE modular kernel](https://github.com/vllm-project/vllm/pull/36307) in vLLM on 2026-03-12. Thanks to Wei Zhao and the vLLM TRT-LLM kernel collaborators, the InferenceX recipe maintainers, and the MiniMax AI team for the open-weights releases.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

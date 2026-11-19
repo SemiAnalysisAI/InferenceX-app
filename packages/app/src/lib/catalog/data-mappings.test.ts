@@ -6,6 +6,7 @@ import {
   getModelLabel,
   getOpenRouterModelId,
   MODEL_OPTIONS,
+  SEQUENCE_OPTIONS,
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
@@ -16,10 +17,10 @@ import {
   getEvalBenchmarkLabel,
   isModelDeprecated,
   isModelMaintenance,
+  isModelDefault,
   isSequenceDeprecated,
   isSequenceDeprecatedForModel,
   isSequenceHiddenForModel,
-  getModelDefaultPrecisions,
   getSequenceCategoryForModel,
   isBestPerSkuDefaultOff,
   showsTcoBasisSelector,
@@ -29,10 +30,57 @@ import {
   EvalBenchmark,
 } from '@/lib/catalog/data-mappings';
 
-// ===========================================================================
-// getModelAndSequence
-// ===========================================================================
+describe('model selector ordering', () => {
+  it('puts Kimi K3.1 Pro first without reordering the other default models', () => {
+    expect(MODEL_OPTIONS.filter(isModelDefault)).toEqual([
+      Model.Kimi_K3_1_Pro,
+      Model.DeepSeek_V4_1_Flash,
+      Model.GLM_5_2,
+      Model.GLM_5_3_Flash,
+      Model.MiniMax_M3_1_Flash,
+      Model.Muse_Spark_Open,
+      Model.Qwen3_5,
+      Model.Qwen3_8_Flash_Next,
+    ]);
+  });
+
+  it('keeps non-default models in their existing order and excludes hidden models', () => {
+    expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
+      Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
+      Model.Kimi_K2_5,
+      Model.MiniMax_M3,
+      Model.DeepSeek_R1,
+      Model.GLM_5,
+      Model.Qwen3_8_27B,
+      Model.Qwen3_8_27B_Eager,
+      Model.GptOss,
+      Model.MiniMax_M2_5,
+      Model.Llama3_3_70B,
+    ]);
+    expect(new Set(MODEL_OPTIONS).size).toBe(MODEL_OPTIONS.length);
+    expect(MODEL_OPTIONS).not.toContain(Model.Llama3_1_70B);
+  });
+});
+
 describe('getModelAndSequence', () => {
+  it('recognizes the GLM Flash fixed-sequence overlay without using the non-Flash bucket', () => {
+    expect(getModelAndSequence('bmk_glm5.3flash_8k1k_fp8_sglang')).toEqual({
+      model: Model.GLM_5_3_Flash,
+      sequence: Sequence.EightK_OneK,
+    });
+  });
+
+  it.each(['fp8', 'fp4', 'nvfp4'])(
+    'keeps Flash %s artifacts out of the older GLM buckets',
+    (precision) => {
+      expect(getModelAndSequence(`bmk_glm5.3flash_agentic_${precision}_sglang`)).toEqual({
+        model: Model.GLM_5_3_Flash,
+        sequence: Sequence.AgenticTraces,
+      });
+    },
+  );
+
   it('parses artifact name with 70b model and 1k1k sequence', () => {
     const result = getModelAndSequence('results_70b_1k1k_fp8');
     expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_OneK });
@@ -66,6 +114,18 @@ describe('getModelAndSequence', () => {
   it('parses artifact name with kimik2.5 model prefix', () => {
     const result = getModelAndSequence('results_kimik2.5_1k1k');
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
+  });
+
+  it('keeps kimik3.1 artifacts out of the kimik3 bucket', () => {
+    expect(
+      getModelAndSequence(
+        'bmk_agentic_kimik3.1_tp8_conc16_kvdram-hicache_spec-draft_model_fp4_sglang',
+      ),
+    ).toEqual({ model: Model.Kimi_K3_1_Pro, sequence: Sequence.AgenticTraces });
+    expect(getModelAndSequence('bmk_agentic_kimik3_tp8_conc16_fp4_vllm')).toEqual({
+      model: Model.Kimi_K3,
+      sequence: Sequence.AgenticTraces,
+    });
   });
 
   it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
@@ -104,9 +164,6 @@ describe('getModelAndSequence', () => {
   });
 });
 
-// ===========================================================================
-// getModelAndSequenceFromArtifact
-// ===========================================================================
 describe('getModelAndSequenceFromArtifact', () => {
   it('parses structured artifact with dsr1 prefix and 1k/1k ISL/OSL', () => {
     const result = getModelAndSequenceFromArtifact({
@@ -172,9 +229,6 @@ describe('getModelAndSequenceFromArtifact', () => {
   });
 });
 
-// ===========================================================================
-// isModelDeprecated
-// ===========================================================================
 describe('isModelDeprecated', () => {
   it('returns true for deprecated model Llama3_3_70B', () => {
     expect(isModelDeprecated(Model.Llama3_3_70B)).toBe(true);
@@ -182,6 +236,16 @@ describe('isModelDeprecated', () => {
 
   it('returns true for deprecated model MiniMax_M2_5 (superseded by M3)', () => {
     expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
+  });
+
+  it('moves MiniMax M3 to deprecated while keeping M3.1 Flash active', () => {
+    expect(isModelDeprecated(Model.MiniMax_M3)).toBe(true);
+    expect(isModelDeprecated(Model.MiniMax_M3_1_Flash)).toBe(false);
+  });
+
+  it('retires DeepSeek V4 Pro while keeping V4.1 Flash active', () => {
+    expect(isModelDeprecated(Model.DeepSeek_V4_Pro)).toBe(true);
+    expect(isModelDeprecated(Model.DeepSeek_V4_1_Flash)).toBe(false);
   });
 
   it('returns true for deprecated model GptOss', () => {
@@ -196,8 +260,8 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.Kimi_K2_5)).toBe(true);
   });
 
-  it('keeps Kimi K3 active', () => {
-    expect(isModelDeprecated(Model.Kimi_K3)).toBe(false);
+  it('marks Kimi K3 deprecated', () => {
+    expect(isModelDeprecated(Model.Kimi_K3)).toBe(true);
   });
 
   it('keeps GLM-5.2 active', () => {
@@ -209,9 +273,6 @@ describe('isModelDeprecated', () => {
   });
 });
 
-// ===========================================================================
-// isModelMaintenance
-// ===========================================================================
 describe('isModelMaintenance', () => {
   it('returns true for maintenance-mode models', () => {
     expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
@@ -224,9 +285,6 @@ describe('isModelMaintenance', () => {
   });
 });
 
-// ===========================================================================
-// isSequenceDeprecated
-// ===========================================================================
 describe('isSequenceDeprecated', () => {
   it('returns true for deprecated sequence OneK_EightK', () => {
     expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
@@ -241,9 +299,6 @@ describe('isSequenceDeprecated', () => {
   });
 });
 
-// ===========================================================================
-// per-model sequence retirement
-// ===========================================================================
 describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
   it('marks 8K/1K deprecated for MiniMax M3 (retired 2026-08-04, InferenceX#2493)', () => {
     expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(true);
@@ -257,9 +312,16 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
     );
   });
 
+  it('deprecates Qwen3.5 8K/1K without hiding history or retiring AgentX', () => {
+    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('deprecated');
+    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isModelDeprecated(Model.Qwen3_5)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.Qwen3_5)).toBe('default');
+  });
+
   it('keeps 8K/1K default for models still sweeping it', () => {
-    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('default');
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_R1)).toBe('default');
   });
 
   it('does not un-deprecate globally deprecated sequences', () => {
@@ -287,9 +349,6 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
   });
 });
 
-// ===========================================================================
-// per-model Best per SKU default
-// ===========================================================================
 describe('isBestPerSkuDefaultOff', () => {
   it('opens Qwen3.5 8K/1K and agentic charts with Best per SKU enabled', () => {
     expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
@@ -308,14 +367,29 @@ describe('isBestPerSkuDefaultOff', () => {
   });
 });
 
-// ===========================================================================
-// per-model TCO Basis selector
-// ===========================================================================
 describe('showsTcoBasisSelector', () => {
-  it('shows the selector only for Qwen3.5 on 8K/1K and AgentX', () => {
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(true);
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
+  it.each([Model.Qwen3_5, Model.Kimi_K3])(
+    'shows the selector for %s only on 8K/1K and AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(
+          sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces,
+        );
+      }
+    },
+  );
+
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash, Model.Qwen3_8_Flash_Next])(
+    'shows the selector for %s only on AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(sequence === Sequence.AgenticTraces);
+      }
+    },
+  );
+
+  it('keeps unrelated models hidden', () => {
+    expect(showsTcoBasisSelector(Model.Kimi_K2_5, Sequence.AgenticTraces)).toBe(false);
     expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
   });
 
@@ -341,13 +415,10 @@ describe('comparison exclusions', () => {
   it('guards only vLLM and SGLang on both 8K/1K and Agentic', () => {
     expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
     expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toEqual(['vllm', 'sglang']);
-    // Deprecated fixed sequences carry no scenario rule of their own; only the
-    // model-level MTP spec applies there.
     expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
   });
 
   it('shares one STP spec between the scenarios that carry it', () => {
-    // The scenarios differ only in which families they guard, not in the rule.
     expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual(
       getSequenceExclusion(Sequence.AgenticTraces),
     );
@@ -366,9 +437,6 @@ describe('comparison exclusions', () => {
   });
 });
 
-// ===========================================================================
-// getModelLabel
-// ===========================================================================
 describe('getModelLabel', () => {
   it('returns correct label for each known model', () => {
     expect(getModelLabel(Model.Llama3_3_70B)).toBe('Llama 3.3 70B Instruct');
@@ -390,17 +458,18 @@ describe('getModelLabel', () => {
 });
 
 describe('getOpenRouterModelId', () => {
-  it('maps every selectable dashboard model to an exact OpenRouter catalog id', () => {
+  it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
+      if (model === Model.Muse_Spark_Open || model === Model.GLM_5_3_Flash) {
+        expect(getOpenRouterModelId(model)).toBeNull();
+        continue;
+      }
       expect(getOpenRouterModelId(model), model).toMatch(/^[^/]+\/[^/]+$/u);
     }
     expect(getOpenRouterModelId(Model.DeepSeek_V4_Pro)).toBe('deepseek/deepseek-v4-pro-0813');
   });
 });
 
-// ===========================================================================
-// getSequenceLabel
-// ===========================================================================
 describe('getSequenceLabel', () => {
   it('returns correct label for each known sequence', () => {
     expect(getSequenceLabel(Sequence.OneK_OneK)).toBe('1K / 1K');
@@ -419,9 +488,6 @@ describe('getSequenceLabel', () => {
   });
 });
 
-// ===========================================================================
-// getPrecisionLabel
-// ===========================================================================
 describe('getPrecisionLabel', () => {
   it('returns correct label for each known precision', () => {
     expect(getPrecisionLabel(Precision.FP4)).toBe('FP4');
@@ -437,9 +503,6 @@ describe('getPrecisionLabel', () => {
   });
 });
 
-// ===========================================================================
-// getEvalBenchmarkLabel
-// ===========================================================================
 describe('getEvalBenchmarkLabel', () => {
   it('returns correct label for GSM8K', () => {
     expect(getEvalBenchmarkLabel(EvalBenchmark.GSM8K)).toBe('GSM8K');
@@ -452,32 +515,28 @@ describe('getEvalBenchmarkLabel', () => {
 });
 
 describe('isSequenceHiddenForModel', () => {
-  it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
-    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
-    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
+  it.each([Model.Muse_Spark_Open])('only offers AgentX for %s', (model) => {
+    expect(
+      SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
+    ).toEqual([Sequence.AgenticTraces]);
   });
-
-  it('also marks the hidden GLM 8K/1K retired for category consumers', () => {
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('deprecated');
+  it('offers GLM Flash 8K/1K and AgentX without exposing other fixed sequences', () => {
+    expect(
+      SEQUENCE_OPTIONS.filter(
+        (sequence) => !isSequenceHiddenForModel(Model.GLM_5_3_Flash, sequence),
+      ),
+    ).toEqual([Sequence.EightK_OneK, Sequence.AgenticTraces]);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_3_Flash)).toBe('default');
+  });
+  it('shows 8K/1K and Agentic coding for GLM-5.2 / GLM-5.3', () => {
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(false);
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('default');
     expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.GLM_5_2)).toBe('default');
   });
 
   it('leaves other models untouched', () => {
     expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
     expect(isSequenceHiddenForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(false);
-  });
-});
-
-describe('getModelDefaultPrecisions', () => {
-  it('opens GLM-5.2 / GLM-5.3 Agentic coding on FP4 and FP8', () => {
-    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.AgenticTraces)).toEqual([
-      Precision.FP4,
-      Precision.FP8,
-    ]);
-  });
-
-  it('leaves other scenarios and models on the auto default', () => {
-    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.EightK_OneK)).toBeUndefined();
-    expect(getModelDefaultPrecisions(Model.Qwen3_5, Sequence.AgenticTraces)).toBeUndefined();
   });
 });

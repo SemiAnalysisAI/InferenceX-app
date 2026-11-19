@@ -11,16 +11,16 @@ import {
 
 describe('explorerHref', () => {
   it('maps the explorer root to the base path in each locale', () => {
-    expect(explorerHref('/')).toBe('/agentic-workload-explorer');
-    expect(explorerHref('/', 'zh')).toBe('/zh/agentic-workload-explorer');
+    expect(explorerHref('/')).toBe('/infx/agentic-workload-explorer');
+    expect(explorerHref('/', 'zh')).toBe('/zh/infx/agentic-workload-explorer');
   });
 
   it('prefixes explorer-relative paths, keeping query strings and hashes', () => {
     expect(explorerHref('/sessions?sort=cost')).toBe(
-      '/agentic-workload-explorer/sessions?sort=cost',
+      '/infx/agentic-workload-explorer/sessions?sort=cost',
     );
     expect(explorerHref('/sessions/abc/conversation#req-7', 'zh')).toBe(
-      '/zh/agentic-workload-explorer/sessions/abc/conversation#req-7',
+      '/zh/infx/agentic-workload-explorer/sessions/abc/conversation#req-7',
     );
   });
 });
@@ -34,14 +34,14 @@ describe('explorerRelativePath', () => {
   });
 
   it('returns null outside the explorer, including look-alike prefixes', () => {
-    expect(explorerRelativePath('/inference/agentic')).toBeNull();
+    expect(explorerRelativePath('/infx/inference/agentic')).toBeNull();
     expect(explorerRelativePath('/zh')).toBeNull();
     expect(explorerRelativePath('/agentic-workload-explorer-old/sessions')).toBeNull();
   });
 });
 
 it('keeps the page and API prefixes aligned with the route directories', () => {
-  expect(EXPLORER_BASE_PATH).toBe('/agentic-workload-explorer');
+  expect(EXPLORER_BASE_PATH).toBe('/infx/agentic-workload-explorer');
   expect(EXPLORER_API_BASE).toBe('/api/v1/agentic-workload-explorer');
 });
 
@@ -56,20 +56,20 @@ describe('versionQuery', () => {
 
 describe('withVersion', () => {
   it('leaves the href alone without a selection', () => {
-    expect(withVersion('/agentic-workload-explorer/sessions', null)).toBe(
-      '/agentic-workload-explorer/sessions',
+    expect(withVersion('/infx/agentic-workload-explorer/sessions', null)).toBe(
+      '/infx/agentic-workload-explorer/sessions',
     );
   });
 
   it('merges into an existing query and keeps the fragment', () => {
-    expect(withVersion('/agentic-workload-explorer/sessions/a/conversation#req-1', 'all')).toBe(
-      '/agentic-workload-explorer/sessions/a/conversation?version=all#req-1',
+    expect(
+      withVersion('/infx/agentic-workload-explorer/sessions/a/conversation#req-1', 'all'),
+    ).toBe('/infx/agentic-workload-explorer/sessions/a/conversation?version=all#req-1');
+    expect(withVersion('/infx/agentic-workload-explorer/sessions?sort=cost', 'all')).toBe(
+      '/infx/agentic-workload-explorer/sessions?sort=cost&version=all',
     );
-    expect(withVersion('/agentic-workload-explorer/sessions?sort=cost', 'all')).toBe(
-      '/agentic-workload-explorer/sessions?sort=cost&version=all',
-    );
-    expect(withVersion('/agentic-workload-explorer/sessions?version=2', 'all')).toBe(
-      '/agentic-workload-explorer/sessions?version=2',
+    expect(withVersion('/infx/agentic-workload-explorer/sessions?version=2', 'all')).toBe(
+      '/infx/agentic-workload-explorer/sessions?version=2',
     );
   });
 });

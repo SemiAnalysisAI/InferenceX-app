@@ -2,7 +2,6 @@ import * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from './types';
 
-/** A scale that can be either continuous (linear/log), banded, or time-based. */
 export type AnyScale = ContinuousScale | d3.ScaleBand<string> | d3.ScaleTime<number, number>;
 
 export interface AxisUpdateConfig {
@@ -12,15 +11,17 @@ export interface AxisUpdateConfig {
   yTickCount?: number;
   xTickValues?: (number | Date)[];
   yTickValues?: (number | Date)[];
-  /** Override tick size for Y axis (default: 6, use 0 for band scales). */
   yTickSize?: number;
-  /** When set, axes animate to new positions over this duration (ms). */
   transitionDuration?: number;
-  /** Limit the update to axes that actually changed. Defaults to both. */
   axes?: 'x' | 'y' | 'both';
 }
 
-/** Render or update axes with current scales. */
+const X_TICK_SPACING_PX = 80;
+
+export function widthTickCount(width: number, requested = 10): number {
+  return Math.min(requested, Math.max(2, Math.floor(width / X_TICK_SPACING_PX)));
+}
+
 export function renderAxes(
   layout: ChartLayout,
   xScale: AnyScale,
@@ -43,53 +44,195 @@ export function renderAxes(
   const updateY = axes === 'y' || axes === 'both';
 
   if (updateX) {
-    let xAxisGen: d3.Axis<d3.AxisDomain>;
-    if ('bandwidth' in xScale) {
-      const bandGen = d3.axisBottom(xScale as d3.ScaleBand<string>).tickSize(6);
-      if (xTickFormat) bandGen.tickFormat(xTickFormat as any);
-      xAxisGen = bandGen as unknown as d3.Axis<d3.AxisDomain>;
-    } else {
-      const gen = d3.axisBottom(xScale as ContinuousScale).tickSize(6);
-      if (xTickCount) gen.ticks(xTickCount);
-      if (xTickValues) {
-        gen.tickValues(visibleTickValues(xScale, xTickValues) as Iterable<d3.NumberValue>);
-      }
-      if (xTickFormat) gen.tickFormat(xTickFormat as any);
-      xAxisGen = gen as unknown as d3.Axis<d3.AxisDomain>;
-    }
-
-    const xTarget = dur > 0 ? layout.xAxisGroup.transition().duration(dur) : layout.xAxisGroup;
-    (xTarget as any).call(xAxisGen as any);
+    const band = 'bandwidth' in xScale;
+    renderAxis(layout.xAxisGroup, 'bottom', xScale, dur, {
+      tickSize: 6,
+      tickArguments: band ? [] : [widthTickCount(layout.width, xTickCount)],
+      tickValues: !band && xTickValues ? visibleTickValues(xScale, xTickValues) : null,
+      tickFormat: xTickFormat ?? null,
+    });
   }
 
   if (updateY) {
-    if ('bandwidth' in yScale) {
-      const bandAxisGen = d3
-        .axisLeft(yScale as d3.ScaleBand<string>)
-        .tickSize(yTickSize ?? 0) as unknown as d3.Axis<d3.AxisDomain>;
-      if (yTickFormat) bandAxisGen.tickFormat(yTickFormat as any);
-      const yBandTarget =
-        dur > 0 ? layout.yAxisGroup.transition().duration(dur) : layout.yAxisGroup;
-      (yBandTarget as any).call(bandAxisGen as any);
-    } else {
-      const yAxisGen = d3.axisLeft(yScale as ContinuousScale).tickSize(yTickSize ?? 6);
-      if (yTickCount) yAxisGen.ticks(yTickCount);
-      if (yTickValues) {
-        yAxisGen.tickValues(visibleTickValues(yScale, yTickValues) as Iterable<d3.NumberValue>);
-      }
-      if (yTickFormat) yAxisGen.tickFormat(yTickFormat as any);
-      const yTarget = dur > 0 ? layout.yAxisGroup.transition().duration(dur) : layout.yAxisGroup;
-      (yTarget as any).call(yAxisGen as any);
-    }
+    const band = 'bandwidth' in yScale;
+    renderAxis(layout.yAxisGroup, 'left', yScale, dur, {
+      tickSize: yTickSize ?? (band ? 0 : 6),
+      tickArguments: !band && yTickCount ? [yTickCount] : [],
+      tickValues: !band && yTickValues ? visibleTickValues(yScale, yTickValues) : null,
+      tickFormat: yTickFormat ?? null,
+    });
   }
 }
 
-/** Render or update grid lines with current scales. */
-/** Which grid line sets to draw; each defaults to true when omitted. */
+function renderAxis(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  orient: AxisOrient,
+  scale: AnyScale,
+  transitionDuration: number,
+  options: AxisOptions,
+): void {
+  const axisScale = scale as d3.AxisScale<d3.AxisDomain>;
+  if (transitionDuration > 0) {
+    group
+      .transition()
+      .duration(transitionDuration)
+      .call(axisGenerator(orient, axisScale, options));
+  } else {
+    drawAxis(group, orient, axisScale, options);
+  }
+}
+
+type AxisOrient = 'bottom' | 'left';
+
+interface AxisOptions {
+  tickArguments: number[];
+  tickValues: (number | Date)[] | null;
+  tickFormat: ((domainValue: d3.AxisDomain, index: number) => string) | null;
+  tickSize: number;
+}
+
+interface AxisScaleLike {
+  (value: unknown): number | undefined;
+  domain: () => unknown[];
+  range: () => number[];
+  copy: () => AxisScaleLike;
+  ticks?: (...args: number[]) => unknown[];
+  tickFormat?: (...args: number[]) => (value: unknown, index: number) => string;
+  bandwidth?: () => number;
+  round?: () => boolean;
+}
+
+const AXIS_TICK_PADDING = 3;
+
+function axisGenerator(
+  orient: AxisOrient,
+  scale: d3.AxisScale<d3.AxisDomain>,
+  options: AxisOptions,
+): d3.Axis<d3.AxisDomain> {
+  const generator = (orient === 'bottom' ? d3.axisBottom(scale) : d3.axisLeft(scale)).tickSize(
+    options.tickSize,
+  );
+  generator.tickArguments(options.tickArguments);
+  if (options.tickValues) generator.tickValues(options.tickValues);
+  if (options.tickFormat) generator.tickFormat(options.tickFormat);
+  return generator;
+}
+
+function drawAxis(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  orient: AxisOrient,
+  axisScale: d3.AxisScale<d3.AxisDomain>,
+  options: AxisOptions,
+): void {
+  const scale = axisScale as unknown as AxisScaleLike;
+  const { tickArguments, tickValues, tickFormat, tickSize } = options;
+  const offset = typeof window !== 'undefined' && window.devicePixelRatio > 1 ? 0 : 0.5;
+  const k = orient === 'left' ? -1 : 1;
+  const x = orient === 'left' ? 'x' : 'y';
+  const values = tickValues ?? (scale.ticks ? scale.ticks(...tickArguments) : scale.domain());
+  const format =
+    tickFormat ??
+    (scale.tickFormat ? scale.tickFormat(...tickArguments) : (value: unknown) => value);
+  const spacing = Math.max(tickSize, 0) + AXIS_TICK_PADDING;
+  const range = scale.range();
+  const range0 = Number(range[0]) + offset;
+  const range1 = Number(range.at(-1)) + offset;
+  const positionScale = scale.copy();
+  let bandOffset = 0;
+  if (positionScale.bandwidth) {
+    bandOffset = Math.max(0, positionScale.bandwidth() - offset * 2) / 2;
+    if (positionScale.round?.()) bandOffset = Math.round(bandOffset);
+  }
+  const position = (value: unknown) => Number(positionScale(value)) + bandOffset;
+
+  const path = group.selectAll<SVGPathElement, null>('.domain').data([null]);
+  const tick = group
+    .selectAll<SVGGElement, unknown>('.tick')
+    .data(values, (value) => String(scale(value)))
+    .order();
+  const tickExit = tick.exit();
+  const tickEnter = tick.enter().append('g').attr('class', 'tick');
+  const line = tick.select<SVGLineElement>('line');
+  const text = tick.select<SVGTextElement>('text');
+
+  const domain = path.merge(
+    path.enter().insert('path', '.tick').attr('class', 'domain').attr('stroke', 'currentColor'),
+  );
+  const ticks = tick.merge(tickEnter);
+  const lines = line.merge(
+    tickEnter
+      .append('line')
+      .attr('stroke', 'currentColor')
+      .attr(`${x}2`, k * tickSize),
+  );
+  const texts = text.merge(
+    tickEnter
+      .append('text')
+      .attr('fill', 'currentColor')
+      .attr(x, k * spacing)
+      .attr('dy', orient === 'bottom' ? '0.71em' : '0.32em'),
+  );
+
+  tickExit.remove();
+
+  writeAttrs(domain, {
+    d:
+      orient === 'left'
+        ? tickSize
+          ? `M${k * tickSize},${range0}H${offset}V${range1}H${k * tickSize}`
+          : `M${offset},${range0}V${range1}`
+        : tickSize
+          ? `M${range0},${k * tickSize}V${offset}H${range1}V${k * tickSize}`
+          : `M${range0},${offset}H${range1}`,
+  });
+  writeAttrs(ticks, {
+    opacity: 1,
+    transform:
+      orient === 'bottom'
+        ? (value) => `translate(${position(value) + offset},0)`
+        : (value) => `translate(0,${position(value) + offset})`,
+  });
+  writeAttrs(lines, { [`${x}2`]: k * tickSize });
+  writeAttrs(texts, { [x]: k * spacing });
+  writeText(texts, (value, index) => {
+    const label = format(value as d3.AxisDomain, index);
+    return label === null || label === undefined ? '' : String(label);
+  });
+
+  group
+    .filter(function () {
+      return !Reflect.get(this, '__axis');
+    })
+    .attr('fill', 'none')
+    .attr('font-size', 10)
+    .attr('font-family', 'sans-serif')
+    .attr('text-anchor', orient === 'left' ? 'end' : 'middle');
+  if (orient === 'bottom' && !positionScale.bandwidth) {
+    const plotEnd = Math.max(range0, range1);
+    const boxes = texts
+      .nodes()
+      .map((node) => {
+        const width = node.getComputedTextLength?.() ?? 0;
+        const center = position(d3.select(node).datum()) + offset;
+        const overhang = center + width / 2 - plotEnd;
+        return { node, overhang, left: center - width / 2, right: center + width / 2 };
+      })
+      .toSorted((a, b) => a.left - b.left);
+    boxes.forEach((box, index) => {
+      const clamped = boxes[index + 1];
+      const collides =
+        clamped && clamped.overhang > 0 && clamped.left - clamped.overhang - box.right < 8;
+      setAttrIfChanged(box.node, 'dx', box.overhang > 0 ? String(-box.overhang) : null);
+      setAttrIfChanged(box.node, 'visibility', collides ? 'hidden' : null);
+    });
+  }
+  group.each(function () {
+    Reflect.set(this, '__axis', position);
+  });
+}
+
 export interface GridVisibility {
-  /** Vertical lines at x-axis ticks. */
   x?: boolean;
-  /** Horizontal lines at y-axis ticks. */
   y?: boolean;
 }
 
@@ -112,8 +255,6 @@ export function renderGrid(
   const showY = visible.y ?? true;
 
   if (updateX && !showX) {
-    // Vertical grid lines disabled: drop any lines from a previous render so
-    // toggling the flag at runtime does not leave stale lines behind.
     gridGroup.select('.grid-v').selectAll('line').remove();
   } else if (updateX) {
     let vGroup = gridGroup.select<SVGGElement>('.grid-v');
@@ -121,19 +262,20 @@ export function renderGrid(
 
     if ('bandwidth' in xScale) {
       const bandScale = xScale as d3.ScaleBand<string>;
-      vGroup
-        .selectAll<SVGLineElement, string>('line')
-        .data(bandScale.domain())
-        .join('line')
-        .attr('x1', (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2)
-        .attr('x2', (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2)
-        .attr('y1', 0)
-        .attr('y2', height);
+      writeAttrs(
+        vGroup.selectAll<SVGLineElement, string>('line').data(bandScale.domain()).join('line'),
+        {
+          x1: (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2,
+          x2: (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2,
+          y1: 0,
+          y2: height,
+        },
+      );
     } else {
       const tickScale = xScale as { ticks: (count?: number) => number[]; (v: number): number };
       const xTicks = xTickValues
         ? (visibleTickValues(xScale, xTickValues) as number[])
-        : tickScale.ticks();
+        : tickScale.ticks(widthTickCount(width));
       const vJoin = vGroup
         .selectAll<SVGLineElement, number>('line')
         .data(xTicks)
@@ -148,12 +290,17 @@ export function renderGrid(
           (update) => update,
           (exit) => exit.remove(),
         );
-      const vTarget = dur > 0 ? (vJoin as any).transition().duration(dur) : vJoin;
-      vTarget
-        .attr('x1', (d: number) => tickScale(d))
-        .attr('x2', (d: number) => tickScale(d))
-        .attr('y1', 0)
-        .attr('y2', height);
+      if (dur > 0) {
+        vJoin
+          .transition()
+          .duration(dur)
+          .attr('x1', (d) => tickScale(d))
+          .attr('x2', (d) => tickScale(d))
+          .attr('y1', 0)
+          .attr('y2', height);
+      } else {
+        writeAttrs(vJoin, { x1: (d) => tickScale(d), x2: (d) => tickScale(d), y1: 0, y2: height });
+      }
     }
   }
 
@@ -165,15 +312,17 @@ export function renderGrid(
 
     if ('bandwidth' in yScale) {
       const bandScale = yScale as d3.ScaleBand<string>;
-      hGroup
-        .selectAll<SVGLineElement, string>('line')
-        .data(bandScale.domain())
-        .join('line')
-        .attr('x1', 0)
-        .attr('x2', width)
-        .attr('y1', (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2)
-        .attr('y2', (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2)
-        .style('stroke-width', 0.5);
+      writeAttrs(
+        hGroup.selectAll<SVGLineElement, string>('line').data(bandScale.domain()).join('line'),
+        {
+          x1: 0,
+          x2: width,
+          y1: (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2,
+          y2: (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2,
+        },
+      ).each(function () {
+        setStyleIfChanged(this, 'stroke-width', '0.5');
+      });
     } else {
       const yTicks = yTickValues
         ? (visibleTickValues(yScale, yTickValues) as number[])
@@ -192,12 +341,17 @@ export function renderGrid(
           (update) => update,
           (exit) => exit.remove(),
         );
-      const hTarget = dur > 0 ? (hJoin as any).transition().duration(dur) : hJoin;
-      hTarget
-        .attr('x1', 0)
-        .attr('x2', width)
-        .attr('y1', (d: number) => yScale(d))
-        .attr('y2', (d: number) => yScale(d));
+      if (dur > 0) {
+        hJoin
+          .transition()
+          .duration(dur)
+          .attr('x1', 0)
+          .attr('x2', width)
+          .attr('y1', (d) => yScale(d))
+          .attr('y2', (d) => yScale(d));
+      } else {
+        writeAttrs(hJoin, { x1: 0, x2: width, y1: (d) => yScale(d), y2: (d) => yScale(d) });
+      }
     }
   }
 }
@@ -217,21 +371,12 @@ function visibleTickValues(
   });
 }
 
-/**
- * Write-if-changed DOM helpers for hot chart paths.
- *
- * A MutationObserver receives a record for every `setAttribute` / style write,
- * even when the value is unchanged. Session replay (rrweb) serializes each
- * record and the coach mark rescans on them, so blind rewrites of hundreds of
- * point labels on every legend toggle or rescale cost far more than the DOM
- * write itself. Reading an attribute or inline style never forces layout.
- */
-
-export function setAttrIfChanged(element: Element, name: string, value: string): void {
-  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+export function setAttrIfChanged(element: Element, name: string, value: string | null): void {
+  if (element.getAttribute(name) === value) return;
+  if (value === null) element.removeAttribute(name);
+  else element.setAttribute(name, value);
 }
 
-/** `''` clears the property, matching `selection.style(name, '')`. */
 export function setStyleIfChanged(
   element: HTMLElement | SVGElement,
   name: string,
@@ -246,22 +391,49 @@ export function setTextIfChanged(element: Element, value: string): void {
   if (element.textContent !== value) element.textContent = value;
 }
 
-/**
- * `selection.raise()` for each selector in turn, skipped when the DOM is
- * already in the resulting order.
- *
- * `raise()` re-appends every node even when it is already last, and each move
- * is a remove + add record that session replay re-serializes with the node's
- * whole subtree. Renders and zoom frames raise hundreds of point groups to keep
- * z-order stable, which is almost always already correct.
- */
+type AttrValue = string | number | null | undefined;
+
+const TEXT_NODE = 3;
+
+export function writeAttrs<E extends Element, D, P extends d3.BaseType, PD>(
+  selection: d3.Selection<E, D, P, PD>,
+  attrs: Record<string, AttrValue | ((datum: D, index: number) => AttrValue)>,
+): d3.Selection<E, D, P, PD> {
+  const entries = Object.entries(attrs);
+  selection.each(function (datum, index) {
+    for (const [name, value] of entries) {
+      const next = typeof value === 'function' ? value(datum, index) : value;
+      if (next === null || next === undefined) this.removeAttribute(name);
+      else setAttrIfChanged(this, name, String(next));
+    }
+  });
+  return selection;
+}
+
+export function writeText<E extends Element, D, P extends d3.BaseType, PD>(
+  selection: d3.Selection<E, D, P, PD>,
+  text: (datum: D, index: number) => string | null | undefined,
+): d3.Selection<E, D, P, PD> {
+  selection.each(function (datum, index) {
+    const next = text(datum, index) ?? '';
+    const only = this.firstChild;
+    const unchanged =
+      next === ''
+        ? only === null
+        : only !== null &&
+          only === this.lastChild &&
+          only.nodeType === TEXT_NODE &&
+          only.nodeValue === next;
+    if (!unchanged) this.textContent = next;
+  });
+  return selection;
+}
+
 export function raiseInOrder(
   root: { selectAll: (selector: string) => { nodes: () => Element[] } },
   selectors: readonly string[],
 ): void {
   const groups = selectors.map((selector) => root.selectAll(selector).nodes());
-  // Each parent's children must already end with its raised nodes, in the
-  // order the sequential raises would leave them.
   const tails = new Map<Node, Element[]>();
   for (const nodes of groups) {
     for (const node of nodes) {
@@ -285,8 +457,6 @@ export function raiseInOrder(
     if (!ordered) break;
   }
   if (ordered) return;
-  // Exactly the sequential raises: re-query each selector after the previous
-  // moves, and move only nodes that are not already last (d3's own rule).
   for (const selector of selectors) {
     for (const node of root.selectAll(selector).nodes()) {
       if (node.nextSibling) node.parentNode?.append(node);

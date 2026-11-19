@@ -102,7 +102,15 @@ before(() => {
     preload,
     `
 import { writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import timers from 'node:timers/promises';
 const mode = process.env.INFERENCEX_CLI_CONTRACT_MODE;
+// Retry backoff timing is covered by http-client.test.mjs; these modes only classify errors.
+if (['network', 'timeout', 'http', 'http-body-stall'].includes(mode)) {
+  const wait = timers.setTimeout;
+  timers.setTimeout = (_milliseconds, value, options) => wait(0, value, options);
+  syncBuiltinESMExports();
+}
 let parseTimeoutController;
 if (mode === 'body-timeout' || mode === 'parse-timeout' || mode === 'request-abort') {
   const timeout = AbortSignal.timeout;

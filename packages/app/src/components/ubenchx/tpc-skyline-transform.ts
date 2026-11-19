@@ -1,10 +1,3 @@
-/**
- * Shared pure transform for the ubenchX TPC Skyline (TPC per GPC grouping).
- *
- * Used by both the UI component and the read-only API route so they cannot
- * silently calculate different results (AGENTS.md read-only coverage rule).
- */
-
 import type { TpcSkylineRun } from './tpc-skyline-data';
 
 export interface TpcSkylineViewResult {
@@ -12,7 +5,6 @@ export interface TpcSkylineViewResult {
   readonly tpcsPerGpc: readonly number[];
   readonly gpcCount: number;
   readonly tpcCount: number;
-  /** Each TPC holds two SMs. */
   readonly smCount: number;
   readonly metadata: Omit<TpcSkylineRun, 'tpcsPerGpc'>;
 }

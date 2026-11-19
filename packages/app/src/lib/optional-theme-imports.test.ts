@@ -7,7 +7,6 @@ import { APP_THEMES } from './themes/themes';
 const src = path.resolve(import.meta.dirname, '..');
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const optionalDirectory = new RegExp(`^components/(?:${optionalThemes.join('|')})/`);
-// These wrappers contain only activation gates and dynamic imports.
 const wrappers = new Set([
   'components/minecraft/minecraft-splash.tsx',
   'components/minecraft/minecraft-toggles-lazy.tsx',
@@ -15,17 +14,16 @@ const wrappers = new Set([
 ]);
 const engine = /^(?:three|@react-three\/[^/]+|@dimforge\/rapier[^/]*)(?:\/|$)/;
 const optionalAsset = new RegExp(
-  `(?:/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
+  `(?:/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|Excalifont-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
   'i',
 );
 
-/** Static runtime imports, including re-exports. Dynamic imports stay behind their gate. */
 function imports(text: string): string[] {
   const file = ts.createSourceFile(
     'module.tsx',
     text,
     ts.ScriptTarget.Latest,
-    true,
+    false,
     ts.ScriptKind.TSX,
   );
   const result: string[] = [];
@@ -60,6 +58,8 @@ function imports(text: string): string[] {
   return result;
 }
 
+const resolvedBases = new Map<string, string | undefined>();
+
 function resolve(from: string, specifier: string): string | undefined {
   const base = specifier.startsWith('@/')
     ? path.join(src, specifier.slice(2))
@@ -67,9 +67,14 @@ function resolve(from: string, specifier: string): string | undefined {
       ? path.resolve(path.dirname(from), specifier)
       : undefined;
   if (!base) return;
-  return ['', '.ts', '.tsx', '.js', '.jsx', '.css', '/index.ts', '/index.tsx']
-    .map((extension) => base + extension)
-    .find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
+  if (!resolvedBases.has(base))
+    resolvedBases.set(
+      base,
+      ['', '.ts', '.tsx', '.js', '.jsx', '.css', '/index.ts', '/index.tsx']
+        .map((extension) => base + extension)
+        .find((candidate) => existsSync(candidate) && statSync(candidate).isFile()),
+    );
+  return resolvedBases.get(base);
 }
 
 function routeEntries(directory: string): string[] {
@@ -116,7 +121,6 @@ describe('optional theme import boundary', () => {
       const dependencies = file.endsWith('.css')
         ? [...text.matchAll(/@import\s+['"](?<url>[^'"]+)['"]/g)].map((match) => match.groups!.url)
         : imports(text);
-      // Palette variables and hiding rules may remain shared; asset/font loads may not.
       if (file.endsWith('.css')) {
         for (const match of text.matchAll(/(?:url\([^)]*\)|@font-face\s*\{[^}]*\})/g))
           if (optionalAsset.test(match[0])) violations.push(`${chain.join(' → ')}: ${match[0]}`);

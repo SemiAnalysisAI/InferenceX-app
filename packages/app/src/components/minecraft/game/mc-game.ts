@@ -66,7 +66,6 @@ export interface Entity extends Body {
   yaw: number;
   pitch: number;
   headYaw: number;
-  /** Previous tick state for render interpolation. */
   px: number;
   py: number;
   pz: number;
@@ -84,7 +83,6 @@ export interface Entity extends Body {
   limbSwing: number;
   limbAmount: number;
   removed: boolean;
-  // AI
   wanderX?: number;
   wanderZ?: number;
   wanderTime?: number;
@@ -93,7 +91,6 @@ export interface Entity extends Body {
   fuse?: number;
   sheared?: boolean;
   lastSound?: number;
-  // item / falling / tnt payload
   stack?: Stack;
   pickupDelay?: number;
   block?: number;
@@ -149,7 +146,6 @@ export interface Input {
   sprint: boolean;
   attack: boolean;
   use: boolean;
-  /** Analog movement from a touch stick, overriding the keys when non-zero. */
   moveX?: number;
   moveZ?: number;
 }
@@ -266,7 +262,6 @@ const DEATH: Partial<Record<MobKind, SoundKey>> = {
   pig: 'mob/pig/death',
 };
 
-/** Blast resistance used by explosions (original values / 5 are folded in). */
 function resistance(id: number) {
   if (BLOCKS[id]?.hardness < 0) return 1e9;
   if (id === B.obsidian) return 1200;
@@ -290,7 +285,6 @@ export function xpForLevel(level: number) {
   return 9 * level - 158;
 }
 
-/** Day light multiplier for sky light (1 at noon, about 0.2 at midnight). */
 export function daylight(time: number) {
   const sun = Math.sin(((time % DAY) / DAY) * Math.PI * 2);
   return Math.min(1, Math.max(0.2, 0.55 + sun * 1.4));
@@ -319,7 +313,6 @@ export class Game {
   time = 1000;
   ticks = 0;
   readonly player: Player;
-  /** 0-8 hotbar, 9-35 main inventory. */
   inventory: (Stack | null)[] = emptySlots(36);
   selected = 0;
   cursor: Stack | null = null;
@@ -331,7 +324,6 @@ export class Game {
   chests = new Map<string, (Stack | null)[]>();
   readonly events: GameEvent[] = [];
   animalChunks = new Set<number>();
-  /** Block currently targeted and its break progress (0..1). */
   target: RayHit | null = null;
   targetEntity: Entity | null = null;
   breakProgress = 0;
@@ -431,7 +423,6 @@ export class Game {
     this.breakProgress = 0;
   }
 
-  /** Land spawn near the origin, avoiding oceans. */
   findSpawn() {
     const t = this.world.terrain;
     for (let r = 0; r < 4000; r += 16) {
@@ -451,16 +442,10 @@ export class Game {
     return { x: 0, y: HEIGHT - 20, z: 0 };
   }
 
-  // -------------------------------------------------------------------------
-  // Chunk streaming (called every frame with a time budget)
-  // -------------------------------------------------------------------------
-  /** Generate and light chunks around the player; returns true when the spawn area is ready. */
   streamChunks(budgetMs: number, now: () => number = () => performance.now()) {
     const start = now();
     const pcx = Math.floor(this.player.x / CHUNK);
     const pcz = Math.floor(this.player.z / CHUNK);
-    // Meshing and lighting each need a full 3×3 neighbourhood, including diagonals.
-    // A circular radius + 2 omits corner dependencies and stalls small view distances.
     const r = this.renderDistance + 2;
     const needed = (cx: number, cz: number, padding: number) => {
       const dx = Math.max(0, Math.abs(cx - pcx) - padding);
@@ -487,7 +472,6 @@ export class Game {
       if (now() - start > budgetMs) return false;
       this.world.lightChunk(c);
     }
-    // Unload far chunks.
     for (const c of this.world.chunks.values()) {
       const dx = c.cx - pcx;
       const dz = c.cz - pcz;
@@ -525,10 +509,6 @@ export class Game {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Main loop
-  // -------------------------------------------------------------------------
-  /** Advance real time; runs fixed 20 Hz ticks. Returns interpolation alpha. */
   update(dt: number, input: Input) {
     this.input = input;
     this.accumulator = Math.min(this.accumulator + dt, 0.25);
@@ -559,14 +539,10 @@ export class Game {
     return this.time % DAY;
   }
 
-  /** Effective sky darkening (0 at day, 11 at night) for spawning. */
   skyDarken() {
     return Math.round((1 - (daylight(this.time) - 0.2) / 0.8) * 11);
   }
 
-  // -------------------------------------------------------------------------
-  // Sounds and messages
-  // -------------------------------------------------------------------------
   sound(key: SoundKey, x: number, y: number, z: number, volume = 1, pitch = 1) {
     this.events.push({ type: 'sound', key, x, y, z, volume, pitch });
   }
@@ -579,9 +555,6 @@ export class Game {
     return this.locale === 'zh' ? zh : en;
   }
 
-  // -------------------------------------------------------------------------
-  // Player
-  // -------------------------------------------------------------------------
   get eyeHeight() {
     return this.player.sneaking && !this.player.flying ? 1.27 : 1.62;
   }
@@ -600,7 +573,6 @@ export class Game {
     return this.mode === 'creative' ? 5 : 4.5;
   }
 
-  /** Update the block and entity under the crosshair. */
   updateTarget() {
     const p = this.player;
     const [dx, dy, dz] = this.lookVector();
@@ -638,7 +610,6 @@ export class Game {
     const input = this.input;
     const creative = this.mode === 'creative';
     if (!creative) p.flying = false;
-    // Double-tap jump toggles flight in creative; double-tap forward sprints.
     if (input.jump && !this.lastJump) {
       if (creative && this.ticks - this.jumpTapTick < 7) {
         p.flying = !p.flying;
@@ -659,7 +630,6 @@ export class Game {
     if ((input.sprint || this.doubleTapSprint) && input.forward && canSprint) p.sprinting = true;
     if (!input.forward || p.collidedH || !canSprint) p.sprinting = false;
 
-    // Movement intent in local space.
     let mx = input.moveX ?? 0;
     let mz = input.moveZ ?? 0;
     if (!mx && !mz) {
@@ -742,7 +712,6 @@ export class Game {
       p.vz *= friction;
     }
 
-    // Fall damage.
     if (!p.onGround && p.y < startY) p.fallDistance += startY - p.y;
     if (p.onGround) {
       if (p.fallDistance > 3 && !creative && !p.inWater) {
@@ -753,7 +722,6 @@ export class Game {
       p.fallDistance = 0;
     }
 
-    // Steps, bobbing, sprint exhaustion.
     const moved = Math.hypot(p.x - p.px, p.z - p.pz);
     if (p.onGround) {
       p.walkDist += moved;
@@ -770,7 +738,6 @@ export class Game {
     if (p.inWater && moved > 0.01 && this.ticks % 12 === 0)
       this.sound('liquid/swim1', p.x, p.y, p.z, 0.15);
 
-    // Survival needs.
     if (!creative) this.tickNeeds();
     if (p.invulnerable > 0) p.invulnerable--;
     if (p.hurtTime > 0) p.hurtTime--;
@@ -788,7 +755,6 @@ export class Game {
 
   private tickNeeds() {
     const p = this.player;
-    // Hunger.
     if (p.exhaustion >= 4) {
       p.exhaustion -= 4;
       if (p.saturation > 0) p.saturation = Math.max(0, p.saturation - 1);
@@ -811,7 +777,6 @@ export class Game {
         p.foodTimer = 0;
       }
     } else p.foodTimer = 0;
-    // Air.
     if (p.eyesInWater) {
       p.air--;
       if (p.air <= -20) {
@@ -819,7 +784,6 @@ export class Game {
         this.hurtPlayer(2, this.t('drowned', '淹死了'));
       }
     } else p.air = Math.min(300, p.air + 5);
-    // Lava and fire.
     if (p.inLava) {
       p.fire = 300;
       if (this.ticks % 10 === 0)
@@ -832,7 +796,6 @@ export class Game {
         if (p.fire % 20 === 0) this.hurtPlayer(1, this.t('burned to death', '被烧死了'));
       }
     }
-    // Cactus.
     const box = bodyBox(p);
     for (let x = Math.floor(box.x0 - 0.05); x <= Math.floor(box.x1 + 0.05); x++)
       for (let z = Math.floor(box.z0 - 0.05); z <= Math.floor(box.z1 + 0.05); z++)
@@ -867,9 +830,7 @@ export class Game {
     const p = this.player;
     p.dead = true;
     p.deathMessage = cause.replace(' by mob', '');
-    // Return the crafting grid and cursor first so they are scattered too.
     this.closeScreen();
-    // Scatter the inventory like the original.
     for (let i = 0; i < this.inventory.length; i++) {
       const s = this.inventory[i];
       if (!s) continue;
@@ -924,9 +885,6 @@ export class Game {
     this.sound('random/orb', p.x, p.y, p.z, 0.3, 0.6 + this.random() * 0.8);
   }
 
-  // -------------------------------------------------------------------------
-  // Mining, attacking and using
-  // -------------------------------------------------------------------------
   private tickInteraction() {
     const p = this.player;
     const input = this.input;
@@ -937,7 +895,6 @@ export class Game {
     if (this.breakCooldown > 0) this.breakCooldown--;
     if (this.useCooldown > 0) this.useCooldown--;
 
-    // Eating.
     const held = this.held;
     const food = held ? ITEMS[held.id]?.food : undefined;
     const interactive = this.target !== null && INTERACTIVE.has(this.target.id) && !p.sneaking;
@@ -1011,7 +968,6 @@ export class Game {
     }
   }
 
-  /** Break a block, dropping its items in survival. */
   breakBlock(x: number, y: number, z: number, drops: boolean) {
     const w = this.world;
     const id = w.getBlock(x, y, z);
@@ -1021,7 +977,6 @@ export class Game {
     this.events.push({ type: 'break', x, y, z, id });
     this.sound(DIG_SOUND[def.sound], x + 0.5, y + 0.5, z + 0.5, 1, 0.8 + this.random() * 0.2);
     const held = this.held?.id;
-    // Remove block (doors are two cells).
     if (id === B.door) {
       const other = meta & 8 ? y - 1 : y + 1;
       if (w.getBlock(x, other, z) === B.door) w.setBlock(x, other, z, B.air);
@@ -1131,7 +1086,6 @@ export class Game {
         break;
       }
       case 49: {
-        // bookshelf
         out.push({ id: 'book', count: 3 });
         break;
       }
@@ -1278,7 +1232,6 @@ export class Game {
     const held = this.held;
     const heldId = held?.id;
     if (this.endgame.use()) return;
-    // Entities.
     const te = this.targetEntity;
     if (te) {
       if (te.kind === 'sheep' && heldId === 'shears' && !te.sheared) {
@@ -1291,7 +1244,6 @@ export class Game {
       }
       return;
     }
-    // Buckets work on liquids.
     if (heldId === 'bucket') {
       const [dx, dy, dz] = this.lookVector();
       const hit = raycast(w, p.x, p.y + this.eyeHeight, p.z, dx, dy, dz, this.reach(), true);
@@ -1314,7 +1266,6 @@ export class Game {
     if (!hit) return;
     const id = hit.id;
     const [nx, ny, nz] = DIRS[hit.face];
-    // Block interactions.
     if (!p.sneaking || !held) {
       const key = `${hit.x},${hit.y},${hit.z}`;
       if (id === B.craftingTable) {
@@ -1354,7 +1305,6 @@ export class Game {
       }
     }
     if (!held) return;
-    // Hoes till dirt.
     if (ITEMS[held.id]?.tool?.kind === 'hoe') {
       if (
         (id === B.grass || id === B.dirt) &&
@@ -1377,7 +1327,6 @@ export class Game {
       }
       return;
     }
-    // Buckets of liquid and blocks.
     let tx = hit.x + nx;
     let ty = hit.y + ny;
     let tz = hit.z + nz;
@@ -1409,7 +1358,6 @@ export class Game {
     }
   }
 
-  /** Validate and place a block from the player; returns true on success. */
   place(id: number, x: number, y: number, z: number, face: number) {
     const w = this.world;
     const def = BLOCKS[id];
@@ -1422,7 +1370,6 @@ export class Game {
         if (face === 2 || face === 3) {
           if (!solidBelow) return false;
         } else {
-          // Attached to the clicked block; facing is the wall direction (0 +Z, 1 -X, 2 -Z, 3 +X).
           const wall = face === 0 ? 1 : face === 1 ? 3 : face === 4 ? 2 : 0;
           const ring = WALL_RING[wall];
           if (!BLOCKS[w.getBlock(x + ring[0], y, z + ring[2])].opaque) return false;
@@ -1432,7 +1379,6 @@ export class Game {
       }
       case 'ladder': {
         if (face === 2 || face === 3) return false;
-        // facing: wall the ladder is attached to (0 +Z, 1 -X, 2 -Z, 3 +X).
         meta = face === 0 ? 1 : face === 1 ? 3 : face === 4 ? 2 : 0;
         const ring = WALL_RING[meta];
         if (!BLOCKS[w.getBlock(x + ring[0], y, z + ring[2])].opaque) return false;
@@ -1494,10 +1440,8 @@ export class Game {
     return true;
   }
 
-  /** Facing that points the block's front toward the player. */
   private facingFromYaw() {
     const yaw = ((this.player.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    // Looking toward -Z (yaw 0) sees the +Z face: facing 0.
     const q = Math.round(yaw / (Math.PI / 2)) % 4;
     return [0, 3, 2, 1][q];
   }
@@ -1511,7 +1455,6 @@ export class Game {
     return bodies.some((b) => boxes.some((box) => intersectsBlock(b, x, y, z, box)));
   }
 
-  /** Middle click: select or (creative) create the targeted block in the hotbar. */
   pickBlock() {
     const hit = this.target;
     if (!hit) return;
@@ -1566,11 +1509,6 @@ export class Game {
     p.swing = 6;
   }
 
-  // -------------------------------------------------------------------------
-  // Inventory
-  // -------------------------------------------------------------------------
-  /** Add a stack to the inventory; returns the remainder count. */
-  /** Whether `giveItem(stack)` would place the whole stack. */
   canFit(stack: Stack): boolean {
     let room = 0;
     const limit = maxStack(stack.id);
@@ -1619,7 +1557,6 @@ export class Game {
       const s = this.screen;
       this.sound('random/chestclosed', s.x + 0.5, s.y + 0.5, s.z + 0.5, 0.5);
     }
-    // Return crafting grid and cursor contents.
     for (let i = 0; i < 9; i++) {
       const s = this.craftGrid[i];
       if (s) {
@@ -1711,7 +1648,6 @@ export class Game {
     }
   }
 
-  /** Mouse click on a slot with original semantics (left, right, shift-click). */
   clickSlot(ref: SlotRef, button: 'left' | 'right', shift: boolean) {
     if (ref.kind === 'result') {
       this.takeCraft(shift);
@@ -1796,7 +1732,6 @@ export class Game {
           return;
         }
       }
-      // Hotbar <-> main inventory.
       const range = ref.index < 9 ? slotRange(9, 36) : slotRange(0, 9);
       const left = mergeInto(this.inventory, slot, range);
       this.setSlot(ref, left ? { ...slot, count: left } : null);
@@ -1810,7 +1745,6 @@ export class Game {
     let result = this.craftResult();
     for (let guard = 0; result && guard < 64; guard++) {
       if (shift) {
-        // Like vanilla, shift-crafting stops once a whole result no longer fits.
         if (!this.canFit(result)) return;
         this.giveItem(result);
       } else {
@@ -1843,20 +1777,14 @@ export class Game {
     }
   }
 
-  /** Read-only view of a slot for the UI. */
   slot(ref: SlotRef): Stack | null {
     return this.getSlot(ref);
   }
 
-  /** Whether the cursor stack may be dropped into a slot (output slots refuse). */
   accepts(ref: SlotRef) {
     return ref.kind !== 'result' && !(ref.kind === 'furnace' && ref.slot === 'output');
   }
 
-  /**
-   * Drag painting: spread the cursor stack evenly (left) or one each (right)
-   * over the slots the mouse was dragged across.
-   */
   distribute(refs: SlotRef[], button: 'left' | 'right') {
     const cursor = this.cursor;
     if (!cursor || refs.length === 0) return;
@@ -1881,7 +1809,6 @@ export class Game {
     if (cursor.count <= 0) this.cursor = null;
   }
 
-  /** Number keys over a slot swap it with that hotbar slot. */
   swapWithHotbar(ref: SlotRef, hotbar: number) {
     if (!this.accepts(ref) || this.cursor) return;
     if (ref.kind === 'inv' && ref.index === hotbar) return;
@@ -1891,7 +1818,6 @@ export class Game {
     this.inventory[hotbar] = a;
   }
 
-  /** Double click: gather matching items from the open screen onto the cursor. */
   collectToCursor() {
     const cursor = this.cursor;
     if (!cursor || cursor.wear) return;
@@ -1911,7 +1837,6 @@ export class Game {
     }
   }
 
-  /** Creative palette click: put a full stack (shift) or one item on the cursor. */
   creativePick(id: string, shift: boolean) {
     if (this.cursor && this.cursor.id === id) {
       this.cursor.count = Math.min(maxStack(id), this.cursor.count + 1);
@@ -1924,7 +1849,6 @@ export class Game {
     this.cursor = { id, count: shift ? maxStack(id) : 1 };
   }
 
-  /** Throw the cursor stack out of the inventory screen. */
   dropCursor() {
     if (!this.cursor) return;
     const p = this.player;
@@ -1933,9 +1857,6 @@ export class Game {
     this.cursor = null;
   }
 
-  // -------------------------------------------------------------------------
-  // Furnaces
-  // -------------------------------------------------------------------------
   private tickFurnaces() {
     for (const [key, f] of this.furnaces) {
       const [x, y, z] = key.split(',').map(Number);
@@ -1981,9 +1902,6 @@ export class Game {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Block updates
-  // -------------------------------------------------------------------------
   private processChecks() {
     if (this.pendingChecks.size === 0) return;
     const list = [...this.pendingChecks];
@@ -2241,9 +2159,6 @@ export class Game {
     return true;
   }
 
-  // -------------------------------------------------------------------------
-  // Explosions
-  // -------------------------------------------------------------------------
   primeTnt(x: number, y: number, z: number, fuse: number) {
     const e = this.newEntity('tnt', x + 0.5, y, z + 0.5, 0.98, 0.98);
     e.fuse = fuse;
@@ -2300,7 +2215,6 @@ export class Game {
       this.dropContainer(bx, by, bz);
       if (this.random() < 1 / power) this.dropBlockItems(bx, by, bz, id, 0, 'diamond_pickaxe');
     }
-    // Damage entities and the player.
     const radius = power * 2;
     const hit = (b: { x: number; y: number; z: number; h: number }) => {
       const dx = b.x - x;
@@ -2336,9 +2250,6 @@ export class Game {
     this.events.push({ type: 'explode', x, y, z, power });
   }
 
-  // -------------------------------------------------------------------------
-  // Entities
-  // -------------------------------------------------------------------------
   newEntity(kind: EntityKind, x: number, y: number, z: number, w: number, h: number): Entity {
     return {
       id: this.nextId++,
@@ -2509,7 +2420,6 @@ export class Game {
   private tickItem(e: Entity) {
     const p = this.player;
     if (e.pickupDelay! > 0) e.pickupDelay!--;
-    // Magnet and pickup.
     const dx = p.x - e.x;
     const dy = p.y + 0.9 - e.y;
     const dz = p.z - e.z;
@@ -2537,7 +2447,6 @@ export class Game {
       e.vz *= 0.7;
     }
     if (e.age > 6000) e.removed = true;
-    // Merge with nearby equal stacks.
     if (e.age % 10 === 0) {
       for (const o of this.entities) {
         if (
@@ -2675,7 +2584,6 @@ export class Game {
     }
     if (e.hurtTime > 0) e.hurtTime--;
     if (e.invulnerable > 0) e.invulnerable--;
-    // Environment damage.
     const sky =
       this.world.getLight(Math.floor(e.x), Math.floor(e.y + e.h - 0.1), Math.floor(e.z)) >> 4;
     const day = daylight(this.time) > 0.75;
@@ -2692,7 +2600,6 @@ export class Game {
     if (e.onGround) e.fallDistance = 0;
     if (e.deathTime > 0) return;
 
-    // AI.
     let tx: number | undefined;
     let tz: number | undefined;
     let speed = stats.speed;
@@ -2770,7 +2677,6 @@ export class Game {
       }
       tx = e.wanderX;
       tz = e.wanderZ;
-      // Passive mobs look at nearby players.
       if (!HOSTILE.has(kind) && dist < 6 && tx === undefined)
         e.yaw = approachAngle(e.yaw, Math.atan2(-dx, -dz), 0.2);
     }
@@ -2784,7 +2690,6 @@ export class Game {
         const accel = (e.onGround ? 0.1 : 0.02) * speed * 4.3;
         e.vx += -Math.sin(e.yaw) * accel;
         e.vz += -Math.cos(e.yaw) * accel;
-        // Avoid walking off high drops when calm.
         if (!HOSTILE.has(kind) && !e.panic && e.onGround) {
           const ax = Math.floor(e.x - Math.sin(e.yaw) * 0.8);
           const az = Math.floor(e.z - Math.cos(e.yaw) * 0.8);
@@ -2805,20 +2710,15 @@ export class Game {
       e.vy = e.inWater ? 0.04 + e.vy : 0.42;
     e.headYaw = HOSTILE.has(kind) && canTarget ? Math.atan2(-dx, -dz) : e.yaw;
     this.physics(e);
-    // Push apart from other mobs and the player.
     const moved = Math.hypot(e.x - e.px, e.z - e.pz);
     e.limbAmount += (Math.min(1, moved * 4) - e.limbAmount) * 0.4;
     e.limbSwing += e.limbAmount;
-    // Ambient sounds.
     const say = SAY[kind];
     if (say && this.random() < 1 / 160 && dist < 16)
       this.sound(say, e.x, e.y + e.h, e.z, 0.6, 0.9 + this.random() * 0.2);
     if (kind === 'chicken' && !e.onGround && e.vy < 0) e.vy *= 0.6;
   }
 
-  // -------------------------------------------------------------------------
-  // Commands
-  // -------------------------------------------------------------------------
   command(line: string): string {
     const parts = line.trim().replace(/^\//, '').split(/\s+/);
     const [cmd, ...args] = parts;
@@ -2926,7 +2826,6 @@ export class Game {
   }
 }
 
-/** Offset to the wall for facing 0 +Z, 1 -X, 2 -Z, 3 +X. */
 const WALL_RING: readonly [number, number, number][] = [
   [0, 0, 1],
   [-1, 0, 0],

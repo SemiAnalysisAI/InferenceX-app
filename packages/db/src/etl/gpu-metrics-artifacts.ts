@@ -1,25 +1,3 @@
-/**
- * Filesystem discovery for `gpu_metrics_<suffix>` artifacts.
- *
- * Layout uploaded by the producer (`benchmark-tmpl.yml` "Upload GPU metrics"):
- *   gpu_metrics.csv                         fixed-sequence jobs
- *   results/gpu_metrics.csv                 AgentX jobs (per-concurrency)
- *   results/gpu_metrics*.csv                multinode staging, one CSV per node
- *   gpu_metrics*_context.json               collector context (timestamp zone …)
- *   gpu_metrics_identity.{json,csv}         SKU / UUID / driver per GPU
- *   gpu_metrics_energy_{start,end}.csv      amd-smi energy counters
- *
- * Multinode jobs (`benchmark-multinode-tmpl.yml`) upload no `gpu_metrics_`
- * artifact; their telemetry travels inside `power_audit_<suffix>`:
- *   LOGS/power/samples.csv                  native telemetry, one row per (host, GPU, s)
- *   LOGS/power/manifest.json                producer, source metric, cadence
- * Single-node jobs upload a `power_audit_` bundle too, so it only stands in
- * for a point when no `gpu_metrics_<suffix>` sibling exists.
- *
- * `eval_gpu_metrics_<suffix>` (eval-only jobs) is deliberately ignored: those
- * jobs produce no benchmark point to attach the telemetry to.
- */
-
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -46,12 +24,9 @@ export interface GpuMetricsCsvFile {
 
 export interface GpuMetricsSidecars {
   context: Record<string, unknown> | null;
-  /** Audit documents keyed by canonical source; nested documents retain original path/hash. */
   validations?: Record<string, Record<string, unknown>>;
-  /** Expected stored files and deduplicated row counts from this one artifact. */
   seriesInventory?: { fileName: string; sampleCount: number }[];
   runArtifactInventory?: string[];
-  /** Bundle manifest when the preferred CSV has its own collector context. */
   powerManifest?: Record<string, unknown> | null;
   identity: unknown | null;
   energyStart: Record<string, number> | null;
@@ -69,10 +44,6 @@ export function isPowerAuditArtifact(artifactName: string): boolean {
   return artifactName.startsWith(POWER_AUDIT_ARTIFACT_PREFIX);
 }
 
-/**
- * The two uploads that may carry one point's telemetry, preferred first. When a
- * point's own sibling was not seen, receipts expect either of them, not both.
- */
 export function expectedTelemetryArtifactNames(suffix: string): string[] {
   return [`${GPU_METRICS_ARTIFACT_PREFIX}${suffix}`, `${POWER_AUDIT_ARTIFACT_PREFIX}${suffix}`];
 }
@@ -80,7 +51,6 @@ export function expectedTelemetryArtifactNames(suffix: string): string[] {
 export function isGpuMetricsCsvPath(relativePath: string): boolean {
   const lower = path.posix.basename(relativePath).toLowerCase();
   if (!lower.startsWith('gpu_metrics') || !lower.endsWith('.csv')) return false;
-  // Sidecars share the prefix but are not time series.
   return !lower.includes('_identity') && !lower.includes('_energy_');
 }
 
@@ -109,7 +79,6 @@ export function readMultinodePowerManifest(samplesPath: string): Record<string, 
   return isRecord(parsed) ? parsed : null;
 }
 
-/** Preserve window boundaries and role overrides before GitHub artifact expiry. */
 export function readPowerAuditValidations(
   root: string,
   artifactName = path.basename(root),
@@ -185,14 +154,9 @@ function readIdentity(csvDir: string): unknown | null {
   });
 }
 
-/**
- * Sidecars live next to the CSV they describe. The context file is either
- * `gpu_metrics_context.json` or `<result>_gpu_metrics_context.json`.
- */
 export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
   const dir = path.dirname(csvPath);
   let context: Record<string, unknown> | null = null;
-  // Match live ZIP reads even when filesystem/central-directory orders differ.
   const contextFiles = fs
     .readdirSync(dir)
     .filter(
@@ -220,12 +184,6 @@ export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
   };
 }
 
-/**
- * Collector clock offset in minutes east of UTC, from the context sidecar.
- * The producer writes `{"timestamp_timezone":"UTC"}`; anything else that is
- * not a fixed `±HH:MM` offset is treated as UTC because nvidia-smi timestamps
- * carry no zone of their own.
- */
 export function contextUtcOffsetMinutes(context: Record<string, unknown> | null): number {
   const zone = context?.timestamp_timezone;
   if (typeof zone !== 'string') return 0;
@@ -235,13 +193,6 @@ export function contextUtcOffsetMinutes(context: Record<string, unknown> | null)
   return match.groups.sign === '-' ? -minutes : minutes;
 }
 
-/**
- * Index every extracted telemetry artifact by its shared suffix. A
- * `gpu_metrics_` upload wins over the `power_audit_` bundle for the same
- * suffix. Single-node jobs upload both, with legacy top-level validations
- * only; multinode jobs upload the bundle alone, and it is the one carrier of
- * nested AgentX windows (`normalizePowerAuditValidations`).
- */
 export function discoverGpuMetricsArtifacts(artifactsDir: string): Map<string, GpuMetricsArtifact> {
   const discovered = new Map<string, GpuMetricsArtifact>();
   if (!fs.existsSync(artifactsDir)) return discovered;

@@ -47,7 +47,6 @@ describe('ordinaryLeastSquares', () => {
       { x: 2, y: 3 },
       { x: 3, y: 7 },
     ]);
-    // Least squares: slope 2.5, intercept -1, residuals (0.5, -1, 0.5) → SSres 1.5, SStot 14.
     expect(fit!.slope).toBeCloseTo(2.5, 12);
     expect(fit!.intercept).toBeCloseTo(-1, 12);
     expect(fit!.rSquared).toBeCloseTo(1 - 1.5 / 14, 12);
@@ -59,6 +58,8 @@ describe('buildPowerFits', () => {
     const gb200 = ladder([100, 300, 500], () => 0, {
       hwKey: 'gb200_dynamo-sglang',
       disagg: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
       num_prefill_gpu: 4,
       num_decode_gpu: 4,
     }).map((entry) => ({

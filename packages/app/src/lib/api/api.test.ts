@@ -3,8 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   fetchBenchmarks,
   fetchWorkflowInfo,
-  fetchAvailability,
-  deleteCollectiveXRun,
+  fetchDashboardAvailability,
   fetchCollectiveXRun,
   fetchCollectiveXRunList,
   fetchReliability,
@@ -151,17 +150,15 @@ describe('simple read abort signals', () => {
   });
 });
 
-describe('fetchAvailability', () => {
-  it('fetches from /api/v1/availability', async () => {
-    const data = [
-      { model: 'dsr1', isl: 1024, osl: 1024, precision: 'fp8', date: '2026-03-01' },
-      { model: 'dsr1', isl: 1024, osl: 1024, precision: 'fp4', date: '2026-02-28' },
-    ];
-    mockOk(data);
-    const result = await fetchAvailability();
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/availability', expect.objectContaining({}));
-    expect(result).toHaveLength(2);
-    expect(result[0].model).toBe('dsr1');
+describe('fetchDashboardAvailability', () => {
+  it('fetches from /api/v1/availability/compact', async () => {
+    mockOk({ dates: ['2026-03-01'], models: ['dsr1'], lines: [] });
+    const result = await fetchDashboardAvailability();
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/availability/compact',
+      expect.objectContaining({}),
+    );
+    expect(result.models).toEqual(['dsr1']);
   });
 });
 
@@ -184,15 +181,15 @@ describe('fetchEvaluations', () => {
   });
 });
 
+function mockJson(payload: unknown) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(payload),
+  });
+}
+
 describe('CollectiveX API', () => {
   const dataset = makeCollectiveXDataset();
-
-  function mockJson(payload: unknown) {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(payload),
-    });
-  }
 
   it('fetches a specific run by id', async () => {
     mockJson(dataset);
@@ -218,26 +215,5 @@ describe('CollectiveX API', () => {
     expect(response.discovery_complete).toBe(true);
     expect(response.runs).toHaveLength(1);
     expect(response.runs[0].run_id).toBe(dataset.run.run_id);
-  });
-
-  it('sends the bearer token on delete and reports success', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
-
-    await expect(deleteCollectiveXRun('160', 'secret-token')).resolves.toBe(true);
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/collectivex/runs/160', {
-      method: 'DELETE',
-      headers: { Authorization: 'Bearer secret-token' },
-    });
-  });
-
-  it('resolves false on 401 so callers can clear a stale token', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
-    await expect(deleteCollectiveXRun('160', 'stale')).resolves.toBe(false);
-  });
-
-  it('throws on non-auth delete failures', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
-    await expect(deleteCollectiveXRun('160', 'secret-token')).rejects.toThrow(/500/);
   });
 });

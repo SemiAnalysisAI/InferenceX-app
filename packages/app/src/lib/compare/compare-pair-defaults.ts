@@ -1,9 +1,6 @@
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-// Picks the (sequence, precision) that maximises overlap of distinct
-// (framework, spec_method, conc) variants between the two GPUs in a compare
-// pair. Falls back to widest single-GPU coverage; nulls if neither has data.
 export function pickPairDefaults(
   rows: BenchmarkRow[],
   a: string,

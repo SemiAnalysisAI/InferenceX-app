@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
-import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', track: vi.fn() }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+vi.mock('@/lib/analytics/analytics', async (importOriginal) => ({
+  ...(await importOriginal<typeof analytics>()),
+  track: mocks.track,
+}));
+
+import {
+  ChartShareActions,
+  MetricAssumptionNotes,
+  metricCostAssumptions,
+} from '@/components/ui/chart-display-helpers';
+import type * as analytics from '@/lib/analytics/analytics';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;
@@ -20,12 +32,14 @@ function getVisibleText() {
 }
 
 function getVisibleCaveatText() {
-  return [...container.querySelectorAll('div.max-h-20 p')]
+  return [...container.querySelectorAll('[data-disagg-caveat]:not([aria-hidden]) p')]
     .map((element) => element.textContent ?? '')
     .join(' ');
 }
 
 beforeEach(() => {
+  mocks.locale = 'en';
+  mocks.track.mockClear();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -46,40 +60,24 @@ describe('ChartShareActions', () => {
   });
 });
 
-// Stand-in for the /inference editable badge row.
-const renderCostBadges = ({
-  label,
-  values,
-  blankedBases,
-}: {
-  label: string;
-  values: Record<string, number>;
-  blankedBases?: string[];
-}) => (
-  <div data-testid="editable" data-blanked={(blankedBases ?? []).join(',')}>
-    {label} {Object.keys(values).join(',')}
-  </div>
-);
-
 describe('MetricAssumptionNotes', () => {
   it('shows power source badges and the per-MW disaggregation caveat for inference metrics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerMw" />);
 
     expect(getVisibleText()).toContain('All in Power/Chip:');
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
-    expect(getVisibleCaveatText()).toContain('calculate power per decode chip or per prefill chip');
+    expect(getVisibleCaveatText()).toContain(
+      'calculate throughput per MW per decode chip or per prefill chip',
+    );
   });
 
-  // Total tok/s/MW divides throughput per chip overall by per-chip power — the
-  // same denominator an aggregated config uses — so, like the total-token cost
-  // metrics, it keeps the power badges but must not carry the disagg caveat.
   it('hides the disaggregation caveat for the total per-MW metric', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tpPerMw" />);
 
     expect(getVisibleText()).toContain('All in Power/Chip:');
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode chip or per prefill chip',
+      'calculate throughput per MW per decode chip or per prefill chip',
     );
   });
 
@@ -89,7 +87,7 @@ describe('MetricAssumptionNotes', () => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
       expect(getVisibleCaveatText()).toContain(
-        'calculate power per decode chip or per prefill chip',
+        'calculate throughput per MW per decode chip or per prefill chip',
       );
     },
   );
@@ -105,7 +103,7 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).not.toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode chip or per prefill chip',
+      'calculate throughput per MW per decode chip or per prefill chip',
     );
 
     renderUi(
@@ -118,7 +116,7 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode chip or per prefill chip',
+      'calculate throughput per MW per decode chip or per prefill chip',
     );
   });
 
@@ -142,9 +140,6 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).toContain('token cost comparison');
   });
 
-  // The prefill/decode split only skews per-token-type metrics; the
-  // total-token metric divides by the whole chip count, exactly as an aggregated
-  // config does, so it must not carry the caveat.
   it.each([
     'y_outputTokensPerDollarH',
     'y_outputTokensPerDollarR',
@@ -174,7 +169,6 @@ describe('MetricAssumptionNotes', () => {
     (metric) => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
-      // The TCO badges and source attribution still explain the hourly-price input.
       expect(getVisibleText()).toContain('TCO $/chip/hr:');
       expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
       expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
@@ -193,10 +187,10 @@ describe('MetricAssumptionNotes', () => {
     );
 
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain('H200:');
-    expect(getVisibleText()).toContain('GB300:');
-    expect(getVisibleText()).not.toContain('H100:');
-    expect(getVisibleText()).not.toContain('MI300X:');
+    expect(getVisibleText()).toContain('H200 ');
+    expect(getVisibleText()).toContain('GB300 ');
+    expect(getVisibleText()).not.toContain('H100 ');
+    expect(getVisibleText()).not.toContain('MI300X ');
   });
 
   it('narrows the power badges to the active legend selection', () => {
@@ -205,16 +199,16 @@ describe('MetricAssumptionNotes', () => {
     );
 
     expect(getVisibleText()).toContain('All in Power/Chip:');
-    expect(getVisibleText()).toContain('MI300X:');
-    expect(getVisibleText()).not.toContain('H100:');
-    expect(getVisibleText()).not.toContain('H200:');
+    expect(getVisibleText()).toContain('MI300X ');
+    expect(getVisibleText()).not.toContain('H100 ');
+    expect(getVisibleText()).not.toContain('H200 ');
   });
 
   it('falls back to every registry GPU when the selection is empty or unrecognized', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollarH" activeHwKeys={[]} />);
 
-    expect(getVisibleText()).toContain('H100:');
-    expect(getVisibleText()).toContain('MI300X:');
+    expect(getVisibleText()).toContain('H100 ');
+    expect(getVisibleText()).toContain('MI300X ');
 
     renderUi(
       <MetricAssumptionNotes
@@ -223,41 +217,45 @@ describe('MetricAssumptionNotes', () => {
       />,
     );
 
-    expect(getVisibleText()).toContain('H100:');
-    expect(getVisibleText()).toContain('MI300X:');
+    expect(getVisibleText()).toContain('H100 ');
+    expect(getVisibleText()).toContain('MI300X ');
   });
 
-  it('hands the TCO badges to the caller-supplied renderer for tiered and custom cost metrics', () => {
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costh"
-        activeHwKeys={['gb300_dynamo-sglang']}
-        renderCostBadges={renderCostBadges}
-      />,
-    );
-    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
-      'TCO $/chip/hr: gb300',
-    );
-    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
-
-    // The custom tier shows the same badge row (so the reader can type into
-    // it) but cites no TCO source: the numbers are theirs.
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costUser"
-        activeHwKeys={['gb300_dynamo-sglang', 'mi355x_vllm']}
-        renderCostBadges={renderCostBadges}
-      />,
-    );
-    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
-      'TCO $/chip/hr: gb300,mi355x',
-    );
+  it('leaves the TCO values and their source to the caller when omitCostValues is set', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" omitCostValues />);
+    expect(getVisibleText()).not.toContain('TCO $/chip/hr:');
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+    expect(getVisibleCaveatText()).toContain(
+      'calculate cost per million tokens per decode chip or per prefill chip',
+    );
+  });
+
+  it('describes which cost values a metric quotes and whether they are editable', () => {
+    expect(metricCostAssumptions('y_tpPerMw', 'external', null)).toBeNull();
+    expect(metricCostAssumptions('y_costh', 'external', null)).toMatchObject({
+      editable: true,
+      custom: false,
+      blankedBases: [],
+    });
+    expect(metricCostAssumptions('y_costhOutput', 'external', null)).toMatchObject({
+      editable: false,
+      custom: false,
+    });
+    expect(
+      metricCostAssumptions('y_costUser', 'external', {
+        gb300: undefined,
+        mi355x: 0.75,
+        b200: undefined,
+      }),
+    ).toEqual({
+      values: { mi355x: 0.75 },
+      blankedBases: ['gb300', 'b200'],
+      editable: true,
+      custom: true,
+    });
   });
 
   it("quotes the reader's own prices on the custom tier and the hyperscaler price before any exist", () => {
-    // The plot prices Custom User Values from `userCosts`, so the badges
-    // must quote those, not a published tier; a blanked chip has no badge.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
@@ -265,31 +263,10 @@ describe('MetricAssumptionNotes', () => {
         userCosts={{ gb300: 9.5, mi355x: 0.75, b200: undefined }}
       />,
     );
-    expect(getVisibleText()).toContain('GB300: 9.5');
-    expect(getVisibleText()).toContain('MI355X: 0.75');
-    expect(getVisibleText()).not.toContain('B200:');
+    expect(getVisibleText()).toContain('GB300 9.5');
+    expect(getVisibleText()).toContain('MI355X 0.75');
+    expect(getVisibleText()).not.toContain('B200 ');
 
-    // Every selected chip blanked: hand the renderer an empty list rather
-    // than every other registry chip the reader never selected.
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costUser"
-        activeHwKeys={['gb300_x']}
-        userCosts={{ gb300: undefined, mi355x: 0.75, b200: undefined }}
-        renderCostBadges={renderCostBadges}
-      />,
-    );
-    expect(container.querySelector('[data-testid="editable"]')?.textContent?.trim()).toBe(
-      'TCO $/chip/hr:',
-    );
-    // Every blanked chip is named so the renderer can keep its badge. A
-    // blanked chip has no point and so leaves the active selection, which is
-    // why the list is not narrowed to `activeHwKeys`.
-    expect(container.querySelector<HTMLElement>('[data-testid="editable"]')?.dataset.blanked).toBe(
-      'gb300,b200',
-    );
-
-    // Nothing entered yet: show the seed the custom costs will start from.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
@@ -297,9 +274,8 @@ describe('MetricAssumptionNotes', () => {
         userCosts={null}
       />,
     );
-    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costh}`);
+    expect(getVisibleText()).toContain(`GB300 ${getGpuSpecs('gb300').costh}`);
 
-    // Published tiers ignore `userCosts`.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costr"
@@ -307,13 +283,13 @@ describe('MetricAssumptionNotes', () => {
         userCosts={{ gb300: 9.5 }}
       />,
     );
-    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costr}`);
+    expect(getVisibleText()).toContain(`GB300 ${getGpuSpecs('gb300').costr}`);
   });
 
-  it('falls back to read-only TCO badges without a renderer', () => {
+  it('quotes read-only custom TCO values without a source link', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costUser" activeHwKeys={['gb300_x']} />);
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain('GB300:');
+    expect(getVisibleText()).toContain('GB300 ');
     expect(container.querySelector('input')).toBeNull();
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
   });
@@ -333,5 +309,110 @@ describe('MetricAssumptionNotes', () => {
       'calculate Joules per decode chip or per prefill chip',
     );
     expect(getVisibleCaveatText()).toContain('direct Joules per token comparison');
+  });
+});
+
+function control(value: 'pool' | 'total', onChange = vi.fn()) {
+  return { value, onChange, source: 'inference' };
+}
+
+const toggle = () => container.querySelector('[data-testid="chip-basis-toggle"]');
+
+describe('MetricAssumptionNotes — chip basis toggle', () => {
+  const visibleNote = getVisibleCaveatText;
+
+  it.each([
+    'y_outputTputPerGpu',
+    'y_inputTputPerGpu',
+    'y_costhOutput',
+    'y_inputTokensPerDollarR',
+    'y_outputTputPerMw',
+    'y_jOutput',
+    'y_jInput',
+  ])('offers the toggle on %s, which divides input or output throughput', (metric) => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} chipBasis={control('pool')} />);
+    expect(toggle()).not.toBeNull();
+    expect(visibleNote()).toContain('per decode chip or per prefill chip');
+  });
+
+  it.each(['y_tpPerGpu', 'y_costh', 'y_jTotal', 'y_tpPerMw'])(
+    'keeps the toggle off %s, which is per total chip already',
+    (metric) => {
+      renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} chipBasis={control('pool')} />);
+      expect(toggle()).toBeNull();
+    },
+  );
+
+  it('describes the total basis as apples-to-apples', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_outputTputPerGpu"
+        chipBasis={control('total')}
+      />,
+    );
+    expect(visibleNote()).toContain('per total chip count (prefill plus decode chips)');
+    expect(visibleNote()).toContain('the output throughput comparison is apples-to-apples');
+    expect(visibleNote()).not.toContain('not an apples-to-apples');
+  });
+
+  it('switches the basis and tracks the change', () => {
+    const onChange = vi.fn();
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_outputTputPerGpu"
+        chipBasis={control('pool', onChange)}
+      />,
+    );
+    const total = container.querySelector<HTMLButtonElement>('[data-testid="chip-basis-total"]');
+    act(() => total!.click());
+    expect(onChange).toHaveBeenCalledWith('total');
+    expect(mocks.track).toHaveBeenCalledWith('chip_basis_changed', {
+      basis: 'total',
+      source: 'inference',
+    });
+  });
+
+  it('renders Chinese copy for both bases', () => {
+    mocks.locale = 'zh';
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_outputTputPerGpu"
+        chipBasis={control('total')}
+      />,
+    );
+    expect(visibleNote()).toContain('按芯片总数（预填充芯片 + 解码芯片）计算');
+    expect(container.querySelector('[data-testid="chip-basis-pool"]')?.textContent).toBe(
+      '按预填充/解码芯片',
+    );
+    expect(container.querySelector('[data-testid="chip-basis-total"]')?.textContent).toBe(
+      '按芯片总数',
+    );
+  });
+});
+
+describe('MetricAssumptionNotes — embed caveats', () => {
+  it('describes the basis without the toggle, sources or cost badges', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costhOutput"
+        chipBasis={{ ...control('total'), readOnly: true }}
+        caveatsOnly
+      />,
+    );
+    expect(container.textContent).toContain('per total chip count');
+    expect(container.querySelector('[data-testid="chip-basis-toggle"]')).toBeNull();
+    expect(container.textContent).not.toContain('TCO $/chip/hr:');
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+  });
+
+  it('renders nothing for metrics the basis does not change', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_jTotal"
+        chipBasis={{ ...control('pool'), readOnly: true }}
+        caveatsOnly
+      />,
+    );
+    expect(container.textContent).toBe('');
   });
 });

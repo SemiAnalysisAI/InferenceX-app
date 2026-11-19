@@ -65,13 +65,7 @@ export function ordinaryLeastSquares(pairs: readonly { x: number; y: number }[])
  */
 export function outputRatePerAllocatedGpu(point: InferenceData): number | undefined {
   if (!isPositive(point.output_tput_per_gpu)) return undefined;
-  const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization({
-    output_tput_per_gpu: point.output_tput_per_gpu,
-    disagg: Boolean(point.disagg),
-    benchmark_type: point.benchmark_type,
-    num_prefill_gpu: point.num_prefill_gpu ?? 0,
-    num_decode_gpu: point.num_decode_gpu ?? 0,
-  });
+  const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(point);
   return isPositive(allocatedGpus) && isPositive(totalOutputTokPerSec)
     ? totalOutputTokPerSec / allocatedGpus
     : undefined;

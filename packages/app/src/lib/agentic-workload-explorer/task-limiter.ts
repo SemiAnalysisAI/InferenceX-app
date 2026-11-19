@@ -1,6 +1,5 @@
 type TaskRunner = <T>(task: () => Promise<T>) => Promise<T>;
 
-/** Run asynchronous work under one shared concurrency ceiling. */
 export function createTaskLimiter(maxConcurrent: number): TaskRunner {
   if (!Number.isInteger(maxConcurrent) || maxConcurrent <= 0) {
     throw new RangeError('maxConcurrent must be a positive integer');

@@ -3,13 +3,6 @@ import { B, BLOCKS, doorBox, isLiquid, ladderBox, type BlockDef, type Box } from
 import { hash3 } from './mc-noise';
 import { CHUNK, chunkKey, HEIGHT, type World } from './mc-world';
 
-/**
- * Chunk geometry. Vertex layout (all integer attributes, decoded in the shader):
- *  - position: Int16 x3 in 1/16 block units, chunk-local.
- *  - uv: Uint16 x2 in atlas pixels.
- *  - light: Uint8 x4 = sky (0-255), block (0-255), shade*AO (0-255), flags.
- * Flags: 1 animated water, 2 animated lava, 3 waving leaves, 4 waving plant top.
- */
 export interface MeshData {
   position: Int16Array;
   uv: Uint16Array;
@@ -44,7 +37,6 @@ class Builder {
   }
 }
 
-// Face order: +X -X +Y -Y +Z -Z. Corners per face in 0..1 units, CCW from outside.
 const FACE_CORNERS: number[][][] = [
   [
     [1, 0, 1],
@@ -93,7 +85,6 @@ const NORMALS = [
 ];
 const SHADE = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
 const AO_CURVE = [0.48, 0.66, 0.83, 1];
-/** Horizontal ring used to rotate fronted blocks: +Z, -X, -Z, +X. */
 const RING = [4, 1, 5, 0];
 const RING_INDEX = [3, 1, -1, -1, 0, 2];
 
@@ -102,7 +93,6 @@ const tileOrigin = (tile: number) => [
   Math.floor(tile / ATLAS_COLUMNS) * 16,
 ];
 
-/** Texture pixel coordinates (u right, v down) of a point on a face, in 1/16 units. */
 function faceUV(face: number, px: number, py: number, pz: number): [number, number] {
   switch (face) {
     case 0: {
@@ -143,7 +133,6 @@ export function tileFor(def: BlockDef, face: number, meta: number): number {
   return def.tiles[face];
 }
 
-/** Padded copy (18 x 18 x HEIGHT) of blocks, meta and light around a chunk. */
 const PW = CHUNK + 2;
 const PSLICE = PW * PW;
 const pBlocks = new Uint8Array(PSLICE * HEIGHT);
@@ -195,7 +184,6 @@ function hidden(def: BlockDef, neighbor: number) {
   return false;
 }
 
-/** Build opaque/cutout and translucent geometry for a chunk. */
 export function meshChunk(world: World, cx: number, cz: number) {
   fillPadded(world, cx, cz);
   const solid = new Builder();
@@ -271,7 +259,6 @@ export function meshChunk(world: World, cx: number, cz: number) {
         const [fu, fv] = faceUV(f, c[0] * 16, c[1] * 16, c[2] * 16);
         t[k * 2] = u0 + fu;
         t[k * 2 + 1] = v0 + fv;
-        // Smooth light and AO from the four cells in front of this corner.
         const sx = c[0] * 2 - 1;
         const sy = c[1] * 2 - 1;
         const sz = c[2] * 2 - 1;
@@ -367,7 +354,6 @@ export function meshChunk(world: World, cx: number, cz: number) {
         t[k + 1] = v0 + uvq[k + 1];
       }
       solid.quad(p, t, l);
-      // Back side.
       const bp = [p[3], p[4], p[5], p[0], p[1], p[2], p[9], p[10], p[11], p[6], p[7], p[8]];
       const bt = [t[2], t[3], t[0], t[1], t[6], t[7], t[4], t[5]];
       solid.quad(bp, bt, l);
@@ -423,7 +409,6 @@ export function meshChunk(world: World, cx: number, cz: number) {
       );
       solid.quad(p, t, l);
       if (def.render === 'ladder' || def.render === 'door') {
-        // Visible from both sides.
         const bp = [p[3], p[4], p[5], p[0], p[1], p[2], p[9], p[10], p[11], p[6], p[7], p[8]];
         const bt = [t[2], t[3], t[0], t[1], t[6], t[7], t[4], t[5]];
         if (def.render === 'ladder') solid.quad(bp, bt, l);
@@ -433,7 +418,6 @@ export function meshChunk(world: World, cx: number, cz: number) {
 
   function torch(def: BlockDef, meta: number, x: number, y: number, z: number) {
     const [u0, v0] = tileOrigin(def.tiles[0]);
-    // Wall torches lean away from the wall they hang on.
     const wall = meta > 0 ? meta - 1 : -1;
     const dir = wall >= 0 ? NORMALS[RING[wall]] : [0, 0, 0];
     const lean = 0.42;
@@ -485,7 +469,6 @@ export function meshChunk(world: World, cx: number, cz: number) {
       return m === 0 || m === 8 ? 0.889 : Math.max(0.12, (8 - m) / 9);
     };
     const own = height(x, y, z);
-    // Corner heights average neighbouring liquid levels, as in the original.
     const corner = (dx: number, dz: number) => {
       if (own === 1) return 1;
       let sum = 0;

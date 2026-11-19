@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 interface UseDashboardDataOptions<T> {
   fetcher: (signal?: AbortSignal) => Promise<T>;
   enabled?: boolean;
-  /** Changing this value starts a new request and resets loading. */
   key?: string;
 }
 

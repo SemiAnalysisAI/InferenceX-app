@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 
 import { track } from '@/lib/analytics/analytics';
 
@@ -9,19 +9,12 @@ import { tagChipClass } from './blog-tag-chip';
 interface BlogTagLinkProps {
   tag: string;
   active?: boolean;
-  /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
   basePath?: string;
-  /** Optional post count shown after the tag name. */
   count?: number;
-  /** When set, the chip links to the unfiltered index (the "All" chip). */
   clear?: boolean;
   children?: React.ReactNode;
 }
 
-/**
- * Tag filter chip. Filtering is a plain `?tag=` query on the index route, so
- * every state is a real URL that can be shared and crawled.
- */
 export function BlogTagLink({
   tag,
   active,
@@ -31,7 +24,7 @@ export function BlogTagLink({
   children,
 }: BlogTagLinkProps) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={clear ? basePath : `${basePath}?tag=${encodeURIComponent(tag)}`}
       className={tagChipClass(active)}
       aria-current={active ? 'page' : undefined}
@@ -46,6 +39,6 @@ export function BlogTagLink({
           {count}
         </span>
       )}
-    </Link>
+    </IntentPrefetchLink>
   );
 }

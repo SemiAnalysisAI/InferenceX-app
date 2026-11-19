@@ -1,17 +1,11 @@
 import { relatedTerms } from './concepts';
 import { isCjkTerm, tokenize } from './tokenize';
 
-/** One searchable unit: a page section (or a whole page for metadata seeds). */
 export interface SearchDoc {
-  /** Path plus optional `#anchor`, e.g. `/blog/foo#results`. */
   url: string;
-  /** Page title, shown as the result's heading. */
   pageTitle: string;
-  /** Section heading inside the page, if any. */
   section?: string;
-  /** Section body text. */
   text: string;
-  /** `seed` docs come from the site index before the page itself is fetched. */
   source: 'seed' | 'page';
 }
 
@@ -35,30 +29,23 @@ interface Posting {
 }
 
 interface StoredDoc extends SearchDoc {
-  /** Page path without the anchor; used for replace-by-page and grouping. */
   page: string;
   titleLength: number;
   bodyLength: number;
   alive: boolean;
 }
 
-// BM25 parameters; field weights favour headings over body text.
 const K1 = 1.2;
 const B = 0.75;
 const TITLE_WEIGHT = 3;
 const BODY_WEIGHT = 1;
-// Expansion weights relative to an exact term match.
 const PREFIX_WEIGHT = 0.7;
 const FUZZY_WEIGHT = 0.5;
 const CONCEPT_WEIGHT = 0.45;
 const CONCEPT_COVERAGE = 0.6;
 const MAX_PREFIX_EXPANSIONS = 24;
 const SNIPPET_WORDS = 28;
-// Seeds are thin placeholders; fetched page sections should win ties.
 const SEED_PENALTY = 0.8;
-// Results scoring at least this share of the best score are "relevant" and
-// ordered by page tier first; weaker matches follow in score order so a
-// barely related main page cannot outrank a strong article match.
 const RELEVANCE_FLOOR = 0.25;
 
 export function pagePath(url: string): string {
@@ -66,7 +53,6 @@ export function pagePath(url: string): string {
   return hash === -1 ? url : url.slice(0, hash);
 }
 
-/** Levenshtein distance capped at `max + 1` (early exit). */
 export function boundedEditDistance(a: string, b: string, max: number): number {
   if (Math.abs(a.length - b.length) > max) return max + 1;
   let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -85,11 +71,6 @@ export function boundedEditDistance(a: string, b: string, max: number): number {
   return prev[b.length];
 }
 
-/**
- * Small in-memory BM25F index with prefix completion, single-typo tolerance
- * and concept expansion. Sized for a few thousand page sections; every query
- * is a synchronous scan of postings for the expanded terms only.
- */
 export class SiteSearchIndex {
   private docs: StoredDoc[] = [];
   private postings = new Map<string, Map<number, Posting>>();
@@ -100,7 +81,6 @@ export class SiteSearchIndex {
   private sortedTerms: string[] | null = null;
   private readonly tierOf: (url: string) => number;
 
-  /** `tierOf` orders relevant results by page type (lower first); default is score-only. */
   constructor(tierOf: (url: string) => number = () => 0) {
     this.tierOf = tierOf;
   }
@@ -109,7 +89,6 @@ export class SiteSearchIndex {
     return this.aliveCount;
   }
 
-  /** Distinct pages with at least one live doc. */
   get pageCount(): number {
     return this.pageDocs.size;
   }
@@ -120,7 +99,6 @@ export class SiteSearchIndex {
     return source ? ids.some((id) => this.docs[id].source === source) : true;
   }
 
-  /** Remove every doc for a page path. */
   removePage(page: string): void {
     const ids = this.pageDocs.get(page);
     if (!ids) return;
@@ -135,7 +113,6 @@ export class SiteSearchIndex {
     this.pageDocs.delete(page);
   }
 
-  /** Replace all docs of the pages present in `docs` with the new set. */
   replacePages(docs: readonly SearchDoc[]): void {
     for (const page of new Set(docs.map((doc) => pagePath(doc.url)))) this.removePage(page);
     for (const doc of docs) this.add(doc);
@@ -181,7 +158,6 @@ export class SiteSearchIndex {
     return this.sortedTerms;
   }
 
-  /** Terms that start with `prefix`, via binary search on the sorted vocabulary. */
   private completions(prefix: string): string[] {
     const vocab = this.vocabulary();
     let lo = 0;
@@ -209,14 +185,8 @@ export class SiteSearchIndex {
     return out;
   }
 
-  /**
-   * Expand each query term into weighted index terms. Returns one map per
-   * query term so coverage (how many query terms a doc satisfies) can be
-   * measured independently of expansion breadth.
-   */
   private expand(query: string): Map<string, number>[] {
     const terms = [...new Set(tokenize(query))];
-    // A trailing partial word ("bench") completes; finished words do not.
     const typingLast = !/\s$/u.test(query);
     return terms.map((term, index) => {
       const weights = new Map<string, number>();
@@ -244,7 +214,6 @@ export class SiteSearchIndex {
 
     for (const weights of expanded) {
       const best = new Map<number, number>();
-      // Coverage credit: literal/prefix/typo matches count fully, concept-only 0.6.
       const credit = new Map<number, number>();
       for (const [term, weight] of weights) {
         const byDoc = this.postings.get(term);
@@ -289,7 +258,6 @@ export class SiteSearchIndex {
     for (const entry of ranked) {
       const doc = this.docs[entry.id];
       const count = perPageCount.get(doc.page) ?? 0;
-      // Sections without their own anchor share a URL; show that link once.
       if (count >= perPage || seenUrls.has(doc.url)) continue;
       seenUrls.add(doc.url);
       perPageCount.set(doc.page, count + 1);
@@ -324,14 +292,7 @@ export class SiteSearchIndex {
   }
 }
 
-/**
- * Pick the window of `SNIPPET_WORDS` words with the most matched terms and
- * split it into plain/highlighted parts. Returned as data, never HTML, so
- * page text cannot inject markup into the results list.
- */
 export function buildSnippet(text: string, matched: ReadonlySet<string>): SnippetPart[] {
-  // Han characters are their own units so CJK hits highlight only the matched
-  // bigram rather than an entire unspaced sentence.
   const words = text.split(/(?<sep>\s+|\p{Script=Han})/u).filter((w) => w.length > 0);
   const han = words.map((word) => isCjkTerm(word));
   const isHit = words.map((word, i) => {
@@ -347,7 +308,6 @@ export function buildSnippet(text: string, matched: ReadonlySet<string>): Snippe
   });
   const wordIndexes = words.flatMap((word, i) => (/^\s+$/u.test(word) ? [] : [i]));
   if (wordIndexes.length === 0) return [];
-  // A Han character carries less text than a word; widen the window for CJK.
   const hanShare = wordIndexes.filter((i) => han[i]).length / wordIndexes.length;
   const windowSize = hanShare > 0.5 ? SNIPPET_WORDS * 2 : SNIPPET_WORDS;
 
@@ -364,7 +324,6 @@ export function buildSnippet(text: string, matched: ReadonlySet<string>): Snippe
     }
     if (s + windowSize >= wordIndexes.length) break;
   }
-  // Start a few words before the window's first hit so it reads in context.
   let firstHit = bestStart;
   while (firstHit < wordIndexes.length - 1 && !isHit[wordIndexes[firstHit]]) firstHit++;
   if (!isHit[wordIndexes[firstHit]]) firstHit = 0;

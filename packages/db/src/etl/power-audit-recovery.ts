@@ -2,7 +2,6 @@ import type { PowerAudit } from './benchmark-mapper.js';
 import type { Sql } from './db-utils.js';
 import { recoveredPowerAudit, type RecoveredPowerAudit } from './power-audit-validations.js';
 
-/** Retained AgentX windows of one telemetry artifact, keyed by concurrency. */
 export type AgentxWindowPlan = ReadonlyMap<number, RecoveredPowerAudit>;
 
 export function agentxWindowPlan(
@@ -12,14 +11,12 @@ export function agentxWindowPlan(
   for (const [source, validation] of Object.entries(validations)) {
     const audit = recoveredPowerAudit(source, validation);
     if (!audit) continue;
-    // recoveredPowerAudit accepted the window, so its concurrency is the nested one.
     const { concurrency } = validation.selected_window as { concurrency: number };
     plan.set(concurrency, audit);
   }
   return plan;
 }
 
-/** A benchmark point the caller may attach provenance to. */
 export interface AgentxAuditCandidate {
   benchmarkType: string;
   conc: number;
@@ -28,18 +25,9 @@ export interface AgentxAuditCandidate {
 
 export interface AgentxAuditRefusal {
   concurrency: number;
-  /** Caller-chosen names of the points sharing the concurrency. */
   points: string[];
 }
 
-/**
- * Attach each retained window to the single agentic point at its concurrency
- * within the covered set (CI: one result file; backfill: one artifact pair).
- * A concurrency shared by two points is refused by name so the caller reports
- * it instead of guessing which measurement the window belongs to. A
- * producer-carried audit wins, as in the upsert: the window only fills absence.
- * Points come back in input order.
- */
 export function attachAgentxAudits<P extends AgentxAuditCandidate>(
   plan: AgentxWindowPlan,
   points: readonly P[],
@@ -71,12 +59,6 @@ export interface AgentxAuditWrite {
   powerAudit: PowerAudit;
 }
 
-/**
- * Write planned provenance into stored AgentX rows that still lack it, in one
- * statement. The plan already decided which row a window belongs to; the
- * statement only guards the row's run, type and NULL audit, and returns the ids
- * it wrote.
- */
 export async function applyAgentxAudits(
   sql: Sql,
   input: { workflowRunId: number; writes: readonly AgentxAuditWrite[] },

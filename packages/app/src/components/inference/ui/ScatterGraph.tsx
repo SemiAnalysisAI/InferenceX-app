@@ -3,16 +3,20 @@
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
 import {
   useInferenceActions,
   useInferenceData,
@@ -20,17 +24,19 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import { usePerfRulerStore } from '@/components/inference/perf-ruler-store';
-import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
-import { useLogAvailability } from '@/hooks/api/use-log-availability';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
+  fitPillSegments,
   parallelismLabelBoxes,
+  pillWidthBudget,
   placeLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import {
   labelOpacityForActiveState,
@@ -59,7 +65,6 @@ import {
   getInferenceHardwareConfig,
   getInferenceRunLabel,
   getOverlayLineLabel,
-  OVERLAY_LABEL_MARKER,
   overlayRunTag,
 } from '@/lib/benchmarks/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -72,7 +77,12 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { raiseInOrder, setAttrIfChanged } from '@/lib/d3-chart/chart-update';
-import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
+import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  canvasPointLayerOf,
+} from '@/lib/d3-chart/layers/canvas-point-registry';
+import { ensureCanvasPointLayer, type PointHaloStyle } from '@/lib/d3-chart/layers/canvas-points';
 import {
   EMPTY_PERF_RULER_STATE,
   clampIsoX,
@@ -101,17 +111,17 @@ import {
 } from '@/lib/d3-chart/overlay-x-marker';
 import { useStableValue } from '@/hooks/useStableValue';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
   overlayRunIndex,
 } from '@/lib/charts/overlay-run-style';
+import { nearestScrubCandidate, type ScrubCandidate } from '@/lib/charts/powerx-scrub';
 import {
   HIT_AREA_RADIUS,
-  formatLargeNumber,
+  compactAxisTickFormat,
   logTickFormat,
-  applyHoverState,
-  applyNormalState,
   getShapeKeyForPrecision,
 } from '@/lib/charts/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -140,13 +150,18 @@ import type {
   PowerVariant,
 } from '@/components/inference/types';
 import {
-  generateOverlayTooltipContent,
-  generateTooltipContent,
+  buildPointDetails,
+  generateHoverTooltipContent,
+  type PointDetailAction,
 } from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
-import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+import {
+  describeEngineComparisonConflict,
+  EngineComparisonConflictNotice,
+} from '@/components/inference/ui/engine-comparison-conflict-notice';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
-import { ALL_IN_MEASURED_EMPTY } from '@/lib/power/power-basis';
+import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -166,17 +181,21 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
-import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
-import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
+  metricAxisCeiling,
 } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
+import {
+  OFFLOAD_HALO_DASHARRAY,
+  OFFLOAD_HALO_RADIUS,
+  OFFLOAD_HALO_STROKE_WIDTH,
+} from './OffloadHaloLegendKey';
 import {
   type ParetoPointLabel,
   getParetoLabel,
@@ -189,9 +208,21 @@ import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
+import {
+  chartNoticeKey,
+  useDismissedChartNotices,
+} from '@/components/inference/hooks/use-dismissed-chart-notices';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
+import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
+import {
+  usePowerXSurface,
+  useSetPowerXActivePoint,
+  useSetPowerXCompareTarget,
+  type PowerXActivePointUpdate,
+} from '@/components/inference/ui/powerx-surface';
+import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -212,6 +243,28 @@ const FixedSequenceLogDialog = dynamic(
     ),
   { ssr: false },
 );
+
+const ReproduceDrawer = dynamic(
+  () =>
+    import('@/components/inference/reproduce/ReproduceDrawer').then(
+      (module) => module.ReproduceDrawer,
+    ),
+  { ssr: false },
+);
+
+const QuickFiltersDialog = dynamic(
+  () =>
+    import('@/components/inference/ui/QuickFiltersDialog').then(
+      (module) => module.QuickFiltersDialog,
+    ),
+  { ssr: false },
+);
+const LegendPointsDialog = dynamic(() => import('@/components/inference/ui/LegendPointsDialog'), {
+  ssr: false,
+});
+const FrontierPointsPanel = dynamic(() => import('@/components/inference/ui/FrontierPointsPanel'), {
+  ssr: false,
+});
 
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
@@ -235,13 +288,10 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
   );
 };
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
+const Y_AXIS_LABEL_GUTTER = 32;
+const Y_AXIS_MARGIN_STEP = 12;
 
-/**
- * Bucket points by their (requested) date. Comparison overlays put multiple
- * dates under one legend key, and rooflines / gradient paths must never span
- * dates — a May 15 point can't dominate a May 17 plot.
- */
 function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]> {
   const byDate = new Map<string, InferenceData[]>();
   for (const p of points) {
@@ -255,24 +305,23 @@ function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]
   return byDate;
 }
 
-/** Identity key for "is this point on a roofline" lookups (scoped per date). */
 const optimalPointKey = (d: InferenceData): string =>
   `${d.hwKey}_${d.precision}_${d.date}-${d.x}-${d.y}`;
 
-// Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
 const EMPTY_CLIPPED_DATA: ClippedInferenceData[] = [];
 
-/**
- * Legend ids of the comparison-series rows (`i_pcompare`), distinct from
- * hardware keys so the shared hover / toggle handlers can tell them apart.
- */
 const POWER_VARIANT_LEGEND_PREFIX = 'power-variant:';
-/** Comparison clones sit behind the base series they annotate. */
 const POWER_VARIANT_POINT_OPACITY = 0.6;
 const pointOpacityForVariant = (d: InferenceData): number =>
   d.powerVariant ? POWER_VARIANT_POINT_OPACITY : 1;
-/** Dash for a series key's variant id (`parseScatterSeriesKey().variant`). */
+const POINT_OPACITY_TRANSITION_MS = 150;
+const OFFLOAD_HALO_STYLE: PointHaloStyle = {
+  radius: OFFLOAD_HALO_RADIUS,
+  strokeWidth: OFFLOAD_HALO_STROKE_WIDTH,
+  dash: OFFLOAD_HALO_DASHARRAY.split(' ').map(Number),
+  opacity: 0.9,
+};
 const powerVariantDashById = (variantId: string | null | undefined): string =>
   variantId ? (VARIANT_DASH_BY_ID.get(variantId) ?? '') : '';
 const VARIANT_DASH_BY_ID = new Map<string, string>(
@@ -281,6 +330,7 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
       ['basis', 'gpu-measured'],
       ['basis', 'gpu-provisioned'],
       ['basis', 'utility-provisioned'],
+      ['basis', 'it-modeled'],
       ['basis', 'utility-modeled'],
       ['role', 'all'],
       ['role', 'prefill'],
@@ -290,10 +340,11 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
 );
 
 const LINE_LABEL_RAISE = ['.line-label'] as const;
-/** Decorations sit above the visible shape, which a precision toggle may replace. */
-const POINT_DECORATION_RAISE = ['.offload-halo'] as const;
+const CANVAS_UNDERLAY = [
+  '.unofficial-overlay-pt > .offload-halo',
+  '.headroom-band, .overflow-continuations-layer, .rooflines-layer',
+] as const;
 
-/** Rebuilds and zoom frames re-sync every gradient stop; skip unchanged writes. */
 function syncGradientStop(this: SVGStopElement, stop: { offset: number; color: string }): void {
   setAttrIfChanged(this, 'offset', `${(stop.offset * 100).toFixed(2)}%`);
   setAttrIfChanged(this, 'stop-color', stop.color);
@@ -307,7 +358,6 @@ function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   return true;
 }
 
-/** Which legend series' points table is open (per-series drill-down dialog). */
 type LegendPointsTarget =
   | { kind: 'official'; hwKey: string }
   | { kind: 'overlay'; runIndex: number; runId: number; branch: string };
@@ -333,7 +383,6 @@ interface CurvedContinuationGeometry {
   angle: number;
 }
 
-/** Find a compact endpoint on an interpolated path, starting at its visible frontier point. */
 function visibleContinuationEndpoint(
   path: SVGPathElement,
   anchorX: number,
@@ -384,9 +433,6 @@ function visibleContinuationEndpoint(
   };
 }
 
-// Scale configs are recomputed from visible points, but a legend or precision
-// toggle often leaves the domain unchanged. Comparing by value preserves the
-// previous config object and prevents a redundant metric-coordinate phase.
 interface ScaleConfigValue {
   type: 'log' | 'linear';
   domain: [number, number];
@@ -400,11 +446,6 @@ const isSameScaleConfig = (a: ScaleConfigValue, b: ScaleConfigValue): boolean =>
   a.domain[0] === b.domain[0] &&
   a.domain[1] === b.domain[1];
 
-// True when the node has a scheduled or running d3 transition with this name.
-// Reads d3-transition's per-node schedule store (`__transition`) because
-// d3.active() only reports transitions that already started, and the chart's
-// entrance transitions are scheduled in the same commit but start on the next
-// timer tick.
 const hasNamedTransition = (node: Element, name: string): boolean => {
   const schedules = (node as Element & { __transition?: Record<string, { name?: string }> })
     .__transition;
@@ -422,16 +463,11 @@ const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): Rende
   };
 };
 
-// Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth.
-// `model` (display name) enables per-model suffix overrides (e.g. M3 MTP → EAGLE).
 const parseHwKeyToLabel = (hwKey: string, model?: string): { name: string; label: string } => {
   const config = getHardwareConfig(hwKey, model);
   return { name: config.label, label: getDisplayLabel(config) };
 };
 
-// Line-label text for a curve. When more than one precision is shown, each curve
-// is its own line, so place the precision between the GPU and engine (e.g.
-// "B200 FP8 (vLLM)") to keep the primary identifiers together.
 const lineLabelText = (
   hwKey: string,
   precision: string,
@@ -461,16 +497,17 @@ const SCATTER_STRINGS = {
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    labels: 'Labels',
+    labels: '# of GPUs Label',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
-    resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
@@ -482,8 +519,8 @@ const SCATTER_STRINGS = {
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
       'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
+    unofficialRun: 'Unofficial run',
     branch: 'Branch',
     viewWorkflow: 'View workflow run',
   },
@@ -496,16 +533,17 @@ const SCATTER_STRINGS = {
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    labels: '标签',
+    labels: 'GPU 数量标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
+    frameworkLabel: '曲线框架标签',
+    offloadingLabel: 'offload 标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
-    resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
@@ -534,6 +572,7 @@ const ScatterGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    footer,
     onShowTable,
     showAllHardwareTypes = false,
     hardwareConfigOverride,
@@ -543,6 +582,7 @@ const ScatterGraph = React.memo(
     pinLineLabels = false,
     xExtentOverride,
     yExtentOverride,
+    plotHeight,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -552,6 +592,7 @@ const ScatterGraph = React.memo(
     const {
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedPrecisions,
       selectedRunId,
       selectedSequence,
@@ -571,6 +612,8 @@ const ScatterGraph = React.memo(
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
+      showOffloadingLabel,
+      showFrameworkLabel,
       showParetoFrontier,
       paretoFrontierPlayful,
     } = useInferenceDisplay();
@@ -589,6 +632,8 @@ const ScatterGraph = React.memo(
       setShowConcurrencyLabels,
       setShowGradientLabels,
       setShowLineLabels,
+      setShowOffloadingLabel,
+      setShowFrameworkLabel,
       setShowParetoFrontier,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
@@ -601,8 +646,6 @@ const ScatterGraph = React.memo(
       | ParetoDirection
       | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
-    // Measured power describes the load sweep. Keep its boundary fixed while
-    // Optimal Only changes marker visibility, as on the other scatter charts.
     const showPowerEnvelope = isPowerCurveMetric(selectedYAxisMetric);
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
@@ -624,13 +667,16 @@ const ScatterGraph = React.memo(
       [showPowerEnvelope, paretoDirection, selectedYAxisMetric],
     );
     const locale = useLocale();
+    // PowerX names the measured boundaries the way its Count control does.
+    const powerXSurface = usePowerXSurface();
+    const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
+    const touchPrimary = useIsCoarsePointer();
+    // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
+    const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
     const legendT = SCATTER_STRINGS[locale];
-    // Comparison series (`i_pcompare`) switched off from the legend. Chart-local,
-    // like Optimal Only's point set: the URL carries the comparison, not which
-    // of its rows a reader hid while looking.
     const [hiddenPowerVariants, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
       () => new Set(),
     );
@@ -649,9 +695,6 @@ const ScatterGraph = React.memo(
     } = useUnofficialRun();
     const chartRef = useRef<D3ChartHandle>(null);
 
-    // Pinned line-label anchors (data-space x) keyed by line-label key. Persists
-    // across renders so each label keeps a stable spot along its line during
-    // replay animation. Only read/written when `pinLineLabels` is true.
     const lineLabelAnchorRef = useRef<Map<string, number>>(new Map());
 
     const scopedOverlayHwTypes = useMemo(() => {
@@ -728,8 +771,6 @@ const ScatterGraph = React.memo(
     );
     const toggleOfficialHwType = useCallback(
       (key: string) => {
-        // The unofficial run is a pinned comparison, not an official legend item.
-        // Soloing an official series must therefore leave every overlay selection unchanged.
         setUnifiedOverlaySelection(
           computeToggle(effectiveOfficialHwTypes, key, hwTypesWithData),
           providerActiveOverlayHwTypes,
@@ -757,7 +798,6 @@ const ScatterGraph = React.memo(
       commitUnifiedSelection,
     ]);
 
-    // When no overlay data, delegate to context's toggleHwType (preserves setActivePresetId)
     const handleToggleHwType = useCallback(
       (key: string) => {
         if (!overlayData) {
@@ -770,9 +810,6 @@ const ScatterGraph = React.memo(
       [overlayData, setBestPerSku, toggleOfficialHwType, toggleHwType],
     );
 
-    // Best per SKU lives in the Quick Filters dialog, but the handler stays
-    // here: overlay mode owns a temporary unified selection that must be
-    // recomputed (or restored) when the automatic mode flips.
     const handleBestPerSkuChange = useCallback(
       (checked: boolean) => {
         setBestPerSku(checked);
@@ -786,8 +823,12 @@ const ScatterGraph = React.memo(
               direction === 'lower_left' ||
               direction === 'lower_right'
             ) {
-              const selection = bestSeriesPerSku(data, direction);
-              for (const key of bestSeriesPerSku(overlayData.data, direction)) {
+              const selection = bestSeriesPerSku(skuColumns(data), direction, selectedPrecisions);
+              for (const key of bestSeriesPerSku(
+                skuColumns(overlayData.data),
+                direction,
+                selectedPrecisions,
+              )) {
                 selection.add(`overlay:${key}`);
               }
               commitUnifiedSelection(selection);
@@ -803,19 +844,13 @@ const ScatterGraph = React.memo(
         overlayData,
         chartDefinition,
         selectedYAxisMetric,
+        selectedPrecisions,
         data,
         commitUnifiedSelection,
         resetUnifiedSelection,
       ],
     );
 
-    // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
-    // overlay loaded the chart reads localOfficialOverride, which the context's
-    // removeHwType (activeHwTypes) never touches, so routing the X through it
-    // left the official series visibly un-removed. Commit the removal through
-    // the unified selection instead; context state stays untouched so
-    // dismissing the overlay restores the pre-overlay official selection, same
-    // as the toggle path.
     const handleRemoveHwType = useCallback(
       (key: string) => {
         if (!overlayData) {
@@ -830,7 +865,6 @@ const ScatterGraph = React.memo(
       [overlayData, setBestPerSku, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
     );
 
-    // --- Theme ---
     const hardwareConfig = hardwareConfigOverride || contextHardwareConfig;
     const activeHwKeys = useMemo(() => {
       const keys = [...effectiveOfficialHwTypes];
@@ -841,12 +875,6 @@ const ScatterGraph = React.memo(
       () => [...effectiveOfficialHwTypes],
       [effectiveOfficialHwTypes],
     );
-    // High-contrast palette is keyed off the FULL set of official hw types with
-    // data, not the active subset. Otherwise deselecting a line shrinks the key
-    // set, which re-sizes the iwanthue palette and shifts every remaining line's
-    // hue (most visible for single-vendor agentic runs that span the full wheel —
-    // e.g. deselecting B300 would recolor B200 from red to blue). Keying off the
-    // stable full set fixes each hw's color so toggling only hides/shows lines.
     const stableHcKeys = useMemo(() => [...hwTypesWithData], [hwTypesWithData]);
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
@@ -855,7 +883,6 @@ const ScatterGraph = React.memo(
       hcKeys: stableHcKeys,
     });
 
-    // --- Changelog ---
     const legendChangelogs = useMemo(
       () =>
         legendChangelogsByHardware(
@@ -866,7 +893,6 @@ const ScatterGraph = React.memo(
       [data, availableRuns, selectedSequence],
     );
 
-    // --- Data Processing ---
     const groupedData = useMemo(
       () =>
         data.reduce(
@@ -882,19 +908,12 @@ const ScatterGraph = React.memo(
     );
 
     const rooflines = useMemo(() => {
-      // Frontier scope is (hw, precision, date) — points from different dates
-      // can never share a frontier (a May 15 point can't dominate a May 17 plot).
-      // The legend grouping is still by (hw, precision); we just split the
-      // pareto compute per date and re-merge into the legend bucket.
       const result: Record<string, InferenceData[]> = {};
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
       const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
       for (const hwKey of Object.keys(groupedData)) {
         const combined: InferenceData[] = [];
         for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
-          // Agentic modes intersect the selected-axis Pareto frontier with the
-          // normalized north-star frontier. This keeps every drawn curve a true
-          // Pareto frontier without admitting a non-canonical winner.
           const front = chartFrontier(datePoints, dir);
           if (front.length === 0) continue;
           combined.push(...front);
@@ -958,7 +977,6 @@ const ScatterGraph = React.memo(
       [distinguishPointDates],
     );
 
-    // filteredData: visible points only (for scale domain calculation)
     const filteredData = useMemo(
       () =>
         Object.values(groupedData)
@@ -972,12 +990,7 @@ const ScatterGraph = React.memo(
     );
 
     const processedOverlayData = useMemo(() => {
-      // Stable empty reference: without an overlay this must not churn on
-      // precision changes — it feeds the `layers` memo, and a new identity
-      // there forces a full chart rebuild.
       if (!overlayData?.data) return EMPTY_OVERLAY_DATA;
-      // Mirror the official path's precision/quick filters and remove inactive
-      // overlay hardware before any points or rooflines are constructed.
       return overlayData.data.filter(
         (point) =>
           selectedPrecisions.includes(point.precision) &&
@@ -997,8 +1010,6 @@ const ScatterGraph = React.memo(
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
 
     const officialOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
-      // Pareto continuations can cross serving configurations; they are not
-      // extensions of the measured power envelope.
       if (showPowerEnvelope) return [];
       interface Bucket {
         hw: string;
@@ -1105,9 +1116,7 @@ const ScatterGraph = React.memo(
       showPowerEnvelope,
     ]);
 
-    // Warning annotations for visible series (official + unofficial overlay)
-    // with known upstream issues. Drawn as an SVG layer (box + arrow to the
-    // affected line) so PNG exports carry the warning.
+    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const visibleOverlayPoints = processedOverlayData.filter((p) =>
         activeOverlayHwTypes.has(p.hwKey as string),
@@ -1124,10 +1133,6 @@ const ScatterGraph = React.memo(
           .filter((p) => pointMatchesIssue(issue, p))
           .map((p) => ({ x: p.x, y: p.y })),
       }));
-      // Official-preview notices intentionally follow only official data. An
-      // unofficial overlay is not an InferenceX publication. `filteredData`
-      // has already applied token-metric support, so the July Rubin notice is
-      // present only on output-token charts alongside its visible curve.
       for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
         const previewPoints = filteredData.filter((point) =>
           hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
@@ -1147,8 +1152,9 @@ const ScatterGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations;
+      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
     }, [
+      dismissedNotices,
       modelLabel,
       filteredData,
       processedOverlayData,
@@ -1162,13 +1168,10 @@ const ScatterGraph = React.memo(
       interface Entry {
         hwKey: string;
         runIndex: number;
-        /** Comparison variant id for boundary / role clones, null for the run's base series. */
         variant: string | null;
         points: InferenceData[];
       }
       if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
-      // Group by hwKey + precision + runIndex so overlay rooflines from different
-      // unofficial runs stay separate and can be styled with per-run hue shifts.
       const grouped = processedOverlayData.reduce(
         (acc, p) => {
           const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
@@ -1214,12 +1217,6 @@ const ScatterGraph = React.memo(
       );
     }, [showPowerEnvelope, overlayRooflines, overlayGroups, groupDisplayedPoints]);
 
-    // Overlay counterpart of `optimalPointKeys`: the points on any overlay
-    // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
-    // Frontier arrays hold the same object references as `processedOverlayData`
-    // items — the pareto fns return the refs they're handed — so identity
-    // membership is exact, and unlike composite string keys it can't collide
-    // across runs sharing a (hw, precision, tp, conc) tuple.
     const overlayOptimalPoints = useMemo(() => {
       const set = new Set<InferenceData>();
       for (const group of Object.values(
@@ -1248,10 +1245,6 @@ const ScatterGraph = React.memo(
       return labels;
     }, [displayedOverlayRooflines]);
 
-    // Overlay points respect the Optimal Only toggle exactly like official
-    // points do — "optimal" = on the overlay run's drawn roofline. Without
-    // this, an e2e-dominated overlay config (hidden on the official side) kept
-    // its X marker sitting on the dashed roofline and read as a pareto point.
     const isOverlayPointVisible = useCallback(
       (d: InferenceData) =>
         !hiddenPowerVariants.has(powerVariantId(d.powerVariant)) &&
@@ -1259,39 +1252,25 @@ const ScatterGraph = React.memo(
       [hiddenPowerVariants, hideNonOptimal, overlayOptimalPoints],
     );
 
-    // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
-    // Bulk presence lookup for agentic points: which ids have a stored
-    // trace_replay blob → controls the "View charts" button in the pinned
-    // tooltip. We deliberately don't fetch the histograms themselves here;
-    // a 95-point dsv4-b300 dashboard would pull GB of profile blobs through
-    // Neon's HTTP API and trip its 64 MB per-response cap.
-    const agenticIds = useMemo(() => {
-      const ids: number[] = [];
-      for (const p of pointsData) {
-        if (p.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(p.id)) ids.push(p.id);
-      }
-      return ids;
-    }, [pointsData]);
-    const { data: traceAvailability, isPending: isTraceAvailabilityPending } =
-      useTraceAvailability(agenticIds);
-
-    // Log availability applies to every persisted official point, including
-    // fixed-sequence runs.
-    const persistedPointIds = useMemo(
-      () => pointsData.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
+    const hasPersistedPoint = useMemo(
+      () => pointsData.some((point) => isPersistedBenchmarkId(point.id)),
       [pointsData],
     );
-    const { data: persistedLogAvailability } = useLogAvailability(persistedPointIds);
+    const { data: presence, isPending: isPresencePending } =
+      useBenchmarkPresence(hasPersistedPoint);
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
+    const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
 
-    const attachPowerTraceAction = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(chartRef);
 
-    // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
-    // A framework lock (embed routes) is not a user filter, so it is not counted.
+    useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
+    useDialogCloseTracking(pointsTableTarget !== null, 'inference_legend_points_table_closed');
+    useDialogCloseTracking(fixedLogPointId !== null, 'latency_logs_closed');
+    useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
     const quickFilterCount =
       quickFilters.vendors.length +
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
@@ -1321,7 +1300,6 @@ const ScatterGraph = React.memo(
       if (pointsTableTarget.kind === 'official') {
         const { hwKey } = pointsTableTarget;
         const hwConfig = hardwareConfig[hwKey];
-        // Keep hidden measurements accessible in the per-series table.
         const pts = pointsData.filter(
           (p) =>
             p.hwKey === hwKey &&
@@ -1367,7 +1345,6 @@ const ScatterGraph = React.memo(
       locale,
     ]);
 
-    // Gradient label data
     const allPointLabelsByKey = useMemo(() => {
       const globalLabelColorMap = new Map<string, string>();
       let globalColorIdx = 0;
@@ -1376,7 +1353,6 @@ const ScatterGraph = React.memo(
         let rooflinePoints = points;
         if (showPowerEnvelope) {
           const byDate = groupDisplayedPoints(points);
-          // Gradient labels share the path's single-date scope.
           if (byDate.size !== 1) return;
           rooflinePoints = byDate.values().next().value!;
         }
@@ -1396,24 +1372,16 @@ const ScatterGraph = React.memo(
       return result;
     }, [displayedRooflines, showPowerEnvelope, groupDisplayedPoints]);
 
-    // Point → gradient color lookup (for coloring points by parallelism strategy)
     const gradientColorByPoint = useMemo(
       () => buildGradientColorMap(allPointLabelsByKey),
       [allPointLabelsByKey],
     );
 
-    // --- Scale Domains ---
-    // When hideNonOptimal is active, compute scale domains from optimal points only
-    // so the axis fits the visible data (especially important for TTFT where non-optimal
-    // outliers can have wildly different x values).
     const visiblePoints = useMemo(() => {
       let pts = filteredData;
       if (hideNonOptimal && !showPowerEnvelope) {
         pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
-      // Overlay points hidden by Optimal Only are excluded from the domain too
-      // so hidden outliers don't stretch the axes.
-      // Marker visibility must not rescale or move the power boundary.
       const overlayPts = processedOverlayData.filter(
         (point) => !hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point),
       );
@@ -1436,9 +1404,6 @@ const ScatterGraph = React.memo(
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
           : ([0, 100] as [number, number]));
 
-      // `x_scale_field` comes from useChartData and follows remapped `data[].x`
-      // through both the live chart and Replay. Unlike `xLabel`, it is stable
-      // across locales and distinct from the registry's natural `x` field.
       const useLog =
         resolveScatterXAxisScale({
           extent: ext,
@@ -1482,12 +1447,33 @@ const ScatterGraph = React.memo(
         yMin = Math.max(0, ext[0] - range * 0.05);
       }
 
+      // Bounded metrics (% TDP) read against their full 0-to-limit range, with headroom
+      // so the dashed limit line stays visible.
+      const ceiling = metricAxisCeiling(selectedYAxisMetric);
+      if (ceiling !== undefined && !useLog) yMin = 0;
+      // % TDP stops at 100%; values above the rating keep the plain 5% headroom.
+      // The PowerX headroom band runs up to the rating, so the axis reaches it then.
+      const yMax =
+        ceiling !== undefined && ext[1] <= ceiling
+          ? headroomShading
+            ? ceiling
+            : Math.min(ext[1] * 1.05, ceiling)
+          : ext[1] * 1.05;
+
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
-        domain: [yMin, ext[1] * 1.05] as [number, number],
+        domain: [yMin, yMax] as [number, number],
         nice: niceAxes,
       };
-    }, [visiblePoints, isInputTputMetric, logScale, niceAxes, yExtentOverride]);
+    }, [
+      visiblePoints,
+      isInputTputMetric,
+      logScale,
+      niceAxes,
+      yExtentOverride,
+      selectedYAxisMetric,
+      headroomShading,
+    ]);
     const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
     const dataIdentity = useMemo(
@@ -1533,7 +1519,6 @@ const ScatterGraph = React.memo(
       ],
     );
 
-    // --- Axis configs ---
     const xAxisConfig = useMemo(
       () => ({
         label: xLabel,
@@ -1545,19 +1530,40 @@ const ScatterGraph = React.memo(
       [xLabel, xScaleConfig._isLog],
     );
 
+    const yTickFormat = useMemo(
+      () => compactAxisTickFormat(yScaleConfig.domain),
+      [yScaleConfig.domain],
+    );
+
     const yAxisConfig = useMemo(
       () => ({
         label: yLabel,
         tickFormat:
-          yScaleConfig.type === 'log'
-            ? undefined
-            : (d: d3.AxisDomain) => formatLargeNumber(d as number),
+          yScaleConfig.type === 'log' ? undefined : (d: d3.AxisDomain) => yTickFormat(d as number),
         tickCount: 10,
       }),
-      [yLabel, yScaleConfig.type],
+      [yLabel, yScaleConfig.type, yTickFormat],
     );
 
-    // --- Point visibility ---
+    const fontsVersion = useFontsVersion();
+    const chartMargin = useMemo(() => {
+      if (yScaleConfig.type === 'log' || typeof document === 'undefined') return CHART_MARGIN;
+      const font = chartFont(CHART_TYPE.axisLabel);
+      const widest = Math.max(
+        0,
+        ...d3
+          .scaleLinear()
+          .domain(yScaleConfig.domain)
+          .nice()
+          .ticks(10)
+          .map((tick) => measureTextWidth(yTickFormat(tick), font)),
+      );
+      const left =
+        Math.ceil((widest + Y_AXIS_LABEL_GUTTER) / Y_AXIS_MARGIN_STEP) * Y_AXIS_MARGIN_STEP;
+      return { ...CHART_MARGIN, left: Math.max(48, left) };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measure once web fonts load
+    }, [yScaleConfig.type, yScaleConfig.domain, yTickFormat, fontsVersion]);
+
     const isPointVisible = useCallback(
       (d: InferenceData) =>
         effectiveActiveHwTypes.has(d.hwKey as string) &&
@@ -1607,7 +1613,6 @@ const ScatterGraph = React.memo(
       () => frontierHardwareKeys(globalParetoPoints, globalFrontier),
       [globalParetoPoints, globalFrontier],
     );
-    // PowerX provenance of the drawn frontier: the same points, listed with their runs.
     const showFrontierPoints =
       showParetoFrontier &&
       globalFrontier.length > 0 &&
@@ -1629,21 +1634,30 @@ const ScatterGraph = React.memo(
     const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
       () => {},
     );
+    const [fadedZoomGroups] = useState(() => new WeakSet<SVGGElement>());
     applyParetoFadeRef.current = (zoomGroup) => {
-      // A separate alpha filter composes with existing visibility/hover opacity.
-      // Hidden marks stay hidden, and hover-end cannot erase the Pareto fade.
-      // Inline SVG styles are retained by chart exports. Apply only to parent
-      // marks, not their children, so point labels/halos are faded once.
+      const node = zoomGroup.node();
+      if (!node) return;
+      const active = showParetoFrontier && frontierHwKeys.size > 0;
+      if (!active && !fadedZoomGroups.has(node)) return;
       zoomGroup
         .selectAll<SVGElement, { hwKey?: string; points?: InferenceData[] }>(
           '.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path, .overflow-continuation, .parallelism-label, .line-label',
         )
         .style('filter', function (d) {
           const hw = this.dataset.hwKey ?? d?.hwKey ?? d?.points?.[0]?.hwKey;
-          return showParetoFrontier && frontierHwKeys.size > 0 && hw && !frontierHwKeys.has(hw)
-            ? 'opacity(0.2)'
-            : null;
+          return active && hw && !frontierHwKeys.has(hw) ? 'opacity(0.2)' : null;
         });
+      canvasPointLayerOf<InferenceData>(node)?.setFade(
+        active
+          ? (d) => {
+              const hw = String(d.hwKey);
+              return hw !== '' && !frontierHwKeys.has(hw);
+            }
+          : null,
+      );
+      if (active) fadedZoomGroups.add(node);
+      else fadedZoomGroups.delete(node);
     };
     const paretoHighlightLayer = useMemo<CustomLayerConfig>(() => {
       const render: NonNullable<CustomLayerConfig['render']> = (zoomGroup, ctx) => {
@@ -1652,8 +1666,6 @@ const ScatterGraph = React.memo(
         const yScale = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
         const bestX = maximizeParetoX === xScale.range()[1] > xScale.range()[0] ? ctx.width : 0;
         const bestY = maximizeParetoY === yScale.range()[1] > yScale.range()[0] ? ctx.height : 0;
-        // Fill beyond the frontier toward the preferred corner.
-        // Backgrounds never capture point hover/click events.
         const boundary = {
           points: globalFrontier,
           visible: showParetoFrontier,
@@ -1679,8 +1691,6 @@ const ScatterGraph = React.memo(
           .attr('y', 0)
           .attr('width', ctx.width)
           .attr('height', ctx.height);
-        // One full-plot image, cropped to cover the plot and then cut off by
-        // the boundary path. Never resize the image to the shaded region.
         pattern
           .selectAll<SVGImageElement, string>('image')
           .data(['/decorative/pareto/sunny-castle.webp'])
@@ -1757,10 +1767,6 @@ const ScatterGraph = React.memo(
       getCssColor,
     ]);
 
-    // The comparison in effect and the base series' identity under it. The
-    // base is the selected metric's own series; deriving it from which variant
-    // no official point carries breaks when only an overlay carries the
-    // comparison, and line labels need the same answer as the legend rows.
     const powerCompareMode = useMemo(() => {
       const official = inferPowerCompare(pointsData);
       return official === 'none' ? inferPowerCompare(processedOverlayData) : official;
@@ -1770,8 +1776,6 @@ const ScatterGraph = React.memo(
       [selectedYAxisMetric, powerCompareMode],
     );
 
-    // One legend row per comparison series present (base first). Rows toggle
-    // chart-local visibility and hover-highlight that series across hardware.
     const powerVariantLegendItems = useMemo(() => {
       const allPoints = [...pointsData, ...processedOverlayData];
       const variants = powerVariantsInData(allPoints, selectedYAxisMetric);
@@ -1783,9 +1787,16 @@ const ScatterGraph = React.memo(
         return {
           name: legendId,
           hw: legendId,
-          label: powerVariantLabel(variant, locale),
+          label: powerVariantLabel(variant, locale, powerLabelStyle),
+          section:
+            variant.kind === 'basis'
+              ? locale === 'zh'
+                ? '功耗边界'
+                : 'Boundary'
+              : locale === 'zh'
+                ? 'GPU 角色'
+                : 'GPU role',
           color: 'var(--foreground)',
-          // The base series is solid, like its points; siblings carry their dash.
           lineDasharray: isBase ? '1 0' : powerVariantDash(variant) || '1 0',
           isActive: !hiddenPowerVariants.has(isBase ? '' : id),
           isRemovable: false,
@@ -1799,7 +1810,7 @@ const ScatterGraph = React.memo(
             });
             track('inference_power_compare_series_toggled', {
               series: id,
-              visible: hiddenPowerVariants.has(key),
+              enabled: hiddenPowerVariants.has(key),
             });
           },
         };
@@ -1810,10 +1821,10 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       powerCompareBaseId,
       locale,
+      powerLabelStyle,
       hiddenPowerVariants,
     ]);
 
-    // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
       (el: SVGElement) => {
         const hw = el.dataset.hwKey;
@@ -1828,16 +1839,6 @@ const ScatterGraph = React.memo(
       [effectiveActiveHwTypes, selectedPrecisions, hiddenPowerVariants],
     );
 
-    // --- Interaction state ref ---
-    // Latest visibility predicates, color resolvers, and active sets — read by
-    // long-lived D3 closures (layer renders, zoom handlers, hover handlers).
-    // Routing these reads through a ref keeps them out of the `layers` /
-    // `tooltipConfig` dependency arrays, so a legend or precision toggle no
-    // longer tears down and rebuilds the whole chart: the decoration effect
-    // below restyles the existing DOM instead (see docs/d3-charts.md "Why 4
-    // Effects" — this is the cheap Effect-4 "display toggle" path). Same
-    // refs-over-closures rule as docs/pitfalls.md "Stale Closures in D3 Event
-    // Handlers".
     const interactionRef = useRef({
       isPointVisible,
       isOverlayPointVisible,
@@ -1848,9 +1849,12 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
-      traceAvailability,
-      logAvailability: persistedLogAvailability,
+      dismissNotice,
+      locale,
+      presence,
+      isPresencePending,
       showPowerTelemetry,
+      powerCompareMode,
     });
     interactionRef.current = {
       isPointVisible,
@@ -1862,32 +1866,16 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
-      traceAvailability,
-      logAvailability: persistedLogAvailability,
+      dismissNotice,
+      locale,
+      presence,
+      isPresencePending,
       showPowerTelemetry,
+      powerCompareMode,
     };
 
-    // --- Perf ruler (opt-in: click two curves, drag the ruler to any iso-x) ---
-    // Curve-to-curve ISO-X semantics: each measurement is two CURVES
-    // (rendered roofline path class tokens) plus a freely chosen iso-x
-    // stored in DATA space (xScale.invert of the click), so measurements
-    // survive zoom (axis-metric changes clear them; see
-    // usePerfRulerAxisReset). BOTH ruler ends are interpolated on
-    // the curves' rendered paths at the iso-x — neither end needs to be a
-    // data point. Multiple rulers accumulate (capped in the pure module);
-    // completing one immediately allows starting the next.
-    //
-    // The primary chart's rulers live in the InferenceProvider store so they
-    // ride along in share links (`i_rulers`) and survive a remount (table
-    // view toggle). Every other instance — the replay chart, which draws the
-    // same curve classes, and harnesses mounted without the provider — keeps
-    // component-local state. Both paths share one `[state, setState]` pair
-    // below, so the reducers, refs, and draw passes are path-agnostic.
     const perfRulerStore = usePerfRulerStore();
     const persistedRulers = perfRulerStore?.chartId === chartId ? perfRulerStore : undefined;
-    // Rulers only render while the mode is on (and the mode-off effect below
-    // clears them), so restored share-link rulers — pending or already
-    // committed by a previous mount — switch the mode on for this instance.
     const [perfRulerMode, setPerfRulerMode] = useState(
       () =>
         persistedRulers !== undefined &&
@@ -1897,39 +1885,19 @@ const ScatterGraph = React.memo(
       useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     const perfRulerState = persistedRulers ? persistedRulers.state : localPerfRulerState;
     const setPerfRulerState = persistedRulers ? persistedRulers.setState : setLocalPerfRulerState;
-    // Changing the x- or y-axis metric (including the x percentile, which
-    // `x_scale_field` encodes) clears every ruler: the curves are redrawn
-    // in different units, so a ruler that persisted would measure a ratio
-    // the user never placed. Runs before the draw pass so no stale ruler
-    // ever paints over the new curves. Render-time adjustment is only legal
-    // for this component's own state, so the hook targets the local state;
-    // the store applies the same reset to persisted rulers inside the
-    // provider (see usePerfRulerStoreValue).
     usePerfRulerAxisReset(
       perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
       setLocalPerfRulerState,
     );
-    // Draw passes read mode/state through refs so toggling off clears the
-    // rulers in the same pre-paint layout pass — lines/labels must never
-    // linger a frame after the switch flips (Bugbot report on PR #853).
     const perfRulerModeRef = useRef(perfRulerMode);
     perfRulerModeRef.current = perfRulerMode;
     const perfRulerStateRef = useRef(perfRulerState);
     perfRulerStateRef.current = perfRulerState;
-    // Live per-ruler iso-x overrides for draw passes. Dragging a ruler
-    // updates its entry once per animation frame WITHOUT touching React
-    // state (the drag commits on end), so the ruler follows the pointer
-    // with one redraw per frame. Cleared when committed state changes (an
-    // effect, not per render, so an unrelated re-render mid-drag cannot
-    // snap the dragged ruler back).
     const perfRulerLiveIsoXRef = useRef(new Map<number, number>());
     useLayoutEffect(() => {
       perfRulerLiveIsoXRef.current.clear();
     }, [perfRulerState]);
 
-    // Scales/group from the most recent draw pass — click and drag handlers
-    // convert between pixel and data space with the exact scales the chart
-    // is currently drawn with.
     const perfRulerDrawCtxRef = useRef<{
       zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
       xScale: ContinuousScale;
@@ -1937,8 +1905,6 @@ const ScatterGraph = React.memo(
       width: number;
       height: number;
     } | null>(null);
-    // Forward ref: the drag frame needs to redraw, but drawPerfRuler is
-    // defined below (it also attaches the drag behavior — benign cycle).
     const drawPerfRulerRef = useRef<
       | ((
           zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -1950,12 +1916,6 @@ const ScatterGraph = React.memo(
       | null
     >(null);
 
-    // Completion clamp for nextPerfRulerState: the stored iso-x must lie
-    // inside the curve pair's overlapping x range, or the completed ruler
-    // could render nowhere — no line and no drag handle to recover it.
-    // Data → pixel through the exact scales/paths the chart is currently
-    // drawn with, clamp, and back. Null (missing paths or disjoint spans)
-    // rejects the measurement and keeps the draft anchored.
     const clampPerfRulerIsoXToOverlap = useCallback(
       (curveA: string, curveB: string, isoX: number): number | null => {
         const ctx = perfRulerDrawCtxRef.current;
@@ -1973,24 +1933,6 @@ const ScatterGraph = React.memo(
       [],
     );
 
-    // Share-link rulers commit only once BOTH curve paths are in the DOM —
-    // otherwise the prune pass would eat them before their data (i_gpus,
-    // comparison dates, overlay runs) has arrived. Hidden curves (opacity 0)
-    // count as present, like for prune. The iso-x is clamped to the pair's
-    // overlap through the drawn paths, so a rounded or since-shifted iso-x
-    // still renders; a pair with disjoint spans can never be measured on
-    // these axes and is dropped. This runs from the draw pass rather than a
-    // React effect: the chart first draws in a D3Chart-local re-render
-    // (dimensions are measured after mount), which re-renders nothing here,
-    // so an effect keyed on our props could miss the first draw and leave
-    // resolvable rulers pending for the rest of the session. The store is
-    // read through a ref for the same reason the draw passes read the ruler
-    // state through refs. Nothing commits while the mode is off (forced off
-    // by the power envelope, or switched off by the user) — the mode-off
-    // effect discards pending rulers, and the analytics event must not
-    // report a restore nobody saw. Draw passes can repeat before React has
-    // applied a commit, so the pending list handed over is remembered by
-    // identity and skipped until the store replaces it.
     const persistedRulersRef = useRef(persistedRulers);
     persistedRulersRef.current = persistedRulers;
     const committedPendingRef = useRef<readonly PerfRulerMeasurement[] | null>(null);
@@ -2018,8 +1960,6 @@ const ScatterGraph = React.memo(
       [clampPerfRulerIsoXToOverlap],
     );
 
-    // Curve click (widened hit strokes): iso-x is the click's x pixel
-    // through the CURRENT rendered x scale, stored in data space.
     const handlePerfRulerCurveClick = useCallback(
       (curve: string, pixelX: number) => {
         const ctx = perfRulerDrawCtxRef.current;
@@ -2037,11 +1977,6 @@ const ScatterGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // Point clicks select their series' rendered curve at that point's x,
-    // including off-boundary measurements. Candidates cover the single-
-    // and multi-date variants, including date-scoped power overlay paths.
-    // Ruler-mode clicks measure instead of pinning the tooltip, so drop
-    // the pin the shared click handler applied just before this callback.
     const handlePerfRulerPointClick = useCallback(
       (point: InferenceData, source: 'official' | 'overlay') => {
         const ctx = perfRulerDrawCtxRef.current;
@@ -2055,7 +1990,6 @@ const ScatterGraph = React.memo(
         const curve = candidates.find(
           (cls) => !ctx.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
         );
-        // Single-point series render no roofline path — nothing to measure.
         if (!curve) return;
         setPerfRulerState((prev) =>
           nextPerfRulerState(prev, { curve, isoX: point.x }, clampPerfRulerIsoXToOverlap),
@@ -2066,31 +2000,28 @@ const ScatterGraph = React.memo(
       [runIndexByUrl, clampPerfRulerIsoXToOverlap],
     );
 
-    // Read by long-lived D3 click closures (official tooltip config + overlay
-    // marker handlers) — same refs-over-closures rule as interactionRef.
+    const setCompareTarget = useSetPowerXCompareTarget();
+    // PowerX: the readout row under the caption follows the hovered or pinned point.
+    const setActivePoint = useSetPowerXActivePoint();
+    const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
+    activePointRef.current = setActivePoint;
+    // PowerX on a coarse pointer: the finger in flight on the plot (its pointer id).
+    const scrubPointerRef = useRef<number | null>(null);
+    const touchScrub = powerXSurface && touchPrimary;
+    const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
+    compareFollowsHoverRef.current =
+      setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
+        ? setCompareTarget
+        : null;
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
-    // Turning the toggle off clears ALL rulers and any in-progress
-    // selection (documented in the info tooltip — simple and predictable;
-    // the switch handler also clears synchronously, this covers
-    // programmatic mode changes). `clearPerfRulers` bails out with the same
-    // reference when there is nothing to clear.
-    // Share-link rulers still waiting for their curves go too — the user
-    // switched the tool off, so nothing should surface later.
     useEffect(() => {
       if (perfRulerMode) return;
       setPerfRulerState(clearPerfRulers);
       persistedRulers?.discardPending();
     }, [perfRulerMode]);
 
-    // Invisible widened hit strokes over every rendered roofline path
-    // (official AND overlay) make the curves themselves clickable in ruler
-    // mode. The hit layer sits directly ABOVE `.rooflines-layer` (so the
-    // visible 2.5px strokes never shadow the hit strokes) but BELOW the
-    // dot-groups and overlay markers, so point hover/click behavior is
-    // untouched. The layer only exists while ruler mode is on — with the
-    // mode off there is nothing to intercept hovers, clicks, or zoom.
     const syncPerfRulerHitPaths = useCallback(
       (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         let hitLayer = zoomGroup.select<SVGGElement>('.perf-ruler-hits');
@@ -2113,15 +2044,10 @@ const ScatterGraph = React.memo(
         zoomGroup
           .selectAll<SVGPathElement, unknown>('.roofline-path, .overlay-roofline-path')
           .each(function () {
-            // The identity token is the curve-specific class, e.g.
-            // `roofline-H100_fp8`, `roofline-H100_fp8__2026-01-01`, or
-            // `overlay-roofline-H100_fp8_run0`.
             const curve = [...this.classList].find(
               (cls) => cls !== 'roofline-path' && cls !== 'overlay-roofline-path',
             );
             const d = this.getAttribute('d');
-            // Curves hidden by legend/precision filters keep their paths at
-            // opacity 0 — invisible curves must not be clickable.
             if (!curve || !d || !isPerfRulerCurveVisible(this.style.opacity)) return;
             entries.push({ curve, d });
           });
@@ -2134,9 +2060,6 @@ const ScatterGraph = React.memo(
           .attr('fill', 'none')
           .attr('d', (e) => e.d)
           .attr('stroke', 'var(--primary)')
-          // Selected curves get a faint halo as feedback; unselected hit
-          // strokes are fully transparent (`pointer-events: stroke` still
-          // hit-tests the invisible stroke geometry).
           .attr('stroke-opacity', (e) => (selected.has(e.curve) ? 0.18 : 0))
           .attr('stroke-width', 13)
           .style('pointer-events', 'stroke')
@@ -2150,13 +2073,6 @@ const ScatterGraph = React.memo(
       [],
     );
 
-    // Horizontal drag on a ruler line — the primary way to fine-tune that
-    // ruler's iso-x. The drag handle's datum (set by the render join)
-    // identifies WHICH ruler is dragged. rAF-throttled: each frame clamps
-    // the pointer x to that ruler's curve pair's overlapping x range,
-    // updates its live iso-x, and redraws; the value commits to React state
-    // on drag end. d3.drag stops mousedown propagation itself, so dragging
-    // a ruler never pans the chart.
     const perfRulerDragTargetRef = useRef<{ id: number; pixelX: number } | null>(null);
     const perfRulerDragFrameRef = useRef<number | null>(null);
     const applyPerfRulerDragFrame = useCallback(() => {
@@ -2200,7 +2116,6 @@ const ScatterGraph = React.memo(
             },
           )
           .on('end', () => {
-            // Flush the pending frame, then commit this ruler's iso-x.
             if (perfRulerDragFrameRef.current !== null) {
               cancelAnimationFrame(perfRulerDragFrameRef.current);
               perfRulerDragFrameRef.current = null;
@@ -2216,11 +2131,6 @@ const ScatterGraph = React.memo(
       [],
     );
 
-    // Draw (or clear) the hit strokes and all rulers for the current draw
-    // pass. Stable callback so the custom layer can live outside the
-    // perf-ruler state dependencies — render/zoom passes read mode, rulers,
-    // and live iso-x values through refs. Gated on the mode ref so a
-    // toggle-off clears everything in the very next pre-paint pass.
     const drawPerfRuler = useCallback(
       (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -2235,15 +2145,6 @@ const ScatterGraph = React.memo(
         const state = perfRulerStateRef.current;
         const entries: PerfRulerRenderEntry[] = [];
         if (perfRulerModeRef.current && state.rulers.length > 0) {
-          // Both ends of each ruler are interpolated on the RENDERED paths —
-          // the drawn curve is the measurement surface, so the ruler matches
-          // it exactly and stays correct under zoom (rooflines redraw before
-          // this layer runs). When either of a ruler's curves does not span
-          // its iso-x, has no rendered path, or is hidden (legend/precision
-          // toggles keep the path in the DOM at opacity 0), that ruler draws
-          // nothing this frame but KEEPS its state — per ruler, others stay
-          // visible; zoom/drag/legend re-toggles that restore both visible
-          // intersections bring it back.
           const geometries: (PerfRulerGeometry | null)[] = state.rulers.map((ruler) => {
             const isoX = perfRulerLiveIsoXRef.current.get(ruler.id) ?? ruler.isoX;
             const pixelX = xScale(isoX);
@@ -2258,7 +2159,6 @@ const ScatterGraph = React.memo(
             }
             return ends.length === 2 ? computeIsoXRulerGeometry(pixelX, ends[0], ends[1]) : null;
           });
-          // Lay out all labels together so overlapping labels nudge apart.
           const layouts = computePerfRulerLabelLayouts(geometries, {
             chartWidth: width,
             chartHeight: height,
@@ -2277,9 +2177,6 @@ const ScatterGraph = React.memo(
             setPerfRulerState((prev) => deletePerfRuler(prev, id));
           },
         });
-        // (Re)attach the horizontal drag behavior to the (possibly fresh)
-        // drag handles the render pass just joined — their datum (the
-        // render entry) tells the drag which ruler it moves.
         const dragHandles = zoomGroup.selectAll<SVGLineElement, PerfRulerRenderEntry>(
           '.perf-ruler .pr-drag',
         );
@@ -2289,14 +2186,15 @@ const ScatterGraph = React.memo(
     );
     drawPerfRulerRef.current = drawPerfRuler;
 
-    // Render context from the last D3 render — lets the decoration effect
-    // restyle with the same layout/scales the chart was drawn with.
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
-    const labelDisplayRef = useRef({ showPointLabels, showGradientLabels, showLineLabels });
-    labelDisplayRef.current = { showPointLabels, showGradientLabels, showLineLabels };
-    const pointLabelsVisible = showPointLabels && !showGradientLabels;
+    const pointLabelsVisible =
+      (showPointLabels || useAdvancedLabels || showConcurrencyLabels) && !showGradientLabels;
+    const labelDisplayRef = useRef({ pointLabelsVisible, showGradientLabels, showLineLabels });
+    labelDisplayRef.current = { pointLabelsVisible, showGradientLabels, showLineLabels };
+    const lastShowGpuCountRef = useRef(showPointLabels);
     const lastPointLabelsVisibleRef = useRef(pointLabelsVisible);
     const lastShowLineLabelsRef = useRef(showLineLabels);
+    const lastShowFrameworkLabelRef = useRef(showFrameworkLabel);
     const lastShowGradientLabelsRef = useRef(showGradientLabels);
 
     const getDisplaySelection = useCallback(() => {
@@ -2307,22 +2205,11 @@ const ScatterGraph = React.memo(
       return zoomGroup.empty() ? null : { svg, ctx, zoomGroup };
     }, []);
 
-    // Hover dimming animates via the inline `transition: opacity 150ms ease`
-    // the render path puts on dots, rooflines, and labels — a single style
-    // write per node. A d3 `.transition()` here would re-write opacity every
-    // animation frame, and each of those writes restarts the CSS transition:
-    // one hover used to emit transitionrun/transitioncancel per node per
-    // frame (tens of thousands of events per session) and feed the same
-    // mutation churn to the PostHog recorder.
     const handleLegendHover = useCallback(
       (hwKey: string) => {
         const svg = chartRef.current?.getSvgElement?.();
         if (!svg) return;
         const root = d3.select(svg);
-        // A comparison-series legend row highlights that boundary / role
-        // across every hardware instead of one hardware across series. Base
-        // points and rooflines carry no variant (only siblings are cloned),
-        // so the empty id maps back to the base legend row's id.
         const variantId = hwKey.startsWith(POWER_VARIANT_LEGEND_PREFIX)
           ? hwKey.slice(POWER_VARIANT_LEGEND_PREFIX.length)
           : null;
@@ -2330,11 +2217,9 @@ const ScatterGraph = React.memo(
           variantId === null
             ? String(d.hwKey) === hwKey
             : (powerVariantId(d.powerVariant) || powerCompareBaseId) === variantId;
-        root
-          .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .style('opacity', (d) =>
-            isPointVisible(d) ? (matchesPoint(d) ? pointOpacityForVariant(d) : 0.15) : 0,
-          );
+        canvasPointLayerOf<InferenceData>(svg)?.setOpacity((d) =>
+          isPointVisible(d) ? (matchesPoint(d) ? pointOpacityForVariant(d) : 0.15) : 0,
+        );
         root
           .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
           .style('opacity', function () {
@@ -2358,9 +2243,9 @@ const ScatterGraph = React.memo(
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
-      root
-        .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .style('opacity', (d) => (isPointVisible(d) ? pointOpacityForVariant(d) : 0));
+      canvasPointLayerOf<InferenceData>(svg)?.setOpacity((d) =>
+        isPointVisible(d) ? pointOpacityForVariant(d) : 0,
+      );
       root
         .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
         .style('opacity', function () {
@@ -2384,7 +2269,6 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes,
     ]);
 
-    // --- Zoom config ---
     const eventPrefix = chartDefinition.chartType === 'e2e' ? 'latency' : 'interactivity';
     const zoomResetEventName = `${eventPrefix}_zoom_reset_${chartId}`;
 
@@ -2424,143 +2308,148 @@ const ScatterGraph = React.memo(
               d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
             );
           }
-          if (showPointLabels && !showGradientLabels) {
+          if (pointLabelsVisible) {
             avoidPointLabelCollisions(ctx.layout.zoomGroup);
           }
         },
       }),
-      [
-        zoomResetEventName,
-        eventPrefix,
-        xScaleConfig._isLog,
-        yScaleConfig.type,
-        showPointLabels,
-        showGradientLabels,
-      ],
+      [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type, pointLabelsVisible],
     );
 
-    // --- Tooltip config ---
-    const tooltipConfig = useMemo(
-      () => ({
-        rulerType: 'crosshair' as const,
-        content: (d: InferenceData, isPinned: boolean) =>
-          generateTooltipContent({
-            data: d,
-            isPinned,
-            xLabel,
-            yLabel,
-            selectedYAxisMetric,
-            hardwareConfig,
-            showPowerTelemetry: interactionRef.current.showPowerTelemetry,
-            runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-            hasTrace:
-              d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                ? (interactionRef.current.traceAvailability?.[d.id] ?? false)
-                : false,
-            hasLog: isPersistedBenchmarkId(d.id)
-              ? (interactionRef.current.logAvailability?.[d.id] ?? false)
-              : false,
-            locale,
-          }),
-        getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
-        getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
-        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
-          applyHoverState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
-        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
-          applyNormalState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
-        onPointClick: (d: InferenceData) => {
-          // Perf ruler mode: the click acts as a click on the point's CURVE
-          // at the point's x INSTEAD of pinning the tooltip (the handler
-          // drops the pin applied by the shared click path; the hover
-          // tooltip stays available).
-          const ruler = perfRulerRef.current;
-          if (ruler.mode) {
-            track('latency_data_point_clicked', {
-              hw: String(d.hwKey),
-              x: d.x,
-              y: d.y,
-              perfRuler: true,
-            });
-            ruler.onPointClick(d, 'official');
-            return;
-          }
-          track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
-          const tooltipEl = chartRef.current?.getTooltipElement();
-          if (!tooltipEl) return;
+    const pointColor = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        isOverlay
+          ? overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl))
+          : interactionRef.current.getCssColor(
+              interactionRef.current.resolveColor(String(d.hwKey)),
+            ),
+      [runIndexByUrl],
+    );
 
-          // ── Summary-page actions ──────────────────────────────────────────
-          // ── "View charts" real link (supports browser open-in-new-tab) ───
-          const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-          if (viewBtn && isPersistedBenchmarkId(d.id)) {
-            viewBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              // Full-document navigation: stamp the chart state onto THIS
-              // history entry first, or Back returns to a bare /inference that
-              // rebuilds from defaults. Skipped in ephemeral scopes (/model
-              // embeds): the store holds the primary dashboard's state there,
-              // not this chart's.
-              if (!ephemeralUrlState) rememberChartStateInUrl();
-              track('latency_view_charts_opened', {
-                id: d.id,
-                hwKey: String(d.hwKey),
-                conc: d.conc,
-              });
-            });
-          }
-          const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
-          if (powerBtn && isPersistedBenchmarkId(d.id)) {
-            powerBtn.addEventListener('click', (event) => {
-              event.stopPropagation();
-              setPowerTelemetryPoint(d);
-              chartRef.current?.dismissTooltip();
-              track('inference_power_telemetry_opened', { id: d.id, hwKey: d.hwKey, conc: d.conc });
-            });
-          }
-          const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-          if (logsBtn && typeof d.id === 'number') {
-            logsBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              if (d.benchmark_type !== 'agentic_traces') {
-                btnEvent.preventDefault();
-                setFixedLogPointId(d.id!);
-                chartRef.current?.dismissTooltip();
-              }
-              track('latency_view_logs_opened', {
-                id: d.id,
-                hwKey: String(d.hwKey),
-                conc: d.conc,
-                benchmarkType: d.benchmark_type ?? 'single_turn',
-              });
-            });
-          }
-          attachPowerTraceAction(tooltipEl, d, false);
-        },
-        attachToLayer: 1, // scatter layer is index 1 (after rooflines at 0)
-      }),
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          showPowerTelemetry: interactionRef.current.showPowerTelemetry,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
+              : false,
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? (interactionRef.current.presence?.log.has(d.id) ?? false)
+            : false,
+          locale,
+          powerLabelStyle,
+          color: pointColor(d, isOverlay),
+        }),
       [
-        attachPowerTraceAction,
         xLabel,
         yLabel,
         selectedYAxisMetric,
         hardwareConfig,
-        // selectedPrecisions and traceAvailability are read through
-        // interactionRef.current so long-lived D3 handlers always observe the
-        // latest state without turning tooltip-only data into chart identity.
+        overlayData,
         locale,
+        powerLabelStyle,
+        pointColor,
       ],
     );
 
-    // --- Layers ---
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: pointColor(d, isOverlay),
+          locale,
+        }),
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, pointColor, locale],
+    );
+
+    const tooltipConfig = useMemo(() => {
+      const onAction = (
+        action: PointDetailAction,
+        event: React.MouseEvent<HTMLElement>,
+        d: InferenceData,
+        isOverlay: boolean,
+      ) => {
+        event.stopPropagation();
+        if (action === 'view-power-trace') {
+          openPowerTrace(event, d, isOverlay);
+        } else if (action === 'view-charts') {
+          if (!ephemeralUrlState) rememberChartStateInUrl();
+          track('latency_view_charts_opened', { id: d.id, gpu: String(d.hwKey), conc: d.conc });
+        } else if (action === 'view-power-telemetry') {
+          setPowerTelemetryPoint(d);
+          chartRef.current?.dismissTooltip();
+          track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
+        } else if (action === 'reproduce') {
+          setReproducePoint(d);
+          chartRef.current?.dismissTooltip();
+        } else if (action === 'view-logs' && typeof d.id === 'number') {
+          if (d.benchmark_type !== 'agentic_traces') {
+            event.preventDefault();
+            setFixedLogPointId(d.id);
+            chartRef.current?.dismissTooltip();
+          }
+          track('latency_view_logs_opened', {
+            id: d.id,
+            gpu: String(d.hwKey),
+            conc: d.conc,
+            benchmark_type: d.benchmark_type ?? 'single_turn',
+          });
+        }
+      };
+      return {
+        rulerType: 'crosshair' as const,
+        content: (d: InferenceData) => hoverCard(d, false),
+        details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+          <PointDetailsPanel
+            details={pointDetails(d, isOverlay)}
+            color={pointColor(d, isOverlay)}
+            onClose={close}
+            onAction={(action, event) => onAction(action, event, d, isOverlay)}
+          />
+        ),
+        getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
+        getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
+        onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          // PowerX: the chip comparison follows the hovered point's interactivity.
+          if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
+          activePointRef.current?.({ point: d, source: 'hover' });
+        },
+        onHoverEnd: () => {
+          activePointRef.current?.(null);
+        },
+        onPointClick: (d: InferenceData) => {
+          activePointRef.current?.({ point: d, source: 'pinned' });
+          const ruler = perfRulerRef.current;
+          if (ruler.mode) {
+            track('latency_data_point_clicked', {
+              gpu: String(d.hwKey),
+              x: d.x,
+              y: d.y,
+              perf_ruler: true,
+            });
+            ruler.onPointClick(d, 'official');
+            return;
+          }
+          track('latency_data_point_clicked', { gpu: String(d.hwKey), x: d.x, y: d.y });
+        },
+        attachToLayer: 1,
+      };
+    }, [pointDetails, pointColor, hoverCard, openPowerTrace]);
+
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
-      // Line-label identity of one drawn series under a power comparison
-      // (`i_pcompare`): the base series keeps the hardware key, so pinned
-      // anchors and hover hooks keep working; a sibling is `<hw>::<variant>`.
       const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
       const lineLabelIdentity = (hw: string, points: readonly InferenceData[]) => {
         const variant = points[0]?.powerVariant;
@@ -2568,8 +2457,6 @@ const ScatterGraph = React.memo(
         const isBase = !variant || variantId === powerCompareBaseId;
         return { variant, variantId, isBase, seriesId: lineLabelSeriesId(hw, variant, isBase) };
       };
-      // A sibling's label says which series it is; a flat provisioned boundary
-      // (TDP, all-in) on a watts axis also states its value.
       const lineLabelSuffix = (
         identity: ReturnType<typeof lineLabelIdentity>,
         points: readonly InferenceData[],
@@ -2577,21 +2464,59 @@ const ScatterGraph = React.memo(
         powerLineLabelSuffix(identity.variant, {
           isBase: identity.isBase,
           locale,
+          labelStyle: powerLabelStyle,
           flatWatts:
             !identity.isBase && wattsAxis && identity.variant?.kind === 'basis'
               ? flatSeriesValue(points.map((point) => point.y))
               : null,
         });
 
-      // ── Layer 0: Rooflines + gradient labels (custom) ──
+      // Comparison lines carry no label pill (the legend's line styles name them) unless they
+      // are flat references whose value is the point of the pill, e.g. "TDP 1 kW".
+      const showsLinePill = (hw: string, points: readonly InferenceData[]) => {
+        const identity = lineLabelIdentity(hw, points);
+        if (identity.isBase) return true;
+        return (
+          wattsAxis &&
+          identity.variant?.kind === 'basis' &&
+          flatSeriesValue(points.map((point) => point.y)) !== null
+        );
+      };
+
+      const pillOccluders = (xScale: ContinuousScale, yScale: ContinuousScale) => {
+        const ir = interactionRef.current;
+        const project = (points: readonly InferenceData[]) =>
+          points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) }));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(displayedRooflines)) {
+          const { hw, precision, variant } = parseScatterSeriesKey(key);
+          if (
+            !ir.effectiveActiveHwTypes.has(hw) ||
+            !ir.selectedPrecisions.includes(precision) ||
+            ir.hiddenPowerVariants.has(variant ?? '')
+          ) {
+            continue;
+          }
+          const byDate = groupDisplayedPoints(points);
+          for (const [date, datePoints] of byDate) {
+            occluders.push({
+              key: byDate.size === 1 ? key : `${key}__${encodeURIComponent(date)}`,
+              points: project(datePoints),
+            });
+          }
+        }
+        for (const [overlayKey, group] of Object.entries(displayedOverlayRooflines)) {
+          if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
+          occluders.push({ key: `overlay-${overlayKey}`, points: project(group.points) });
+        }
+        return occluders;
+      };
+
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'rooflines',
-        displayIdentity: `${showGradientLabels}:${showLineLabels}`,
+        displayIdentity: `${showGradientLabels}:${showLineLabels}:${showFrameworkLabel}`,
         render: (zoomGroup, ctx) => {
-          // Visibility / colors come from the interaction ref so this closure
-          // stays correct between layer recreations (toggles restyle via the
-          // decoration effect instead of rebuilding the chart).
           const ir = interactionRef.current;
           const xScale = ctx.xScale as ContinuousScale;
           const yScale = ctx.yScale as ContinuousScale;
@@ -2603,10 +2528,11 @@ const ScatterGraph = React.memo(
             .y((d) => yScale(d.y))
             .curve(d3.curveMonotoneX);
 
-          // Ensure rooflines layer exists before dot-groups
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
           if (rooflinesLayer.empty()) {
-            const firstDotGroup = zoomGroup.select('.dot-group').node() as SVGGElement | null;
+            const firstDotGroup = zoomGroup
+              .select(`.dot-group, ${CANVAS_POINT_LAYER_SELECTOR}`)
+              .node() as SVGGElement | null;
             const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             node.setAttribute('class', 'rooflines-layer');
             const parent = zoomGroup.node()!;
@@ -2615,12 +2541,10 @@ const ScatterGraph = React.memo(
             rooflinesLayer = d3.select<SVGGElement, unknown>(node);
           }
 
-          // Build roofline entries with gradient or solid stroke
           interface Entry {
             key: string;
             hw: string;
             precision: string;
-            /** Comparison variant id (`i_pcompare`), '' for the base series. */
             variant: string;
             points: InferenceData[];
             stroke: string;
@@ -2637,8 +2561,6 @@ const ScatterGraph = React.memo(
               !ir.hiddenPowerVariants.has(variant ?? '');
             const baseStroke = ir.getCssColor(ir.resolveColor(hw));
 
-            // Split into per-date sub-paths so the line never crosses dates.
-            // (When only one date is present the loop runs once with the full set.)
             const byDate = groupDisplayedPoints(pts);
             const singleDate = byDate.size === 1;
 
@@ -2646,9 +2568,6 @@ const ScatterGraph = React.memo(
               const entryKey = singleDate ? key : `${key}__${encodeURIComponent(date)}`;
               let stroke = baseStroke;
 
-              // Gradient labels only apply in the single-date case; mapping the
-              // (key-wide) ParetoPointLabel array onto per-date sub-segments is
-              // ambiguous and the comparison-date overlay is a rare combo.
               if (singleDate && showGradientLabels) {
                 const pointLabels = allPointLabelsByKey[key];
                 if (pointLabels) {
@@ -2686,7 +2605,6 @@ const ScatterGraph = React.memo(
             }
           });
 
-          // Remove stale gradients
           defs.selectAll('linearGradient').each(function () {
             const id = (this as SVGLinearGradientElement).id;
             if (id.startsWith(`roofline-gradient-${chartId}-`) && !activeGradientIds.has(id)) {
@@ -2694,7 +2612,6 @@ const ScatterGraph = React.memo(
             }
           });
 
-          // Data join for roofline paths
           rooflinesLayer
             .selectAll<SVGPathElement, Entry>('.roofline-path')
             .data(
@@ -2710,13 +2627,17 @@ const ScatterGraph = React.memo(
             .attr('fill', 'none')
             .attr('stroke', (d) => d.stroke)
             .attr('stroke-width', 2.5)
-            // Comparison siblings share the hardware colour; the dash tells them apart.
-            .attr('stroke-dasharray', (d) => powerVariantDashById(d.variant) || null)
+            .attr(
+              'stroke-dasharray',
+              (d) =>
+                powerVariantDashById(d.variant) ||
+                (ir.powerCompareMode === 'none' ? frameworkDasharray(d.hw) : null) ||
+                null,
+            )
             .attr('d', (d) => lineGen(d.points))
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
 
-          // Parallelism labels
           interface LabelSeg {
             segKey: string;
             hw: string;
@@ -2809,9 +2730,6 @@ const ScatterGraph = React.memo(
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
 
-          // Size each label's background to its text in two passes — write all
-          // texts, then measure all bboxes — so the batch forces one layout
-          // instead of one per label.
           plSel.each(function (d) {
             d3.select(this).select<SVGTextElement>('.pl-text').text(d.label);
           });
@@ -2832,10 +2750,7 @@ const ScatterGraph = React.memo(
               .attr('fill', d.color);
           }
 
-          // ── Line labels (run name along each roofline) ──
           let lineLabels: LineLabelPlacement[] = [];
-          // Comparison variant and label suffix per label key, for the text
-          // segments and the `data-power-variant` hook on each pill.
           const lineLabelMeta = new Map<
             string,
             { variantId: string; suffix: string; runTag: string }
@@ -2845,10 +2760,6 @@ const ScatterGraph = React.memo(
             const officialByGroup = new Map<string, (typeof entries)[number]>();
             for (const entry of entries) {
               if (!entry.visible) continue;
-              // One label per hardware and, under a power comparison, per
-              // sibling series: the measured line and its boundary / pool
-              // lines each say which one they are, instead of the longest
-              // line taking the hardware's only label.
               const groupKey = multiPrecision ? entry.key : `${entry.hw}::${entry.variant}`;
               const previous = officialByGroup.get(groupKey);
               if (!previous || entry.points.length > previous.points.length) {
@@ -2856,27 +2767,26 @@ const ScatterGraph = React.memo(
               }
             }
 
-            const officialSeries: LineLabelSeries<InferenceData>[] = [
-              ...officialByGroup.values(),
-            ].map((entry) => {
-              const identity = lineLabelIdentity(entry.hw, entry.points);
-              const suffix = lineLabelSuffix(identity, entry.points);
-              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
-              return {
-                key: entry.key,
-                seriesId: identity.seriesId,
-                label: `${lineLabelText(
-                  entry.hw,
-                  entry.precision,
-                  multiPrecision,
-                  modelLabel,
-                  entry.points,
-                )}${suffix}`,
-                color: ir.getCssColor(ir.resolveColor(entry.hw)),
-                points: entry.points,
-              };
-            });
-            // Runs drawing the same hardware need a run tag on their pills.
+            const officialSeries: LineLabelSeries<InferenceData>[] = [...officialByGroup.values()]
+              .filter((entry) => showsLinePill(entry.hw, entry.points))
+              .map((entry) => {
+                const identity = lineLabelIdentity(entry.hw, entry.points);
+                const suffix = lineLabelSuffix(identity, entry.points);
+                lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
+                return {
+                  key: entry.key,
+                  seriesId: identity.seriesId,
+                  label: `${lineLabelText(
+                    entry.hw,
+                    entry.precision,
+                    multiPrecision,
+                    modelLabel,
+                    entry.points,
+                  )}${suffix}`,
+                  color: ir.getCssColor(ir.resolveColor(entry.hw)),
+                  points: entry.points,
+                };
+              });
             const overlayRunsByHw = new Map<string, Set<number>>();
             for (const group of Object.values(displayedOverlayRooflines)) {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
@@ -2887,6 +2797,7 @@ const ScatterGraph = React.memo(
               displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
+              if (!showsLinePill(group.hwKey, group.points)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
               const hardwareLabel = lineLabelText(
@@ -2917,9 +2828,6 @@ const ScatterGraph = React.memo(
             });
             const labelSeries = [...officialSeries, ...overlaySeries];
 
-            // Both chart types spread labels along their lines with collision
-            // avoidance — endpoint-only placement stacked every label at the
-            // right edge of the e2e latency chart.
             lineLabels = placeLineLabels(labelSeries, xScale, yScale, {
               collisionWidth: 120,
               anchors: lineLabelAnchorRef.current,
@@ -2927,8 +2835,6 @@ const ScatterGraph = React.memo(
               obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
             });
 
-            // Keep hidden data-join entries for precision/date curves that lost
-            // deduplication, preserving the chart's one-label-per-series identity.
             const labeledKeys = new Set(lineLabels.map((label) => label.key));
             for (const entry of entries) {
               if (labeledKeys.has(entry.key)) continue;
@@ -2962,12 +2868,11 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
+            occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
                 .attr('data-visible', label.visible ? '1' : '0')
-                // Legend hover and filter sync key labels by hardware alone;
-                // the variant names the comparison sibling ('' for the base).
                 .attr('data-hw-key', lineLabelHardwareKey(label.seriesId))
                 .attr('data-power-variant', lineLabelMeta.get(label.key)?.variantId ?? '')
                 .select('.ll-bg')
@@ -2975,23 +2880,15 @@ const ScatterGraph = React.memo(
             },
             configureText: (text, label) => {
               const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
-              // Parse the hardware part without the variant suffix, which gets
-              // its own segment so the engine is still matched at the end.
               const meta = lineLabelMeta.get(label.key);
               const suffix = meta?.suffix ?? '';
               const runTag = meta?.runTag ?? '';
               let coreLabel = suffix ? label.label.slice(0, -suffix.length) : label.label;
               if (runTag) coreLabel = coreLabel.slice(0, -runTag.length);
-              // Overlay pills lead with the run marker; the hardware behind it is
-              // parsed like an official pill so the GPU name stays bold.
-              const marker = coreLabel.startsWith(OVERLAY_LABEL_MARKER) ? OVERLAY_LABEL_MARKER : '';
-              coreLabel = coreLabel.slice(marker.length);
               const hardwareLabel = getDisplayLabel(config);
               const isHardwareLabel =
                 coreLabel === hardwareLabel || coreLabel.startsWith(`${config.label} `);
               const remainingLabel = isHardwareLabel ? coreLabel.slice(config.label.length) : '';
-              // Use this curve's resolved suffix, not the generic hwKey label:
-              // official and overlay curves can share a key but differ by run.
               const engineLabel =
                 remainingLabel.match(/ \([^()]*\)$/u)?.[0] ??
                 (config.suffix ? ` ${config.suffix}` : '');
@@ -2999,18 +2896,14 @@ const ScatterGraph = React.memo(
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
-              const markerSegments = marker
-                ? [{ className: 'll-marker', text: marker, fill: 'white', weight: '600' }]
-                : [];
               const runSegments = runTag
-                ? [{ className: 'll-run', text: runTag, fill: '#d1d5db', weight: '400' }]
+                ? [{ className: 'll-run', text: runTag, fill: 'white', weight: '400' }]
                 : [];
               const variantSegments = suffix
                 ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
-                    ...markerSegments,
                     { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
                     ...(precisionLabel
                       ? [
@@ -3022,12 +2915,12 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
-                    ...(engineLabel
+                    ...(engineLabel && showFrameworkLabel
                       ? [
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: '#d1d5db',
+                            fill: 'white',
                             weight: '400',
                           },
                         ]
@@ -3036,7 +2929,6 @@ const ScatterGraph = React.memo(
                     ...variantSegments,
                   ]
                 : [
-                    ...markerSegments,
                     {
                       className: 'll-plain',
                       text: coreLabel,
@@ -3046,9 +2938,18 @@ const ScatterGraph = React.memo(
                     ...runSegments,
                     ...variantSegments,
                   ];
+              const textX = Number(text.attr('x') ?? 0);
+              const fitted = fitPillSegments(
+                segments,
+                pillWidthBudget(ctx.width) - textX - 10,
+                (value, weight) =>
+                  measureTextWidth(value, chartFont(CHART_TYPE.lineLabel, weight), {
+                    whiteSpace: 'pre-wrap',
+                  }),
+              );
               text
                 .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
-                .data(segments, (segment) => segment.className)
+                .data(fitted, (segment) => segment.className)
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
                 .attr('fill', (segment) => segment.fill)
@@ -3056,24 +2957,26 @@ const ScatterGraph = React.memo(
                 .attr('x', null)
                 .attr('dy', null)
                 .text((segment) => segment.text);
-              // Keep the framework and role visible when a pill is wider than
-              // the mobile plot, without shrinking its text or dropping fields.
-              const textX = Number(text.attr('x') ?? 0);
               const maxLineWidth = ctx.width - textX - 10;
               let lineWidth = 0;
-              text.selectAll<SVGTSpanElement, unknown>('tspan').each(function () {
-                const width = this.getComputedTextLength();
-                if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
-                  d3.select(this)
-                    .attr('x', textX)
-                    .attr('dy', CHART_TYPE.lineLabel + 3);
-                  lineWidth = 0;
-                }
-                lineWidth += width;
-              });
+              text
+                .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
+                .each(function (segment) {
+                  const width = measureTextWidth(
+                    segment.text,
+                    chartFont(CHART_TYPE.lineLabel, segment.weight),
+                    { whiteSpace: 'pre-wrap' },
+                  );
+                  if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
+                    d3.select(this)
+                      .attr('x', textX)
+                      .attr('dy', CHART_TYPE.lineLabel + 3);
+                    lineWidth = 0;
+                  }
+                  lineWidth += width;
+                });
             },
           });
-          // Labels can be joined independently of the Pareto display pass.
           applyParetoFadeRef.current(zoomGroup);
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
@@ -3097,8 +3000,6 @@ const ScatterGraph = React.memo(
             .y((d) => newYScale(d.y))
             .curve(d3.curveMonotoneX);
 
-          // Update roofline paths — must split per-date so the zoom redraw
-          // matches the per-date sub-paths created in the initial render.
           Object.entries(displayedRooflines).forEach(([key, pts]) => {
             if (pts.length < 2) return;
             const byDate = groupDisplayedPoints(pts);
@@ -3113,7 +3014,6 @@ const ScatterGraph = React.memo(
             }
           });
 
-          // Update gradient coordinates
           if (showGradientLabels) {
             Object.entries(allPointLabelsByKey).forEach(([key, pointLabels]) => {
               if (pointLabels.length < 2) return;
@@ -3133,7 +3033,6 @@ const ScatterGraph = React.memo(
                 }
               }
 
-              // Update parallelism label positions
               const segments: { points: InferenceData[] }[] = [];
               let cur = { points: [pointLabels[0].point] };
               for (let i = 1; i < pointLabels.length; i++) {
@@ -3162,8 +3061,6 @@ const ScatterGraph = React.memo(
             });
           }
 
-          // Update line label positions on zoom with the same placement
-          // primitives used for the initial render.
           if (showLineLabels) {
             const multiPrecision = ir.selectedPrecisions.length > 1;
             const bestByGroup = new Map<
@@ -3223,20 +3120,18 @@ const ScatterGraph = React.memo(
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(zoomGroup.node()),
             });
-            updateRenderedLineLabels(zoomGroup, zoomLabels);
+            updateRenderedLineLabels(zoomGroup, zoomLabels, {
+              occluders: pillOccluders(newXScale, newYScale),
+            });
           }
         },
       };
 
-      // ── Layer 1: Official scatter points ──
       const scatterLayer: LayerConfig<InferenceData> = {
         type: 'scatter',
         key: 'points',
         data: pointsData,
         config: {
-          // Visibility / colors / shapes read the interaction ref so these
-          // accessors stay current between layer recreations (toggles restyle
-          // via the decoration effect instead of rebuilding the chart).
           getColor: (d) =>
             (showGradientLabels && gradientColorByPoint.get(d)) ||
             interactionRef.current.getCssColor(
@@ -3245,23 +3140,36 @@ const ScatterGraph = React.memo(
           getOpacity: (d) =>
             interactionRef.current.isPointVisible(d) ? pointOpacityForVariant(d) : 0,
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
-          hideLabels: !showPointLabels || showGradientLabels,
+          hideLabels: !pointLabelsVisible,
           // Concurrency (C=) is appended only when the advanced
           // "# Concurrent Sessions" toggle is on.
-          getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
+          getLabelText: (d) =>
+            pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
             'power-variant': (d) => d.powerVariant?.id ?? '',
-            // Lets the agentic coach mark pick an anchor out of the DOM
-            // without knowing anything about React state.
             'benchmark-type': (d) => d.benchmark_type ?? '',
+            'has-trace': (d) =>
+              d.benchmark_type === 'agentic_traces' &&
+              isPersistedBenchmarkId(d.id) &&
+              interactionRef.current.presence?.trace.has(d.id) === true
+                ? 'true'
+                : null,
+            'trace-availability': (d) => {
+              if (d.benchmark_type !== 'agentic_traces' || !isPersistedBenchmarkId(d.id)) {
+                return null;
+              }
+              return interactionRef.current.isPresencePending ? 'pending' : 'resolved';
+            },
           },
           getShapeKey: (d) =>
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
+          underlay: CANVAS_UNDERLAY,
         },
         keyFn: buildPointId,
+        canvas: ensureCanvasPointLayer,
       };
 
       const updateOverlayLabels = (
@@ -3271,12 +3179,12 @@ const ScatterGraph = React.memo(
           '.unofficial-overlay-pt',
         );
         const powerLabels = showPowerEnvelope && showGradientLabels;
-        const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
+        const showLabels = powerLabels || pointLabelsVisible;
         overlayPoints.each(function (d) {
           const lines = (
             powerLabels
               ? getParetoLabel(d)
-              : pointLabelText(d, useAdvancedLabels, showConcurrencyLabels)
+              : pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels)
           ).split('\n');
           const text = d3
             .select(this)
@@ -3310,17 +3218,15 @@ const ScatterGraph = React.memo(
         });
       };
 
-      // ── Layer 2: Overlay (rooflines + X-shape points) ──
       const overlayLayer: CustomLayerConfig | null = overlayData
         ? {
             type: 'custom',
             key: 'overlay',
-            displayIdentity: `${showPointLabels}:${showGradientLabels}`,
+            displayIdentity: `${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${showGradientLabels}`,
             render: (zoomGroup, ctx) => {
               const xScale = ctx.xScale as ContinuousScale;
               const yScale = ctx.yScale as ContinuousScale;
 
-              // Overlay rooflines
               const lineGen = d3
                 .line<InferenceData>()
                 .x((d) => xScale(d.x))
@@ -3341,7 +3247,6 @@ const ScatterGraph = React.memo(
                   ovEntries.push({
                     key,
                     points: group.points,
-                    // Color by run — same palette entry the legend uses, so they match.
                     stroke: overlayRunColor(group.runIndex),
                     runIndex: group.runIndex,
                     variant: group.variant,
@@ -3363,8 +3268,6 @@ const ScatterGraph = React.memo(
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
                 .attr('data-power-variant', (d) => d.variant)
-                // The run keeps its colour; a comparison sibling takes the
-                // variant dash so it reads like its official counterpart.
                 .attr('stroke-dasharray', (d) =>
                   d.variant
                     ? powerVariantDashById(d.variant)
@@ -3372,13 +3275,10 @@ const ScatterGraph = React.memo(
                 )
                 .attr('d', (d) => lineGen(d.points))
                 .style('filter', null)
-                // Comparison rows hidden from the legend (the decoration effect
-                // keeps this in step with later toggles).
                 .style('opacity', (d) =>
                   interactionRef.current.hiddenPowerVariants.has(d.variant ?? '') ? 0 : null,
                 );
 
-              // Overlay X-shape points — index-keyed so every point renders
               const overlayPoints = zoomGroup
                 .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
                 .data(processedOverlayData, (_d, i) => String(i))
@@ -3406,9 +3306,6 @@ const ScatterGraph = React.memo(
 
               overlayPoints.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
               overlayPoints.style('filter', null);
-              // Optimal Only parity with official points (see isOverlayPointVisible).
-              // Read through the interaction ref so this long-lived closure sees
-              // the current toggle state on zoom/label re-renders.
               overlayPoints.each(function (d) {
                 const visible = interactionRef.current.isOverlayPointVisible(d);
                 d3.select(this)
@@ -3421,20 +3318,17 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
-              // Match official points: KV offload is the only persistent point
-              // decoration. Decode method remains in the tooltip.
               overlayPoints.each(function (d) {
                 renderOffloadHalo(
                   d3.select(this),
                   d,
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                  showOffloadingLabel,
                 );
               });
 
               updateOverlayLabels(zoomGroup);
 
-              // Overlay marker content/coordinates stay chart-local; the shared
-              // helper owns the hover, pin, ruler, and marker-state lifecycle.
               const svgNode = ctx.layout.svg.node()!;
               const container = svgNode.parentElement as HTMLDivElement;
               const tooltip = d3.select(ctx.tooltipElement);
@@ -3453,17 +3347,8 @@ const ScatterGraph = React.memo(
                 hoverPath: xMarkerPath(7, 0.7),
                 tooltip,
                 handle: chartRef.current,
-                content: (point, pinned) =>
-                  generateOverlayTooltipContent({
-                    data: point,
-                    isPinned: pinned,
-                    xLabel,
-                    yLabel,
-                    selectedYAxisMetric,
-                    hardwareConfig: overlayData.hardwareConfig,
-                    overlayData,
-                    locale,
-                  }),
+                panel: true,
+                content: (point) => hoverCard(point, true),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
                   return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -3473,31 +3358,24 @@ const ScatterGraph = React.memo(
                   hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
                 },
                 onClick: (point) => {
-                  // Overlay points participate in the perf ruler too — a
-                  // ruler-mode click acts as a click on the overlay curve at
-                  // the point's x instead of keeping the pinned tooltip (see
-                  // AGENTS.md "Unofficial Run Support").
                   const ruler = perfRulerRef.current;
                   if (ruler.mode) {
                     track('latency_data_point_clicked', {
-                      hw: String(point.hwKey),
+                      gpu: String(point.hwKey),
                       x: point.x,
                       y: point.y,
                       overlay: true,
-                      perfRuler: true,
+                      perf_ruler: true,
                     });
                     ruler.onPointClick(point, 'overlay');
                     return;
                   }
                   track('latency_data_point_clicked', {
-                    hw: String(point.hwKey),
+                    gpu: String(point.hwKey),
                     x: point.x,
                     y: point.y,
                     overlay: true,
                   });
-                  // The shared helper has just rendered the pinned content into
-                  // this element and pinned it via `handle`.
-                  attachPowerTraceAction(ctx.tooltipElement, point, true);
                 },
               });
             },
@@ -3506,7 +3384,6 @@ const ScatterGraph = React.memo(
               const newXScale = ctx.newXScale as ContinuousScale;
               const newYScale = ctx.newYScale as ContinuousScale;
 
-              // Update overlay rooflines
               const lineGen = d3
                 .line<InferenceData>()
                 .x((d) => newXScale(d.x))
@@ -3521,7 +3398,6 @@ const ScatterGraph = React.memo(
                 if (!sel.empty()) sel.attr('d', lineGen(group.points) as string);
               });
 
-              // Update overlay points
               zoomGroup
                 .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
                 .attr('transform', (d) => `translate(${newXScale(d.x)},${newYScale(d.y)})`);
@@ -3529,7 +3405,6 @@ const ScatterGraph = React.memo(
           }
         : null;
 
-      // ── Intentional clipping: interpolated dashed Pareto continuation + arrow ──
       const drawOverflowContinuations = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
         ctx: RenderContext,
@@ -3683,8 +3558,6 @@ const ScatterGraph = React.memo(
           ),
       };
 
-      // Annotations/colors resolve through the interaction ref so visibility
-      // toggles can redraw this layer without recreating the chart.
       const knownIssueLayer = createKnownIssueLayer(() => {
         const current = interactionRef.current;
         return {
@@ -3696,19 +3569,17 @@ const ScatterGraph = React.memo(
           onLinkClick: (annotation) =>
             annotation.issue &&
             track('inference_known_issue_clicked', {
-              hwKey: annotation.issue.hwKey,
+              gpu: annotation.issue.hwKey,
               issue: annotation.issue.issueRef,
             }),
+          onDismiss: (annotation) => {
+            track('inference_chart_notice_dismissed', { notice: chartNoticeKey(annotation) });
+            current.dismissNotice(annotation);
+          },
+          dismissLabel: current.locale === 'zh' ? '关闭提示' : 'Dismiss notice',
         };
       });
 
-      // ── Perf ruler (opt-in iso-x measurement between two curves) ──
-      // Mode and measurement are read through refs, so this layer needs
-      // no perf-ruler dependencies: full re-renders redraw it after the data
-      // phase (the iso-x lives in data space, so it survives metric/display
-      // re-renders), and onZoom keeps it glued to the curves during pan/zoom.
-      // It lives inside the zoomGroup, so it is clipped and PNG-exported like
-      // any other mark.
       const perfRulerLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'perf-ruler',
@@ -3730,15 +3601,284 @@ const ScatterGraph = React.memo(
           ),
       };
 
-      const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
+      const axisCeiling = metricAxisCeiling(selectedYAxisMetric);
+      const drawCeiling = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        yScale: ContinuousScale,
+        width: number,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        // Only mark the rating when the axis reaches it.
+        const y = axisCeiling === undefined || axisCeiling > domainTop ? null : yScale(axisCeiling);
+        const g = zoomGroup
+          .selectAll<SVGGElement, number>('g.metric-ceiling')
+          .data(y === null || !Number.isFinite(y) ? [] : [y])
+          .join('g')
+          .attr('class', 'metric-ceiling')
+          .attr('pointer-events', 'none');
+        g.selectAll('line')
+          .data((d) => [d])
+          .join('line')
+          .attr('x1', 0)
+          .attr('x2', width)
+          .attr('y1', (d) => d)
+          .attr('y2', (d) => d)
+          .attr('stroke', 'var(--muted-foreground)')
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '5,4');
+        g.selectAll('text')
+          .data((d) => [d])
+          .join('text')
+          .attr('x', width - 4)
+          .attr('y', (d) => d - 4)
+          .attr('text-anchor', 'end')
+          .attr('font-size', 11)
+          .attr('fill', 'var(--muted-foreground)')
+          .text('100% TDP');
+      };
+      const ceilingLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'metric-ceiling',
+        render: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale, ctx.width),
+        onZoom: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, ctx.newYScale as ContinuousScale, ctx.width),
+      };
+
+      // PowerX headroom: the band between each chip's P90 draw (dotted) and 100 % TDP,
+      // for the official chip lines and for every unofficial-run overlay line in its run color.
+      const headroomBand = (points: InferenceData[], optimal: (p: InferenceData) => boolean) =>
+        points
+          .filter(
+            (p) =>
+              selectedPrecisions.includes(p.precision) &&
+              (!hideNonOptimal || optimal(p)) &&
+              Number.isFinite(p.measuredP90Power?.y) &&
+              Number.isFinite(p.measuredAvgPower?.y) &&
+              (p.measuredAvgPower?.y ?? 0) > 0 &&
+              Number.isFinite(p.measuredPowerPercentTdp?.y),
+          )
+          .map((p) => ({
+            x: p.x,
+            // % TDP at P90 = P90 W × (% TDP ÷ avg W), the point's own TDP ratio.
+            y: (p.measuredP90Power!.y * p.measuredPowerPercentTdp!.y) / p.measuredAvgPower!.y,
+          }))
+          .toSorted((a, b) => a.x - b.x);
+      const headroomSeries: {
+        key: string;
+        color: string;
+        band: { x: number; y: number }[];
+        runIndex: number | null;
+      }[] = headroomShading
+        ? [
+            ...Object.entries(groupedData).flatMap(([key, points]) => {
+              if (points[0]?.powerVariant) return [];
+              const hwKey = points[0]?.hwKey;
+              if (!hwKey || !effectiveActiveHwTypes.has(hwKey)) return [];
+              const band = headroomBand(points, (p) => optimalPointKeys.has(optimalPointKey(p)));
+              return band.length >= 2
+                ? [{ key, color: getCssColor(resolveColor(hwKey)), band, runIndex: null }]
+                : [];
+            }),
+            ...Object.entries(overlayGroups).flatMap(([key, group]) => {
+              if (group.variant !== null || !activeOverlayHwTypes.has(group.hwKey)) return [];
+              const band = headroomBand(group.points, (p) => overlayOptimalPoints.has(p));
+              return band.length >= 2
+                ? [
+                    {
+                      key: `overlay-${key}`,
+                      color: overlayRunColor(group.runIndex),
+                      band,
+                      runIndex: group.runIndex,
+                    },
+                  ]
+                : [];
+            }),
+          ]
+        : [];
+      const drawHeadroom = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        const topY = yScale(Math.min(100, domainTop));
+        const area = d3
+          .area<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y0(() => topY)
+          .y1((d) => yScale(d.y));
+        const line = d3
+          .line<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y((d) => yScale(d.y));
+        const g = zoomGroup
+          .selectAll<SVGGElement, (typeof headroomSeries)[number]>('g.headroom-band')
+          .data(headroomSeries, (d) => d.key)
+          .join('g')
+          .attr('class', 'headroom-band')
+          .attr('data-testid', 'headroom-band')
+          .attr('data-run-index', (d) => (d.runIndex === null ? null : d.runIndex))
+          .attr('pointer-events', 'none');
+        g.selectAll('path.headroom-area')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-area')
+          .attr('fill', (d) => d.color)
+          .attr('fill-opacity', 0.09)
+          .attr('stroke', 'none')
+          .attr('d', (d) => area(d.band));
+        g.selectAll('path.headroom-p90')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-p90')
+          .attr('fill', 'none')
+          .attr('stroke', (d) => d.color)
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '2,3')
+          .attr('d', (d) => line(d.band));
+      };
+      const headroomLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'powerx-headroom',
+        render: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+          ),
+      };
+
+      // PowerX on a coarse pointer: there is no hover tooltip, so a finger dragged across
+      // the plot snaps to the nearest visible point (official or overlay, under the current
+      // zoom) and the readout above the chart reads it; a tap on a point still opens its
+      // sheet through the point's own click. One-finger touches never reach d3-zoom
+      // (zoomEventFilter), the svg keeps touch-action pan-y so a vertical pan scrolls the
+      // page, and it is none only while a scrub is in progress.
+      const scrubLayer: CustomLayerConfig | null = touchScrub
+        ? {
+            type: 'custom',
+            key: 'powerx-scrub',
+            render: (zoomGroup, ctx) => {
+              // A re-render (the readout's own update re-renders the chart) keeps the mark
+              // where the finger last was; the next finger, or a zoom, moves or drops it.
+              zoomGroup.select('g.powerx-scrub').raise();
+              const svg = ctx.layout.svg;
+              const svgNode = svg.node();
+              const candidates = (): ScrubCandidate<InferenceData>[] => {
+                if (!svgNode) return [];
+                const zoomed = currentZoomRenderContext(svgNode, ctx);
+                const xScale = zoomed.xScale as ContinuousScale;
+                const yScale = zoomed.yScale as ContinuousScale;
+                const ir = interactionRef.current;
+                return [
+                  ...pointsData
+                    .filter((point) => ir.isPointVisible(point))
+                    .map((point) => ({
+                      point,
+                      x: xScale(point.x),
+                      y: yScale(point.y),
+                      overlay: false,
+                    })),
+                  ...processedOverlayData
+                    .filter((point) => ir.isOverlayPointVisible(point))
+                    .map((point) => ({
+                      point,
+                      x: xScale(point.x),
+                      y: yScale(point.y),
+                      overlay: true,
+                    })),
+                ];
+              };
+              const snap = (event: PointerEvent) => {
+                const [mx, my] = d3.pointer(event, zoomGroup.node());
+                const best = nearestScrubCandidate(candidates(), mx, my);
+                if (!best) return;
+                const ir = interactionRef.current;
+                const color = best.overlay
+                  ? overlayRunColor(overlayRunIndex(best.point.run_url ?? null, runIndexByUrl))
+                  : ir.getCssColor(ir.resolveColor(best.point.hwKey as string));
+                let mark = zoomGroup.select<SVGGElement>('g.powerx-scrub');
+                if (mark.empty()) {
+                  mark = zoomGroup
+                    .append('g')
+                    .attr('class', 'powerx-scrub')
+                    .attr('data-testid', 'powerx-scrub')
+                    .attr('pointer-events', 'none');
+                  mark
+                    .append('line')
+                    .attr('class', 'powerx-scrub-rule')
+                    .attr('stroke', 'var(--foreground)')
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-opacity', 0.7);
+                  mark
+                    .append('circle')
+                    .attr('class', 'powerx-scrub-ring')
+                    .attr('r', 9)
+                    .attr('fill', 'none')
+                    .attr('stroke-width', 2.5);
+                }
+                mark
+                  .attr('data-hw-key', String(best.point.hwKey))
+                  .attr('data-conc', String(best.point.conc))
+                  .attr('data-overlay', best.overlay ? 'true' : null)
+                  .raise();
+                mark
+                  .select('line.powerx-scrub-rule')
+                  .attr('x1', best.x)
+                  .attr('x2', best.x)
+                  .attr('y1', 0)
+                  .attr('y2', ctx.height);
+                mark
+                  .select('circle.powerx-scrub-ring')
+                  .attr('cx', best.x)
+                  .attr('cy', best.y)
+                  .attr('stroke', color);
+                activePointRef.current?.({ point: best.point, source: 'scrub' });
+              };
+              svg
+                .on('pointerdown.powerxScrub', (event: PointerEvent) => {
+                  if (event.pointerType === 'mouse' || event.isPrimary === false) return;
+                  scrubPointerRef.current = event.pointerId;
+                  snap(event);
+                })
+                .on('pointermove.powerxScrub', (event: PointerEvent) => {
+                  if (scrubPointerRef.current !== event.pointerId) return;
+                  if (svgNode) svgNode.style.touchAction = 'none';
+                  snap(event);
+                })
+                .on('pointerup.powerxScrub pointercancel.powerxScrub', (event: PointerEvent) => {
+                  if (scrubPointerRef.current !== event.pointerId) return;
+                  scrubPointerRef.current = null;
+                  if (svgNode) svgNode.style.touchAction = 'pan-y';
+                });
+            },
+            // The mark's pixel position is stale after a zoom; the next finger redraws it.
+            onZoom: (zoomGroup) => {
+              zoomGroup.selectAll('.powerx-scrub').remove();
+            },
+          }
+        : null;
+
+      const result: LayerConfig<InferenceData>[] = headroomShading
+        ? [headroomLayer, rooflineLayer, scatterLayer]
+        : [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, paretoHighlightLayer, perfRulerLayer, knownIssueLayer);
+      result.push(
+        overflowContinuationLayer,
+        paretoHighlightLayer,
+        perfRulerLayer,
+        knownIssueLayer,
+        ceilingLayer,
+      );
+      if (scrubLayer) result.push(scrubLayer);
       return result;
-      // Interaction state (visibility, colors, precision shapes, known-issue
-      // annotations) is deliberately NOT a dependency: layer closures read it
-      // through interactionRef, and the decoration effect restyles the
-      // existing DOM when it changes. Only data/structure changes recreate
-      // the layers (and with them, the full chart render).
     }, [
       displayedRooflines,
       paretoHighlightLayer,
@@ -3753,8 +3893,11 @@ const ScatterGraph = React.memo(
       chartId,
       pointsData,
       showPointLabels,
+      pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
+      showOffloadingLabel,
+      showFrameworkLabel,
       buildPointId,
       overlayData,
       processedOverlayData,
@@ -3768,40 +3911,92 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       powerCompareBaseId,
+      headroomShading,
+      groupedData,
+      overlayGroups,
+      activeOverlayHwTypes,
+      overlayOptimalPoints,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hideNonOptimal,
+      optimalPointKeys,
+      getCssColor,
+      resolveColor,
       chartDefinition,
       locale,
+      powerLabelStyle,
       drawPerfRuler,
-      attachPowerTraceAction,
+      hoverCard,
+      touchScrub,
     ]);
 
-    // Layers handle for the decoration effect — lets it re-run individual
-    // custom layer renders (rooflines/labels, known issues) without waiting
-    // for a full chart rebuild.
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
-    // --- onRender: CSS transitions, offload halos, and log tick formatting ---
-    const onRender = useCallback(
+    const syncOffloadHalos = useCallback(
+      (zoomGroup: RenderContext['layout']['zoomGroup']) => {
+        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+          renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
+        });
+        canvasPointLayerOf<InferenceData>(zoomGroup.node())?.setHalo(
+          showOffloadingLabel
+            ? (point) => (point.offload_mode === 'on' ? 'var(--foreground)' : null)
+            : null,
+          OFFLOAD_HALO_STYLE,
+        );
+        zoomGroup
+          .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+          .each(function (point) {
+            renderOffloadHalo(
+              d3.select(this),
+              point,
+              overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
+              showOffloadingLabel,
+            );
+          });
+      },
+      [showOffloadingLabel, runIndexByUrl],
+    );
+
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (display) syncOffloadHalos(display.zoomGroup);
+    }, [getDisplaySelection, syncOffloadHalos]);
+
+    const onExportRender = useCallback(
       (ctx: RenderContext) => {
-        // Stash the render context for the decoration effect.
-        lastRenderCtxRef.current = ctx;
         const { zoomGroup } = ctx.layout;
 
-        // CSS transitions for smooth opacity animation on hw toggle
-        zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
-
-        // Offload halo: dashed ring on every point that used KV offload (Pareto or not).
-        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
+        zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+          if (this.style.getPropertyValue('transition') === '') {
+            this.style.setProperty('transition', 'opacity 150ms ease');
+          }
         });
+        const points = canvasPointLayerOf(zoomGroup.node());
+        if (points) points.setOpacityTransition(POINT_OPACITY_TRANSITION_MS);
 
-        avoidPointLabelCollisions(zoomGroup);
+        syncOffloadHalos(zoomGroup);
 
-        // Tell the nudge engine the chart has painted, so an anchored coach
-        // mark can retry resolving a point to point at. This fires once per
-        // full render, never per zoom frame.
-        window.dispatchEvent(new CustomEvent(SCATTER_RENDERED_EVENT));
-        // Log tick formatting on initial render
+        const zoomNode = zoomGroup.node();
+        if (zoomNode && !points) {
+          canvasPointLayerOf<InferenceData>(
+            getDisplaySelection()?.zoomGroup.node(),
+          )?.restoreExportOrder(zoomNode, buildPointId);
+          const lines = zoomNode.querySelector(CANVAS_UNDERLAY[1]);
+          const halos = `.dot-group > .offload-halo, ${CANVAS_UNDERLAY[0]}`;
+          for (const halo of lines ? zoomNode.querySelectorAll(halos) : []) {
+            const owner = halo.parentElement as unknown as SVGGElement;
+            const anchor = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            anchor.setAttribute('transform', owner.getAttribute('transform') ?? '');
+            anchor.style.opacity = owner.style.opacity;
+            anchor.style.filter = owner.style.filter;
+            anchor.append(halo);
+            lines?.before(anchor);
+          }
+        }
+
+        if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
+
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
           ctx.layout.xAxisGroup.call(
@@ -3816,6 +4011,10 @@ const ScatterGraph = React.memo(
         }
       },
       [
+        syncOffloadHalos,
+        getDisplaySelection,
+        buildPointId,
+        pointLabelsVisible,
         hardwareConfig,
         xScaleConfig._isLog,
         yScaleConfig.type,
@@ -3825,53 +4024,31 @@ const ScatterGraph = React.memo(
       ],
     );
 
-    // --- Side effects ---
+    const onRender = useCallback(
+      (ctx: RenderContext) => {
+        lastRenderCtxRef.current = ctx;
+        onExportRender(ctx);
+      },
+      [onExportRender],
+    );
 
-    // ScatterGraph has more independent display controls than the generic
-    // D3 scatter layer. Keep their mutation scopes separate so a label-only
-    // toggle never restamps every point shape, visibility flag, or trace
-    // attribute.
-    //
-    // Mark styling: visibility, palette, and precision shape. This effect can
-    // run immediately after a full render while the renderer's old-to-new
-    // entrance transitions are only scheduled, so it never writes the
-    // animated dot-group `transform` or roofline `d` attributes.
     useLayoutEffect(() => {
       const display = getDisplaySelection();
       if (!display) return;
       const { zoomGroup } = display;
       const ir = interactionRef.current;
 
-      zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-        const point = d3.select(this);
-        const visible = ir.isPointVisible(d);
-        point
-          .style('opacity', visible ? pointOpacityForVariant(d) : 0)
-          .style('pointer-events', visible ? 'auto' : 'none');
-        const color =
-          (showGradientLabels && gradientColorByPoint.get(d)) ||
-          ir.getCssColor(ir.resolveColor(d.hwKey as string));
-        syncPointShape(
-          point as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
-          getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
-          color,
-        );
-        // A precision toggle may replace and append the visible SVG shape.
-        // Keep the decorations above that shape after the swap.
-        raiseInOrder(point, POINT_DECORATION_RAISE);
-      });
+      const scatterLayer = layersRef.current.find((layer) => layer.key === 'points');
+      if (scatterLayer?.type === 'scatter') {
+        canvasPointLayerOf<InferenceData>(zoomGroup.node())?.restyle(scatterLayer.config);
+      }
 
-      // Overlay points keep their X marker and run-derived color. Only their
-      // visibility follows Optimal Only and overlay hardware selection.
       zoomGroup.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (d) {
         const visible = ir.isOverlayPointVisible(d);
         d3.select(this)
           .style('opacity', visible ? pointOpacityForVariant(d) : 0)
           .style('pointer-events', visible ? 'auto' : 'none');
       });
-      // Overlay rooflines are only drawn for active overlay hardware; a
-      // comparison row hidden from the legend is the one visibility toggle
-      // they answer to here.
       zoomGroup.selectAll<SVGPathElement, unknown>('.overlay-roofline-path').each(function () {
         const roofline = d3.select(this);
         if (ir.hiddenPowerVariants.has(this.dataset.powerVariant ?? '')) {
@@ -3881,8 +4058,6 @@ const ScatterGraph = React.memo(
         }
       });
 
-      // Rooflines: visibility and solid-stroke recolor as direct writes. Keep
-      // gradient url references intact and never touch animated path geometry.
       zoomGroup.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
         const hw = this.dataset.hwKey;
         const precision = this.dataset.precision;
@@ -3941,50 +4116,41 @@ const ScatterGraph = React.memo(
       gradientColorByPoint,
     ]);
 
-    // Trace presence resolves asynchronously after the points render. Stamp
-    // only the tooltip metadata it owns, without restyling any chart marks.
-    useLayoutEffect(() => {
-      const display = getDisplaySelection();
-      if (!display) return;
-      display.zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-        const pointId = isPersistedBenchmarkId(d.id) ? d.id : null;
-        const persistedAgenticPoint = d.benchmark_type === 'agentic_traces' && pointId !== null;
-        d3.select(this)
-          .attr(
-            'data-has-trace',
-            pointId !== null && traceAvailability?.[pointId] === true ? 'true' : null,
-          )
-          .attr(
-            'data-trace-availability',
-            persistedAgenticPoint ? (isTraceAvailabilityPending ? 'pending' : 'resolved') : null,
-          );
-      });
-    }, [getDisplaySelection, dataIdentity, traceAvailability, isTraceAvailabilityPending]);
-
-    // Label-mode controls own point-label visibility and collision placement.
-    // Line and gradient labels are collision obstacles whose custom layer
-    // renders once through D3's display phase. Replaying that layer before the
-    // point-label collision pass preserves its stable placement behavior
-    // without restyling unrelated point marks. Overlay label visibility remains
-    // owned by the overlay custom layer's matching selective display callback.
     useLayoutEffect(() => {
       const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
+      const gpuCountChanged = lastShowGpuCountRef.current !== showPointLabels;
       const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
+      const frameworkLabelChanged = lastShowFrameworkLabelRef.current !== showFrameworkLabel;
       const gradientLabelsChanged = lastShowGradientLabelsRef.current !== showGradientLabels;
-      if (!visibilityChanged && !lineLabelsChanged && !gradientLabelsChanged) return;
+      if (
+        !visibilityChanged &&
+        !gpuCountChanged &&
+        !lineLabelsChanged &&
+        !gradientLabelsChanged &&
+        !frameworkLabelChanged
+      )
+        return;
+      lastShowGpuCountRef.current = showPointLabels;
       lastPointLabelsVisibleRef.current = pointLabelsVisible;
       lastShowLineLabelsRef.current = showLineLabels;
+      lastShowFrameworkLabelRef.current = showFrameworkLabel;
       lastShowGradientLabelsRef.current = showGradientLabels;
       const display = getDisplaySelection();
       if (!display) return;
       const { svg, ctx, zoomGroup } = display;
-      if (visibilityChanged) {
-        zoomGroup
-          .selectAll<SVGTextElement, unknown>('.dot-group .point-label')
-          .style('display', pointLabelsVisible ? '' : 'none')
-          .style('opacity', pointLabelsVisible ? 1 : 0);
+      if (visibilityChanged || gpuCountChanged) {
+        canvasPointLayerOf<InferenceData>(zoomGroup.node())?.setLabels(
+          pointLabelsVisible
+            ? (point) =>
+                pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels)
+            : null,
+          'var(--foreground)',
+        );
       }
-      if ((lineLabelsChanged || gradientLabelsChanged) && (showLineLabels || showGradientLabels)) {
+      if (
+        (lineLabelsChanged || gradientLabelsChanged || frameworkLabelChanged) &&
+        (showLineLabels || showGradientLabels)
+      ) {
         const entranceInFlight = zoomGroup
           .selectAll<SVGPathElement, unknown>('.roofline-path')
           .nodes()
@@ -3995,11 +4161,17 @@ const ScatterGraph = React.memo(
         }
       }
       if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
-    }, [getDisplaySelection, pointLabelsVisible, showGradientLabels, showLineLabels]);
+    }, [
+      getDisplaySelection,
+      pointLabelsVisible,
+      showPointLabels,
+      useAdvancedLabels,
+      showConcurrencyLabels,
+      showGradientLabels,
+      showLineLabels,
+      showFrameworkLabel,
+    ]);
 
-    // Visibility and palette changes can alter label collision placement and
-    // line-label colors. Label mode changes are handled by each custom layer's
-    // display identity, so they do not also enter this pass.
     useLayoutEffect(() => {
       const display = getDisplaySelection();
       if (!display) return;
@@ -4016,7 +4188,7 @@ const ScatterGraph = React.memo(
           rooflineLayer.render(zoomGroup, currentZoomRenderContext(svg, ctx));
         }
       }
-      if (labelDisplay.showPointLabels && !labelDisplay.showGradientLabels) {
+      if (labelDisplay.pointLabelsVisible) {
         avoidPointLabelCollisions(zoomGroup);
       }
     }, [
@@ -4030,8 +4202,6 @@ const ScatterGraph = React.memo(
       resolveColor,
     ]);
 
-    // Known-issue annotations have their own data and theme inputs. Re-render
-    // only that layer when either changes.
     useLayoutEffect(() => {
       const display = getDisplaySelection();
       if (!display) return;
@@ -4044,9 +4214,6 @@ const ScatterGraph = React.memo(
       }
     }, [getDisplaySelection, knownIssueAnnotations, getCssColor, resolveColor]);
 
-    // D3 custom layers are keyed additions, so removing the overlay layer from
-    // the config does not delete DOM that the previous render created. Clear
-    // those marks explicitly when the last unofficial run is dismissed.
     useLayoutEffect(() => {
       if (overlayData) return;
       const svg = chartRef.current?.getSvgElement?.();
@@ -4056,19 +4223,6 @@ const ScatterGraph = React.memo(
         .remove();
     }, [overlayData]);
 
-    // Perf-ruler decorations: refresh the curve hit strokes and redraw all
-    // rulers whenever the mode, ruler state, visibility filters, or
-    // underlying data change. Narrow mutation scope — only the hit layer
-    // and the ruler groups are touched; the chart itself never rebuilds for
-    // a ruler interaction. Redraws use the currently applied zoom transform
-    // (mode, rulers, and live iso-x are read through refs in drawPerfRuler).
-    //
-    // Ordering matters twice here — this effect is deliberately declared
-    // AFTER both (a) the mark-styling effect that writes curve opacities
-    // from the legend/precision filters, so hiding a curve clears the ruler,
-    // label, arrow, and halos in the SAME commit paint (no lingering frame),
-    // and (b) the overlay-cleanup effect above, so a dismissed overlay's
-    // paths are already gone when the ruler re-resolves.
     useLayoutEffect(() => {
       const display = getDisplaySelection();
       if (!display) return;
@@ -4080,13 +4234,6 @@ const ScatterGraph = React.memo(
         display.ctx.width,
         display.ctx.height,
       );
-      // Hidden-but-present curves KEEP their rulers (a legend re-toggle
-      // brings a hidden ruler back); curves whose paths left the DOM
-      // entirely are truly gone from the data, so prune each ruler (and the
-      // draft) that references one. `prunePerfRulers` bails out with the
-      // same reference when nothing changed. Share-link rulers still
-      // pending are not state yet, so prune cannot touch them; drawPerfRuler
-      // above committed those whose curves now exist.
       setPerfRulerState((prev) =>
         prunePerfRulers(prev, (cls) => !display.zoomGroup.select(`.${CSS.escape(cls)}`).empty()),
       );
@@ -4102,12 +4249,10 @@ const ScatterGraph = React.memo(
       overlayData,
     ]);
 
-    // Dismiss tooltip on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
     }, [selectedPrecisions, selectedYAxisMetric, hideNonOptimal, overlayData, chartId]);
 
-    // Dismiss when pinned point's hardware becomes hidden
     useEffect(() => {
       const pp = chartRef.current?.getPinnedPoint() as InferenceData | null;
       if (!pp) return;
@@ -4122,9 +4267,6 @@ const ScatterGraph = React.memo(
       }
     }, [effectiveActiveHwTypes, selectedPrecisions, activeOverlayHwTypes]);
 
-    // Distinguish only causes supported by the currently available rows. The
-    // official data is already scope-filtered, so an empty array alone cannot
-    // prove which upstream filter removed it. Overlay rows use the same filters.
     const hasMatchingHiddenPoints =
       data.some((point) => selectedPrecisions.includes(point.precision)) ||
       (overlayData?.data ?? []).some(
@@ -4174,11 +4316,11 @@ const ScatterGraph = React.memo(
       />
     );
 
-    // --- Empty state ---
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
         <div className="relative w-full p-3">
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
+          {footer}
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}
@@ -4189,23 +4331,27 @@ const ScatterGraph = React.memo(
     }
 
     return (
-      <>
+      <div
+        className="contents"
+        data-orange-chicken-eligible={
+          selectedSequence === Sequence.AgenticTraces ? 'true' : undefined
+        }
+      >
         <D3Chart<InferenceData>
           ref={chartRef}
-          // Embeds drop the zoom/pan hint line; the host page has its own caption.
-          instructions={minimalChrome ? '' : undefined}
+          // PowerX drops the interaction hint under its charts; /infx/inference keeps it.
+          instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
-          // Stable across toggles: the render effect keys on this for "data
-          // changed" rebuilds; scale domains come from x/yScaleConfig (computed
-          // from the visible points), and visibility is applied via opacity.
+          height={plotHeight}
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
-          margin={CHART_MARGIN}
+          margin={chartMargin}
           watermark={getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}
+          footer={footer}
           xScale={xScaleConfig}
           yScale={yScaleConfig}
           xAxis={xAxisConfig}
@@ -4215,6 +4361,7 @@ const ScatterGraph = React.memo(
           tooltip={tooltipConfig}
           transitionDuration={transitionDuration}
           onRender={onRender}
+          onExportRender={onExportRender}
           noDataOverlay={
             filteredData.length === 0 && processedOverlayData.length === 0 ? (
               <div
@@ -4226,317 +4373,343 @@ const ScatterGraph = React.memo(
             ) : undefined
           }
           legendElement={
-            <ChartLegend
-              variant="sidebar"
-              onItemHover={handleLegendHover}
-              onItemHoverEnd={handleLegendHoverEnd}
-              onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
-              legendItems={[
-                // Overlay legend: one entry per loaded unofficial run that actually
-                // contributes points to this chart. Colored from the shared palette
-                // so the legend swatch matches the stroke color used in the chart.
-                ...(overlayData && unofficialRunInfos.length > 0
-                  ? unofficialRunInfos
-                      .map((info, idx) => {
-                        const hasPoints = overlayData.data.some(
-                          (d) =>
-                            overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
-                            selectedPrecisions.includes(d.precision),
-                        );
-                        if (!hasPoints) return null;
-                        const branch = info.branch || `run ${info.id}`;
-                        return {
-                          name: `✕ unofficial-run-${info.id}`,
-                          label: getInferenceRunLabel(
-                            `✕ ${branch}`,
-                            overlayData.data.filter(
-                              (point) =>
-                                overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
-                                selectedPrecisions.includes(point.precision),
+            <>
+              {!minimalChrome && (
+                <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+              )}
+              <EngineComparisonConflictNotice className="mb-2" />
+              <ChartLegend
+                variant="sidebar"
+                onItemHover={handleLegendHover}
+                onItemHoverEnd={handleLegendHoverEnd}
+                onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
+                legendItems={[
+                  ...(overlayData && unofficialRunInfos.length > 0
+                    ? unofficialRunInfos
+                        .map((info, idx) => {
+                          const hasPoints = overlayData.data.some(
+                            (d) =>
+                              overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
+                              selectedPrecisions.includes(d.precision),
+                          );
+                          if (!hasPoints) return null;
+                          const branch = info.branch || `run ${info.id}`;
+                          return {
+                            name: `✕ unofficial-run-${info.id}`,
+                            label: getInferenceRunLabel(
+                              `✕ ${branch}`,
+                              overlayData.data.filter(
+                                (point) =>
+                                  overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
+                                  selectedPrecisions.includes(point.precision),
+                              ),
                             ),
-                          ),
-                          color: overlayRunColor(idx),
-                          title: legendT.unofficialTitle(branch),
-                          isHighlighted: true,
-                          hw: `overlay-run-${info.id}`,
-                          isActive: true,
-                          onClick: () => {},
-                          onShowPoints: () => {
-                            setPointsTableTarget({
-                              kind: 'overlay',
-                              runIndex: idx,
-                              runId: info.id,
-                              branch,
-                            });
-                            track('inference_legend_points_table_opened', {
-                              hw: `overlay-run-${info.id}`,
-                              framework: 'overlay',
-                            });
-                          },
-                          tooltip: (
-                            <div className="font-normal text-xs">
-                              <div className="text-red-500 font-semibold">
-                                {legendT.unofficialRun}
-                              </div>
-                              <div>
-                                {legendT.branch}: {branch}
-                              </div>
-                              {info.url && (
-                                <a
-                                  href={info.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline"
-                                >
-                                  {legendT.viewWorkflow}
-                                </a>
-                              )}
-                            </div>
-                          ),
-                        };
-                      })
-                      .filter((x): x is NonNullable<typeof x> => x !== null)
-                  : []),
-                ...Object.entries(hardwareConfig)
-                  .filter(([key]) =>
-                    showAllHardwareTypes
-                      ? effectiveActiveHwTypes.has(key)
-                      : hwTypesWithData.has(key),
-                  )
-                  .toSorted(
-                    ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                  )
-                  .map(([key, hwConfig]: [string, any]) => ({
-                    name: hwConfig.name,
-                    label: getDisplayLabel(hwConfig),
-                    color: resolveColor(key),
-                    title: hwConfig.gpu,
-                    isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
-                    hw: key,
-                    isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
-                    onClick: showAllHardwareTypes
-                      ? () => {}
-                      : () => {
-                          handleToggleHwType(key);
-                          track('latency_hw_type_toggled', { hw: key });
-                        },
-                    onShowPoints: () => {
-                      setPointsTableTarget({ kind: 'official', hwKey: key });
-                      track('inference_legend_points_table_opened', {
-                        hw: key,
-                        framework: hwConfig.framework ?? '',
-                      });
-                    },
-                    tooltip: legendChangelogs.has(key)
-                      ? formatChangelogDescription(
-                          legendChangelogs.get(key)!.entries.map((entry) => entry.description),
-                        )
-                      : null,
-                  })),
-                // Comparison series (`i_pcompare`): one dash-swatch row per
-                // boundary / role, toggling that series across every hardware.
-                ...powerVariantLegendItems,
-              ]}
-              disableActiveSort={false}
-              isLegendExpanded={isLegendExpanded}
-              onExpandedChange={(expanded) => {
-                setIsLegendExpanded(expanded);
-                track('latency_legend_expanded', { expanded });
-              }}
-              switches={[
-                ...(selectedYAxisMetric === 'y_inputTputPerGpu'
-                  ? []
-                  : [
-                      {
-                        id: 'scatter-log-scale',
-                        label: legendT.logScale,
-                        advanced: true,
-                        checked: logScale,
-                        onCheckedChange: (checked: boolean) => {
-                          setLogScale(checked);
-                          track('latency_log_scale_toggled', { enabled: checked });
-                        },
-                      },
-                    ]),
-                ...(paretoDirection
-                  ? [
-                      {
-                        id: 'scatter-hide-non-optimal',
-                        label: legendT.optimalOnly,
-                        checked: hideNonOptimal,
-                        onCheckedChange: (checked: boolean) => {
-                          setHideNonOptimal(checked);
-                          track('latency_hide_non_optimal_toggled', { enabled: checked });
-                        },
-                        ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
-                          ? {
-                              infoTooltip: showPowerEnvelope
-                                ? legendT.powerBoundaryInfo
-                                : legendT.optimalInfo,
-                            }
-                          : {}),
-                      },
-                      {
-                        id: `${chartId}-pareto-frontier`,
-                        label: legendT.paretoFrontier,
-                        advanced: true,
-                        checked: showParetoFrontier,
-                        infoTooltip: legendT.paretoFrontierInfo,
-                        onCheckedChange: (checked: boolean) => {
-                          setShowParetoFrontier(checked);
-                          track('inference_pareto_frontier_toggled', { enabled: checked });
-                        },
-                      },
-                    ]
-                  : []),
-                {
-                  id: 'scatter-point-labels',
-                  label: legendT.labels,
-                  advanced: true,
-                  checked: showPointLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowPointLabels(checked);
-                    track('latency_point_labels_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-high-contrast',
-                  label: legendT.highContrast,
-                  advanced: true,
-                  checked: highContrast,
-                  onCheckedChange: (checked: boolean) => {
-                    setHighContrast(checked);
-                    track('latency_high_contrast_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-parallelism-labels',
-                  label: legendT.parallelismLabels,
-                  advanced: true,
-                  checked: useAdvancedLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setUseAdvancedLabels(checked);
-                    track('latency_advanced_labels_toggled', { enabled: checked });
-                    // Parallelism labels are point labels; turning them on is
-                    // pointless if labels are hidden, so auto-enable Labels.
-                    if (checked && !showPointLabels) setShowPointLabels(true);
-                    if (checked && !showGradientLabels) {
-                      window.dispatchEvent(
-                        new CustomEvent(GRADIENT_NUDGE_EVENT, {
-                          detail: {
-                            enableGradient: () => {
-                              setShowGradientLabels(true);
-                              setUseAdvancedLabels(false);
-                              track('latency_gradient_labels_toggled', {
-                                enabled: true,
-                                source: 'nudge',
+                            color: overlayRunColor(idx),
+                            lineDasharray:
+                              powerCompareMode === 'none'
+                                ? overlayRooflineDasharray(idx)
+                                : undefined,
+                            title: legendT.unofficialTitle(branch),
+                            isHighlighted: true,
+                            hw: `overlay-run-${info.id}`,
+                            isActive: true,
+                            onClick: () => {},
+                            onShowPoints: () => {
+                              setPointsTableTarget({
+                                kind: 'overlay',
+                                runIndex: idx,
+                                runId: info.id,
+                                branch,
+                              });
+                              track('inference_legend_points_table_opened', {
+                                gpu: `overlay-run-${info.id}`,
+                                framework: 'overlay',
                               });
                             },
-                          },
-                        }),
-                      );
-                    }
-                  },
-                },
-                {
-                  id: 'scatter-gradient-labels',
-                  label: legendT.gradientLabels,
-                  checked: showGradientLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowGradientLabels(checked);
-                    track('latency_gradient_labels_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-line-labels',
-                  label: legendT.lineLabels,
-                  advanced: true,
-                  checked: showLineLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowLineLabels(checked);
-                    track('latency_line_labels_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-perf-ruler',
-                  label: legendT.perfRuler,
-                  advanced: true,
-                  checked: perfRulerMode,
-                  infoTooltip: legendT.perfRulerInfo,
-                  onCheckedChange: (checked: boolean) => {
-                    setPerfRulerMode(checked);
-                    // Toggle-off clears ALL rulers in the same state batch —
-                    // the pre-paint decoration effect then removes the rulers
-                    // and the curve hit strokes before the next frame (no
-                    // lingering lines after toggle-off).
-                    if (!checked) {
-                      setPerfRulerState(clearPerfRulers);
-                      persistedRulers?.discardPending();
-                    }
-                    track('latency_perf_ruler_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-concurrency-labels',
-                  label: legendT.concurrencyLabels,
-                  advanced: true,
-                  checked: showConcurrencyLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowConcurrencyLabels(checked);
-                    track('latency_concurrency_labels_toggled', { enabled: checked });
-                    // Concurrency is a point-label annotation; turning it on is
-                    // pointless if labels are hidden, so auto-enable Labels.
-                    if (checked && !showPointLabels) setShowPointLabels(true);
-                  },
-                },
-              ]}
-              onAdvancedExpandedChange={(expanded) => {
-                track('latency_advanced_controls_toggled', { expanded });
-              }}
-              actions={[
-                ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < scopedOverlayHwTypes.size ||
-                quickFilterCount > 0
-                  ? [
-                      {
-                        id: 'scatter-reset-filter',
-                        label: legendT.resetFilter,
-                        onClick: () => {
-                          resetUnifiedSelection();
-                          clearQuickFilters();
-                          track('latency_legend_filter_reset');
-                        },
-                      },
-                    ]
-                  : []),
-                ...(perfRulerState.rulers.length > 0
-                  ? [
-                      {
-                        id: 'scatter-clear-perf-rulers',
-                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
-                        onClick: () => {
-                          track('latency_perf_ruler_cleared', {
-                            count: perfRulerState.rulers.length,
+                            tooltip: (
+                              <div className="font-normal text-xs">
+                                <div className="font-medium text-destructive">
+                                  {legendT.unofficialRun}
+                                </div>
+                                <div>
+                                  {legendT.branch}: {branch}
+                                </div>
+                                {info.url && (
+                                  <a
+                                    href={info.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline"
+                                  >
+                                    {legendT.viewWorkflow}
+                                  </a>
+                                )}
+                              </div>
+                            ),
+                          };
+                        })
+                        .filter((x): x is NonNullable<typeof x> => x !== null)
+                    : []),
+                  ...Object.entries(hardwareConfig)
+                    .filter(([key]) =>
+                      showAllHardwareTypes
+                        ? effectiveActiveHwTypes.has(key)
+                        : hwTypesWithData.has(key),
+                    )
+                    .toSorted(
+                      ([a], [b]) =>
+                        getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+                    )
+                    .map(([key, hwConfig]: [string, any]) => {
+                      const isActive = showAllHardwareTypes
+                        ? true
+                        : effectiveOfficialHwTypes.has(key);
+                      const blocked = isActive ? undefined : blockedHwToggles.get(key);
+                      return {
+                        name: hwConfig.name,
+                        label: getDisplayLabel(hwConfig),
+                        color: resolveColor(key),
+                        lineDasharray:
+                          powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
+                        title: hwConfig.gpu,
+                        isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
+                        hw: key,
+                        isActive,
+                        blockedReason: blocked
+                          ? describeEngineComparisonConflict(
+                              { kind: 'blocked', ...blocked },
+                              locale,
+                            )
+                          : undefined,
+                        onClick: showAllHardwareTypes
+                          ? () => {}
+                          : () => {
+                              handleToggleHwType(key);
+                              track('latency_hw_type_toggled', { gpu: key });
+                            },
+                        onShowPoints: () => {
+                          setPointsTableTarget({ kind: 'official', hwKey: key });
+                          track('inference_legend_points_table_opened', {
+                            gpu: key,
+                            framework: hwConfig.framework ?? '',
                           });
-                          setPerfRulerState(clearPerfRulers);
-                          persistedRulers?.discardPending();
                         },
-                      },
-                    ]
-                  : []),
-                {
-                  id: 'scatter-quick-filters',
-                  label: legendT.quickFilters(quickFilterCount),
-                  onClick: () => {
-                    setQuickFiltersOpen(true);
-                    track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                        tooltip: legendChangelogs.has(key)
+                          ? formatChangelogDescription(
+                              legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                            )
+                          : null,
+                      };
+                    }),
+                  ...powerVariantLegendItems,
+                ]}
+                disableActiveSort={false}
+                isLegendExpanded={isLegendExpanded}
+                onExpandedChange={(expanded) => {
+                  setIsLegendExpanded(expanded);
+                  track('latency_legend_expanded', { enabled: expanded });
+                }}
+                switches={[
+                  ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                    ? []
+                    : [
+                        {
+                          id: 'scatter-log-scale',
+                          label: legendT.logScale,
+                          checked: logScale,
+                          onCheckedChange: (checked: boolean) => {
+                            setLogScale(checked);
+                            track('latency_log_scale_toggled', { enabled: checked });
+                          },
+                        },
+                      ]),
+                  ...(paretoDirection
+                    ? [
+                        {
+                          id: 'scatter-hide-non-optimal',
+                          label: legendT.optimalOnly,
+                          checked: hideNonOptimal,
+                          onCheckedChange: (checked: boolean) => {
+                            setHideNonOptimal(checked);
+                            track('latency_hide_non_optimal_toggled', { enabled: checked });
+                          },
+                          ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
+                            ? {
+                                infoTooltip: showPowerEnvelope
+                                  ? legendT.powerBoundaryInfo
+                                  : legendT.optimalInfo,
+                              }
+                            : {}),
+                        },
+                        {
+                          id: `${chartId}-pareto-frontier`,
+                          label: legendT.paretoFrontier,
+                          advanced: true,
+                          checked: showParetoFrontier,
+                          infoTooltip: legendT.paretoFrontierInfo,
+                          onCheckedChange: (checked: boolean) => {
+                            setShowParetoFrontier(checked);
+                            track('inference_pareto_frontier_toggled', { enabled: checked });
+                          },
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'scatter-point-labels',
+                    label: legendT.labels,
+                    advanced: true,
+                    checked: showPointLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowPointLabels(checked);
+                      track('latency_point_labels_toggled', { enabled: checked });
+                    },
                   },
-                },
-              ]}
-              hideAtomFootnote
-              readOnly={minimalChrome}
-              enableTooltips={true}
-            />
+                  {
+                    id: 'scatter-high-contrast',
+                    label: legendT.highContrast,
+                    advanced: true,
+                    checked: highContrast,
+                    onCheckedChange: (checked: boolean) => {
+                      setHighContrast(checked);
+                      track('latency_high_contrast_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-parallelism-labels',
+                    label: legendT.parallelismLabels,
+                    checked: useAdvancedLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setUseAdvancedLabels(checked);
+                      track('latency_advanced_labels_toggled', { enabled: checked });
+                      if (checked && !showGradientLabels) {
+                        window.dispatchEvent(
+                          new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                            detail: {
+                              enableGradient: () => {
+                                setShowGradientLabels(true);
+                                setUseAdvancedLabels(false);
+                                track('latency_gradient_labels_toggled', {
+                                  enabled: true,
+                                  source: 'nudge',
+                                });
+                              },
+                            },
+                          }),
+                        );
+                      }
+                    },
+                  },
+                  {
+                    id: 'scatter-gradient-labels',
+                    label: legendT.gradientLabels,
+                    checked: showGradientLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowGradientLabels(checked);
+                      track('latency_gradient_labels_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-line-labels',
+                    label: legendT.lineLabels,
+                    advanced: true,
+                    checked: showLineLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowLineLabels(checked);
+                      track('latency_line_labels_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-framework-label',
+                    label: legendT.frameworkLabel,
+                    advanced: true,
+                    checked: showFrameworkLabel,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowFrameworkLabel(checked);
+                      track('latency_framework_label_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-offloading-label',
+                    label: legendT.offloadingLabel,
+                    advanced: true,
+                    checked: showOffloadingLabel,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowOffloadingLabel(checked);
+                      track('latency_offloading_label_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-perf-ruler',
+                    label: legendT.perfRuler,
+                    advanced: true,
+                    checked: perfRulerMode,
+                    infoTooltip: legendT.perfRulerInfo,
+                    onCheckedChange: (checked: boolean) => {
+                      setPerfRulerMode(checked);
+                      if (!checked) {
+                        setPerfRulerState(clearPerfRulers);
+                        persistedRulers?.discardPending();
+                      }
+                      track('latency_perf_ruler_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-concurrency-labels',
+                    label: legendT.concurrencyLabels,
+                    advanced: true,
+                    checked: showConcurrencyLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowConcurrencyLabels(checked);
+                      track('latency_concurrency_labels_toggled', { enabled: checked });
+                    },
+                  },
+                ]}
+                onAdvancedExpandedChange={(expanded) => {
+                  track('latency_advanced_controls_toggled', { enabled: expanded });
+                }}
+                reset={{
+                  id: 'scatter-reset-filter',
+                  disabled:
+                    effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
+                    activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
+                    quickFilterCount === 0,
+                  onClick: () => {
+                    resetUnifiedSelection();
+                    clearQuickFilters();
+                    track('latency_legend_filter_reset');
+                  },
+                }}
+                actions={[
+                  ...(perfRulerState.rulers.length > 0
+                    ? [
+                        {
+                          id: 'scatter-clear-perf-rulers',
+                          label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                          onClick: () => {
+                            track('latency_perf_ruler_cleared', {
+                              count: perfRulerState.rulers.length,
+                            });
+                            setPerfRulerState(clearPerfRulers);
+                            persistedRulers?.discardPending();
+                          },
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'scatter-quick-filters',
+                    label: legendT.quickFilters(quickFilterCount),
+                    onClick: () => {
+                      setQuickFiltersOpen(true);
+                      track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                    },
+                  },
+                ]}
+                hideAtomFootnote
+                readOnly={minimalChrome}
+                collapsible={!minimalChrome}
+                enableTooltips={true}
+              />
+            </>
           }
         />
         <QuickFiltersDialog
@@ -4557,7 +4730,7 @@ const ScatterGraph = React.memo(
             isOverlay={pointsTable.isOverlay}
             onRowClick={(row) =>
               track('inference_legend_points_table_row_clicked', {
-                hw: pointsTable.hw,
+                gpu: pointsTable.hw,
                 conc: row.conc,
                 href: row.href ?? '',
               })
@@ -4593,7 +4766,14 @@ const ScatterGraph = React.memo(
             }}
           />
         )}
-      </>
+        {reproducePoint === null ? null : (
+          <ReproduceDrawer
+            point={reproducePoint}
+            source="scatter"
+            onClose={() => setReproducePoint(null)}
+          />
+        )}
+      </div>
     );
   },
 );

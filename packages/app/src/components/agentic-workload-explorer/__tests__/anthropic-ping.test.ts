@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isAnthropicHealthPing } from '@/lib/agentic-workload-explorer/anthropic-ping';
 
-// Mirrors packages/proxy/src/__tests__/anthropic-ping.test.ts. If the proxy
-// detector ever changes shape, this dashboard-side copy needs to track —
-// otherwise the dashboard would let through pings the proxy is supposed to
-// drop (or vice versa).
-
 const CANONICAL_PING = {
   model: 'claude-haiku-4-5-20251001',
   messages: [{ role: 'user', content: null }],
@@ -33,7 +28,6 @@ describe('isAnthropicHealthPing (dashboard mirror)', () => {
   });
 
   it('matches across content variants (null, empty string, "test")', () => {
-    // SDK has drifted across versions; structural shape is what matters.
     expect(
       isAnthropicHealthPing({
         ...CANONICAL_PING,

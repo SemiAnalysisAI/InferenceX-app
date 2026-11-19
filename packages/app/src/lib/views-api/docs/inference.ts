@@ -1,5 +1,6 @@
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import {
   text,
   stringSchema,
@@ -10,14 +11,6 @@ import {
   arraySchema,
   listParam,
 } from '@/lib/api/api-documentation-helpers';
-
-/**
- * Docs fragment for GET /api/v1/views/inference.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
@@ -82,10 +75,10 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'X-axis mode. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
-      'X 轴模式。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
+      'X-axis mode. Defaults to e2e for Qwen3.5 and interactivity for other models. An explicit value overrides the model default. e2e-normalized-interactivity uses persisted derived AgentX metrics, and unofficialrun overlays use the values reported by their run; points without eligible values are omitted.',
+      'X 轴模式。Qwen3.5 默认为 e2e，其他模型默认为 interactivity；显式值覆盖模型默认值。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标，unofficialrun 叠加数据则使用该 run 自身报告的数值；没有合格数值的数据点不参与此视图。',
     ),
-    schema: { type: 'string', enum: X_MODE_ENUM, default: 'interactivity' },
+    schema: { type: 'string', enum: X_MODE_ENUM },
     example: 'e2e',
   },
   {
@@ -155,8 +148,8 @@ const parameters: readonly ApiParameter[] = [
   listParam(
     'gpus',
     text(
-      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey).',
-      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。',
+      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey). When omitted, Qwen3.5 excludes MI300X, MI325X, H100, and H200. An explicit list overrides this default; gpus= includes all hardware.',
+      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。省略时，Qwen3.5 排除 MI300X、MI325X、H100 和 H200。显式列表覆盖此默认值；gpus= 包含所有硬件。',
     ),
     'h200,mi355x',
   ),
@@ -168,7 +161,7 @@ const parameters: readonly ApiParameter[] = [
     'frameworks',
     text('Comma-separated framework families.', '逗号分隔的推理框架系列。'),
     'vllm,sglang',
-    ['atom', 'sglang', 'trt', 'vllm'],
+    ['atom', 'sglang', 'tokenspeed', 'trt', 'vllm'],
   ),
   listParam(
     'deployment',
@@ -203,8 +196,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Defaults to true: rank all candidate frameworks per SKU using the current axes and shared measured range. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
-      '默认为 true：按当前坐标轴和共同实测区间，对每个 SKU 的所有候选框架进行排名。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
+      'Defaults to true: rank candidate frameworks per SKU within the selected precisions, using the current axes. Each candidate is scored by the area its measured Pareto frontier dominates (hypervolume from the origin, with lower-is-better axes taken as reciprocals so $/M tok ranks like tok/$); a curve earns nothing where it has no measurement. An unselected precision cannot displace a visible configuration. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
+      '默认为 true：仅在选定精度内，按当前坐标轴对每个 SKU 的候选框架进行排名。每个候选按其实测 Pareto 前沿所覆盖的面积（hypervolume，以原点为参考点）计分；越低越好的坐标轴先取倒数，因此 $/M tok 与 tok/$ 的排名一致；没有实测数据的区间不得分。未选中的精度不会挤掉当前可见的配置。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
     ),
     schema: { type: 'boolean', default: true },
     example: 'true',
@@ -216,7 +209,7 @@ const parameters: readonly ApiParameter[] = [
     type: 'boolean',
     description: text(
       'API-only analysis: include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency). Uses scoped observed points before frontier/best pruning. No corresponding dashboard control or panel. JSON only.',
-      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选后、前沿和 best 筛选前的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
+      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选范围内、尚未经前沿和 best 筛选的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -282,13 +275,37 @@ const parameters: readonly ApiParameter[] = [
     example: 'true',
   },
   {
+    name: 'powerBreakdown',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured Grace CPU (NVL72 with valid socket telemetry), and the modeled host CPU, memory, NICs, NVSwitch, storage, PCIe and misc parts, fans, PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
+      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 Grace CPU（NVL72 且插槽遥测有效时），以及建模的主机 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他部件、风扇、电源损耗、Scale-out 网络分摊和 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
+    name: 'headroom',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include headroom: the PowerX measured-vs-TDP table. Per hardware line (hwKey + precision), measured average and P90 W per chip, P90 as % of registry TDP and headroom = 100 − that, read at 25 / 50 / 100 / 300 tok/s/user on interactivityField by the chart’s own interpolation (throughput Pareto front, monotone Steffen spline). A cell outside a line’s measured range is null, never extrapolated; lines without P90 power, throughput, a registry TDP or two points are omitted. GPU board power only. JSON only.',
+      '返回 headroom：PowerX 的实测功耗 vs TDP 余量表。按硬件曲线（hwKey + 精度）给出每芯片实测平均与 P90 功耗、P90 占注册表 TDP 的百分比以及余量 = 100 − 该百分比，在 interactivityField 上的 25 / 50 / 100 / 300 tok/s/user 处用图表自身的插值（吞吐 Pareto 前沿、单调 Steffen 样条）读取。超出曲线实测范围的单元为 null，不做外推；缺少 P90 功耗、吞吐、注册表 TDP 或不足两个点的曲线会被省略。仅 GPU 板卡功耗。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
     name: 'format',
     location: 'query',
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns one flat row per plotted point; serviceCompare, roleShare and powerFit analytical results require JSON and return 400 with CSV.',
-      '响应编码。csv 为每个图表点返回一行平面数据；serviceCompare、roleShare 和 powerFit 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
+      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare, powerFit, powerBreakdown and headroom analytical results require JSON and return 400 with CSV.',
+      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare、powerFit、powerBreakdown 和 headroom 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -319,7 +336,11 @@ const seriesSchema = objectSchema(
     gpu: stringSchema,
     framework: stringSchema,
     specMethod: stringSchema,
-    label: stringSchema,
+    label: {
+      ...stringSchema,
+      description:
+        'Chart display label. If any point in a plain SGLang/vLLM series has router_name=smg, the entire series is labeled SMG SGLang/SMG vLLM. Canonical framework and hwKey are unchanged.',
+    },
     vendor: stringSchema,
     deployment: stringSchema,
     kvOffload: booleanSchema,
@@ -336,6 +357,71 @@ const seriesSchema = objectSchema(
     'kvOffload',
     'bestPerSku',
     'points',
+  ],
+);
+
+const tableRowSchema = objectSchema(
+  {
+    ...pointSchema.properties,
+    id: { type: ['integer', 'null'] },
+    hwKey: stringSchema,
+    gpu: stringSchema,
+    framework: stringSchema,
+    specMethod: stringSchema,
+    label: {
+      ...stringSchema,
+      description:
+        'Point-specific chart display label, including SMG SGLang/SMG vLLM when this point has router_name=smg. Canonical framework and hwKey are unchanged.',
+    },
+    vendor: stringSchema,
+    deployment: stringSchema,
+    kvOffload: booleanSchema,
+    x: { type: ['number', 'null'], description: 'Selected service axis; null when unavailable.' },
+    y: { type: ['number', 'null'], description: 'Selected all-in metric; null when unavailable.' },
+    measuredGpuWatts: { ...numberSchema, description: 'Validated measured mean W/GPU.' },
+    status: { type: 'string', enum: ['available', 'unavailable'] },
+    unavailableReason: {
+      oneOf: [
+        {
+          type: 'string',
+          enum: [
+            'workload',
+            'hardware',
+            'telemetry',
+            'gpu-count',
+            'topology',
+            'role-power',
+            'model-domain',
+            'energy',
+            'model-unavailable',
+          ],
+        },
+        { type: 'null' },
+      ],
+    },
+  },
+  [
+    'id',
+    'precision',
+    'hwKey',
+    'gpu',
+    'framework',
+    'specMethod',
+    'label',
+    'deployment',
+    'kvOffload',
+    'x',
+    'y',
+    'concurrency',
+    'topologyKey',
+    'tp',
+    'date',
+    'frontier',
+    'bestPerSku',
+    'metrics',
+    'measuredGpuWatts',
+    'status',
+    'unavailableReason',
   ],
 );
 
@@ -453,6 +539,11 @@ const responseSchema = objectSchema(
       ]),
     ),
     series: arraySchema(seriesSchema),
+    tableRows: {
+      ...arraySchema(tableRowSchema),
+      description:
+        'All in Measured only: GPU-valid observations in the selected scope, including unavailable estimates. Honors hardware/best selection; under best=true, SKUs with no rankable estimate keep their rows. Not clipped by optimal or chart axes. Also returned per comparison and overlay. count remains the numeric series point count.',
+    },
     count: integerSchema,
     serviceSources: arraySchema(sourceSchema),
     equalServiceComparison: { ...comparisonSchema, type: ['object', 'null'] },
@@ -539,9 +630,99 @@ const responseSchema = objectSchema(
         ),
       }),
     ),
+    powerBreakdowns: arraySchema(
+      objectSchema({
+        key: { type: 'string', description: 'hwKey|precision.' },
+        hwKey: { type: 'string' },
+        precision: { type: 'string' },
+        label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
+        categories: arraySchema({
+          type: 'string',
+          enum: [...SYSTEM_POWER_CATEGORIES],
+          description:
+            'Parts with watts on at least one point, in stack order. gpu and measuredCpu are measured; the rest are modeled.',
+        }),
+        tdpWattsPerGpu: nullableNumber('Rated board TDP per GPU (reference, not a measurement).'),
+        allInProvisionedWattsPerGpu: nullableNumber(
+          'Registry all-in provisioned W/GPU, PUE included (reference, not a measurement).',
+        ),
+        modelRevision: { type: 'string', description: 'Pinned power_model commit.' },
+        interactivityField: {
+          type: 'string',
+          description:
+            'Interactivity field the points are placed on: the chart x-axis when it is an interactivity axis, otherwise median_intvty.',
+        },
+        points: arraySchema(
+          objectSchema({
+            concurrency: integerSchema,
+            interactivity: {
+              ...numberSchema,
+              description: 'tok/s/user on interactivityField; points are sorted by it.',
+            },
+            configLabel: { type: 'string', description: 'Date, topology and recipe of the point.' },
+            wattsPerGpu: objectSchema(
+              Object.fromEntries(SYSTEM_POWER_CATEGORIES.map((key) => [key, numberSchema])),
+            ),
+            totalWattsPerGpu: { ...numberSchema, description: 'All in Measured W/GPU.' },
+            pue: numberSchema,
+            cpuBasis: {
+              type: ['string', 'null'],
+              description: '`measured` or `modeled` Grace sockets on NVL72 trays; null otherwise.',
+            },
+            chassisBasis: { type: 'string', enum: ['full', 'extrapolated'] },
+            point: identitySchema,
+          }),
+        ),
+      }),
+    ),
+    headroom: objectSchema({
+      interactivities: arraySchema(numberSchema),
+      interactivityField: {
+        type: 'string',
+        description:
+          'Interactivity field the cells are read on: the chart x-axis when it is an interactivity axis, otherwise median_intvty.',
+      },
+      rows: arraySchema(
+        objectSchema({
+          key: { type: 'string', description: 'hwKey|precision.' },
+          hwKey: { type: 'string' },
+          precision: { type: 'string' },
+          label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
+          tdpWatts: { ...numberSchema, description: 'Rated board TDP per GPU from the registry.' },
+          interactivityMin: numberSchema,
+          interactivityMax: numberSchema,
+          cells: arraySchema({
+            oneOf: [
+              objectSchema({
+                interactivity: numberSchema,
+                avgWatts: {
+                  ...numberSchema,
+                  description: 'Interpolated measured average W per chip.',
+                },
+                p90Watts: {
+                  ...numberSchema,
+                  description: 'Interpolated measured P90 fleet W per chip.',
+                },
+                percentTdpP90: { ...numberSchema, description: 'P90 ÷ TDP × 100.' },
+                headroomPercent: { ...numberSchema, description: '100 − percentTdpP90.' },
+              }),
+              { type: 'null' },
+            ],
+          }),
+        }),
+      ),
+    }),
     pricing: { type: ['object', 'null'], additionalProperties: true },
-    comparisons: arraySchema({ type: 'object', additionalProperties: true }),
-    overlays: arraySchema({ type: 'object', additionalProperties: true }),
+    comparisons: arraySchema({
+      type: 'object',
+      properties: { tableRows: arraySchema(tableRowSchema) },
+      additionalProperties: true,
+    }),
+    overlays: arraySchema({
+      type: 'object',
+      properties: { tableRows: arraySchema(tableRowSchema) },
+      additionalProperties: true,
+    }),
   },
   ['view', 'apiVersion', 'params', 'metric', 'xAxis', 'frontier', 'series', 'count'],
 );
@@ -575,6 +756,8 @@ const responseExample = {
     serviceTarget: null,
     roleShare: false,
     powerFit: false,
+    powerBreakdown: false,
+    headroom: false,
   },
   metric: {
     key: 'tpPerGpu',
@@ -679,14 +862,14 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/inference',
     summary: text('Get the main inference chart view', '获取主推理图表视图'),
     description: text(
-      'Returns the chart-ready series the /inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection.',
-      '返回 /inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。',
+      'Returns the chart-ready series the /infx/inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection. All in Measured watts and energy support single_turn and AgentX rows with validated telemetry and supported topology; AgentX uses the power model’s agentic workload state without independent workload calibration. All in Measured adds tableRows with every GPU-valid observation in the selected scope and best-series selection (SKUs with no rankable estimate keep their rows), before optimal or axis clipping; unavailable estimates have y=null and a reason. series and count remain numeric chart points.',
+      '返回 /infx/inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。整体实测功耗及能耗支持遥测已验证、拓扑受支持的 single_turn 和 AgentX 数据；AgentX 采用功耗模型的智能体工作负载状态，尚未针对该工作负载单独校准。整体实测指标另返回 tableRows，保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点（没有可排名估算的 SKU 保留其全部观测点），不按 optimal 或坐标轴显示范围裁剪；估算不可用时 y 为 null，并给出原因。series 和 count 仍仅包含可绘制的数值点。',
     ),
     audience: 'public',
     stability: 'beta',
     parameters,
     responses,
     responseShapeName: 'InferenceView',
-    curlUrl: `${API_BASE_URL}/api/v1/views/inference?model=DeepSeek-V4-Pro&metric=y_tokensPerDollarN&sequence=8k-1k`,
+    curlUrl: `${API_BASE_URL}/api/v1/views/inference?model=Kimi-K3&metric=y_tokensPerDollarN&sequence=agentic-traces`,
   },
 ];

@@ -26,7 +26,6 @@ interface CompareOgOptions {
   size: CompareOgSize;
 }
 
-/** Shared compare OG layout with optional bundled Simplified Chinese fonts. */
 export async function renderCompareOg({
   eyebrow,
   title,

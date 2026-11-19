@@ -1,4 +1,4 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getTraceServerMetrics,
@@ -30,7 +30,8 @@ export const maxDuration = 300;
 export const CACHE_KEY_PREFIX = `trace-server-metrics-v${TRACE_SERVER_METRICS_VERSION}`;
 
 const getCachedTraceServerMetrics = cachedQuery(
-  (id: number): Promise<TraceServerMetrics | null> => getTraceServerMetrics(getDb(), id),
+  async (id: number): Promise<TraceServerMetrics | null> =>
+    getTraceServerMetrics(await getPayloadDb(id), id),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

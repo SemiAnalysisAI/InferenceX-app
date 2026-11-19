@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  pathname: { value: '/zh/inference' },
+  pathname: { value: '/zh/infx/inference' },
   track: vi.fn(),
 }));
 
@@ -24,7 +24,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  mocks.pathname.value = '/zh/inference';
+  mocks.pathname.value = '/zh/infx/inference';
   mocks.track.mockReset();
   container = document.createElement('div');
   document.body.append(container);

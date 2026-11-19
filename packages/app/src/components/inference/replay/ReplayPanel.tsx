@@ -18,6 +18,7 @@ import { useInferenceDisplay, useInferenceFilters } from '@/components/inference
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -28,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerSession } from '@/lib/analytics/analytics';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -47,9 +48,6 @@ import { useReducedMotion } from './useReducedMotion';
 
 type Mp4ExportGuard = (value: unknown) => value is Mp4ExportError;
 
-// Lowercase pipeline tokens like "mux"/"flush" are jargon in a user-facing
-// banner. The raw stage still flows through telemetry — only the user copy
-// is humanized.
 const STAGE_LABELS: Record<Locale, Partial<Record<Mp4ExportStage, string>>> = {
   en: {
     render: 'while rendering frames',
@@ -69,7 +67,7 @@ const REPLAY_STRINGS = {
   en: {
     heading: 'Replay over time',
     loading: 'Loading benchmark history…',
-    loadError: 'Failed to load benchmark history.',
+    loadError: 'Failed to load benchmark history',
     insufficient:
       'Not enough history yet to replay this chart — at least two distinct benchmark dates are required.',
     dates: (count: number) => `${count} dates`,
@@ -84,7 +82,7 @@ const REPLAY_STRINGS = {
     fixedAxes: 'Fixed axes',
     fixedAxesTitle:
       'Keep the axes fixed across the whole run so you can see the frontier improve over time, or let them refit to each frame.',
-    chromiumRequired: 'MP4 export requires a Chromium-based browser (Chrome, Edge).',
+    chromiumRequired: 'MP4 export requires a Chromium-based browser (Chrome, Edge)',
     webCodecsRequired:
       'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
     exporting: 'Exporting…',
@@ -92,13 +90,13 @@ const REPLAY_STRINGS = {
     exportMp4: 'Export MP4',
     cancel: 'Cancel',
     exportFailed: 'MP4 export failed:',
-    fallbackError: 'Export failed.',
+    fallbackError: 'Export failed',
     dismiss: 'Dismiss',
   },
   zh: {
     heading: '按时间回放',
     loading: '正在加载基准测试历史……',
-    loadError: '基准测试历史加载失败。',
+    loadError: '基准测试历史加载失败',
     insufficient: '历史数据不足，暂时无法回放该图表——至少需要两个不同的基准测试日期。',
     dates: (count: number) => `${count} 个日期`,
     configs: (count: number) => `${count} 个配置`,
@@ -112,14 +110,14 @@ const REPLAY_STRINGS = {
     fixedAxes: '固定坐标轴',
     fixedAxesTitle:
       '在整次运行中固定坐标轴，以观察 Pareto 前沿随时间改善；也可关闭，让坐标轴随每一帧重新拟合。',
-    chromiumRequired: 'MP4 导出需要基于 Chromium 的浏览器（Chrome、Edge）。',
+    chromiumRequired: 'MP4 导出需要基于 Chromium 的浏览器（Chrome、Edge）',
     webCodecsRequired: 'MP4 导出需要 WebCodecs（Chrome、Edge 或 Chromium），当前浏览器不支持。',
     exporting: '正在导出……',
     exportingProgress: (percent: number) => `正在导出 ${percent}%`,
     exportMp4: '导出 MP4',
     cancel: '取消',
     exportFailed: 'MP4 导出失败：',
-    fallbackError: '导出失败。',
+    fallbackError: '导出失败',
     dismiss: '关闭',
   },
 } as const;
@@ -170,14 +168,6 @@ function replayPlaybackReducer(
   };
 }
 
-/**
- * Replay panel that drives the actual `<ScatterGraph>` with interpolated frame
- * data per tick. React re-renders every frame; ScatterGraph's `transitionDuration`
- * is forced to 0 so positions snap to the interpolation instead of being
- * smoothed by D3's tween. This trades raw render throughput for full parity
- * with the regular chart — every toggle and feature the scatter chart respects
- * automatically applies to replay because it IS the scatter chart.
- */
 export default function ReplayPanel({
   parentChartId,
   chartDefinition,
@@ -211,10 +201,6 @@ export default function ReplayPanel({
     );
   }, [history.data, chartDefinition, selectedYAxisMetric, effectiveX, selectedPrecisions]);
 
-  // Fixed axes for the whole run: take the extent across every step (not just
-  // the current frame) for the active hardware, so the axes stay put and the
-  // frontier visibly expands toward them over time instead of the chart
-  // refitting each frame. Recomputed when the legend's hw filter changes.
   const fixedExtent = useMemo(
     () => (timeline ? computeFullRunDomain(timeline, (hw) => activeHwTypes.has(hw)) : null),
     [timeline, activeHwTypes],
@@ -259,12 +245,6 @@ function ReplayPanelContent({
 }: ReplayPanelContentProps) {
   const locale = useLocale();
   const t = REPLAY_STRINGS[locale];
-  // Track the SVG's position inside our relative wrapper so the date overlay
-  // can anchor its bottom-right to the chart plot's top-right (the wrapper
-  // also contains the legend, so we can't anchor to the wrapper edge).
-  // Callback ref — fires when the wrapper element mounts/unmounts, including
-  // after the panel transitions out of the loading state. A useEffect with
-  // [] deps would have run before the wrapper existed and never re-fired.
   const [svgOffset, setSvgOffset] = useState<{ right: number; top: number } | null>(null);
   const observersRef = useRef<{ size: ResizeObserver; mutation: MutationObserver } | null>(null);
   const setChartWrapperEl = useCallback((wrapper: HTMLDivElement | null) => {
@@ -283,14 +263,6 @@ function ReplayPanelContent({
       if (!svg) return;
       const wRect = wrapper.getBoundingClientRect();
       const sRect = svg.getBoundingClientRect();
-      // When the legend sits to the right of the SVG, anchor the date's right
-      // edge to the legend's left edge (with a small gap) so wide dates like
-      // "2026-05-13" can't bleed into the legend column. Fall back to the
-      // SVG's right edge when no legend column is present (mobile/stacked).
-      // The legend container is positioned over the right edge of the SVG, so
-      // its bounding rect overlaps the SVG horizontally — anchor the date's
-      // right edge to the legend's left edge whenever it's present rather
-      // than checking for non-overlap.
       const legend = wrapper.querySelector<HTMLElement>('[data-testid="chart-legend"]');
       const legendRect = legend?.getBoundingClientRect();
       const rightAnchor = legendRect
@@ -346,9 +318,6 @@ function ReplayPanelContent({
     dispatchPlayback({ type: 'setPlaying', value });
   }, []);
   const [speed, setSpeed] = useState(1);
-  // Fixed axes (default) freeze the coordinate space to the whole run so the
-  // frontier visibly expands over time; turning this off lets the axes refit to
-  // each frame's points.
   const [fixedAxes, setFixedAxes] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
@@ -357,15 +326,12 @@ function ReplayPanelContent({
 
   const prefersReducedMotion = useReducedMotion();
 
-  // Pre-flight feature detection so the Export button is disabled with a clear
-  // reason on browsers that lack WebCodecs (Firefox today, older Safari).
   const hasWebCodecs = useMemo(() => typeof VideoEncoder !== 'undefined', []);
-  const unavailableReportedRef = useRef(false);
   useEffect(() => {
-    if (!hasWebCodecs && !unavailableReportedRef.current) {
-      unavailableReportedRef.current = true;
-      track('inference_replay_export_unavailable', {
-        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
+    if (!hasWebCodecs) {
+      trackOncePerSession('inference_replay_export_unavailable', {
+        user_agent:
+          typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
       });
     }
   }, [hasWebCodecs]);
@@ -375,11 +341,6 @@ function ReplayPanelContent({
   const playingRef = useRef(playing);
   playingRef.current = playing;
 
-  // Accumulator decoupled from React state so the rAF loop doesn't trigger a
-  // commit on every tick. Snapshot the previous ref value *before* mutating
-  // so the predicate compares like-with-like — comparing against the
-  // React-committed value lags by a frame and would no-op a backward scrub
-  // that crosses a quantum boundary.
   const fractionRef = useRef(fraction);
   if (timelineChanged) fractionRef.current = 0;
   const commitFraction = useCallback((next: number, opts?: { force?: boolean }) => {
@@ -392,8 +353,6 @@ function ReplayPanelContent({
 
   useEffect(() => {
     if (!playing || !timeline) return;
-    // Reduced motion: advance one observed step per ~1.2s without per-frame
-    // interpolation, so users get a slideshow rather than continuous motion.
     if (prefersReducedMotion) {
       const stepMs = 1200 / Math.max(0.1, speedRef.current);
       const n = timeline.dates.length;
@@ -419,9 +378,6 @@ function ReplayPanelContent({
       if (next >= 1) setPlaying(false);
       rafId = requestAnimationFrame(step);
     };
-    // When the tab is hidden the browser throttles rAF to ~1Hz, so resuming
-    // without rebasing produces a multi-second `dt` that jumps the playhead.
-    // Cancel on hide, rebase + resume on show.
     const onVisibility = () => {
       if (document.hidden) {
         if (rafId !== 0) {
@@ -516,6 +472,7 @@ function ReplayPanelContent({
   }, []);
 
   const handleReset = useCallback(() => {
+    track('inference_replay_reset', { fraction: fractionRef.current });
     commitFraction(0, { force: true });
     setPlaying(false);
   }, [commitFraction]);
@@ -535,21 +492,17 @@ function ReplayPanelContent({
     const startedAt = performance.now();
     track('inference_replay_export_started', {
       model: selectedModel,
-      chartType: chartDefinition.chartType,
-      hasWebCodecs,
+      chart_type: chartDefinition.chartType,
+      has_web_codecs: hasWebCodecs,
     });
     let stage: Mp4ExportStage = 'init';
     let frameCount = 0;
     let lastProgressAt = startedAt;
-    // Late-bound so the catch can narrow the error after the module loads.
     let guard: Mp4ExportGuard | null = null;
     try {
       const mod = await import('./exportMp4');
       const { exportReplayMp4 } = mod;
       guard = mod.isMp4ExportError;
-      // Export duration is deterministic from timeline length, NOT playback speed
-      // — the MP4 is an artifact of the dataset, not a recording of the current
-      // UI session. Capped at 60s.
       const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
       const root = panelRef.current;
       if (!root) throw new Error('Replay panel element is not mounted.');
@@ -559,8 +512,6 @@ function ReplayPanelContent({
         durationSec,
         signal: ac.signal,
         renderFrame: async (frameFraction) => {
-          // flushSync forces React to commit synchronously; two RAFs let the
-          // browser paint before the capture step reads back the DOM.
           flushSync(() => commitFraction(frameFraction, { force: true }));
           await new Promise<void>((resolve) => {
             requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -577,17 +528,17 @@ function ReplayPanelContent({
       });
       track('inference_replay_export_completed', {
         model: selectedModel,
-        chartType: chartDefinition.chartType,
-        durationMs: Math.round(performance.now() - startedAt),
+        chart_type: chartDefinition.chartType,
+        duration_ms: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
       if (ac.signal.aborted) {
         track('inference_replay_export_cancelled', {
           model: selectedModel,
-          chartType: chartDefinition.chartType,
-          frameCount,
+          chart_type: chartDefinition.chartType,
+          frame_count: frameCount,
           stage,
-          durationMs: Math.round(performance.now() - startedAt),
+          duration_ms: Math.round(performance.now() - startedAt),
         });
         return;
       }
@@ -608,15 +559,16 @@ function ReplayPanelContent({
       );
       track('inference_replay_export_failed', {
         reason: message.slice(0, 500),
-        errorName,
-        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
-        hasWebCodecs,
-        frameCount,
-        durationMs: Math.round(performance.now() - startedAt),
+        error_name: errorName,
+        user_agent:
+          typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
+        has_web_codecs: hasWebCodecs,
+        frame_count: frameCount,
+        duration_ms: Math.round(performance.now() - startedAt),
         stage,
-        encoderState,
-        queuedFrames,
-        elapsedSinceLastProgressMs,
+        encoder_state: encoderState,
+        queued_frames: queuedFrames,
+        elapsed_since_last_progress_ms: elapsedSinceLastProgressMs,
       });
     } finally {
       setIsExporting(false);
@@ -681,8 +633,8 @@ function ReplayPanelContent({
         <h3 className="text-base font-semibold">{t.heading}</h3>
         <p className="text-xs text-muted-foreground">
           {formatReplayDate(timeline.dates[0], locale)} →{' '}
-          {formatReplayDate(timeline.dates.at(-1) ?? '', locale)} • {t.dates(timeline.dates.length)}{' '}
-          • {t.configs(timeline.configs.length)}
+          {formatReplayDate(timeline.dates.at(-1) ?? '', locale)} · {t.dates(timeline.dates.length)}{' '}
+          · {t.configs(timeline.configs.length)}
         </p>
       </div>
 
@@ -743,7 +695,8 @@ function ReplayPanelContent({
           step={1}
           onChange={(e) => handleScrub(Number(e.target.value) / 1000)}
           onKeyDown={handleScrubKeyDown}
-          className="flex-1 min-w-[120px] h-2 cursor-pointer accent-foreground"
+          className="range-slider h-4 min-w-[120px] flex-1"
+          style={rangeProgressStyle(fraction, 0, 1)}
           aria-label={t.timeline}
           aria-valuetext={formatReplayDate(currentDate, locale) || undefined}
           data-testid="replay-scrubber"

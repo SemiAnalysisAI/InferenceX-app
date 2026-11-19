@@ -11,7 +11,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -22,7 +22,9 @@ import {
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { RangeField } from '@/components/ui/range-field';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import {
@@ -31,7 +33,6 @@ import {
   PrecisionSelector,
   ScenarioSelector,
 } from '@/components/ui/chart-selectors';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -51,7 +52,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type { CostProvider, CostType } from './types';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 
 const COST_PROVIDER_OPTIONS: {
   value: CostProvider;
@@ -61,9 +62,9 @@ const COST_PROVIDER_OPTIONS: {
   {
     value: 'costh',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有 - 超大规模云大批量',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
@@ -103,10 +104,10 @@ const STRINGS = {
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
-    costProviderPlaceholder: '成本供应商',
+      '集群成本线采用的定价层级。按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
+    costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
       '表格中每芯片指标按总 token、仅输入 token 还是仅输出 token 计。收入始终同时计入两类 token。',
@@ -129,17 +130,21 @@ const COST_TYPE_LABELS_ZH: Record<CostType, string> = {
   output: '输出 Token',
 };
 
-export default function FleetLifecycleDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+export default function FleetLifecycleDisplay() {
   return (
-    <GlobalFilterProvider
-      initialModel={urlSeed?.model}
-      initialSequence={urlSeed?.sequence}
-      initialPrecisions={urlSeed?.precisions}
-      initialRunDate={urlSeed?.runDate}
-      initialRunId={urlSeed?.runId}
-    >
-      <FleetLifecycleInner initialPercentile={urlSeed?.percentile ?? Percentile.P90} />
-    </GlobalFilterProvider>
+    <CalculatorUrlSeedBoundary>
+      {(urlSeed) => (
+        <GlobalFilterProvider
+          initialModel={urlSeed.model}
+          initialSequence={urlSeed.sequence}
+          initialPrecisions={urlSeed.precisions}
+          initialRunDate={urlSeed.runDate}
+          initialRunId={urlSeed.runId}
+        >
+          <FleetLifecycleInner initialPercentile={urlSeed.percentile ?? Percentile.P90} />
+        </GlobalFilterProvider>
+      )}
+    </CalculatorUrlSeedBoundary>
   );
 }
 
@@ -148,8 +153,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const t = STRINGS[locale];
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
-  // Shorter-commit rental tiers are listed but locked; picking one opens the
-  // TCO model dialog instead of changing the cost provider.
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
     useLockedTierDialog('fleet_cost_provider');
 
@@ -161,6 +164,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const warmThroughputChange = useWarmThroughputChange();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
@@ -171,8 +175,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const [inputValue, setInputValue] = useState<string>('35');
   const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
-  // Owned here so the `c_mw` URL seed is read once, at the page level — the
-  // lifecycle section renders the input and is its only consumer.
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
@@ -191,8 +193,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
-  // AgentX publishes on P90, so the percentile control stays behind the
-  // ↑↑↓↓ feature gate, matching the calculator.
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -202,8 +202,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     writeUrlParams({ c_mw: Number.isFinite(parsed) && parsed > 0 ? raw : '' });
   }, []);
 
-  // The selection key represents user-driven scope, mirroring the calculator's
-  // rule: a data or filter transition reseeds visibility to everything.
   const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
@@ -224,8 +222,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   );
   const currentRange = ranges.interactivity;
 
-  const handleSliderChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
+  const handleSliderChange = useCallback((value: number) => {
     setRequestedTargetValue(value);
     setInputValue(String(value));
   }, []);
@@ -324,14 +321,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
       visible: new Set(availableHwKeys),
       known: new Set(availableHwKeys),
     });
-    track('fleet_gpu_reset', { gpuCount: availableHwKeys.length });
+    track('fleet_gpu_reset', { gpu_count: availableHwKeys.length });
   }, [availableHwKeys, selectionKey]);
 
-  // The legend filters which chips are candidates for the lifecycle lines,
-  // exactly as the calculator's chart legend did when the section lived there.
-  // It renders in the controls card rather than inside the chart so it stays
-  // reachable from the table view and — critically — after isolating a config
-  // that is unplottable at the current target, when the chart itself unmounts.
   const legendItems = useMemo(
     () =>
       Object.entries(hardwareConfig)
@@ -341,6 +333,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
           name: config.name,
           label: getDisplayLabel(config),
           color: resolveColor(key),
+          lineDasharray: 'none',
           title: config.gpu,
           hw: key,
           isActive: visibleHwKeys.has(key),
@@ -360,11 +353,12 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   if (!loading && error) {
     console.error(error);
     return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
     );
   }
 
@@ -374,6 +368,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title}
               description={t.description}
               actions={<ChartShareActions />}
@@ -395,6 +390,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     onChange={handleModelChange}
                     open={openDropdown === 'model'}
                     onOpenChange={handleDropdownOpenChange('model')}
+                    onOptionIntent={(model) => warmThroughputChange({ model })}
                     availableModels={availableModels}
                   />
                 </div>
@@ -405,6 +401,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   onChange={handleSequenceChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
+                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
                   availableSequences={availableSequences}
                   model={selectedModel}
                 />
@@ -423,15 +420,16 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   onChange={handlePrecisionChange}
                   open={openDropdown === 'precision'}
                   onOpenChange={handleDropdownOpenChange('precision')}
+                  onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
                   availablePrecisions={availablePrecisions}
                 />
               </ControlPanel>
               <ControlPanel
                 legend={t.chartGroup}
                 data-testid="fleet-chart-panel"
-                className="grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                className="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
               >
-                <div className="flex min-w-0 flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex min-w-0 flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="fleet-cost"
                     label={t.costProviderLabel}
@@ -468,7 +466,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   </div>
                 </div>
 
-                <div className="flex min-w-0 flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex min-w-0 flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="fleet-cost-type"
                     label={t.tokenTypeLabel}
@@ -486,7 +484,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('fleet_cost_type_changed', { costType: next });
+                        track('fleet_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}
@@ -514,9 +512,10 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   </div>
                 )}
 
-                {/* Target value slider + input */}
                 {!loading && hasData && (
-                  <div className="space-y-2 md:col-span-2 xl:col-span-3">
+                  <div
+                    className={`space-y-1.5 md:col-span-2 ${showsTcoBasis ? 'xl:col-span-1' : ''}`}
+                  >
                     <LabelWithTooltip
                       htmlFor="fleet-target"
                       label={
@@ -528,61 +527,29 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                           : t.targetTooltip
                       }
                     />
-                    <div className="flex items-center gap-4">
-                      <div className="min-w-0 flex-1">
-                        <input
-                          id="fleet-target"
-                          type="range"
-                          min={currentRange.min}
-                          max={currentRange.max}
-                          step={1}
-                          value={targetValue}
-                          onChange={handleSliderChange}
-                          onPointerUp={() =>
-                            track('fleet_target_slider_set', { mode, value: targetValue })
-                          }
-                          className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
-                        [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                        />
-                        <div
-                          className="relative h-4 text-xs text-muted-foreground"
-                          style={{ marginLeft: 8, marginRight: 8 }}
-                        >
-                          {Array.from({ length: 6 }, (_, i) => (
-                            <span
-                              key={i}
-                              className="absolute -translate-x-1/2"
-                              style={{ left: `${(i / 5) * 100}%` }}
-                            >
-                              {Math.round(
-                                currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                              )}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        aria-label={
-                          isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                        }
-                        value={resolveCalculatorTargetInputValue(
+                    <RangeField
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      min={currentRange.min}
+                      max={currentRange.max}
+                      value={targetValue}
+                      onSliderChange={handleSliderChange}
+                      onSliderCommit={() =>
+                        track('fleet_target_slider_set', { mode, value: targetValue })
+                      }
+                      input={{
+                        id: 'fleet-target',
+                        value: resolveCalculatorTargetInputValue(
                           inputValue,
                           targetValue,
                           isTargetInputFocused,
-                        )}
-                        onFocus={handleInputFocus}
-                        onChange={handleInputChange}
-                        onBlur={handleInputBlur}
-                        className="w-24 shrink-0"
-                        min={0}
-                      />
-                    </div>
+                        ),
+                        onFocus: handleInputFocus,
+                        onChange: handleInputChange,
+                        onBlur: handleInputBlur,
+                      }}
+                    />
                   </div>
                 )}
               </ControlPanel>
@@ -591,7 +558,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
             {!loading && legendItems.length > 0 && (
               <div
                 data-testid="fleet-legend"
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3"
+                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border/30 pt-3"
               >
                 <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {legendItems.map((item) => (

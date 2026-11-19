@@ -26,7 +26,6 @@ describe('withExplorerRoute', () => {
     const handler = vi.fn(() => Promise.resolve({ ok: true }));
     await withExplorerRoute(handler)(makeRequest());
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ vis: ANON_ONLY_VISIBILITY }));
-    // A non-null filter is what restricts DB helpers to privacy_mode = 'anon'.
     expect(ANON_ONLY_VISIBILITY).not.toBeNull();
   });
 

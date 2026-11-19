@@ -21,11 +21,6 @@ export function fitContinuationLabelBaseline(endpointY: number, height: number):
     : Math.max(12, Math.min(height - 4, endpointY - 12));
 }
 
-/**
- * Find transitions where a complete Pareto frontier crosses from a visible
- * point into an intentionally clipped run. A single visible point can yield
- * two continuations when hidden frontier points exist on both sides.
- */
 export function buildFrontierContinuations(
   visible: InferenceData[],
   clipped: ClippedInferenceData[],

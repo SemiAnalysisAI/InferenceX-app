@@ -1,45 +1,102 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
+import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { hardwareLabel, sortHardware } from './compare/hardware';
+import {
+  hardwareLabel,
+  operatorXColors,
+  measuredHardware,
+  removeHardwareSelection,
+  toggleHardwareSelection,
+} from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
+import {
+  BASELINE_PARAM,
+  HARDWARE_PARAM,
+  parsePickedHardware,
+  setPickedHardware,
+  setSearchParam,
+} from './compare/url-selection';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
-/** Baseline select value for "no baseline". */
 const NO_BASELINE = 'none';
 
-/** Visible cards with their width: a half card left alone in its row takes the whole row. */
-function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }[] {
-  const out = visible.map((viz) => ({ viz, wide: Boolean(viz.wide) }));
+const STRINGS = {
+  en: {
+    loading: 'Loading results…',
+    controlsGroup: 'Comparison config',
+    empty: 'No results yet',
+    workload: 'Workload',
+    devices: 'Devices',
+    metric: 'Metric',
+    baseline: 'Baseline',
+    none: 'None',
+    oneDevice: '1 GPU',
+    loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
+  },
+  zh: {
+    loading: '正在加载结果…',
+    controlsGroup: '对比配置',
+    empty: '暂无结果',
+    workload: '工作负载',
+    devices: '设备',
+    metric: '指标',
+    baseline: '基线',
+    none: '无',
+    oneDevice: '单 GPU',
+    loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
+  },
+};
+
+// Literal class names so Tailwind generates them.
+const SPAN_CLASS = {
+  5: 'lg:col-span-5',
+  6: 'lg:col-span-6',
+  7: 'lg:col-span-7',
+  12: 'lg:col-span-12',
+} as const;
+
+type Span = keyof typeof SPAN_CLASS;
+
+function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] {
+  const out = visible.map((viz) => ({ viz, span: (viz.wide ? 12 : 6) as Span }));
   let run: typeof out = [];
   for (const card of [...out, null]) {
-    if (card && !card.wide) {
+    if (card && card.span !== 12) {
       run.push(card);
       continue;
     }
-    if (run.length % 2 === 1) run.at(-1)!.wide = true;
+    if (run.length % 2 === 1) run.at(-1)!.span = 12;
+    for (let i = 0; i + 1 < run.length; i += 2) {
+      const [first, second] = [run[i], run[i + 1]];
+      first.span = first.viz.span ?? (second.viz.span ? ((12 - second.viz.span) as Span) : 6);
+      second.span = (12 - first.span) as Span;
+    }
     run = [];
   }
   return out;
@@ -48,6 +105,25 @@ function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
+  replaceClientSearch(params);
+}
+
+/** A new workload drops the GPU picks and baseline, which belong to the old one. */
+function setWorkload(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.set('workload', value);
+  params.delete(HARDWARE_PARAM);
+  params.delete(BASELINE_PARAM);
+  replaceClientSearch(params);
+}
+
+/** The one-device option's select value (its split key is empty). */
+const ONE_DEVICE = '1';
+
+function setParallel(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === ONE_DEVICE) params.delete('parallel');
+  else params.set('parallel', value);
   replaceClientSearch(params);
 }
 
@@ -68,30 +144,123 @@ function ControlGroup({
   );
 }
 
-function VizCard({
-  model,
-  viz,
-  wide,
-}: {
-  model: ComparisonModel;
-  viz: VizDefinition;
-  wide: boolean;
-}) {
+const VizCard = memo(
+  ({
+    model,
+    viz,
+    span,
+    eager,
+  }: {
+    model: ComparisonModel;
+    viz: VizDefinition;
+    span: Span;
+    eager: boolean;
+  }) => {
+    const locale = useLocale();
+    const [mounted, setMounted] = useState(eager);
+    const card = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      if (mounted) return;
+      if (eager || typeof IntersectionObserver === 'undefined') {
+        setMounted(true);
+        return;
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setMounted(true);
+          }
+        },
+        { rootMargin: '300px' },
+      );
+      if (card.current) observer.observe(card.current);
+      return () => observer.disconnect();
+    }, [eager, mounted]);
+    return (
+      <Card
+        ref={card}
+        data-testid={`operatorx-viz-${viz.id}`}
+        aria-busy={!mounted}
+        aria-labelledby={`operatorx-title-${viz.id}`}
+        tabIndex={mounted ? undefined : 0}
+        onFocus={() => setMounted(true)}
+        className={`min-w-0 ${SPAN_CLASS[span]}`}
+      >
+        <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
+          {viz.title[locale]}
+        </Heading>
+        {mounted ? (
+          <viz.Component model={model} />
+        ) : (
+          <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
+        )}
+      </Card>
+    );
+  },
+);
+
+function vizSkeletonClass(viz: VizDefinition): string {
+  return viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]';
+}
+
+function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDefinition[] {
+  return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
+}
+
+const CONTROL_LABELS = ['workload', 'devices', 'metric', 'baseline'] as const;
+
+/**
+ * Loading state laid out like the loaded dashboard (controls card, then the card grid with
+ * each chart's placeholder height), so the content that replaces it does not move the cards
+ * or the footer under a reader who has already scrolled.
+ */
+function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   return (
-    <Card
-      data-testid={`operatorx-viz-${viz.id}`}
-      className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
+    <div
+      className="flex flex-col gap-4"
+      data-testid="operatorx-loading"
+      aria-busy="true"
+      aria-label={strings.loading}
     >
-      <Heading as="h2" level="card" className="mb-4">
-        {viz.title}
-      </Heading>
-      <viz.Component model={model} />
-    </Card>
+      <Card className="relative z-10 py-4 md:py-5">
+        <ControlPanel
+          legend={strings.controlsGroup}
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {CONTROL_LABELS.map((key) => (
+            <div key={key} className="min-w-0 space-y-1.5">
+              <Label>{strings[key]}</Label>
+              <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
+            </div>
+          ))}
+        </ControlPanel>
+        <div className="mt-4 border-t border-border/30 pt-3">
+          <Skeleton aria-hidden="true" className="h-[106px] lg:h-[62px]" />
+        </div>
+      </Card>
+      <div className="grid gap-4 lg:grid-cols-12">
+        {layout(visibleVisualizations(op, null)).map(({ viz, span }) => (
+          <Card
+            key={viz.id}
+            data-testid={`operatorx-viz-skeleton-${viz.id}`}
+            className={`min-w-0 ${SPAN_CLASS[span]}`}
+          >
+            <Heading as="h2" level="card" className="mb-4">
+              {viz.title[locale]}
+            </Heading>
+            <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 
-/** Cross-hardware comparison of one op: workload, metric and GPU controls over the visualizations. */
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const {
@@ -100,30 +269,49 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     isLoading,
     isPlaceholderData: switching,
     refetch,
-  } = useOperatorXComparison(op, search.get('workload'));
+  } = useOperatorXComparison(op, search.get('workload'), search.get('parallel'));
   const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
-  const [picked, setPicked] = useState<string[] | null>(null);
-  const [pickedBaseline, setBaseline] = useState<string | null>(null);
+  // GPU picks and the baseline live in the address bar so share links reproduce them.
+  const pickedParam = search.get(HARDWARE_PARAM);
+  const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
+  const pickedBaseline = search.get(BASELINE_PARAM);
   const [inspected, setInspected] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
 
-  const workload = view?.workloads.find((w) => w.id === view.workload);
-  const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
+  // GPUs with measured results at the selected device split
+  const available = useMemo(() => (view ? measuredHardware([view]) : []), [view]);
   const colors = useMemo(
-    () => generateVendorColors(view?.hardware.map((h) => h.id) ?? [], theme),
+    () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],
   );
   const hardware = useMemo(
     () => (picked ? available.filter((h) => picked.includes(h)) : available),
     [picked, available],
   );
-  // No baseline until one is picked.
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
+  // Charts, legend, GPU control and case detail all read this same live state.
   const model = useMemo(() => {
     if (!view) return null;
+    const pick = (next: string[]) => {
+      if (next === hardware) return;
+      setPickedHardware(next.length === available.length ? null : next);
+    };
     const toggle = (hw: string) => {
-      const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
-      if (next.length > 0) setPicked(next);
+      track('operatorx_gpu_toggled', { op, gpu: hw, placement: 'chart' });
+      pick(toggleHardwareSelection(hardware, hw, available));
+    };
+    const remove = (hw: string) => {
+      track('operatorx_gpu_removed', { op, gpu: hw, placement: 'chart' });
+      pick(removeHardwareSelection(hardware, hw));
+    };
+    const reset = () => {
+      track('operatorx_legend_filter_reset', { op });
+      setPickedHardware(null);
+    };
+    const inspect = (index: number) => {
+      track('operatorx_case_opened', { op, metric: metric.id });
+      setInspected(index);
     };
     const preview = (i: number) =>
       prefetchOperatorXTimelines(
@@ -131,10 +319,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         op,
         caseRefs(view, hardware, i).map((r) => r.ref),
       );
-    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
-      inspect: setInspected,
-      preview,
-    });
+    return buildModel(
+      view,
+      metric,
+      { hardware, available, toggle, remove, reset },
+      colors,
+      baseline,
+      {
+        inspect,
+        preview,
+      },
+    );
   }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
 
   if (error)
@@ -146,33 +341,27 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         testId="operatorx-comparison-error"
       />
     );
-  if (isLoading || !view || !model)
-    return (
-      <Card data-testid="operatorx-loading" className="min-h-80 items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
-      </Card>
-    );
-  // While another workload loads, the previous one stays on screen, dimmed.
+  if (isLoading || !view || !model) return <ComparisonSkeleton op={op} />;
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;
-  if (view.workloads.length === 0)
-    return (
-      <Card className="py-6 text-center">
-        <p className="text-sm text-muted-foreground">No results yet</p>
-      </Card>
-    );
+  if (view.workloads.length === 0) return <EmptyState>{strings.empty}</EmptyState>;
 
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ControlGroup label="Workload" htmlFor="operatorx-workload">
+        <ControlPanel
+          legend={strings.controlsGroup}
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <ControlGroup label={strings.workload} htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
               value={pending?.id ?? view.workload ?? ''}
-              onValueChange={(v) => setParam('workload', v)}
+              onValueChange={(v) => {
+                track('operatorx_workload_selected', { op, workload: v });
+                setWorkload(v);
+              }}
               groups={[
                 {
                   label: '',
@@ -184,57 +373,77 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="Metric" htmlFor="operatorx-metric">
+          <ControlGroup label={strings.devices} htmlFor="operatorx-parallel">
             <SearchableSelect
-              triggerId="operatorx-metric"
-              value={metric.id}
-              onValueChange={(v) => setParam('metric', v)}
+              triggerId="operatorx-parallel"
+              value={view.parallel || ONE_DEVICE}
+              onValueChange={(v) => {
+                track('operatorx_parallel_selected', { op, parallel: v });
+                setParallel(v);
+              }}
               searchable={false}
               groups={[
                 {
                   label: '',
-                  options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
+                  options: view.parallelOptions.map((o) => ({
+                    value: o.key || ONE_DEVICE,
+                    label: o.key ? o.label : strings.oneDevice,
+                  })),
                 },
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="GPUs" htmlFor="operatorx-hardware">
-            <MultiSelect
-              triggerId="operatorx-hardware"
-              options={available.map((h) => ({ value: h, label: hardwareLabel(h) }))}
-              value={hardware}
-              onChange={setPicked}
-              minSelections={1}
+          <ControlGroup label={strings.metric} htmlFor="operatorx-metric">
+            <SearchableSelect
+              triggerId="operatorx-metric"
+              value={metric.id}
+              onValueChange={(v) => {
+                track('operatorx_metric_selected', { op, metric: v });
+                setParam('metric', v);
+              }}
+              searchable={false}
+              groups={[
+                {
+                  label: '',
+                  options: METRICS.map((m) => ({
+                    value: m.id,
+                    label:
+                      locale === 'zh' ? `${m.label.zh}（${m.unit}）` : `${m.label.en} (${m.unit})`,
+                  })),
+                },
+              ]}
             />
           </ControlGroup>
-          <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
+
+          <ControlGroup label={strings.baseline} htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
               value={baseline ?? NO_BASELINE}
-              onValueChange={setBaseline}
+              onValueChange={(v) => {
+                track('operatorx_baseline_selected', { op, gpu: v });
+                setSearchParam(BASELINE_PARAM, v === NO_BASELINE ? null : v);
+              }}
               searchable={false}
               groups={[
                 {
                   label: '',
                   options: [
-                    { value: NO_BASELINE, label: 'None' },
+                    { value: NO_BASELINE, label: strings.none },
                     ...hardware.map((h) => ({ value: h, label: hardwareLabel(h) })),
                   ],
                 },
               ]}
             />
           </ControlGroup>
-        </div>
-        <div className="mt-4 border-t border-border/60 pt-3">
+        </ControlPanel>
+        <div className="mt-4 border-t border-border/30 pt-3">
           <CoverageStrip model={model} />
         </div>
       </Card>
-      <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {layout(
-            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
-          ).map(({ viz, wide }) => (
-            <VizCard key={viz.id} model={model} viz={viz} wide={wide} />
+      <Pending active={switching} label={strings.loadingWorkload(pending?.label)}>
+        <div className="grid gap-4 lg:grid-cols-12">
+          {layout(visibleVisualizations(op, baseline)).map(({ viz, span }, index) => (
+            <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />
           ))}
         </div>
       </Pending>

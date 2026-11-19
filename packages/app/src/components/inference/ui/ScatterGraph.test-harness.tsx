@@ -4,14 +4,20 @@ import { afterEach, beforeEach, vi } from 'vitest';
 
 import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
+import type { BenchmarkPresenceSets } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  POINT_HIT_AREA_CLASS,
+} from '@/lib/d3-chart/layers/canvas-point-registry';
+import type { CanvasPointLayerElement } from '@/lib/d3-chart/layers/canvas-points';
 import type * as NextNavigation from 'next/navigation';
 
 vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.hoisted(() => {
-  globalThis.__scatterPathnameState = { value: '/inference' };
+  globalThis.__scatterPathnameState = { value: '/infx/inference' };
 });
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
@@ -22,20 +28,17 @@ declare global {
   var __scatterLegendState: { current: Record<string, any> | null };
   var __scatterInferenceState: { current: Record<string, unknown> };
   var __scatterOverlayState: { current: Record<string, unknown> };
-  var __scatterTraceAvailabilityState: { current: Record<number, boolean> | undefined };
-  var __scatterLogAvailabilityState: { current: Record<number, boolean> | undefined };
+  var __scatterPresenceState: {
+    current: BenchmarkPresenceSets | undefined;
+    enabled: boolean | undefined;
+  };
   var __scatterPathnameState: { value: string };
 }
-const availabilityIdsGlobal = vi.hoisted(() => ({
-  traceIds: [] as number[],
-  logIds: [] as number[],
-}));
 vi.hoisted(() => {
   globalThis.__scatterLegendState = { current: null };
   globalThis.__scatterInferenceState = { current: {} };
   globalThis.__scatterOverlayState = { current: {} };
-  globalThis.__scatterTraceAvailabilityState = { current: undefined };
-  globalThis.__scatterLogAvailabilityState = { current: undefined };
+  globalThis.__scatterPresenceState = { current: undefined, enabled: undefined };
 });
 
 vi.mock('@/components/ui/chart-legend', () => ({
@@ -56,20 +59,12 @@ vi.mock('@/providers/unofficial-run-provider', () => ({
 
 export const legendState = globalThis.__scatterLegendState;
 export const inferenceState = globalThis.__scatterInferenceState;
-export const logAvailabilityState = globalThis.__scatterLogAvailabilityState;
 export const overlayState = globalThis.__scatterOverlayState;
-export const traceAvailabilityState = globalThis.__scatterTraceAvailabilityState;
-export const availabilityState = availabilityIdsGlobal;
-vi.mock('@/hooks/api/use-trace-availability', () => ({
-  useTraceAvailability: (ids: number[]) => {
-    availabilityIdsGlobal.traceIds = ids ?? [];
-    return { data: globalThis.__scatterTraceAvailabilityState.current, isPending: false };
-  },
-}));
-vi.mock('@/hooks/api/use-log-availability', () => ({
-  useLogAvailability: (ids: number[]) => {
-    availabilityIdsGlobal.logIds = ids ?? [];
-    return { data: globalThis.__scatterLogAvailabilityState.current, isPending: false };
+export const presenceState = globalThis.__scatterPresenceState;
+vi.mock('@/hooks/api/use-benchmark-presence', () => ({
+  useBenchmarkPresence: (enabled: boolean) => {
+    globalThis.__scatterPresenceState.enabled = enabled;
+    return { data: globalThis.__scatterPresenceState.current, isPending: false };
   },
 }));
 
@@ -117,6 +112,7 @@ export const noop = () => {};
 export function baseInferenceState() {
   return {
     activeHwTypes: new Set(['h100', 'b200']),
+    blockedHwToggles: new Map(),
     hardwareConfig: HARDWARE_CONFIG,
     toggleHwType: noop,
     removeHwType: noop,
@@ -163,6 +159,9 @@ export function baseInferenceState() {
     showGradientLabels: false,
     setShowGradientLabels: noop,
     showLineLabels: false,
+    showOffloadingLabel: true,
+    showFrameworkLabel: true,
+    setShowOffloadingLabel: noop,
     setShowLineLabels: noop,
   };
 }
@@ -212,15 +211,30 @@ export function mountChart(props?: Partial<Parameters<typeof ScatterGraph>[0]>) 
   };
 }
 
-export const dotGroups = (container: HTMLElement, hwKey?: string) =>
-  [...container.querySelectorAll<SVGGElement>('.dot-group')].filter(
-    (node) => !hwKey || node.dataset.hwKey === hwKey,
-  );
+export const scatterPoints = (container: HTMLElement, hwKey?: string) =>
+  (
+    container
+      .querySelector<CanvasPointLayerElement>(CANVAS_POINT_LAYER_SELECTOR)
+      ?.scatterPoints?.() ?? []
+  ).filter((entry) => !hwKey || entry.attrs['hw-key'] === hwKey);
+
+export function dispatchAtPoint(
+  container: HTMLElement,
+  type: 'click' | 'mousemove' | 'mouseleave',
+  target: { clientX: number; clientY: number },
+) {
+  const hitArea = container.querySelector(`.${POINT_HIT_AREA_CLASS}`)!;
+  act(() => {
+    hitArea.dispatchEvent(
+      new MouseEvent(type, { bubbles: true, clientX: target.clientX, clientY: target.clientY }),
+    );
+  });
+}
 
 export const rebuildCount = () => vi.mocked(setupChartStructure).mock.calls.length;
 
 beforeEach(() => {
-  globalThis.__scatterPathnameState.value = '/inference';
+  globalThis.__scatterPathnameState.value = '/infx/inference';
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
   Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
     configurable: true,
@@ -257,10 +271,8 @@ beforeEach(() => {
   inferenceState.current = baseInferenceState();
   overlayState.current = baseOverlayState();
   legendState.current = null;
-  traceAvailabilityState.current = undefined;
-  logAvailabilityState.current = undefined;
-  availabilityState.traceIds = [];
-  availabilityState.logIds = [];
+  presenceState.current = undefined;
+  presenceState.enabled = undefined;
   vi.mocked(setupChartStructure).mockClear();
 });
 

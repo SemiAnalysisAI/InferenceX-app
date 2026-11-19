@@ -352,6 +352,7 @@ test('dry-run predicts a skip after recovering an activated first install', () =
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);
@@ -636,6 +637,7 @@ test('a process killed after committed backup cleanup leaves its owner marker re
   assert.deepEqual(readdirSync(skillsRoot), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);
@@ -980,6 +982,7 @@ test('the owner tolerates a contender removing its empty terminal recovery direc
   assert.deepEqual(readdirSync(skillsRoot).sort(), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
     'neighbor',
@@ -1129,6 +1132,7 @@ test('simultaneous recoverers atomically claim a dead transaction before restori
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);
@@ -1184,6 +1188,7 @@ test('a killed recovery owner leaves its exact owner token reclaimable', async (
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);
@@ -1393,6 +1398,7 @@ test('a stale none contender can overlap only cleanup after recovery settles the
   assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);
@@ -1609,6 +1615,7 @@ test('terminal cleanup claim crashes cannot block, delete, or hide a newer insta
   assert.deepEqual(readdirSync(skillsRoot), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);
@@ -1724,6 +1731,7 @@ test('terminal cleanup at the canonical path leaves an identifiable tombstone', 
   assert.deepEqual(readdirSync(skillsRoot), [
     'inferencex',
     'inferencex-api',
+    'inferencex-pr-improvements',
     'inferencex-to-chart',
     'inferencex-to-table',
   ]);

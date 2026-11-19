@@ -1,86 +1,89 @@
 import {
   ArrowRight,
   BookOpen,
+  Cpu,
   Download,
-  MousePointerClick,
   MessageSquareText,
   Palette,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Star,
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
+import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import {
-  AGENTIC_COACH_MARK_STORAGE_KEY,
-  AGENTIC_POINT_ACTION_SELECTOR,
-  SCATTER_RENDERED_EVENT,
-  getAgenticPointAnchorMutationRoot,
-  getAgenticPointAnchorRect,
-  resolveAgenticPointAnchor,
-} from '@/lib/nudges/agentic-point-coach-mark';
-import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
+  HUAWEI_UBENCHX_URL,
+  LANDING_BANNER_ANALYTICS_EVENTS,
+  LANDING_BANNER_EXPERIMENT,
+  LANDING_BANNER_STORAGE_KEY,
+  OPERATORX_URL,
+  TPUV7_QWEN_3_5_AGENTX_URL,
+} from '@/lib/nudges/landing-banner';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
+import { GoogleIcon } from '@/components/ui/google-icon';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { Model } from '@/lib/catalog/data-mappings';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
+import {
+  AGENTX_ROUTE,
+  dashboardRouteForPathname,
+  getDashboardRoute,
+} from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 
-/**
- * Event name dispatched by ScatterGraph when parallelism labels are enabled.
- * Exported so the dispatch site can import a stable constant.
- */
 export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
 
-/**
- * The inference chart lives at `/`, `/inference`, and their `/zh` siblings.
- * Used to scope the filter-hint nudge so it only fires on the inference tab.
- */
 function isOnInferenceTab(): boolean {
   if (typeof window === 'undefined') return false;
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  if (segments[0] === 'zh') segments.shift();
-  return (segments[0] ?? 'inference') === 'inference';
+  return dashboardRouteForPathname(window.location.pathname)?.key === 'inference';
 }
 
-/** Resolve an internal nudge destination in the locale active at click time. */
+/**
+ * True on a phone-width PowerX page, where a bottom toast would cover the date and
+ * run controls under the chart. Dashboard toasts stay off there; from md up, and on
+ * every other tab, they show as usual.
+ */
+export function isPhoneWidthPowerX(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  if (segments[0] === 'zh') segments.shift();
+  return segments[0] === 'pwx' && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
+
+const notPhoneWidthPowerX = () => !isPhoneWidthPowerX();
+
 function localizedNudgeHref(enPath: string): string {
   if (typeof window === 'undefined') return enPath;
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-const TPUV7_QWEN_3_5_AGENTX_URL = '/inference/qwen-3-5';
-
-export const TPUV7_LAUNCH_MODAL_STORAGE_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+export const TPUV7_LAUNCH_MODAL_STORAGE_KEY =
+  'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
 function telemetryTutorialHref(): string {
-  return localizedNudgeHref('/agentx/telemetry');
+  return localizedNudgeHref(`${AGENTX_ROUTE.path}/telemetry`);
 }
 
-// ---------------------------------------------------------------------------
-// Registry — every engagement nudge in one place
-// ---------------------------------------------------------------------------
-
 export const NUDGE_REGISTRY: NudgeDefinition[] = [
-  // -------------------------------------------------------------------------
-  // Dashboard toasts
-  // -------------------------------------------------------------------------
   {
     id: 'reproducibility',
     type: 'toast',
     trigger: { type: 'timer', delayMs: 1500 },
-    dismissal: { type: 'session' },
-    storageKey: 'inferencex-reproducibility-nudge-shown',
+    dismissal: { type: 'permanent' },
+    storageKey: 'inferencex-reproducibility-nudge-dismissed',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 10,
     scope: 'dashboard',
     content: {
       icon: ShieldCheck,
-      iconClassName: 'text-brand',
       title: 'Every result is reproducible',
       titleZh: '每项结果均可复现',
       description:
@@ -113,15 +116,15 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     storageKey: 'inferencex-star-nudge-shown',
     permanentSuppressKey: STARRED_KEY,
     permanentSuppressEvent: STARRED_EVENT,
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 20,
     scope: 'dashboard',
     content: {
       icon: Star,
-      iconClassName: 'text-yellow-500 fill-yellow-500',
       title: 'Finding us useful?',
       titleZh: '觉得有用吗？',
-      description: 'Help the project grow so we can add more benchmarks! Star us on GitHub.',
-      descriptionZh: '帮助项目成长，让我们可以添加更多基准测试！在 GitHub 上为我们加星。',
+      description: 'Help the project grow so we can add more benchmarks. Star us on GitHub.',
+      descriptionZh: '帮助项目成长，让我们可以添加更多基准测试。在 GitHub 上为我们加星。',
       action: {
         label: 'Star on GitHub',
         labelZh: '在 GitHub 上加星',
@@ -149,16 +152,16 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-export-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 15,
     scope: 'dashboard',
     content: {
       icon: Download,
-      iconClassName: 'text-blue-500',
       title: 'Need the data?',
       titleZh: '需要数据？',
       description:
-        'Use the download button on any chart to export as PNG or CSV — no need to copy from tooltips.',
-      descriptionZh: '使用任意图表上的下载按钮导出 PNG 或 CSV——无需从提示框中复制。',
+        'Use the download button on any chart to export PNG or CSV instead of copying from tooltips.',
+      descriptionZh: '使用任意图表上的下载按钮导出 PNG 或 CSV，无需从提示框中复制。',
       testId: 'export-nudge',
     },
     analytics: {
@@ -168,7 +171,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
   {
     id: 'gradient-label',
-    type: 'toast',
+    type: 'inline',
     trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
@@ -176,12 +179,11 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Palette,
-      iconClassName: 'text-purple-500',
       title: 'Try Gradient Labels',
       titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
-      descriptionZh: '渐变标签按并发级别对数据点进行颜色编码，让您一目了然地发现性能模式。',
+      descriptionZh: '渐变标签按并行度对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
         label: 'Enable Gradient Labels',
         labelZh: '启用渐变标签',
@@ -191,6 +193,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         },
       },
       testId: 'gradient-label-nudge',
+      slot: NUDGE_SLOTS.inferenceLegend,
     },
     analytics: {
       shown: 'gradient_nudge_shown',
@@ -201,9 +204,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
 
   {
     id: 'filter-hint',
-    type: 'toast',
-    // Show shortly after landing on the inference tab, and re-attempt on tab
-    // switches so users who arrive via another tab still see it once.
+    type: 'inline',
     trigger: [
       { type: 'timer', delayMs: 2500 },
       { type: 'event', event: 'inferencex:tab-change', delayMs: 800 },
@@ -215,14 +216,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: SlidersHorizontal,
-      iconClassName: 'text-brand',
       title: 'Too much on the chart?',
       titleZh: '图表太拥挤？',
       description:
-        'Use the legend filters on the right to focus — toggle NVIDIA vs AMD vendors, disaggregated vs aggregated (disagg/agg) serving, precision (FP8/FP4), and more to compare just what you care about.',
+        'Filter the legend below by vendor (NVIDIA or AMD), disaggregated or aggregated serving (disagg/agg), precision (FP8/FP4) and more to compare only what you care about.',
       descriptionZh:
-        '使用右侧图例筛选器聚焦对比——切换 NVIDIA 与 AMD 厂商、分离式与聚合式 (disagg/agg) 服务模式、精度 (FP8/FP4) 等，只查看您关心的内容。',
+        '使用下方图例按厂商 (NVIDIA 或 AMD)、分离式或聚合式服务 (disagg/agg)、精度 (FP8/FP4) 等筛选，只对比您关心的内容。',
       testId: 'filter-hint-nudge',
+      slot: NUDGE_SLOTS.inferenceLegend,
     },
     analytics: {
       shown: 'filter_hint_nudge_shown',
@@ -230,16 +231,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
   },
 
-  // -------------------------------------------------------------------------
-  // Evaluation toast
-  // -------------------------------------------------------------------------
   {
     id: 'eval-samples',
-    type: 'toast',
+    type: 'inline',
     trigger: { type: 'timer', delayMs: 1500 },
-    // Re-show every week so returning users see it again. Cadence runs from
-    // first show (or last suppress event), not from dismissal — matches the
-    // pre-refactor `EvalSamplesNudge` behavior.
     dismissal: {
       type: 'timed',
       durationMs: 7 * 24 * 60 * 60 * 1000,
@@ -251,13 +246,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'evaluation',
     content: {
       icon: MessageSquareText,
-      iconClassName: 'text-brand',
       title: "See the model's actual answers",
       titleZh: '查看模型的实际回答',
       description:
-        'Click Prompts on any row to compare each prompt, the expected answer, and what the model actually responded.',
-      descriptionZh: '点击任意行的"提示词"按钮，对比每条提示、预期答案和模型的实际回复。',
+        'Click the Prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
+      descriptionZh: '点击任意行末尾的提示词图标，对比每条提示、预期答案和模型的实际回复。',
       testId: 'eval-samples-nudge',
+      slot: NUDGE_SLOTS.evaluationTable,
     },
     analytics: {
       shown: 'evaluation_samples_nudge_shown',
@@ -265,98 +260,65 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
   },
 
-  // -------------------------------------------------------------------------
-  // Agentic chart coach mark
-  // -------------------------------------------------------------------------
-  {
-    id: 'agentic-point-detail',
-    type: 'coach-mark',
-    // Three ways in, all retried until an anchor exists (see `isEligible`'s
-    // `requireAnchor`): a short timer for a chart that is already painted,
-    // every subsequent chart render for the usual async-data case, and scroll
-    // — on a laptop viewport the chart starts below the fold, so the first two
-    // fire while there is still nothing on screen to point at. The resolver
-    // rejects an off-screen chart with a single rect read, keeping the scroll
-    // path cheap, and the engine drops these listeners once the tip is up.
-    trigger: [
-      { type: 'timer', delayMs: 1200 },
-      { type: 'event', event: SCATTER_RENDERED_EVENT, delayMs: 700 },
-      { type: 'dom-event', event: 'scroll' },
-    ],
-    dismissal: { type: 'permanent' },
-    storageKey: AGENTIC_COACH_MARK_STORAGE_KEY,
-    // Highest dashboard priority: it is the only nudge tied to a specific
-    // element, so it should claim its slot the moment that element exists.
-    // (It has its own slot, so this only orders it against future coach marks.)
-    priority: 45,
-    scope: 'dashboard',
-    content: {
-      icon: MousePointerClick,
-      iconClassName: 'text-brand',
-      title: 'Every point has a story',
-      titleZh: '每个数据点背后都有细节',
-      description:
-        'Click any point to view server metrics and logs — cache hit rates, queue depth, and the full request timeline for that run.',
-      descriptionZh:
-        '点击任意数据点即可查看服务端指标与日志——cache 命中率、队列深度，以及该次运行的完整请求时间线。',
-      testId: 'agentic-point-coach-mark',
-      anchor: {
-        resolve: resolveAgenticPointAnchor,
-        getRect: getAgenticPointAnchorRect,
-        getMutationRoot: getAgenticPointAnchorMutationRoot,
-        actionSelector: AGENTIC_POINT_ACTION_SELECTOR,
-      },
-    },
-    analytics: {
-      shown: 'inference_agentic_point_coach_mark_shown',
-      dismissed: 'inference_agentic_point_coach_mark_dismissed',
-      action: 'inference_agentic_point_coach_mark_point_clicked',
-    },
-  },
-
-  // -------------------------------------------------------------------------
-  // Landing banner
-  //
-  // Note: the landing scope deliberately has no GitHub star nudge. The footer
-  // grid already carries the persistent star CTA (footer-star-cta) and the
-  // header carries another, so a fixed bottom card here duplicated the control
-  // and covered the footer. The engagement-triggered star-nudge toast on the
-  // dashboard scope is the only overlay star prompt.
-  // -------------------------------------------------------------------------
   {
     id: 'tpuv7-agentx-launch-modal',
     type: 'modal',
-    trigger: { type: 'immediate' },
-    dismissal: { type: 'permanent' },
-    // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
-    // landing UI under test; a rename here has to be mirrored there.
+    trigger: { type: 'idle' },
+    dismissal: { type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 },
     storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
     priority: 50,
     scope: 'landing',
     content: {
-      icon: Sparkles,
-      iconClassName: 'text-brand',
-      title: 'Google TPUv7 joins AgentX',
-      titleZh: 'Google TPUv7 加入 AgentX',
-      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
-      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
+      icon: GoogleIcon,
+      title: 'TPUv7 preliminary results across multiple models',
+      titleZh: 'TPUv7 多模型初步结果',
+      description: 'AgentX Preview Submissions',
+      descriptionZh: 'AgentX 预览版提交结果',
       testId: 'launch-modal',
-      containerClassName: 'border-brand/40',
-      // Launch announcement — centered with a backdrop so it reads as the
-      // page's headline moment instead of a bottom-right corner card.
       centered: true,
       badge: 'New',
       badgeZh: '最新',
-      dismissLabel: 'Maybe Later',
-      dismissLabelZh: '稍后再看',
+      hideDismissButton: true,
       primaryAction: {
-        label: 'View results',
-        labelZh: '查看结果',
-        icon: <ArrowRight className="size-4" />,
+        label: 'Qwen3.5',
+        labelZh: 'Qwen3.5',
+        icon: <ModelLogo model={Model.Qwen3_5} />,
         onClick: () => {
           window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
         },
       },
+      secondaryAction: {
+        label: 'Kimi K3',
+        labelZh: 'Kimi K3',
+        icon: <ModelLogo model={Model.Kimi_K3} />,
+        onClick: () => {
+          window.location.href = localizedNudgeHref(
+            `${getDashboardRoute('inference').path}/kimi-k3`,
+          );
+        },
+      },
+      additionalActions: [
+        {
+          label: 'GLM5.3',
+          labelZh: 'GLM5.3',
+          icon: <ModelLogo model={Model.GLM_5_2} />,
+          onClick: () => {
+            window.location.href = localizedNudgeHref(
+              `${getDashboardRoute('inference').path}/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
+            );
+          },
+        },
+        {
+          label: 'Muse Spark 1.3/Open',
+          labelZh: 'Muse Spark 1.3/Open',
+          icon: <ModelLogo model={Model.Muse_Spark_Open} />,
+          onClick: () => {
+            window.location.href = localizedNudgeHref(
+              `${getDashboardRoute('inference').path}/muse-spark-open`,
+            );
+          },
+        },
+      ],
     },
     analytics: {
       shown: 'inference_tpuv7_agentx_modal_shown',
@@ -365,7 +327,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
   },
   {
-    id: 'tpuv7-qwen-3-5-agentx-banner',
+    id: 'huawei-ascend-950pr-ubenchx-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -373,42 +335,73 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     priority: 60,
     scope: 'landing',
     renderOnInitialLoad: true,
+    variant: 'ubenchx',
     content: {
-      icon: Sparkles,
-      iconClassName: 'text-brand',
-      title: 'Google TPUv7 joins AgentX',
-      titleZh: 'Google TPUv7 加入 AgentX',
-      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
-      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
+      icon: Cpu,
+      title: 'Huawei Ascend 950PR Microbenchmarks',
+      titleZh: 'Huawei Ascend 950PR 微基准测试',
+      description: 'Cycle-Level Core memory-access microbenchmarks (Beta)',
+      descriptionZh: '周期级核心访存微基准测试（Beta）',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: TPUV7_QWEN_3_5_AGENTX_URL,
+      href: HUAWEI_UBENCHX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+        window.location.href = localizedNudgeHref(HUAWEI_UBENCHX_URL);
       },
     },
     analytics: {
-      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
-      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
-      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
+      ...LANDING_BANNER_ANALYTICS_EVENTS,
       properties: {
-        banner_id: 'tpuv7-qwen-3-5-agentx',
-        destination: 'inference',
+        banner_id: 'huawei-ascend-950pr-ubenchx',
+        destination: 'ubenchx',
+        experiment: LANDING_BANNER_EXPERIMENT,
+        variant: 'ubenchx',
+      },
+    },
+  },
+  {
+    id: 'operatorx-banner',
+    type: 'banner',
+    trigger: { type: 'immediate' },
+    dismissal: { type: 'permanent' },
+    storageKey: LANDING_BANNER_STORAGE_KEY,
+    priority: 60,
+    scope: 'landing',
+    renderOnInitialLoad: true,
+    variant: 'operatorx',
+    content: {
+      icon: Cpu,
+      title: 'Huawei Ascend 950PR Microbenchmarks',
+      titleZh: 'Huawei Ascend 950PR 微基准测试',
+      description: '950PR GEMM FLOPs and Max FLOPS utilization',
+      descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
+      testId: 'launch-banner',
+      badge: 'New',
+      badgeZh: '最新',
+      href: OPERATORX_URL,
+      linkLabel: 'View results',
+      linkLabelZh: '查看结果',
+      onLinkClick: () => {
+        window.location.href = localizedNudgeHref(OPERATORX_URL);
+      },
+    },
+    analytics: {
+      ...LANDING_BANNER_ANALYTICS_EVENTS,
+      properties: {
+        banner_id: 'operatorx',
+        destination: 'operatorx',
+        experiment: LANDING_BANNER_EXPERIMENT,
+        variant: 'operatorx',
       },
     },
   },
 
-  // -------------------------------------------------------------------------
-  // Agentic point-detail modal
-  // -------------------------------------------------------------------------
   {
     id: 'agentx-telemetry-tutorial',
     type: 'modal',
-    // The detail page is chart-dense and its data arrives asynchronously;
-    // waiting lets the charts paint before the card slides in.
     trigger: { type: 'timer', delayMs: 2500 },
     dismissal: { type: 'permanent' },
     storageKey: TELEMETRY_TUTORIAL_STORAGE_KEY,
@@ -416,17 +409,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'agentic-detail',
     content: {
       icon: BookOpen,
-      iconClassName: 'text-brand',
       title: 'New to these charts?',
       titleZh: '第一次看这些图表？',
       description:
-        'The telemetry tutorial explains every chart on this page — the sequence-length distributions, the cache and queue series, the request timeline, and the per-conversation flamegraph.',
+        'The telemetry tutorial explains every chart on this page: the sequence-length distributions, the cache and queue series, the request timeline and the per-conversation flamegraph.',
       descriptionZh:
-        '遥测数据教程会讲解本页的每一张图表——序列长度分布、cache 与队列相关曲线、请求时间线，以及单会话火焰图。',
+        '遥测数据教程会讲解本页的每一张图表，包括序列长度分布、cache 与队列相关曲线、请求时间线以及单会话火焰图。',
       testId: 'telemetry-tutorial-modal',
-      // Deliberately NOT centered: a backdrop here would cover the charts the
-      // tutorial is describing. A bottom-right card leaves the page usable.
-      containerClassName: 'border-brand/40',
       dismissLabel: 'Not now',
       dismissLabelZh: '暂不需要',
       primaryAction: {

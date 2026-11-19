@@ -7,7 +7,6 @@ export function supportsEngineComparisonConsent(sequence: Sequence): boolean {
   return sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces;
 }
 
-/** Only the same-SKU vLLM/SGLang rule is waivable, not global MTP rules. */
 export function needsEngineComparisonConsent(
   keys: Iterable<string>,
   exclusion: Exclusion | null,
@@ -27,14 +26,12 @@ export function needsEngineComparisonConsent(
   return false;
 }
 
-/** Consent stays in memory, never in a share URL or browser storage. */
 export function useEngineComparisonConsent(scope: string) {
   const [state, setState] = useState<{
     scope: string;
     accepted: boolean;
     pending: (() => void) | null;
   }>({ scope, accepted: false, pending: null });
-  // Reset during render so a scope change cannot briefly render with old consent.
   if (state.scope !== scope) setState({ scope, accepted: false, pending: null });
   const accepted = state.scope === scope && state.accepted;
   const pending = state.scope === scope ? state.pending : null;

@@ -39,6 +39,7 @@ import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import {
   getModelCategory,
   getSequenceLabel,
+  getSequenceCategoryForModel,
   isSequenceDeprecated,
   Model,
   MODEL_OPTIONS,
@@ -96,6 +97,9 @@ function buildOptionsPayload() {
       category: getModelCategory(model),
       releaseDate: getModelReleaseDate(model),
       compareSlug: COMPARE_SLUG_BY_DISPLAY.get(model) ?? null,
+      deprecatedSequences: SEQUENCE_OPTIONS.filter(
+        (sequence) => getSequenceCategoryForModel(sequence, model) === 'deprecated',
+      ),
     };
   });
 
@@ -195,6 +199,7 @@ function buildOptionsPayload() {
       serviceCompare: false,
       roleShare: false,
       powerFit: false,
+      powerBreakdown: false,
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',
@@ -215,7 +220,7 @@ export function GET(request: NextRequest) {
     }
 
     return Promise.resolve(
-      cachedJson({
+      cachedJson(request, {
         view: 'options',
         apiVersion: 'v1',
         params: { format: 'json' },

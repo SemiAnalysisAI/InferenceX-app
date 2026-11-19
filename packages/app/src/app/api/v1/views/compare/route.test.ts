@@ -8,7 +8,7 @@ import { buildCompareTable } from '@/lib/views-api/compare-view';
 
 const { mockGetComparePageDerivedData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetComparePageDerivedData: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),
@@ -122,6 +122,20 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/compare', () => {
+  it('uses the shared Muse label without changing the measured model identity', async () => {
+    const response = await GET(request('/api/v1/views/compare?slug=muse-spark-open-b200-vs-h200'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    expect(body.model).toEqual({
+      slug: 'muse-spark-open',
+      displayName: 'Muse-Spark-Open',
+      label: 'Muse Spark 1.3/Open 816B',
+    });
+    expect(body.params.model).toBe('Muse-Spark-Open');
+    expect(mockGetComparePageDerivedData.mock.calls[0][0]).toEqual(['musespark']);
+  });
+
   it('serves a slug pair with page-parity table rows', async () => {
     const response = await GET(request('/api/v1/views/compare?slug=deepseek-r1-h200-vs-b200'));
     expect(response.status).toBe(200);
@@ -130,7 +144,6 @@ describe('GET /api/v1/views/compare', () => {
     expect(body.view).toBe('compare');
     expect(body.apiVersion).toBe('v1');
     expect(body.generatedAt).toBe('2026-03-01');
-    // GPU order is canonicalized (alphabetical) like the page redirect.
     expect(body.params.slug).toBe('deepseek-r1-b200-vs-h200');
     expect(body.gpus).toEqual(['b200', 'h200']);
     expect(body.model).toEqual({
@@ -149,7 +162,6 @@ describe('GET /api/v1/views/compare', () => {
       '8k/1k',
     );
 
-    // Parity with the page pipeline, minus nearestPoints evidence arrays.
     const derived = buildDerived(ROWS);
     expect(body.table).toEqual(
       structuredClone(buildCompareTable(derived.ssrRows, 'default', 'b200', 'h200')),
@@ -158,7 +170,7 @@ describe('GET /api/v1/views/compare', () => {
     expect(body.table).toHaveLength(3);
     for (const row of body.table) {
       expect(row.basis).toBe('throughputPerGpu');
-      expect(row.winner).toBe('b200'); // 1.5x throughput at every knot
+      expect(row.winner).toBe('b200');
       expect(row.a.throughputPerGpu).toBeGreaterThan(row.b.throughputPerGpu);
       expect(row.a).not.toHaveProperty('nearestPoints');
     }
@@ -191,14 +203,12 @@ describe('GET /api/v1/views/compare', () => {
       request('/api/v1/views/compare?slug=deepseek-r1-b200-vs-h200&tiers=15,25,500'),
     );
     const body = await response.json();
-    // Measured interactivity spans 10-40 tok/s/user; 500 is unreachable.
     expect(body.tiers).toEqual([15, 25]);
     expect(body.params.tiers).toEqual([15, 25, 500]);
     for (const row of body.table) {
       expect(row.a).not.toBeNull();
       expect(row.b).not.toBeNull();
     }
-    // headToHead stays pinned to the default targets (display label, as on page).
     expect(body.summary.headToHead?.faster).toBe('B200');
   });
 
@@ -268,7 +278,7 @@ describe('GET /api/v1/views/compare', () => {
     const responseText = await response.text();
     const lines = responseText.trim().split('\r\n');
     expect(lines[0].startsWith('model,scenario,tier,basis,delta_pct,winner,a_hardware')).toBe(true);
-    expect(lines).toHaveLength(4); // header + 3 default targets
+    expect(lines).toHaveLength(4);
   });
 
   it('returns 500 when compare assembly fails', async () => {

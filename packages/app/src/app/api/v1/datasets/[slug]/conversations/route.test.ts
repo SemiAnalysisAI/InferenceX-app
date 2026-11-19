@@ -16,7 +16,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { GET } from './route';
@@ -41,7 +41,6 @@ describe('GET /api/v1/datasets/[slug]/conversations — search input validation'
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('search too long');
-    // DB must not be called.
     expect(mockListConversations).not.toHaveBeenCalled();
   });
 
@@ -56,8 +55,6 @@ describe('GET /api/v1/datasets/[slug]/conversations — search input validation'
   });
 
   it('trims whitespace before applying the length check', async () => {
-    // A 101-char string that is 100 chars of spaces + 1 real char should become
-    // 1 char after trimming — well under the limit.
     const paddedSearch = `${' '.repeat(100)}a`;
     mockListConversations.mockResolvedValueOnce({ total: 1, items: [] });
     const res = await GET(

@@ -19,6 +19,7 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
+  useWarmFilterChange,
 } from '@/providers/GlobalFilterContext';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
@@ -31,6 +32,7 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import type { EvalRow } from '@/lib/api/api';
 import type { Model } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   aggregateEvaluationChartRows,
@@ -39,7 +41,6 @@ import {
 } from './chart-data';
 import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
 
-/** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
 
 import { resolveEvaluationDate } from './date-resolution';
@@ -101,6 +102,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   );
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
+  const locale = useLocale();
 
   const [dateIntent, setDateIntent] = useState(() => ({
     date: getUrlParam('e_rundate') || '',
@@ -125,8 +127,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     remove: removeHwRaw,
   } = useChartToggleSet();
 
-  // Pending legend-active selection restored from `e_active` URL param.
-  // Consumed once when hardware availability settles.
   const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
     const value = getUrlParam('e_active');
     if (!value) return null;
@@ -198,8 +198,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         selectedModel,
         effectivePrecisions,
         selectedRunDate,
+        locale,
       ),
-    [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions],
+    [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions, locale],
   );
 
   const unfilteredUnofficialChartData: EvaluationChartData[] = useMemo(
@@ -209,8 +210,10 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         selectedBenchmark,
         selectedModel,
         effectivePrecisions,
+        undefined,
+        locale,
       ),
-    [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions],
+    [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions, locale],
   );
 
   const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
@@ -239,8 +242,15 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [unfilteredChartData, selectedRunDate]);
 
   const changelogEntries: EvalChangelogEntry[] = useMemo(
-    () => buildEvalChangelogEntries(rawData, selectedRunDate, selectedModel, effectivePrecisions),
-    [rawData, selectedRunDate, selectedModel, effectivePrecisions],
+    () =>
+      buildEvalChangelogEntries(
+        rawData,
+        selectedRunDate,
+        selectedModel,
+        effectivePrecisions,
+        locale,
+      ),
+    [rawData, selectedRunDate, selectedModel, effectivePrecisions, locale],
   );
 
   const modelHasEvalData = useMemo(() => {
@@ -296,7 +306,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [setSelectedModel],
   );
 
-  // ── Debounced hardware selection tracking ────────────────────────────────
   const evalTrackMounted = useRef(false);
   useEffect(() => {
     if (!evalTrackMounted.current) {
@@ -316,7 +325,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [enabledHardware]);
 
-  // Serialize the legend-active set, omitting when it equals all hwTypesWithData.
   const eActiveStr = useMemo(() => {
     if (enabledHardware.size === 0) return '';
     if (enabledHardware.size === hwTypesWithData.size) {
@@ -351,6 +359,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       eActiveStr,
     ],
   );
+  const warmFilterChange = useWarmFilterChange();
 
   const value: EvaluationChartContextType = useMemo(
     () => ({
@@ -390,6 +399,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       selectedPrecisions: effectivePrecisions,
       setSelectedPrecisions,
       availablePrecisions,
+      warmFilterChange,
     }),
     [
       loading,
@@ -423,6 +433,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       effectivePrecisions,
       setSelectedPrecisions,
       availablePrecisions,
+      warmFilterChange,
     ],
   );
 

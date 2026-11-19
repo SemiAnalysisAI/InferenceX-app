@@ -50,7 +50,6 @@ describe('pickPairDefaults', () => {
 
   it('returns null/null when only rows with an unmapped (isl,osl) exist for the pair', () => {
     const rows: BenchmarkRow[] = [
-      // 123/456 is not a registered sequence — islOslToSequence returns undefined
       makeRow({ hardware: 'h100', isl: 123, osl: 456, conc: 8 }),
       makeRow({ hardware: 'gb200', isl: 123, osl: 456, conc: 8 }),
     ];
@@ -61,8 +60,6 @@ describe('pickPairDefaults', () => {
   });
 
   it('picks the (seq, precision) where both GPUs share the most variants', () => {
-    // Both GPUs at 8K/1K fp8 share conc=64 + conc=128
-    // gb200 also has 8K/1K fp4 — but h100 doesn't, so that combo has both=0
     const rows: BenchmarkRow[] = [
       makeRow({ hardware: 'h100', isl: 8192, osl: 1024, precision: 'fp8', conc: 64 }),
       makeRow({ hardware: 'h100', isl: 8192, osl: 1024, precision: 'fp8', conc: 128 }),
@@ -77,8 +74,6 @@ describe('pickPairDefaults', () => {
   });
 
   it('falls back to union coverage when no combo has overlap', () => {
-    // No (seq, precision) is shared. h100 only at 8k/1k fp8; gb200 only at 1k/8k fp4.
-    // Tiebreaker = larger combined coverage. Pad gb200 to win.
     const rows: BenchmarkRow[] = [
       makeRow({ hardware: 'h100', isl: 8192, osl: 1024, precision: 'fp8', conc: 64 }),
       makeRow({ hardware: 'gb200', isl: 1024, osl: 8192, precision: 'fp4', conc: 4 }),
@@ -86,7 +81,6 @@ describe('pickPairDefaults', () => {
       makeRow({ hardware: 'gb200', isl: 1024, osl: 8192, precision: 'fp4', conc: 16 }),
     ];
     const result = pickPairDefaults(rows, 'h100', 'gb200');
-    // gb200 has 3 variants on 1k/8k fp4; h100 has 1 on 8k/1k fp8 — gb200's combo wins.
     expect(result).toEqual({ sequence: '1k/8k', precision: 'fp4' });
   });
 

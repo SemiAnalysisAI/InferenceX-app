@@ -1,14 +1,15 @@
 'use client';
 
+import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { useCallback, useMemo, useState } from 'react';
 
-import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/official-preview-notice';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   ModelSelector,
@@ -37,13 +38,18 @@ import {
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
+import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
+import { plottedChipBases, TcoPriceTable } from '@/components/ui/editable-tco-badges';
+import { ResultContext } from '@/components/ui/result-context';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
+import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -51,7 +57,8 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
-import { getModelSortIndex } from '@/lib/catalog/constants';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
+import { getGpuSpecs, getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
@@ -80,7 +87,7 @@ import {
 import FirstTokenLimitsChart, { configLabel, formatCost } from './FirstTokenLimitsChart';
 import { getCostProviderLabel, getCostTypeLabel } from './ThroughputBarChart';
 import type { CostProvider, CostType } from './types';
-import { useThroughputData } from './useThroughputData';
+import { useThroughputData, useWarmThroughputChange } from './useThroughputData';
 
 const COST_PROVIDER_OPTIONS: {
   value: CostProvider;
@@ -90,9 +97,9 @@ const COST_PROVIDER_OPTIONS: {
   {
     value: 'costh',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有 - 超大规模云大批量',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string; labelZh: string }[] = [
@@ -114,7 +121,7 @@ const STRINGS = {
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
-      'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip, so their input- and output-basis costs are not per chip overall.',
+      'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip unless the note below the chart switches them to every chip, so by default their input- and output-basis costs are not per chip overall.',
     tokenTypePlaceholder: 'Token type',
     minInteractivityLabel: (stat: string) => `Minimum ${stat} Interactivity (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
@@ -136,12 +143,16 @@ const STRINGS = {
     captionFloor: (min: number, stat: string) => `≥${min} tok/s/user ${stat} interactivity`,
     captionRows: (qualifying: number, measured: number) =>
       `${qualifying} of ${measured} measured rows clear the floor`,
-    captionSource: 'Source: SemiAnalysis InferenceX',
+    captionSource: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + unofficial overlays',
     unofficialRun: 'Unofficial run',
     note: 'Note:',
+    disaggCost:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, so on the Input and Output token types a disaggregated config reads cheaper than it is.',
+    disaggCostTotal:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) have their input and output throughput divided by every chip in the deployment, prefill plus decode, the same basis aggregated configs use, so $/M tok on the Input and Output token types compares like for like.',
     methodology: (ttftStat: string, ivStat: string) =>
       ` Cost is $ per million tokens at 100% utilization from the SemiAnalysis AI Cloud TCO Model. The ${ivStat} interactivity floor and the ${ttftStat} time-to-first-token cap are separate percentile statistics on the same row: a row that clears both did so on each measure, which does not mean every individual request did. Bars are measured rows, not interpolated frontier points, so a cheaper configuration can sit just outside a cap and only appear under the next one.`,
-    source: 'Source: ',
     colCap: 'TTFT cap (s)',
     colSeries: 'Series',
     colConfig: 'Configuration',
@@ -160,13 +171,13 @@ const STRINGS = {
       '哪款芯片最优，取决于用户能接受多长的首 token 等待。本页面按每一档首 token 延迟（TTFT）上限，从同时满足交互性下限的实测配置中，逐厂商选出成本最低的一个。仅使用实测数据，不做插值，每个柱形都可追溯到对应的运行记录。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '柱形成本采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
-    costProviderPlaceholder: '成本供应商',
+      '柱形成本采用的定价层级。按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
+    costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
-      '成本按每百万总 token、输入 token 还是输出 token 计。分离式配置的输入、输出吞吐量分别按 prefill 芯片和 decode 芯片统计，因此其输入、输出口径的成本并非按全部芯片计。',
+      '成本按每百万总 token、输入 token 还是输出 token 计。分离式配置的输入、输出吞吐量默认分别按 prefill 芯片和 decode 芯片统计（可在图表下方的说明中切换为按全部芯片计），因此默认情况下其输入、输出口径的成本并非按全部芯片计。',
     tokenTypePlaceholder: 'Token 类型',
     minInteractivityLabel: (stat: string) => `${zhStatPhrase('交互性', stat, '最低')} (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
@@ -183,17 +194,21 @@ const STRINGS = {
     noTtft: (stat: string) =>
       `${zhStatPhrase('首 token 延迟', stat, '当前选择的实测数据行未报告')}，无法施加上限。请尝试其他工作负载或运行日期。`,
     noneUnderCaps: (cap: string, stat: string) =>
-      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本梯度最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
+      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本阶梯的最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
     captionFloor: (min: number, stat: string) =>
       `${zhStatPhrase('交互性', stat)} ≥${min} tok/s/user`,
     captionRows: (qualifying: number, measured: number) =>
       `${measured} 行实测数据中有 ${qualifying} 行满足下限`,
-    captionSource: '来源：SemiAnalysis InferenceX',
+    captionSource: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + 非官方 overlays',
     unofficialRun: '非官方运行',
     note: '注：',
+    disaggCost:
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，因此在「输入」与「输出」token 类型下，分离式配置显示的成本低于实际。',
+    disaggCostTotal:
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量按部署中的芯片总数（预填充芯片 + 解码芯片）计算，与聚合配置口径一致，因此「输入」与「输出」token 类型下的 $/M tok 可以直接对比。',
     methodology: (ttftStat: string, ivStat: string) =>
       ` 成本为 100% 利用率下的每百万 token 成本，取自 SemiAnalysis AI Cloud TCO 模型。${zhStatPhrase('交互性', ivStat)}下限与${zhStatPhrase('首 token 延迟', ttftStat, '')}上限是同一数据行上两个独立的分位数统计：同时满足两者，表示该行在两项指标上分别达标，不代表每个请求都同时达标。柱形为实测数据行而非插值的前沿点，因此更便宜的配置可能刚好超出某一档上限，只出现在下一档中。`,
-    source: '来源：',
     colCap: 'TTFT 上限 (s)',
     colSeries: '系列',
     colConfig: '配置',
@@ -227,17 +242,21 @@ interface FirstTokenRow {
   runUrl: string | null;
 }
 
-export default function FirstTokenLimitsDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+export default function FirstTokenLimitsDisplay() {
   return (
-    <GlobalFilterProvider
-      initialModel={urlSeed?.model}
-      initialSequence={urlSeed?.sequence}
-      initialPrecisions={urlSeed?.precisions}
-      initialRunDate={urlSeed?.runDate}
-      initialRunId={urlSeed?.runId}
-    >
-      <FirstTokenLimitsInner initialPercentile={urlSeed?.percentile ?? Percentile.P90} />
-    </GlobalFilterProvider>
+    <CalculatorUrlSeedBoundary>
+      {(urlSeed) => (
+        <GlobalFilterProvider
+          initialModel={urlSeed.model}
+          initialSequence={urlSeed.sequence}
+          initialPrecisions={urlSeed.precisions}
+          initialRunDate={urlSeed.runDate}
+          initialRunId={urlSeed.runId}
+        >
+          <FirstTokenLimitsInner initialPercentile={urlSeed.percentile ?? Percentile.P90} />
+        </GlobalFilterProvider>
+      )}
+    </CalculatorUrlSeedBoundary>
   );
 }
 
@@ -252,12 +271,23 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   const {
     tcoBasis,
+    chipBasis,
     selectedModel,
     effectiveSequence: selectedSequence,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
+    useGlobalFilterActions();
+  const warmThroughputChange = useWarmThroughputChange();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'first_token' }),
+    [chipBasis, setChipBasis],
+  );
+  const readOnlyChipBasisControl = useMemo(
+    () => ({ ...chipBasisControl, readOnly: true }),
+    [chipBasisControl],
+  );
   const { selectedRunDate } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
@@ -268,16 +298,11 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
-  // Both inputs are URL-seeded so an article can link the exact figure. Empty
-  // means "use the sequence-aware default", which is why the defaults are not
-  // written into the URL.
   const [minInteractivityInput, setMinInteractivityInput] = useState<string>(
     () => readUrlParams().c_ivmin ?? '',
   );
   const [capsInput, setCapsInput] = useState<string>(() => readUrlParams().c_ttft ?? '');
 
-  // Unofficial-run overlay (`?unofficialrun=…`): each loaded run gets its own
-  // bar per cap, chosen from its own rows only, in the run's palette color.
   const { isUnofficialRun, unofficialBenchmarkRows, unofficialRunInfos, runIndexByUrl } =
     useUnofficialRun();
   const overlayInput = useMemo(
@@ -308,12 +333,12 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     true,
     costType,
     tcoBasis,
+    false,
+    chipBasis,
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
-  // Agentic rows are read at the selected percentile; fixed sequences at the
-  // median, the same split as the inference chart's interactivity and TTFT axes.
   const statLabel = isAgenticSequence
     ? selectedPercentile.toUpperCase()
     : STAT_LABELS[locale].median;
@@ -330,8 +355,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     [capsInput],
   );
 
-  // One legend governs a chip's official and overlay bars together; overlay-only
-  // hardware is merged in so its bar can be hidden. See docs/tco-calculator.md.
   const legendHwKeys = useMemo(() => {
     if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
     return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
@@ -439,8 +462,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     writeUrlParams({ c_ttft: parsed ? formatFirstTokenCaps(parsed) : '' });
   }, []);
   const handleCapsBlur = useCallback(() => {
-    // Normalize what was typed to the ladder actually in use, so the field and
-    // the chart agree; an unusable entry falls back to the default ladder.
     const parsed = parseFirstTokenCaps(capsInput);
     setCapsInput(parsed ? formatFirstTokenCaps(parsed) : '');
     track('first_token_caps_set', { caps: formatFirstTokenCaps(caps) });
@@ -489,8 +510,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
           title: `${t.unofficialRun}: ${series.label}`,
           hw: `overlay-run-${info?.id ?? series.runIndex}`,
           isActive: true,
-          // A label for the run, not a series the legend can hide: per-run
-          // removal lives in the unofficial-run banner.
           isRemovable: false,
           onClick: () => {},
         };
@@ -595,7 +614,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
               href={r.runUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2"
+              className="text-brand underline underline-offset-2"
               onClick={() => track('first_token_run_link_clicked')}
             >
               {t.viewRun}
@@ -638,6 +657,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
       t.captionFloor(minInteractivity, statLabel),
       getCostProviderLabel(costProvider, locale),
+      ...(costType === 'total' ? [] : [chipBasisCsvNote(chipBasis, locale)]),
     ]);
     track('first_token_csv_exported', { model: selectedModel });
   }, [
@@ -650,6 +670,8 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     locale,
     minInteractivity,
     costProvider,
+    costType,
+    chipBasis,
   ]);
 
   const showsJalapenoPreview = includesJalapenoResult(legendHwKeys);
@@ -658,15 +680,62 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   const caption = (
     <>
-      <Heading as="h2" level="card">
-        {t.title}
-      </Heading>
-      <p className="text-sm text-muted-foreground mb-2">
-        {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
-        {t.captionFloor(minInteractivity, statLabel)} • {getCostProviderLabel(costProvider, locale)}{' '}
-        • {t.captionRows(result.qualifyingRows, result.measuredRows)} • {t.captionSource}
-      </p>
+      <div className="md:pr-12">
+        <Heading as="h2" level="card">
+          {t.title}
+        </Heading>
+        <p className="text-sm text-muted-foreground mb-2">
+          {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)} ·{' '}
+          {t.captionFloor(minInteractivity, statLabel)} ·{' '}
+          {getCostProviderLabel(costProvider, locale)} ·{' '}
+          {t.captionRows(result.qualifyingRows, result.measuredRows)}
+        </p>
+      </div>
+      {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+      {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+      {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
+  );
+
+  const plottedBases = plottedChipBases(
+    result.cells.flatMap((cell) => (cell.winner ? [cell.winner.hwKey] : [])),
+    (base) => base in HW_REGISTRY,
+  );
+  const footer = (
+    <div className="mt-3">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        chipBasis={
+          costType === 'total' ? undefined : <ChipBasisCaption control={chipBasisControl} />
+        }
+        priceTable={
+          plottedBases.length > 0 ? (
+            <TcoPriceTable
+              items={plottedBases.map((base) => ({
+                base,
+                label:
+                  HW_REGISTRY[base as keyof typeof HW_REGISTRY].badgeLabel ?? base.toUpperCase(),
+                value: getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2),
+              }))}
+              testId="first-token-prices"
+              cellTestId="first-token-price"
+              inputIdPrefix="first-token-price"
+            />
+          ) : undefined
+        }
+        date={selectedRunDate}
+        source={isUnofficialRun ? t.sourceWithOverlays : t.captionSource}
+        metaEnd={plottedBases.length > 0 ? <PricesSourceLink /> : undefined}
+      />
+      <ChipBasisNote
+        visible={costType !== 'total'}
+        testId="first-token-disagg-cost-note"
+        label={t.note}
+        text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
+        chipBasis={readOnlyChipBasisControl}
+      />
+    </div>
   );
 
   const legendElement = (
@@ -677,7 +746,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('first_token_legend_expanded', { expanded });
+        track('first_token_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {
@@ -690,17 +759,30 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
           },
         },
       ]}
+      reset={{
+        id: 'first-token-reset-filter',
+        disabled: visibleHwKeys.size >= legendHwKeys.length,
+        onClick: () => {
+          setVisibilityIntent({
+            scopeKey: selectionKey,
+            visible: new Set(legendHwKeys),
+            known: new Set(legendHwKeys),
+          });
+          track('first_token_gpu_reset', { gpu_count: legendHwKeys.length });
+        },
+      }}
     />
   );
 
   if (!loading && error) {
     console.error(error);
     return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
     );
   }
 
@@ -710,6 +792,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title}
               description={t.description}
               actions={<ChartShareActions />}
@@ -731,6 +814,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                     onChange={handleModelChange}
                     open={openDropdown === 'model'}
                     onOpenChange={handleDropdownOpenChange('model')}
+                    onOptionIntent={(model) => warmThroughputChange({ model })}
                     availableModels={availableModels}
                   />
                 </div>
@@ -741,6 +825,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                   onChange={handleSequenceChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
+                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
                   availableSequences={availableSequences}
                   model={selectedModel}
                 />
@@ -759,6 +844,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                   onChange={handlePrecisionChange}
                   open={openDropdown === 'precision'}
                   onOpenChange={handleDropdownOpenChange('precision')}
+                  onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
                   availablePrecisions={availablePrecisions}
                 />
               </ControlPanel>
@@ -823,7 +909,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('first_token_cost_type_changed', { costType: next });
+                        track('first_token_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}
@@ -902,29 +988,28 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       )}
 
       {!loading && !hasAnyData && (
-        <Card>
-          <div
-            className="flex items-center justify-center h-64 text-muted-foreground text-center px-6"
-            data-testid="first-token-no-data"
-          >
-            {t.noData}
-          </div>
-        </Card>
+        <EmptyState className="h-64" data-testid="first-token-no-data">
+          {t.noData}
+        </EmptyState>
       )}
 
       {!loading && hasAnyData && (
         <Card>
-          <figure data-testid="first-token-figure" className="relative rounded-lg">
+          <figure data-testid="first-token-figure" className="relative min-w-0">
             <ChartButtons
               chartId="first-token-limits"
               analyticsPrefix="first_token"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
+              className="md:absolute md:right-0 md:top-0 md:z-10 md:mb-0"
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_first_token_limits_${selectedModel}`}
             />
-            {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-            {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
             {hasBars ? (
               <FirstTokenLimitsChart
                 result={result}
@@ -936,6 +1021,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 runInfoByIndex={runInfoByIndex}
                 legendElement={legendElement}
                 caption={caption}
+                footer={footer}
               />
             ) : (
               <>
@@ -950,22 +1036,14 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                       ? t.noneQualify(minInteractivity, statLabel)
                       : t.noneUnderCaps(formatCap(Math.max(...caps)), statLabel)}
                 </div>
+                {footer}
               </>
             )}
           </figure>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            <strong>{t.note}</strong>
-            {t.methodology(statLabel, statLabel)} {t.source}
-            <a
-              href={TCO_SOURCE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              {TCO_SOURCE_TITLE}
-              <ExternalLinkIcon />
-            </a>
+            <span className="font-medium text-foreground">{t.note}</span>
+            {t.methodology(statLabel, statLabel)}
           </p>
 
           {tableRows.length > 0 && (

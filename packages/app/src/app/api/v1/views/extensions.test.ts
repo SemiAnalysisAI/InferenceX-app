@@ -3,7 +3,9 @@ import { profitModelDefaults } from '@/components/calculator/profit-estimator';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import type { BenchmarkRow } from '@/lib/api/api';
+import type { BenchmarkRequestParams } from '@/lib/benchmarks/benchmark-request-params';
 import { Model } from '@/lib/catalog/data-mappings';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
@@ -23,10 +25,19 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
-vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
+vi.mock('@/lib/benchmarks/benchmarks-endpoint.server', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadBenchmarks: async (query: BenchmarkRequestParams) => {
+    const response: Response = await mocks.benchmarks(query);
+    return response.json();
+  },
+}));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
 vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
-vi.mock('@/lib/cache/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
+vi.mock('@/lib/cache/api-cache', () => ({
+  cachedQuery: (fn: unknown) => fn,
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
+}));
 const req = (view: string, query = '') =>
   new NextRequest(`https://example.test/api/v1/views/${view}?${query}`);
 
@@ -98,6 +109,51 @@ beforeEach(() => {
   mocks.unofficial.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
   mocks.submissions.mockImplementation(() => Response.json({ summary: [], volume: [] }));
 });
+const correlation = async (query: string) => {
+  const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
+  return response.json();
+};
+
+const curve = (scale: number, date: string) =>
+  [
+    [20, 9000, 1],
+    [40, 8000, 0],
+    [60, 3000, 1],
+  ].map(([interactivity, throughput, powerValid], index) =>
+    agenticRow({
+      id: scale * 100 + index,
+      conc: 3 - index,
+      date: scale === 2 && index === 0 ? '2026-09-08' : date,
+      run_url:
+        scale === 2 && index === 0
+          ? 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/122'
+          : agenticRow().run_url,
+      curve_workflow_run_id: scale * 1000,
+      curve_date: date,
+      metrics: {
+        ...agenticRow().metrics,
+        p90_itl: 1 / interactivity,
+        tput_per_gpu: throughput * scale,
+        input_tput_per_gpu: throughput * scale * 0.9,
+        output_tput_per_gpu: throughput * scale * 0.1,
+        power_valid: powerValid,
+      },
+    }),
+  );
+
+const nvl72Tray = (metrics: Record<string, number>, sensor: 'grace_socket' | 'module') =>
+  agenticRow({
+    hardware: 'gb300',
+    prefill_tp: 4,
+    decode_tp: 4,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+    power_audit: {
+      cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
+    },
+    metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
+  });
+
 describe('new dashboard projections', () => {
   it('GPU visibility, axes, statistics and no-store match shared helpers', async () => {
     const result = await gpu(
@@ -196,6 +252,7 @@ describe('new dashboard projections', () => {
     const body = await response.json();
     expect(body.stats).toEqual([]);
   });
+
   it('reports the correlation y-axis it draws when the series has no temperature', async () => {
     const data = [
       { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
@@ -204,10 +261,6 @@ describe('new dashboard projections', () => {
     mocks.metrics.mockImplementation(() =>
       Response.json({ runInfo: { id: 123 }, artifacts: [{ name: 'h200', data }] }),
     );
-    const correlation = async (query: string) => {
-      const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
-      return response.json();
-    };
     const defaulted = await correlation('');
     expect(defaulted.params.corrYMetric).toBe('smClock');
     expect(defaulted.chart).toEqual([
@@ -283,7 +336,8 @@ describe('new dashboard projections', () => {
   ] as const)(
     '%s shares the DeepSeek V4 Pro default and preserves explicit targets',
     async (view, handler) => {
-      const row = agenticRow();
+      const baseRow = agenticRow();
+      const row = agenticRow({ metrics: { ...baseRow.metrics, p90_itl: 1 / 190 } });
       mocks.benchmarks.mockImplementation(() =>
         Response.json([
           row,
@@ -303,11 +357,11 @@ describe('new dashboard projections', () => {
       const response = await handler(req(view, 'model=DeepSeek-V4-Pro'));
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.params).toMatchObject({ target: 35, priceSource: 'list', labCut: 0 });
+      expect(body.params).toMatchObject({ target: 170, priceSource: 'list', labCut: 0 });
       expect(body.params.target).toBe(profitModelDefaults(Model.DeepSeek_V4_Pro).interactivity);
       expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
 
-      const explicit = await handler(req(view, 'model=DeepSeek-V4-Pro&target=35'));
+      const explicit = await handler(req(view, 'model=DeepSeek-V4-Pro&target=170'));
       expect(explicit.status).toBe(200);
       const explicitBody = await explicit.json();
       expect(explicitBody.data).toEqual(body.data);
@@ -317,6 +371,125 @@ describe('new dashboard projections', () => {
       const customBody = await custom.json();
       expect(customBody.params.target).toBe(24);
       expect(customBody.data).not.toEqual(body.data);
+    },
+  );
+  it.each([
+    [Model.Kimi_K3, 'kimik3', 60],
+    [Model.GLM_5_2, 'glm5.2', 135],
+    [Model.MiniMax_M3, 'minimaxm3', 115],
+    [Model.DeepSeek_V4_Pro, 'dsv4', 170],
+    [Model.DeepSeek_V4_1_Flash, 'dsv41flash', 150],
+    [Model.Muse_Spark_Open, 'musespark', 100],
+  ] as const)(
+    'prices supported agentic model %s at its default through both public profit views',
+    async (model, dbKey, target) => {
+      const baseRow = agenticRow({ model: dbKey });
+      const firstRow = agenticRow({
+        model: dbKey,
+        metrics: { ...baseRow.metrics, p90_itl: 1 / 250 },
+      });
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          firstRow,
+          agenticRow({
+            id: 2,
+            model: dbKey,
+            conc: 32,
+            metrics: {
+              ...firstRow.metrics,
+              p90_itl: 1 / 20,
+              tput_per_gpu: 9000,
+              input_tput_per_gpu: 8100,
+              output_tput_per_gpu: 900,
+            },
+          }),
+        ]),
+      );
+      for (const [view, handler] of [
+        ['profit-estimator', profit],
+        ['profit-estimator-per-gigawatt', gw],
+      ] as const) {
+        const query = `model=${encodeURIComponent(model)}&priceSource=custom`;
+        const response = await handler(req(view, query));
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.params).toMatchObject({ model, sequence: 'agentic-traces', target });
+        expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+        expect(body.data.rows[0].profit).toBeTypeOf('number');
+        if (model === Model.Muse_Spark_Open) {
+          const listResponse = await handler(req(view, `model=${encodeURIComponent(model)}`));
+          expect(listResponse.status).toBe(200);
+          const listBody = await listResponse.json();
+          expect(listBody.params).toMatchObject({ target: 100, priceSource: 'list', labCut: 30 });
+          expect(listBody.pricing).toEqual({
+            source: 'normalized',
+            inputPerMillion: 1.25,
+            cachedInputPerMillion: 0.15,
+            outputPerMillion: 4.25,
+          });
+          expect(listBody.data.rows[0].profit).toBeTypeOf('number');
+        }
+
+        const overridden = await handler(req(view, `${query}&target=35`));
+        expect(overridden.status).toBe(200);
+        const overriddenBody = await overridden.json();
+        expect(overriddenBody.params.target).toBe(35);
+      }
+    },
+  );
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s applies model defaults to official and unofficial runs',
+    async (view, handler) => {
+      for (const [model, dbKey, target] of [
+        ['DeepSeek-V4-Pro', 'dsv4', 170],
+        ['Muse-Spark-Open', 'musespark', 100],
+      ] as const) {
+        const low = agenticRow({
+          model: dbKey,
+          metrics: {
+            ...agenticRow().metrics,
+            p90_itl: 1 / 20,
+            tput_per_gpu: 9000,
+            input_tput_per_gpu: 8100,
+            output_tput_per_gpu: 900,
+          },
+        });
+        const high = agenticRow({
+          model: dbKey,
+          id: 2,
+          conc: 2,
+          metrics: {
+            ...low.metrics,
+            p90_itl: 1 / 250,
+            tput_per_gpu: 6000,
+            input_tput_per_gpu: 5400,
+            output_tput_per_gpu: 600,
+          },
+        });
+        mocks.benchmarks.mockImplementation(() => Response.json([low, high]));
+        const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/456';
+        mocks.unofficial.mockImplementation(() =>
+          Response.json({
+            benchmarks: [
+              { ...low, id: 456, hardware: 'b300', run_url: runUrl },
+              { ...high, id: 457, hardware: 'b300', run_url: runUrl },
+            ],
+            evaluations: [],
+          }),
+        );
+
+        const response = await handler(
+          req(view, `model=${model}&priceSource=list&unofficialrun=456`),
+        );
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.params.target).toBe(target);
+        expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+        expect(hardwareKeys(body.overlays)).toEqual(['b300_sglang']);
+      }
     },
   );
   it.each([
@@ -365,9 +538,9 @@ describe('new dashboard projections', () => {
         'model=DeepSeek-V4-Pro&runId=123&unofficialrun=456&caps=1,2&costType=output',
       ),
     );
-    const query = mocks.benchmarks.mock.calls[0][0].nextUrl.searchParams;
-    expect(query.get('runId')).toBe('123');
-    expect(query.get('exactRun')).toBe('true');
+    const query: BenchmarkRequestParams = mocks.benchmarks.mock.calls[0][0];
+    expect(query.runId).toBe('123');
+    expect(query.exactRun).toBe(true);
     expect(mocks.unofficial.mock.calls[0][0].nextUrl.pathname).toBe('/api/unofficial-run');
   });
   it.each([false, true])(
@@ -500,7 +673,6 @@ describe('new dashboard projections', () => {
         body.data,
       ]);
 
-      // An in-progress run can change between requests; the next one must fetch it again.
       overlay = { ...overlay, hardware: 'mi355x' };
       const freshResponse = await profit(req('profit-estimator', query));
       expect(freshResponse.status).toBe(200);
@@ -510,24 +682,19 @@ describe('new dashboard projections', () => {
       expect([firstFetchCount, mocks.unofficial.mock.calls.length]).toEqual([1, 2]);
     },
   );
-  it.each(['modeled', 'compare'])(
+  it.each(['modeled'])(
     'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
     async (powerBasis) => {
       const rows = [
         agenticRow({ id: 90, hardware: 'mi355x', date: '2026-09-09' }),
         agenticRow({ id: 100 }),
       ];
-      // A pinned run can legitimately contain append-only rows from an older date.
       const pinned = agenticRow({ id: 789, hardware: 'b300', date: '2026-09-08' });
-      mocks.benchmarks.mockImplementation((request: NextRequest) => {
-        const search = request.nextUrl.searchParams;
-        if (search.get('runId') === '789' && search.get('exactRun') === 'true')
-          return Response.json([pinned]);
-        const date = search.get('date')!;
+      mocks.benchmarks.mockImplementation((query: BenchmarkRequestParams) => {
+        if (query.runId === '789' && query.exactRun) return Response.json([pinned]);
+        const date = query.date!;
         return Response.json(
-          rows.filter((row) =>
-            search.get('exact') === 'true' ? row.date === date : row.date <= date,
-          ),
+          rows.filter((row) => (query.exact ? row.date === date : row.date <= date)),
         );
       });
       const response = await gw(
@@ -551,7 +718,134 @@ describe('new dashboard projections', () => {
       expect(body.comparisons[0].data.rows[0].revenuePerGpuHour).toBeCloseTo(5.8536, 4);
     },
   );
+
   it.each(['modeled', 'compare'])(
+    'uses valid power curves at the same target in official, historical and overlay %s estimates',
+    async (powerBasis) => {
+      mocks.benchmarks.mockImplementation((query: BenchmarkRequestParams) =>
+        Response.json(query.exact ? curve(2, '2026-09-09') : curve(1, '2026-09-10')),
+      );
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: curve(3, '2026-09-10'), evaluations: [] }),
+      );
+      const query = `model=DeepSeek-V4-Pro&precisions=fp4&target=45&priceSource=custom&inputPrice=1&cachedInputPrice=1&outputPrice=1&powerBasis=${powerBasis}&dates=2026-09-09&unofficialrun=456`;
+      const response = await gw(req('profit-estimator-per-gigawatt', query));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      for (const [output, scale] of [
+        [body.data, 1],
+        [body.comparisons[0].data, 2],
+        [body.overlays, 3],
+      ]) {
+        expect(output.skipped).toEqual([]);
+        expect(output.rows).toHaveLength(powerBasis === 'compare' ? 2 : 1);
+        for (const row of output.rows)
+          expect(row.revenuePerGpuHour).toBeCloseTo(17.159765625 * scale);
+      }
+      const provisioned = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          query.replace(`powerBasis=${powerBasis}`, 'powerBasis=provisioned'),
+        ),
+      );
+      const baseline = await provisioned.json();
+      expect(baseline.data.rows).toHaveLength(1);
+      expect(baseline.data.rows[0].revenuePerGpuHour).toBeGreaterThan(17.159765625);
+    },
+  );
+  const grace = {
+    cpu_power_valid: 1,
+    avg_cpu_socket_power_w: 98.066,
+    avg_total_cpu_power_w: 196.132,
+  };
+  it('retains provisioned NVL72 estimates with invalid GPU telemetry and explains missing measured power', async () => {
+    mocks.benchmarks.mockImplementation(() =>
+      Response.json([nvl72Tray({ power_valid: 0 }, 'grace_socket')]),
+    );
+    for (const powerBasis of ['compare', 'modeled']) {
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.rows).toHaveLength(powerBasis === 'compare' ? 1 : 0);
+      if (powerBasis === 'compare') {
+        expect(body.data.rows[0].powerLabel).toBe('All in Provisioned');
+        expect(body.data.rows[0].powerSource).toBeUndefined();
+      }
+      expect(body.data.skipped).toMatchObject([{ reason: 'no-measured-power' }]);
+    }
+  });
+  it.each([
+    ['GPU-only telemetry', {}, 'grace_socket'],
+    ['a module-sensor CPU audit', grace, 'module'],
+  ] as const)(
+    'prices NVL72 trays with %s on the modeled Grace sockets',
+    async (_name, metrics, sensor) => {
+      mocks.benchmarks.mockImplementation(() => Response.json([nvl72Tray(metrics, sensor)]));
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.skipped).toEqual([]);
+      expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+        undefined,
+        {
+          topology: 'nvl72-tray',
+          cpu: 'modeled',
+          pue: 1.1,
+          modelRevision: SYSTEM_POWER_MODEL_REVISION,
+        },
+      ]);
+    },
+  );
+  it('prices an NVL72 aggregate on its measured GPU and Grace-socket rack share', async () => {
+    const trays = agenticRow({
+      hardware: 'gb300',
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 16,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      power_audit: {
+        cpu: { sensor_kind: 'grace_socket', expected_sockets: 8, observed_sockets: 8 },
+      },
+      metrics: {
+        ...agenticRow().metrics,
+        avg_power_w: 594.191,
+        avg_total_gpu_power_w: 9507.056,
+        ...grace,
+        avg_total_cpu_power_w: 784.528,
+      },
+    });
+    mocks.benchmarks.mockImplementation(() => Response.json([trays]));
+    const response = await gw(
+      req(
+        'profit-estimator-per-gigawatt',
+        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.skipped).toEqual([]);
+    expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+      undefined,
+      {
+        topology: 'nvl72-tray',
+        cpu: 'measured',
+        pue: 1.1,
+        modelRevision: SYSTEM_POWER_MODEL_REVISION,
+      },
+    ]);
+  });
+  it.each(['modeled'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
     async (powerBasis) => {
       const partial = agenticRow({
@@ -592,6 +886,7 @@ describe('new dashboard projections', () => {
       'caps=2,Infinity',
       'caps=2,',
       'costProvider=costn',
+      'chipBasis=decode',
       'surprise=true',
       'runId=0',
       'date=2026-02-30',
@@ -610,6 +905,23 @@ describe('new dashboard projections', () => {
     const body = await response.json();
     expect(body.params.caps).toEqual([0.5, 2, 5]);
   });
+  it('echoes the first-token chip basis and keeps it off views without the control', async () => {
+    for (const chipBasis of ['pool', 'total']) {
+      const response = await first(
+        req('first-token', `model=DeepSeek-V4-Pro&costType=output&chipBasis=${chipBasis}`),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.chipBasis).toBe(chipBasis);
+    }
+    const defaulted = await first(req('first-token', 'model=DeepSeek-V4-Pro'));
+    const defaultedBody = await defaulted.json();
+    expect(defaultedBody.params.chipBasis).toBe('pool');
+    const profitResponse = await profit(
+      req('profit-estimator', 'model=DeepSeek-V4-Pro&chipBasis=total'),
+    );
+    expect(profitResponse.status).toBe(400);
+  });
   it('empty submission history is a successful empty view', async () => {
     const result = await submissions(
       req('submissions', 'search=notfound&lines=amd&mode=cumulative'),
@@ -618,6 +930,30 @@ describe('new dashboard projections', () => {
     expect(result.status).toBe(200);
     expect(body.rows).toEqual([]);
     expect(body.series).toEqual([{ key: 'amd', points: [] }]);
+  });
+  it('defaults submission series to every vendor with submissions plus total', async () => {
+    mocks.submissions.mockImplementationOnce(() =>
+      Response.json({
+        summary: [],
+        volume: [
+          { date: '2026-08-22', hardware: 'jalapeno', datapoints: 4 },
+          { date: '2026-08-26', hardware: 'tpuv7', datapoints: 3 },
+          { date: '2026-08-26', hardware: 'h200', datapoints: 5 },
+        ],
+      }),
+    );
+    const result = await submissions(req('submissions', 'mode=cumulative'));
+    const body = await result.json();
+    expect(result.status).toBe(200);
+    expect(body.params.lines).toEqual(['nvidia', 'openai', 'google', 'total']);
+    expect(
+      Object.fromEntries(
+        body.series.map((line: { key: string; points: { value: number }[] }) => [
+          line.key,
+          line.points.map((point) => point.value),
+        ]),
+      ),
+    ).toEqual({ nvidia: [0, 5], openai: [4, 4], google: [0, 3], total: [4, 12] });
   });
 });
 

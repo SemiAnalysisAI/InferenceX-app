@@ -11,6 +11,7 @@ import {
   getShapeKeyForPrecision,
   applyNormalState,
   applyHoverState,
+  compactAxisTickFormat,
   formatLargeNumber,
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
@@ -23,9 +24,6 @@ function mockSelection() {
   return { attr: vi.fn().mockReturnThis() } as any;
 }
 
-// ===========================================================================
-// SHAPE_CONFIG (keyed by shape name)
-// ===========================================================================
 describe('SHAPE_CONFIG', () => {
   it('circle config has type "circle" with radius', () => {
     expect(SHAPE_CONFIG.circle.type).toBe('circle');
@@ -58,18 +56,12 @@ describe('SHAPE_CONFIG', () => {
   });
 });
 
-// ===========================================================================
-// SHAPE_ORDER
-// ===========================================================================
 describe('SHAPE_ORDER', () => {
   it('assigns circle → square → triangle → diamond in that order', () => {
     expect([...SHAPE_ORDER]).toEqual(['circle', 'square', 'triangle', 'diamond']);
   });
 });
 
-// ===========================================================================
-// getShapeKeyForPrecision (positional)
-// ===========================================================================
 describe('getShapeKeyForPrecision', () => {
   it('first selected precision maps to circle', () => {
     expect(getShapeKeyForPrecision('fp8', ['fp8', 'fp4'])).toBe('circle');
@@ -100,9 +92,6 @@ describe('getShapeKeyForPrecision', () => {
   });
 });
 
-// ===========================================================================
-// getShapeConfig
-// ===========================================================================
 describe('getShapeConfig', () => {
   it('returns the shape config for a given shape key', () => {
     expect(getShapeConfig('circle')).toBe(SHAPE_CONFIG.circle);
@@ -112,9 +101,6 @@ describe('getShapeConfig', () => {
   });
 });
 
-// ===========================================================================
-// applyNormalState
-// ===========================================================================
 describe('applyNormalState', () => {
   it('sets path attributes for triangle', () => {
     const sel = mockSelection();
@@ -149,9 +135,6 @@ describe('applyNormalState', () => {
   });
 });
 
-// ===========================================================================
-// applyHoverState
-// ===========================================================================
 describe('applyHoverState', () => {
   it('sets hover path attributes for triangle', () => {
     const sel = mockSelection();
@@ -183,9 +166,6 @@ describe('applyHoverState', () => {
   });
 });
 
-// ===========================================================================
-// formatLargeNumber
-// ===========================================================================
 describe('formatLargeNumber', () => {
   it('formats evenly divisible millions without decimal', () => {
     expect(formatLargeNumber(2_000_000)).toBe('2M');
@@ -226,11 +206,28 @@ describe('formatLargeNumber', () => {
   it('handles exactly 1_000_000 (boundary)', () => {
     expect(formatLargeNumber(1_000_000)).toBe('1M');
   });
+
+  it('formats billions instead of four-digit millions', () => {
+    expect(formatLargeNumber(1_800_000_000)).toBe('1.8B');
+  });
 });
 
-// ===========================================================================
-// logTickFormat
-// ===========================================================================
+describe('compactAxisTickFormat', () => {
+  it('keeps one billion unit across an axis that reaches billions', () => {
+    const format = compactAxisTickFormat([0, 1_750_000_000]);
+    expect([0, 200_000_000, 1_000_000_000, 1_800_000_000].map(format)).toEqual([
+      '0',
+      '0.2B',
+      '1B',
+      '1.8B',
+    ]);
+  });
+
+  it('falls back to the per-value formatter below a billion', () => {
+    expect(compactAxisTickFormat([0, 900_000])(500_000)).toBe('500k');
+  });
+});
+
 describe('logTickFormat', () => {
   it('shows all labels when logRange < 2', () => {
     const formatter = logTickFormat(mockScale(10, 50));
@@ -263,9 +260,6 @@ describe('logTickFormat', () => {
   });
 });
 
-// ===========================================================================
-// logTickFormat — additional edge cases
-// ===========================================================================
 describe('logTickFormat — edge cases', () => {
   it('shows all labels at narrow zoom (logRange < 2) including non-powers-of-10', () => {
     const formatter = logTickFormat(mockScale(100, 500));
@@ -308,9 +302,6 @@ describe('logTickFormat — edge cases', () => {
   });
 });
 
-// ===========================================================================
-// formatLargeNumber — additional edge cases
-// ===========================================================================
 describe('formatLargeNumber — additional edge cases', () => {
   it('formats 999 (just below 1000 boundary) as plain number', () => {
     expect(formatLargeNumber(999)).toBe('999');

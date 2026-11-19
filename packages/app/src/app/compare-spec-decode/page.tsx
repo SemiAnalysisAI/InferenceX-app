@@ -1,23 +1,27 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
+import {
+  CompareCatalogLink,
+  CompareCatalogLinks,
+  CompareModelSection,
+  ComparePairGrid,
+} from '@/components/compare/compare-catalog';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { type Model } from '@/lib/catalog/data-mappings';
 import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
 } from '@/lib/compare/compare-variant-availability';
-import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
 import { formatModelList } from '@/lib/compare/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
@@ -25,25 +29,25 @@ import {
   specMethodDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
 
-const DESCRIPTION = `Does speculative decoding (MTP-style multi-token prediction, model-specific methods like EAGLE for MiniMax M3) improve inference throughput and cost? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Each page compares a model + chip with the speculative decoding method ON versus OFF.`;
+const DESCRIPTION =
+  'Does speculative decoding (MTP, EAGLE) improve LLM inference throughput and cost? Each page compares one model and chip with the method on versus off.';
+
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Speculative decoding on vs off for the same model and chip: does MTP or EAGLE raise inference throughput and cut cost? Independent, open-source benchmarks.';
 
 export const metadata: Metadata = {
   title: 'Chip Speculative Decoding Comparisons',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-spec-decode'),
-  openGraph: {
+  ...socialMetadata({
     title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-spec-decode`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {
@@ -74,7 +78,7 @@ function buildCards(
 export default async function CompareSpecDecodeIndexPage() {
   const pairsByModel = await getSpecDecodePairsByModelSlug();
   const totalUrls = [...pairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (pairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 
@@ -83,35 +87,21 @@ export default async function CompareSpecDecodeIndexPage() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">
+          <Heading as="h1" level="page">
             Chip Speculative Decoding Comparisons
-          </h1>
-          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+          </Heading>
+          <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} speculative decoding comparisons across{' '}
             {formatModelList(modelsWithPairs)}. Each page compares inference with the speculative
-            decoding method (MTP, EAGLE, etc.) enabled versus disabled on the same model and chip —
-            throughput, cost, and interactivity at matched operating points.
+            decoding method (MTP, EAGLE and others) enabled versus disabled on the same model and
+            chip, covering throughput, cost and interactivity at matched operating points.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-spec-decode-index-links">
-            <Link
-              href="/compare"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              Chip comparisons
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              href="/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
+          <CompareCatalogLinks testId="compare-spec-decode-index-links">
+            <CompareCatalogLink href="/compare">Chip Comparisons</CompareCatalogLink>
+            <CompareCatalogLink href="/compare-per-dollar">
               Performance per dollar
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-          </div>
+            </CompareCatalogLink>
+          </CompareCatalogLinks>
         </Card>
       </section>
 
@@ -119,28 +109,29 @@ export default async function CompareSpecDecodeIndexPage() {
         const pairs = pairsByModel.get(model.slug) ?? [];
         const cards = buildCards(model, pairs);
         return (
-          <section key={model.slug} id={model.slug}>
-            <Card className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} speculative decoding comparison{pairs.length === 1 ? '' : 's'} with
-                  benchmark data on {model.label}.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cards.map(({ slug, label, archLine }) => (
-                  <ComparePairCardLink
-                    key={slug}
-                    href={`/compare-spec-decode/${slug}`}
-                    slug={slug}
-                    label={label}
-                    archLine={archLine}
-                  />
-                ))}
-              </div>
-            </Card>
-          </section>
+          <CompareModelSection
+            key={model.slug}
+            id={model.slug}
+            title={
+              <>
+                <ModelLogo model={model.displayName as Model} className="size-6" />
+                {model.label}
+              </>
+            }
+            summary={`${pairs.length} speculative decoding comparison${pairs.length === 1 ? '' : 's'} with benchmark data on ${model.label}`}
+          >
+            <ComparePairGrid>
+              {cards.map(({ slug, label, archLine }) => (
+                <ComparePairCardLink
+                  key={slug}
+                  href={`/compare-spec-decode/${slug}`}
+                  slug={slug}
+                  label={label}
+                  archLine={archLine}
+                />
+              ))}
+            </ComparePairGrid>
+          </CompareModelSection>
         );
       })}
     </>

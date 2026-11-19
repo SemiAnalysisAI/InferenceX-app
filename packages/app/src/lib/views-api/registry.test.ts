@@ -37,6 +37,13 @@ describe('public view contract coverage', () => {
       else expect(coverage.exclusion.length).toBeGreaterThan(20);
     }
   });
+  it('retains the reliability API after retiring its dashboard page', () => {
+    expect(DASHBOARD_API_COVERAGE).not.toHaveProperty('reliability');
+    expect(VIEW_QUERY_PARAMS.reliability).toEqual(['asOf', 'format', 'gpus', 'range']);
+    expect(apiOperations.some((operation) => operation.path === '/api/v1/views/reliability')).toBe(
+      true,
+    );
+  });
   for (const [view, keys] of Object.entries(VIEW_QUERY_PARAMS)) {
     it(`${view}: GET only, documented selectors, rejects unknown and duplicate keys`, () => {
       const operation = apiOperations.find((op) => op.path === `/api/v1/views/${view}`)!;

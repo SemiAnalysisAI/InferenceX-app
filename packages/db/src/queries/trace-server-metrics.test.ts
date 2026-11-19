@@ -36,6 +36,7 @@ function metaRow(overrides: Record<string, unknown> = {}) {
     id: 42,
     trace_replay_id: 7,
     has_blob: true,
+    summary_gz: null,
     chart_series: currentSeries(),
     metric_sources: [],
     hardware: 'gb200',
@@ -126,7 +127,6 @@ describe('getTraceServerMetrics', () => {
       recipe_fingerprint: 'exact-fingerprint',
     });
     expect(calls).toHaveLength(1);
-    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
     expect(calls[0]).toContain("atr.chart_series - 'metricSources'");
     expect(calls[0]).toContain("metric_source->'kvCacheUsageByEngine'");
     expect(calls[0]).toContain("br.metrics ->> 'kv_offload_backend'");
@@ -145,17 +145,18 @@ describe('getTraceServerMetrics', () => {
       ),
     );
     const stale = { ...currentSeries(), version: CHART_SERIES_VERSION - 1 };
-    const { sql, calls } = mockSql([[metaRow({ chart_series: stale })], [{ blob: raw }]]);
+    const { sql, calls } = mockSql([
+      [metaRow({ chart_series: stale })],
+      [{ size: raw.length }],
+      [{ data: raw }],
+    ]);
 
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
-    // 3 calls: meta read, blob read, then the fire-and-forget chart_series
-    // write-back that self-heals the stale precomputed series.
-    expect(calls).toHaveLength(3);
-    expect(calls[1]).toContain('server_metrics_json_gz as blob');
-    expect(calls[2]).toContain('update agentic_trace_replay set chart_series');
-    expect(calls[2]).toContain('::jsonb where id');
+    expect(calls).toHaveLength(4);
+    expect(calls[3]).toContain('set chart_series = ');
+    expect(calls[3]).toContain('chart_series_summary_gz = ');
   });
 
   it('returns null without a blob and does not issue a second query', async () => {
@@ -205,18 +206,9 @@ describe('getTraceServerMetricSource', () => {
     await expect(getTraceServerMetricSource(sql, 42, 'decode-0')).resolves.toEqual(metricSource);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain("metric_source->'source'->>'id'");
-    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 });
 
-// ── All-endpoints KV overlay collapses per worker ───────────────────────
-//
-// `chart_series.kvCacheUsageByEngine` is per DP rank. On a PD-disaggregated
-// run that is unreadable (6 prefill workers x DP4 + decode = 28 lines), so the
-// read layer averages each worker's ranks into one line. Derived here, not in
-// the ETL, so it needs no CHART_SERIES_VERSION bump or backfill.
-
-/** One metric source (worker) owning `ranks` engines, each at a flat value. */
 function workerSource(
   role: MetricSourceSeries['source']['role'],
   workerId: string,
@@ -251,16 +243,16 @@ function workerSource(
   };
 }
 
-describe('getTraceServerMetrics all-endpoints KV overlay', () => {
-  function run(metricSources: unknown[], fallback: unknown[] = []) {
-    const series = {
-      ...currentSeries(),
-      kvCacheUsageByEngine: fallback,
-    } as unknown as ChartSeries;
-    const { sql } = mockSql([[metaRow({ chart_series: series, metric_sources: metricSources })]]);
-    return getTraceServerMetrics(sql, 42);
-  }
+function run(metricSources: unknown[], fallback: unknown[] = []) {
+  const series = {
+    ...currentSeries(),
+    kvCacheUsageByEngine: fallback,
+  } as unknown as ChartSeries;
+  const { sql } = mockSql([[metaRow({ chart_series: series, metric_sources: metricSources })]]);
+  return getTraceServerMetrics(sql, 42);
+}
 
+describe('getTraceServerMetrics all-endpoints KV overlay', () => {
   it("averages each worker's ranks into one line", async () => {
     const result = await run([
       workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
@@ -276,8 +268,6 @@ describe('getTraceServerMetrics all-endpoints KV overlay', () => {
   });
 
   it('keeps the stored per-rank overlay for a single-worker run', async () => {
-    // A plain DP deployment has no per-source data; rank skew is the signal
-    // there, so the stored per-rank lines must survive untouched.
     const perRank = [
       { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
       { engineLabel: '1', points: [{ t: 0, value: 0.9 }] },

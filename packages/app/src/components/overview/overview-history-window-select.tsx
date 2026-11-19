@@ -29,15 +29,8 @@ export function OverviewHistoryWindowSelect({
   options: readonly WindowOption[];
 }) {
   const navigation = useOverviewNavigation();
-  // Control the trigger from the pending URL so a window chosen during a slow
-  // load shows immediately and re-selecting the previous window undoes it
-  // instead of being dropped by the `next === value` guard. A pending switch
-  // back to hardware mode carries no window, so keep the committed one.
   const pendingMode = useOverviewComparisonMode();
   const value = pendingMode === 'hardware' ? committedValue : pendingMode;
-  // Same reason as the reference select: `document.body` sits outside both the
-  // fullscreen element and the CSS `zoom`, so a portalled menu would be
-  // invisible or unscaled while presenting.
   const presenting = useIsPresenting();
 
   return (
@@ -54,7 +47,7 @@ export function OverviewHistoryWindowSelect({
         data-testid="overview-history-window-select"
         aria-label={ariaLabel}
         size="sm"
-        className="h-8 border-0 bg-transparent px-1.5 text-sm font-semibold shadow-none hover:bg-muted/60"
+        className="h-8 border-0 bg-transparent px-1.5 text-sm font-medium shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/60"
       >
         <SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue>
       </SelectTrigger>

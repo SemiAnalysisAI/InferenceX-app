@@ -1,37 +1,85 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  brotliCompressSync,
+  brotliDecompressSync,
+  constants as zlibConstants,
+  gunzipSync,
+  gzipSync,
+} from 'node:zlib';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as WorkUnitStorage from 'next/dist/server/app-render/work-unit-async-storage.external';
 
-// Mock next/cache before importing the module under test
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: vi.fn((fn: (...args: any[]) => any, _keys: string[], _opts: unknown) => fn),
 }));
 
+const afterTasks = vi.hoisted(() => ({ pending: [] as (() => Promise<unknown>)[] }));
+vi.mock('next/server', () => ({
+  after: (task: () => Promise<unknown>) => {
+    afterTasks.pending.push(task);
+  },
+}));
+
+const workStore = vi.hoisted(() => ({
+  current: undefined as { type: string; consumerWillServerCache?: boolean } | undefined,
+}));
+vi.mock('next/dist/server/app-render/work-unit-async-storage.external', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkUnitStorage>()),
+  workUnitAsyncStorage: { getStore: () => workStore.current },
+}));
+
+const fixtures = vi.hoisted(() => ({ mode: false }));
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  FIXTURES_MODE: false,
+  get FIXTURES_MODE() {
+    return fixtures.mode;
+  },
 }));
 
 vi.mock('./blob-cache', () => ({
+  CONTENT_BLOB_KEY_PREFIX: 'content/',
+  blobEnabled: vi.fn(() => true),
   blobGet: vi.fn(),
   blobSet: vi.fn(),
+  blobGetBytes: vi.fn(),
+  blobSetBytes: vi.fn(),
   blobPurge: vi.fn(),
 }));
 
-import { cachedQuery, purgeAll, purgeCollectiveX, cachedJson } from './api-cache';
+const generation = vi.hoisted(() => ({ value: 'g1' }));
+
+import {
+  cachedQuery,
+  purgeAll,
+  purgeCollectiveX,
+  purgeVideo,
+  cachedJson,
+  cachedJsonResponse,
+  cachedGzipJson,
+  negotiateEncoding,
+  notModifiedJson,
+} from './api-cache';
 import { revalidateTag, unstable_cache } from 'next/cache';
-import { blobGet, blobSet, blobPurge } from './blob-cache';
+import { blobEnabled, blobGet, blobGetBytes, blobSet, blobSetBytes, blobPurge } from './blob-cache';
 
 const mockRevalidateTag = vi.mocked(revalidateTag);
 const mockUnstableCache = vi.mocked(unstable_cache);
+const mockBlobEnabled = vi.mocked(blobEnabled);
 const mockBlobGet = vi.mocked(blobGet);
 const mockBlobSet = vi.mocked(blobSet);
+const mockBlobGetBytes = vi.mocked(blobGetBytes);
+const mockBlobSetBytes = vi.mocked(blobSetBytes);
 const mockBlobPurge = vi.mocked(blobPurge);
 const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.CACHE_NAMESPACE;
-  // Default: unstable_cache returns the original function as-is
-  mockUnstableCache.mockImplementation((fn: (...args: any[]) => any) => fn as any);
+  afterTasks.pending = [];
+  generation.value = 'g1';
+  mockUnstableCache.mockImplementation(((fn: unknown, keys: string[]) =>
+    keys[0] === 'blob-generation'
+      ? () => Promise.resolve({ value: generation.value })
+      : fn) as unknown as typeof unstable_cache);
 });
 
 afterAll(() => {
@@ -48,7 +96,11 @@ describe('cachedQuery', () => {
       const fn = vi.fn((x: number) => Promise.resolve(x * 2));
       cachedQuery(fn, 'test-key');
 
-      expect(mockUnstableCache).toHaveBeenCalledWith(fn, ['test-key'], { tags: ['db'] });
+      expect(mockUnstableCache).toHaveBeenCalledWith(
+        expect.any(Function),
+        ['test-key', fn.toString()],
+        { tags: ['db'] },
+      );
     });
 
     it('isolates the key and tag when CACHE_NAMESPACE is set', () => {
@@ -57,9 +109,11 @@ describe('cachedQuery', () => {
 
       cachedQuery(fn, 'test-key');
 
-      expect(mockUnstableCache).toHaveBeenCalledWith(fn, ['staging:test-key'], {
-        tags: ['db:staging'],
-      });
+      expect(mockUnstableCache).toHaveBeenCalledWith(
+        expect.any(Function),
+        ['staging:test-key', fn.toString()],
+        { tags: ['db:staging'] },
+      );
     });
 
     it('calls through to the original function and returns its result', async () => {
@@ -88,22 +142,112 @@ describe('cachedQuery', () => {
       expect(mockBlobGet).not.toHaveBeenCalled();
       expect(mockBlobSet).not.toHaveBeenCalled();
     });
+
+    it.each([
+      { type: 'prerender', expected: 'page' },
+      { type: 'prerender-client', expected: 'page' },
+      { type: 'prerender-legacy', expected: 'page' },
+      { type: 'request', expected: 'route' },
+      { type: 'prerender-runtime', expected: 'route' },
+      { type: 'validation-client', expected: 'route' },
+      { type: 'build-time-generator', expected: 'route' },
+      { type: 'cache', consumerWillServerCache: true, expected: 'page' },
+      { type: 'cache', consumerWillServerCache: false, expected: 'route' },
+      { type: 'private-cache', consumerWillServerCache: true, expected: 'page' },
+      { type: 'private-cache', consumerWillServerCache: false, expected: 'route' },
+      { type: 'unstable-cache', consumerWillServerCache: true, expected: 'page' },
+      { type: 'unstable-cache', consumerWillServerCache: false, expected: 'route' },
+    ])('selects the $expected cache for $type ($consumerWillServerCache)', async (context) => {
+      const routeFn = vi.fn(() => Promise.resolve({ value: 'route' }));
+      const pageFn = vi.fn(() => Promise.resolve({ value: 'page' }));
+      // The mock returns plain stand-ins for unstable_cache's wrapped function.
+      mockUnstableCache.mockImplementation(((_fn: unknown, keys: string[]) =>
+        keys[0].startsWith('page:') ? pageFn : routeFn) as unknown as typeof unstable_cache);
+      const fn = vi.fn(() => Promise.resolve('data'));
+      const wrapped = cachedQuery(fn, 'split');
+
+      expect(mockUnstableCache).toHaveBeenCalledWith(
+        expect.any(Function),
+        ['split', fn.toString()],
+        { tags: ['db'] },
+      );
+      expect(mockUnstableCache).toHaveBeenCalledWith(
+        expect.any(Function),
+        ['page:split', fn.toString()],
+        { tags: ['db-page'] },
+      );
+      await expect(wrapped()).resolves.toBe('route');
+      workStore.current = context;
+      await expect(wrapped()).resolves.toBe(context.expected);
+      workStore.current = { type: 'request' };
+      await expect(wrapped()).resolves.toBe('route');
+    });
+
+    it('uses only the custom tag when one is passed', () => {
+      const fn = vi.fn(() => Promise.resolve('data'));
+      cachedQuery(fn, 'custom', { tag: 'collectivex' });
+
+      expect(mockUnstableCache).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Function),
+        ['custom', fn.toString()],
+        { tags: ['collectivex'] },
+      );
+    });
+
+    it('caches results whose entry would exceed the 2 MB data cache limit', async () => {
+      const store = new Map<string, string>();
+      mockUnstableCache.mockImplementation(((
+        cb: (...args: unknown[]) => Promise<unknown>,
+        keys: string[],
+      ) =>
+        async (...args: unknown[]) => {
+          const key = `${keys.join(',')}-${JSON.stringify(args)}`;
+          const body = store.get(key);
+          if (body !== undefined) return JSON.parse(body);
+          const result = await cb(...args);
+          const entry = JSON.stringify({ data: { body: JSON.stringify(result) } });
+          if (entry.length <= 2 * 1024 * 1024) store.set(key, JSON.stringify(result));
+          return result;
+        }) as unknown as typeof unstable_cache);
+      const rows = Array.from({ length: 15_000 }, (_, id) => ({
+        id: String(id),
+        model: 'dsr1',
+        metrics: { score: id / 7, em_strict: null },
+        run_url: `https://github.com/org/repo/actions/runs/${id}`,
+        note: String.raw`quote " and \ backslash`,
+      }));
+      const fn = vi.fn((model: string) => Promise.resolve(model === 'big' ? rows : null));
+      const wrapped = cachedQuery(fn, 'large');
+
+      expect(JSON.stringify(rows).length).toBeGreaterThan(2 * 1024 * 1024);
+      const miss = await wrapped('big');
+      const hit = await wrapped('big');
+      expect(fn).toHaveBeenCalledOnce();
+      expect(JSON.stringify(hit)).toBe(JSON.stringify(rows));
+      expect(JSON.stringify(miss)).toBe(JSON.stringify(rows));
+
+      await expect(wrapped('small')).resolves.toBeNull();
+      await expect(wrapped('small')).resolves.toBeNull();
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('blobOnly mode', () => {
     it('returns cached value from blob on hit', async () => {
-      mockBlobGet.mockResolvedValue({ answer: 42 });
+      mockBlobGet.mockResolvedValue('{"answer":42}');
       const fn = vi.fn(() => Promise.resolve({ answer: 99 }));
       const wrapped = cachedQuery(fn, 'blob-key', { blobOnly: true });
 
       const result = await wrapped();
       expect(result).toEqual({ answer: 42 });
-      expect(mockBlobGet).toHaveBeenCalledWith(expect.stringMatching(/^blob-key:v2:/u));
+      expect(mockBlobGet).toHaveBeenCalledWith(
+        expect.stringMatching(/^generation\/g1\/blob-key:v2:/u),
+      );
       expect(fn).not.toHaveBeenCalled();
       expect(mockBlobSet).not.toHaveBeenCalled();
     });
 
-    it('calls fn and stores result on blob miss', async () => {
+    it('calls fn and stores its JSON on blob miss', async () => {
       mockBlobGet.mockResolvedValue(null);
       mockBlobSet.mockResolvedValue(undefined);
       const fn = vi.fn(() => Promise.resolve({ big: 'payload' }));
@@ -112,9 +256,101 @@ describe('cachedQuery', () => {
       const result = await wrapped();
       expect(result).toEqual({ big: 'payload' });
       expect(fn).toHaveBeenCalled();
-      expect(mockBlobSet).toHaveBeenCalledWith(expect.stringMatching(/^miss-key:v2:/u), {
-        big: 'payload',
+      expect(mockBlobSet).toHaveBeenCalledWith(
+        expect.stringMatching(/^generation\/g1\/miss-key:v2:/u),
+        '{"big":"payload"}',
+      );
+    });
+
+    it('moves to new paths when a purge rolls the generation', async () => {
+      mockBlobGet.mockResolvedValue('1');
+      const wrapped = cachedQuery(() => Promise.resolve(2), 'rolled', { blobOnly: true });
+
+      await wrapped();
+      generation.value = 'g2';
+      await wrapped();
+
+      const [first, second] = mockBlobGet.mock.calls.map(([path]) => path);
+      expect(first).toMatch(/^generation\/g1\/rolled:v2:/u);
+      expect(second).toBe(first!.replace('generation/g1/', 'generation/g2/'));
+    });
+
+    it('keeps revisioned keys outside the purge generation', async () => {
+      mockBlobGet.mockResolvedValue('1');
+      const wrapped = cachedQuery((_revision: string) => Promise.resolve(2), 'operatorx/ns/cmp', {
+        blobOnly: true,
+        revisioned: true,
       });
+
+      await wrapped('rev');
+      expect(mockBlobGet).toHaveBeenCalledWith(expect.stringMatching(/^operatorx\/ns\/cmp:v2:/u));
+    });
+
+    it('runs one read and one query for concurrent misses, each caller getting its own copy', async () => {
+      const { promise: rows, resolve } = Promise.withResolvers<{ rows: number[] }>();
+      mockBlobGet.mockResolvedValue(null);
+      mockBlobSet.mockResolvedValue(undefined);
+      const fn = vi.fn(() => rows);
+      const wrapped = cachedQuery(fn, 'stampede', { blobOnly: true });
+
+      const calls = [wrapped(), wrapped(), wrapped()];
+      await vi.waitFor(() => expect(fn).toHaveBeenCalledOnce());
+      resolve({ rows: [1, 2] });
+      const [first, second, third] = await Promise.all(calls);
+
+      expect(fn).toHaveBeenCalledOnce();
+      expect(mockBlobGet).toHaveBeenCalledOnce();
+      expect(mockBlobSet).toHaveBeenCalledOnce();
+      expect(second).toEqual(first);
+      expect(third).toEqual(first);
+      expect(second).not.toBe(first);
+      expect(third).not.toBe(second);
+    });
+
+    it('shares one blob read between concurrent hits', async () => {
+      mockBlobGet.mockResolvedValue('{"rows":[1]}');
+      const wrapped = cachedQuery(() => Promise.resolve({ rows: [] }), 'hits', { blobOnly: true });
+
+      const [first, second] = await Promise.all([wrapped(), wrapped()]);
+
+      expect(mockBlobGet).toHaveBeenCalledOnce();
+      expect(second).toEqual({ rows: [1] });
+      expect(second).not.toBe(first);
+    });
+
+    it('forgets a settled flight, so a failed query is retried by the next call', async () => {
+      mockBlobGet.mockResolvedValue(null);
+      mockBlobSet.mockResolvedValue(undefined);
+      const fn = vi
+        .fn<() => Promise<{ ok: boolean }>>()
+        .mockRejectedValueOnce(new Error('db down'))
+        .mockResolvedValueOnce({ ok: true });
+      const wrapped = cachedQuery(fn, 'retry', { blobOnly: true });
+
+      const failed = [wrapped(), wrapped()];
+      await expect(failed[0]).rejects.toThrow('db down');
+      await expect(failed[1]).rejects.toThrow('db down');
+      await expect(wrapped()).resolves.toEqual({ ok: true });
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-queries instead of serving a stored empty result such as null', async () => {
+      mockBlobGet.mockResolvedValue('null');
+      mockBlobSet.mockResolvedValue(undefined);
+      const fn = vi.fn(() => Promise.resolve({ found: true }));
+      const wrapped = cachedQuery(fn, 'server-log', { blobOnly: true });
+
+      await expect(wrapped()).resolves.toEqual({ found: true });
+      expect(fn).toHaveBeenCalledOnce();
+    });
+
+    it('queries directly when Blob is not configured', async () => {
+      mockBlobEnabled.mockReturnValueOnce(false);
+      const fn = vi.fn(() => Promise.resolve('fresh'));
+      const wrapped = cachedQuery(fn, 'off', { blobOnly: true });
+
+      await expect(wrapped()).resolves.toBe('fresh');
+      expect(mockBlobGet).not.toHaveBeenCalled();
     });
 
     it('builds blob key from prefix and args', async () => {
@@ -125,8 +361,8 @@ describe('cachedQuery', () => {
 
       await wrapped('llama', '2025-01-01');
       const key = mockBlobGet.mock.calls[0]![0];
-      expect(key).toMatch(/^bench:v2:[A-Za-z0-9_-]+$/u);
-      expect(mockBlobSet).toHaveBeenCalledWith(key, ['llama', '2025-01-01']);
+      expect(key).toMatch(/^generation\/g1\/bench:v2:[A-Za-z0-9_-]+$/u);
+      expect(mockBlobSet).toHaveBeenCalledWith(key, '["llama","2025-01-01"]');
     });
 
     it('hashes oversized argument lists into a bounded deterministic key', async () => {
@@ -142,9 +378,11 @@ describe('cachedQuery', () => {
       const firstKey = mockBlobGet.mock.calls[0]![0];
       const secondKey = mockBlobGet.mock.calls[1]![0];
       expect(firstKey).toBe(secondKey);
-      expect(firstKey).toMatch(/^derived-agentic-metrics-v7:v2:sha256:[a-f0-9]{64}$/u);
+      expect(firstKey).toMatch(
+        /^generation\/g1\/derived-agentic-metrics-v7:v2:sha256:[a-f0-9]{64}$/u,
+      );
       expect(firstKey.length).toBeLessThan(128);
-      expect(mockBlobSet).toHaveBeenCalledWith(firstKey, 200);
+      expect(mockBlobSet).toHaveBeenCalledWith(firstKey, '200');
     });
 
     it('cannot collide arrays, objects, null, and undefined that stringify similarly', async () => {
@@ -202,118 +440,325 @@ describe('cachedQuery', () => {
     });
 
     it('versions keys even when no arguments are passed', async () => {
-      mockBlobGet.mockResolvedValue('cached');
+      mockBlobGet.mockResolvedValue('"cached"');
       const fn = vi.fn(() => Promise.resolve('fresh'));
       const wrapped = cachedQuery(fn, 'no-args', { blobOnly: true });
 
-      await wrapped();
-      expect(mockBlobGet).toHaveBeenCalledWith(expect.stringMatching(/^no-args:v2:/u));
-    });
-
-    it('does not use unstable_cache in blobOnly mode', () => {
-      const fn = vi.fn(() => Promise.resolve(null));
-      cachedQuery(fn, 'skip-uc', { blobOnly: true });
-
-      expect(mockUnstableCache).not.toHaveBeenCalled();
+      await expect(wrapped()).resolves.toBe('cached');
+      expect(mockBlobGet).toHaveBeenCalledWith(
+        expect.stringMatching(/^generation\/g1\/no-args:v2:/u),
+      );
     });
   });
 });
 
+const runAfterTasks = () => Promise.all(afterTasks.pending.map((task) => task()));
+
 describe('purgeAll', () => {
-  it('calls revalidateTag and blobPurge', async () => {
-    mockBlobPurge.mockResolvedValue(15);
+  it('expires route data now but only marks page data and CDN responses stale', async () => {
+    await purgeAll();
 
-    const deleted = await purgeAll();
-
-    expect(deleted).toBe(15);
+    // The CDN's background refresh must read fresh data, never a stale server entry.
     expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
-    expect(mockBlobPurge).toHaveBeenCalled();
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', 'max');
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn', 'max');
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('db-cdn', { expire: 0 });
+    // Stored log text never changes on ingest, so its year-long CDN entries survive.
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('db-log', expect.anything());
   });
 
-  it('drops the CollectiveX tag too — the blob purge removed its entries', async () => {
-    mockBlobPurge.mockResolvedValue(1);
+  it('drops every layer outright when asked to purge immediately', async () => {
+    await purgeAll({ immediate: true });
+
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+    // Retractions must drop cached server logs too.
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-log', { expire: 0 });
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith(expect.anything(), 'max');
+  });
+
+  it('marks the CollectiveX tag stale too', async () => {
+    await purgeAll();
+
+    expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', 'max');
+  });
+
+  it('schedules no blob work when Blob is not configured', async () => {
+    mockBlobEnabled.mockReturnValueOnce(false);
 
     await purgeAll();
 
-    expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+    expect(afterTasks.pending).toHaveLength(0);
   });
 
-  it('returns 0 when no blobs were deleted', async () => {
-    mockBlobPurge.mockResolvedValue(0);
+  describe('with Blob configured', () => {
+    beforeEach(() => {
+      mockBlobEnabled.mockReturnValue(true);
+      mockBlobPurge.mockResolvedValue(0);
+      // Expiring the db tag is what rolls the generation for later readers.
+      mockRevalidateTag.mockImplementation((tag) => {
+        if (tag === 'db') generation.value = 'g2';
+      });
+    });
 
-    const deleted = await purgeAll();
-    expect(deleted).toBe(0);
+    afterEach(() => {
+      mockRevalidateTag.mockReset();
+      mockBlobPurge.mockReset();
+    });
+
+    it('deletes the generation that was current before the tags expired, never the new one', async () => {
+      await purgeAll();
+      await runAfterTasks();
+
+      const prefixes = mockBlobPurge.mock.calls.map(([prefix]) => prefix);
+      expect(prefixes[0]).toBe('generation/g1/');
+      expect(prefixes).not.toContain('generation/g2/');
+    });
+
+    it('sweeps leftovers only when they predate the purge by the skew margin', async () => {
+      const before = Date.now();
+
+      await purgeAll();
+      await runAfterTasks();
+
+      const [prefix, keep, cutoff] = mockBlobPurge.mock.calls[1]!;
+      expect(prefix).toBe('');
+      expect(keep).toEqual(['operatorx/', 'content/']);
+      expect((cutoff as Date).getTime()).toBeLessThanOrEqual(before - 60_000 + 1000);
+      expect((cutoff as Date).getTime()).toBeGreaterThanOrEqual(before - 60_000 - 1000);
+    });
+
+    it('sweeps content-addressed blobs too when purging immediately, keeping only OperatorX', async () => {
+      await purgeAll({ immediate: true });
+      await runAfterTasks();
+
+      expect(mockBlobPurge.mock.calls[1]![1]).toEqual(['operatorx/']);
+    });
+
+    it('expires tags and resolves before the blob purge runs, even if it never settles', async () => {
+      mockBlobPurge.mockReturnValue(new Promise(() => {}));
+
+      await purgeAll();
+
+      expect(mockBlobPurge).not.toHaveBeenCalled();
+      expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+      expect(afterTasks.pending).toHaveLength(1);
+      void runAfterTasks();
+      expect(mockBlobPurge).toHaveBeenCalledExactlyOnceWith('generation/g1/');
+    });
+
+    it('logs a failed blob purge instead of throwing', async () => {
+      const error = new Error('rate limited');
+      mockBlobPurge.mockRejectedValue(error);
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await purgeAll({ immediate: true });
+      expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+      await expect(runAfterTasks()).resolves.toBeDefined();
+
+      expect(consoleError).toHaveBeenCalledWith(expect.any(String), error);
+      consoleError.mockRestore();
+    });
+
+    it('keeps the OperatorX CDN tag, since results ingests do not change OperatorX', async () => {
+      await purgeAll();
+
+      expect(mockRevalidateTag).not.toHaveBeenCalledWith('operatorx', expect.anything());
+    });
   });
 
   it('invalidates only the configured cache namespace', async () => {
     process.env.CACHE_NAMESPACE = 'staging';
-    mockBlobPurge.mockResolvedValue(0);
 
     await purgeAll();
 
     expect(mockRevalidateTag).toHaveBeenCalledWith('db:staging', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-page:staging', 'max');
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn:staging', 'max');
+  });
+});
+
+describe('purgeVideo', () => {
+  it('expires the video tag at once — its responses are private and never CDN cached', () => {
+    purgeVideo();
+
+    expect(mockBlobPurge).not.toHaveBeenCalled();
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('video', { expire: 0 });
+  });
+
+  it('isolates the video tag by namespace', () => {
+    process.env.CACHE_NAMESPACE = 'staging';
+    purgeVideo();
+
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('video:staging', { expire: 0 });
   });
 });
 
 describe('purgeCollectiveX', () => {
-  it('drops only the collectivex tag — no blobs belong to that scope', () => {
+  it('marks only the collectivex tag stale — no blobs belong to that scope', () => {
     purgeCollectiveX();
 
     expect(mockBlobPurge).not.toHaveBeenCalled();
-    expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
-    expect(mockRevalidateTag).not.toHaveBeenCalledWith('db', { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('collectivex', 'max');
+  });
+
+  it('drops the CDN entries outright when asked to purge immediately', () => {
+    purgeCollectiveX({ immediate: true });
+
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('collectivex', { expire: 0 });
   });
 });
 
-describe('cachedJson', () => {
-  it('sets Cache-Control with max-age=0 and 1 day s-maxage', () => {
-    const res = cachedJson({ ok: true });
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=86400');
+function apiRequest(headers: Record<string, string> = {}): Request {
+  return new Request('https://example.test/api/v1/benchmarks', { headers });
+}
+
+function numberedRows(count: number) {
+  return { rows: Array.from({ length: count }, (_, id) => ({ id, value: id / 7 })) };
+}
+
+async function bodyText(response: Response): Promise<string> {
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const encoding = response.headers.get('Content-Encoding');
+  if (encoding === 'br') return brotliDecompressSync(bytes).toString();
+  if (encoding === 'gzip') return gunzipSync(bytes).toString();
+  return bytes.toString();
+}
+
+describe('negotiateEncoding', () => {
+  it.each([
+    [null, 'identity'],
+    ['', 'identity'],
+    ['identity', 'identity'],
+    ['gzip', 'gzip'],
+    ['x-gzip', 'gzip'],
+    ['gzip, deflate, br, zstd', 'br'],
+    ['GZIP, BR', 'br'],
+    ['br;q=0.5, gzip', 'gzip'],
+    ['br;q=0, gzip;q=0', 'identity'],
+    ['deflate', 'identity'],
+    ['*', 'br'],
+    ['gzip;q=0.4, *;q=0.5', 'br'],
+    ['*;q=0, gzip', 'gzip'],
+  ] as const)('Accept-Encoding %j selects %s', (header, expected) => {
+    expect(negotiateEncoding(header)).toBe(expected);
   });
 
-  it('sets Vercel-Cache-Tag to db', () => {
-    const res = cachedJson({ ok: true });
-    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db');
+  it('falls back to identity when no offered coding is acceptable', () => {
+    expect(negotiateEncoding('br', ['gzip', 'identity'])).toBe('identity');
+    expect(negotiateEncoding('br, gzip;q=0.1', ['gzip', 'identity'])).toBe('gzip');
+  });
+});
+
+const brotli = (data: unknown, headers: Record<string, string> = {}, version?: string) =>
+  cachedJson(apiRequest({ 'Accept-Encoding': 'br', ...headers }), data, { version });
+
+const encodedEtag = (data: unknown, acceptEncoding: string) =>
+  cachedJson(apiRequest({ 'Accept-Encoding': acceptEncoding }), data).headers.get('ETag');
+
+const versionedEtag = (data: unknown, version: string) =>
+  cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data, { version }).headers.get('ETag');
+
+describe('cachedJson', () => {
+  it('lets browsers reuse responses for a minute and the CDN for a day', () => {
+    const res = cachedJson(apiRequest(), { ok: true });
+    expect(res.headers.get('Cache-Control')).toBe(
+      'public, max-age=60, s-maxage=86400, stale-while-revalidate=86400',
+    );
+  });
+
+  it('tags responses with the CDN-only tag that ingests mark stale', () => {
+    const res = cachedJson(apiRequest(), { ok: true });
+    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db-cdn');
   });
 
   it('carries a custom cache tag when one is passed', () => {
-    const res = cachedJson({ ok: true }, { tag: 'collectivex' });
+    const res = cachedJson(apiRequest(), { ok: true }, { tag: 'collectivex' });
     expect(res.headers.get('Vercel-Cache-Tag')).toBe('collectivex');
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=86400');
   });
 
   it('honors a custom Cache-Control for lazily-refreshed routes', () => {
     const res = cachedJson(
+      apiRequest(),
       { ok: true },
       { tag: 'collectivex', cacheControl: 'public, max-age=0, s-maxage=60' },
     );
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=60');
   });
 
+  it('keeps fixture responses out of the browser cache so E2E intercepts see every request', () => {
+    fixtures.mode = true;
+    try {
+      const res = cachedJson(apiRequest(), { ok: true }, { cacheControl: 'public, max-age=5' });
+      expect(res.headers.get('Cache-Control')).toBe('no-store');
+    } finally {
+      fixtures.mode = false;
+    }
+  });
+
   it('sets an environment-scoped Vercel-Cache-Tag', () => {
     process.env.CACHE_NAMESPACE = 'staging';
 
-    const res = cachedJson({ ok: true });
+    const res = cachedJson(apiRequest(), { ok: true });
 
-    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db:staging');
+    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db-cdn:staging');
   });
 
-  it('sets Content-Type to application/json', () => {
-    const res = cachedJson({ ok: true });
+  it.each([
+    ['gzip, deflate, br, zstd', 'br'],
+    ['gzip', 'gzip'],
+    ['identity', null],
+    [undefined, null],
+  ] as const)('encodes for Accept-Encoding %j as %s', async (acceptEncoding, encoding) => {
+    const data = { branch: 'feat/\u{1F680}-rocket', label: '基准测试', rows: [1, 2, 3] };
+    const res = cachedJson(
+      apiRequest(acceptEncoding === undefined ? {} : { 'Accept-Encoding': acceptEncoding }),
+      data,
+    );
+    expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('application/json');
+    expect(res.headers.get('Content-Encoding')).toBe(encoding);
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding');
+    expect(JSON.parse(await bodyText(res))).toEqual(data);
   });
 
-  it('returns the data as JSON body', async () => {
-    const data = { users: [1, 2, 3] };
-    const res = cachedJson(data);
-    const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
-    const text = await new Response(decompressed).text();
-    expect(JSON.parse(text)).toEqual(data);
+  it.each(['gzip, deflate, br, zstd', 'deflate, gzip', 'br', undefined])(
+    'leaves compression to the CDN with one variant for Accept-Encoding %j',
+    async (acceptEncoding) => {
+      const data = { label: '基准测试', rows: [1, 2, 3] };
+      const res = cachedJson(
+        apiRequest(acceptEncoding === undefined ? {} : { 'Accept-Encoding': acceptEncoding }),
+        data,
+        { compression: 'cdn' },
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBeNull();
+      expect(res.headers.get('Vary')).toBeNull();
+      expect(res.headers.get('ETag')).toBe(
+        cachedJson(apiRequest(), data, { compression: 'cdn' }).headers.get('ETag'),
+      );
+      expect(res.headers.get('Cache-Control')).toBe(
+        'public, max-age=60, s-maxage=86400, stale-while-revalidate=86400',
+      );
+      expect(JSON.parse(await bodyText(res))).toEqual(data);
+    },
+  );
+
+  it('answers If-None-Match without Vary when the CDN compresses', () => {
+    const data = { rows: [1] };
+    const etag = cachedJson(apiRequest(), data, { compression: 'cdn' }).headers.get('ETag')!;
+    const res = cachedJson(apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': etag }), data, {
+      compression: 'cdn',
+    });
+    expect(res.status).toBe(304);
+    expect(res.headers.get('Vary')).toBeNull();
   });
 
   it('streams large payloads across multiple chunks', async () => {
-    const data = { big: 'x'.repeat(200_000) };
-    const res = cachedJson(data);
+    const res = cachedJson(apiRequest(), { big: 'x'.repeat(200_000) });
     const reader = res.body!.getReader();
     let chunks = 0;
     let readResult = await reader.read();
@@ -324,11 +769,329 @@ describe('cachedJson', () => {
     expect(chunks).toBeGreaterThan(1);
   });
 
-  it('preserves non-BMP characters (emoji, surrogate pairs)', async () => {
-    const data = { branch: 'feat/\u{1F680}-rocket', msg: '\u{1F4A9}\u{1F30D}\u{1F525}' };
-    const res = cachedJson(data);
-    const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
-    const text = await new Response(decompressed).text();
-    expect(JSON.parse(text)).toEqual(data);
+  it('compresses a large payload completely', async () => {
+    const data = { rows: Array.from({ length: 20_000 }, (_, id) => ({ id, value: id / 7 })) };
+    const res = cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data);
+    expect(JSON.parse(await bodyText(res))).toEqual(data);
+  });
+
+  it('derives a strong ETag from the payload and the chosen encoding', () => {
+    expect(encodedEtag({ a: 1 }, 'br')).toMatch(/^"[\w-]+"$/u);
+    expect(encodedEtag({ a: 1 }, 'br')).toBe(encodedEtag({ a: 1 }, 'br'));
+    expect(encodedEtag({ a: 2 }, 'br')).not.toBe(encodedEtag({ a: 1 }, 'br'));
+    expect(
+      new Set([
+        encodedEtag({ a: 1 }, 'br'),
+        encodedEtag({ a: 1 }, 'gzip'),
+        encodedEtag({ a: 1 }, 'identity'),
+      ]).size,
+    ).toBe(3);
+  });
+
+  it('compresses large bodies at a lower brotli quality and names it in the ETag', async () => {
+    expect(brotli(numberedRows(10)).headers.get('ETag')).toMatch(/^"[\w-]{32}-br"$/u);
+    const versionTag = brotli(numberedRows(10), {}, 'rev').headers.get('ETag')!;
+    for (const [count, quality, minBytes] of [
+      [50_000, 8, 1024 * 1024],
+      [120_000, 7, 4 * 1024 * 1024],
+    ] as const) {
+      const data = numberedRows(count);
+      const bytes = Buffer.from(JSON.stringify(data));
+      expect(bytes.byteLength).toBeGreaterThan(minBytes);
+      const res = brotli(data);
+      const body = Buffer.from(await res.arrayBuffer());
+      expect(res.headers.get('ETag')).toMatch(new RegExp(`^"[\\w-]{32}-br${quality}"$`, 'u'));
+      const expected = brotliCompressSync(bytes, {
+        params: {
+          [zlibConstants.BROTLI_PARAM_QUALITY]: quality,
+          [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+          [zlibConstants.BROTLI_PARAM_SIZE_HINT]: bytes.byteLength,
+        },
+      });
+      expect(body.equals(expected)).toBe(true);
+      expect(brotli(data, { 'If-None-Match': versionTag }, 'rev').status).toBe(304);
+    }
+  }, 30_000);
+
+  it('answers a matching If-None-Match with a bodiless 304 and the cache headers', async () => {
+    const data = { rows: [1, 2, 3] };
+    const first = cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data);
+    const etag = first.headers.get('ETag')!;
+
+    for (const ifNoneMatch of [etag, `W/${etag}`, `"other", ${etag}`, '*']) {
+      const res = cachedJson(
+        apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': ifNoneMatch }),
+        data,
+      );
+      expect(res.status).toBe(304);
+      expect(await res.text()).toBe('');
+      expect(res.headers.get('ETag')).toBe(etag);
+      expect(res.headers.get('Vary')).toBe('Accept-Encoding');
+      expect(res.headers.get('Cache-Control')).toBe(first.headers.get('Cache-Control'));
+      expect(res.headers.get('Content-Encoding')).toBeNull();
+    }
+  });
+
+  it('sends the full body when the payload or the negotiated encoding changed', async () => {
+    const etag = cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), { v: 1 }).headers.get('ETag')!;
+
+    const changed = cachedJson(apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': etag }), {
+      v: 2,
+    });
+    expect(changed.status).toBe(200);
+    expect(JSON.parse(await bodyText(changed))).toEqual({ v: 2 });
+
+    const otherEncoding = cachedJson(
+      apiRequest({ 'Accept-Encoding': 'gzip', 'If-None-Match': etag }),
+      { v: 1 },
+    );
+    expect(otherEncoding.status).toBe(200);
+    expect(otherEncoding.headers.get('Content-Encoding')).toBe('gzip');
+  });
+
+  it('derives the ETag from a supplied version instead of the payload', () => {
+    expect(versionedEtag({ v: 1 }, 'rev-1')).toBe(versionedEtag({ v: 2 }, 'rev-1'));
+    expect(versionedEtag({ v: 1 }, 'rev-2')).not.toBe(versionedEtag({ v: 1 }, 'rev-1'));
+  });
+});
+
+const sameResponse = async (actual: Response, expected: Response) => {
+  expect(actual.status).toBe(expected.status);
+  expect([...actual.headers]).toEqual([...expected.headers]);
+  expect(await bodyText(actual)).toBe(await bodyText(expected));
+};
+
+const storedBytes = () => mockBlobSetBytes.mock.calls.at(-1)![1];
+
+const fullEncodingRequest = () => apiRequest({ 'Accept-Encoding': 'gzip, deflate, br, zstd' });
+
+describe('cachedJsonResponse', () => {
+  it.each([
+    ['br', numberedRows(10)],
+    ['gzip', numberedRows(10)],
+    ['identity', numberedRows(10)],
+    ['br', numberedRows(50_000)],
+    ['gzip', numberedRows(50_000)],
+  ] as const)(
+    'stores and then streams the %s response cachedJson sends',
+    async (acceptEncoding, data) => {
+      mockBlobGetBytes.mockResolvedValueOnce(null);
+      const load = vi.fn((_model: string) => Promise.resolve(data));
+      const respond = cachedJsonResponse(load, 'stored');
+      const request = () => apiRequest({ 'Accept-Encoding': acceptEncoding });
+
+      await sameResponse(await respond(request(), 'dsr1'), cachedJson(request(), data));
+      expect(mockBlobSetBytes).toHaveBeenCalledWith(
+        expect.stringMatching(/^generation\/g1\/stored:v2:.+\.response\.br$/u),
+        expect.any(Uint8Array),
+      );
+
+      mockBlobGetBytes.mockResolvedValueOnce(storedBytes());
+      await sameResponse(await respond(request(), 'dsr1'), cachedJson(request(), data));
+      expect(load).toHaveBeenCalledOnce();
+      expect(mockBlobGetBytes.mock.calls[1][0]).toBe(mockBlobGetBytes.mock.calls[0][0]);
+    },
+    30_000,
+  );
+
+  it('streams the stored brotli bytes unchanged', async () => {
+    mockBlobGetBytes.mockResolvedValueOnce(null);
+    const respond = cachedJsonResponse(() => Promise.resolve({ v: 1 }), 'raw');
+    await respond(apiRequest({ 'Accept-Encoding': 'br' }));
+    const stored = storedBytes();
+    mockBlobGetBytes.mockResolvedValueOnce(stored);
+
+    const res = await respond(apiRequest({ 'Accept-Encoding': 'br' }));
+
+    expect(Buffer.from(await res.arrayBuffer()).equals(Buffer.from(stored.subarray(33)))).toBe(
+      true,
+    );
+  });
+
+  it('stores the plain JSON body and serves it unchanged when the CDN compresses', async () => {
+    const data = { label: '基准测试', rows: [1, 2, 3] };
+    const options = { compression: 'cdn' } as const;
+    mockBlobGetBytes.mockResolvedValueOnce(null);
+    const respond = cachedJsonResponse(() => Promise.resolve(data), 'cdn', options);
+    await sameResponse(
+      await respond(fullEncodingRequest()),
+      cachedJson(fullEncodingRequest(), data, options),
+    );
+    expect(mockBlobSetBytes).toHaveBeenCalledWith(
+      expect.stringMatching(/^generation\/g1\/cdn:v2:.+\.response\.json$/u),
+      expect.any(Uint8Array),
+    );
+    const stored = storedBytes();
+    expect(Buffer.from(stored.subarray(33)).toString('utf8')).toBe(JSON.stringify(data));
+    mockBlobGetBytes.mockResolvedValueOnce(stored);
+
+    await sameResponse(
+      await respond(fullEncodingRequest()),
+      cachedJson(fullEncodingRequest(), data, options),
+    );
+  });
+
+  it('answers a held ETag from the stored digest with a 304', async () => {
+    const data = { rows: [1, 2, 3] };
+    const etag = cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data).headers.get('ETag')!;
+    mockBlobGetBytes.mockResolvedValueOnce(null);
+    const respond = cachedJsonResponse(() => Promise.resolve(data), 'etag');
+    await respond(apiRequest());
+    mockBlobGetBytes.mockResolvedValueOnce(storedBytes());
+
+    const res = await respond(apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': etag }));
+
+    expect(res.status).toBe(304);
+    expect(res.headers.get('ETag')).toBe(etag);
+  });
+
+  it('keys entries by arguments and moves to new paths when a purge rolls the generation', async () => {
+    mockBlobGetBytes.mockResolvedValue(null);
+    const respond = cachedJsonResponse((model: string) => Promise.resolve([model]), 'keyed');
+
+    await respond(apiRequest(), 'a');
+    await respond(apiRequest(), 'b');
+    generation.value = 'g2';
+    await respond(apiRequest(), 'a');
+
+    const [a, b, rolled] = mockBlobGetBytes.mock.calls.map(([path]) => path);
+    expect(b).not.toBe(a);
+    expect(rolled).toBe(a.replace('generation/g1/', 'generation/g2/'));
+  });
+
+  it('runs one read and one load for concurrent misses', async () => {
+    const { promise: rows, resolve } = Promise.withResolvers<number[]>();
+    mockBlobGetBytes.mockResolvedValue(null);
+    const load = vi.fn(() => rows);
+    const respond = cachedJsonResponse(load, 'stampede');
+
+    const calls = [respond(apiRequest()), respond(apiRequest())];
+    await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+    resolve([1, 2]);
+    const responses = await Promise.all(calls);
+
+    expect(mockBlobGetBytes).toHaveBeenCalledOnce();
+    expect(mockBlobSetBytes).toHaveBeenCalledOnce();
+    for (const res of responses) expect(JSON.parse(await bodyText(res))).toEqual([1, 2]);
+  });
+
+  it('forgets a failed load so the next request retries it', async () => {
+    mockBlobGetBytes.mockResolvedValue(null);
+    const load = vi
+      .fn<() => Promise<number[]>>()
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValueOnce([1]);
+    const respond = cachedJsonResponse(load, 'retry');
+
+    await expect(respond(apiRequest())).rejects.toThrow('db down');
+    expect(JSON.parse(await bodyText(await respond(apiRequest())))).toEqual([1]);
+  });
+
+  it('serves the response when the blob write fails', async () => {
+    mockBlobGetBytes.mockResolvedValue(null);
+    mockBlobSetBytes.mockRejectedValueOnce(new Error('blob down'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const respond = cachedJsonResponse(() => Promise.resolve({ ok: true }), 'write-fails');
+
+    const res = await respond(apiRequest({ 'Accept-Encoding': 'br' }));
+
+    expect(JSON.parse(await bodyText(res))).toEqual({ ok: true });
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it('loads and encodes directly when Blob is not configured', async () => {
+    mockBlobEnabled.mockReturnValueOnce(false);
+    const respond = cachedJsonResponse(() => Promise.resolve({ v: 1 }), 'no-blob');
+
+    await sameResponse(
+      await respond(apiRequest({ 'Accept-Encoding': 'br' })),
+      cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), { v: 1 }),
+    );
+    expect(mockBlobGetBytes).not.toHaveBeenCalled();
+    expect(mockBlobSetBytes).not.toHaveBeenCalled();
+  });
+});
+
+describe('notModifiedJson', () => {
+  it('returns the 304 cachedJson would send for a held version, without the payload', async () => {
+    const options = { version: 'rev-1', cacheControl: 'private, no-cache' };
+    const full = cachedJson(apiRequest({ 'Accept-Encoding': 'gzip' }), { v: 1 }, options);
+    const etag = full.headers.get('ETag')!;
+
+    const res = notModifiedJson(
+      apiRequest({ 'Accept-Encoding': 'gzip', 'If-None-Match': etag }),
+      options,
+    );
+
+    expect(res?.status).toBe(304);
+    expect(await res?.text()).toBe('');
+    expect(Object.fromEntries(res!.headers)).toEqual(
+      Object.fromEntries([...full.headers].filter(([name]) => !name.startsWith('content-'))),
+    );
+  });
+
+  it('returns null when the request holds no version or another one', () => {
+    const options = { version: 'rev-2' };
+    const stale = cachedJson(apiRequest(), { v: 1 }, { version: 'rev-1' }).headers.get('ETag')!;
+    expect(notModifiedJson(apiRequest(), options)).toBeNull();
+    expect(notModifiedJson(apiRequest({ 'If-None-Match': stale }), options)).toBeNull();
+  });
+});
+
+describe('cachedGzipJson', () => {
+  const data = { requests: [{ cid: 'trace-é', cancelled: false, ttftMs: null }] };
+  const gzip = gzipSync(JSON.stringify(data));
+  async function* chunks() {
+    yield gzip.subarray(0, 13);
+    yield gzip.subarray(13);
+  }
+
+  it('preserves complete gzip bytes for gzip clients with the CDN headers', async () => {
+    const response = cachedGzipJson(apiRequest({ 'Accept-Encoding': 'gzip, br' }), chunks());
+    expect(response.headers.get('Content-Encoding')).toBe('gzip');
+    expect(response.headers.get('Vary')).toBe('Accept-Encoding');
+    expect(response.headers.get('Vercel-Cache-Tag')).toBe('db-cdn');
+    expect(response.headers.get('Cache-Control')).toBe(
+      cachedJson(apiRequest(), data).headers.get('Cache-Control'),
+    );
+    const received = Buffer.from(await response.arrayBuffer());
+    expect(received.equals(gzip)).toBe(true);
+    expect(mockBlobGet).not.toHaveBeenCalled();
+    expect(mockBlobSet).not.toHaveBeenCalled();
+  });
+
+  it('decompresses for clients that do not accept gzip', async () => {
+    const response = cachedGzipJson(apiRequest(), chunks());
+    expect(response.headers.get('Content-Encoding')).toBeNull();
+    expect(await response.json()).toEqual(data);
+  });
+
+  it('does not fetch ahead and stops fetching after cancellation', async () => {
+    const next = vi.fn().mockResolvedValue({ done: false, value: new Uint8Array([1]) });
+    const cleanup = vi.fn().mockResolvedValue({ done: true });
+    const response = cachedGzipJson(apiRequest({ 'Accept-Encoding': 'gzip' }), {
+      [Symbol.asyncIterator]: () => ({ next, return: cleanup }),
+    });
+    await Promise.resolve();
+    expect(next).not.toHaveBeenCalled();
+    const reader = response.body!.getReader();
+    await reader.read();
+    expect(next).toHaveBeenCalledTimes(1);
+    await reader.cancel();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails the response stream rather than silently truncating on read errors', async () => {
+    const cleanup = vi.fn().mockResolvedValue({ done: true });
+    const response = cachedGzipJson(apiRequest({ 'Accept-Encoding': 'gzip' }), {
+      [Symbol.asyncIterator]: () => ({
+        next: () => Promise.reject(new Error('chunk failed')),
+        return: cleanup,
+      }),
+    });
+    await expect(response.arrayBuffer()).rejects.toThrow('chunk failed');
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });

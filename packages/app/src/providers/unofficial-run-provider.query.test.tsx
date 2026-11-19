@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
+import './unofficial-chart-data';
 import {
   UnofficialRunProvider,
   useUnofficialRun,
@@ -16,6 +17,7 @@ vi.mock('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => nu
 
 interface PendingRequest {
   url: string;
+  cache: RequestCache | undefined;
   signal: AbortSignal;
   resolve: (response: Response) => void;
 }
@@ -62,6 +64,7 @@ function installPendingFetch(): void {
     const { promise, resolve } = Promise.withResolvers<Response>();
     requests.push({
       url: String(input),
+      cache: init?.cache,
       signal: init?.signal as AbortSignal,
       resolve,
     });
@@ -111,7 +114,7 @@ afterEach(() => {
   dismissLatest = null;
   latestContextValue = null;
   rerenderProvider = null;
-  window.history.replaceState({}, '', '/inference');
+  window.history.replaceState({}, '', '/infx/inference');
   vi.restoreAllMocks();
 });
 
@@ -128,13 +131,15 @@ describe('UnofficialRunProvider query lifecycle', () => {
 
   it('aborts the old key and ignores its response after a URL race', async () => {
     installPendingFetch();
-    window.history.replaceState({}, '', '/inference?unofficialrun=1');
+    window.history.replaceState({}, '', '/infx/inference?unofficialrun=1');
     const root = mountProvider();
     await flush();
     expect(requests[0].url).toContain('runId=1');
+    // The route's run-state Cache-Control decides freshness; no-store would bypass the CDN.
+    expect(requests[0].cache).toBeUndefined();
 
     act(() => {
-      window.history.pushState({}, '', '/inference?unofficialruns=2');
+      window.history.pushState({}, '', '/infx/inference?unofficialruns=2');
       window.dispatchEvent(new CustomEvent(CLIENT_SEARCH_CHANGE_EVENT));
     });
     await flush();
@@ -151,13 +156,13 @@ describe('UnofficialRunProvider query lifecycle', () => {
       json: () => Promise.resolve({ runInfos: [runInfo(1)], benchmarks: [], evaluations: [] }),
     } as Response);
     await flush();
-    expect(latestRunIds).toEqual([2]);
+    await waitForRunIds([2]);
     act(() => root.unmount());
   });
 
   it('dismisses one run with pushState while retaining the other run data', async () => {
     installPendingFetch();
-    window.history.replaceState({}, '', '/inference?unofficialruns=1,2');
+    window.history.replaceState({}, '', '/infx/inference?unofficialruns=1,2');
     const root = mountProvider();
     await flush();
     requests[0].resolve({

@@ -1,4 +1,4 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getBenchmarkSiblings,
@@ -12,7 +12,8 @@ import { idQueryRoute } from '../id-routes';
 export const dynamic = 'force-dynamic';
 
 const getCachedSiblings = cachedQuery(
-  (id: number): Promise<BenchmarkSiblings | null> => getBenchmarkSiblings(getDb(), id),
+  async (id: number): Promise<BenchmarkSiblings | null> =>
+    getBenchmarkSiblings(await getPayloadDb(id), id),
   // v3 adds DCP/PCP. Roll the blob namespace so cached sibling payloads gain
   // the complete parallelism mapping used by chart point labels.
   'benchmark-siblings-v3',

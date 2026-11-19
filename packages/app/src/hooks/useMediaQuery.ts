@@ -2,22 +2,16 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 const NOOP = () => {};
 
-/** Phones and small tablets in portrait: below Tailwind's `md` breakpoint. */
 export const MOBILE_VIEWPORT_QUERY = '(max-width: 767px)';
 
-/** Devices whose primary pointer cannot hover (phones, most tablets). */
 export const COARSE_POINTER_QUERY = '(hover: none) and (pointer: coarse)';
 
 function canMatch(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
 }
 
-/**
- * Subscribe to a CSS media query. Returns `false` during SSR and hydration so
- * server markup and the first client paint agree; the real value lands right
- * after hydration and updates on viewport or input-mode changes.
- */
-export function useMediaQuery(query: string): boolean {
+/** `serverValue` is what the server and hydration render before the viewport can be asked. */
+export function useMediaQuery(query: string, serverValue = false): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       if (!canMatch()) return NOOP;
@@ -28,7 +22,7 @@ export function useMediaQuery(query: string): boolean {
     [query],
   );
   const getSnapshot = useCallback(() => canMatch() && window.matchMedia(query).matches, [query]);
-  return useSyncExternalStore(subscribe, getSnapshot, () => false);
+  return useSyncExternalStore(subscribe, getSnapshot, () => serverValue);
 }
 
 export function useIsMobileViewport(): boolean {

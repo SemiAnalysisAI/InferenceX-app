@@ -14,9 +14,9 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 
-// useLayoutEffect warns during SSR; alias to useEffect on the server (no-op there anyway).
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[keyof T] {
@@ -24,46 +24,55 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 }
 
 import { useAvailability } from '@/hooks/api/use-availability';
-import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
+import { useWorkflowInfo, workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import {
   hasExplicitUrlParam,
+  peekNavigationUrlParams,
   refreshUrlParams,
+  type UrlStateKey,
   type UrlStateParams,
 } from '@/lib/routing/url-state';
 import { modelRoutePathnameRewrite, routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
-import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { type AvailableModelSequence, useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
   getModelDefaultPrecisions,
   isSequenceHiddenForModel,
   Model,
   MODEL_OPTIONS,
+  isModelVisible,
+  isRegisteredModel,
+  modelRequiresFeatureGate,
+  modelRequiresObservations,
   Precision,
   PRECISION_OPTIONS,
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/catalog/data-mappings';
 import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
+import { setInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
 import { computeAutoSwitchDecision } from '@/lib/benchmarks/unofficial-run-auto-switch';
 import {
   countCurvesByPrecision,
   resolveEffectivePrecisions,
 } from '@/lib/benchmarks/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
-import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
+import type { WorkflowInfoResponse } from '@/lib/api/api';
+import {
+  type AvailabilityIndex,
+  type AvailabilityLine,
+  datesOfLines,
+  linesForModels,
+} from '@/lib/benchmarks/availability-index';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
-// Placeholder for the public (non-null) `effectiveSequence` during the window
-// before availability has loaded. It stays on the fixed-sequence app default
-// until availability confirms whether the selected model has AgentX data, so a
-// fixed-seq-only model never flashes an agentic label. Consumers that must not
-// act on an unresolved sequence gate on `sequenceResolved` instead.
-// (Declared after the import block so it never references `Sequence` above its import.)
 const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
 
 export interface GlobalFilterSelectionContextType {
@@ -71,22 +80,31 @@ export interface GlobalFilterSelectionContextType {
   selectedSequence: Sequence;
   selectedPrecisions: string[];
   tcoBasis: TcoBasis;
+  /** Which chips divide disaggregated input/output throughput. */
+  chipBasis: ChipBasis;
   effectiveSequence: Sequence;
-  /**
-   * Whether `effectiveSequence` reflects the selected model's real availability
-   * rather than the pre-load placeholder.
-   */
   sequenceResolved: boolean;
   effectivePrecisions: string[];
 }
 
+export interface ModelSelectionOptions {
+  /**
+   * Defaults to true. Pass false for programmatic corrections so the path sync they cause is not
+   * recorded as a virtual pageview.
+   */
+  userSelection?: boolean;
+}
+
 export interface GlobalFilterActionsContextType {
   setTcoBasis: (basis: TcoBasis) => void;
-  setSelectedModel: (model: Model) => void;
+  setChipBasis: (basis: ChipBasis) => void;
+  setSelectedModel: (model: Model, options?: ModelSelectionOptions) => void;
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedRunDate: (date: string) => void;
   setSelectedRunId: (id: string) => void;
+  /** The provider's request and selection after `change`, or null when it would ignore it. */
+  previewFilterChange: (change: FilterChange) => FilterPreview | null;
 }
 
 export interface GlobalFilterRunContextType {
@@ -101,8 +119,7 @@ export interface GlobalFilterAvailabilityContextType {
   availableSequences: Sequence[];
   availablePrecisions: string[];
   availableDates: string[];
-  availabilityRows: AvailabilityRow[] | undefined;
-  /** True once the database availability request has either succeeded or failed. */
+  availability: AvailabilityIndex | undefined;
   availabilitySettled: boolean;
   availabilityError: string | null;
   availabilityIsError: boolean;
@@ -115,28 +132,22 @@ export interface GlobalFilterWorkflowContextType {
   workflowError: string | null;
 }
 
-/** @internal Exported for focused provider tests and Cypress provider wrapping. */
 export const GlobalFilterSelectionContext = createContext<
   GlobalFilterSelectionContextType | undefined
 >(undefined);
-/** @internal Exported for focused provider tests and Cypress provider wrapping. */
 export const GlobalFilterActionsContext = createContext<GlobalFilterActionsContextType | undefined>(
   undefined,
 );
-/** @internal Exported for focused provider tests and Cypress provider wrapping. */
 export const GlobalFilterRunContext = createContext<GlobalFilterRunContextType | undefined>(
   undefined,
 );
-/** @internal Exported for focused provider tests and Cypress provider wrapping. */
 export const GlobalFilterAvailabilityContext = createContext<
   GlobalFilterAvailabilityContextType | undefined
 >(undefined);
-/** @internal Exported for focused provider tests and Cypress provider wrapping. */
 export const GlobalFilterWorkflowContext = createContext<
   GlobalFilterWorkflowContextType | undefined
 >(undefined);
 
-/** Transform API response into the run map consumed by selectors and displays. */
 export function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
   const changelogsByRunId = new Map<string, (typeof data.changelogs)[number][]>();
   for (const changelog of data.changelogs) {
@@ -183,22 +194,6 @@ export function resolveEffectiveRunDate(
   return availableDates.at(-1)!;
 }
 
-/**
- * The run that actually happened last on the selected date.
- *
- * GitHub run ids are not a chronological key. A re-run keeps its original id,
- * and same-day sweeps land with ids out of `created_at` order in production
- * (2026-09-01 DSV4: 33447526958 at 17:10Z vs 33418433573 at 21:35Z) — so the
- * lexicographically-greatest id is NOT reliably the newest run. Picking by id
- * opened a fresh page on "Run 2/3" (an older sweep with a larger id) instead of
- * the day's last sweep, with that older run's changelog.
- *
- * `runDate` is `latest_workflow_runs.created_at`, which the API serializes as
- * a fixed-width ISO-8601 UTC string, so a plain string compare orders it
- * chronologically. Ties (and missing timestamps) fall back to API order, which
- * `getWorkflowRunsByDate` sorts by `created_at ASC` — the same order the run
- * selector numbers its entries, so "latest" and "Run N/N" agree.
- */
 export function latestRunId(availableRuns: Readonly<Record<string, RunInfo>>): string {
   let latest = '';
   let latestDate = '';
@@ -231,6 +226,419 @@ export function getRequestedRunUrlParams(
   };
 }
 
+/** Seed precisions the catalog knows, in their given order. */
+export function validPrecisions(precisions: readonly string[] | undefined): string[] {
+  return (precisions ?? []).filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
+}
+
+/** The model the provider requests on mount, before the route and URL params apply. */
+export function initialRequestedModel(
+  initialModel: Model | undefined,
+  pathname: string | null | undefined,
+): Model {
+  return initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro;
+}
+
+/** The sequence the provider selects on mount. `urlSequence` is an explicit `i_seq` value. */
+export function initialSelectedSequence(
+  initialSequence: Sequence | undefined,
+  urlSequence: string | undefined,
+): Sequence {
+  if (initialSequence) return initialSequence;
+  if (urlSequence && Object.values(Sequence).includes(urlSequence as Sequence)) {
+    return urlSequence as Sequence;
+  }
+  return Sequence.EightK_OneK;
+}
+
+/** A gated model renders as a public one until the gate unlocks. */
+export function visibleSelectedModel(requested: Model, featureGateUnlocked: boolean): Model {
+  return isModelVisible(requested, featureGateUnlocked) ? requested : Model.Kimi_K3_1_Pro;
+}
+
+export interface FilterNavigationOverrides {
+  model?: Model;
+  /** An explicit `i_seq`, which also marks the sequence explicit. */
+  sequence?: Sequence;
+  precisions?: { selected: string[]; explicit: boolean };
+  /** An explicit `g_rundate`, which also marks the run date explicit. */
+  runDate?: string;
+  runId?: string;
+  tcoBasis: TcoBasis;
+  chipBasis?: ChipBasis;
+}
+
+/**
+ * Selections the provider applies when `pathname` mounts or changes. The route's model wins over
+ * the remembered `g_model` unless the URL names one.
+ */
+export function resolveFilterNavigationOverrides({
+  pathname,
+  getUrlParam,
+  hasExplicitUrlParam: isExplicit,
+  initialPrecisions,
+  initialChipBasis,
+}: {
+  pathname: string | null | undefined;
+  getUrlParam: (key: UrlStateKey) => string | undefined;
+  hasExplicitUrlParam: (key: UrlStateKey) => boolean;
+  /** The provider's `initialPrecisions`, already passed through `validPrecisions`. */
+  initialPrecisions: string[];
+  initialChipBasis: ChipBasis | undefined;
+}): FilterNavigationOverrides {
+  const overrides: FilterNavigationOverrides = {
+    tcoBasis: getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS,
+  };
+
+  const routeModel = routeModelForPathname(pathname);
+  if (routeModel) overrides.model = routeModel;
+  const pathModel = inferenceModelForPathname(pathname);
+  if (pathModel !== null) overrides.model = pathModel;
+  if (pathModel === null || isExplicit('g_model')) {
+    const urlModel = getUrlParam('g_model');
+    if (urlModel !== undefined && isEnumValue(Model, urlModel)) overrides.model = urlModel;
+  }
+
+  if (isExplicit('i_seq')) {
+    const urlSequence = getUrlParam('i_seq');
+    if (urlSequence !== undefined && isEnumValue(Sequence, urlSequence)) {
+      overrides.sequence = urlSequence;
+    }
+  }
+
+  const urlPrec = isExplicit('i_prec') ? getUrlParam('i_prec') : undefined;
+  if (urlPrec) {
+    const precs = validPrecisions(urlPrec.split(','));
+    if (precs.length > 0) overrides.precisions = { selected: precs, explicit: true };
+  } else if (pathModel !== null) {
+    overrides.precisions = {
+      selected: initialPrecisions.length > 0 ? initialPrecisions : [Precision.FP4],
+      explicit: initialPrecisions.length > 0,
+    };
+  }
+
+  if (isExplicit('g_rundate')) {
+    const urlRunDate = getUrlParam('g_rundate');
+    if (urlRunDate !== undefined && RUNDATE_RE.test(urlRunDate)) overrides.runDate = urlRunDate;
+  }
+  if (isExplicit('g_runid')) {
+    const urlRunId = getUrlParam('g_runid');
+    if (urlRunId !== undefined && RUNID_RE.test(urlRunId)) overrides.runId = urlRunId;
+  }
+  // Profit-estimator routes carry no g_chips segment. Keep the session's basis there instead of
+  // resetting it, and apply it again on return. Embeds resolve their own basis server-side
+  // (`initialChipBasis`), and the URL must not override it on the client.
+  if (initialChipBasis === undefined && isExplicit('g_chips')) {
+    overrides.chipBasis = getUrlParam('g_chips') === 'total' ? 'total' : DEFAULT_CHIP_BASIS;
+  }
+  return overrides;
+}
+
+export interface FilterRequest {
+  /** The rendered model, after the feature gate. */
+  model: Model;
+  selectedSequence: Sequence;
+  sequenceExplicit: boolean;
+  selectedPrecisions: string[];
+  precisionExplicit: boolean;
+  requestedRunDate: string;
+  requestedRunDateExplicit: boolean;
+  requestedRunId: string;
+}
+
+/**
+ * The selection a freshly mounted provider settles on once its mount-time navigation pass has
+ * run. It combines the `useState` initializers with `resolveFilterNavigationOverrides`.
+ */
+export function resolveMountedFilterRequest({
+  pathname,
+  initialModel,
+  initialSequence,
+  initialPrecisions,
+  initialRunDate,
+  initialRunId,
+  getUrlParam,
+  hasExplicitUrlParam: isExplicit,
+  featureGateUnlocked,
+}: {
+  pathname: string;
+  initialModel?: Model;
+  initialSequence?: Sequence;
+  initialPrecisions?: string[];
+  initialRunDate?: string;
+  initialRunId?: string;
+  getUrlParam: (key: UrlStateKey) => string | undefined;
+  hasExplicitUrlParam: (key: UrlStateKey) => boolean;
+  featureGateUnlocked: boolean;
+}): FilterRequest {
+  const seedPrecisions = validPrecisions(initialPrecisions);
+  const overrides = resolveFilterNavigationOverrides({
+    pathname,
+    getUrlParam,
+    hasExplicitUrlParam: isExplicit,
+    initialPrecisions: seedPrecisions,
+    initialChipBasis: undefined,
+  });
+  const requestedModel = overrides.model ?? initialRequestedModel(initialModel, pathname);
+  return {
+    model: visibleSelectedModel(requestedModel, featureGateUnlocked),
+    selectedSequence:
+      overrides.sequence ??
+      initialSelectedSequence(
+        initialSequence,
+        isExplicit('i_seq') ? getUrlParam('i_seq') : undefined,
+      ),
+    sequenceExplicit: overrides.sequence !== undefined || initialSequence !== undefined,
+    selectedPrecisions:
+      overrides.precisions?.selected ??
+      (seedPrecisions.length > 0 ? seedPrecisions : [Precision.FP4]),
+    precisionExplicit: overrides.precisions?.explicit ?? seedPrecisions.length > 0,
+    requestedRunDate: overrides.runDate ?? initialRunDate ?? '',
+    requestedRunDateExplicit:
+      overrides.runDate !== undefined || initialRunDate !== undefined || isExplicit('g_rundate'),
+    requestedRunId: overrides.runId ?? initialRunId ?? '',
+  };
+}
+
+export function modelDbKeys(model: string): string[] {
+  return DISPLAY_MODEL_TO_DB[model] ?? [model];
+}
+
+export function resolveAvailableModels(
+  availability: AvailabilityIndex | undefined,
+  unofficialAvailable: readonly AvailableModelSequence[],
+  featureGateUnlocked: boolean,
+): Model[] {
+  const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
+  const registered = MODEL_OPTIONS.filter((m) => {
+    if (!isModelVisible(m, featureGateUnlocked)) return false;
+    if (unofficialModels.has(m)) return true;
+    if (!availability) return !modelRequiresObservations(m);
+    return modelDbKeys(m).some((key) => availability.linesByModel.has(key));
+  });
+  const unregistered = [...unofficialModels].filter((m) => !isRegisteredModel(m)).toSorted();
+  return [...registered, ...unregistered];
+}
+
+export function resolveAvailableSequences(
+  modelLines: readonly AvailabilityLine[],
+  unofficialAvailable: readonly AvailableModelSequence[],
+  selectedModel: Model,
+): Sequence[] {
+  const unofficialSeqs = unofficialAvailable
+    .filter((a) => a.model === selectedModel)
+    .map((a) => a.sequence as Sequence);
+  const dbSeqs = modelLines.map((line) => line.sequence).filter((s): s is Sequence => s !== null);
+  const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
+    (s) => !isSequenceHiddenForModel(selectedModel, s),
+  );
+  return merged.length > 0
+    ? merged
+    : SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(selectedModel, sequence));
+}
+
+export function isAvailabilityLoaded(
+  availability: AvailabilityIndex | undefined,
+  unofficialAvailable: readonly AvailableModelSequence[],
+  selectedModel: Model,
+): boolean {
+  return availability !== undefined || unofficialAvailable.some((a) => a.model === selectedModel);
+}
+
+export function unofficialPrecisionsFor(
+  unofficialAvailable: readonly AvailableModelSequence[],
+  selectedModel: Model,
+  sequence: Sequence,
+): string[] {
+  return unofficialAvailable
+    .filter((a) => a.model === selectedModel && a.sequence === sequence)
+    .flatMap((a) => a.precisions);
+}
+
+export function resolveAvailablePrecisions(
+  availability: AvailabilityIndex | undefined,
+  sequenceLines: readonly AvailabilityLine[],
+  unofficialPrecisions: readonly string[],
+): string[] {
+  if (!availability) {
+    return unofficialPrecisions.length > 0
+      ? [...new Set(unofficialPrecisions)].toSorted()
+      : ['fp4'];
+  }
+  const dbPrecs = sequenceLines.map((line) => line.precision);
+  const merged = [...new Set([...dbPrecs, ...unofficialPrecisions])].toSorted();
+  return merged.length > 0 ? merged : ['fp4'];
+}
+
+export function resolveSelectionPrecisions({
+  selectedPrecisions,
+  availablePrecisions,
+  curveCounts,
+  unofficialPrecisions,
+  explicit,
+  selectedModel,
+  sequence,
+}: {
+  selectedPrecisions: string[];
+  availablePrecisions: string[];
+  curveCounts: Record<string, number>;
+  unofficialPrecisions: string[];
+  explicit: boolean;
+  selectedModel: Model;
+  sequence: Sequence;
+}): string[] {
+  return resolveEffectivePrecisions({
+    selectedPrecisions,
+    availablePrecisions,
+    curveCounts,
+    unofficialPrecisions,
+    explicit,
+    modelDefaultPrecisions: getModelDefaultPrecisions(selectedModel, sequence),
+  });
+}
+
+export function resolveAvailableDates(
+  availability: AvailabilityIndex | undefined,
+  sequenceLines: readonly AvailabilityLine[],
+  effectivePrecisions: readonly string[],
+): string[] {
+  if (!availability) return [];
+  const lines = sequenceLines.filter((line) => effectivePrecisions.includes(line.precision));
+  return datesOfLines(availability, lines.length > 0 ? lines : sequenceLines);
+}
+
+export interface FilterSelection {
+  effectiveSequence: Sequence;
+  sequenceResolved: boolean;
+  effectivePrecisions: string[];
+  availableDates: string[];
+  effectiveRunDate: string;
+}
+
+/** A selection change as the provider's setters apply it. */
+export interface FilterChange {
+  model?: Model;
+  sequence?: Sequence;
+  precisions?: string[];
+  /** The URL the page moves to along with the change. The new route's selections apply on top. */
+  navigation?: { pathname: string; search: string };
+}
+
+export interface FilterPreview {
+  request: FilterRequest;
+  selection: FilterSelection;
+}
+
+/**
+ * The request after `change`, as the provider's setters and its navigation pass apply it. Null
+ * when the provider ignores the change, as it does for a model the feature gate hides.
+ */
+export function applyFilterChange(
+  request: FilterRequest,
+  change: FilterChange,
+  {
+    featureGateUnlocked,
+    initialPrecisions,
+  }: {
+    featureGateUnlocked: boolean;
+    /** The provider's `initialPrecisions`, already passed through `validPrecisions`. */
+    initialPrecisions: string[];
+  },
+): FilterRequest | null {
+  if (change.model !== undefined && !isModelVisible(change.model, featureGateUnlocked)) {
+    return null;
+  }
+  const next: FilterRequest = { ...request };
+  if (change.model !== undefined) next.model = change.model;
+  if (change.sequence !== undefined) {
+    next.selectedSequence = change.sequence;
+    next.sequenceExplicit = true;
+  }
+  if (change.precisions !== undefined) {
+    next.selectedPrecisions = change.precisions;
+    next.precisionExplicit = true;
+  }
+  if (!change.navigation) return next;
+
+  const { pathname, search } = change.navigation;
+  const { params, explicit } = peekNavigationUrlParams(pathname, search);
+  const overrides = resolveFilterNavigationOverrides({
+    pathname,
+    getUrlParam: (key) => params[key],
+    hasExplicitUrlParam: (key) => explicit[key] !== undefined,
+    initialPrecisions,
+    initialChipBasis: undefined,
+  });
+  if (overrides.model !== undefined) {
+    next.model = visibleSelectedModel(overrides.model, featureGateUnlocked);
+  }
+  if (overrides.sequence !== undefined) {
+    next.selectedSequence = overrides.sequence;
+    next.sequenceExplicit = true;
+  }
+  if (overrides.precisions) {
+    next.selectedPrecisions = overrides.precisions.selected;
+    next.precisionExplicit = overrides.precisions.explicit;
+  }
+  if (overrides.runDate !== undefined) {
+    next.requestedRunDate = overrides.runDate;
+    next.requestedRunDateExplicit = true;
+  }
+  if (overrides.runId !== undefined) next.requestedRunId = overrides.runId;
+  return next;
+}
+
+/**
+ * The selection the provider derives from `request` and `availability`, step for step as its
+ * memo chain does. Pass `undefined` availability for the state before it loads.
+ */
+export function resolveFilterSelection(
+  availability: AvailabilityIndex | undefined,
+  request: FilterRequest,
+  unofficialAvailable: readonly AvailableModelSequence[] = [],
+): FilterSelection {
+  const { model } = request;
+  const modelLines = availability ? linesForModels(availability, modelDbKeys(model)) : [];
+  const resolvedSequence = resolveEffectiveSequence({
+    selectedSequence: request.selectedSequence,
+    availableSequences: resolveAvailableSequences(modelLines, unofficialAvailable, model),
+    availabilityLoaded: isAvailabilityLoaded(availability, unofficialAvailable, model),
+    sequenceExplicit: request.sequenceExplicit,
+  });
+  const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
+  const sequenceLines = modelLines.filter((line) => line.sequence === effectiveSequence);
+  const unofficialPrecisions = unofficialPrecisionsFor(
+    unofficialAvailable,
+    model,
+    effectiveSequence,
+  );
+  const effectivePrecisions = resolveSelectionPrecisions({
+    selectedPrecisions: request.selectedPrecisions,
+    availablePrecisions: resolveAvailablePrecisions(
+      availability,
+      sequenceLines,
+      unofficialPrecisions,
+    ),
+    curveCounts: countCurvesByPrecision(sequenceLines),
+    unofficialPrecisions,
+    explicit: request.precisionExplicit,
+    selectedModel: model,
+    sequence: effectiveSequence,
+  });
+  const availableDates = resolveAvailableDates(availability, sequenceLines, effectivePrecisions);
+  return {
+    effectiveSequence,
+    sequenceResolved: resolvedSequence !== null,
+    effectivePrecisions,
+    availableDates,
+    effectiveRunDate: resolveEffectiveRunDate(
+      request.requestedRunDate,
+      availableDates,
+      request.requestedRunDateExplicit,
+    ),
+  };
+}
+
 export function GlobalFilterProvider({
   children,
   initialModel,
@@ -238,61 +646,51 @@ export function GlobalFilterProvider({
   initialPrecisions,
   initialRunDate,
   initialRunId,
+  initialChipBasis,
 }: {
   children: ReactNode;
-  /**
-   * Initial values used when no URL params are present. Lets per-route entry
-   * points (e.g. `/compare/[a]-vs-[b]`) seed sensible defaults derived from
-   * actual data, without forcing a second provider during server rendering.
-   */
   initialModel?: Model;
   initialSequence?: Sequence;
   initialPrecisions?: string[];
   initialRunDate?: string;
   initialRunId?: string;
+  /** Starting chip basis for surfaces without URL state, such as embeds. */
+  initialChipBasis?: ChipBasis;
 }) {
   const { getUrlParam, setUrlParams } = useUrlState();
 
-  // Owned by the Next router. Seeds per-model routes below and keys the
-  // URL-param layout effect further down (see that effect for the full
-  // usePathname-vs-useSearchParams rationale).
   const pathname = usePathname();
 
-  // ── Core filter state ─────────────────────────────────────────────────────
-  // Per-model routes (/historical/<slug>) imply a model at first render so the
-  // server response and hydration already show the routed model — no client
-  // effect flicker. An explicit `initialModel` prop (calculator URL seed) wins.
-  const [selectedModel, setSelectedModel] = useState<Model>(
-    () => initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro,
+  const featureGateUnlocked = useFeatureGate();
+  const [featureGateReady, setFeatureGateReady] = useState(false);
+  useEffect(() => setFeatureGateReady(true), []);
+  const [requestedModel, setSelectedModel] = useState<Model>(() =>
+    initialRequestedModel(initialModel, pathname),
+  );
+  const modelGatePending = modelRequiresFeatureGate(requestedModel) && !featureGateReady;
+  // Derive the safe value during render, including the first SSR/hydration render
+  // and the render immediately after relocking. Every consumer sees this value.
+  const selectedModel = visibleSelectedModel(requestedModel, featureGateUnlocked);
+  useIsomorphicLayoutEffect(() => {
+    if (!modelGatePending) setInferenceNavigationModel(selectedModel);
+  }, [selectedModel, modelGatePending]);
+  // The model the user last picked. A path sync counts as a pageview only when it applies that pick.
+  const userSelectedModelRef = useRef<Model | null>(null);
+  const selectModel = useCallback(
+    (model: Model, { userSelection = true }: ModelSelectionOptions = {}) => {
+      if (!isModelVisible(model, featureGateUnlocked)) return;
+      if (userSelection) userSelectedModelRef.current = model;
+      setSelectedModel(model);
+    },
+    [featureGateUnlocked],
   );
 
-  const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
-    if (initialSequence) return initialSequence;
-    // Only honor `i_seq` when the CURRENT navigation's URL carries it. The
-    // module-level snapshot retains self-written params across soft
-    // navigations (the URL-sync effect pins the resolved sequence on every
-    // dashboard visit), so an unguarded read would revive the previous page's
-    // sequence — e.g. a paramless AgentX hero link opening on a stale 8k/1k.
-    const urlSeq = hasExplicitUrlParam('i_seq') ? getUrlParam('i_seq') : undefined;
-    if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
-    // Default to the 8K/1K fixed-seq scenario; the effectiveSequence resolution
-    // below prefers the Agentic scenario when availability confirms the model
-    // has corresponding data, and handles models that lack 8K/1K entirely.
-    return Sequence.EightK_OneK;
-  });
-  // Whether the scenario was chosen explicitly (seeded `initialSequence` prop,
-  // URL `i_seq`, or a manual pick). Until then the availability-driven AgentX
-  // default applies —
-  // without this flag the initial `8k/1k` state is indistinguishable from a
-  // deliberate 8K/1K selection, and the Agentic scenario could never win.
-  //
-  // Deliberately NOT seeded from `i_seq` here: this flag feeds the scenario
-  // label rendered during the pre-availability window, and `getUrlParam` sees
-  // the query string on the client but not on the server. Reading it in the
-  // initializer would render a different label on each side and fail
-  // hydration. The layout effect below applies `i_seq` (flag included) after
-  // the first commit and before paint, which is how every other URL param
-  // lands.
+  const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() =>
+    initialSelectedSequence(
+      initialSequence,
+      hasExplicitUrlParam('i_seq') ? getUrlParam('i_seq') : undefined,
+    ),
+  );
   const [sequenceExplicit, setSequenceExplicit] = useState<boolean>(
     () => initialSequence !== undefined,
   );
@@ -302,16 +700,12 @@ export function GlobalFilterProvider({
   }, []);
 
   const initialValidPrecisions = useMemo(
-    () =>
-      (initialPrecisions ?? []).filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p)),
+    () => validPrecisions(initialPrecisions),
     [initialPrecisions],
   );
   const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() =>
     initialValidPrecisions.length > 0 ? initialValidPrecisions : [Precision.FP4],
   );
-  // Whether the precision was chosen explicitly (seeded prop, URL `i_prec`,
-  // preset, or manual toggle). Until then we auto-pick the densest precision
-  // for the current model/sequence so FP8-heavy models don't open barren.
   const [precisionExplicit, setPrecisionExplicit] = useState<boolean>(
     () => initialValidPrecisions.length > 0,
   );
@@ -320,7 +714,6 @@ export function GlobalFilterProvider({
     setPrecisionExplicit(true);
   }, []);
 
-  // ── Run date / run ID ─────────────────────────────────────────────────────
   const [requestedRunDate, setRequestedRunDate] = useState<string>(() => initialRunDate ?? '');
   const [selectedRunDateRev, setSelectedRunDateRev] = useState(0);
   const requestedRunDateExplicitRef = useRef(
@@ -329,120 +722,35 @@ export function GlobalFilterProvider({
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
   const [tcoBasis, setTcoBasis] = useState<TcoBasis>(DEFAULT_TCO_BASIS);
+  const [chipBasis, setChipBasis] = useState<ChipBasis>(initialChipBasis ?? DEFAULT_CHIP_BASIS);
 
-  // Apply URL param overrides synchronously after the first commit. Runs only
-  // on the client (useEffect on server is a no-op). Updates state before paint
-  // so users with shareable URLs (?i_seq=…&g_model=…) see their values without
-  // flicker, and SSR/client hydration agree because initial state came from
-  // props/defaults on both sides.
-  // Soft navigations do not remount this provider, and `useUrlState` caches the
-  // URL in a ref at first render — so without this, landing on
-  // `/inference?g_model=Qwen-3.5-397B-A17B` via a <Link> kept whatever model
-  // the previous page had (the default, DeepSeek). Every AgentX card on the
-  // landing page pointed at the right URL and still opened the wrong model.
-  // `usePathname` rather than `useSearchParams`: the latter forces every
-  // statically-prerendered page that mounts this provider behind a Suspense
-  // boundary, which fails the build on /ai-chart. Pathname changes on the
-  // navigations that matter here — the AgentX cards and every share link live
-  // on a different route from /inference. (`pathname` itself is declared with
-  // the core filter state above, where it also seeds per-model routes.)
   useIsomorphicLayoutEffect(() => {
-    // Pull the live URL into the shared snapshot first: `getUrlParam` below and
-    // the auto-switch guard further down both read from it, and on a soft
-    // navigation it still holds the previous page's params.
     refreshUrlParams();
-    const applyIfEnum = <T extends Record<string, string>>(
-      key: 'g_model' | 'i_seq',
-      enumType: T,
-      apply: (v: T[keyof T]) => void,
-    ) => {
-      const value = getUrlParam(key);
-      if (value !== undefined && isEnumValue(enumType, value)) apply(value);
-    };
-    const applyIfMatches = (
-      key: 'g_rundate' | 'g_runid',
-      pattern: RegExp,
-      apply: (v: string) => void,
-    ) => {
-      const value = getUrlParam(key);
-      if (value !== undefined && pattern.test(value)) apply(value);
-    };
-
-    // Per-model routes imply a model on soft navigation too (the useState
-    // seed above only covers the mount; soft navigations between model pages
-    // do not remount this provider). Two route families pin the model:
-    // `/calculator/<model>` + `/historical/<model>` (routeModelForPathname)
-    // and `/inference/<model>` (inferenceModelForPathname).
-    const routeModel = routeModelForPathname(pathname);
-    if (routeModel) setSelectedModel(routeModel);
-    const pathModel = inferenceModelForPathname(pathname);
-    if (pathModel !== null) setSelectedModel(pathModel);
-    // On calculator/historical pages an explicit legacy ?g_model= still wins
-    // (applied after the route pin; the URL-sync effect below then
-    // canonicalizes the pathname to whatever model actually got applied). On
-    // an `/inference/<model>` page, `g_model` applies only when present in
-    // the CURRENT URL: the snapshot retains params from the previous
-    // navigation (`refreshUrlParams` only overwrites keys present in the live
-    // URL), and letting that stale value through would override the model the
-    // path just asked for.
-    if (pathModel === null || hasExplicitUrlParam('g_model')) {
-      applyIfEnum('g_model', Model, setSelectedModel);
+    const overrides = resolveFilterNavigationOverrides({
+      pathname,
+      getUrlParam,
+      hasExplicitUrlParam,
+      initialPrecisions: initialValidPrecisions,
+      initialChipBasis,
+    });
+    if (overrides.model !== undefined) setSelectedModel(overrides.model);
+    if (overrides.sequence !== undefined) setSelectedSequence(overrides.sequence);
+    if (overrides.precisions) {
+      setSelectedPrecisionsRaw(overrides.precisions.selected);
+      setPrecisionExplicit(overrides.precisions.explicit);
     }
-    // Same guard as the initializer above: `i_seq` applies (and flips
-    // `sequenceExplicit`, which blocks the availability-driven AgentX default)
-    // only when the current URL actually carries it — never from the snapshot's
-    // retained self-writes of a previously visited page.
-    if (hasExplicitUrlParam('i_seq')) {
-      applyIfEnum('i_seq', Sequence, setSelectedSequence);
+    if (overrides.runDate !== undefined) {
+      requestedRunDateExplicitRef.current = true;
+      setRequestedRunDate(overrides.runDate);
     }
-    // The shared snapshot survives Back and retains the TPU shortcut's FP8.
-    // Only a precision carried by this navigation may pin the new model.
-    const urlPrec = hasExplicitUrlParam('i_prec') ? getUrlParam('i_prec') : undefined;
-    if (urlPrec) {
-      const precs = urlPrec
-        .split(',')
-        .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
-      if (precs.length > 0) {
-        setSelectedPrecisionsRaw(precs);
-        setPrecisionExplicit(true);
-      }
-    } else if (pathModel !== null) {
-      // Per-model links without a precision use their own availability-driven
-      // default, including when the router reuses this provider.
-      setSelectedPrecisionsRaw(
-        initialValidPrecisions.length > 0 ? initialValidPrecisions : [Precision.FP4],
-      );
-      setPrecisionExplicit(initialValidPrecisions.length > 0);
-    }
-    // Same guard again for the run pins. The snapshot retains `g_rundate` /
-    // `g_runid` self-writes from an earlier visit (a manual date pick, or a
-    // blog "live chart" link that pinned a date), and `refreshUrlParams` does
-    // not evict keys the live URL no longer carries. Applying them here would
-    // flip `requestedRunDateExplicitRef` and re-pin a stale date on a page the
-    // user reached without any `g_rundate` — so a fresh dashboard would open
-    // on an old run instead of the latest one. Only the CURRENT URL may pin.
-    if (hasExplicitUrlParam('g_rundate')) {
-      applyIfMatches('g_rundate', RUNDATE_RE, (date) => {
-        requestedRunDateExplicitRef.current = true;
-        setRequestedRunDate(date);
-      });
-    }
-    if (hasExplicitUrlParam('g_runid')) {
-      applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
-    }
-    // Re-runs on client-side navigation as well as on mount. Keyed on the
-    // pathname, which the Next router owns: the provider's own share-link
-    // writes go through `history.replaceState` and never change it, so this
-    // cannot fight a user changing filters in place. A param-only navigation
-    // within /inference is therefore not picked up — no in-app link does that
-    // today, and covering it would mean the Suspense bailout above.
-    setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
+    if (overrides.runId !== undefined) setRequestedRunId(overrides.runId);
+    setTcoBasis(overrides.tcoBasis);
+    if (overrides.chipBasis !== undefined) setChipBasis(overrides.chipBasis);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // ── Availability data ─────────────────────────────────────────────────────
   const {
-    data: availabilityRows,
+    data: availability,
     error: availabilityQueryError,
     isError: availabilityIsError,
     isPending: availabilityPending,
@@ -455,42 +763,22 @@ export function GlobalFilterProvider({
   }, [refetchAvailability]);
   const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
-  const dbModelKeys = useMemo<string[]>(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
-    [selectedModel],
+  const dbModelKeys = useMemo<string[]>(() => modelDbKeys(selectedModel), [selectedModel]);
+
+  const modelLines = useMemo(
+    () => (availability ? linesForModels(availability, dbModelKeys) : []),
+    [availability, dbModelKeys],
   );
 
-  // Pre-filter availability rows by model once
-  const modelRows = useMemo(
-    () => availabilityRows?.filter((r) => dbModelKeys.includes(r.model)) ?? [],
-    [availabilityRows, dbModelKeys],
+  const availableModels = useMemo(
+    () => resolveAvailableModels(availability, unofficialAvailable, featureGateUnlocked),
+    [availability, unofficialAvailable, featureGateUnlocked],
   );
 
-  // Models that have any data (DB ∪ unofficial run)
-  const availableModels = useMemo(() => {
-    if (!availabilityRows) return MODEL_OPTIONS;
-    const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
-    return MODEL_OPTIONS.filter((m) => {
-      if (unofficialModels.has(m)) return true;
-      const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
-      return availabilityRows.some((r) => keys.includes(r.model));
-    });
-  }, [availabilityRows, unofficialAvailable]);
-
-  // Auto-switch the selected model when an unofficial run is loaded that
-  // doesn't include the currently selected model. Without this, navigating
-  // to `?unofficialrun=<id>` while the default `g_model=DeepSeek-R1` sticks
-  // leaves the user staring at a chart with no overlay points — they'd have
-  // to know to open the dropdown and pick the run's model themselves.
-  //
-  // Explicit URL intent is tracked separately from the mutable state mirrored
-  // for provider remounts. Automatic model changes serialize like any other
-  // filter, but must not become an explicit `g_model` that blocks the next
-  // unofficial-run auto-switch.
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
     const decision = computeAutoSwitchDecision(
-      unofficialAvailable,
+      unofficialAvailable.filter((entry) => isModelVisible(entry.model, featureGateUnlocked)),
       hasExplicitUrlParam('g_model') ? getUrlParam('g_model') : undefined,
       selectedModel,
       lastAutoSwitchKeyRef.current,
@@ -499,46 +787,18 @@ export function GlobalFilterProvider({
     if (decision.modelToSet !== null) {
       setSelectedModel(decision.modelToSet);
     }
-  }, [unofficialAvailable, selectedModel]);
+  }, [unofficialAvailable, selectedModel, featureGateUnlocked]);
 
-  // Sequences available for the selected model (DB ∪ unofficial run for this model).
-  const availableSequences = useMemo(() => {
-    const unofficialSeqs = unofficialAvailable
-      .filter((a) => a.model === selectedModel)
-      .map((a) => a.sequence as Sequence);
-    if (!availabilityRows) {
-      return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : [...SEQUENCE_OPTIONS];
-    }
-    const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
-    const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
-      (s) => !isSequenceHiddenForModel(selectedModel, s),
-    );
-    return merged.length > 0 ? merged : [...SEQUENCE_OPTIONS];
-  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
-
-  // Whether we actually know the selected model's sequences yet. Availability
-  // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run
-  // (`unofficialAvailable` for this model) — either source lets us resolve a
-  // trustworthy effectiveSequence. Until then `availableSequences` is the static
-  // SEQUENCE_OPTIONS fallback (which contains every scenario), so resolving
-  // eagerly would honor a selection the model may not have (e.g. agentic-traces
-  // from a shared link on a fixed-seq-only model), fetch it, then snap once
-  // availability lands (flash + wasted request).
-  const availabilityLoaded = useMemo(
-    () =>
-      availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
-    [availabilityRows, unofficialAvailable, selectedModel],
+  const availableSequences = useMemo(
+    () => resolveAvailableSequences(modelLines, unofficialAvailable, selectedModel),
+    [modelLines, unofficialAvailable, selectedModel],
   );
 
-  // Synchronously validated sequence.
-  //
-  // `resolveEffectiveSequence` returns null while availability is still loading
-  // so InferenceProvider can gate the
-  // benchmark fetch until the real sequence is known (no agentic fetch fires for
-  // a fixed-seq-only model). For the non-null public `effectiveSequence` value
-  // we retain the fixed-sequence placeholder until availability confirms the
-  // AgentX scenario exists; the chart shows its normal loading skeleton until
-  // `sequenceResolved` flips true.
+  const availabilityLoaded = useMemo(
+    () => isAvailabilityLoaded(availability, unofficialAvailable, selectedModel),
+    [availability, unofficialAvailable, selectedModel],
+  );
+
   const resolvedSequence = useMemo(
     () =>
       resolveEffectiveSequence({
@@ -552,47 +812,36 @@ export function GlobalFilterProvider({
   const sequenceResolved = resolvedSequence !== null;
   const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
 
-  // Precisions available for the selected model + sequence (DB ∪ unofficial run)
-  const availablePrecisions = useMemo(() => {
-    const unofficialPrecs = unofficialAvailable
-      .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
-      .flatMap((a) => a.precisions);
-    if (!availabilityRows) {
-      return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
-    }
-    const rows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
-    const dbPrecs = rows.map((r) => r.precision);
-    const merged = [...new Set([...dbPrecs, ...unofficialPrecs])].toSorted();
-    return merged.length > 0 ? merged : ['fp4'];
-  }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
-
-  // Curve count per precision (distinct hw/framework/spec/disagg series) for the
-  // selected model + sequence — drives the auto default toward the densest one.
-  const precisionCurveCounts = useMemo(
-    () => countCurvesByPrecision(modelRows.filter((r) => rowToSequence(r) === effectiveSequence)),
-    [modelRows, effectiveSequence],
+  const sequenceLines = useMemo(
+    () => modelLines.filter((line) => line.sequence === effectiveSequence),
+    [modelLines, effectiveSequence],
   );
 
-  // Precisions present in a loaded unofficial run for the current model + sequence.
   const unofficialPrecisionsForSelection = useMemo(
-    () =>
-      unofficialAvailable
-        .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
-        .flatMap((a) => a.precisions),
+    () => unofficialPrecisionsFor(unofficialAvailable, selectedModel, effectiveSequence),
     [unofficialAvailable, selectedModel, effectiveSequence],
   );
 
-  // Synchronously validated precisions. When the user hasn't explicitly chosen a
-  // precision, auto-pick the densest (see resolveEffectivePrecisions).
+  const availablePrecisions = useMemo(
+    () => resolveAvailablePrecisions(availability, sequenceLines, unofficialPrecisionsForSelection),
+    [availability, sequenceLines, unofficialPrecisionsForSelection],
+  );
+
+  const precisionCurveCounts = useMemo(
+    () => countCurvesByPrecision(sequenceLines),
+    [sequenceLines],
+  );
+
   const effectivePrecisions = useMemo(
     () =>
-      resolveEffectivePrecisions({
+      resolveSelectionPrecisions({
         selectedPrecisions,
         availablePrecisions,
         curveCounts: precisionCurveCounts,
         unofficialPrecisions: unofficialPrecisionsForSelection,
         explicit: precisionExplicit,
-        modelDefaultPrecisions: getModelDefaultPrecisions(selectedModel, effectiveSequence),
+        selectedModel,
+        sequence: effectiveSequence,
       }),
     [
       selectedPrecisions,
@@ -605,16 +854,10 @@ export function GlobalFilterProvider({
     ],
   );
 
-  // Dates available for selected model + sequence + precisions
-  const availableDates = useMemo(() => {
-    if (!availabilityRows) return [];
-    const seqRows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
-    const rows = seqRows.filter((r) => effectivePrecisions.includes(r.precision));
-    if (rows.length === 0) {
-      return [...new Set(seqRows.map((r) => r.date))].toSorted();
-    }
-    return [...new Set(rows.map((r) => r.date))].toSorted();
-  }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
+  const availableDates = useMemo(
+    () => resolveAvailableDates(availability, sequenceLines, effectivePrecisions),
+    [availability, sequenceLines, effectivePrecisions],
+  );
 
   const setSelectedRunDateManual = useCallback((date: string) => {
     requestedRunDateExplicitRef.current = true;
@@ -628,12 +871,11 @@ export function GlobalFilterProvider({
     requestedRunDateExplicitRef.current,
   );
 
-  // ── Workflow info ─────────────────────────────────────────────────────────
   const {
     data: workflowData,
     isLoading: workflowLoading,
     error: workflowQueryError,
-  } = useWorkflowInfo(effectiveRunDate);
+  } = useWorkflowInfo(modelGatePending ? '' : effectiveRunDate);
 
   const workflowError = workflowQueryError ? workflowQueryError.message : null;
 
@@ -651,9 +893,16 @@ export function GlobalFilterProvider({
     setRequestedRunId(runId);
   }, []);
 
-  // ── URL sync ──────────────────────────────────────────────────────────────
   const isMountedRef = useRef(false);
+  const syncedModelRef = useRef(selectedModel);
   useEffect(() => {
+    // Do not canonicalize an explicitly unlocked deep link before localStorage
+    // has been read by the existing feature-gate hook.
+    if (!featureGateReady) return;
+    const modelChanged = syncedModelRef.current !== selectedModel;
+    syncedModelRef.current = selectedModel;
+    const userSwitchedModel = modelChanged && userSelectedModelRef.current === selectedModel;
+    if (modelChanged) userSelectedModelRef.current = null;
     if (!isMountedRef.current) {
       isMountedRef.current = true;
       return;
@@ -662,27 +911,23 @@ export function GlobalFilterProvider({
       g_model: selectedModel,
       ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
       g_tco: tcoBasis,
-      // Don't pin the sequence to the URL until it's resolved from real
-      // availability — writing the pre-load placeholder (8k/1k) would clobber a
-      // shared `?i_seq=agentic-traces` link before the model's availability
-      // confirms it has agentic data.
+      g_chips: chipBasis,
       i_seq: sequenceResolved ? effectiveSequence : undefined,
-      // Only pin the precision in the URL once chosen explicitly; in auto mode
-      // leave it out so the link keeps following the per-model densest default.
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
-    // Keep per-model pathnames (/calculator/<slug>, /historical/<slug>) in
-    // sync with the selected model — a plain history.replaceState, so switching
-    // models updates the address bar without an App Router navigation, RSC
-    // fetch, or component remount. Null when no rewrite is needed (bare tab
-    // path on the default model stays bare).
+    // Canonicalizing a bare route and settling non-model filters also rewrite the path, but only a
+    // user's model switch is a new page.
     const pathnameRewrite = modelRoutePathnameRewrite(window.location.pathname, selectedModel);
-    if (pathnameRewrite) replaceClientPathname(pathnameRewrite);
+    if (pathnameRewrite) {
+      replaceClientPathname(pathnameRewrite, [], { pageview: userSwitchedModel });
+    }
   }, [
+    featureGateReady,
     selectedModel,
     requestedRunDate,
     requestedRunId,
     tcoBasis,
+    chipBasis,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -696,6 +941,7 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       tcoBasis,
+      chipBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -705,27 +951,63 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       tcoBasis,
+      chipBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
     ],
   );
 
+  const previewInputs = {
+    request: {
+      model: selectedModel,
+      selectedSequence,
+      sequenceExplicit,
+      selectedPrecisions,
+      precisionExplicit,
+      requestedRunDate,
+      requestedRunId,
+    },
+    availability,
+    unofficialAvailable,
+    featureGateUnlocked,
+    initialPrecisions: initialValidPrecisions,
+  };
+  const previewInputsRef = useRef(previewInputs);
+  previewInputsRef.current = previewInputs;
+  const previewFilterChange = useCallback((change: FilterChange): FilterPreview | null => {
+    const inputs = previewInputsRef.current;
+    const request = applyFilterChange(
+      { ...inputs.request, requestedRunDateExplicit: requestedRunDateExplicitRef.current },
+      change,
+      inputs,
+    );
+    return (
+      request && {
+        request,
+        selection: resolveFilterSelection(inputs.availability, request, inputs.unofficialAvailable),
+      }
+    );
+  }, []);
+
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
       setTcoBasis,
-      setSelectedModel,
+      setChipBasis,
+      setSelectedModel: selectModel,
       setSelectedSequence,
       setSelectedPrecisions,
       setSelectedRunDate: setSelectedRunDateManual,
       setSelectedRunId,
+      previewFilterChange,
     }),
     [
-      setSelectedModel,
+      selectModel,
       setSelectedSequence,
       setSelectedPrecisions,
       setSelectedRunDateManual,
       setSelectedRunId,
+      previewFilterChange,
     ],
   );
 
@@ -745,7 +1027,7 @@ export function GlobalFilterProvider({
       availableSequences,
       availablePrecisions,
       availableDates,
-      availabilityRows,
+      availability,
       availabilitySettled,
       availabilityError,
       availabilityIsError,
@@ -756,7 +1038,7 @@ export function GlobalFilterProvider({
       availableSequences,
       availablePrecisions,
       availableDates,
-      availabilityRows,
+      availability,
       availabilitySettled,
       availabilityError,
       availabilityIsError,
@@ -768,6 +1050,11 @@ export function GlobalFilterProvider({
     () => ({ availableRuns, workflowLoading, workflowError }),
     [availableRuns, workflowLoading, workflowError],
   );
+
+  // A boundary can mount this provider after its own gate has hydrated. This
+  // provider's hook still starts locked; do not mount query consumers with the
+  // temporary fallback model. Ordinary public model SSR remains unchanged.
+  if (modelGatePending) return null;
 
   return (
     <GlobalFilterActionsContext.Provider value={actionsValue}>
@@ -798,6 +1085,29 @@ export function useGlobalFilterActions() {
     throw new Error('useGlobalFilterActions must be used within a GlobalFilterProvider');
   }
   return context;
+}
+
+/**
+ * Returns a function that warms the queries a filter change leads to, before the user makes it.
+ * It warms the provider's workflow info, and `warmPage` adds the page's own queries.
+ */
+export function useWarmFilterChange(
+  warmPage?: (preview: FilterPreview, queryClient: QueryClient) => void,
+): (change: FilterChange) => void {
+  const queryClient = useQueryClient();
+  const { previewFilterChange } = useGlobalFilterActions();
+  const warmPageRef = useRef(warmPage);
+  warmPageRef.current = warmPage;
+  return useCallback(
+    (change: FilterChange) => {
+      const preview = previewFilterChange(change);
+      if (!preview) return;
+      const workflow = workflowInfoQueryOptions(preview.selection.effectiveRunDate);
+      if (workflow.enabled) void queryClient.prefetchQuery(workflow);
+      warmPageRef.current?.(preview, queryClient);
+    },
+    [queryClient, previewFilterChange],
+  );
 }
 
 export function useGlobalFilterRun() {

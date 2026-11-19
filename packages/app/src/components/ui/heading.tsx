@@ -3,25 +3,16 @@ import * as React from 'react';
 
 import { cn } from '@/lib/shared/utils';
 
-/**
- * Visual heading levels, derived from the recipes already in use across the
- * app. The rendered tag is chosen independently via `as`, so document outline
- * and visual size never fight each other. New pages should reach for this
- * instead of retyping a size/weight/tracking combo; existing headings migrate
- * as their files get touched. See docs/typography.md.
- */
 const headingVariants = cva('text-foreground', {
   variants: {
     level: {
-      /** Landing/marketing hero. */
-      display: 'text-4xl font-bold tracking-heading text-balance md:text-5xl',
-      /** Route-level page title. */
-      page: 'text-2xl lg:text-4xl font-bold tracking-tight',
-      /** Section head within a page. */
-      section: 'text-xl font-semibold',
-      /** Card or panel head. */
-      card: 'text-base font-semibold',
-      /** Dense sub-head above tables or control groups. */
+      display: 'text-4xl font-semibold tracking-heading text-balance md:text-5xl',
+      reading:
+        'text-3xl leading-tight font-semibold text-balance sm:text-4xl sm:tracking-heading lg:text-5xl lg:leading-[1.08]',
+      page: 'text-2xl font-semibold lg:text-4xl lg:tracking-heading',
+      title: 'text-xl font-semibold md:text-2xl lg:text-title',
+      section: 'text-xl font-medium',
+      card: 'text-base font-semibold leading-snug',
       label: 'text-sm font-medium',
     },
   },
@@ -36,14 +27,41 @@ function Heading({
   className,
   level,
   as: Tag = 'h2',
+  logo,
+  children,
   ...props
 }: React.ComponentProps<'h2'> &
   VariantProps<typeof headingVariants> & {
     as?: HeadingTag;
+    logo?: React.ReactNode;
   }) {
   return (
-    <Tag data-slot="heading" className={cn(headingVariants({ level, className }))} {...props} />
+    <Tag
+      data-slot="heading"
+      className={cn(headingVariants({ level, className }), logo && 'flex items-start gap-2')}
+      {...props}
+    >
+      {logo ? (
+        <>
+          <span className="flex h-lh shrink-0 items-center empty:hidden">{logo}</span>
+          <span className="min-w-0">{children}</span>
+        </>
+      ) : (
+        children
+      )}
+    </Tag>
   );
 }
 
-export { Heading, headingVariants };
+function HeadingQualifier({ children }: { children: React.ReactNode }) {
+  if (children === null || children === undefined || children === '') return null;
+  const opensWithFullwidthBracket = typeof children === 'string' && /^[（【「]/u.test(children);
+  return (
+    <>
+      {opensWithFullwidthBracket ? null : ' '}
+      <span className="mt-0.5 block text-sm font-normal text-muted-foreground">{children}</span>
+    </>
+  );
+}
+
+export { Heading, HeadingQualifier, headingVariants };

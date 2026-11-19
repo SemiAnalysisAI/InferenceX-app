@@ -27,9 +27,15 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // K3 is a new architecture (Kimi Delta Attention + Attention Residuals, 2.8T),
   // not a K2 point release, so it gets its own display bucket.
   kimik3: 'Kimi-K3',
+  // K3.1 Pro (moonshotai/Kimi-K3.1-Pro) is a separate checkpoint from K3, so it
+  // gets its own display bucket rather than folding into Kimi-K3.
+  'kimik3.1': 'Kimi-K3.1-Pro',
   'minimaxm2.5': 'MiniMax-M2.5',
   'minimaxm2.7': 'MiniMax-M2.5',
   minimaxm3: 'MiniMax-M3',
+  // M3.1-Flash keeps M3's 428B/23B MoE but ships NVFP4 experts, a QAT NVFP4 KV
+  // cache and a built-in DSpark drafter, so it gets its own display bucket.
+  minimaxm31flash: 'MiniMax-M3.1-Flash',
   glm5: 'GLM-5',
   'glm5.1': 'GLM-5',
   'glm5.2': 'GLM-5.2',
@@ -37,10 +43,14 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // under its own `glm5.3` prefix (InferenceX#3330); it shares the GLM-5.2
   // display bucket the same way glm5.1 folds into GLM-5.
   'glm5.3': 'GLM-5.2',
+  // Experimental AgentX producer identity (InferenceX#4718 / #4714), not
+  // the historical non-Flash glm5.3 alias above.
+  'glm5.3flash': 'GLM-5.3-Flash',
   dsv4: 'DeepSeek-V4-Pro',
   // V4.1-Flash is a separate CED/CSA2 architecture (552B backbone, 8B prefill /
   // 16B decode active), not a V4-Pro point release, so it gets its own bucket.
   dsv41flash: 'DeepSeek-V4.1-Flash',
+  musespark: 'Muse-Spark-Open',
 };
 
 /**
@@ -68,14 +78,15 @@ export function sequenceToIslOsl(seq: string): { isl: number; osl: number } | nu
   return map[seq] ?? null;
 }
 
+const ISL_OSL_TO_SEQUENCE: Record<string, string> = {
+  '1024_1024': '1k/1k',
+  '1024_8192': '1k/8k',
+  '8192_1024': '8k/1k',
+};
+
 /** Convert ISL/OSL in tokens to a frontend sequence string. */
 export function islOslToSequence(isl: number, osl: number): string | null {
-  const map: Record<string, string> = {
-    '1024_1024': '1k/1k',
-    '1024_8192': '1k/8k',
-    '8192_1024': '8k/1k',
-  };
-  return map[`${isl}_${osl}`] ?? null;
+  return ISL_OSL_TO_SEQUENCE[`${isl}_${osl}`] ?? null;
 }
 
 /**
@@ -122,15 +133,27 @@ export function rowToSequence(row: {
  * earliest date they actually have data for.
  */
 export const MODEL_RELEASE_DATES: Record<string, string> = {
+  // Meta's open-weight launch announcement (not the earlier closed Muse Spark service):
+  // https://research.meta.ai/blog/muse-spark-open — October 15, 2026.
+  'Muse-Spark-Open': '2026-10-15',
   // Newest first. `sweep:` is the model's "Date added" from MODELS.md — the first
   // InferenceX benchmark — recorded so the "cannot predate its own weights"
   // invariant above is checkable by eye at review time.
   //
+  // Moonshot opened the weights at moonshotai/Kimi-K3.1-Pro on 2026-11-04, the
+  // date it set at the 2026-10-23 API launch. The repo's only commit is dated
+  // 2026-11-02 04:13Z, before it went public. sweep: 2026-11-04 (InferenceX#4803)
+  // — day zero.
+  'Kimi-K3.1-Pro': '2026-11-04',
   // DeepSeek-V4.1-Flash — MIT weights published at deepseek-ai/DeepSeek-V4.1-Flash
   // on 2026-09-10 UTC (HF repo initial commit 02:17Z, tech report 05:34Z). The
   // vLLM bring-up image is tagged `deepseekv41-flash-0909`, a day earlier, but
   // that is the image build date, not the weights date. sweep: 2026-09-10 — day zero.
   'DeepSeek-V4.1-Flash': '2026-09-10',
+  // Weights published at MiniMaxAI/MiniMax-M3.1-Flash on 2026-10-23 UTC (HF
+  // "Init" commit 03:37Z), the same day as the vLLM day-0 blog post.
+  // sweep: 2026-10-23 — day zero.
+  'MiniMax-M3.1-Flash': '2026-10-23',
   // Weights published on Hugging Face 2026-07-27 under the Kimi K3 License,
   // eleven days after the 2026-07-16 product launch; the gap was to let vLLM,
   // NVIDIA and AMD prepare day-zero support. sweep: 2026-07-27 — day zero.

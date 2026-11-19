@@ -1,3 +1,4 @@
+import { videoArtifactIdentity } from './artifact-identity';
 import { at, rows, safePath, sha256, text, type Json } from './bundle';
 
 export interface CIArtifact {
@@ -45,7 +46,6 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
     if (!bytes) throw new Error(`Missing artifact file: ${path}`);
     return new Blob([new Uint8Array(bytes).buffer]);
   };
-  // Verify the outer export index and every contained source before selecting a result.
   const sums = await read('SHA256SUMS').text();
   const verified = new Set<string>();
   for (const line of sums.trim().split('\n')) {
@@ -66,9 +66,7 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
   )
     throw new Error('Missing verified archive entry point');
   const index: Json = files['index.json'] ? JSON.parse(await read('index.json').text()) : null;
-  const identity = /^h3-(?:video|results|fidelity)-(?<run>\d+)-(?<attempt>\d+)$/u.exec(
-    artifact.name,
-  )?.groups;
+  const identity = videoArtifactIdentity(artifact.name);
   if (!identity) throw new Error('Invalid H3 artifact identity');
   if (fidelity) {
     const comparison: Json = JSON.parse(await read('comparison.json').text());
@@ -117,9 +115,28 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
       };
     });
   const manifest: Json = JSON.parse(await read('manifest.json').text());
-  if (at(manifest, 'run_id') !== identity.run || at(manifest, 'run_attempt') !== identity.attempt)
-    throw new Error('Manifest and GitHub artifact identify different runs');
+  verifyManifestIdentity(manifest, artifact);
   return [
     { id: text(at(manifest, 'run_id')), read: (path: string) => Promise.resolve(read(path)) },
   ];
+}
+
+/** Binds a root manifest to the GitHub artifact name, run attempt and workflow revision. */
+export function verifyManifestIdentity(manifest: Json, artifact: CIArtifact) {
+  const identity = videoArtifactIdentity(artifact.name);
+  if (
+    !identity ||
+    at(manifest, 'run_id') !== identity.run ||
+    at(manifest, 'run_attempt') !== identity.attempt ||
+    ((identity.configuration || at(manifest, 'artifact_name') !== null) &&
+      at(manifest, 'artifact_name') !== artifact.name) ||
+    (artifact.workflow_run !== undefined &&
+      (String(artifact.workflow_run.id) !== identity.run ||
+        ((identity.configuration || at(manifest, 'ci', 'head_sha') !== null) &&
+          // A dispatched run tests ci.head_sha on the workflow at ci.workflow_sha, which GitHub reports.
+          ![at(manifest, 'ci', 'head_sha'), at(manifest, 'ci', 'workflow_sha')].includes(
+            artifact.workflow_run.head_sha,
+          ))))
+  )
+    throw new Error('Manifest and GitHub artifact identify different runs');
 }

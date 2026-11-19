@@ -1,6 +1,6 @@
 """Render the stacked revenue/profit bars for an InferenceX whitepaper.
 
-The plot reproduces the bar drawn by /profit-estimator-per-gigawatt (same
+The plot reproduces the bar drawn by /infx/profit-estimator-per-gigawatt (same
 colours, grid, bar width, label placement) so the PDF figure and the live
 dashboard look like the same chart. One PNG+SVG pair is written per scenario
 and per theme.

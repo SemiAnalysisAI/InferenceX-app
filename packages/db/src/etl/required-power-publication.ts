@@ -11,6 +11,7 @@ import { createSkipTracker } from './skip-tracker';
 import { configCacheKey } from './config-cache';
 import { powerWorkloadForScenario } from './power-publication';
 import { CHANGELOG_ARTIFACT_NAME, REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
+import { benchmarkPointKey, perJobPointKeys } from './retry-copies';
 
 type JsonRow = Record<string, unknown>;
 export interface RequiredPowerSource {
@@ -23,22 +24,14 @@ export interface CurveReplacement {
   previous_snapshot_workflow_run_id: number;
   removed_point_identities: string[];
 }
-/** The manifest's authorization to shrink a published curve: none, or exact observed losses. */
 export interface CurvePublication {
   mode: 'incremental' | 'replacement';
   replacement_scope: CurveReplacement[];
 }
-/** What a verified v2 manifest requires this ingest to publish. */
 export interface RequiredPowerScope {
-  /** Every producer-required benchmark point, mapped before run overrides. */
   points: BenchmarkParams[];
   publication: CurvePublication;
 }
-/**
- * One file the manifest may bind. Benchmark files arrive hashed with their
- * parsed rows; sidecars are hashed and re-read per verification, because the
- * extracted bundle does not change for the lifetime of this process.
- */
 interface Evidence {
   path: string;
   sha256: string;
@@ -71,23 +64,14 @@ function mappedIdentity(row: BenchmarkParams): string {
   return JSON.stringify([row.recipeFingerprint, row.conc, row.benchmarkType, row.isl, row.osl]);
 }
 
-/**
- * A purge or later ingest filter must not turn an incomplete required scope into
- * success. `before_write` runs over the planned points before the first
- * irreversible write and prevents publication; `after_insert` runs over the rows
- * actually handed to the benchmark insert and is what fails the ingest step when
- * a row was dropped on the way (a config error, a failed bulk insert). The
- * required side is the verifier's pre-correction mapped point and both retained
- * sides are post-correction, so a backfill that changes a required point's
- * identity reports it as missing.
- */
+const retainedIdentity = (row: BenchmarkParams) =>
+  JSON.stringify([configCacheKey(row.config), row.offloadMode, mappedIdentity(row)]);
+
 export function assertRequiredPowerPointsRetained(
   required: readonly BenchmarkParams[],
   retained: readonly BenchmarkParams[],
   stage: 'before_write' | 'after_insert',
 ): void {
-  const retainedIdentity = (row: BenchmarkParams) =>
-    JSON.stringify([configCacheKey(row.config), row.offloadMode, mappedIdentity(row)]);
   const present = new Map(retained.map((row) => [retainedIdentity(row), row]));
   for (const row of required) {
     const key = retainedIdentity(row);
@@ -109,7 +93,6 @@ export function assertRequiredPowerPointsRetained(
   }
 }
 
-/** The one validation of the policy; the curve check trusts this type. */
 function parsePublicationPolicy(value: unknown): CurvePublication {
   const publication = object(value, 'publication policy');
   const mode = publication.mode;
@@ -149,7 +132,6 @@ function parsePublicationPolicy(value: unknown): CurvePublication {
   return { mode, replacement_scope: replacementScope };
 }
 
-/** Validate only the producer-declared required scope; legacy optional points remain unchanged. */
 function verifyRequiredPowerBundle(
   manifestValue: unknown,
   files: readonly BenchmarkArtifactFile[],
@@ -207,12 +189,14 @@ function verifyRequiredPowerBundle(
     throw new Error('Required power: manifest has no required benchmark points');
 
   const seen = new Map<string, { row: JsonRow; path: string; point: BenchmarkParams }>();
+  const perJobPoints = perJobPointKeys(files);
   for (const file of files) {
     const inFile = new Set<string>();
+    const aggregate = !file.path.startsWith('bmk_');
     for (const { raw, mapped } of file.rows) {
       if (!mapped) continue;
+      if (aggregate && perJobPoints.has(benchmarkPointKey(mapped))) continue;
       const fingerprint = mapped.recipeFingerprint;
-      // A missing fingerprint cannot match a required point; the missing-point check fails below.
       if (typeof fingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(fingerprint)) continue;
       const key = mappedIdentity(mapped);
       if (!expected.has(key)) continue;
@@ -221,7 +205,6 @@ function verifyRequiredPowerBundle(
       inFile.add(key);
       const prior = seen.get(key);
       if (prior) {
-        // collect-results uploads exact copies of per-job rows in results_bmk.
         if (prior.path === file.path || !isDeepStrictEqual(prior.row, raw))
           throw new Error(`Required power: conflicting or duplicate point ${key} in ${file.path}`);
         continue;
@@ -256,13 +239,6 @@ function verifyRequiredPowerBundle(
   return { points: [...seen.values()].map(({ point }) => point), publication };
 }
 
-/**
- * Run before any database upsert, including workflow/config metadata writes.
- * Null means the run declares no required scope (no v2 manifest). `readFiles`
- * lends the ingest's one benchmark-artifact read; the standalone commands fall
- * back to their own read with a throwaway tracker. It is called only once a
- * manifest exists, so an ordinary run reads nothing here.
- */
 export function verifyRequiredPowerArtifacts(
   root: string,
   source: RequiredPowerSource,
@@ -327,7 +303,6 @@ export function verifyRequiredPowerArtifacts(
     }
   }
   const scope = verifyRequiredPowerBundle(manifest, files, bundle, source);
-  // Rerun-failed-jobs keeps successful points and metadata from earlier attempts of this head.
   console.log(
     `  Required power scope: run ${source.runId}, declared attempt ${manifest['run-attempt']}, ingest attempt ${source.runAttempt}`,
   );
@@ -358,12 +333,6 @@ function nonempty(value: unknown, label: string): string {
   return value;
 }
 
-/**
- * Binds each manifest point to its benchmark row and required matrix row, then
- * checks, in order: identity, topology, physical GPU count, measurement window,
- * hash-bound evidence, audit verdict, the collector's telemetry files, and
- * per-device energy.
- */
 function verifyPointEvidence(
   manifest: JsonRow,
   expected: Map<string, JsonRow>,
@@ -413,7 +382,6 @@ function verifyPointEvidence(
   }
 }
 
-/** Model, hardware, framework and precision agree across manifest, benchmark and matrix. */
 function verifyDeclaredIdentity(id: JsonRow, row: JsonRow, matrix: JsonRow, key: string): void {
   for (const [field, rawField] of [
     ['model', 'infmax_model_prefix'],
@@ -462,7 +430,6 @@ const TOPOLOGY_FIELDS = [
   'decode_dp_attention',
 ];
 
-/** The declared topology equals the benchmark row and the planned matrix parallelism. */
 function verifyDeclaredTopology(
   topology: JsonRow,
   row: JsonRow,
@@ -526,7 +493,6 @@ function verifyDeclaredTopology(
   }
 }
 
-/** The declared physical GPU count matches the matrix plan; returns it. */
 function verifyPhysicalGpuCount(topology: JsonRow, matrix: JsonRow, key: string): number {
   let plannedGpuCount = matrix['num-gpus'];
   if (matrix.prefill && matrix.decode) {
@@ -555,7 +521,6 @@ function verifyPhysicalGpuCount(topology: JsonRow, matrix: JsonRow, key: string)
   return gpuCount;
 }
 
-/** The point's declared artifacts, each hash-verified, one of which holds its benchmark row. */
 function hashBoundEvidence(
   artifacts: unknown,
   bundle: ReadonlyMap<string, Evidence>,
@@ -598,7 +563,6 @@ function oneEvidence(evidence: ReadonlyMap<string, Evidence>, name: string): Evi
   return matches[0];
 }
 
-/** The point's one power validation sidecar, valid for its window and every physical GPU. */
 function verifiedAudit(
   evidence: ReadonlyMap<string, Evidence>,
   start: number,
@@ -626,23 +590,18 @@ function verifiedAudit(
   return audit;
 }
 
-/**
- * Which collector produced the evidence. Only native per-node SMI audits name
- * their kind; central DCGM (multinode) and per-job SMI (single node) audits
- * carry none. Any other kind is a collector this verifier does not know.
- */
-type TelemetryKind = 'native_multinode' | 'central_multinode' | 'single_node';
+type TelemetryKind = 'native_multinode' | 'central' | 'single_node';
 
 function telemetryKind(audit: JsonRow, isMultinode: boolean): TelemetryKind {
   const kind = audit.telemetry_kind;
-  if (kind === undefined || kind === null) return isMultinode ? 'central_multinode' : 'single_node';
+  if (kind === undefined || kind === null)
+    return isMultinode || audit.selected_window !== undefined ? 'central' : 'single_node';
   if (kind === 'native_multinode_smi' && isMultinode) return 'native_multinode';
   throw new Error(
     `Required power: unsupported telemetry_kind ${JSON.stringify(kind)} for a ${isMultinode ? 'multinode' : 'single-node'} point`,
   );
 }
 
-/** The collector's own telemetry files are present. */
 function verifyTelemetryEvidence(
   kind: TelemetryKind,
   evidence: ReadonlyMap<string, Evidence>,
@@ -653,7 +612,7 @@ function verifyTelemetryEvidence(
       oneEvidence(evidence, 'gpu_metrics.csv');
       break;
     }
-    case 'central_multinode': {
+    case 'central': {
       oneEvidence(evidence, 'samples.csv');
       oneEvidence(evidence, 'manifest.json');
       if (
@@ -669,7 +628,6 @@ function verifyTelemetryEvidence(
   }
 }
 
-/** One complete per-node collection for each receipt, matching its hashes. */
 function verifyNativeNodeReceipts(evidence: ReadonlyMap<string, Evidence>, audit: JsonRow): void {
   if (!Array.isArray(audit.nodes) || audit.nodes.length === 0)
     throw new Error('Required power: missing native node receipts');
@@ -702,12 +660,6 @@ function verifyNativeNodeReceipts(evidence: ReadonlyMap<string, Evidence>, audit
   }
 }
 
-/**
- * The audit's per-GPU energy as `{ node, gpu_uuid, role, energy_j }`. Single-node
- * audits key energy by GPU index and name the node and UUIDs in sibling files.
- * Multinode audits key it by `node/uuid` with `per_gpu_role`, or by UUID alone for
- * native collection, whose receipts name each UUID's node.
- */
 function auditDevices(
   kind: TelemetryKind,
   audit: JsonRow,
@@ -749,7 +701,6 @@ function auditDevices(
   });
 }
 
-/** GPU index → UUID from the point's one identity file, CSV or JSON. */
 function physicalGpuUuids(evidence: ReadonlyMap<string, Evidence>): Map<string, string> {
   const identityFiles = [...evidence.values()].filter((file) =>
     /^(?:gpu_metrics_identity\.csv|gpu_metrics_devices\.json)$/u.test(
@@ -800,10 +751,6 @@ function physicalGpuUuids(evidence: ReadonlyMap<string, Evidence>): Map<string, 
   return new Map(uuidRows);
 }
 
-/**
- * Every declared GPU is a distinct audited device, the devices span the planned
- * nodes and roles, and their energy sums to the benchmark row's totals.
- */
 function verifyDeviceEnergy(
   declaredDevices: unknown,
   audited: readonly JsonRow[],
@@ -849,7 +796,17 @@ function verifyDeviceEnergy(
     if (!audited.some((actual) => isDeepStrictEqual(actual, device)))
       throw new Error(`Required power: physical GPU evidence differs from audit for ${key}`);
   }
-  if (nodes.size !== (matrix['node-count'] ?? 1))
+  const scheduledNodes = positive(matrix['node-count'] ?? 1, 'scheduled node count');
+  const computeNodes =
+    matrix['compute-node-count'] === undefined
+      ? scheduledNodes
+      : positive(matrix['compute-node-count'], 'compute node count');
+  if (
+    !Number.isSafeInteger(scheduledNodes) ||
+    !Number.isSafeInteger(computeNodes) ||
+    computeNodes > scheduledNodes ||
+    nodes.size !== computeNodes
+  )
     throw new Error(
       `Required power: participating node count differs from required matrix for ${key}`,
     );

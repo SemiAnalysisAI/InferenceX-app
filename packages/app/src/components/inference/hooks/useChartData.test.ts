@@ -16,6 +16,7 @@ import {
   derivedModeRoofline,
   flipRooflineDirection,
   supportsPointTokenMetric,
+  withUncachedQualifier,
 } from './useChartData';
 
 interface DedupeInput {
@@ -58,9 +59,6 @@ describe('dedupeRowsToLatestPerConfig', () => {
   });
 
   it('keeps BOTH offload variants even when they were ingested on different dates', () => {
-    // The regression: offload=on sweep landed LATER than offload=off. Without
-    // offload in the key, the on-variant's newer date would win the shared group
-    // and silently drop the (older) off-variant series entirely.
     const rows = [
       drow({ id: 1, offload_mode: 'off', date: '2026-06-01' }),
       drow({ id: 2, offload_mode: 'on', date: '2026-06-05' }),
@@ -86,8 +84,6 @@ describe('dedupeRowsToLatestPerConfig', () => {
   });
 
   it('normalizes a missing offload_mode to "off" (matches the SQL lineKey)', () => {
-    // A row with no offload_mode collides with an explicit offload=off row of the
-    // same config — both are the "off" series, so latest-date dedup applies.
     const rows = [
       drow({ id: 1, offload_mode: undefined, date: '2026-06-01' }),
       drow({ id: 2, offload_mode: 'off', date: '2026-06-03' }),
@@ -469,7 +465,6 @@ describe('applyAgenticPercentileToXLabel', () => {
   });
 
   it('does not touch mid-label statistic words', () => {
-    // Only a LEADING statistic word is a prefix; words later in the label are content.
     expect(applyAgenticPercentileToXLabel('Normalized E2E @ 400 output tokens (s)', 'P90')).toBe(
       'P90 Normalized E2E @ 400 output tokens (s)',
     );
@@ -490,10 +485,6 @@ describe('flipRooflineDirection', () => {
 });
 
 describe('derived higher-is-better x-axis rooflines', () => {
-  // The E2E Normalized Interactivity mode renders on the e2e chart definition (lower-x-is-better)
-  // but its x-axis is higher-is-better, like interactivity. ChartDisplay
-  // therefore mirrors each configured e2e corner horizontally rather than
-  // hardcoding one corner.
   it('mirroring the e2e corner reproduces the interactivity corner for every y-metric', () => {
     const defs = chartDefinitions as Record<string, unknown>[];
     const e2e = defs.find((d) => d.chartType === 'e2e')!;
@@ -591,13 +582,6 @@ const scopePoint = (hwKey: string, extra: Record<string, unknown> = {}): Inferen
   }) as unknown as InferenceData;
 
 describe('applyScopeFilters', () => {
-  // The legend's selection universe is built from this filter chain. It must
-  // depend on the GPU picker / quick filters / compare scope and on nothing
-  // else — in particular NOT on which y-axis metric is drawn. See the
-  // `selectionPoints` comment in useChartData: reconcileActiveSet intersects
-  // the user's legend selection with whatever set it is handed and never
-  // re-widens, so a universe that shrinks when a Measured Energy axis is
-  // picked deletes the telemetry-less configs for good.
   const withTelemetry = scopePoint('b200_sglang', {
     measuredAvgPower: { y: 900, roof: false },
   });
@@ -631,23 +615,63 @@ describe('applyScopeFilters', () => {
 });
 
 describe('supportsPointTokenMetric', () => {
-  it('uses the source snapshot date when a curve is stamped with the selected display date', () => {
-    const julyRubin = scopePoint('vr200_rubin-july', {
-      date: '2026-08-22',
-      actualDate: '2026-07-01',
+  it('limits a point without stored total throughput to output-token metrics', () => {
+    const outputOnly = scopePoint('vr200_rubin-july', {
+      rawMetricKeys: ['output_tput_per_gpu', 'median_intvty'],
     });
 
-    expect(supportsPointTokenMetric(julyRubin, 'output')).toBe(true);
-    expect(supportsPointTokenMetric(julyRubin, 'total')).toBe(false);
-    expect(supportsPointTokenMetric(julyRubin, 'input')).toBe(false);
+    expect(supportsPointTokenMetric(outputOnly, 'output')).toBe(true);
+    expect(supportsPointTokenMetric(outputOnly, 'total')).toBe(false);
+    expect(supportsPointTokenMetric(outputOnly, 'input')).toBe(false);
   });
 
-  it('does not restrict future Vera Rubin snapshots without capability metadata', () => {
-    const futureRubin = scopePoint('vr200_rubin-july', {
-      date: '2026-10-01',
-      actualDate: '2026-09-01',
+  it('does not restrict points that store total throughput', () => {
+    const full = scopePoint('vr200_rubin-july', {
+      rawMetricKeys: ['tput_per_gpu', 'output_tput_per_gpu', 'median_intvty'],
     });
 
-    expect(supportsPointTokenMetric(futureRubin, 'total')).toBe(true);
+    expect(supportsPointTokenMetric(full, 'total')).toBe(true);
+    expect(supportsPointTokenMetric(full, 'input')).toBe(true);
+  });
+
+  it('does not restrict points that report no throughput at all', () => {
+    const powerOnly = scopePoint('b200_sglang', { rawMetricKeys: ['median_intvty'] });
+
+    expect(supportsPointTokenMetric(powerOnly, 'total')).toBe(true);
+  });
+});
+
+describe('withUncachedQualifier', () => {
+  it('renames total and unqualified token nouns to uncached suffix + output tokens', () => {
+    expect(withUncachedQualifier('Total Tokens per $1 TCO (tok/$)', 'en')).toBe(
+      'Uncached Suffix + Output Tokens per $1 TCO (tok/$)',
+    );
+    expect(withUncachedQualifier('Token Throughput per Chip', 'en')).toBe(
+      'Uncached Suffix + Output Token Throughput per Chip',
+    );
+    expect(withUncachedQualifier('Cost per Million Total Tokens ($)', 'en')).toBe(
+      'Cost per Million Uncached Suffix + Output Tokens ($)',
+    );
+    expect(withUncachedQualifier('Measured Joules per Token (incl. prompt)', 'en')).toBe(
+      'Measured Joules per Uncached Suffix + Output Token',
+    );
+  });
+
+  it('renames input-only token nouns to uncached suffix input tokens', () => {
+    expect(withUncachedQualifier('Input Token Throughput per Chip', 'en')).toBe(
+      'Uncached Suffix Input Token Throughput per Chip',
+    );
+  });
+
+  it('renames Chinese labels', () => {
+    expect(withUncachedQualifier('每 1 美元 TCO 对应的总 token 数（tok/$）', 'zh')).toBe(
+      '每 1 美元 TCO 对应的未缓存 suffix + 输出 token 数（tok/$）',
+    );
+    expect(withUncachedQualifier('每芯片 token 吞吐量（tok/s/chip）', 'zh')).toBe(
+      '每芯片 未缓存 suffix + 输出 token 吞吐量（tok/s/chip）',
+    );
+    expect(withUncachedQualifier('每芯片输入 token 吞吐量', 'zh')).toBe(
+      '每芯片未缓存 suffix 输入 token 吞吐量',
+    );
   });
 });

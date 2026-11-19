@@ -1,10 +1,5 @@
+import { availabilityBody } from '../support/e2e';
 import { assertShareLinkParams } from '../support/share-link';
-
-// The Measured Power "Timeline" display (`y_measuredPowerTimeline`) restores its
-// shared view on a `?unofficialrun=` trace. Intercepted rows carry the
-// `power_audit.source` / `run_url` provenance that names each point's
-// `gpu_metrics_*` artifact; `/api/gpu-metrics?series=power` returns matching
-// one-second series.
 
 const MODEL = 'dsv4';
 const DATE = '2026-09-01';
@@ -14,7 +9,6 @@ const OVERLAY_RUN_ID = '31415926535';
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 const START_MS = Date.UTC(2026, 8, 1, 20, 0, 0);
 
-/** conc, interactivity (tok/s/user), output tok/s per GPU, measured W per GPU */
 const CONFIGS: [number, number, number, number][] = [
   [16, 90, 200, 500],
   [64, 60, 400, 600],
@@ -113,11 +107,14 @@ const availability = [
 ];
 
 function interceptRows() {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: rows(RUN_URL, 'b200') }).as('benchmarks');
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
   cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
     body: seriesFor('b200', RUN_URL, RUN_ID),
   }).as('series');
@@ -150,10 +147,10 @@ function interceptOverlay() {
 
 function visitChart(extraParams: string) {
   interceptRows();
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
+  cy.visit(`/pwx?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
@@ -167,6 +164,21 @@ describe('PowerX measured power timeline', () => {
         return false;
       }
     });
+  });
+
+  it('moves old /powerx links to /pwx with the query intact', () => {
+    interceptRows();
+    cy.visit('/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      },
+    });
+    cy.location().should((location) => {
+      expect(location.pathname).to.eq('/pwx');
+      expect(location.search).to.eq('?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4');
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 
   it('restores the shared serving-window view and focus on an unofficial trace', () => {
@@ -185,6 +197,8 @@ describe('PowerX measured power timeline', () => {
     );
     cy.get('path.power-trace[data-segment="full"]').should('not.exist');
     cy.get('path.power-trace[data-run-index="0"][data-segment="window"]').should('exist');
+    // PowerX shows no interaction hint under the timeline.
+    cy.contains('p', 'pin tooltip').should('not.exist');
     assertShareLinkParams({
       i_metric: 'y_measuredPowerTimeline',
       i_ptaxis: 'serving',

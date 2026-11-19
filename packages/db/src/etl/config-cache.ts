@@ -1,10 +1,3 @@
-/**
- * Config dimension cache.
- * `createConfigCache(sql)` returns `getOrCreateConfig`, `preloadConfigs`, and a `size` getter.
- * The in-memory cache avoids redundant DB round-trips when the same config appears
- * across many artifacts in a single run.
- */
-
 import type postgres from 'postgres';
 import type { DbClient } from '../connection.js';
 
@@ -30,14 +23,6 @@ export interface ConfigParams {
   numDecodeGpu: number;
 }
 
-/**
- * Derive a stable string cache key from all config dimensions.
- * The key is a colon-joined concatenation of every field in declaration order,
- * matching the DB unique constraint on the `configs` table.
- *
- * @param p - Config parameter object.
- * @returns A deterministic string key suitable for use in a `Map`.
- */
 export function configCacheKey(p: ConfigParams): string {
   return [
     p.hardware,
@@ -60,7 +45,6 @@ export function configCacheKey(p: ConfigParams): string {
   ].join(':');
 }
 
-/** The cache key of one stored `configs` row. */
 export function configKeyFromRow(row: Record<string, unknown>): string {
   return configCacheKey({
     hardware: row.hardware as string,
@@ -83,10 +67,6 @@ export function configKeyFromRow(row: Record<string, unknown>): string {
   });
 }
 
-/**
- * Every stored config id by cache key, read from the table on each call; the
- * preload and the read-only preflight each take their own snapshot.
- */
 export async function loadConfigIds(sql: Sql | DbClient): Promise<Map<string, number>> {
   const rows = await sql`
     select id, hardware, framework, model, precision, spec_method,
@@ -99,26 +79,9 @@ export async function loadConfigIds(sql: Sql | DbClient): Promise<Map<string, nu
   return new Map(rows.map((row) => [configKeyFromRow(row), Number(row.id)]));
 }
 
-/**
- * Create an in-memory config cache backed by the `configs` DB table.
- *
- * @param sql - Active `postgres` connection used for upserts and preload queries.
- * @returns An object with:
- *   - `getOrCreateConfig` — resolve or upsert a config row and return its id.
- *   - `preloadConfigs` — bulk-load all existing configs into the cache at startup.
- *   - `size` — getter returning the current number of cached entries.
- */
 export function createConfigCache(sql: Sql) {
   const cache = new Map<string, number>();
 
-  /**
-   * Return the DB id for a config, upserting a new row if the combination of
-   * dimensions does not yet exist. Results are cached in memory so repeated
-   * calls for the same config skip the DB round-trip entirely.
-   *
-   * @param p - All config dimensions describing a benchmark run.
-   * @returns The `configs.id` primary key for this combination of dimensions.
-   */
   async function getOrCreateConfig(p: ConfigParams): Promise<number> {
     const key = configCacheKey(p);
     if (cache.has(key)) return cache.get(key)!;
@@ -152,11 +115,6 @@ export function createConfigCache(sql: Sql) {
     return row.id;
   }
 
-  /**
-   * Bulk-load all existing `configs` rows into the in-memory cache.
-   * Call this once at startup so that re-runs of the ingest script skip every
-   * config upsert round-trip for data that is already in the DB.
-   */
   async function preloadConfigs(): Promise<void> {
     for (const [key, id] of await loadConfigIds(sql)) cache.set(key, id);
   }

@@ -29,7 +29,7 @@ tags:
 
 考虑到上述特征，对这类工作负载做基准测试，与现有的固定序列长度基准测试有本质区别。
 
-由于 prefix 复用比例极高，KV tensor 必须在节点与 rank 之间高效传输，这正是 NIXL、MORI-IO 和 [Mooncake](/zh/agentx/optimizations/mooncake) 这类传输层要解决的问题。随后还需要把不同对话路由到其 prefix 所在的节点或 rank，以最大化 cache 命中率，llm-d、[Dynamo](/zh/agentx/optimizations/dynamo) 以及 vLLM 与 SGLang 的 router 承担的就是这项工作。长上下文对话会给 KV cache 的 HBM 容量带来压力，迫使 KV tensor offload 到 DRAM、SSD 等更慢的存储层级，而这一过程同样需要高效实现——Mooncake Store、[LMCache](/zh/agentx/optimizations/lmcache)、vLLM 的 CPU offloading 与 SGLang HiCache 都在攻克这一层。
+由于 prefix 复用比例极高，KV tensor 必须在节点与 rank 之间高效传输，这正是 NIXL、MORI-IO 和 [Mooncake](/zh/infx/agentx/optimizations/mooncake) 这类传输层要解决的问题。随后还需要把不同对话路由到其 prefix 所在的节点或 rank，以最大化 cache 命中率，llm-d、[Dynamo](/zh/infx/agentx/optimizations/dynamo) 以及 vLLM 与 SGLang 的 router 承担的就是这项工作。长上下文对话会给 KV cache 的 HBM 容量带来压力，迫使 KV tensor offload 到 DRAM、SSD 等更慢的存储层级，而这一过程同样需要高效实现——Mooncake Store、[LMCache](/zh/infx/agentx/optimizations/lmcache)、vLLM 的 CPU offloading 与 SGLang HiCache 都在攻克这一层。
 
 与之相对的是固定序列长度的单轮工作负载：prefix 复用在其中并不相关，推理性能主要反映芯片与 kernel 的基础表现。这并不意味着 InferenceX 上大量的固定序列长度数据不重要。剥离 agentic 推理服务的复杂性之后，这些数据能清晰呈现底层推理优化的进展，也构成了解读 AgentX 结果时所依据的基线。
 
@@ -44,13 +44,15 @@ tags:
 
 缺少这些 header，一个扇出 N 个并发 subagent 的会话就与 N 个互不相关的对话无法区分，塑造[回放图](/zh/glossary/trace-replay)的 spawn 与 join 依赖关系也就无从还原。
 
-完整的数据集规则、分布图与来源链接发布在 [AgentX 方法论](/zh/agentx/methodology)页面；该工作负载已经暴露出的具体引擎改进，则记录在 [AgentX 优化追踪页](/zh/agentx/optimizations)。
+完整的数据集规则、分布图与来源链接发布在 [AgentX 方法论](/zh/infx/agentx/methodology)页面；该工作负载已经暴露出的具体引擎改进，则记录在 [AgentX 优化追踪页](/zh/infx/agentx/optimizations)。
 
 ## 致谢
 
 感谢 Anthropic 团队在 Claude Code 中落地 agent 身份标识 header，也感谢 Qwen-Bailian 与 AIPerf 背后的阿里巴巴与 NVIDIA 团队——AgentX 的回放流水线正建立在他们的工作之上。
 
-<DashboardCTA href="/zh/inference?i_seq=agentic-traces">对比实时 AgentX 推理结果 →</DashboardCTA>
+<DashboardCTA href="/zh/infx/inference?i_seq=agentic-traces">
+  对比实时 AgentX 推理结果 →
+</DashboardCTA>
 
 ## 常见问题
 

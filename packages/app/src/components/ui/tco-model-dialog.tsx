@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
@@ -33,7 +34,7 @@ const STRINGS = {
     locked: 'Locked',
     title: (tier: string) => `${tier} pricing is in the ${TCO_MODEL_TITLE}`,
     lead: (tier: string) =>
-      `InferenceX publishes two TCO tiers: Owning at Large Hyperscaler Volume and Rent - 3 Year Commit. ${tier} and the other rental terms come from the same source, the SemiAnalysis ${TCO_MODEL_TITLE}.`,
+      `InferenceX publishes two TCO tiers: Owning at Large Hyperscaler Volume and Rent – 3-Year Commit. ${tier} and the other rental terms come from the same source, the SemiAnalysis ${TCO_MODEL_TITLE}.`,
     includesHeading: 'What the model covers',
     includes: [
       'Current market GPU rental prices and their variation across on-demand, 1 month, 6 month, 1 year, 2 year and 3 year terms.',
@@ -51,7 +52,7 @@ const STRINGS = {
     locked: '已锁定',
     title: (tier: string) => `${tier}价格包含在 ${TCO_MODEL_TITLE} 中`,
     lead: (tier: string) =>
-      `InferenceX 公开两档 TCO：自有（超大规模云大批量）与租赁 - 3 年承诺。${tier}及其他租赁期限的价格来自同一来源：SemiAnalysis ${TCO_MODEL_TITLE}。`,
+      `InferenceX 公开两档 TCO：“自有 · 超大规模云厂商批量采购”和“租赁 - 3 年承诺”。${tier}及其他租赁期限的价格来自同一来源：SemiAnalysis ${TCO_MODEL_TITLE}。`,
     includesHeading: '模型包含的内容',
     includes: [
       '当前市场 GPU 租赁价格及其在按需、1 个月、6 个月、1 年、2 年和 3 年期限之间的差异。',
@@ -66,7 +67,6 @@ const STRINGS = {
   },
 } as const;
 
-/** Trailing lock glyph for selector options whose pricing lives in the TCO model. */
 export function LockedTierBadge({ className }: { className?: string }) {
   const t = STRINGS[useLocale()];
   return (
@@ -82,17 +82,11 @@ export function LockedTierBadge({ className }: { className?: string }) {
 }
 
 interface TcoModelDialogProps {
-  /** Tier the reader clicked; null keeps the dialog closed. */
   tier: LockedRentTier | null;
   onClose: () => void;
-  /** Analytics surface, e.g. "yaxis_metric" or "profit_cost_provider". */
   source: string;
 }
 
-/**
- * Modal that opens when a locked rental tier is picked. It plugs the
- * SemiAnalysis AI Cloud TCO Model, where those rental rates are published.
- */
 export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -102,7 +96,7 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
     <Dialog open={tier !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-xl" data-testid="tco-model-dialog">
         <DialogHeader>
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Lock aria-hidden="true" className="size-3.5" />
             SemiAnalysis
           </div>
@@ -118,7 +112,7 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
           </ul>
           <p className="text-muted-foreground">{t.delivery}</p>
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
             {t.dismiss}
           </Button>
@@ -142,17 +136,13 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
   );
 }
 
-/**
- * State for a selector that mixes real options with locked rental tiers.
- * `interceptLocked(value)` returns true (and opens the dialog) when the value
- * is a locked tier, so callers can bail before writing to their own state.
- */
 export function useLockedTierDialog(source: string): {
   lockedTier: LockedRentTier | null;
   interceptLocked: (value: string) => boolean;
   dialog: ReactNode;
 } {
   const [lockedTier, setLockedTier] = useState<LockedRentTier | null>(null);
+  useDialogCloseTracking(lockedTier !== null, 'tco_model_dialog_closed', { source });
   const interceptLocked = useCallback(
     (value: string) => {
       const tier = parseLockedTierValue(value);
@@ -171,10 +161,6 @@ export function useLockedTierDialog(source: string): {
   };
 }
 
-/**
- * Locked rental tiers shaped as `MultiSelect` options for the calculator
- * Cost Provider selectors. The caller runs `interceptLocked` in `onChange`.
- */
 export function lockedCostProviderOptions(locale: Locale): {
   value: string;
   label: string;

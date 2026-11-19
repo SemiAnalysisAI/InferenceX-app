@@ -140,7 +140,6 @@ describe('diff', () => {
 
     const snap = tracker.snapshot();
 
-    // Simulate processing more rows
     tracker.skips.unmappedModel += 3;
     tracker.skips.unmappedHw += 2;
     tracker.skips.noIslOsl += 1;
@@ -174,7 +173,6 @@ describe('diff', () => {
 
     const snap = tracker.snapshot();
 
-    // Add the same ones again — they should not appear as new
     tracker.unmappedModels.add('old');
     tracker.unmappedHws.add('old-hw');
 
@@ -191,12 +189,12 @@ const jsonbLimit = () =>
   );
 
 describe('database write warning rules', () => {
-  it('records trace_replay at the Postgres size limit as a warning', () => {
+  it('fails ingestion when trace storage still exceeds a Postgres size limit', () => {
     const tracker = createSkipTracker();
     tracker.recordDbError('trace_replay', 'dsv41flash conc 4096', jsonbLimit());
-    expect(tracker.skips.dbError).toBe(0);
-    expect(tracker.dbWriteErrors).toEqual([]);
-    expect(tracker.dbWriteWarnings).toEqual([
+    expect(tracker.skips.dbError).toBe(1);
+    expect(tracker.dbWriteWarnings).toEqual([]);
+    expect(tracker.dbWriteErrors).toEqual([
       {
         kind: 'trace_replay',
         subject: 'dsv41flash conc 4096',

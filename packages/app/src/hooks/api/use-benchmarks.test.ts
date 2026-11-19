@@ -180,5 +180,35 @@ describe('benchmarkQueryOptions', () => {
       expect(opts.placeholderData?.(rows, prevQuery)).toBeUndefined();
       expect(opts.placeholderData?.(rows, undefined)).toBeUndefined();
     });
+
+    it('drops placeholder rows from a differently scoped key such as a one-sequence seed', () => {
+      const seedQuery = { queryKey: [...prevQuery.queryKey, 'scope', 'compare:a:b:1k/8k'] };
+      const fullModel = benchmarkQueryOptions(
+        'DeepSeek-R1-0528',
+        '2026-03-01',
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+      expect(fullModel.placeholderData?.(rows, seedQuery)).toBeUndefined();
+      const sameScope = benchmarkQueryOptions(
+        'DeepSeek-R1-0528',
+        '2026-03-08',
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'compare:a:b:1k/8k',
+        true,
+      );
+      expect(sameScope.placeholderData?.(rows, seedQuery)).toBe(rows);
+    });
   });
 });

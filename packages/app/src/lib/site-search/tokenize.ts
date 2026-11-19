@@ -1,17 +1,3 @@
-/**
- * Tokenizer for the in-browser site search.
- *
- * Latin text is lower-cased, accent-folded, split on non-alphanumerics and
- * reduced with a small suffix stemmer so "benchmarks", "benchmarking" and
- * "benchmarked" share one term. Hardware and model identifiers keep their
- * digits ("mi355x", "gb200", "fp8"), and dotted versions are joined
- * ("v4.1" -> "v41", "k2.6" -> "k26") because that is how they appear in slugs.
- *
- * CJK runs have no word boundaries, so they are indexed as overlapping
- * character bigrams (plus the single character for one-character runs), the
- * standard dictionary-free approach for Chinese full-text search.
- */
-
 const CJK_RANGE = /[\u3400-\u9FFF\uF900-\uFAFF]/u;
 const TOKEN_PATTERN = /[\p{Script=Han}]+|[\p{L}\p{N}]+(?:\.[\p{N}]+)*/gu;
 
@@ -44,9 +30,7 @@ const STOP_WORDS = new Set([
   'with',
 ]);
 
-/** Light English suffix stripping; deliberately conservative for identifiers. */
 export function stem(word: string): string {
-  // Identifiers with digits (h100, fp8, gb300, 8k1k) are never stemmed.
   if (word.length <= 3 || /\d/u.test(word)) return word;
   let w = word;
   if (w.endsWith('ies') && w.length > 4) w = `${w.slice(0, -3)}y`;
@@ -69,10 +53,6 @@ function cjkBigrams(run: string): string[] {
   return out;
 }
 
-/**
- * Split text into normalized search terms. Stop words are dropped unless
- * `keepStopWords` is set (used for phrase snippets).
- */
 export function tokenize(text: string, keepStopWords = false): string[] {
   const normalized = text
     .normalize('NFKD')

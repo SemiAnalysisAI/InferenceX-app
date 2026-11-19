@@ -1,16 +1,16 @@
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 
+import type { Locale } from '@/lib/i18n/i18n';
+
 import type { ComparisonModel } from '../compare/model';
 
-/** One dashboard visualization; `viz/index.ts` lists the ones the page shows. */
 export interface VizDefinition {
-  /** Stable id, used for the card's test id. */
   id: string;
-  title: string;
+  title: Record<Locale, string>;
   ops: ComparisonOp[];
-  /** Spans the full row instead of half of it. */
   wide?: boolean;
-  /** Compares against the baseline GPU; hidden when none is picked. */
+  /** Desktop columns out of 12 when paired with another card; the partner takes the rest. */
+  span?: 5 | 6 | 7;
   needsBaseline?: boolean;
   Component: (props: { model: ComparisonModel }) => React.ReactNode;
 }

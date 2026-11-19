@@ -3,7 +3,6 @@
 import { useState } from 'react';
 
 export const SPLASHES = [
-  'AgentX is here!!',
   'Now with more tokens!',
   'Chip go brrr!',
   'Also try SGLang!',

@@ -1,15 +1,14 @@
 import type * as d3 from 'd3';
+import { scaleLinear } from 'd3';
 
 import { formatNumber } from '@/lib/shared/utils';
 
-// Point shape constants
-export const POINT_SIZE = 3.5; // Base size (radius for circle, half-width/height for rectangle)
-export const HOVER_POINT_SIZE = 6; // Hover size
-export const STROKE_WIDTH = 0; // Normal stroke width
-export const HOVER_STROKE_WIDTH = 0; // Hover stroke width
-export const HIT_AREA_RADIUS = 12; // Invisible hit area for easier interaction
+export const POINT_SIZE = 3.5;
+export const HOVER_POINT_SIZE = 6;
+export const STROKE_WIDTH = 0;
+export const HOVER_STROKE_WIDTH = 0;
+export const HIT_AREA_RADIUS = 12;
 
-// Triangle path for BF16 precision
 const TRIANGLE_SIZE = 5;
 const TRIANGLE_HOVER_SIZE = 7;
 const getTrianglePath = (size: number) => {
@@ -17,17 +16,14 @@ const getTrianglePath = (size: number) => {
   return `M 0 ${(-h * 2) / 3} L ${size} ${Number(h) / 3} L ${-size} ${Number(h) / 3} Z`;
 };
 
-// Diamond path for INT4 precision
 const DIAMOND_SIZE = 5;
 const DIAMOND_HOVER_SIZE = 7;
 const getDiamondPath = (size: number) => `M 0 ${-size} L ${size} 0 L 0 ${size} L ${-size} 0 Z`;
 
 export type ShapeKey = 'circle' | 'square' | 'triangle' | 'diamond';
 
-// Shape assignment order: first selected precision gets circle, second square, etc.
 export const SHAPE_ORDER: readonly ShapeKey[] = ['circle', 'square', 'triangle', 'diamond'];
 
-// Shape configuration keyed by shape name (not precision).
 export const SHAPE_CONFIG = {
   circle: {
     type: 'circle' as const,
@@ -81,11 +77,6 @@ export const SHAPE_CONFIG = {
   },
 };
 
-/**
- * Resolve a precision's shape based on its position in the selectedPrecisions list.
- * First selected → circle, second → square, third → triangle, fourth → diamond.
- * Precisions not in the list (or beyond the 4th slot) fall back to circle.
- */
 export const getShapeKeyForPrecision = (
   precision: string,
   selectedPrecisions: readonly string[],
@@ -97,11 +88,6 @@ export const getShapeKeyForPrecision = (
 
 export const getShapeConfig = (shapeKey: ShapeKey) => SHAPE_CONFIG[shapeKey];
 
-/**
- * The normal-state attributes of a shape, stringified exactly as `.attr()`
- * would write them. Mirrors `applyNormalState` (a parity test pins the two together) for callers
- * that write only changed attributes (`syncPointShape`).
- */
 export const normalStateAttrs = (shapeKey: ShapeKey): [string, string][] => {
   const config = getShapeConfig(shapeKey);
   if (config.type === 'path') {
@@ -125,7 +111,6 @@ export const normalStateAttrs = (shapeKey: ShapeKey): [string, string][] => {
   ];
 };
 
-// Helper function to apply normal state attributes to a shape
 export const applyNormalState = (
   shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,
   shapeKey: ShapeKey,
@@ -149,7 +134,6 @@ export const applyNormalState = (
   }
 };
 
-// Helper function to apply hover state attributes to a shape
 export const applyHoverState = (
   shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,
   shapeKey: ShapeKey,
@@ -174,6 +158,9 @@ export const applyHoverState = (
 };
 
 export const formatLargeNumber = (value: number): string => {
+  if (Math.abs(value) >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(value % 1_000_000_000 === 0 ? 0 : 1)}B`;
+  }
   if (Math.abs(value) >= 1_000_000) {
     return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
   }
@@ -184,10 +171,12 @@ export const formatLargeNumber = (value: number): string => {
   return Number(value.toFixed(Math.abs(value) >= 10 ? 1 : 2)).toString();
 };
 
-/**
- * Log scale label formatter for D3 axes.
- * Shows all labels when zoomed in (logRange < 2), only powers of 10 when zoomed out.
- */
+export const compactAxisTickFormat = (domain: readonly number[]) => {
+  const max = scaleLinear().domain(domain).nice().domain()[1];
+  if (Math.abs(max) < 1_000_000_000) return formatLargeNumber;
+  return (value: number) => (value === 0 ? '0' : `${Number((value / 1_000_000_000).toFixed(2))}B`);
+};
+
 export const logTickFormat = (scale: d3.ScaleLogarithmic<number, number>) => {
   const [min, max] = scale.domain();
   const logRange = Math.log10(max) - Math.log10(min);
@@ -198,10 +187,6 @@ export const logTickFormat = (scale: d3.ScaleLogarithmic<number, number>) => {
   };
 };
 
-/**
- * Gets theme colors from CSS variables for chart styling.
- * Also returns rootStyles for additional dynamic color lookups.
- */
 export const getChartThemeColors = () => {
   if (typeof document === 'undefined') {
     return {

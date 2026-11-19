@@ -37,9 +37,6 @@ function makeReq(overrides: Partial<SessionRequest> = {}): SessionRequest {
   };
 }
 
-// ---------------------------------------------------------------------------
-// buildStatRows
-// ---------------------------------------------------------------------------
 describe('buildStatRows', () => {
   it('returns empty array for empty input', () => {
     expect(buildStatRows([])).toEqual([]);
@@ -196,18 +193,15 @@ describe('buildStatRows', () => {
 
     expect(rows).toHaveLength(3);
 
-    // First: main turn 1
     expect(rows[0].kind).toBe('main');
     expect(rows[0].turn).toBe(1);
 
-    // Second: subagent_group turn 2 (two haiku requests merged)
     expect(rows[1].kind).toBe('subagent_group');
     expect(rows[1].turn).toBe(2);
     const group = rows[1] as StatRow & { kind: 'subagent_group' };
     expect(group.requestCount).toBe(2);
     expect(group.label).toBe('Subagent (Haiku)');
 
-    // Third: main turn 3
     expect(rows[2].kind).toBe('main');
     expect(rows[2].turn).toBe(3);
   });
@@ -312,18 +306,17 @@ describe('buildStatRows', () => {
       makeReq({
         id: 'h1',
         model: 'claude-haiku-4-5-20251001',
-        outputTokens: 51, // 50 intervals
+        outputTokens: 51,
         tpotMs: 10,
       }),
       makeReq({
         id: 'h2',
         model: 'claude-haiku-4-5-20251001',
-        outputTokens: 101, // 100 intervals
+        outputTokens: 101,
         tpotMs: 20,
       }),
     ]);
     const group = rows[0] as StatRow & { kind: 'subagent_group' };
-    // weighted: (10 * 50 + 20 * 100) / (50 + 100) = 2500 / 150 ≈ 16.67
     expect(group.tpotMs).toBeCloseTo(2500 / 150);
   });
 

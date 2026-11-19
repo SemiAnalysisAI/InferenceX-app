@@ -4,10 +4,6 @@ import {
   stripSystemReminders,
 } from '@/components/agentic-workload-explorer/conversation-view';
 
-// ---------------------------------------------------------------------------
-// extractTextFromContent
-// ---------------------------------------------------------------------------
-
 describe('extractTextFromContent', () => {
   it('returns empty string for undefined', () => {
     expect(extractTextFromContent(undefined)).toBe('');
@@ -76,10 +72,6 @@ describe('extractTextFromContent', () => {
     expect(extractTextFromContent(content as never)).toBe('{"nested":true}');
   });
 });
-
-// ---------------------------------------------------------------------------
-// stripSystemReminders
-// ---------------------------------------------------------------------------
 
 describe('stripSystemReminders', () => {
   it('returns text unchanged when no system-reminder tags', () => {

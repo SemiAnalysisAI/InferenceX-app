@@ -33,17 +33,24 @@ describe('parseEmbedOptions', () => {
       theme: 'dark',
       sequence: undefined,
       yAxisMetric: 'y_tpPerGpu',
+      chipBasis: 'pool',
     });
   });
 
+  it('reads the chip basis from chips or the dashboard g_chips param', () => {
+    expect(parseEmbedOptions({ chips: 'total' }).chipBasis).toBe('total');
+    expect(parseEmbedOptions({ g_chips: 'TOTAL' }).chipBasis).toBe('total');
+    expect(parseEmbedOptions({ chips: 'pool', g_chips: 'total' }).chipBasis).toBe('pool');
+    expect(parseEmbedOptions({ chips: 'decode' }).chipBasis).toBe('pool');
+  });
+
   it('locks to the requested framework families and drops unknown ones', () => {
-    // The lock is what keeps a vLLM-hosted embed from ever plotting another
-    // engine, so unknown keys must not silently widen it.
     expect(parseEmbedOptions({ framework: 'vllm' }).frameworks).toEqual(['vllm']);
     expect(parseEmbedOptions({ framework: 'VLLM, sglang' }).frameworks).toEqual(['vllm', 'sglang']);
     expect(parseEmbedOptions({ framework: 'vllm,vllm,nope' }).frameworks).toEqual(['vllm']);
     expect(parseEmbedOptions({ framework: 'nope' }).frameworks).toEqual([]);
     expect(parseEmbedOptions({ fw: 'trt' }).frameworks).toEqual(['trt']);
+    expect(parseEmbedOptions({ framework: 'TokenSpeed,nope' }).frameworks).toEqual(['tokenspeed']);
   });
 
   it('takes the first value of a repeated query key', () => {
@@ -66,12 +73,10 @@ describe('parseEmbedOptions', () => {
       theme: 'dark',
       skin: 'vllm',
     });
-    // Unknown skin prefix: keep the base theme, drop the skin.
     expect(parseEmbedOptions({ theme: 'sglang-light' })).toMatchObject({
       theme: 'light',
       skin: undefined,
     });
-    // Standalone skin= is also accepted; theme= prefix wins when both are set.
     expect(parseEmbedOptions({ skin: 'vllm' })).toMatchObject({ theme: 'dark', skin: 'vllm' });
     expect(parseEmbedOptions({ skin: 'nope', theme: 'light' }).skin).toBeUndefined();
   });

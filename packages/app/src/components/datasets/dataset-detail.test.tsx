@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { act, createElement, type ButtonHTMLAttributes, type PropsWithChildren } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  act,
+  createElement,
+  type ButtonHTMLAttributes,
+  type PropsWithChildren,
+  type ReactNode,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,6 +83,9 @@ vi.mock('@/hooks/api/use-datasets', () => ({
 import { DatasetDetail } from './dataset-detail';
 import { track } from '@/lib/analytics/analytics';
 
+const withQueryClient = (ui: ReactNode) =>
+  createElement(QueryClientProvider, { client: new QueryClient() }, ui);
+
 function changeInput(input: HTMLInputElement, value: string): void {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -133,7 +143,7 @@ describe('DatasetDetail descriptions', () => {
       testState.dataset.data = { ...testState.dataset.data!, slug, description };
       const container = document.createElement('div');
       const root = createRoot(container);
-      act(() => root.render(createElement(DatasetDetail, { slug })));
+      act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug }))));
 
       expect(
         container.querySelector('[data-testid="dataset-description"]')?.textContent ?? null,
@@ -151,13 +161,13 @@ describe('DatasetDetail conversation search', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
+    act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'trace' }))));
 
     expect(
       container.querySelector<HTMLElement>('[data-testid="dataset-detail-error"]')?.dataset.locale,
     ).toBe('zh');
     expect(container.querySelector('[data-testid="dataset-detail-not-found"]')).toBeNull();
-    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/agentx');
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/infx/agentx');
     const retry = [...container.querySelectorAll('button')].find(
       (button) => button.textContent === '重试',
     );
@@ -178,7 +188,7 @@ describe('DatasetDetail conversation search', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(DatasetDetail, { slug: 'missing' })));
+    act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'missing' }))));
 
     expect(
       container.querySelector<HTMLElement>('[data-testid="dataset-detail-not-found"]')?.dataset
@@ -195,11 +205,11 @@ describe('DatasetDetail conversation search', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
+    act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'trace' }))));
     act(() => vi.advanceTimersByTime(250));
 
     const next = [...container.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Next →',
+      (button) => button.textContent === 'Next',
     );
     expect(next).toBeDefined();
     act(() => next?.click());
@@ -240,10 +250,10 @@ describe('DatasetDetail conversation search', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
+    act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'trace' }))));
 
     expect(container.textContent).toContain('正在加载对话…');
-    expect(container.textContent).not.toContain('没有匹配的对话。');
+    expect(container.textContent).not.toContain('没有匹配的对话');
 
     act(() => root.unmount());
   });
@@ -259,10 +269,10 @@ describe('DatasetDetail conversation search', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
+    act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'trace' }))));
 
-    expect(container.textContent).toContain('对话加载失败。');
-    expect(container.textContent).not.toContain('没有匹配的对话。');
+    expect(container.textContent).toContain('对话加载失败');
+    expect(container.textContent).not.toContain('没有匹配的对话');
 
     act(() => root.unmount());
   });
@@ -270,16 +280,17 @@ describe('DatasetDetail conversation search', () => {
   it('passes the active locale to application-owned number formatting', () => {
     testState.locale = 'zh';
     const localeCalls: (Intl.LocalesArgument | undefined)[] = [];
-    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(
-      function (this: number, locales) {
-        localeCalls.push(locales);
-        return String(this.valueOf());
-      },
-    );
+    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+      this: number,
+      locales,
+    ) {
+      localeCalls.push(locales);
+      return String(this.valueOf());
+    });
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
+    act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'trace' }))));
 
     expect(localeCalls).toContain('zh-CN');
 

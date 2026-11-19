@@ -37,16 +37,13 @@ export interface Actor extends Point {
 export interface Car extends Actor {
   y: number;
   vy: number;
-  /** Lateral (sideways) velocity in m/s; non-zero while sliding. */
   slip: number;
   steer: number;
   airborne: boolean;
-  /** Wheel rotation in radians, used by the renderer. */
   spin: number;
 }
 export interface Walker extends Actor {
   y: number;
-  /** Accumulated stride phase in radians for the walk cycle. */
   stride: number;
 }
 export interface LaneAgent extends Actor {
@@ -65,7 +62,6 @@ export interface Ped extends Walker {
   dir: 1 | -1;
   side: 1 | -1;
   model: number;
-  /** Seconds remaining knocked down, or 0. */
   down: number;
   flee: number;
 }
@@ -80,7 +76,6 @@ export interface CityState {
   health: number;
   elapsed: number;
   time: number;
-  /** Hour of day, 0-24. */
   clock: number;
   job: number;
   cash: number;
@@ -105,7 +100,6 @@ export interface CityState {
   camera: number;
   explorer: boolean;
   altitude: number;
-  /** Deterministic RNG state. */
   seed: number;
   tour: TourId | null;
 }
@@ -166,7 +160,6 @@ export function nearestLane(world: World, p: Point, radius: number) {
 }
 
 export const START_POINT: Point = { x: 470, z: 290 };
-/** San Jovano arrival point on the road between NVIDIA Endeavor and AMD HQ. */
 export const SOUTH_POINT: Point = { x: -470, z: 6000 };
 
 export function newCity(world: World, seed = 1): CityState {
@@ -250,7 +243,6 @@ export function enterExit(world: World, s: CityState) {
       s.message = 'fast';
       return false;
     }
-    // Driver door first (left side), then the passenger side, then behind/in front.
     const p = [-Math.PI / 2, Math.PI / 2, Math.PI, 0]
       .map((offset) => ({
         x: s.car.x + Math.sin(s.car.angle + offset) * 1.9,
@@ -306,14 +298,12 @@ export function changeVehicle(s: CityState) {
   return true;
 }
 
-/** Quick travel between San Fierro and the South Bay when stopped. */
 export function travel(world: World, s: CityState, to: 'city' | 'south') {
   if (s.phase !== 'driving' || s.explorer || Math.abs(s.player.speed) > 2) return false;
   const goal = to === 'south' ? SOUTH_POINT : START_POINT;
   const lane = nearestLane(world, goal, 400);
   const p = lane?.point || goal;
   let angle = lane?.point.angle ?? Math.PI;
-  // Arrive facing the NVIDIA campus in San Jovano, or downtown in the city.
   const face = to === 'south' ? world.landmarks.nvidia_endeavor : world.landmarks.transamerica;
   if (face && Math.sin(angle) * (face.x - p.x) + Math.cos(angle) * (face.z - p.z) < 0)
     angle += Math.PI;
@@ -356,7 +346,6 @@ function nextLane(world: World, s: CityState, a: LaneAgent, toward?: Point) {
     return !(lane.oneway && o.end === 1);
   });
   if (options.length === 0) {
-    // Dead end: turn around unless the street is one-way.
     if (!r.oneway) a.dir = a.dir > 0 ? -1 : 1;
     a.s = 0;
     return !r.oneway;
@@ -503,7 +492,6 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
     spec = SPECS[s.vehicle];
   const throttle = Number(c.forward) - Number(c.reverse),
     turn = Number(c.right) - Number(c.left);
-  // Steering: smoothed wheel angle, reduced at speed like a real car.
   const maxSteer = 0.62 / (1 + Math.abs(car.speed) / 14);
   car.steer += (turn * maxSteer - car.steer) * Math.min(1, dt * 7);
   const grounded = !car.airborne;
@@ -511,7 +499,6 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
     let force = 0;
     if (throttle > 0) force = car.speed < -0.5 ? 14 : spec.accel * (1 - car.speed / spec.top);
     else if (throttle < 0) force = car.speed > 0.5 ? -14 : -4.5 * (1 + car.speed / 14);
-    // Gravity along the slope: San Francisco hills matter.
     const ax = Math.sin(car.angle),
       az = Math.cos(car.angle);
     const grade =
@@ -525,7 +512,6 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
     if (c.brake) car.speed *= Math.exp(-2.6 * dt);
     if (!throttle && Math.abs(car.speed) < 0.3 && Math.abs(grade) < 0.12) car.speed = 0;
     car.speed = Math.max(-14, Math.min(spec.top, car.speed));
-    // Kinematic bicycle model plus lateral slip that decays with tyre grip.
     const yaw = (car.speed * Math.tan(car.steer)) / spec.wheelbase;
     car.angle -= yaw * dt * (c.brake && Math.abs(car.speed) > 12 ? 1.35 : 1);
     car.slip += yaw * car.speed * dt * (c.brake ? 0.35 : 0.08);
@@ -545,7 +531,6 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
       s.immunity = 0.6;
     }
   }
-  // Vertical motion: follow the road, or fly off crests and land.
   const groundY = world.surface(car.x, car.z);
   if (car.airborne) {
     car.vy -= 9.81 * dt;
@@ -561,7 +546,6 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
     }
   } else {
     const vy = (groundY - car.y) / dt;
-    // Leave the ground when the road falls away faster than gravity can follow.
     if (groundY < car.y - 0.05 && car.vy - 9.81 * dt > vy && Math.abs(car.speed) > 14) {
       car.airborne = true;
       car.vy = Math.max(car.vy, 0);
@@ -584,13 +568,11 @@ function stepFoot(world: World, s: CityState, c: Controls, dt: number) {
     turn = Number(c.right) - Number(c.left);
   p.angle -= turn * 2.6 * dt;
   const goal = throttle * (throttle > 0 ? (c.sprint ? 6.2 : 1.55) : 1.1);
-  // Ease into and out of walking instead of snapping to full speed.
   p.speed += (goal - p.speed) * Math.min(1, dt * (c.sprint ? 3.5 : 6));
   if (Math.abs(p.speed) < 0.02 && !throttle) p.speed = 0;
   const dx = Math.sin(p.angle) * p.speed * dt,
     dz = Math.cos(p.angle) * p.speed * dt;
   if (!slide(world, p, dx, dz, 0.32)) p.speed = 0;
-  // Do not let the player walk through traffic.
   for (const t of s.traffic)
     if (distance(t, p) < 1.6) {
       const a = Math.atan2(p.x - t.x, p.z - t.z);
@@ -599,7 +581,6 @@ function stepFoot(world: World, s: CityState, c: Controls, dt: number) {
     }
   const ground = world.surface(p.x, p.z);
   p.y += (ground - p.y) * Math.min(1, dt * 12);
-  // One stride cycle per 1.4 m walked (two steps).
   p.stride += (Math.abs(p.speed) * dt * Math.PI * 2) / (Math.abs(p.speed) > 3 ? 2.6 : 1.45);
 }
 
@@ -654,7 +635,6 @@ function stepAgents(world: World, s: CityState, dt: number) {
   for (const cop of s.police) {
     const d = distance(cop, s.player);
     if (d < 90) {
-      // Close pursuit: steer straight at the player and ram.
       const want = Math.atan2(s.player.x - cop.x, s.player.z - cop.z);
       let diff = want - cop.angle;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));

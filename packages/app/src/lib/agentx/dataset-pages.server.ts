@@ -1,0 +1,18 @@
+import { cache } from 'react';
+
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import type { DatasetDetail } from '@semianalysisai/inferencex-db/queries/datasets';
+
+import { getCachedDataset } from '@/lib/agentx/dataset-detail.server';
+
+export type DatasetPageLookup =
+  | { kind: 'found'; record: DatasetDetail }
+  | { kind: 'missing' }
+  /** Fixture builds have no database; the client fetch (mocked in e2e) decides what renders. */
+  | { kind: 'unchecked' };
+
+export const lookupDatasetPage = cache(async (slug: string): Promise<DatasetPageLookup> => {
+  if (FIXTURES_MODE) return { kind: 'unchecked' };
+  const record = await getCachedDataset(slug);
+  return record ? { kind: 'found', record } : { kind: 'missing' };
+});

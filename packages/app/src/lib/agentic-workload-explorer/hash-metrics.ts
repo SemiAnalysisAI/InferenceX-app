@@ -1,5 +1,3 @@
-// Hash-prefix reuse measures prior session content, not the provider's reported cache hits.
-
 export interface HashSourceRow {
   requestId: string;
   hashIds: string[] | null;
@@ -26,7 +24,6 @@ export function inferHashBlockSizeFromCounts(hashCount: number, tokenCount: numb
   return null;
 }
 
-// Infer from persisted counts because ANONYMIZE_BLOCK_SIZE can override the default.
 function inferHashBlockSize(rows: HashSourceRow[]): number {
   for (const row of rows) {
     const blockSize = inferHashBlockSizeFromCounts(
@@ -38,7 +35,6 @@ function inferHashBlockSize(rows: HashSourceRow[]): number {
   return 64;
 }
 
-/** Tokens contributed by a single hash block. The last block may be partial. */
 function tokenCountForHashBlock(
   index: number,
   hashCount: number,
@@ -85,7 +81,6 @@ interface HashMetricsAccumulator {
   totals: () => HashMetricsTotals;
 }
 
-/** Accumulate exact hash-prefix metrics without retaining every source row. */
 export function createHashMetricsAccumulator(blockSize: number): HashMetricsAccumulator {
   if (!Number.isFinite(blockSize) || blockSize <= 0) {
     throw new RangeError('blockSize must be a positive number');
@@ -129,8 +124,6 @@ export function createHashMetricsAccumulator(blockSize: number): HashMetricsAccu
   };
 }
 
-// Callers must flatten subagent groups and order rows chronologically.
-// Only the longest position-aligned prefix shared with a prior chain counts as cached.
 export function buildHashMetrics(rows: HashSourceRow[]): {
   byRequestId: Map<string, HashMetric>;
   blockSize: number;

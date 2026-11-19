@@ -18,6 +18,7 @@ concurrency:
 jobs:
   preflight:
     name: Check three-day cadence
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app'
     runs-on: ubuntu-latest
     permissions: {}
     outputs:
@@ -115,16 +116,16 @@ jobs:
 
       - name: Invalidate staging cache
         env:
-          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
           VERCEL_STAGING_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
         run: |
           set -euo pipefail
 
-          if [ -z "$STAGING_SITE_URL" ] || [ -z "$VERCEL_STAGING_BYPASS_SECRET" ]; then
-            echo "::error::STAGING_SITE_URL and VERCEL_STAGING_BYPASS_SECRET are required"
+          if [ -z "$STAGING_APP_URL" ] || [ -z "$VERCEL_STAGING_BYPASS_SECRET" ]; then
+            echo "::error::STAGING_APP_URL and VERCEL_STAGING_BYPASS_SECRET are required"
             exit 1
           fi
 
           curl --retry 3 --retry-all-errors -sSf -X POST \
-            "${STAGING_SITE_URL%/}/api/v1/invalidate" \
+            "${STAGING_APP_URL%/}/api/v1/invalidate" \
             -H "x-vercel-protection-bypass: $VERCEL_STAGING_BYPASS_SECRET"

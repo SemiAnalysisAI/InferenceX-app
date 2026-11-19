@@ -3,16 +3,16 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 const BLOCK_COLORS = [
-  '#7FB238', // grass
-  '#976D4D', // dirt
-  '#707070', // stone
-  '#5CDBD5', // diamond
-  '#FAE04D', // gold
-  '#51D975', // emerald
-  '#8B7355', // oak wood
-  '#AB1B09', // redstone
-  '#14121D', // obsidian
-  '#4A80D4', // lapis lazuli
+  '#7FB238',
+  '#976D4D',
+  '#707070',
+  '#5CDBD5',
+  '#FAE04D',
+  '#51D975',
+  '#8B7355',
+  '#AB1B09',
+  '#14121D',
+  '#4A80D4',
 ];
 
 interface BlockData {
@@ -82,7 +82,6 @@ function BlockGroup({
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
   useFrame(({ clock }) => {
-    // Throttle to ~20fps for performance
     frameCounter.current = (frameCounter.current ?? 0) + 1;
     if (frameCounter.current % 3 !== 0) return;
     if (!meshRef.current) return;

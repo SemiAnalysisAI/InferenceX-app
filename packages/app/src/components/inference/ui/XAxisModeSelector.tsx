@@ -10,6 +10,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { X_AXIS_EXPLANATIONS, type XAxisKind } from '../axis-metric-explanations';
 import { isAgenticOnlyXAxisMode, type XAxisMode } from '../hooks/useChartData';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import type { FixedSequenceStatistic } from '../utils/resolveXAxisField';
 import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
@@ -46,7 +47,8 @@ const STRINGS = {
   },
 } as const;
 
-export function XAxisModeSelector() {
+/** `className` goes on the cell. */
+export function XAxisModeSelector({ className }: { className?: string } = {}) {
   const {
     selectedXAxisMode: value,
     selectedPercentile,
@@ -59,17 +61,14 @@ export function XAxisModeSelector() {
   useEffect(() => setMounted(true), []);
   const locale = useLocale();
   const t = STRINGS[locale];
-  // Match SSR and the initial client render before URL-backed scenario state settles.
   const options = X_AXIS_OPTIONS.filter(
     ({ value: option }) => !mounted || isAgentic || !isAgenticOnlyXAxisMode(option),
   );
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex w-full flex-wrap gap-4">
-        <div
-          className={`flex w-full min-w-0 flex-col space-y-1.5 ${isAgentic ? 'max-w-72' : 'max-w-44'}`}
-        >
+      <div className="flex w-full flex-wrap gap-3">
+        <div className={cn('flex min-w-36 flex-1 flex-col space-y-1.5', className)}>
           <LabelWithTooltip htmlFor="x-axis-mode-select" label={t.label} tooltip={t.help} />
           <SearchableSelect
             value={value}
@@ -111,8 +110,12 @@ export function XAxisModeSelector() {
             ]}
           />
         </div>
+        {/* The server cannot tell whether the sequence is agentic, so the statistic picker
+            waits for mount. Hold its half until then so the X-axis picker does not shrink
+            under the pointer when it appears. */}
+        {!mounted && <div aria-hidden="true" className="min-w-36 flex-1" />}
         {mounted && !isAgentic && (
-          <div className="flex w-full max-w-44 min-w-0 flex-col space-y-1.5">
+          <div className="flex min-w-36 flex-1 flex-col space-y-1.5">
             <LabelWithTooltip
               htmlFor="fixed-sequence-statistic-select"
               label={t.statistic}

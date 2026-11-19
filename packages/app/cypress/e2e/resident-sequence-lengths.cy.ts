@@ -4,7 +4,7 @@ import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2
 import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures';
 
 function visitAgenticChart(extraQuery = '') {
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4${extraQuery}`, {
+  cy.visit(`/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4${extraQuery}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       unlockAgenticGate(win);
@@ -38,8 +38,6 @@ describe('resident sequence-length footer summary', () => {
       .and('contain.text', 'p95 8.2k')
       .and('contain.text', 'OSL p50 1k');
 
-    // Legend visibility is downstream of the resident set. Hiding a series
-    // must not remove the footer summary or issue a narrower stats request.
     cy.get('.sidebar-legend button').first().click({ force: true });
     cy.get('[data-testid="resident-sequence-lengths"]').should('be.visible');
     cy.get('@residentSequenceLengths.all').should('have.length', 1);

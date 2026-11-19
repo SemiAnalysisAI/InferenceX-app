@@ -22,9 +22,6 @@ function totals(metrics: Iterable<HashMetric>) {
 
 describe('createHashMetricsAccumulator', () => {
   it('matches one complete ordered trie walk across page boundaries', () => {
-    // The two same-timestamp rows are in stable ID order and deliberately split
-    // across pages. Reversing them changes the theoretical cache bound, so the
-    // fixture also protects the (timestamp, id) ordering expected from paging.
     const orderedRows: OrderedHashRow[] = [
       {
         requestId: 'first',

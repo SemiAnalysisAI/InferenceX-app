@@ -37,10 +37,6 @@ function makeNode(overrides: Partial<MessageNode> = {}): MessageNode {
   };
 }
 
-// ---------------------------------------------------------------------------
-// truncate
-// ---------------------------------------------------------------------------
-
 describe('truncate', () => {
   it('returns [stripped] for null', () => {
     expect(truncate(null, 10)).toBe('[stripped]');
@@ -75,10 +71,6 @@ describe('truncate', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// tokenSummary
-// ---------------------------------------------------------------------------
-
 describe('tokenSummary', () => {
   it('returns empty string when all null', () => {
     expect(tokenSummary(null, null, null, null)).toBe('');
@@ -111,29 +103,21 @@ describe('tokenSummary', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// formatCost
-// ---------------------------------------------------------------------------
-
 describe('formatCost', () => {
-  it('returns <$0.01 for small costs', () => {
-    expect(formatCost(0.005)).toBe('<$0.01');
-    expect(formatCost(0)).toBe('<$0.01');
+  it('returns <$0.01 for tiny non-zero costs', () => {
+    expect(formatCost(0.004)).toBe('<$0.01');
   });
 
-  it('formats costs >= 0.01', () => {
-    expect(formatCost(0.01)).toBe('$0.010');
-    expect(formatCost(1.234)).toBe('$1.234');
+  it('returns $0 for zero', () => {
+    expect(formatCost(0)).toBe('$0');
   });
 
-  it('rounds to 3 decimal places', () => {
-    expect(formatCost(0.12345)).toBe('$0.123');
+  it('matches formatDollars for costs >= 0.01', () => {
+    expect(formatCost(0.01)).toBe('$0.01');
+    expect(formatCost(0.12345)).toBe('$0.12');
+    expect(formatCost(37.632)).toBe('$37.63');
   });
 });
-
-// ---------------------------------------------------------------------------
-// messageNodeSummary
-// ---------------------------------------------------------------------------
 
 describe('messageNodeSummary', () => {
   it('truncates user content at 60 chars', () => {
@@ -156,7 +140,7 @@ describe('messageNodeSummary', () => {
     expect(messageNodeSummary(node)).toBe('Read');
   });
 
-  it('shows Tool Call when no toolName', () => {
+  it('shows the Tool Call label when no toolName', () => {
     const node = makeNode({ type: 'tool_use', content: '', toolName: undefined });
     expect(messageNodeSummary(node)).toBe('Tool Call');
   });
@@ -176,10 +160,6 @@ describe('messageNodeSummary', () => {
     expect(messageNodeSummary(node)).toBe('Thinking \u00B7 23 chars');
   });
 });
-
-// ---------------------------------------------------------------------------
-// getToolArg
-// ---------------------------------------------------------------------------
 
 describe('getToolArg', () => {
   it('returns empty string when no toolInput', () => {
@@ -217,10 +197,6 @@ describe('getToolArg', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// subagentSummary
-// ---------------------------------------------------------------------------
-
 function makeGroup(overrides: Partial<SubagentGroupNode> = {}): SubagentGroupNode {
   return {
     kind: 'subagent_group',
@@ -251,7 +227,7 @@ describe('subagentSummary', () => {
 
   it('includes cost when > 0', () => {
     const result = subagentSummary(makeGroup({ requestCount: 2, totalCost: 0.05 }));
-    expect(result).toBe('Explore Agent \u00B7 2 reqs \u00B7 $0.050');
+    expect(result).toBe('Explore Agent \u00B7 2 reqs \u00B7 $0.05');
   });
 
   it('shows <$0.01 for small costs', () => {

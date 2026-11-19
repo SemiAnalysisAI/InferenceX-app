@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getChartTitleZh,
+  formatCalculatorRatioZh,
   resolveCalculatorBarSelection,
   resolveCalculatorTarget,
   resolveCalculatorTargetInputValue,
@@ -12,7 +13,10 @@ describe('calculator Chinese chart titles', () => {
   it('describes power efficiency as token throughput per all-in provisioned megawatt', () => {
     expect(
       getChartTitleZh('power', 'interactivity_to_throughput', 25, 'input', undefined, 'p90'),
-    ).toBe('25 tok/s/user P90 交互性下每全电源配置兆瓦输入 token 吞吐量');
+    ).toEqual({
+      title: '每全电源配置兆瓦输入 token 吞吐量',
+      qualifier: '（25 tok/s/user P90 交互性）',
+    });
   });
 });
 
@@ -65,5 +69,23 @@ describe('calculator effective state selectors', () => {
     const intent = { resultsKey: 'old', selected: new Set(['a', 'b']) };
     expect(resolveCalculatorBarSelection(intent, 'new', new Set(['a', 'b']))).toEqual(new Set());
     expect(resolveCalculatorBarSelection(intent, 'old', new Set(['b']))).toEqual(new Set(['b']));
+  });
+});
+
+describe('calculator Chinese ratio comparisons', () => {
+  it.each([
+    [150, 100, '1.5'],
+    [100, 100, '1.0'],
+    [200, 100, '2.0'],
+  ])('expresses %s / %s as a multiple of the baseline', (higher, lower, multiple) => {
+    expect(formatCalculatorRatioZh('B200', 'H100', '吞吐量', higher / lower)).toBe(
+      `B200 的吞吐量是 H100 的 ${multiple} 倍`,
+    );
+  });
+
+  it('also formats cost multiples without implying a percentage increase', () => {
+    expect(formatCalculatorRatioZh('H100', 'B200', '成本', 3 / 2)).toBe(
+      'H100 的成本是 B200 的 1.5 倍',
+    );
   });
 });

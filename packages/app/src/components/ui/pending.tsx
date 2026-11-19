@@ -2,10 +2,6 @@ import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/shared/utils';
 
-/**
- * Content that stays on screen while its replacement loads: dimmed, inert, with a floating
- * status pill naming what is loading.
- */
 export function Pending({
   active,
   label = 'Loading…',
@@ -21,7 +17,7 @@ export function Pending({
     <div aria-busy={active} className={cn('relative', className)}>
       {active && (
         <div role="status" className="sticky top-16 z-20 flex h-0 justify-center overflow-visible">
-          <span className="mt-4 flex h-9 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm text-muted-foreground shadow-md">
+          <span className="mt-4 flex h-9 items-center gap-2 rounded-lg border border-border/30 bg-card px-4 text-sm text-muted-foreground shadow-sm">
             <Loader2 className="size-4 animate-spin" />
             {label}
           </span>

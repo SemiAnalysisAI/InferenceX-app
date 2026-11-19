@@ -4,7 +4,6 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import {
   ModelSelector,
   ScenarioSelector,
-  SequenceSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
 import {
@@ -14,122 +13,117 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { OptionInfo } from '@/components/ui/option-info';
+import { Model, MODEL_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
-  for (const locale of ['en', 'zh'] as const) {
-    for (const width of [390, 1280]) {
-      it(`uses the same surface for label, selected-value, option and action hints (${locale}, ${width}px)`, () => {
-        cy.viewport(width, 844);
-        const label = locale === 'zh' ? '配置' : 'Configuration';
-        const explanation =
-          locale === 'zh' ? '查看当前模型的配置说明。' : 'Inspect the current model configuration.';
-        cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
-            <div className="space-y-6 p-4" style={{ minHeight: 1200 }}>
-              <LabelWithTooltip htmlFor="test-label" label={label} tooltip={explanation} />
-              <input id="test-label" data-testid="unrelated-input" defaultValue="unchanged" />
-              <div className="flex h-9">
-                <SelectedOptionInfo label={label} value="test-selected">
-                  {explanation}
-                </SelectedOptionInfo>
-              </div>
-              <OptionInfo label={label} value="test-option">
-                {explanation}
-              </OptionInfo>
-              <TooltipProvider delayDuration={0}>
-                <TooltipRoot>
-                  <TooltipTrigger asChild>
-                    <button data-testid="hint-action" onClick={cy.stub().as('action')}>
-                      {label}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent data-testid="action-hint">{explanation}</TooltipContent>
-                </TooltipRoot>
-              </TooltipProvider>
-            </div>
-          </PathnameContext.Provider>,
-        );
-        let sharedStyle: Record<string, string>;
-        const checkSurface = ($content: JQuery<HTMLElement>) => {
-          const element = $content[0];
-          const css = element.ownerDocument.defaultView!.getComputedStyle(element);
-          const style = Object.fromEntries(
-            [
-              'padding',
-              'fontSize',
-              'lineHeight',
-              'fontWeight',
-              'borderRadius',
-              'backgroundColor',
-              'borderColor',
-            ].map((key) => [key, css[key as keyof CSSStyleDeclaration]]),
-          ) as Record<string, string>;
-          if (sharedStyle) expect(style).to.deep.equal(sharedStyle);
-          else sharedStyle = style;
-          const bounds = element.getBoundingClientRect();
-          expect(bounds.left).to.be.at.least(0);
-          expect(bounds.right).to.be.at.most(element.ownerDocument.documentElement.clientWidth);
-        };
-        for (const [trigger, content] of [
-          ['option-help-test-label', 'option-help-content-test-label'],
-          ['selected-option-help-test-selected', 'selected-option-help-content-test-selected'],
-          ['option-help-test-option', 'option-help-content-test-option'],
-        ]) {
-          cy.get(`[data-testid="${trigger}"] [data-slot="info-help-icon"]`).should(($icon) => {
-            const icon = $icon[0];
-            const bounds = icon.getBoundingClientRect();
-            const css = icon.ownerDocument.defaultView!.getComputedStyle(icon);
-            expect(bounds.width, 'same circular hover surface for every help placement').to.equal(
-              24,
+  for (const [locale, width] of [
+    ['en', 390],
+    ['zh', 1280],
+  ] as const) {
+    it(`uses the same surface for label, option and action hints (${locale}, ${width}px)`, () => {
+      cy.viewport(width, 844);
+      const label = locale === 'zh' ? '配置' : 'Configuration';
+      const explanation =
+        locale === 'zh' ? '查看当前模型的配置说明。' : 'Inspect the current model configuration.';
+      cy.mount(
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
+          <div className="space-y-6 p-4" style={{ minHeight: 1200 }}>
+            <LabelWithTooltip htmlFor="test-label" label={label} tooltip={explanation} />
+            <input id="test-label" data-testid="unrelated-input" defaultValue="unchanged" />
+            <OptionInfo label={label} value="test-option">
+              {explanation}
+            </OptionInfo>
+            <TooltipProvider delayDuration={0}>
+              <TooltipRoot>
+                <TooltipTrigger asChild>
+                  <button data-testid="hint-action" onClick={cy.stub().as('action')}>
+                    {label}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent data-testid="action-hint">{explanation}</TooltipContent>
+              </TooltipRoot>
+            </TooltipProvider>
+          </div>
+        </PathnameContext.Provider>,
+      );
+      let sharedStyle: Record<string, string>;
+      const checkSurface = ($content: JQuery<HTMLElement>) => {
+        const element = $content[0];
+        const css = element.ownerDocument.defaultView!.getComputedStyle(element);
+        const style = Object.fromEntries(
+          [
+            'padding',
+            'fontSize',
+            'lineHeight',
+            'fontWeight',
+            'borderRadius',
+            'backgroundColor',
+            'borderColor',
+          ].map((key) => [key, css[key as keyof CSSStyleDeclaration]]),
+        ) as Record<string, string>;
+        if (sharedStyle) expect(style).to.deep.equal(sharedStyle);
+        else sharedStyle = style;
+        const bounds = element.getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(element.ownerDocument.documentElement.clientWidth);
+      };
+      for (const [trigger, content] of [
+        ['option-help-test-label', 'option-help-content-test-label'],
+        ['option-help-test-option', 'option-help-content-test-option'],
+      ]) {
+        cy.get(`[data-testid="${trigger}"] [data-slot="info-help-icon"]`).should(($icon) => {
+          const icon = $icon[0];
+          const bounds = icon.getBoundingClientRect();
+          const css = icon.ownerDocument.defaultView!.getComputedStyle(icon);
+          expect(bounds.width, 'same circular hover surface for every help placement').to.equal(24);
+          expect(bounds.height).to.equal(bounds.width);
+          expect(parseFloat(css.borderRadius)).to.be.at.least(bounds.width / 2);
+          const target = icon.parentElement!.getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(target.left);
+          expect(bounds.right).to.be.at.most(target.right);
+          expect(bounds.top).to.be.at.least(target.top);
+          expect(bounds.bottom).to.be.at.most(target.bottom);
+          if (trigger === 'option-help-test-option') {
+            expect(target.width, 'keep the larger option touch target').to.equal(
+              width < 768 ? 44 : 32,
             );
-            expect(bounds.height).to.equal(bounds.width);
-            expect(parseFloat(css.borderRadius)).to.be.at.least(bounds.width / 2);
-            const target = icon.parentElement!.getBoundingClientRect();
-            expect(bounds.left).to.be.at.least(target.left);
-            expect(bounds.right).to.be.at.most(target.right);
-            expect(bounds.top).to.be.at.least(target.top);
-            expect(bounds.bottom).to.be.at.most(target.bottom);
-            if (trigger === 'option-help-test-option') {
-              expect(target.width, 'keep the larger option touch target').to.equal(
-                width < 768 ? 44 : 32,
-              );
-            }
-          });
-          cy.get('[data-testid="unrelated-input"]').focus();
-          cy.get(`[data-testid="${trigger}"]`).trigger('pointerover', { pointerType: 'mouse' });
+          }
+        });
+        cy.get('[data-testid="unrelated-input"]').focus();
+        cy.get(`[data-testid="${trigger}"]`).trigger('pointerover', { pointerType: 'mouse' });
+        cy.get(`[data-testid="${content}"]`)
+          .should('be.visible')
+          .and('contain.text', explanation)
+          .should(checkSurface);
+        cy.get('[data-testid="unrelated-input"]')
+          .should('have.focus')
+          .and('have.value', 'unchanged');
+        cy.get(`[data-testid="${content}"]`).then(($hoverContent) => {
+          cy.get(`[data-testid="${trigger}"]`).click();
           cy.get(`[data-testid="${content}"]`)
-            .should('be.visible')
-            .and('contain.text', explanation)
+            .should(($clickedContent) => {
+              expect($clickedContent[0], 'hover and click keep the same surface').to.equal(
+                $hoverContent[0],
+              );
+            })
             .should(checkSurface);
-          cy.get('[data-testid="unrelated-input"]')
-            .should('have.focus')
-            .and('have.value', 'unchanged');
-          cy.get(`[data-testid="${content}"]`).then(($hoverContent) => {
-            cy.get(`[data-testid="${trigger}"]`).click();
-            cy.get(`[data-testid="${content}"]`)
-              .should(($clickedContent) => {
-                expect($clickedContent[0], 'hover and click keep the same surface').to.equal(
-                  $hoverContent[0],
-                );
-              })
-              .should(checkSurface);
-          });
-          cy.get('body').type('{esc}');
-          cy.get(`[data-testid="${content}"]`).should('not.exist');
-          cy.get(`[data-testid="${trigger}"]`).should('have.focus');
-          cy.press(Cypress.Keyboard.Keys.SPACE);
-          cy.get(`[data-testid="${content}"]`).should('be.visible').should(checkSurface);
-          cy.get('body').click(0, 0);
-          cy.get(`[data-testid="${content}"]`).should('not.exist');
-        }
-        cy.get('[data-testid="hint-action"]').trigger('pointermove', { pointerType: 'mouse' });
-        cy.get('[data-testid="action-hint"]').should('be.visible').should(checkSurface);
-        cy.get('[data-testid="hint-action"]').click();
-        cy.get('@action').should('have.been.calledOnce');
-      });
-    }
+        });
+        cy.get('body').type('{esc}');
+        cy.get(`[data-testid="${content}"]`).should('not.exist');
+        cy.get(`[data-testid="${trigger}"]`).should('have.focus');
+        cy.press(Cypress.Keyboard.Keys.SPACE);
+        cy.get(`[data-testid="${content}"]`).should('be.visible').should(checkSurface);
+        cy.get('body').click(0, 0);
+        cy.get(`[data-testid="${content}"]`).should('not.exist');
+      }
+      cy.get('[data-testid="hint-action"]').trigger('pointermove', { pointerType: 'mouse' });
+      cy.get('[data-testid="action-hint"]').should('be.visible').should(checkSurface);
+      cy.get('[data-testid="hint-action"]').click();
+      cy.get('@action').should('have.been.calledOnce');
+    });
   }
 });
 
@@ -148,20 +142,6 @@ function ModelSelectorHarness() {
           Model.Llama3_3_70B,
         ]}
         data-testid="model-selector"
-      />
-    </TooltipProvider>
-  );
-}
-
-function SequenceSelectorHarness() {
-  const [value, setValue] = useState('1024_128');
-  return (
-    <TooltipProvider>
-      <SequenceSelector
-        value={value}
-        onChange={setValue}
-        availableSequences={['1024_128', '1024_8192', '8192_1024']}
-        data-testid="sequence-selector"
       />
     </TooltipProvider>
   );
@@ -233,30 +213,22 @@ function SelectableContextHarness() {
   );
 }
 
-function assertAgenticInfoInside(height: number) {
+function assertClosedScenarioHasNoHelp(height: number) {
   cy.get('[data-testid="scenario-selector"]').should(($control) => {
     const control = $control[0];
-    const bounds = control.getBoundingClientRect();
-    const info = control.parentElement!.querySelector(
-      '[data-testid="selected-option-help-agentic-traces"] svg',
+    expect(
+      control.parentElement!.querySelector('[data-slot="info-help"]'),
+      'the label carries the only help icon on the closed control',
+    ).to.equal(null);
+    expect(control.getBoundingClientRect().height, 'control keeps its shared height').to.equal(
+      height,
     );
-    expect(info, 'explainer is inside the scenario control').not.to.equal(null);
-    const icon = info!.getBoundingClientRect();
-    const label = control
-      .parentElement!.querySelector('[aria-hidden="true"].invisible')!
-      .getBoundingClientRect();
-    expect(icon.left - label.right, 'explainer is directly beside Agentic').to.be.closeTo(7, 1);
-    expect(icon.left).to.be.greaterThan(bounds.left);
-    expect(icon.right).to.be.lessThan(bounds.right);
-    expect(icon.top).to.be.greaterThan(bounds.top);
-    expect(icon.bottom).to.be.lessThan(bounds.bottom);
-    expect(bounds.height, 'control keeps its shared height').to.equal(height);
   });
 }
 
 function assertDisabledBenchmarkControls() {
   cy.get('[role="combobox"]')
-    .should('have.length', 2)
+    .should('have.length', 1)
     .each(($control) => {
       cy.wrap($control)
         .should('be.disabled')
@@ -272,7 +244,7 @@ function assertDisabledBenchmarkControls() {
 }
 
 describe('Chart Selectors', () => {
-  for (const width of [390, 768, 1280]) {
+  for (const width of [390, 1280]) {
     it(`keeps fixed and selectable values the same height when disabled and enabled at ${width}px`, () => {
       cy.viewport(width, 900);
       cy.mount(<SelectableContextHarness />);
@@ -282,7 +254,8 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
       };
       assertDisabledBenchmarkControls();
-      assertHeights();
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
+      cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
       cy.get('[data-testid="toggle-options"]').click();
       cy.get('[role="combobox"]')
         .should('have.length', 2)
@@ -328,17 +301,17 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="precision-multiselect"]').click('right');
       cy.get('[role="option"][aria-selected="true"]').should('have.length', 3);
       cy.get('[data-testid="toggle-options"]').click();
-      cy.get('button#scenario-select').should('have.text', '8K / 1K');
+      cy.get('button#scenario-select').should('not.exist');
       cy.get('button#precision-select').should('have.text', 'FP4');
       assertDisabledBenchmarkControls();
-      assertHeights();
+      cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
     });
   }
 
   it('keeps single-value benchmark context readable on Chinese phones', () => {
     cy.viewport(390, 720);
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <TooltipProvider delayDuration={0}>
           <div className="grid gap-3 p-4">
             <ScenarioSelector
@@ -351,8 +324,8 @@ describe('Chart Selectors', () => {
         </TooltipProvider>
       </PathnameContext.Provider>,
     );
-    cy.get('label[for="scenario-select"]').should('have.text', '场景');
-    cy.get('button#scenario-select').should('be.visible').and('have.text', '8K / 1K');
+    cy.get('label[for="scenario-select"]').should('not.exist');
+    cy.get('button#scenario-select').should('not.exist');
     cy.get('label[for="precision-select"]').should('have.text', '精度');
     cy.get('button#precision-select').should('be.visible').and('have.text', 'FP4');
     cy.get('[role="combobox"]').each(($value) => {
@@ -367,22 +340,48 @@ describe('Chart Selectors', () => {
       cy.mount(<ModelSelectorHarness />);
     });
 
-    it('shows options when clicked', () => {
-      cy.get('[data-testid="model-selector"]').click();
-      cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    });
-
-    it('selecting an option updates the displayed value', () => {
-      cy.get('[data-testid="model-selector"]').click();
-      cy.get('[role="option"]').contains('Qwen3.5 397B').click();
-      cy.get('[data-testid="model-selector"]').should('contain', 'Qwen3.5 397B');
+    it('keeps default models in the requested selector order (en)', () => {
+      cy.viewport(1280, 720);
+      cy.mount(
+        <PathnameContext.Provider value="/infx/inference">
+          <TooltipProvider>
+            <ModelSelector
+              value={Model.Muse_Spark_Open}
+              onChange={cy.stub().as('selectModel')}
+              availableModels={MODEL_OPTIONS}
+              data-testid="model-selector"
+            />
+          </TooltipProvider>
+        </PathnameContext.Provider>,
+      );
+      cy.get('[data-testid="model-selector"]')
+        .should('contain.text', 'Muse Spark 1.3/Open')
+        .click();
+      cy.get('[role="option"]').then(($options) => {
+        expect([...$options].slice(0, 8).map((option) => option.textContent?.trim())).to.deep.equal(
+          [
+            'Kimi K3.1 Pro 2.8T',
+            'DeepSeek V4.1 Flash 552B',
+            'GLM5.2/GLM5.3 744B',
+            'GLM 5.3 Flash',
+            'MiniMax M3.1 Flash 428B',
+            'Muse Spark 1.3/Open 816B',
+            'Qwen3.5 397B',
+            'Qwen3.8 Flash Next 176B',
+          ],
+        );
+      });
+      cy.contains('[role="option"]', 'Kimi K3 2.8T').click();
+      cy.get('@selectModel').should('have.been.calledOnceWith', Model.Kimi_K3);
     });
 
     for (const locale of ['en', 'zh']) {
       it(`searches across model groups, recovers from no results, and selects by keyboard (${locale})`, () => {
         cy.viewport(locale === 'zh' ? 390 : 1280, 720);
         cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <ModelSelectorHarness />
           </PathnameContext.Provider>,
         );
@@ -435,7 +434,7 @@ describe('Chart Selectors', () => {
 
     it('localizes model category labels and reasons on Chinese routes', () => {
       cy.mount(
-        <PathnameContext.Provider value="/zh/inference">
+        <PathnameContext.Provider value="/zh/infx/inference">
           <ModelSelectorHarness />
         </PathnameContext.Provider>,
       );
@@ -450,108 +449,93 @@ describe('Chart Selectors', () => {
     });
   });
 
-  describe('SequenceSelector', () => {
-    beforeEach(() => {
-      cy.mount(<SequenceSelectorHarness />);
-    });
-
-    it('shows options when clicked', () => {
-      cy.get('[data-testid="sequence-selector"]').click();
-      cy.get('[role="option"]').should('have.length', 3);
-    });
-
-    it('selecting an option updates the displayed value', () => {
-      cy.get('[data-testid="sequence-selector"]').click();
-      cy.get('[role="option"]').last().click();
-      cy.get('[data-testid="sequence-selector"]').should('not.contain', '1K / 128');
-    });
-  });
-
   describe('ScenarioSelector', () => {
-    it('explains the agentic workload in a tooltip that links to /agentx', () => {
+    it('explains the agentic workload in its menu option, linking to /infx/agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
-      assertAgenticInfoInside(36);
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
+      assertClosedScenarioHasNoHelp(36);
+      cy.get('[data-testid="scenario-selector"]').click('right');
+      cy.get('[data-testid="option-help-agentic-traces"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
 
-      cy.contains('Realistic Long Context Multi Turn Agentic Workload with Sub Agents.').should(
+      cy.contains('Realistic Long-Context, Multi-Turn Agentic Workload with Sub-Agents').should(
         'be.visible',
       );
       cy.get('[data-testid="scenario-agentic-info-link"]')
         .should('be.visible')
-        .and('have.attr', 'href', '/agentx')
+        .and('have.attr', 'href', '/infx/agentx')
         .then(($link) => {
           const followLink = cy.spy().as('followAgenticLink');
           $link[0].addEventListener('click', (event) => {
             followLink(event.defaultPrevented);
-            // Keep the component runner mounted while checking native link activation.
             event.preventDefault();
           });
         })
         .click();
       cy.get('@followAgenticLink').should('have.been.calledOnceWith', false);
-      cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').click();
-      cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-select-option]', '8K / 1K').should('be.visible');
     });
 
-    it('keeps the fixed-sequence scenario visible without a one-option menu', () => {
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <div data-testid="selector-host">
-            <ScenarioSelector
-              value={Sequence.EightK_OneK}
-              onChange={() => {}}
-              availableSequences={[Sequence.EightK_OneK]}
-              data-testid="scenario-selector"
-            />
-          </div>
-        </TooltipProvider>,
-      );
-      cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('button[data-testid="scenario-selector"]')
-        .should('be.visible')
-        .and('have.text', '8K / 1K');
-      cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
-      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
-    });
+    for (const variant of ['field', 'caption'] as const) {
+      for (const sequence of [Sequence.AgenticTraces, Sequence.EightK_OneK]) {
+        it(`omits the entire ${variant} for sole scenario ${sequence}`, () => {
+          cy.mount(
+            <TooltipProvider delayDuration={0}>
+              <div data-testid="selector-host">
+                <ScenarioSelector
+                  variant={variant}
+                  value={sequence}
+                  onChange={cy.stub().as('changeScenario')}
+                  availableSequences={[sequence]}
+                  data-testid="scenario-selector"
+                />
+              </div>
+            </TooltipProvider>,
+          );
+          cy.get('[data-testid="selector-host"]').should('be.empty');
+          cy.get('@changeScenario').should('not.have.been.called');
+        });
+      }
 
-    it('keeps the agentic scenario and its explanation visible with one option', () => {
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <div data-testid="selector-host">
-            <ScenarioSelector
-              value={Sequence.AgenticTraces}
-              onChange={() => {}}
-              availableSequences={[Sequence.AgenticTraces]}
-              data-testid="scenario-selector"
-            />
-          </div>
-        </TooltipProvider>,
-      );
-      cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('button[data-testid="scenario-selector"]')
-        .should('be.visible')
-        .and('have.text', 'Agentic');
-      cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
-      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
-      assertAgenticInfoInside(36);
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
-        pointerType: 'mouse',
+      const Harness = () => {
+        const [multiple, setMultiple] = useState(false);
+        const [value, setValue] = useState(Sequence.AgenticTraces);
+        return (
+          <TooltipProvider delayDuration={0}>
+            <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
+            <output data-testid="selected-scenario">{value}</output>
+            <div data-testid="selector-host">
+              <ScenarioSelector
+                variant={variant}
+                value={value}
+                onChange={setValue}
+                availableSequences={
+                  multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
+                }
+                data-testid="scenario-selector"
+              />
+            </div>
+          </TooltipProvider>
+        );
+      };
+
+      it(`restores the ${variant} selector when another scenario becomes available`, () => {
+        cy.mount(<Harness />);
+        cy.get('[data-testid="selector-host"]').should('be.empty');
+        cy.contains('button', 'Toggle scenarios').click();
+        cy.get('[data-testid="scenario-selector"]').should('be.enabled').click();
+        cy.contains('[data-select-option]', '8K / 1K').click();
+        cy.get('[data-testid="selected-scenario"]').should('have.text', Sequence.EightK_OneK);
+        cy.contains('button', 'Toggle scenarios').click();
+        cy.get('[data-testid="selector-host"]').should('be.empty');
+        cy.get('[data-testid="selected-scenario"]').should('have.text', Sequence.EightK_OneK);
       });
-      cy.get('[data-testid="scenario-agentic-info-link"]')
-        .should('be.visible')
-        .and('have.attr', 'href', '/agentx');
-    });
+    }
 
     for (const fixed of [true, false]) {
-      it(`keeps the ${fixed ? 'fixed' : 'selectable'} Agentic explainer inside on Chinese phones`, () => {
+      it(`${fixed ? 'omits the sole scenario' : 'keeps the Agentic explainer in the menu'} on Chinese phones`, () => {
         cy.viewport(390, 720);
         cy.mount(
-          <PathnameContext.Provider value="/zh/inference">
+          <PathnameContext.Provider value="/zh/infx/inference">
             <TooltipProvider delayDuration={0}>
               <div className="w-40 p-3">
                 <ScenarioSelector
@@ -568,8 +552,14 @@ describe('Chart Selectors', () => {
             </TooltipProvider>
           </PathnameContext.Provider>,
         );
-        assertAgenticInfoInside(44);
-        cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
+        if (fixed) {
+          cy.get('[data-testid="scenario-selector"]').should('not.exist');
+          cy.get('[data-testid="option-help-agentic-traces"]').should('not.exist');
+          return;
+        }
+        assertClosedScenarioHasNoHelp(44);
+        cy.get('[data-testid="scenario-selector"]').click('right');
+        cy.get('[data-testid="option-help-agentic-traces"]').trigger('pointerover', {
           pointerType: 'mouse',
         });
         cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
@@ -577,14 +567,11 @@ describe('Chart Selectors', () => {
         );
         cy.get('[data-testid="scenario-agentic-info-link"]')
           .should('be.visible')
-          .and('have.attr', 'href', '/zh/agentx');
+          .and('have.attr', 'href', '/zh/infx/agentx');
       });
     }
 
     it('marks model-specific retired scenarios in their option labels', () => {
-      // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
-      // (InferenceX#2493): with the model passed in, 8K / 1K moves out of the
-      // option label gains the deprecated status without a separate group.
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <ScenarioSelector
@@ -607,33 +594,13 @@ describe('Chart Selectors', () => {
         .should('have.text', '8K / 1K (deprecated)');
     });
 
-    it('marks 8K/1K retired for DeepSeek V4 Pro while AgentX stays active', () => {
-      // DeepSeek V4 Pro's single-turn 8k1k sweep ran for the last time on
-      // 2026-09-08 (InferenceX#2728, MODELS.md): the fixed-length option
-      // carries the deprecated status, the agentic option does not.
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <ScenarioSelector
-            value={Sequence.AgenticTraces}
-            onChange={() => {}}
-            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
-            model={Model.DeepSeek_V4_Pro}
-            data-testid="scenario-selector"
-          />
-        </TooltipProvider>,
-      );
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-select-option]', '8K / 1K (deprecated)').should('be.visible');
-      cy.contains('[data-select-option]', 'Agentic')
-        .should('be.visible')
-        .and('not.contain.text', 'deprecated');
-    });
-
     for (const locale of ['en', 'zh']) {
       it(`keeps retired choices selectable in one fixed-length group with inline status (${locale})`, () => {
         cy.viewport(390, 720);
         cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <TooltipProvider delayDuration={0}>
               <div className="w-44 p-3">
                 <ScenarioSelector
@@ -654,6 +621,7 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="scenario-selector"]').click('right');
         const active = locale === 'zh' ? '固定序列长度' : 'Fixed Sequence Length';
         const deprecated = locale === 'zh' ? '1K / 1K（已弃用）' : '1K / 1K (deprecated)';
+        const deprecatedEightK = locale === 'zh' ? '8K / 1K（已弃用）' : '8K / 1K (deprecated)';
         cy.get('[data-slot="select-label"]').should('have.length', 1);
         cy.contains('[data-select-option]', deprecated).should(($option) => {
           const option = $option[0];
@@ -673,7 +641,7 @@ describe('Chart Selectors', () => {
           .should('have.length', 2)
           .then(($options) => {
             expect([...$options].map((option) => option.textContent)).to.deep.equal([
-              '8K / 1K',
+              deprecatedEightK,
               deprecated,
             ]);
           });
@@ -714,28 +682,21 @@ describe('Chart Selectors', () => {
       cy.get('[data-slot="select-content"]').should('not.contain.text', 'Deprecated');
     });
 
-    it('hides the agentic explainer on fixed-sequence scenarios', () => {
+    it('keeps scenario explainers out of the closed control for every scenario', () => {
       cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
+      assertClosedScenarioHasNoHelp(36);
 
-      // ...and appears as soon as the user picks the agentic scenario.
       cy.get('[data-testid="scenario-selector"]').click();
       cy.contains('[data-select-option]', 'Agentic').click();
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      assertClosedScenarioHasNoHelp(36);
     });
   });
 
   describe('PrecisionSelector', () => {
     beforeEach(() => {
       cy.mount(<PrecisionSelectorHarness />);
-    });
-
-    it('shows current selection', () => {
-      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
-        'have.text',
-        'FP8',
-      );
     });
 
     it('removes a precision from its chip without opening the menu or losing other selections', () => {
@@ -758,7 +719,9 @@ describe('Chart Selectors', () => {
       it(`separates the compact selection count from the minimum and keeps it accurate (${locale})`, () => {
         cy.viewport(locale === 'zh' ? 390 : 1280, 720);
         cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <div className="w-44">
               <PrecisionSelectorHarness />
             </div>
@@ -814,7 +777,12 @@ describe('Chart Selectors', () => {
         .should('be.visible')
         .and('have.text', 'FP8');
       cy.get('label[for="precision-select"]').should('have.text', 'Precision');
-      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
+      cy.get('[role="combobox"]')
+        .should('be.disabled')
+        .and('have.css', 'cursor', 'not-allowed')
+        .and('have.css', 'opacity', '1');
+      cy.get('[data-slot="select-chip"]').should('not.exist');
+      cy.get('[data-slot="select-values"] .text-foreground').should('have.text', 'FP8');
     });
   });
 });

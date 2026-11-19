@@ -45,7 +45,6 @@ vi.mock('@semianalysisai/inferencex-db/proxytrace/shared/trace', () => ({
 
 import { GET } from '@/app/api/v1/agentic-workload-explorer/graphs/route';
 
-// The explorer always queries anonymized rows only (ANON_ONLY_VISIBILITY).
 const VISIBILITY: string[] = [];
 const CACHE_KEY = 'graphs::all';
 
@@ -77,8 +76,6 @@ describe('graphs GET cache repair', () => {
     mocks.readStatsCache.mockImplementation(() =>
       Promise.resolve({
         cachedAt: new Date(),
-        // Every read receives a fresh row snapshot: only the cache patch mock can
-        // make the repair durable across requests.
         data: { ...persistedData },
       }),
     );

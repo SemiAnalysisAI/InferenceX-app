@@ -5,23 +5,22 @@ import type { InferenceData } from '@/components/inference/types';
 import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 import { Precision } from '@/lib/catalog/data-mappings';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/power/system-power-model';
 
 import {
   createMockChartDefinition,
   createMockHardwareConfig,
   createMockInferenceData,
 } from '../support/mock-data';
+import { clickScatterPoint } from '../support/scatter-points';
 import { mountWithProviders } from '../support/test-utils';
-
-// Power comparison series (`i_pcompare`) on `?unofficialrun=` overlays: role
-// clones draw in the overlay run colour with the role dash, and their legend
-// rows toggle them.
 
 const OVERLAY_RUN_ID = 31415926535;
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 const hwConfig = createMockHardwareConfig();
-// `lower_right` is what the registry resolves for a lower-is-better metric on
-// the interactivity chart; the power envelope walks from that corner.
 const chartDefinition = createMockChartDefinition({
   chartType: 'interactivity',
   y_measuredAvgPower: 'measuredAvgPower.y',
@@ -30,10 +29,6 @@ const chartDefinition = createMockChartDefinition({
 
 const metric = (y: number) => ({ y, roof: false });
 
-/**
- * Three measured points with both roles available. Power falls as x rises so
- * every point sits on the upper power envelope the chart draws for watt axes.
- */
 function measuredCurve(hwKey: string, run_url?: string): InferenceData[] {
   return [
     [8, 700, 840, 500],
@@ -55,10 +50,14 @@ function measuredCurve(hwKey: string, run_url?: string): InferenceData[] {
   );
 }
 
-function mountCompare(data: InferenceData[], overlay: InferenceData[]) {
+function mountCompare(
+  data: InferenceData[],
+  overlay: InferenceData[],
+  { locale = 'en', width = 1000 }: { locale?: 'en' | 'zh'; width?: number } = {},
+) {
   mountWithProviders(
-    <PathnameContext.Provider value="/inference">
-      <div style={{ width: 1000, height: 640 }}>
+    <PathnameContext.Provider value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}>
+      <div style={{ width, height: 640 }}>
         <ScatterGraph
           chartId="power-compare-test"
           modelLabel="DeepSeek V4 Pro"
@@ -164,11 +163,7 @@ describe('ScatterGraph power comparison series', () => {
     mountCompare(official, overlay);
 
     cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should('exist');
-    // Base points and rooflines carry no variant id (only role siblings are
-    // cloned), so the base row has to map back onto them.
     cy.get(legend).contains('label', 'All GPUs').trigger('mouseover');
-    // Wait for the siblings to settle first: opacity transitions over 150 ms,
-    // so a base check taken at once would still read the pre-hover value.
     cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should(
       'have.css',
       'opacity',
@@ -182,4 +177,87 @@ describe('ScatterGraph power comparison series', () => {
       '1',
     );
   });
+});
+
+describe('Modeled power source links', () => {
+  for (const width of [1280, 390]) {
+    const overlay = width === 390;
+    const modeledCurve = (hwKey: string, runUrl?: string) =>
+      measuredCurve(hwKey, runUrl).map((point) =>
+        createMockInferenceData({
+          ...point,
+          disagg: false,
+          modeledSystemPower: {
+            status: 'supported',
+            unit: 'chassis',
+            hardware: hwKey,
+            modelRevision: SYSTEM_POWER_MODEL_REVISION,
+            operatingState: { workload: 'fixed-seq-len', scaleOut: false },
+            gpuCount: 8,
+            chassisCount: 1,
+            modeledGpuCount: 8,
+            measuredGpuWattsPerGpu: 600,
+            itWatts: 6400,
+            itWattsPerGpu: 800,
+            facilityWatts: 8320,
+            deploymentItWatts: 6400,
+            deploymentFacilityWatts: 8320,
+            deploymentBreakdownWatts: {
+              gpu: 4800,
+              measuredCpu: 0,
+              cpu: 375,
+              memory: 150,
+              nic: 250,
+              nvswitch: 125,
+              storage: 60,
+              other: 40,
+              fans: 200,
+              psuLoss: 200,
+              network: 200,
+              facility: 1920,
+            },
+            pue: 1.3,
+            topologyBasis: 'single-node',
+            chassisBasis: 'full',
+            telemetryBasis: 'validated-v2',
+          },
+        }),
+      );
+
+    it(`links to the pinned power model from a en ${overlay ? 'mobile overlay' : 'desktop official'} tooltip`, () => {
+      cy.viewport(width, 720);
+      mountCompare(modeledCurve('b200'), modeledCurve('h100', OVERLAY_RUN_URL), {
+        locale: 'en',
+        width: Math.min(1000, width - 32),
+      });
+      if (overlay) {
+        cy.get(`${svg} .unofficial-overlay-pt`).eq(1).click({ force: true });
+      } else {
+        cy.scatterPoints('#power-compare-test')
+          .should((points) => expect(points).to.have.length.at.least(2))
+          .then((points) => clickScatterPoint(points[1]));
+      }
+      cy.get('[data-testid="point-details-panel"]').within(() => {
+        if (overlay) cy.contains('powerx-compare').should('exist');
+        cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {
+          cy.get(`a[href="${SYSTEM_POWER_MODEL_SOURCE_URL}"]`)
+            .should('have.attr', 'target', '_blank')
+            .and('have.attr', 'rel', 'noopener noreferrer')
+            .then(($link) => {
+              $link[0].scrollIntoView({ block: 'center' });
+            })
+            .should('be.visible')
+            .then(($link) => {
+              const bounds = $link[0].getBoundingClientRect();
+              expect(bounds.left).to.be.at.least(0);
+              expect(bounds.right).to.be.at.most(width);
+              const shell = $link.closest('[data-testid="point-details-panel"]')[0];
+              const frame = shell.getBoundingClientRect();
+              expect(bounds.top).to.be.at.least(frame.top);
+              expect(bounds.bottom).to.be.at.most(frame.bottom);
+            });
+        });
+      });
+    });
+  }
 });

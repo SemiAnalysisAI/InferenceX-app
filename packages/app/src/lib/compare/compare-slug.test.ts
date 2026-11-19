@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
+import { META_TITLE_MAX } from '@/lib/seo/meta-text';
+
 import {
   allCanonicalComparePairs,
   allCanonicalCompareSlugs,
@@ -143,8 +145,8 @@ describe('parseCompareSlug — legacy bare slug (PR #351 backward compat)', () =
 
 describe('parseCompareSlug — rejection cases', () => {
   it('returns null for unknown GPU keys', () => {
-    expect(parseCompareSlug('a100-vs-h100')).toBeNull();
-    expect(parseCompareSlug('deepseek-r1-a100-vs-h100')).toBeNull();
+    expect(parseCompareSlug('unknown-gpu-vs-h100')).toBeNull();
+    expect(parseCompareSlug('deepseek-r1-unknown-gpu-vs-h100')).toBeNull();
   });
 
   it('returns null when both sides are the same GPU', () => {
@@ -261,17 +263,19 @@ describe('compareModelDisplayLabel', () => {
 });
 
 describe('compareModelSeoName', () => {
-  // Single, natural, current-version search name per model — no version-group
-  // slashes, no param-count suffix, no fully-qualified checkpoint id.
   const EXPECTED: Record<string, string> = {
+    'glm-5-3-flash': 'GLM-5.3-Flash',
+    'muse-spark-open': 'Muse Spark 1.3/Open',
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-v41-flash': 'DeepSeek V4.1 Flash',
     'deepseek-r1': 'DeepSeek R1',
+    'kimi-k31-pro': 'Kimi K3.1 Pro',
     'kimi-k3': 'Kimi K3',
     'kimi-k26': 'Kimi K2.6',
     'glm-5-1': 'GLM-5',
     'glm-5-3': 'GLM-5.3',
     'minimax-m3': 'MiniMax M3',
+    'minimax-m31-flash': 'MiniMax M3.1 Flash',
     'minimax-m27': 'MiniMax M2.7',
     'qwen-3-8-flash-next': 'Qwen3.8-Flash-Next',
     'qwen-3-8-27b': 'Qwen3.8-27B',
@@ -281,7 +285,7 @@ describe('compareModelSeoName', () => {
     'llama-3-3-70b': 'Llama 3.3 70B',
   };
 
-  it('returns the expected single-version name for every model', () => {
+  it('returns the expected SEO name for every model', () => {
     for (const model of COMPARE_MODEL_SLUGS) {
       expect(compareModelSeoName(model), `seoName for ${model.slug}`).toBe(EXPECTED[model.slug]);
     }
@@ -293,12 +297,12 @@ describe('compareModelSeoName', () => {
     );
   });
 
-  it('never returns a version-grouped label (no slashes) and is non-empty', () => {
-    for (const model of COMPARE_MODEL_SLUGS) {
-      const name = compareModelSeoName(model);
-      expect(name.length, `non-empty for ${model.slug}`).toBeGreaterThan(0);
-      expect(name.includes('/'), `no slash in ${model.slug}`).toBe(false);
-    }
+  it('keeps the shared Muse family name in comparison titles without changing its URL', () => {
+    const model = getCompareModelBySlug('muse-spark-open')!;
+    expect(compareSeoTitle('B200 vs H200', compareModelSeoName(model))).toContain(
+      'Muse Spark 1.3/Open',
+    );
+    expect(canonicalCompareSlug(model.slug, 'b200', 'h200')).toBe('muse-spark-open-b200-vs-h200');
   });
 });
 
@@ -306,24 +310,24 @@ describe('compareSeoTitle', () => {
   it('leads with the GPU pair and keeps "Inference Benchmark" when it fits', () => {
     const title = compareSeoTitle('B200 vs B300', 'GLM-5');
     expect(title).toBe('B200 vs B300: GLM-5 Inference Benchmark');
-    expect(title.startsWith('B200 vs B300:')).toBe(true);
-    expect(title.length).toBeLessThanOrEqual(60);
+    expect(title.length).toBeLessThanOrEqual(META_TITLE_MAX);
   });
 
-  it('drops "Inference" → "Benchmark" for a long GPU pair + model name', () => {
-    const title = compareSeoTitle('GB200 NVL72 vs GB300 NVL72', 'DeepSeek V4 Pro');
-    // "…Inference Benchmark" would exceed ~60 chars, so it shortens.
-    expect(title).toBe('GB200 NVL72 vs GB300 NVL72: DeepSeek V4 Pro Benchmark');
-    expect(title.includes('Inference Benchmark')).toBe(false);
-    expect(title.startsWith('GB200 NVL72 vs GB300 NVL72:')).toBe(true);
+  it('drops the metric words before cutting the GPU pair or model name', () => {
+    expect(compareSeoTitle('H100 vs MI355X', 'DeepSeek V4 Pro')).toBe(
+      'H100 vs MI355X: DeepSeek V4 Pro Benchmark',
+    );
+    expect(compareSeoTitle('GB200 NVL72 vs GB300 NVL72', 'DeepSeek V4 Pro')).toBe(
+      'GB200 NVL72 vs GB300 NVL72: DeepSeek V4 Pro',
+    );
   });
 
-  it('always starts with the GPU pair for every real (model × pair)', () => {
+  it('starts with the GPU pair and fits the title budget for every real (model × pair)', () => {
     for (const model of COMPARE_MODEL_SLUGS) {
       const gpuLabel = compareDisplayLabel('gb200', 'gb300');
       const title = compareSeoTitle(gpuLabel, compareModelSeoName(model));
       expect(title.startsWith(`${gpuLabel}:`), `pair-led for ${model.slug}`).toBe(true);
-      expect(/(?<suffix>Inference Benchmark|Benchmark)$/u.test(title)).toBe(true);
+      expect(title.length, title).toBeLessThanOrEqual(META_TITLE_MAX);
     }
   });
 });
@@ -350,15 +354,20 @@ describe('getCompareModelBySlug', () => {
   });
 
   it('keeps the bare kimi alias on the K2 series, with kimi-k3 canonical and separate', () => {
-    // K3 is a distinct architecture, not a K2 point release: it must not join
-    // the kimi-k26 dbKey group, and the family alias stays where it was so
-    // existing /compare/kimi-* links keep resolving to K2.
     expect(getCompareModelBySlug('kimi')?.slug).toBe('kimi-k26');
     const k3 = getCompareModelBySlug('kimi-k3');
     expect(k3?.slug).toBe('kimi-k3');
     expect(k3?.dbKeys).toEqual(['kimik3']);
     expect(k3?.displayName).toBe('Kimi-K3');
     expect(KIMI_K26.dbKeys).not.toContain('kimik3');
+  });
+
+  it('gives Kimi K3.1 Pro its own slug and dbKey, separate from K3', () => {
+    const k31 = getCompareModelBySlug('kimi-k31-pro');
+    expect(k31?.slug).toBe('kimi-k31-pro');
+    expect(k31?.dbKeys).toEqual(['kimik3.1']);
+    expect(k31?.displayName).toBe('Kimi-K3.1-Pro');
+    expect(getCompareModelBySlug('kimi-k3')?.dbKeys).toEqual(['kimik3']);
   });
 
   it('returns null for unknown slugs', () => {

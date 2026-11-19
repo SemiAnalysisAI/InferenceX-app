@@ -15,18 +15,20 @@ const LABELS = {
   zh: { external: '外部', internal: '内部', aria: 'TCO 口径' },
 } as const;
 
-/**
- * Whether the current model/scenario exposes the TCO Basis selector. The basis
- * state itself is global; only the control is scoped to scenarios that
- * benchmark hardware with a distinct internal owner cost.
- */
 export function useShowsTcoBasisSelector(): boolean {
   const { selectedModel, effectiveSequence } = useGlobalFilterSelection();
   return showsTcoBasisSelector(selectedModel, effectiveSequence);
 }
 
-/** Global external customer pricing versus internal owner cost selection. */
-export function TcoBasisToggle({ source, className }: { source: string; className?: string }) {
+export function TcoBasisToggle({
+  source,
+  className,
+  caption = false,
+}: {
+  source: string;
+  className?: string;
+  caption?: boolean;
+}) {
   const { tcoBasis } = useGlobalFilterSelection();
   const { setTcoBasis } = useGlobalFilterActions();
   const labels = LABELS[useLocale()];
@@ -49,7 +51,8 @@ export function TcoBasisToggle({ source, className }: { source: string; classNam
       }}
       ariaLabel={labels.aria}
       testId="tco-basis-toggle"
-      className={cn('w-fit self-start', className)}
+      className={cn('w-fit self-start', caption && 'md:min-h-6', className)}
+      buttonClassName={caption ? 'text-xs md:min-h-4 md:py-0' : undefined}
     />
   );
 }

@@ -4,7 +4,11 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
 
+import { TcoPriceTable } from './editable-tco-badges';
 import { ResultContext } from './result-context';
+
+const order = (node: Element | null | undefined, other: Element | null | undefined) =>
+  node!.compareDocumentPosition(other!) & Node.DOCUMENT_POSITION_FOLLOWING;
 
 function renderContext(locale: 'en' | 'zh') {
   const container = document.createElement('div');
@@ -27,12 +31,43 @@ function renderContext(locale: 'en' | 'zh') {
 }
 
 describe('ResultContext', () => {
+  it.each([
+    ['en', 'SemiAnalysis InferenceX™', 'Source: SemiAnalysis InferenceX™ (Deprecated)'],
+    ['zh', 'SemiAnalysis InferenceX™', '来源: SemiAnalysis InferenceX™ (已弃用)'],
+    [
+      'en',
+      'SemiAnalysis InferenceX™ + UNOFFICIAL overlays',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
+    ],
+    [
+      'zh',
+      'SemiAnalysis InferenceX™ + 非官方 overlays',
+      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+    ],
+  ] as const)('appends the deprecated status to the %s source %s', (locale, source, expected) => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => root.render(<ResultContext locale={locale} source={source} deprecated />));
+    expect(container.textContent).toBe(expected);
+    act(() => root.render(<ResultContext locale={locale} source={source} deprecated={false} />));
+    expect(container.textContent).toBe(`${locale === 'zh' ? '来源' : 'Source'}: ${source}`);
+    act(() => root.unmount());
+  });
+
+  it('does not render an orphan deprecated label without a source', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => root.render(<ResultContext locale="en" deprecated />));
+    expect(container.textContent).toBe('');
+    act(() => root.unmount());
+  });
+
   it('renders all effective result inputs in English', () => {
     const context = renderContext('en');
     expect(context.querySelector('[data-testid="result-context"]')?.textContent).toContain(
       'Model: DeepSeek-R1-0528',
     );
-    expect(context.textContent).toContain('Date range: 2026-08-01 → 2026-08-31');
+    expect(context.textContent).toContain('Date range: Aug 1, 2026 → Aug 31, 2026');
     expect(context.textContent).toContain('Source: SemiAnalysis InferenceX™');
     expect(context.textContent).not.toContain('Source: Source:');
     expect(context.textContent).toContain('Cost basis: Input $1/M tok · Output $8/M tok');
@@ -41,7 +76,7 @@ describe('ResultContext', () => {
   it('localizes labels while preserving technical values', () => {
     const context = renderContext('zh');
     expect(context.textContent).toContain('模型: DeepSeek-R1-0528');
-    expect(context.textContent).toContain('日期范围: 2026-08-01 → 2026-08-31');
+    expect(context.textContent).toContain('日期范围: 2026年8月1日 → 2026年8月31日');
     expect(context.textContent).toContain('成本口径: Input $1/M tok · Output $8/M tok');
   });
 
@@ -61,7 +96,7 @@ describe('ResultContext', () => {
     const text = container.textContent ?? '';
     expect(text).toContain('Precision: FP8');
     expect(text).toContain('Cost Tier: Owning at Large Hyperscaler Volume');
-    expect(text).toContain('Updated: 2026-09-01');
+    expect(text).toContain('Updated: Sep 1, 2026');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
     expect(text).not.toContain('Workload:');
@@ -77,8 +112,8 @@ describe('ResultContext', () => {
       createRoot(container).render(
         <ResultContext
           locale="en"
-          costTier="Rent - 3 Year Commit"
-          costTierControl={<button data-testid="tier-control">Rent - 3 Year Commit</button>}
+          costTier="Rent – 3-Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-Year Commit</button>}
           date="2026-09-01"
         />,
       );
@@ -86,9 +121,101 @@ describe('ResultContext', () => {
     const dd = container.querySelector('[data-testid="result-context-cost-tier"]');
     expect(container.textContent).toContain('Cost Tier:');
     expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
-    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent - 3 Year Commit');
+    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent – 3-Year Commit');
     expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
-    expect(container.textContent).toContain('Updated: 2026-09-01');
+    expect(container.textContent).toContain('Updated: Sep 1, 2026');
+  });
+
+  it('makes the cost tier the price table row label and the price source its footnote', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          costTier="Rent – 3-Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-Year Commit</button>}
+          tcoBasis={<div data-testid="tco-slot" />}
+          date="2026-09-01"
+          source="SemiAnalysis InferenceX™"
+          priceTable={
+            <TcoPriceTable
+              items={[{ base: 'gb300', label: 'GB300', value: '2.31' }]}
+              testId="prices"
+              cellTestId="price"
+              inputIdPrefix="price"
+            />
+          }
+          markers={<span>KV offload on</span>}
+          metaEnd={<span data-testid="prices-source">Prices: model</span>}
+        />,
+      );
+    });
+    const tiers = container.querySelectorAll('[data-testid="result-context-cost-tier"]');
+    expect(tiers).toHaveLength(1);
+    const rowHeader = container.querySelector('[data-testid="prices"] tbody th');
+    expect(tiers[0].parentElement).toBe(rowHeader);
+    expect(rowHeader?.textContent).not.toContain('TCO');
+    expect(tiers[0].querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
+    expect(tiers[0].querySelector('.export-only.hidden')?.textContent).toBe('Rent – 3-Year Commit');
+    const table = container.querySelector('[data-testid="prices"]');
+    const source = container.querySelector('[data-testid="prices-source"]');
+    expect(container.querySelectorAll('[data-testid="prices-source"]')).toHaveLength(1);
+    expect(table?.parentElement?.contains(source)).toBe(true);
+    expect(table?.contains(source)).toBe(false);
+    expect(order(container.querySelector('[data-testid="tco-slot"]'), table)).toBeTruthy();
+    const markers = container.querySelector('[data-testid="result-context-markers"]');
+    expect(order(source, markers)).toBeTruthy();
+    expect(markers?.textContent).toBe('KV offload on');
+    expect(markers?.parentElement?.textContent).toBe(
+      'Updated Sep 1, 2026SourceSemiAnalysis InferenceX™KV offload on',
+    );
+  });
+
+  it('keeps the tier on the controls row and the source on the meta line without a price table', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          costTier="Rent – 3-Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-Year Commit</button>}
+          date="2026-09-01"
+          metaEnd={<span data-testid="prices-source">Prices: model</span>}
+        />,
+      );
+    });
+    const tier = container.querySelector('[data-testid="result-context-cost-tier"]');
+    expect(tier?.tagName).toBe('DD');
+    const dt = tier?.previousSibling?.previousSibling as HTMLElement;
+    expect(dt.querySelector('.sr-only')?.textContent).toBe('Cost Tier');
+    expect(dt.querySelector('.export-only.hidden')?.textContent).toBe('Cost Tier:');
+    expect(
+      container.querySelector('[data-testid="prices-source"]')?.parentElement?.parentElement
+        ?.textContent,
+    ).toBe('Updated Sep 1, 2026Prices: model');
+  });
+
+  it('puts the scenario first and the chip basis last on the footer controls row', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          scenario={<div data-testid="scenario-slot" />}
+          tcoBasis={<div data-testid="tco-slot" />}
+          chipBasis={<div data-testid="chip-slot" />}
+          date="2026-09-01"
+        />,
+      );
+    });
+    const row = container.querySelector('[data-testid="scenario-slot"]')?.parentElement;
+    expect(
+      [...(row?.children ?? [])].map((child) => (child as HTMLElement).dataset.testid),
+    ).toEqual(['scenario-slot', 'tco-slot', 'chip-slot']);
+    expect(container.textContent).toContain('Updated Sep 1, 2026');
   });
 
   it('shows utilization and the model license fee when given, in both locales', () => {
@@ -122,7 +249,6 @@ describe('ResultContext', () => {
         />,
       );
     });
-    // The caption term becomes the label for the editor's input.
     expect(container.querySelector('label[for="util"]')?.textContent).toBe('Utilization:');
     expect(container.querySelector('label[for="fee"]')?.textContent).toBe(
       'Model License Fee Assumption:',
@@ -130,7 +256,6 @@ describe('ResultContext', () => {
     const util = container.querySelector('[data-testid="result-context-utilization"]');
     expect(util?.querySelector('.no-export [data-testid="util-control"]')).not.toBeNull();
     expect(util?.querySelector('.export-only')?.textContent).toBe('60%');
-    // textContent reads as the plain caption, so exports and text assertions match.
     expect(util?.textContent).toBe('60%');
     const fee = container.querySelector('[data-testid="result-context-license-fee"]');
     expect(fee?.querySelector('.no-export [data-testid="fee-control"]')).not.toBeNull();
@@ -142,10 +267,10 @@ describe('ResultContext', () => {
     const container = document.createElement('div');
     act(() => {
       createRoot(container).render(
-        <ResultContext locale="zh" costTier="自有（超大规模云大批量）" date="2026-09-01" />,
+        <ResultContext locale="zh" costTier="自有 · 超大规模云厂商批量采购" date="2026-09-01" />,
       );
     });
-    expect(container.textContent).toContain('成本层级: 自有（超大规模云大批量）');
+    expect(container.textContent).toContain('成本层级: 自有 · 超大规模云厂商批量采购');
     expect(container.textContent).not.toContain('模型:');
   });
 
@@ -163,7 +288,7 @@ describe('ResultContext', () => {
         />,
       );
     });
-    expect(container.textContent).toContain('Dates: 2026-08-01, 2026-08-15, 2026-08-31');
-    expect(container.textContent).not.toContain('Updated: 2026-08-31');
+    expect(container.textContent).toContain('Dates: Aug 1, 2026, Aug 15, 2026, Aug 31, 2026');
+    expect(container.textContent).not.toContain('Updated: Aug 31, 2026');
   });
 });

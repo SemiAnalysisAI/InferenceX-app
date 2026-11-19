@@ -1,30 +1,16 @@
 import type { CSSProperties } from 'react';
 
-/**
- * October decoration: a few leaves drifting down the left edge of the
- * viewport. Pure CSS (no client JS), aria-hidden and pointer-events: none so
- * it never intercepts clicks or reaches assistive tech. Negative delays start
- * each leaf mid-fall so the strip is populated on first paint. Under
- * `prefers-reduced-motion` the leaves rest in place instead of falling.
- */
 type LeafShape = 'maple' | 'oval';
 
 interface Leaf {
   shape: LeafShape;
-  /** Horizontal position inside the strip, as a percentage. */
   left: number;
-  /** Rendered size in px. */
   size: number;
-  /** Fall duration in seconds. */
   duration: number;
-  /** Negative start offset in seconds. */
   delay: number;
-  /** Peak horizontal sway in px. */
   sway: number;
-  /** Resting top position (%) used when motion is reduced. */
   rest: number;
   color: string;
-  /** Rendered on wide viewports only, keeping phones uncluttered. */
   desktopOnly?: boolean;
 }
 

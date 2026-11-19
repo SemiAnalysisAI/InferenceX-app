@@ -1,7 +1,6 @@
 /**
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
- * It fetches live GitHub Actions artifacts which change while a run is in progress —
- * same policy as `/api/unofficial-run`.
+ * It fetches live GitHub Actions artifacts which change while a run is in progress.
  */
 import { type NextRequest, NextResponse } from 'next/server';
 

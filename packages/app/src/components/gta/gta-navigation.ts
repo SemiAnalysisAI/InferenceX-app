@@ -46,8 +46,6 @@ function graphFor(world: World) {
       previous = key;
     }
   }
-  // The deliberately compressed freeway overlaps streets without sharing OSM
-  // vertices. Join only overlapping, unobstructed road surfaces (at most 15 m).
   for (const key of freeway) {
     const p = graph.get(key)!;
     for (const line of lines) {
@@ -92,7 +90,6 @@ function graphFor(world: World) {
   return graph;
 }
 
-/** GPS uses all mapped drivable roads, not just the subset populated by traffic. */
 export function streetRoute(world: World, from: Point, to: Point): Point[] {
   if (distance(from, to) < 18) return [];
   const graph = graphFor(world);

@@ -1,8 +1,6 @@
 import type { Generated } from 'kysely';
 import type { AltHash, PrivacyMode } from './shared/trace';
 
-// ── Core tables ──
-
 export interface ClientsTable {
   id: Generated<string>;
   api_key_hash: string;
@@ -17,8 +15,6 @@ export interface SessionsTable {
   started_at: Generated<Date>;
   last_active_at: Generated<Date>;
   metadata: SessionMetadata | null;
-  // Locked at first insert. ON CONFLICT DO UPDATE in upsertSession does not
-  // touch this column, so subsequent ingests read back the original mode.
   privacy_mode: PrivacyMode;
 }
 
@@ -28,18 +24,11 @@ export interface SessionMetadata {
   os?: string;
   arch?: string;
   nodeVersion?: string;
-  /**
-   * Client-kind label contributed by the provider (e.g. 'openai').
-   * Absent for old Anthropic rows; presence distinguishes non-Anthropic traffic
-   * in the UI without parsing user-agent strings.
-   */
   client?: string;
 }
 
 export interface RequestsTable {
   id: Generated<string>;
-  // Proxy-stamped idempotency key, reused across upload retries. Unique index
-  // dedups retried uploads at ingest. NULL for legacy/third-party rows.
   trace_id: string | null;
   session_id: string;
   client_id: string;
@@ -63,14 +52,9 @@ export interface RequestsTable {
   is_streaming: Generated<boolean | null>;
   is_fast_mode: Generated<boolean | null>;
   privacy_mode: Generated<PrivacyMode>;
-  // Version of the trace-production pipeline that wrote this row. Bumped when
-  // the proxy's anonymization/hashing/body-capture changes in a way that makes
-  // older rows incomparable. See CURRENT_TRACE_VERSION in ./shared/trace.
   trace_version: Generated<number>;
   hash_ids: string[] | null;
   hash_token_count: number | null;
-  // Additional tokenizations of the prompt (raw hashed chains under non-primary
-  // tokenizers). Null on rows written before this column / by older proxies.
   alt_hashes: AltHash[] | null;
   cost_usd: number | null;
   web_search_count: Generated<number>;
@@ -78,8 +62,6 @@ export interface RequestsTable {
   error: string | null;
   metadata: Record<string, unknown> | null;
 }
-
-// ── RBAC tables ──
 
 export type DashboardRole = 'admin' | 'user';
 export type DashboardUserStatus = 'pending' | 'approved' | 'rejected' | 'banned';
@@ -122,33 +104,18 @@ export interface RequestStatsTable {
   tool_results: Generated<unknown>;
 }
 
-// Cron-computed tool-analytics payloads, keyed by
-// `ta:<schema-version>:<kind>:<scope>:<trace-version>`. See migration 028.
 export interface ToolAnalyticsCacheTable {
   key: string;
   data: unknown;
   cached_at: Generated<Date>;
 }
 
-// Cron-computed overview/models payloads, keyed by
-// `sc:<schema-version>:<kind>:<scope>:<trace-version>`. Mirrors
-// tool_analytics_cache exactly. See migration 029.
 export interface StatsCacheTable {
   key: string;
   data: unknown;
   cached_at: Generated<Date>;
 }
 
-// Incrementally-maintained daily rollup of `requests`. One row per
-// (UTC day, model, privacy_mode, trace_version, is_fast_mode) holding only
-// ADDITIVE metrics (sums/counts) — percentiles never live here. Powers the
-// lifetime totals + per-model breakdown + daily time-series that /api/overview
-// and /api/models used to compute with full-table scans, and future
-// "behavior over time" trend views. Refreshed from a watermark minus a 48h
-// safety lag (see refreshRollupRequestsDaily). NULL model is stored as the
-// empty-string sentinel so it can sit in the primary key (Postgres PKs reject
-// NULLs); reads that mirror `getTokensByModel` exclude it via `model <> ''`.
-// See migration 029.
 export interface RollupRequestsDailyTable {
   day: string;
   model: string;
@@ -170,8 +137,6 @@ export interface RollupRequestsDailyTable {
   web_search_count: number;
   duration_ms_sum: number;
 }
-
-// ── Database interface ──
 
 export interface Database {
   clients: ClientsTable;

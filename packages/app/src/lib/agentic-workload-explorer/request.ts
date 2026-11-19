@@ -1,9 +1,6 @@
 import { isPublicModel } from '@semianalysisai/inferencex-db/proxytrace/shared/pricing';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 
-/**
- * Parse and clamp pagination params from URL search params.
- */
 const DEFAULT_PAGINATION = { limit: 50, maxLimit: 500 };
 
 export function parsePagination(
@@ -19,12 +16,6 @@ export function parsePagination(
   };
 }
 
-/**
- * Parse the global `?version=N` query param. `all` (or any out-of-range value)
- * returns `null` — meaning "no version filter, show every trace_version" — so
- * callers can pass the result straight into DB ops that accept
- * `traceVersion: number | null`.
- */
 export function parseTraceVersion(searchParams: URLSearchParams): number | null {
   const raw = searchParams.get('version');
   if (raw === null || raw === 'all') return null;
@@ -33,10 +24,6 @@ export function parseTraceVersion(searchParams: URLSearchParams): number | null 
   return n;
 }
 
-/**
- * Parse `?model=`. Only models the public pricing table names are accepted, so the
- * filter cannot confirm whether an unlisted model ID exists; anything else is a 400.
- */
 export function parseModelFilter(
   searchParams: URLSearchParams,
 ): { model: string | null } | Response {

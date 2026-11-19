@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import Link from 'next/link';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -10,18 +10,23 @@ import {
   explorerRelativePath,
   versionQuery,
 } from '@/lib/agentic-workload-explorer/paths';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
 export interface ExplorerNavLink {
-  /** Explorer-relative path, e.g. `/sessions`. */
   path: string;
   label: { en: string; zh: string };
 }
 
-/** Primary sections, shown inline; the rest live in the "More" menu. */
 export const PRIMARY_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/', label: { en: 'Overview', zh: '概览' } },
   { path: '/sessions', label: { en: 'Sessions', zh: '会话' } },
@@ -54,14 +59,12 @@ const STRINGS = {
   zh: { more: '更多', navLabel: 'Agentic Workload Explorer 分区', select: '分区' },
 };
 
-/** Whether `relativePath` (explorer-relative) is inside the section at `sectionPath`. */
 export function isActiveSection(relativePath: string | null, sectionPath: string): boolean {
   if (relativePath === null) return false;
   if (sectionPath === '/') return relativePath === '/';
   return relativePath === sectionPath || relativePath.startsWith(`${sectionPath}/`);
 }
 
-/** Number keys 1-9 jump to the first nine sections and 0 to the tenth. */
 function useSectionHotkeys(locale: Locale, query: string) {
   const router = useRouter();
 
@@ -87,10 +90,10 @@ function useSectionHotkeys(locale: Locale, query: string) {
 
 const tabClass = (active: boolean) =>
   cn(
-    'inline-flex items-center gap-1 border-b-2 py-1 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-none',
+    '-mb-px inline-flex items-center gap-1 border-b-2 pt-1 pb-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-none',
     active
-      ? 'border-secondary text-secondary dark:border-primary dark:text-primary'
-      : 'border-transparent text-muted-foreground hover:border-muted-foreground/30',
+      ? 'border-brand text-foreground'
+      : 'border-transparent text-muted-foreground hover:text-foreground',
   );
 
 function MoreMenu({
@@ -129,7 +132,7 @@ function MoreMenu({
       <button
         type="button"
         onClick={() => {
-          track('agentic_workload_more_menu_toggled', { open: !open });
+          track('agentic_workload_more_menu_toggled', { enabled: !open });
           setOpen(!open);
         }}
         aria-expanded={open}
@@ -139,21 +142,21 @@ function MoreMenu({
         <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col rounded-md border border-border bg-popover p-1 shadow-md">
+        <div className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col rounded-lg border border-border/30 bg-popover p-1 shadow-md">
           {MORE_SECTIONS.map((link) => (
-            <Link
+            <IntentPrefetchLink
               key={link.path}
               href={explorerHref(link.path, locale) + query}
               onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
               className={cn(
-                'rounded-sm px-2.5 py-1.5 text-sm transition-colors',
+                'rounded-md px-2.5 py-1.5 text-sm transition-colors',
                 isActiveSection(relativePath, link.path)
                   ? 'bg-brand/10 text-brand'
                   : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
               )}
             >
               {link.label[locale]}
-            </Link>
+            </IntentPrefetchLink>
           ))}
         </div>
       )}
@@ -166,11 +169,6 @@ function SectionNavWithVersion() {
   return <SectionNavInner query={versionQuery(searchParams.get('version'))} />;
 }
 
-/**
- * Explorer section tabs (desktop) and a section picker (mobile). Links keep
- * the current `?version=` selection; `useSearchParams` needs a Suspense
- * boundary, so the static render falls back to links without it.
- */
 export function SectionNav() {
   return (
     <Suspense fallback={<SectionNavInner query="" />}>
@@ -194,33 +192,36 @@ function SectionNavInner({ query }: { query: string }) {
 
   return (
     <>
-      <label className="flex items-center gap-2 text-sm lg:hidden">
+      <div className="flex items-center gap-2 text-sm lg:hidden">
         <span className="text-muted-foreground">{strings.select}</span>
-        <select
+        <Select
           value={activePath}
-          onChange={(e) => {
-            track('agentic_workload_section_selected', { section: e.target.value });
-            router.push(explorerHref(e.target.value, locale) + query);
+          onValueChange={(next) => {
+            track('agentic_workload_section_selected', { section: next });
+            router.push(explorerHref(next, locale) + query);
           }}
-          className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm"
         >
-          {activePath === '' && <option value="" disabled />}
-          {ALL_SECTIONS.map((link) => (
-            <option key={link.path} value={link.path}>
-              {link.label[locale]}
-            </option>
-          ))}
-        </select>
-      </label>
+          <SelectTrigger aria-label={strings.select} className="min-h-11 min-w-0 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ALL_SECTIONS.map((link) => (
+              <SelectItem key={link.path} value={link.path}>
+                {link.label[locale]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <nav
         aria-label={strings.navLabel}
-        className="relative z-40 hidden rounded-xl border border-border/40 bg-surface px-6 py-4 backdrop-blur-[2px] lg:block"
+        className="relative z-40 hidden border-b border-border/30 lg:block"
       >
-        <div className="flex items-center justify-evenly gap-4">
+        <div className="flex items-end gap-6">
           {PRIMARY_SECTIONS.map((link, index) => {
             const active = isActiveSection(relativePath, link.path);
             return (
-              <Link
+              <IntentPrefetchLink
                 key={link.path}
                 href={explorerHref(link.path, locale) + query}
                 aria-current={active ? 'page' : undefined}
@@ -229,7 +230,7 @@ function SectionNavInner({ query }: { query: string }) {
                 className={tabClass(active)}
               >
                 {link.label[locale]}
-              </Link>
+              </IntentPrefetchLink>
             );
           })}
           <MoreMenu relativePath={relativePath} locale={locale} query={query} />

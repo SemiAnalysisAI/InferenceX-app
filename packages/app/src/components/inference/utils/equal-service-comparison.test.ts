@@ -76,6 +76,22 @@ const options = {
   xField: 'mean_intvty' as const,
 };
 
+const role = (overrides: Partial<InferenceData>) =>
+  point({
+    disagg: true,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    joules_per_input_token: 1,
+    joules_per_output_token: 8,
+    prefill_joules_per_input_token: 0.4,
+    decode_joules_per_output_token: 4.8,
+    measuredPrefillAvgPower: metric(300),
+    measuredDecodeAvgPower: metric(500),
+    ...overrides,
+  });
+
 describe('equal-service comparison', () => {
   it('interpolates each raw quantity first, retains endpoints, and uses one percentage sign convention', () => {
     const result = buildEqualServiceComparison([...a, ...b], options);
@@ -104,7 +120,6 @@ describe('equal-service comparison', () => {
       [1, 8, a[0].run_url],
       [2, 1, a[1].run_url],
     ]);
-    // Interpolating the endpoint percentages instead would incorrectly give 62.5%.
     expect(result.metrics.meanWattsPerGpu.changePercent).not.toBe(62.5);
   });
 
@@ -124,6 +139,8 @@ describe('equal-service comparison', () => {
     const pd = point({
       hwKey: 'gb200',
       disagg: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
       physicalChips: 8,
       num_prefill_gpu: 4,
       num_decode_gpu: 4,
@@ -166,7 +183,6 @@ describe('equal-service comparison', () => {
   });
 
   it('keys a stitched append-only curve by its snapshot; rows without one keep their own run', () => {
-    // B200 TP4: run 35905882425 appended c1–c4 onto run 35843506474's c8–c128.
     const snapshot = { curve_workflow_run_id: 35843506474, curve_date: '2026-09-20' };
     const stitched = [
       point({
@@ -224,22 +240,6 @@ describe('equal-service comparison', () => {
   );
 
   it('plots role panels on the trace-derived P75/P90 axes from point.x without interpolating on them', () => {
-    const role = (overrides: Partial<InferenceData>) =>
-      point({
-        disagg: true,
-        num_prefill_gpu: 4,
-        num_decode_gpu: 4,
-        power_valid: 1,
-        power_metric_schema_version: 2,
-        joules_per_input_token: 1,
-        joules_per_output_token: 8,
-        prefill_joules_per_input_token: 0.4,
-        decode_joules_per_output_token: 4.8,
-        measuredPrefillAvgPower: metric(300),
-        measuredDecodeAvgPower: metric(500),
-        ...overrides,
-      });
-    // The chart and the views API both store the derived value on `x` only.
     const rows = [
       role({ id: 1, x: 31.2 }),
       role({ id: 2, x: 24.8, conc: 16 }),

@@ -14,9 +14,6 @@ import {
   isKnownGpu,
 } from '@/lib/catalog/constants';
 
-// ===========================================================================
-// GPU_KEY_ALIASES / GPU_ALIAS_TO_CANONICAL
-// ===========================================================================
 describe('GPU_KEY_ALIASES', () => {
   it('maps gb200_dynamo-trt to its legacy trtllm key', () => {
     expect(GPU_KEY_ALIASES['gb200_dynamo-trt']).toContain('gb200_dynamo-trtllm');
@@ -59,9 +56,6 @@ describe('GPU_ALIAS_TO_CANONICAL', () => {
   });
 });
 
-// ===========================================================================
-// hardwareKeyMatchesBase / hardwareKeyMatchesAnyBase
-// ===========================================================================
 describe('hardwareKeyMatchesBase', () => {
   it('matches exact registry key and prefixed variants', () => {
     expect(hardwareKeyMatchesBase('h100', 'h100')).toBe(true);
@@ -84,9 +78,6 @@ describe('hardwareKeyMatchesAnyBase', () => {
   });
 });
 
-// ===========================================================================
-// getHardwareConfig
-// ===========================================================================
 describe('getHardwareConfig', () => {
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -121,6 +112,15 @@ describe('getHardwareConfig', () => {
     const config = getHardwareConfig('h100_nonexistent');
     expect(config.label).toBe('H100');
     expect(config.suffix).toBe('(NONEXISTENT)');
+  });
+
+  it('labels disaggregated vLLM in chart legends and tooltips', () => {
+    const config = getHardwareConfig('mi355x_vllm-disagg');
+    expect(config.name).toBe('mi355x-vllm-disagg');
+    expect(config.label).toBe('MI355X');
+    expect(config.suffix).toBe('(MoRI vLLM)');
+    expect(config.gpu).toContain('MoRI vLLM');
+    expect(getHardwareConfig('mi355x_vllm-disagg_mtp').suffix).toBe('(MoRI vLLM, MTP)');
   });
 
   it('handles GB200 NVL72 label vs gpu name divergence', () => {
@@ -164,14 +164,17 @@ describe('getHardwareConfig', () => {
     });
   });
 
-  it('returns unknown config when base GPU is not recognised', () => {
-    const config = getHardwareConfig('completelynew');
-    expect(config.label).toBe('Unknown');
-  });
-
-  it('returns unknown config when neither key nor base is recognised', () => {
-    const config = getHardwareConfig('completelynew_variant');
-    expect(config.label).toBe('Unknown');
+  it('labels an unregistered base GPU by its raw name and keeps its parts', () => {
+    expect(getHardwareConfig('completelynew')).toMatchObject({
+      name: 'completelynew',
+      label: 'COMPLETELYNEW',
+      suffix: '',
+    });
+    expect(getHardwareConfig('completelynew_sglang_mtp')).toMatchObject({
+      name: 'completelynew-sglang-mtp',
+      label: 'COMPLETELYNEW',
+      suffix: '(SGLang, MTP)',
+    });
   });
 
   it('always returns an object with required fields (name, label)', () => {
@@ -182,11 +185,10 @@ describe('getHardwareConfig', () => {
     }
   });
 
-  it('logs a console.warn for unknown keys', () => {
+  it('logs a console.warn for the unknown sentinel key', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    getHardwareConfig('not-a-real-gpu');
-    // first warn: the key itself not found; second warn: base key also not found
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not-a-real-gpu'));
+    expect(getHardwareConfig('unknown').label).toBe('Unknown');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown'));
     warnSpy.mockRestore();
   });
 
@@ -205,8 +207,6 @@ describe('getHardwareConfig', () => {
   });
 
   it('does not let the model-scoped cache leak into the model-less lookup', () => {
-    // Prime the cache with the M3 (EAGLE) variant first, then ensure the
-    // model-less call still returns the generic label.
     getHardwareConfig('b200_vllm_mtp', 'MiniMax-M3');
     expect(getHardwareConfig('b200_vllm_mtp').suffix).toBe('(vLLM, MTP)');
   });
@@ -229,7 +229,6 @@ describe('getHardwareConfig', () => {
     for (const [gpu, entry] of Object.entries(HW_REGISTRY)) {
       for (const tier of ['costh', 'costr'] as const) {
         const value = entry[tier];
-        // A published rate, never a raw TCO-model output with 16 digits.
         expect(`${gpu}.${tier}=${value}`).toBe(`${gpu}.${tier}=${Math.round(value * 100) / 100}`);
       }
     }
@@ -254,9 +253,6 @@ describe('getHardwareConfig', () => {
   });
 });
 
-// ===========================================================================
-// getGpuSpecs
-// ===========================================================================
 describe('getGpuSpecs', () => {
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
@@ -326,9 +322,6 @@ describe('getGpuSpecs', () => {
   });
 });
 
-// ===========================================================================
-// getModelSortIndex
-// ===========================================================================
 describe('getModelSortIndex', () => {
   it('extracts base key from compound keys', () => {
     expect(getModelSortIndex('h100_vllm')).toBe(getModelSortIndex('h100'));

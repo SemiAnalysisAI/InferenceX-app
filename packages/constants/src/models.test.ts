@@ -45,6 +45,23 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).toEqual(['minimaxm3']);
   });
 
+  it('keeps GLM-5.3-Flash separate from both historical GLM buckets', () => {
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.3-Flash']).toEqual(['glm5.3flash']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.2']).toEqual(['glm5.2', 'glm5.3']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(['glm5', 'glm5.1']);
+    expect(getModelReleaseDate('GLM-5.3-Flash')).toBeNull();
+  });
+
+  it('keeps minimaxm31flash in its own MiniMax-M3.1-Flash display bucket', () => {
+    expect(DISPLAY_MODEL_TO_DB['MiniMax-M3.1-Flash']).toEqual(['minimaxm31flash']);
+    expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).not.toContain('minimaxm31flash');
+  });
+
+  it('keeps kimik3.1 in its own Kimi-K3.1-Pro display bucket', () => {
+    expect(DISPLAY_MODEL_TO_DB['Kimi-K3.1-Pro']).toEqual(['kimik3.1']);
+    expect(DISPLAY_MODEL_TO_DB['Kimi-K3']).toEqual(['kimik3']);
+  });
+
   it('keeps kimik3 out of the grouped Kimi-K2.5 display bucket', () => {
     expect(DISPLAY_MODEL_TO_DB['Kimi-K3']).toEqual(['kimik3']);
     expect(DISPLAY_MODEL_TO_DB['Kimi-K2.5']).not.toContain('kimik3');
@@ -55,15 +72,11 @@ describe('MODEL_RELEASE_DATES', () => {
   it('stores every date as a real calendar day in YYYY-MM-DD', () => {
     for (const [model, date] of Object.entries(MODEL_RELEASE_DATES)) {
       expect(date, model).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
-      // `new Date` happily accepts '2026-02-30' and rolls it into March, so
-      // round-tripping is the only way to catch a day that does not exist.
       expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10), model).toBe(date);
     }
   });
 
   it('has no model releasing in the future', () => {
-    // A future date is the signature of a typo'd year, and it would put the
-    // Fleet Lifecycle anchor after every sweep it is meant to precede.
     const today = new Date().toISOString().slice(0, 10);
     for (const [model, date] of Object.entries(MODEL_RELEASE_DATES)) {
       expect(
@@ -74,8 +87,6 @@ describe('MODEL_RELEASE_DATES', () => {
   });
 
   it('is keyed by display name, never by DB model key', () => {
-    // Keying by 'dsv4' instead of 'DeepSeek-V4-Pro' does not fail loudly — the
-    // lookup just returns null forever and the caller silently falls back.
     const dbKeys = new Set(Object.keys(DB_MODEL_TO_DISPLAY));
     for (const model of Object.keys(MODEL_RELEASE_DATES)) {
       expect(dbKeys.has(model), `${model} is a DB key, not a display name`).toBe(false);
@@ -83,8 +94,6 @@ describe('MODEL_RELEASE_DATES', () => {
   });
 
   it('returns null rather than throwing for a model with no sourced date', () => {
-    // Every model shipped today has a date, so this documents the fallback path
-    // that a future model arrives on rather than an existing gap.
     expect(getModelReleaseDate('not-a-model')).toBeNull();
     expect(getModelReleaseDate('')).toBeNull();
   });

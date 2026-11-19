@@ -2,7 +2,6 @@ import { SOUND_VARIANTS, type SoundKey } from './mc-atlas';
 
 const SOUND_BASE = '/decorative/minecraft/game/sounds/';
 
-/** File URL for one variant of a sound key (variant 0 when the key has a single file). */
 export function soundUrl(key: SoundKey, variant: number) {
   const name = key.replaceAll('/', '-');
   return `${SOUND_BASE}${name}${SOUND_VARIANTS[key] ? variant + 1 : ''}.mp3`;
@@ -16,7 +15,6 @@ export function soundEnabled() {
   }
 }
 
-/** Web Audio playback of the vanilla sound effects with distance attenuation. */
 export class Audio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -39,7 +37,6 @@ export class Audio {
     return this.ctx;
   }
 
-  /** Resume after a user gesture (browsers start contexts suspended). */
   resume() {
     const ctx = this.context();
     if (ctx && ctx.state === 'suspended') void ctx.resume();
@@ -68,7 +65,6 @@ export class Audio {
     return p;
   }
 
-  /** Warm the cache for frequently used sounds. */
   preload(keys: SoundKey[]) {
     for (const key of keys) {
       const n = Math.max(1, SOUND_VARIANTS[key]);
@@ -76,10 +72,6 @@ export class Audio {
     }
   }
 
-  /**
-   * Play a sound at a world position relative to the listener.
-   * Volume falls off linearly over 16 blocks per unit of volume, like vanilla.
-   */
   play(key: SoundKey, volume = 1, pitch = 1, distance = 0) {
     if (!this.enabled) return;
     const range = 16 * Math.max(1, volume);

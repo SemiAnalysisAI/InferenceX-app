@@ -204,7 +204,7 @@ export function GET(request: NextRequest) {
           : [];
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'compare',
       apiVersion: 'v1',
       generatedAt: derived.newest ?? null,

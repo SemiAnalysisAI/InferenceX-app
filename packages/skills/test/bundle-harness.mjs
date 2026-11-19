@@ -43,6 +43,21 @@ function defaultFixtures() {
   };
 }
 
+function fingerprint(directory) {
+  return files(directory)
+    .map((path) => {
+      const entry = lstatSync(path);
+      const bytes = entry.isFile() ? readFileSync(path) : Buffer.alloc(0);
+      return {
+        path: relative(directory, path).split('\\').join('/'),
+        mode: entry.mode,
+        size: entry.size,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      };
+    })
+    .toSorted((left, right) => left.path.localeCompare(right.path));
+}
+
 export function bundleSuite(fixtures = {}) {
   const suite = packedSkillSuite();
   const registered = { ...defaultFixtures(), ...fixtures };
@@ -136,21 +151,6 @@ globalThis.fetch = async (input) => {
 
   function invoke(args, { offline = false, cwd = suite.project('invoke case-'), env = {} } = {}) {
     return command(offline ? offlinePreload : fixturePreload, args, cwd, env);
-  }
-
-  function fingerprint(directory) {
-    return files(directory)
-      .map((path) => {
-        const entry = lstatSync(path);
-        const bytes = entry.isFile() ? readFileSync(path) : Buffer.alloc(0);
-        return {
-          path: relative(directory, path).split('\\').join('/'),
-          mode: entry.mode,
-          size: entry.size,
-          sha256: createHash('sha256').update(bytes).digest('hex'),
-        };
-      })
-      .toSorted((left, right) => left.path.localeCompare(right.path));
   }
 
   return { create, verify, fingerprint, invoke, readResult };

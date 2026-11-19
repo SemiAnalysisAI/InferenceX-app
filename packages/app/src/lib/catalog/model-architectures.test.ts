@@ -22,20 +22,15 @@ import {
 } from './model-architectures';
 
 describe('MODEL_RELEASE_DATES coverage', () => {
-  it('has a sourced date for every model the user can select', () => {
-    // Without a date the Fleet Lifecycle axis falls back to the model's first
-    // benchmark run, which reads as "this is when the model appeared" when it is
-    // really "this is when we got to it" — for gpt-oss that gap is five weeks.
-    // A model whose release date genuinely cannot be sourced belongs in an
-    // explicit allowlist here, so the gap stays visible; do not delete the test.
+  it('leaves the unverified GLM-5.3-Flash release date unknown', () => {
     const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
-    expect(missing).toEqual([]);
+    expect(missing).toEqual([Model.GLM_5_3_Flash]);
+    expect(getModelArchitecture(Model.GLM_5_3_Flash)).toBeUndefined();
   });
 
   it('anchors each model to its weights publication, not its first sweep', () => {
-    // Pinned so a silent revert fails. Every one of these predates the model's
-    // first InferenceX sweep, which is the invariant that caught the four wrong
-    // dates: a model cannot be benchmarked before its weights exist.
+    expect(getModelReleaseDate(Model.Kimi_K3_1_Pro)).toBe('2026-11-04');
+    expect(getModelReleaseDate(Model.MiniMax_M3_1_Flash)).toBe('2026-10-23');
     expect(getModelReleaseDate(Model.Kimi_K3)).toBe('2026-07-27');
     expect(getModelReleaseDate(Model.GLM_5_2)).toBe('2026-06-13');
     expect(getModelReleaseDate(Model.MiniMax_M3)).toBe('2026-06-07');
@@ -51,11 +46,6 @@ describe('MODEL_RELEASE_DATES coverage', () => {
   });
 
   it('names a real model, so no entry is dead weight', () => {
-    // The table is keyed by string because it lives in the constants package,
-    // below the `Model` enum. A key that matches no model never throws — the
-    // lookup returns null and every caller quietly falls back to its own
-    // default, so a typo here is invisible until someone notices the axis is
-    // anchored to the wrong date. This is the only place both are in scope.
     const displayNames = new Set<string>(Object.values(Model));
     for (const model of Object.keys(MODEL_RELEASE_DATES)) {
       expect(displayNames.has(model), `${model} matches no Model display name`).toBe(true);
@@ -75,6 +65,7 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.Kimi_K3,
       Model.MiniMax_M2_5,
       Model.MiniMax_M3,
+      Model.MiniMax_M3_1_Flash,
     ];
 
     for (const model of models) {
@@ -86,12 +77,6 @@ describe('MODEL_ARCHITECTURES', () => {
   });
 
   it('carries no release date of its own, so there is nothing to diverge from', () => {
-    // This is the guard on the refactor, not a style rule. When each entry kept
-    // its own `releaseDate`, this file and MODEL_RELEASE_DATES disagreed about
-    // DeepSeek-V4-Pro — one of them had it releasing six weeks after its own
-    // first benchmark run — and both were rendered to users. Re-adding the field
-    // here recreates that, so the test fails on the field itself rather than
-    // waiting for the values to drift.
     for (const [model, arch] of Object.entries(MODEL_ARCHITECTURES)) {
       expect(arch, model).toBeDefined();
       expect(Object.keys(arch!), model).not.toContain('releaseDate');
@@ -99,8 +84,6 @@ describe('MODEL_ARCHITECTURES', () => {
   });
 
   it('sources every architecture caption from the one release-date table', () => {
-    // The diagram prints "Released by {developer} on {date}", so an entry with a
-    // developer and no date silently drops the whole caption.
     const missing = Object.values(MODEL_ARCHITECTURES)
       .filter((arch) => arch?.developer && !getModelReleaseDate(arch.model))
       .map((arch) => arch!.model);
@@ -191,7 +174,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.numKVHeads).toBe(8);
     expect(arch?.ffnDim).toBe(28672);
     expect(arch?.vocabSize).toBe(128256);
-    expect(arch?.contextWindow).toBe(128000);
+    expect(arch?.contextWindow).toBe(131072);
     expect(arch?.developer).toBe('Meta');
   });
 
@@ -208,8 +191,6 @@ describe('getModelArchitecture', () => {
     expect(arch?.numKVHeads).toBe(8);
     expect(arch?.ffnDim).toBe(28672);
     expect(arch?.vocabSize).toBe(128256);
-    // The release date is no longer carried here; it lives once in
-    // MODEL_RELEASE_DATES and is asserted in the constants package.
     expect(getModelReleaseDate(Model.Llama3_1_70B)).toBe('2024-07-23');
   });
 
@@ -229,7 +210,8 @@ describe('getModelArchitecture', () => {
     expect(arch?.hasSharedExpert).toBe(true);
     expect(arch?.denseFFNLayers).toBe(3);
     expect(arch?.denseFFNDim).toBe(18432);
-    expect(arch?.contextWindow).toBe(128000);
+    expect(arch?.contextWindow).toBe(163840);
+    expect(arch?.advertisedContextWindow).toBe(128000);
     expect(arch?.developer).toBe('DeepSeek');
     expect(arch?.vocabSize).toBe(129280);
   });
@@ -251,11 +233,8 @@ describe('getModelArchitecture', () => {
     expect(arch?.numExperts).toBe(385);
     expect(arch?.activeExperts).toBe(6);
     expect(arch?.hasSharedExpert).toBe(true);
-    // First 3 layers use hash-routed MoE (not dense FFN), so no dense block —
-    // they render as a dedicated hash-routed prefix block instead.
     expect(arch?.denseFFNLayers).toBeUndefined();
     expect(arch?.hashRoutedLayers).toBe(3);
-    // mHC: residuals are replaced by 4 parallel hyper-connection streams.
     expect(arch?.hyperConnections).toBe(4);
     expect(arch?.slidingWindow).toBe(128);
     expect(arch?.contextWindow).toBe(1048576);
@@ -278,8 +257,6 @@ describe('getModelArchitecture', () => {
     expect(arch?.alternatingLayers).toBeDefined();
     expect(arch?.alternatingLayers).toHaveLength(2);
 
-    // Counts describe the learned-router layers (the first 3 hash-routed layers
-    // are split out into their own block): 29 HCA + 29 CSA + 3 hash = 61.
     const [hca, csa] = arch!.alternatingLayers!;
     expect(hca.label).toBe('Heavily Compressed Attention');
     expect(hca.count).toBe(29);
@@ -328,9 +305,6 @@ describe('getModelArchitecture', () => {
     expect(arch?.activeParams).toBe(104);
     expect(arch?.architectureType).toBe('moe');
     expect(arch?.attentionType).toBe('Hybrid');
-    // KDA + gated MLA is not the DeepSeek V4 CSA/HCA hybrid, so neither the
-    // single-block nor the per-alternating-block attention drill-down applies
-    // (see ModelArchitectureDiagram). V4 keeps the latter, K3 does not.
     expect(arch?.attentionExpandable).toBe(false);
     expect(arch?.alternatingAttentionExpandable).toBe(false);
     expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingAttentionExpandable).not.toBe(
@@ -340,7 +314,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.hiddenSize).toBe(7168);
     expect(arch?.numHeads).toBe(96);
     expect(arch?.ffnDim).toBe(3072);
-    expect(arch?.numExperts).toBe(898); // 896 routed + 2 shared
+    expect(arch?.numExperts).toBe(898);
     expect(arch?.sharedExperts).toBe(2);
     expect(arch?.activeExperts).toBe(16);
     expect(arch?.hasSharedExpert).toBe(true);
@@ -355,19 +329,14 @@ describe('getModelArchitecture', () => {
     const arch = getModelArchitecture(Model.Kimi_K3);
     expect(arch?.alternatingLayers).toHaveLength(2);
     const [kda, mla] = arch!.alternatingLayers!;
-    // The diagram stacks the dense prefix above both alternating blocks, so the
-    // dense-FFN layer (a KDA layer) is carved out of the KDA count: the model
-    // has 69 KDA layers, 68 of which appear in the alternating block.
     expect(kda.count).toBe(68);
     expect(mla.count).toBe(24);
     const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
     expect(totalAlternating + (arch!.denseFFNLayers ?? 0)).toBe(arch!.numLayers);
-    // Neither KDA nor gated MLA uses a sliding window.
     for (const spec of arch!.alternatingLayers!) {
       expect(spec.slidingWindow).toBeUndefined();
     }
-    // The 1:1 "alternating every layer" default would misdescribe a 68:24 split.
-    expect(arch?.alternatingNote).toBe('gated MLA every 4th layer');
+    expect(arch?.alternatingNote).toBe('gated MLA at layers 4, 8, …, 92, 93');
     expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingNote).toBeUndefined();
   });
 
@@ -383,24 +352,19 @@ describe('getModelArchitecture', () => {
   });
 
   it('subtracts the model’s own shared-expert count from the routed figure', () => {
-    // The expert grid renders this string; assuming a single shared expert
-    // would show K3 as "897 routed + 1 shared" against a model card that says
-    // 896 + 2.
     expect(expertRouterSummary(getModelArchitecture(Model.Kimi_K3)!)).toBe(
       'Top-16 of 896 routed + 2 shared',
     );
-    // Unchanged for the DeepSeek-style single-shared-expert models.
     expect(expertRouterSummary(getModelArchitecture(Model.Kimi_K2_5)!)).toBe(
       'Top-8 of 384 routed + 1 shared',
     );
     expect(expertRouterSummary(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(
       'Top-8 of 256 routed + 1 shared',
     );
-    // gpt-oss has no shared expert — no suffix, no subtraction.
     expect(expertRouterSummary(getModelArchitecture(Model.GptOss)!)).toBe('Top-4 of 128 routed');
   });
 
-  it('names K3’s FFN SiTU-GLU and leaves every other model on SwiGLU', () => {
+  it('distinguishes SiTU-GLU, modified SwiGLU and ordinary SwiGLU', () => {
     const k3 = getModelArchitecture(Model.Kimi_K3)!;
     expect(ffnVariantLabel(k3)).toBe('SiTU-GLU');
     expect(ffnGateActivationLabel(k3)).toBe('SiTU');
@@ -410,18 +374,19 @@ describe('getModelArchitecture', () => {
     expect(k3Ffn.leftPath[1]?.name).toBe('SiTU Activation');
     for (const arch of Object.values(MODEL_ARCHITECTURES)) {
       if (!arch || arch.model === Model.Kimi_K3) continue;
+      if (arch.ffnSwiGLUOAI) {
+        expect(ffnVariantLabel(arch)).toBe('SwiGLU-OAI');
+        continue;
+      }
       expect(ffnVariantLabel(arch), `ffn variant for ${arch.model}`).toBe('SwiGLU');
       expect(ffnGateActivationLabel(arch), `gate activation for ${arch.model}`).toBe('SiLU');
     }
   });
 
   it('labels K3’s dense prefix block KDA, not the model-wide hybrid type', () => {
-    // The dense-FFN layer is layer 1, which config.json lists under kda_layers,
-    // so the model-wide "Hybrid Attention" label would misdescribe that block.
     expect(denseLayerAttentionLabel(getModelArchitecture(Model.Kimi_K3)!)).toBe(
       'Kimi Delta Attention (KDA)',
     );
-    // Uniform-attention models keep falling back to their attention type.
     expect(denseLayerAttentionLabel(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(
       'Multi-head Latent Attention',
     );
@@ -453,7 +418,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.contextWindow).toBe(196608);
     expect(arch?.vocabSize).toBe(200064);
     expect(arch?.developer).toBe('MiniMax');
-    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M2');
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M2.5');
   });
 
   it('MiniMax M2.5 has no dense initial layers', () => {
@@ -488,8 +453,8 @@ describe('getModelArchitecture', () => {
   it('returns architecture for gpt-oss 120B with MoE, alternating attention, and sink tokens', () => {
     const arch = getModelArchitecture(Model.GptOss);
     expect(arch).toBeDefined();
-    expect(arch?.totalParams).toBe(120);
-    expect(arch?.activeParams).toBe(5);
+    expect(arch?.totalParams).toBe(116.83);
+    expect(arch?.activeParams).toBe(5.13);
     expect(arch?.architectureType).toBe('moe');
     expect(arch?.attentionType).toBe('AlternatingSinkGQA');
     expect(arch?.numLayers).toBe(36);
@@ -520,10 +485,10 @@ describe('getModelArchitecture', () => {
     expect(sliding.description).toContain('attention sink');
     expect(sliding.slidingWindow).toBe(128);
 
-    expect(full.label).toBe('Causal Grouped Query Attention');
+    expect(full.label).toBe('Causal GQA + Sink');
     expect(full.count).toBe(18);
-    expect(full.description).toContain('full causal masking');
-    // Full-attention block has no sliding window (per-spec, not block-index).
+    expect(full.description).toContain('Full causal GQA');
+    expect(full.description).toContain('softmax sink');
     expect(full.slidingWindow).toBeUndefined();
   });
 
@@ -535,8 +500,6 @@ describe('getModelArchitecture', () => {
   });
 
   it('returns undefined for models without architecture data', () => {
-    // Use a model enum that doesn't have architecture data yet
-    // (all models except the ones we've added may return undefined)
     const definedModels = Object.keys(MODEL_ARCHITECTURES);
     expect(definedModels.length).toBeGreaterThanOrEqual(6);
   });
@@ -585,7 +548,7 @@ describe('getArchitectureSummary', () => {
 
   it('returns MoE summary for gpt-oss 120B', () => {
     const arch = getModelArchitecture(Model.GptOss);
-    expect(getArchitectureSummary(arch!)).toBe('MoE 120B (5B active)');
+    expect(getArchitectureSummary(arch!)).toBe('MoE 116.83B (5.13B active)');
   });
 
   it('returns MoE summary for Kimi K2.5 with trillion-scale params', () => {
@@ -637,7 +600,6 @@ describe('getAttentionSubBlocks', () => {
     expect(flow.layout).toBe('threeWay');
     if (flow.layout !== 'threeWay') return;
 
-    // Q path (left) — projection then RoPE
     expect(flow.leftPath.length).toBe(2);
     expect(flow.leftPath[0].name).toBe('Q Projection');
     expect(flow.leftPath[0].detail).toContain('64 heads');
@@ -645,7 +607,6 @@ describe('getAttentionSubBlocks', () => {
     expect(flow.leftPath[1].name).toBe('RoPE');
     expect(flow.leftPath[1].type).toBe('operation');
 
-    // K path (middle) — projection then RoPE
     expect(flow.middlePath.length).toBe(2);
     expect(flow.middlePath[0].name).toBe('K Projection');
     expect(flow.middlePath[0].detail).toContain('8 KV heads');
@@ -653,15 +614,12 @@ describe('getAttentionSubBlocks', () => {
     expect(flow.middlePath[1].name).toBe('RoPE');
     expect(flow.middlePath[1].type).toBe('operation');
 
-    // V path (right) — independent projection, bypasses RoPE
     expect(flow.rightPath.length).toBe(1);
     expect(flow.rightPath[0].name).toBe('V Projection');
     expect(flow.rightPath[0].detail).toContain('8 KV heads');
 
-    // No intermediate merge — RoPE is per-path now
     expect(flow.intermediateMergeBlocks.length).toBe(0);
 
-    // Final merge: all three converge at attention
     expect(flow.finalMergeBlocks[0].name).toBe('Grouped Attention');
     expect(flow.finalMergeBlocks[0].detail).toBe('64:8 Q:KV ratio');
     expect(flow.finalMergeBlocks[1].name).toBe('Output Projection');
@@ -694,8 +652,6 @@ describe('getAttentionSubBlocks', () => {
     const arch = getModelArchitecture(Model.DeepSeek_R1)!;
     const flow = getAttentionSubBlocks(arch);
 
-    // getAttentionSubBlocks always returns GQA threeWay flow
-    // (MLA is not expandable in the diagram, so these sub-blocks are not rendered)
     expect(flow.layout).toBe('threeWay');
     if (flow.layout !== 'threeWay') return;
 
@@ -707,7 +663,6 @@ describe('getAttentionSubBlocks', () => {
     const arch = getModelArchitecture(Model.GptOss)!;
     const flow = getAttentionSubBlocks(arch);
 
-    // AlternatingSinkGQA is not expandable, but getAttentionSubBlocks still returns valid flow data
     expect(flow.layout).toBe('threeWay');
     if (flow.layout !== 'threeWay') return;
 
@@ -725,7 +680,6 @@ describe('getAttentionSubBlocks', () => {
     const arch = getModelArchitecture(Model.MiniMax_M2_5)!;
     const flow = getAttentionSubBlocks(arch);
 
-    // getAttentionSubBlocks returns valid flow data even though attentionExpandable=false
     expect(flow.layout).toBe('threeWay');
     if (flow.layout !== 'threeWay') return;
 
@@ -750,7 +704,6 @@ describe('getAttentionSubBlocks', () => {
     const arch = getModelArchitecture(Model.Kimi_K2_5)!;
     const flow = getAttentionSubBlocks(arch);
 
-    // MLA is not expandable, but getAttentionSubBlocks still returns valid flow data
     expect(flow.layout).toBe('threeWay');
     if (flow.layout !== 'threeWay') return;
 
@@ -781,7 +734,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // Gate path (left): Gate Projection -> SiLU
     expect(flow.leftPath.length).toBe(2);
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 28,672');
@@ -789,12 +741,10 @@ describe('getFFNSubBlocks', () => {
     expect(flow.leftPath[1].name).toBe('SiLU Activation');
     expect(flow.leftPath[1].type).toBe('activation');
 
-    // Up path (right): Up Projection only
     expect(flow.rightPath.length).toBe(1);
     expect(flow.rightPath[0].name).toBe('Up Projection');
     expect(flow.rightPath[0].detail).toBe('\u2192 28,672');
 
-    // Merge: circled x multiply -> down projection
     expect(flow.mergeBlocks.length).toBe(2);
     expect(flow.mergeBlocks[0].circleSymbol).toBe('\u00D7');
     expect(flow.mergeBlocks[0].type).toBe('operation');
@@ -822,7 +772,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // Expert FFN dim is 2,048
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 2,048');
     expect(flow.rightPath[0].name).toBe('Up Projection');
@@ -838,7 +787,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // Dense FFN dim is 18,432
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 18,432');
     expect(flow.rightPath[0].name).toBe('Up Projection');
@@ -854,7 +802,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // gpt-oss expert FFN dim equals hidden size (2,880)
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 2,880');
     expect(flow.rightPath[0].name).toBe('Up Projection');
@@ -870,7 +817,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // Expert FFN dim is 2,048 (same as DeepSeek R1)
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 2,048');
     expect(flow.rightPath[0].name).toBe('Up Projection');
@@ -886,7 +832,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // Dense FFN dim is 18,432
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 18,432');
     expect(flow.rightPath[0].name).toBe('Up Projection');
@@ -902,7 +847,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // Expert FFN dim is 1,536
     expect(flow.leftPath[0].name).toBe('Gate Projection');
     expect(flow.leftPath[0].detail).toBe('\u2192 1,536');
     expect(flow.rightPath[0].name).toBe('Up Projection');
@@ -918,7 +862,6 @@ describe('getFFNSubBlocks', () => {
     expect(flow.layout).toBe('parallel');
     if (flow.layout !== 'parallel') return;
 
-    // No denseFFNDim on Llama, falls back to regular ffnDim (28,672)
     expect(flow.leftPath[0].detail).toBe('\u2192 28,672');
   });
 
@@ -946,19 +889,14 @@ describe('getHybridAttentionSubBlocks', () => {
     expect(csaFlow.layout).toBe('parallel');
     if (csaFlow.layout !== 'parallel') return;
     expect(csaFlow.leftLabel).toBe('Local');
-    // Local branch is the sliding-window KV source (one explicit block). The
-    // sink is NOT here — it is a learnable softmax bias on the shared MQA.
     expect(csaFlow.leftPath[0].name).toBe('Sliding Window');
     expect(csaFlow.leftPath[0].detail).toContain('128');
     expect(csaFlow.leftPath).toHaveLength(1);
     expect(csaFlow.leftPath.some((b) => b.name === 'Attention Sink')).toBe(false);
-    // CSA compressed branch: light compression then the learned lightning
-    // indexer (sparse top-k) — two stages.
     expect(csaFlow.rightPath.map((b) => b.name)).toEqual([
       'Token Compression',
       'Lightning Indexer',
     ]);
-    // The fused attention is a single shared-KV MQA that carries the sink
     expect(csaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA + Sink');
     expect(csaFlow.mergeBlocks.at(-1)?.name).toBe('Output Projection');
 
@@ -966,7 +904,6 @@ describe('getHybridAttentionSubBlocks', () => {
     if (hcaFlow.layout !== 'parallel') return;
     expect(hcaFlow.leftPath[0].name).toBe('Sliding Window');
     expect(hcaFlow.leftPath).toHaveLength(1);
-    // HCA compressed branch is a single heavy-compression source (no indexer)
     expect(hcaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(false);
     expect(hcaFlow.rightPath.map((b) => b.name)).toEqual(['Heavy Compression']);
     expect(hcaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA + Sink');
@@ -985,7 +922,6 @@ describe('getHybridAttentionSubBlocks', () => {
   });
 });
 
-/** Helper: get all blocks from a flow (flat list for easy assertions) */
 function getAllBlocks(flow: SubBlockFlow) {
   if (flow.layout === 'sequential') return flow.blocks;
   if (flow.layout === 'threeWay')
@@ -998,3 +934,12 @@ function getAllBlocks(flow: SubBlockFlow) {
     ];
   return [...flow.leftPath, ...flow.rightPath, ...flow.mergeBlocks];
 }
+
+describe('Llama 3.1 checkpoint context regression', () => {
+  it('uses the checkpoint position limit and explicit head dimension', () => {
+    expect(getModelArchitecture(Model.Llama3_1_70B)).toMatchObject({
+      contextWindow: 131072,
+      headDim: 128,
+    });
+  });
+});

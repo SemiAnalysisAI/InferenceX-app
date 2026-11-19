@@ -20,7 +20,6 @@ export function ActiveQuickFilters() {
   const t = STRINGS[locale];
   const { quickFilters, selectedSequence, lockedFrameworks } = useInferenceFilters();
   const actions = useInferenceActions();
-  // A framework lock (embed routes) cannot be removed, so it gets no chip.
   const filters = quickFilterSummary(
     quickFilters,
     locale,
@@ -42,7 +41,7 @@ export function ActiveQuickFilters() {
     <section
       aria-label={t.active}
       data-testid="active-quick-filters"
-      className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-3"
+      className="flex flex-wrap items-center gap-2"
     >
       <span className="text-xs font-medium text-muted-foreground">{t.active}</span>
       {filters.map(({ category, value, categoryLabel, label }) => (
@@ -76,8 +75,6 @@ export function ActiveQuickFilters() {
         className="text-muted-foreground"
         data-testid="clear-active-quick-filters"
         onClick={() => {
-          // Clear only displayed categories: an AgentX visit must not erase a
-          // fixed-sequence spec filter that does not apply to this workload.
           new Set(filters.map((filter) => filter.category)).forEach((category) =>
             setCategory(category, []),
           );

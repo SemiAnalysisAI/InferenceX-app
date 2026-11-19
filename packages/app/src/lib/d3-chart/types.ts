@@ -1,6 +1,5 @@
 import type * as d3 from 'd3';
 
-/** D3 selections returned from chart structure setup. */
 export interface ChartLayout {
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   g: d3.Selection<SVGGElement, unknown, null, undefined>;
@@ -30,7 +29,6 @@ export interface ChartSetupConfig {
   xLabel?: string;
   yLabel?: string;
   clipContent?: boolean;
-  /** Skip border lines, axis groups, and grid. Used for radial charts. */
   hideAxes?: boolean;
 }
 

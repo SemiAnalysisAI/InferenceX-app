@@ -1,4 +1,3 @@
-/** Minimal FIFO semaphore for bounding concurrent asynchronous operations. */
 export class AsyncSemaphore {
   private active = 0;
   private readonly waiters: (() => void)[] = [];

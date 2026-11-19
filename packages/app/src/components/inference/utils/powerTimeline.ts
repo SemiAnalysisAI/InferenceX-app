@@ -1,18 +1,3 @@
-/**
- * Joins chart points to the per-second GPU telemetry behind their measured
- * average power (the PowerX "Timeline" display).
- *
- * Every validated row records its window in `power_audit`, whose `source` is
- * `power_validation_<name>.json`. Two collectors publish the telemetry:
- * - single-node runners upload one `gpu_metrics_<name>` CSV artifact per
- *   config, so the source names the artifact exactly;
- * - Slurm / Dynamo runners upload one `power_audit_<RESULT_FILENAME>` bundle per
- *   sweep whose `LOGS/power/samples.csv` covers every concurrency; the API cuts
- *   it into one series per `power_validation_*.json` it contains and labels
- *   each with that `source`, so the same file name joins it to the row.
- * Nothing is matched by hardware or concurrency; points whose telemetry is
- * missing (expired artifact, another collector) are reported, not guessed.
- */
 import {
   bucketTimeMs,
   sumPowerAt,
@@ -30,35 +15,27 @@ interface AuditedPoint {
   power_audit?: { source?: string } | null;
 }
 
-/** The `<name>` of a point's `power_validation_<name>.json` audit source. */
 export function telemetryNameForPoint(point: AuditedPoint): string | null {
   const source = point.power_audit?.source;
   if (!source) return null;
   return SOURCE_PATTERN.exec(source)?.groups?.name ?? null;
 }
 
-/** `gpu_metrics_<RESULT_FILENAME>` for a point, from its power-audit source. */
 export function telemetryArtifactForPoint(point: AuditedPoint): string | null {
   const name = telemetryNameForPoint(point);
   return name ? `${ARTIFACT_PREFIX}${name}` : null;
 }
 
-/**
- * Stable identity of a point's trace: run id plus audit name. Unique within a
- * chart because the audit name carries the config and the concurrency.
- */
 export function traceKeyForPoint(point: AuditedPoint & { run_url?: string }): string | null {
   const runId = runIdFromUrl(point.run_url);
   const name = telemetryNameForPoint(point);
   return runId && name ? `${runId}:${name}` : null;
 }
 
-/** Workflow run id from a GitHub Actions run URL. */
 export function runIdFromUrl(url: string | null | undefined): string | null {
   return url?.match(/\/runs\/(?<runId>\d+)/u)?.groups?.runId ?? null;
 }
 
-/** Attempt number from a `/runs/<id>/attempts/<n>` URL; null when the URL names none. */
 export function runAttemptFromUrl(url: string | null | undefined): number | null {
   const attempt = url?.match(/\/runs\/\d+\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
   return attempt ? Number(attempt) : null;
@@ -78,17 +55,10 @@ export function longestCommonPrefix(values: readonly string[]): string {
 
 export interface PowerTimelineRequest {
   runId: string;
-  /** RESULT_FILENAME prefix shared by every wanted artifact of the run. */
   prefix: string;
-  /** Sorted, unique validation basenames expected by the displayed points. */
   sources: string[];
 }
 
-/**
- * One request per workflow run, narrowed to the common RESULT_FILENAME prefix
- * of the points' artifacts so a sweep of other models is not downloaded.
- * Points without a run URL or an audit source plan nothing.
- */
 export function planPowerTimelineRequests(
   points: readonly InferenceData[],
 ): PowerTimelineRequest[] {
@@ -112,17 +82,11 @@ export function planPowerTimelineRequests(
     });
 }
 
-/** Run id half of a trace key (`traceKeyForPoint`). */
 export function traceKeyRunId(key: string | null | undefined): string | null {
   const runId = key?.split(':')[0];
   return runId || null;
 }
 
-/**
- * Moves the request for `runId` to the front so it survives the per-chart run
- * cap; the order of the other requests is kept. Returns the same array when
- * nothing needs moving.
- */
 export function prioritizeRun(
   requests: PowerTimelineRequest[],
   runId: string | null,
@@ -132,13 +96,6 @@ export function prioritizeRun(
   return [requests[index], ...requests.slice(0, index), ...requests.slice(index + 1)];
 }
 
-/**
- * Moves every request whose run is in `runIds` ahead of the others, keeping
- * the relative order inside both groups. Unofficial-run overlays are loaded
- * on purpose, so their telemetry must survive the per-chart run cap before
- * official rows compete for the remaining slots. Returns the same array when
- * nothing needs moving.
- */
 export function prioritizeRuns(
   requests: PowerTimelineRequest[],
   runIds: ReadonlySet<string>,
@@ -152,12 +109,10 @@ export function prioritizeRuns(
 }
 
 export interface PowerTimelineTrace {
-  /** `traceKeyForPoint(point)`. */
   key: string;
   point: InferenceData;
   runId: string;
   series: GpuPowerSeries;
-  /** Validated measurement window (UTC ms) from `power_audit`, when recorded. */
   windowStartMs: number | null;
   windowEndMs: number | null;
 }
@@ -165,7 +120,6 @@ export interface PowerTimelineTrace {
 export type PowerTimelineAxis = 'wall' | 'elapsed' | 'serving';
 export type PowerTimelineLines = 'mean' | 'gpu' | 'pool';
 
-/** URL input is optional: an omitted axis retains the existing per-run default. */
 export function parsePowerTimelineParams(params: {
   i_ptaxis?: string;
   i_ptlines?: string;
@@ -173,6 +127,7 @@ export function parsePowerTimelineParams(params: {
   i_ptfocus?: string;
   i_ptutility?: string;
   i_ptconc?: string;
+  i_ptraw?: string;
 }) {
   return {
     axis: (['wall', 'elapsed', 'serving'].includes(params.i_ptaxis ?? '')
@@ -185,6 +140,7 @@ export function parsePowerTimelineParams(params: {
     focus:
       params.i_ptfocus && /^[1-9]\d*:[\w.-]+$/u.test(params.i_ptfocus) ? params.i_ptfocus : null,
     utility: params.i_ptutility === '1',
+    raw: params.i_ptraw === '1',
     concurrency: /^[1-9]\d{0,5}$/u.test(params.i_ptconc ?? '') ? Number(params.i_ptconc) : null,
   };
 }
@@ -199,7 +155,6 @@ export function hasPowerTimelineWindow(trace: PowerTimelineTrace): boolean {
   );
 }
 
-/** Filter and position retained buckets only; never infer a missing serving origin. */
 export function powerTimelineSampleX(
   trace: PowerTimelineTrace,
   column: number,
@@ -214,17 +169,6 @@ export function powerTimelineSampleX(
   return (timeMs - origin) / 1000;
 }
 
-/**
- * Why a validated point has no trace:
- * - `no-source`: the row predates `power_audit.source` (older schema), so no
- *   artifact can be named;
- * - `no-run`: no workflow run URL to look in;
- * - `run-not-fetched`: its run is not among the loaded responses (over the
- *   per-chart run limit, still loading, or the request failed);
- * - `not-in-run`: the run was loaded but holds neither a matching
- *   `gpu_metrics_*` artifact nor a power-audit bundle with the point's
- *   validation file (expired, over the download cap, or another collector).
- */
 export type MissingTraceReason = 'no-source' | 'no-run' | 'run-not-fetched' | 'not-in-run';
 
 export interface MissingTrace {
@@ -234,11 +178,9 @@ export interface MissingTrace {
 
 export interface PowerTimelineJoin {
   traces: PowerTimelineTrace[];
-  /** Points with a validated average but no telemetry trace, with the reason. */
   missing: MissingTrace[];
 }
 
-/** Attaches fetched series to points; order follows `points`. */
 export function joinPowerTimeline(
   points: readonly InferenceData[],
   responses: ReadonlyMap<string, GpuPowerSeriesResponse>,
@@ -261,8 +203,6 @@ export function joinPowerTimeline(
       missing.push({ point, reason: 'run-not-fetched' });
       continue;
     }
-    // A bundle-cut series names the point's validation file; a per-config
-    // CSV artifact names the config itself.
     const source = `power_validation_${name}.json`;
     const artifact = `${ARTIFACT_PREFIX}${name}`;
     const series =
@@ -289,7 +229,6 @@ function unixSecondsToMs(seconds: number | undefined): number | null {
   return typeof seconds === 'number' && Number.isFinite(seconds) ? seconds * 1000 : null;
 }
 
-/** Sample position relative to the validated window. */
 export type WindowPhase = 'before' | 'window' | 'after' | 'unknown';
 
 export function windowPhase(trace: PowerTimelineTrace, timeMs: number): WindowPhase {
@@ -299,7 +238,6 @@ export function windowPhase(trace: PowerTimelineTrace, timeMs: number): WindowPh
   return 'window';
 }
 
-/** Short config label: `TP8 · c64`, plus `PD` for disaggregated points. */
 export function traceConfigLabel(point: InferenceData): string {
   const parts: string[] = [];
   if (point.disagg) parts.push('PD');
@@ -312,17 +250,11 @@ export type PowerPoolRole = GpuPowerRole | 'all';
 
 export interface PowerPool {
   role: PowerPoolRole;
-  /** Row indices into `series.power`, in series order. */
   rows: number[];
 }
 
 const POOL_ORDER: readonly PowerPoolRole[] = ['all', 'prefill', 'decode'];
 
-/**
- * The GPU pools of a series by worker role, in `prefill`, `decode` order —
- * only the roles that have at least one device. A series whose collector
- * assigns no roles yields no pools; callers fall back to `allGpuPool`.
- */
 export function tracePools(series: Pick<GpuPowerSeries, 'devices' | 'power'>): PowerPool[] {
   const rows = new Map<PowerPoolRole, number[]>();
   series.devices?.forEach((device, row) => {
@@ -341,11 +273,6 @@ export interface PoolSizeGroup {
   roles: PowerPoolRole[];
 }
 
-/**
- * Pools that hold the same number of GPUs share one rated ceiling, so their
- * reference draws once, labelled `prefill / decode ×16`, instead of two labels
- * printed over each other. Sizes ascending, roles in pool order, deduplicated.
- */
 export function groupPoolsBySize(
   pools: readonly Pick<PowerPool, 'role' | 'rows'>[],
 ): PoolSizeGroup[] {
@@ -362,54 +289,86 @@ export function groupPoolsBySize(
     }));
 }
 
+/** Seconds of the centered rolling mean the timeline draws unless raw samples are requested. */
+export const POWER_TIMELINE_SMOOTH_SECONDS = 30;
+
 /**
- * Label row for each reference line: lines at the same watts (different
- * hardware with an equal pool ceiling) stack their labels upward, slot 0 on
- * the line and slot n `n` rows above, instead of overprinting. Input order.
+ * Centered rolling mean over `window` samples. Nulls are skipped inside a window and stay null
+ * in the output, so gaps in telemetry are never bridged with invented values.
  */
-export function referenceLabelSlots(lines: readonly { watts: number }[]): number[] {
-  const used = new Map<number, number>();
-  return lines.map((line) => {
-    const slot = used.get(line.watts) ?? 0;
-    used.set(line.watts, slot + 1);
-    return slot;
+export function rollingMean(values: readonly (number | null)[], window: number): (number | null)[] {
+  const span = Math.max(1, Math.round(window));
+  if (span <= 1) return [...values];
+  const half = Math.floor(span / 2);
+  const sums = [0];
+  const counts = [0];
+  for (const value of values) {
+    const valid = value !== null && Number.isFinite(value);
+    sums.push(sums.at(-1)! + (valid ? value : 0));
+    counts.push(counts.at(-1)! + (valid ? 1 : 0));
+  }
+  return values.map((value, index) => {
+    if (value === null || !Number.isFinite(value)) return null;
+    const lo = Math.max(0, index - half);
+    const hi = Math.min(values.length, index - half + span);
+    const count = counts[hi] - counts[lo];
+    return count > 0 ? (sums[hi] - sums[lo]) / count : null;
   });
 }
 
 /**
- * Rows for end-of-line trace labels in pixel space: a label whose box overlaps
- * one already placed (both ranges intersect) moves one `rowHeight` below it,
- * top anchors first, so pools ending at the same watts do not overprint.
- * Returns each label's y in input order.
+ * Moves label centers apart so no two are closer than `rowHeight`, keeping their order and
+ * staying inside [min, max]. Labels are shifted symmetrically around their wanted position
+ * instead of only downwards, so a cluster stays centered on the lines it names.
  */
-export function stackTraceLabels(
-  labels: readonly { left: number; right: number; y: number }[],
+export function spreadLabelYs(
+  wanted: readonly number[],
   rowHeight: number,
+  min: number,
+  max: number,
 ): number[] {
-  const ys = labels.map((label) => label.y);
-  const placed: { left: number; right: number; y: number }[] = [];
-  const order = labels.map((_, index) => index).toSorted((a, b) => labels[a].y - labels[b].y);
+  const order = wanted.map((_, index) => index).toSorted((a, b) => wanted[a] - wanted[b]);
+  interface Block {
+    start: number;
+    members: number[];
+    center: number;
+  }
+  const blocks: Block[] = [];
   for (const index of order) {
-    const { left, right } = labels[index];
-    let y = ys[index];
-    // Each move strictly lowers the label, so this ends within `placed.length` passes.
-    let moved = true;
-    while (moved) {
-      moved = false;
-      for (const other of placed) {
-        if (left < other.right && other.left < right && Math.abs(y - other.y) < rowHeight) {
-          y = other.y + rowHeight;
-          moved = true;
-        }
-      }
+    let block: Block = { start: wanted[index], members: [index], center: wanted[index] };
+    while (blocks.length > 0) {
+      const previous = blocks.at(-1)!;
+      if (previous.start + previous.members.length * rowHeight <= block.start) break;
+      blocks.pop();
+      const members = [...previous.members, ...block.members];
+      const center = members.reduce((sum, member) => sum + wanted[member], 0) / members.length;
+      block = { members, center, start: center - ((members.length - 1) * rowHeight) / 2 };
     }
-    ys[index] = y;
-    placed.push({ left, right, y });
+    blocks.push(block);
+  }
+  const ys = [...wanted];
+  const total = order.length * rowHeight;
+  const room = Math.max(0, max - min);
+  // Clamp the whole layout into range; when it cannot fit, compress the row height evenly.
+  const row = total - rowHeight > room && order.length > 1 ? room / (order.length - 1) : rowHeight;
+  let cursor = min;
+  for (const block of blocks) {
+    let y = Math.max(block.start, cursor);
+    for (const member of block.members) {
+      ys[member] = y;
+      y += row;
+    }
+    cursor = y;
+  }
+  // Pull back from the bottom edge, preserving spacing.
+  let ceiling = max;
+  for (const index of order.toReversed()) {
+    if (ys[index] > ceiling) ys[index] = ceiling;
+    ceiling = ys[index] - row;
   }
   return ys;
 }
 
-/** Every GPU of the series as one pool. */
 export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
   return { role: 'all', rows: series.power.map((_, row) => row) };
 }
@@ -417,24 +376,15 @@ export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
 export interface TracePoolSummary {
   role: PowerPoolRole;
   gpuCount: number;
-  /** Highest drawn one-second pool sum inside the window; null when none was complete. */
   peakWatts: number | null;
 }
 
 export interface TraceWindowSummary {
-  /** Recorded validated serving-window length, or null when bounds are missing. */
   windowSeconds: number | null;
   bucketSeconds: number;
   pools: TracePoolSummary[];
 }
 
-/**
- * What a Timeline reader needs next to the curves: the validated window's
- * length and, per pool, its GPU count and the peak of the drawn pool line
- * inside the window. A bucket missing a pool device is a gap in the line, so
- * it is skipped. Averages are not recomputed: the benchmark row's validated
- * figures stay the only means.
- */
 export function summarizeTraceWindow(
   trace: PowerTimelineTrace,
   pools: readonly PowerPool[],
@@ -461,22 +411,90 @@ export function summarizeTraceWindow(
   };
 }
 
-// ── Deep link from a pinned scatter tooltip ─────────────────────────────────
-//
-// "View power trace" on a pinned tooltip switches the metric to the Timeline
-// display; the timeline mounts afterwards and reads the requested trace here
-// so it can emphasise that config. The one-shot gesture takes precedence over
-// restored URL focus; the mounted timeline then persists it with its view state.
-
 let pendingFocus: string | null = null;
 
 export function requestPowerTraceFocus(key: string): void {
   pendingFocus = key;
 }
 
-/** The pending focus request, cleared on read. */
 export function consumePowerTraceFocus(): string | null {
   const key = pendingFocus;
   pendingFocus = null;
   return key;
+}
+
+/**
+ * Concurrency shared by the most hardware configs (ties go to the higher level),
+ * so a first look at the timeline compares chips at one load instead of every sweep point.
+ */
+export function mostCoveredConcurrency(
+  points: readonly { conc: number; hwKey: string }[],
+): number | null {
+  const coverage = new Map<number, Set<string>>();
+  for (const { conc, hwKey } of points) {
+    if (!Number.isSafeInteger(conc) || conc <= 0) continue;
+    let keys = coverage.get(conc);
+    if (!keys) coverage.set(conc, (keys = new Set()));
+    keys.add(hwKey);
+  }
+  let best: number | null = null;
+  let bestCount = 0;
+  for (const [conc, keys] of coverage) {
+    if (keys.size > bestCount || (keys.size === bestCount && best !== null && conc > best)) {
+      best = conc;
+      bestCount = keys.size;
+    }
+  }
+  return best;
+}
+
+/** What the timeline shows in place of (or on top of) its plot. */
+export type PowerTimelineStatus =
+  | { kind: 'loading'; runs: number; blocking: boolean }
+  | { kind: 'error'; blocking: true }
+  | { kind: 'empty'; reason: 'noArtifacts' | 'noTraces'; blocking: true }
+  | { kind: 'empty'; reason: 'missingWindow'; missing: number; blocking: true };
+
+export interface PowerTimelineStatusInput {
+  /** Requests still in flight. */
+  loadingRuns: number;
+  /** Requests that were sent (after the per-chart run cap). */
+  fetchedRuns: number;
+  /** Requests that failed. */
+  failedRuns: number;
+  /** Whether any plotted point has a telemetry artifact to request. */
+  hasAnyArtifact: boolean;
+  /** Traces that pass the legend, concurrency and overlay filters. */
+  visibleTraces: number;
+  /** Visible traces omitted because they lack serving-window bounds. */
+  missingWindows: number;
+  /** Whether at least one line can be drawn. */
+  drawable: boolean;
+}
+
+/**
+ * Decides the timeline's status panel. A blocking status replaces the plot (its placeholder axes
+ * are hidden); a non-blocking one is a small notice over lines that are already drawn, so a run
+ * that is still loading never hides the runs that have arrived.
+ */
+export function powerTimelineStatus(input: PowerTimelineStatusInput): PowerTimelineStatus | null {
+  if (input.drawable) {
+    return input.loadingRuns > 0
+      ? { kind: 'loading', runs: input.loadingRuns, blocking: false }
+      : null;
+  }
+  if (input.loadingRuns > 0) return { kind: 'loading', runs: input.loadingRuns, blocking: true };
+  if (!input.hasAnyArtifact) return { kind: 'empty', reason: 'noArtifacts', blocking: true };
+  if (input.fetchedRuns > 0 && input.failedRuns === input.fetchedRuns) {
+    return { kind: 'error', blocking: true };
+  }
+  if (input.visibleTraces > 0 && input.missingWindows === input.visibleTraces) {
+    return {
+      kind: 'empty',
+      reason: 'missingWindow',
+      missing: input.missingWindows,
+      blocking: true,
+    };
+  }
+  return { kind: 'empty', reason: 'noTraces', blocking: true };
 }

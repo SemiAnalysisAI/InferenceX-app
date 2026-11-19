@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readFirstFound } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   listConversations,
@@ -29,7 +29,7 @@ const getCachedConversations = cachedQuery(
       sort: sort as ListConversationsOpts['sort'],
     };
 
-    return listConversations(getDb(), slug, opts);
+    return readFirstFound((sql) => listConversations(sql, slug, opts));
   },
   'dataset-conversations',
 );
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const data = await getCachedConversations(slug, search, limit, offset, sort);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching dataset conversations:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

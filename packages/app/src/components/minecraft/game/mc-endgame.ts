@@ -12,7 +12,6 @@ export interface Progress {
   netherPortal?: [number, number, number];
 }
 
-/** Rules confined to the optional Minecraft bundle. No application-level effects. */
 export class Endgame {
   progress: Progress = { dragonDefeated: false, completed: false, arenaInitialized: false };
   portalCooldown = 0;
@@ -27,7 +26,6 @@ export class Endgame {
     this.game.message(this.game.locale === 'zh' ? zh : en);
   }
 
-  /** A frame may be 2–21 blocks wide and 3–21 high; corners are optional. */
   ignite(x: number, y: number, z: number) {
     const w = this.game.world;
     if (w.dimension === 'end' || w.getBlock(x, y, z) !== B.air) return false;
@@ -110,7 +108,6 @@ export class Endgame {
         if (g.world.getMeta(hit.x, hit.y, hit.z) & 4) return true;
         g.world.setBlock(hit.x, hit.y, hit.z, B.endFrame, 4, false);
         consume();
-        // Find the ring around this frame, including player-built creative portals.
         for (const [dx, dz] of PORTAL_RING) {
           const cx = hit.x - dx,
             cz = hit.z - dz;
@@ -133,7 +130,6 @@ export class Endgame {
           dz = target.z - p.z,
           distance = Math.hypot(dx, dz) || 1;
         consume();
-        // An eye flies toward the stronghold and falls as a recoverable item.
         g.spawnItem(
           { id: 'ender_eye', count: 1 },
           p.x,
@@ -175,7 +171,6 @@ export class Endgame {
 
   private buildPortal(x: number, y: number, z: number) {
     const w = this.game.world;
-    // Clear a protected landing pad before allowing physics in the destination.
     for (let a = -2; a <= 4; a++)
       for (let b = -2; b <= 2; b++)
         for (let h = -1; h <= 4; h++)
@@ -196,7 +191,6 @@ export class Endgame {
     const g = this.game;
     g.closeScreen();
     g.dimensions.set(g.dimension, g.dimensionState());
-    // Only the active dimension keeps generated terrain in memory.
     for (const c of g.world.chunks.values()) g.world.unloadChunk(c.cx, c.cz);
     const state = g.dimensions.get(dimension);
     g.dimension = dimension;
@@ -256,9 +250,7 @@ export class Endgame {
         (destination === 'nether'
           ? 49
           : g.dimensions.get('overworld')!.world.terrain.spawnHeight(x, z));
-      // The linked portal cell is safe for either frame orientation; its exterior may be walled in.
       this.travel(destination, [x + 0.5, y, z + 0.5]);
-      // Rebuild only if the linked frame was destroyed, never overwrite intact landing areas.
       if (!existing || g.world.getBlock(x, y, z) !== B.netherPortal) this.buildPortal(x, y, z);
       this.progress[targetKey] = [x, y, z];
     } else if (id === B.endPortal) {
@@ -296,7 +288,6 @@ export class Endgame {
     if (g.ticks % 100 === 0 && g.difficulty !== 'peaceful' && g.dimension !== 'end') this.spawn();
   }
 
-  /** Extinguish a portal whose frame was mined or exploded. */
   validatePortal(x: number, y: number, z: number) {
     const w = this.game.world;
     const axis = w.getMeta(x, y, z) & 1;
@@ -413,7 +404,6 @@ export class Endgame {
       }
       return true;
     }
-    // Circle, descend/perch (melee window), then charge; all movement is 20 Hz.
     const phase = e.age % 800;
     const perch = phase >= 440 && phase < 620;
     const charge = phase >= 620;

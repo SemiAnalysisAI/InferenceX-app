@@ -22,7 +22,6 @@ const roots: string[] = [];
 const GITHUB_RUN_ID = 34557177019;
 const RUN = { github_run_id: GITHUB_RUN_ID, run_attempt: 2 };
 
-/** Raw `bmk_` JSON as the runner emits it for a fixed-sequence sweep. */
 function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -59,10 +58,6 @@ afterAll(async () => {
   await db?.close();
 });
 
-/**
- * Config 1 matches the fixture rows; config 2 differs only in decode_tp. Attempt 1
- * of the same GitHub run holds a point that must never be matched from attempt 2.
- */
 beforeEach(async () => {
   await db.exec(`TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE;
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, created_at, date)

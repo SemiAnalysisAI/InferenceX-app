@@ -21,8 +21,8 @@ describe('collapseRuns', () => {
 describe('analyzeToolSequences — summary', () => {
   it('computes repeat share and longest streak', () => {
     const result = analyzeToolSequences([
-      ['Bash', 'Bash', 'Bash', 'Bash', 'Read'], // 5 calls → 2 steps
-      ['Edit', 'Edit', 'Bash'], // 3 calls → 2 steps
+      ['Bash', 'Bash', 'Bash', 'Bash', 'Read'],
+      ['Edit', 'Edit', 'Bash'],
     ]);
     expect(result.totalSessions).toBe(2);
     expect(result.totalCalls).toBe(8);
@@ -47,7 +47,6 @@ describe('analyzeToolSequences — motifs', () => {
     const sequences = [
       ['Read', 'Edit', 'Bash'],
       ['Grep', 'Read', 'Edit', 'Bash'],
-      // Read … Edit … Bash appears here only with gaps — must not count.
       ['Read', 'Grep', 'Edit', 'WebFetch', 'Bash'],
     ];
     const result = analyzeToolSequences(sequences);
@@ -99,7 +98,6 @@ describe('analyzeToolSequences — motifs', () => {
       ['Grep', 'WebFetch', 'Write'],
       ['Bash', 'Read', 'Grep'],
     ]);
-    // Every 3-step window is unique to one session; minSupport is 2.
     expect(result.motifs).toEqual([]);
   });
 });
@@ -107,17 +105,17 @@ describe('analyzeToolSequences — motifs', () => {
 describe('analyzeToolSequences — streaks', () => {
   it('computes run percentiles and streak sessions per tool', () => {
     const result = analyzeToolSequences([
-      ['Bash', 'Bash', 'Bash', 'Bash', 'Read', 'Bash'], // Bash runs: 4, 1
-      ['Bash', 'Bash', 'Read', 'Edit'], // Bash runs: 2
-      ['Read', 'Edit', 'Bash'], // Bash runs: 1
+      ['Bash', 'Bash', 'Bash', 'Bash', 'Read', 'Bash'],
+      ['Bash', 'Bash', 'Read', 'Edit'],
+      ['Read', 'Edit', 'Bash'],
     ]);
     const bash = result.streaks.find((s) => s.tool === 'Bash');
     expect(bash).toBeDefined();
     expect(bash!.totalCalls).toBe(8);
-    expect(bash!.runs).toBe(4); // [4, 1, 2, 1]
+    expect(bash!.runs).toBe(4);
     expect(bash!.p50Run).toBe(1);
     expect(bash!.maxRun).toBe(4);
-    expect(bash!.streakSessions).toBe(2); // sessions 1 and 2 have a run ≥ 2
+    expect(bash!.streakSessions).toBe(2);
   });
 
   it('ranks streak rows by total calls', () => {

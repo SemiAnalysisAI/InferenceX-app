@@ -1,20 +1,3 @@
-/**
- * Chip pages — static, indexable SEO surfaces at /chips, /chips/[slug] and
- * /chips/[a]-vs-[b].
- *
- * Content strategy: every page is fully static (no DB) and joins two existing
- * sources of truth so numbers can never drift from the rest of the site:
- *
- * - `GPU_SPECS` (src/lib/catalog/gpu-specs.ts) — memory, bandwidth, dense TFLOP/s,
- *   interconnect and topology details shown on the Chip Specs tab.
- * - `HW_REGISTRY` (@semianalysisai/inferencex-constants) — TDP, all-in power
- *   and the $/chip/hr tiers used by the TCO calculator and per-dollar pages.
- *
- * FAQ answers and versus-page copy are generated from those structures at
- * render time; only the overview prose is hand-authored. The Simplified
- * Chinese siblings live in `chip-pages-zh.ts` and MUST be updated in the same
- * PR as this file (see AGENTS.md "Chinese Website Pages").
- */
 import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
 
 import { GPU_SPECS, type GpuSpec } from '@/lib/catalog/gpu-specs';
@@ -25,29 +8,17 @@ export interface ChipFaqItem {
 }
 
 export interface ChipPageEntry {
-  /** URL slug under /chips/ */
   slug: string;
-  /** Key into HW_REGISTRY (TDP, all-in power, $/hr tiers) */
   hwKey: string;
-  /** `name` of the matching GPU_SPECS row */
   specName: string;
-  /** Full display title, e.g. "NVIDIA B200" */
   title: string;
-  /** Short label used in tables and versus copy, e.g. "B200" */
   label: string;
-  /** Meta-description base; supporters line is appended by the page. */
   summary: string;
-  /** Hand-authored overview paragraphs (keyword-bearing prose). */
   overview: readonly string[];
-  /** How InferenceX benchmarks this chip. */
   benchmarkContext: string;
-  /** Meta keywords; searcher-phrased, includes "GPU" variants. */
   keywords: readonly string[];
-  /** Blog posts under content/blog that feature this chip. */
   relatedBlogSlugs: readonly string[];
-  /** Glossary entries that explain the concepts named in the prose. */
   relatedGlossarySlugs: readonly string[];
-  /** Other chip pages worth crosslinking. */
   relatedChipSlugs: readonly string[];
 }
 
@@ -200,7 +171,7 @@ const entries = [
     summary:
       'NVIDIA GB200 NVL72 specs, rack pricing and live LLM inference benchmarks: 72 Blackwell chips in one NVLink domain, 186 GB HBM3e per chip, 900 GB/s scale-up, measured daily on disaggregated vLLM, SGLang and Dynamo TRT-LLM.',
     overview: [
-      'The NVIDIA GB200 NVL72 is a rack-scale system: 72 Blackwell chips and 36 Grace CPUs joined by fifth-generation NVLink into a single 72-chip domain with 900 GB/s of unidirectional bandwidth per chip. There is no scale-out network inside the rack because the rack itself is the compute unit, with roughly 13.4 TB of pooled HBM3e.',
+      'The NVIDIA GB200 NVL72 is a rack-scale system: 72 Blackwell chips and 36 Grace CPUs joined by fifth-generation NVLink into a single 72-chip domain with 900 GB/s of unidirectional bandwidth per chip. GPUs communicate within the rack over NVLink, with roughly 13.4 TB of pooled HBM3e; each GPU also has a 400G ConnectX-7 NIC for scale-out communication.',
       'That one-hop, all-to-all fabric is why GB200 NVL72 dominates wide-expert-parallel serving of large MoE models: expert layers can be spread across dozens of chips without crossing InfiniBand or Ethernet. Disaggregated prefill/decode stacks such as Dynamo and SGLang PD map naturally onto the domain.',
     ],
     benchmarkContext:
@@ -333,7 +304,7 @@ const entries = [
     summary:
       'AMD Instinct MI355X specs, cloud pricing and live LLM inference benchmarks: 288 GB HBM3e, 8 TB/s bandwidth, 10,066 dense FP4 TFLOP/s, the first AMD chip with FP4, measured daily on ROCm vLLM, SGLang and ATOM.',
     overview: [
-      'The AMD Instinct MI355X is the CDNA 4 flagship and the first AMD accelerator with FP4 tensor throughput: 10,066 dense FP4 and 5,033 FP8 TFLOP/s with 288 GB of HBM3e at 8 TB/s, the largest single-chip memory in the field. Eight chips form a full-mesh node over fifth-generation Infinity Fabric at 538 GB/s per chip.',
+      'The AMD Instinct MI355X is the CDNA 4 flagship and the first AMD accelerator with FP4 tensor throughput: 10,066 dense FP4 and 5,033 FP8 TFLOP/s with 288 GB of HBM3e at 8 TB/s, the largest single-chip memory in the field. Eight chips form a full-mesh node over fourth-generation Infinity Fabric at 538 GB/s per chip.',
       'MI355X matches B200-class bandwidth and exceeds its memory while pricing meaningfully lower per hour, making it the sharpest performance-per-dollar challenge AMD has mounted. Its 1,400 W TDP and the maturity of ROCm serving stacks are the tradeoffs the live data quantifies.',
     ],
     benchmarkContext:
@@ -362,7 +333,6 @@ const entries = [
 
 export type ChipSlug = (typeof entries)[number]['slug'];
 
-/** Curated versus pairs. Order = page narrative order (a is the newer/leading chip). */
 export const CHIP_VS_PAIRS = [
   { a: 'b200', b: 'h100' },
   { a: 'b200', b: 'h200' },
@@ -421,12 +391,10 @@ export function getChipVsPage(slug: string): ChipVsPage | undefined {
   return getAllChipVsPages().find((page) => page.slug === slug);
 }
 
-/** Every slug served by /chips/[slug] (chip pages first, then versus pages). */
 export function getAllChipRouteSlugs(): readonly string[] {
   return [...entries.map((entry) => entry.slug), ...getAllChipVsPages().map((page) => page.slug)];
 }
 
-/** Parse "186 GB" / "8 TB/s" / "3.35 TB/s" style values to a number in the given unit. */
 export function leadingNumber(value: string): number {
   const match = /^(?<num>[\d.]+)/u.exec(value.trim());
   if (!match?.groups?.num) throw new Error(`Cannot parse numeric prefix from "${value}"`);
@@ -436,7 +404,6 @@ export function leadingNumber(value: string): number {
 const formatRatio = (x: number, y: number): string => `${(x / y).toFixed(2).replace(/0$/u, '')}x`;
 
 export interface ChipVsHighlight {
-  /** Stable key so the zh sibling can localize the label. */
   key:
     | 'memory'
     | 'memoryBandwidth'
@@ -447,11 +414,9 @@ export interface ChipVsHighlight {
     | 'scaleUpWorldSize';
   aValue: string;
   bValue: string;
-  /** a over b, e.g. "1.5x" — omitted when either side lacks the number. */
   ratio?: string;
 }
 
-/** Data-derived comparison rows shared by the EN and ZH versus pages. */
 export function buildChipVsHighlights(page: ChipVsPage): readonly ChipVsHighlight[] {
   const specA = getChipSpec(page.a);
   const specB = getChipSpec(page.b);
@@ -507,7 +472,6 @@ export function buildChipVsHighlights(page: ChipVsPage): readonly ChipVsHighligh
   ];
 }
 
-/** English FAQ, generated from the spec/pricing registries so it cannot drift. */
 export function buildChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
   const spec = getChipSpec(entry);
   const hw = getChipHw(entry);
@@ -547,7 +511,6 @@ export function buildChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
   ];
 }
 
-/** English FAQ for a versus page, generated from the same registries. */
 export function buildChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
   const highlights = buildChipVsHighlights(page);
   const memory = highlights.find((h) => h.key === 'memory');
@@ -573,7 +536,6 @@ export function buildChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
   ];
 }
 
-/** English labels for the data-derived versus highlight rows. */
 export const CHIP_VS_HIGHLIGHT_LABELS_EN: Readonly<Record<ChipVsHighlight['key'], string>> = {
   memory: 'Memory per chip',
   memoryBandwidth: 'Memory bandwidth',
