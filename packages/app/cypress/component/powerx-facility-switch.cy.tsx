@@ -116,7 +116,8 @@ describe('PowerX Include facility switch (mobile)', () => {
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
     );
-    cy.get('[data-testid="power-chip-compare-value"]').should('exist');
+    // Compare at lives in the PowerX context strip now; the bars are the readiness signal.
+    cy.get('[data-testid="power-chip-compare-segment"]').should('have.length.greaterThan', 0);
     cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').should(
       'have.attr',
       'aria-checked',
