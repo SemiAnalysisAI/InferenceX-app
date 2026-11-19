@@ -9,6 +9,7 @@ import {
   operatorXColors,
   peakBandwidthTBs,
   peakTflops,
+  removeHardwareSelection,
   toggleHardwareSelection,
 } from './hardware';
 import { metricById } from './metrics';
@@ -142,13 +143,34 @@ describe('Ascend OperatorX reference', () => {
 });
 
 describe('toggleHardwareSelection', () => {
-  it('removes a selected GPU and appends an unselected one', () => {
-    expect(toggleHardwareSelection(['b200', 'h200', 'mi355x'], 'h200')).toEqual(['b200', 'mi355x']);
-    expect(toggleHardwareSelection(['b200'], 'h200')).toEqual(['b200', 'h200']);
+  const all = ['b200', 'h200', 'mi355x'];
+
+  it('isolates a shown GPU, like the inference chart legends', () => {
+    expect(toggleHardwareSelection(['b200', 'h200', 'mi355x'], 'h200', all)).toEqual(['h200']);
   });
 
-  it('keeps the last selected GPU and returns the same array so callers can skip the update', () => {
+  it('adds a hidden GPU', () => {
+    expect(toggleHardwareSelection(['b200'], 'h200', all)).toEqual(['b200', 'h200']);
+  });
+
+  it('restores every GPU when the only shown GPU is clicked', () => {
+    expect(toggleHardwareSelection(['h200'], 'h200', all)).toEqual(all);
+  });
+
+  it('returns the same array when nothing changes so callers can skip the update', () => {
     const only = ['b200'];
-    expect(toggleHardwareSelection(only, 'b200')).toBe(only);
+    expect(toggleHardwareSelection(only, 'b200', ['b200'])).toBe(only);
+  });
+});
+
+describe('removeHardwareSelection', () => {
+  it('hides one GPU', () => {
+    expect(removeHardwareSelection(['b200', 'h200', 'mi355x'], 'h200')).toEqual(['b200', 'mi355x']);
+  });
+
+  it('keeps the last selected GPU and returns the same array', () => {
+    const only = ['b200'];
+    expect(removeHardwareSelection(only, 'b200')).toBe(only);
+    expect(removeHardwareSelection(only, 'h200')).toBe(only);
   });
 });

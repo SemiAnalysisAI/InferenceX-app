@@ -8,6 +8,7 @@ export interface ComparisonModel {
   hardware: string[];
   available: string[];
   toggle: (hardware: string) => void;
+  remove: (hardware: string) => void;
   reset: () => void;
   colors: Record<string, string>;
   baseline: string | null;
@@ -25,6 +26,7 @@ export function buildModel(
     hardware: string[];
     available: string[];
     toggle: (hardware: string) => void;
+    remove: (hardware: string) => void;
     reset: () => void;
   },
   colors: Record<string, string>,
