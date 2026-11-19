@@ -3,6 +3,7 @@ export interface FwEntry {
 }
 
 export const FW_REGISTRY: Record<string, FwEntry> = {
+  'atomesh-vllm-mooncake': { label: 'ATOMesh vLLM (Mooncake)' },
   atom: { label: 'ATOM¹' },
   'coreweave-vera-rubin': { label: 'Vera Rubin' },
   'dynamo-sglang': { label: 'Dynamo SGLang' },

@@ -989,6 +989,12 @@ views. Keep using `vllm-disagg` as the raw framework key and
 `mi355x_vllm-disagg` as its MI355X hardware selector; the label does not rename
 stored data or API selectors.
 
+`atomesh-vllm-mooncake` labels native vLLM workers behind ATOMesh with Mooncake
+transfer as `ATOMesh vLLM (Mooncake)`. Its MI355X selector is
+`mi355x_atomesh-vllm-mooncake`; the key is stored without an alias and belongs
+to the `vllm` engine family. It has a separate curve scope from `vllm`,
+`vllm-disagg` and `mooncake-atom`.
+
 `TokenSpeed` uses the canonical framework key and family `tokenspeed`. Select it
 with `frameworks=tokenspeed` in inference and historical views; dashboard engine
 filters and embeds use the same family. `/api/v1/views/options` lists its label

@@ -6,6 +6,7 @@ describe('frameworkFamily', () => {
   it('maps base and variant engines to their family', () => {
     expect(frameworkFamily('vllm')).toBe('vllm');
     expect(frameworkFamily('dynamo-vllm')).toBe('vllm');
+    expect(frameworkFamily('atomesh-vllm-mooncake')).toBe('vllm');
     expect(frameworkFamily('sglang')).toBe('sglang');
     expect(frameworkFamily('mori-sglang')).toBe('sglang');
     expect(frameworkFamily('trt')).toBe('trt');

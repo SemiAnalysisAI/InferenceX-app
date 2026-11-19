@@ -26,6 +26,7 @@ describe('benchmarkCurveScope', () => {
     );
   });
   it.each([
+    { framework: 'atomesh-vllm-mooncake' },
     { model: 'dsv4' },
     { hardware: 'gb200' },
     { framework: 'sglang' },

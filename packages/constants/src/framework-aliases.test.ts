@@ -39,6 +39,12 @@ describe('MODEL_SPEC_METHOD_LABELS', () => {
 });
 
 describe('resolveFrameworkPartLabel', () => {
+  it('labels ATOMesh vLLM Mooncake without aliasing existing curves', () => {
+    expect(resolveFrameworkPartLabel(undefined, 'atomesh-vllm-mooncake')).toBe('ATOMesh vLLM (Mooncake)');
+    expect(resolveFrameworkAlias('atomesh-vllm-mooncake')).toBe('atomesh-vllm-mooncake');
+    expect(resolveFrameworkAliasesInString('mi355x_atomesh-vllm-mooncake')).toBe('mi355x_atomesh-vllm-mooncake');
+  });
+
   it('preserves TokenSpeed branding without renaming its data key', () => {
     expect(resolveFrameworkPartLabel(undefined, 'tokenspeed')).toBe('TokenSpeed');
     expect(resolveFrameworkPartLabel('Qwen3.8-Flash-Next', 'tokenspeed')).toBe('TokenSpeed');
