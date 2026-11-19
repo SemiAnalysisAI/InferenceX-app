@@ -194,7 +194,7 @@ export function PowerXRanking({
         >
           {t.at(at)}
         </span>
-        <span className="-mr-1.5 ml-auto flex items-center gap-0.5">
+        <span className="ml-auto flex items-center gap-0.5">
           <ShowMenu show={show} onShowChange={onShowChange} />
           <button
             type="button"
