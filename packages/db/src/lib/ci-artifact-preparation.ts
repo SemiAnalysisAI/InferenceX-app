@@ -4,7 +4,7 @@ import type { ArtifactMeta } from './github-artifacts.js';
 export const CHANGELOG_ARTIFACT_NAME = 'changelog-metadata';
 export const REQUIRED_POWER_MANIFEST = 'required-power-sweep-manifest';
 const REUSED_INGEST_BUNDLE = 'reused-ingest-artifacts';
-const UNREAD_ARTIFACT_PREFIXES = ['job_event', 'al_gate'] as const;
+const UNREAD_ARTIFACT_PREFIXES = ['job_event', 'al_gate', 'scheduling-facts'] as const;
 
 // Ingest reads server logs only beside the bmk_ artifact with the same suffix.
 function isReadByIngest(artifact: ArtifactMeta, names: ReadonlySet<string>): boolean {
