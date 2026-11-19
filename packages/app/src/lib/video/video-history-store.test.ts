@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlobNotFoundError, del, head, list, put, type HeadBlobResult } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
+import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import { servingArtifact } from '../../../cypress/support/video-artifacts';
 import {
   publishedVideoHistory as publishedVideoHistoryRead,
@@ -55,8 +57,8 @@ const artifactReads = () =>
       ([url]) => /\/runs\/\d+\//u.test(String(url)) && !String(url).includes('/approvals/'),
     ).length;
 
-async function publish(i: number, approve = true) {
-  const saved = servingArtifact(100 + i, 1000 + i);
+async function publish(i: number, approve = true, hardware?: string, takes?: number) {
+  const saved = servingArtifact(100 + i, 1000 + i, hardware, takes);
   save(indexPath(saved), JSON.stringify(saved));
   if (approve)
     await approveVideoPublication(
@@ -178,10 +180,24 @@ describe('published video history', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it('lists every index page, orders by publication date, and reads only ten indexes', async () => {
+  it('keeps an older deployment on the dashboard when newer sources fill the first window', async () => {
+    await publish(0, true, 'NVIDIA H100', 10);
+    for (let i = 1; i <= 50; i++) await publish(i, true, 'NVIDIA H200', 10);
+    const page = await publishedVideoHistory(1, VIDEO_HISTORY_MAX_PAGES);
+    expect(page.nextPage).toBe(VIDEO_HISTORY_MAX_PAGES + 1);
+    expect(page.entries.at(-1)?.runId).toBe('100');
+    expect(
+      new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
+    ).toEqual(new Set(['h100', 'h200']));
+  });
+
+  it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
+    // An unreadable unapproved index past the window neither costs a read nor blocks retention.
+    save(indexPath(servingArtifact(99, 999)), 'not json');
     for (let i = 0; i < 12; i++) await publish(i, false);
     vi.mocked(fetch).mockClear();
-    const page = await publishedVideoHistory(1);
+    const { page, complete } = await publishedVideoHistoryRead(1);
+    expect(complete).toBe(true);
     expect(page.entries.map((entry) => entry.runId)).toEqual([
       '111',
       '110',
@@ -356,8 +372,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after cost tier labels returned to title case; labels are not stored in entries.
-      sources: 'ed6de4a65a129a45ddcd7ee97b3f6647b0477206034c5f5ab2507d5ae7629d1e',
+      // Re-pinned after the first page began carrying older deployments; entries are unchanged.
+      sources: 'ffa72941ccd41231488583876e830337fd5d094ceb3413e5489382480118e2f9',
     });
   });
 });
