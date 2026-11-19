@@ -10,6 +10,7 @@ import { HuaweiSkuConfigurations } from './HuaweiSkuConfigurations';
 import { UbenchxHub } from './UbenchxHub';
 import { TPC_SKYLINE_RUNS } from './tpc-skyline-data';
 import { transformTpcSkylineRun } from './tpc-skyline-transform';
+import { MethodologyFold } from './MethodologyFold';
 
 const STRINGS = {
   en: {
@@ -102,8 +103,9 @@ export function TpcSkylineContent() {
             <div className="mt-3">
               <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
               <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
-                <h3 className="font-medium text-foreground">{t.methodology}</h3>
-                <p>{t.methodologyText}</p>
+                <MethodologyFold title={t.methodology} testId="tpc-skyline">
+                  <p>{t.methodologyText}</p>
+                </MethodologyFold>
               </div>
               <div className="mt-3 overflow-x-auto" data-testid="tpc-skyline-device-specs">
                 <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
