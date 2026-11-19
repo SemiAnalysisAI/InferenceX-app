@@ -1,6 +1,7 @@
 import '@/lib/runtime/polyfills';
 import './globals.css';
 import '@/components/semianalysis/semianalysis-theme.css';
+import '@/components/semianalysis/semianalysis-layouts.css';
 
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
@@ -13,7 +14,12 @@ import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { SemiAnalysisThemeBanner } from '@/components/semianalysis/semianalysis-banner';
+import {
+  LayoutSwitcher,
+  SemiAnalysisChrome,
+  SemiAnalysisTopStrip,
+} from '@/components/semianalysis/sa-slides';
+import { saLayoutPrepaintScript } from '@/components/semianalysis/layout-variant';
 import { APP_THEMES, SITE_THEME } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
@@ -190,6 +196,11 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
         <script
+          id="sa-layout-prepaint"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: saLayoutPrepaintScript }}
+        />
+        <script
           id="unofficial-domain-prepaint"
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: unofficialDomainPrepaintScript }}
@@ -206,15 +217,17 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
+              <SemiAnalysisTopStrip />
               <Header />
               <UnofficialDomainNotice />
-              <SemiAnalysisThemeBanner />
+              <SemiAnalysisChrome />
               <div className="grow flex flex-col">
                 <ModelFeatureBoundary>
                   <RouteTransition>{children}</RouteTransition>
                 </ModelFeatureBoundary>
               </div>
               <Footer />
+              <LayoutSwitcher />
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <VercelAnalytics />}

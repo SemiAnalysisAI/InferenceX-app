@@ -7,6 +7,7 @@ import { IntroSection } from '@/components/landing/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { NudgeEngine } from '@/components/nudges/nudge-engine';
+import { SemiAnalysisLandingSlides } from '@/components/semianalysis/sa-slides';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 import { analyticsPlacement } from '@/lib/analytics/placement';
@@ -64,9 +65,12 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto flex flex-col gap-6 px-4 lg:px-8">
+        <SemiAnalysisLandingSlides locale={locale} slot="top" />
         <div className="contents" {...analyticsPlacement('landing_hero')}>
           <AgentXCompareHero locale={locale} headingLevel="h1" surface="landing" />
         </div>
+
+        <SemiAnalysisLandingSlides locale={locale} slot="after-hero" />
 
         <IntroSection locale={locale} />
 
@@ -142,6 +146,8 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </Card>
           )}
         </section>
+
+        <SemiAnalysisLandingSlides locale={locale} slot="end" />
       </div>
     </main>
   );
