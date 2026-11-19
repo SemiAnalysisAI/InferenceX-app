@@ -8,7 +8,7 @@
 let search = '';
 /** The link the settings were read from; null until the document's first read. */
 let link: string | null = null;
-/** The unofficial run whose workload the settings already opened on; a new link forgets it. */
+/** The named unofficial run once the settings were offered its workload; a new link forgets it. */
 let openedRun: string | null = null;
 const listeners = new Set<() => void>();
 
@@ -29,13 +29,14 @@ export function readVideoLink() {
 }
 
 /**
- * Whether the settings may still open on the workload `run` measured: once per run and link, so a
- * workload picked afterwards stays when the page mounts again.
+ * Whether the settings may still open on the workload the named `run` measured. A run is offered
+ * it once while it stays named, so a workload picked afterwards survives the page mounting again;
+ * dismissing the run (null) or naming another starts over.
  */
-export function claimRunWorkload(run: string) {
+export function claimRunWorkload(run: string | null) {
   if (openedRun === run) return false;
   openedRun = run;
-  return true;
+  return run !== null;
 }
 
 export function videoSearch() {

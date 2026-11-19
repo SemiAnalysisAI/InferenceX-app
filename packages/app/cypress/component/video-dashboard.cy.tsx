@@ -418,10 +418,8 @@ describe('VideoGenX Results', () => {
   });
 
   it('opens a link that names only a run on the workload that run measured', () => {
-    mount({
-      search: '?unofficialRun=34341996789&r_y=videosPerGpuHour',
-      editPage: namedOnlyWorkload,
-    });
+    const search = '?unofficialRun=34341996789&r_y=videosPerGpuHour';
+    mount({ search, editPage: namedOnlyWorkload });
     hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
     hardwarePoints('h200').should('not.exist');
     // A workload only the run publishes has no model slug, so the link carries a point ID.
@@ -429,6 +427,10 @@ describe('VideoGenX Results', () => {
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     hardwarePoints('h200').should('have.attr', 'data-overlay', 'false');
     searchParam('r_workload').should('equal', null);
+    // The dismissed run no longer holds the page, so its link opens on its workload again.
+    openLink(search);
+    hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
+    hardwarePoints('h200').should('not.exist');
   });
 
   it('keeps a workload picked after a run link opened it, when the served page mounts again', () => {

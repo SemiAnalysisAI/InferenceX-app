@@ -374,7 +374,7 @@ describe('history projection version', () => {
       projection: 6,
       // Re-pinned after the page settings began remembering the run whose workload they opened on;
       // entries are unchanged.
-      sources: '710f91299461fc3ffa6f175138cd1119d9c50134505b25fa5c1f1a5fbbceca95',
+      sources: '1364b8b7886f28962093521b3a14bd2c770cb933a342d23009ee7c1bf07eb59c',
     });
   });
 });

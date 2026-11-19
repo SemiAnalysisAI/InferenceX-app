@@ -432,7 +432,8 @@ export default function VideoDashboard({
   // inference charts open on an unofficial run's model. Decided once per run, so a later pick stays.
   useEffect(() => {
     const run = state.unofficialRun;
-    if (run === null || (namedSource !== 'history' && namedSource !== 'live')) return;
+    // A named run waits for its points; a dismissed one is forgotten at once.
+    if (run !== null && namedSource !== 'history' && namedSource !== 'live') return;
     if (!claimRunWorkload(run)) return;
     if (state.workload !== null || projection.overlayDeploymentCells.length > 0) return;
     let best: { workload: string; hardware: number } | null = null;
