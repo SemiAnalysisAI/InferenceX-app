@@ -144,6 +144,16 @@ a `Chip basis:` note naming it. Embedded charts
 (`/embed/model/<slug>`) accept `chips=total` (or `g_chips=total`) and show the
 basis note, without the toggle, below metrics that depend on it.
 
+Embedded charts also accept `hw=<hardware keys>` (or the dashboard's `i_active`), for
+example `hw=gb200_vllm`, to show only those official lines. A bare GPU such as
+`hw=gb200` keeps every engine on it, and unknown SKUs are ignored. A request turns off
+the best-per-SKU default, so a requested engine is not swapped for its SKU's best one.
+With `unofficialrun=`, the overlay keeps all of its own hardware next to the requested
+official lines, and `i_active` limits the official lines on the dashboard the same way.
+This is a visibility selection. The read-only `inference` view's `gpus` parameter
+accepts the same keys but filters overlay series too. To reproduce such an embed, read
+the official series with `gpus=gb200_vllm&best=false` and the overlay without `gpus`.
+
 Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) are marked
 disaggregated but record no workers and the whole deployment in both
 `num_prefill_gpu` and `num_decode_gpu`. Most October 2025 rows store input and

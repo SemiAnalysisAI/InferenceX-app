@@ -580,7 +580,9 @@ export function InferenceProvider({
   const [bestPerSkuChoice, setBestPerSku] = useState<boolean | null>(() => {
     if (activeTab !== 'inference') return false;
     const raw = getUrlParam('i_best');
-    return raw === '0' ? false : raw === '1' ? true : null;
+    if (raw === '0' || raw === '1') return raw === '1';
+    // An explicit hardware request would otherwise be replaced by the best-per-SKU set.
+    return getUrlParam('i_active') || initialActiveHwTypes?.length ? false : null;
   });
   const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
   const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
@@ -637,6 +639,7 @@ export function InferenceProvider({
   const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState(() =>
     Boolean(getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus),
   );
+  const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -1320,7 +1323,8 @@ export function InferenceProvider({
           pendingActiveHwTypes.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
       ),
     );
-    if (restored.size === 0) restored = selectableHwTypes;
+    const matchedRequest = restored.size > 0;
+    if (!matchedRequest) restored = selectableHwTypes;
     if (exclusion) {
       const proposed = restored;
       const resolved = resolveHwSelection(restored, new Set());
@@ -1333,6 +1337,7 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(restored);
+    setRequestedHwSelection(matchedRequest ? restored : null);
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
     setPendingActiveHwTypes(null);
@@ -1773,10 +1778,13 @@ export function InferenceProvider({
     ],
   );
 
+  const requestedHwTypes = requestedHwSelection === activeHwTypes ? requestedHwSelection : null;
+
   const filtersValue = useMemo<InferenceFiltersContextType>(
     () => ({
       activeHwTypes,
       bestPerSku,
+      requestedHwTypes,
       blockedHwToggles,
       selectedModel,
       selectedSequence: effectiveSequence,
@@ -1799,6 +1807,7 @@ export function InferenceProvider({
     [
       activeHwTypes,
       bestPerSku,
+      requestedHwTypes,
       blockedHwToggles,
       selectedModel,
       effectiveSequence,
