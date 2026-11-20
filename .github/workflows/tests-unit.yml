@@ -15,7 +15,7 @@ concurrency:
 jobs:
   changes:
     name: Changed files
-    timeout-minutes: 2
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read # List the pull request's changed files.
@@ -102,7 +102,7 @@ jobs:
     name: Unit tests
     needs: [changes, vitest]
     if: ${{ always() }}
-    timeout-minutes: 2
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions: {}
     steps:

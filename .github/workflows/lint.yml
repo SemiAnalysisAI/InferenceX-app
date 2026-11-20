@@ -16,7 +16,7 @@ jobs:
   oxc:
     name: Lint, format and typecheck
     if: ${{ !github.event.pull_request.draft }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
