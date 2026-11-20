@@ -131,7 +131,6 @@ jobs:
               '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null
             {
               echo "Child database: $NEON_BRANCH_NAME ($branch_id)"
-              echo "Host: $database_host"
               echo "Expires: $(jq -r '.expires_at' <<<"$branch")"
             } | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then

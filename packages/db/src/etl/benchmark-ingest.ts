@@ -8,6 +8,7 @@ import {
   type ServerLogFilePath,
 } from './server-log-artifacts';
 import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
+import { redactText } from './log-redaction';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 import { serverLogBlocksEnabled, writeTextAsBlocks } from './server-log-block-writer';
 import {
@@ -177,7 +178,7 @@ async function insertDeferredServerLogFiles(
           `${capped.storedBytes} (limit ${maxBytes}); full file stays in the artifact`,
       );
     }
-    return capped.text;
+    return redactText(capped.text);
   };
   const primaryText = readStored(primary);
   const serverLog =

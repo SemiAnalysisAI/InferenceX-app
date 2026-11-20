@@ -47,6 +47,7 @@
     "admin:db:backfill-full-response-interactivity": "bun run --cwd packages/db db:backfill-full-response-interactivity",
     "admin:db:backfill-gpu-metrics": "bun run --cwd packages/db db:backfill-gpu-metrics",
     "admin:db:backfill-gpu-sample-blobs": "bun run --cwd packages/db db:backfill-gpu-sample-blobs",
+    "admin:db:backfill-log-redaction": "bun run --cwd packages/db db:backfill-log-redaction",
     "admin:db:backfill-power-series": "bun run --cwd packages/db db:backfill-power-series",
     "admin:db:backfill-request-chart-data": "bun run --cwd packages/db db:backfill-request-chart-data",
     "admin:db:backfill-sequence-length-sketches": "bun run --cwd packages/db db:backfill-sequence-length-sketches",

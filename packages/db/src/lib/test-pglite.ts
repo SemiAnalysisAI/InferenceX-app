@@ -60,10 +60,25 @@ class PgliteQuery implements PromiseLike<Rows> {
   }
 }
 
+/** postgres.js `sql(rows)` as a fragment, `(columns) values (...), (...)`, for an insert. */
+function rowValues(database: Pick<PGlite, 'query'>, rows: readonly Record<string, unknown>[]) {
+  const columns = Object.keys(rows[0] ?? {});
+  const strings = [`(${columns.map((column) => `"${column}"`).join(', ')}) values (`];
+  const values: unknown[] = [];
+  for (const [r, row] of rows.entries()) {
+    const rowEnd = r === rows.length - 1 ? ')' : '), (';
+    for (const [c, column] of columns.entries()) {
+      values.push(row[column]);
+      strings.push(c === columns.length - 1 ? rowEnd : ', ');
+    }
+  }
+  return new PgliteQuery(database, strings as unknown as TemplateStringsArray, values);
+}
+
 function client(database: Pick<PGlite, 'query'>) {
   return Object.assign(
-    (strings: TemplateStringsArray, ...values: unknown[]) =>
-      new PgliteQuery(database, strings, values),
+    (first: TemplateStringsArray | readonly Record<string, unknown>[], ...values: unknown[]) =>
+      'raw' in first ? new PgliteQuery(database, first, values) : rowValues(database, first),
     { json: JSON.stringify, array: (value: unknown) => value },
   );
 }
