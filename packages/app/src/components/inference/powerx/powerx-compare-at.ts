@@ -1,7 +1,7 @@
 /**
- * Compare at: the one interactivity (tok/s/user) every PowerX tab reads at. The ranking,
- * the Breakdown bars, the Over time trace and the orange reading line all follow it. It
- * lives in the URL as `i_at`; the default (80) leaves the parameter out.
+ * Compare at: the one interactivity (tok/s/user) PowerX reads at. The Breakdown bars and
+ * the Over time trace follow it. It lives in the URL as `i_at`; the default (80) leaves
+ * the parameter out.
  */
 export const POWERX_COMPARE_AT_DEFAULT = 80;
 export const POWERX_COMPARE_AT_PRESETS = [50, 80, 130, 200] as const;

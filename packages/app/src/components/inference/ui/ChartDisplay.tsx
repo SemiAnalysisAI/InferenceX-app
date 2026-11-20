@@ -1808,13 +1808,11 @@ export default function ChartDisplay({
                               overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                             }
                             plotHeight={powerXChartHeight}
-                            ranking={
+                            powerXDirectLabels={
                               powerXLayout &&
                               powerXMounted &&
                               powerXEnergyOrPower &&
                               selectedXAxisMode === 'interactivity'
-                                ? yMetricLabel(graph.chartDefinition)
-                                : undefined
                             }
                           />
                         </div>
@@ -2071,8 +2069,7 @@ export default function ChartDisplay({
           <CustomPowers loading={loading} />
         </section>
       )}
-      {/* PowerX lists active filters in the ranking header (Filter (n)). */}
-      {!minimalChrome && !powerXLayout && <ActiveQuickFilters />}
+      {!minimalChrome && <ActiveQuickFilters />}
       <div
         className="motion-stale flex flex-col gap-4"
         data-stale={isRefetching || undefined}

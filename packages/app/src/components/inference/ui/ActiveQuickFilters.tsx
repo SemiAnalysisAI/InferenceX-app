@@ -11,20 +11,11 @@ import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
 
 const STRINGS = {
-  en: {
-    active: 'Active filters',
-    clear: 'Clear quick filters',
-    clearShort: 'Clear',
-    remove: 'Remove',
-  },
-  zh: { active: '当前筛选', clear: '清除快捷筛选', clearShort: '清除', remove: '移除' },
+  en: { active: 'Active filters', clear: 'Clear quick filters', remove: 'Remove' },
+  zh: { active: '当前筛选', clear: '清除快捷筛选', remove: '移除' },
 } as const;
 
-/**
- * The active quick filters as removable chips. `compact` is the PowerX ranking's row under
- * its Filter button: small chips and a plain Clear, no heading.
- */
-export function ActiveQuickFilters({ compact = false }: { compact?: boolean } = {}) {
+export function ActiveQuickFilters() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const { quickFilters, selectedSequence, lockedFrameworks } = useInferenceFilters();
@@ -46,60 +37,6 @@ export function ActiveQuickFilters({ compact = false }: { compact?: boolean } = 
     else actions.setQuickFilterPower(values as PowerTier[]);
   };
 
-  const removeFilter = (category: (typeof filters)[number]['category'], value: string) =>
-    setCategory(
-      category,
-      (quickFilters[category] ?? []).filter((item) => item !== value),
-    );
-  const clearAll = () =>
-    new Set(filters.map((filter) => filter.category)).forEach((category) =>
-      setCategory(category, []),
-    );
-
-  if (compact) {
-    return (
-      <section
-        aria-label={t.active}
-        data-testid="active-quick-filters"
-        className="flex flex-wrap items-center gap-1 border-b border-border py-2"
-      >
-        {filters.map(({ category, value, categoryLabel, label }) => (
-          <span
-            key={`${category}:${value}`}
-            className="inline-flex h-6 max-w-full items-center gap-1 rounded-full pr-1 pl-2 text-xs shadow-[inset_0_0_0_1px_var(--border)]"
-          >
-            <span className="min-w-0 truncate" title={`${categoryLabel}: ${label}`}>
-              {label}
-            </span>
-            <button
-              type="button"
-              className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-              data-testid={`remove-filter-${category}-${value}`}
-              aria-label={`${t.remove} ${categoryLabel}: ${label}`}
-              onClick={() => {
-                removeFilter(category, value);
-                track('powerx_filter_removed', { category, value });
-              }}
-            >
-              <X className="size-3" aria-hidden="true" />
-            </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          className="inline-flex h-6 cursor-pointer items-center rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          data-testid="clear-active-quick-filters"
-          onClick={() => {
-            clearAll();
-            track('powerx_filters_cleared', { count: filters.length });
-          }}
-        >
-          {t.clearShort}
-        </button>
-      </section>
-    );
-  }
-
   return (
     <section
       aria-label={t.active}
@@ -117,7 +54,10 @@ export function ActiveQuickFilters({ compact = false }: { compact?: boolean } = 
           data-testid={`remove-filter-${category}-${value}`}
           aria-label={`${t.remove} ${categoryLabel}: ${label}`}
           onClick={() => {
-            removeFilter(category, value);
+            setCategory(
+              category,
+              (quickFilters[category] ?? []).filter((item) => item !== value),
+            );
             track('inference_quick_filter_removed', { category, value, source: 'result_summary' });
           }}
         >
@@ -135,7 +75,9 @@ export function ActiveQuickFilters({ compact = false }: { compact?: boolean } = 
         className="text-muted-foreground"
         data-testid="clear-active-quick-filters"
         onClick={() => {
-          clearAll();
+          new Set(filters.map((filter) => filter.category)).forEach((category) =>
+            setCategory(category, []),
+          );
           track('inference_quick_filters_cleared', { source: 'result_summary' });
         }}
       >

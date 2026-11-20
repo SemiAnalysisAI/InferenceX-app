@@ -43,8 +43,9 @@ import {
 /**
  * The PowerX page shell: one flat surface. A title row, a quiet sticky context strip
  * (model, scenario, precision, GPU role, Compare at, run), the tabs directly under it,
- * then per tab one toolbar row, a y-title row with the pin line, the chart with the
- * ranking beside it, the pinned-point strip and whatever the tab shows below.
+ * then per tab one toolbar row, a y-title row with the pin line, the chart with its
+ * legend (or, on Over time, the swing ranking) beside it, the pinned-point strip and
+ * whatever the tab shows below.
  *
  * Every row has a fixed height so the chart starts at the same place on every tab and
  * GPU role. Slots: `PowerXContextStrip`, `PowerXToolbar` (options + More + actions),
@@ -76,7 +77,7 @@ const STRINGS = {
     compareAtAxis: 'tok/s/user · P90 interactivity',
     compareAt: POWERX_VOCAB.en.compareAt,
     compareAtHelp:
-      'The interactivity every tab reads at: the ranking, the Breakdown bars and the Over time trace use the point nearest it.',
+      'The interactivity PowerX reads at: the Breakdown bars and the Over time trace use the point nearest it.',
     tokPerUser: 'tok/s/user',
     tokShort: 'tok/s',
     presets: 'Presets',
@@ -126,8 +127,7 @@ const STRINGS = {
     precisionNote: '唯一有功耗数据的精度',
     compareAtAxis: 'tok/s/user · P90 交互性',
     compareAt: POWERX_VOCAB.zh.compareAt,
-    compareAtHelp:
-      '所有标签页读取的交互性：排名、功耗构成条形图与随时间变化曲线都取最接近该值的数据点。',
+    compareAtHelp: 'PowerX 读取的交互性：功耗构成条形图与随时间变化曲线都取最接近该值的数据点。',
     tokPerUser: 'tok/s/user',
     tokShort: 'tok/s',
     presets: '预设',

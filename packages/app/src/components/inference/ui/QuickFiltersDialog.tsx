@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { OptionInfo } from '@/components/ui/option-info';
 import { ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,7 +37,6 @@ const STRINGS = {
     agenticDescription:
       'Narrow the chart by chip vendor, serving framework, deployment mode, and power-measurement status. Selecting none in a group shows all.',
     selected: 'selected',
-    advanced: 'Advanced options',
     bestPerSku: 'Best per SKU',
     bestPerSkuHint: 'Show the best configuration per chip; turn off to select more',
     bestPerSkuHelp:
@@ -83,7 +81,6 @@ const STRINGS = {
     agenticDescription:
       '按芯片厂商、推理框架、部署模式和功耗测量状态筛选图表。某组不选则显示全部。',
     selected: '项已选',
-    advanced: '高级选项',
     bestPerSku: '每个 SKU 仅显示最佳配置',
     bestPerSkuHint: '每款芯片显示最佳配置；关闭后可选择更多配置',
     bestPerSkuHelp:
@@ -142,13 +139,10 @@ export function QuickFiltersDialog({
   open,
   onOpenChange,
   bestPerSku,
-  advanced,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   bestPerSku?: { checked: boolean; onCheckedChange: (checked: boolean) => void };
-  /** PowerX: the chart's advanced switches, listed under the filters. */
-  advanced?: ReactNode;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -419,13 +413,6 @@ export function QuickFiltersDialog({
             </section>
           ))}
         </div>
-
-        {advanced && (
-          <section className="flex flex-col gap-2" data-testid="quick-filters-advanced">
-            <h3 className="text-sm leading-5 font-medium text-muted-foreground">{t.advanced}</h3>
-            {advanced}
-          </section>
-        )}
 
         <DialogFooter className="flex-row justify-between sm:justify-between">
           <Button

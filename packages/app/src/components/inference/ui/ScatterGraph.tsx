@@ -151,7 +151,6 @@ import type {
 } from '@/components/inference/types';
 import {
   buildPointDetails,
-  formatMetricValue,
   generateHoverTooltipContent,
   type PointDetailAction,
 } from '@/components/inference/utils/tooltipUtils';
@@ -221,34 +220,16 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import {
-  usePowerXCompareTarget,
   usePowerXActivePoint,
   usePowerXSurface,
   useSetPowerXActivePoint,
-  useSetPowerXCompareTarget,
   type PowerXActivePointUpdate,
 } from '@/components/inference/ui/powerx-surface';
-import { POWERX_COMPARE_AT_DEFAULT } from '@/components/inference/powerx/powerx-compare-at';
 import {
   nudgePowerXLabels,
   powerXDirectLabelTexts,
-  powerXFrameworkName,
   powerXFrameworkTag,
-  powerXRankingRows,
-  gpuWeightedPools,
-  sumPools,
-  powerXRankingToggle,
-  powerXShowFor,
-  powerXShowState,
-  type PowerXShow,
 } from '@/components/inference/powerx/powerx-ranking';
-import {
-  PowerXAdvancedSwitches,
-  PowerXRanking,
-  type PowerXRankingRowView,
-} from '@/components/inference/powerx/PowerXRanking';
-import { drawPowerXReadingLine } from '@/components/inference/powerx/powerx-reading-line';
-import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
 import {
   buildFrontierContinuations,
@@ -514,22 +495,8 @@ const lineLabelText = (
 
 const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'points'}`;
 
-/**
- * Legend switches the PowerX ranking does not repeat under Filter: Show covers Optimal
- * Only, the tab's More holds log scale and the parallelism and gradient labels, and the
- * direct line labels never show the framework.
- */
-const POWERX_RANKING_ELSEWHERE_SWITCHES: ReadonlySet<string> = new Set([
-  'scatter-log-scale',
-  'scatter-hide-non-optimal',
-  'scatter-parallelism-labels',
-  'scatter-gradient-labels',
-  'scatter-framework-label',
-]);
-
 const SCATTER_STRINGS = {
   en: {
-    compareAtTag: (at: number) => `${at} tok/s/user`,
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     paretoFrontier: 'Pareto Frontier',
@@ -569,7 +536,6 @@ const SCATTER_STRINGS = {
     viewWorkflow: 'View workflow run',
   },
   zh: {
-    compareAtTag: (at: number) => `${at} tok/s/user`,
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     paretoFrontier: 'Pareto 前沿',
@@ -645,10 +611,10 @@ const ScatterGraph = React.memo(
     xExtentOverride,
     yExtentOverride,
     plotHeight,
-    ranking,
+    powerXDirectLabels = false,
   }: ScatterGraphProps) => {
-    const rankingUnit = ranking ?? null;
-    const rankingOn = rankingUnit !== null;
+    // Point details on these charts still open from the pinned strip, not the legend slot.
+    const rankingOn = powerXDirectLabels;
     const {
       hardwareConfig: contextHardwareConfig,
       hwTypesWithData,
@@ -1973,126 +1939,7 @@ const ScatterGraph = React.memo(
       );
     }, [powerXSurface, powerRole, pointsData, processedOverlayData]);
 
-    // PowerX ranking (Energy and Power): the legend becomes a ranking at Compare at. Each
-    // GPU config reads its drawn line (All GPUs, or the role's pool) at the point nearest
-    // Compare at; aggregated configs under a role stay listed, dimmed, never valued.
-    const compareTarget = usePowerXCompareTarget();
-    const setCompareTarget = useSetPowerXCompareTarget();
-    const compareAt = compareTarget ?? POWERX_COMPARE_AT_DEFAULT;
     const phone = useIsMobileViewport();
-    const rankingSeries = useMemo(() => {
-      if (!rankingOn) return null;
-      const byHw = new Map<
-        string,
-        { base: InferenceData[]; prefill: InferenceData[]; decode: InferenceData[] }
-      >();
-      for (const [key, points] of Object.entries(displayedRooflines)) {
-        const { hw, precision } = parseScatterSeriesKey(key);
-        if (!selectedPrecisions.includes(precision) || points.length === 0) continue;
-        const variant = points[0].powerVariant;
-        const slot =
-          variant === undefined
-            ? 'base'
-            : variant.kind === 'role' && (variant.id === 'prefill' || variant.id === 'decode')
-              ? variant.id
-              : null;
-        if (slot === null) continue;
-        const entry = byHw.get(hw) ?? { base: [], prefill: [], decode: [] };
-        for (const segment of groupDisplayedPoints(points).values()) entry[slot].push(...segment);
-        byHw.set(hw, entry);
-      }
-      return byHw;
-    }, [rankingOn, displayedRooflines, selectedPrecisions, groupDisplayedPoints]);
-
-    const rankingRows = useMemo((): PowerXRankingRowView[] => {
-      if (!rankingSeries) return [];
-      const keys = Object.keys(hardwareConfig)
-        .filter((key) => hwTypesWithData.has(key))
-        .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
-      const pool = powerRole === 'prefill' || powerRole === 'decode' ? powerRole : null;
-      const splitEnergy = selectedYAxisMetric.startsWith('y_measuredJ');
-      const rows = powerXRankingRows(
-        keys.map((key) => {
-          const series = rankingSeries.get(key) ?? { base: [], prefill: [], decode: [] };
-          const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
-          return {
-            key,
-            hidden: !effectiveOfficialHwTypes.has(key),
-            aggregated,
-            points: pool && !aggregated ? series[pool] : series.base,
-            // Prefill vs decode draws only the two pools, so the row ranks them combined
-            // into the config's all-GPU value: energy per output token adds up, power per
-            // GPU is the GPU-weighted mean.
-            pools:
-              powerRole === 'split'
-                ? {
-                    prefill: series.prefill,
-                    decode: series.decode,
-                    combine: splitEnergy ? sumPools : gpuWeightedPools,
-                  }
-                : undefined,
-          };
-        }),
-        compareAt,
-      );
-      const visible = rows.filter((row) => !row.hidden).length;
-      return rows.map((row) => {
-        const hwConfig = hardwareConfig[row.key];
-        const series = rankingSeries.get(row.key);
-        const format = (point: InferenceData | null) =>
-          point ? formatMetricValue(point.y, selectedYAxisMetric) : '–';
-        const valueText =
-          row.value === null
-            ? null
-            : row.pools
-              ? `${format(row.pools.prefill)} / ${format(row.pools.decode)}`
-              : formatMetricValue(row.value, selectedYAxisMetric);
-        return {
-          key: row.key,
-          label: hwConfig?.label ?? row.key,
-          fullLabel: hwConfig ? getDisplayLabel(hwConfig) : row.key,
-          color: getCssColor(resolveColor(row.key)),
-          pd: powerRole === 'all' && Boolean(series?.base.some((point) => point.disagg)),
-          framework: hwConfig?.suffix ? powerXFrameworkName(hwConfig.suffix) : '',
-          rank: row.rank,
-          valueText,
-          delta: row.delta,
-          hidden: row.hidden,
-          aggregated: row.aggregated,
-          conc: row.point?.conc ?? null,
-          x: row.point?.x ?? null,
-          locked: !row.hidden && visible <= 1,
-        };
-      });
-    }, [
-      rankingSeries,
-      hardwareConfig,
-      hwTypesWithData,
-      powerRole,
-      roleSplitHwKeys,
-      effectiveOfficialHwTypes,
-      compareAt,
-      selectedYAxisMetric,
-      getCssColor,
-      resolveColor,
-    ]);
-
-    const handleRankingToggle = useCallback(
-      (key: string) => {
-        const { action } = powerXRankingToggle(effectiveOfficialHwTypes, key);
-        if (action === 'hide') handleRemoveHwType(key);
-        else if (action === 'show') handleToggleHwType(key);
-      },
-      [effectiveOfficialHwTypes, handleRemoveHwType, handleToggleHwType],
-    );
-    const handleRankingShowChange = useCallback(
-      (next: PowerXShow) => {
-        const state = powerXShowState(next);
-        if (state.optimalOnly !== hideNonOptimal) setHideNonOptimal(state.optimalOnly);
-        if (state.bestPerSku !== bestPerSku) handleBestPerSkuChange(state.bestPerSku);
-      },
-      [hideNonOptimal, bestPerSku, setHideNonOptimal, handleBestPerSkuChange],
-    );
 
     const isRooflineVisible = useCallback(
       (el: SVGElement) => {
@@ -2723,8 +2570,8 @@ const ScatterGraph = React.memo(
       };
     }, [pointDetails, pointColor, hoverCard, openPowerTrace, rankingOn]);
 
-    // PowerX ranking: the lines carry short direct labels instead of the label pills.
-    const pillLineLabels = showLineLabels && !rankingOn;
+    // PowerX Energy and Power: the lines carry short direct labels instead of the label pills.
+    const pillLineLabels = showLineLabels && !powerXDirectLabels;
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
       const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
       const lineLabelIdentity = (hw: string, points: readonly InferenceData[]) => {
@@ -4212,14 +4059,9 @@ const ScatterGraph = React.memo(
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
-    // PowerX ranking: short direct labels at the line ends (no pill) and the orange
-    // Compare-at reading line with its drag grip. Compare at itself is read through a ref
-    // and redrawn by an effect, so a drag never re-renders the plot.
-    const readingRef = useRef({ at: compareAt, set: setCompareTarget });
-    readingRef.current = { at: compareAt, set: setCompareTarget };
-    const readingLineText = legendT.compareAtTag;
+    // PowerX Energy and Power: short direct labels at the line ends (no pill).
     const powerXLayers = useMemo((): LayerConfig<InferenceData>[] => {
-      if (!rankingOn) return [];
+      if (!powerXDirectLabels) return [];
       const split = powerRole === 'split';
       const drawDirectLabels = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -4339,29 +4181,9 @@ const ScatterGraph = React.memo(
             ctx.height,
           ),
       };
-      const readingLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'powerx-at-line',
-        render: (zoomGroup, ctx) =>
-          drawPowerXReadingLine(zoomGroup, {
-            xScale: (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
-            width: ctx.width,
-            height: ctx.height,
-            reading: readingRef,
-            tag: readingLineText,
-          }),
-        onZoom: (zoomGroup, ctx) =>
-          drawPowerXReadingLine(zoomGroup, {
-            xScale: ctx.newXScale as ContinuousScale,
-            width: ctx.width,
-            height: ctx.height,
-            reading: readingRef,
-            tag: readingLineText,
-          }),
-      };
-      return [readingLayer, labelsLayer];
+      return [labelsLayer];
     }, [
-      rankingOn,
+      powerXDirectLabels,
       powerRole,
       phone,
       showLineLabels,
@@ -4373,27 +4195,11 @@ const ScatterGraph = React.memo(
       hiddenPowerVariants,
       getCssColor,
       resolveColor,
-      readingLineText,
     ]);
     const chartLayers = useMemo(
       () => (powerXLayers.length === 0 ? layers : [...layers, ...powerXLayers]),
       [layers, powerXLayers],
     );
-    // Compare at moved (picker, preset or drag): redraw only the reading line.
-    useLayoutEffect(() => {
-      if (!rankingOn) return;
-      const display = getDisplaySelection();
-      if (!display) return;
-      const zoomed = currentZoomRenderContext(display.svg, display.ctx);
-      drawPowerXReadingLine(display.zoomGroup, {
-        xScale: zoomed.xScale as ContinuousScale,
-        width: display.ctx.width,
-        height: display.ctx.height,
-        reading: readingRef,
-        tag: readingLineText,
-      });
-    }, [rankingOn, compareAt, getDisplaySelection, readingLineText]);
-
     const syncOffloadHalos = useCallback(
       (zoomGroup: RenderContext['layout']['zoomGroup']) => {
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
@@ -4902,16 +4708,21 @@ const ScatterGraph = React.memo(
           track('latency_line_labels_toggled', { enabled: checked });
         },
       },
-      {
-        id: 'scatter-framework-label',
-        label: legendT.frameworkLabel,
-        advanced: true,
-        checked: showFrameworkLabel,
-        onCheckedChange: (checked: boolean) => {
-          setShowFrameworkLabel(checked);
-          track('latency_framework_label_toggled', { enabled: checked });
-        },
-      },
+      // PowerX direct labels name the framework on their own when two lines share a GPU.
+      ...(powerXDirectLabels
+        ? []
+        : [
+            {
+              id: 'scatter-framework-label',
+              label: legendT.frameworkLabel,
+              advanced: true,
+              checked: showFrameworkLabel,
+              onCheckedChange: (checked: boolean) => {
+                setShowFrameworkLabel(checked);
+                track('latency_framework_label_toggled', { enabled: checked });
+              },
+            },
+          ]),
       {
         id: 'scatter-offloading-label',
         label: legendT.offloadingLabel,
@@ -4993,230 +4804,203 @@ const ScatterGraph = React.memo(
             ) : undefined
           }
           legendElement={
-            rankingOn ? (
-              <PowerXRanking
-                at={compareAt}
-                unit={rankingUnit ?? ''}
-                show={powerXShowFor(hideNonOptimal, bestPerSku)}
-                onShowChange={handleRankingShowChange}
-                filterCount={quickFilterCount}
-                onFilterOpen={() => setQuickFiltersOpen(true)}
-                filterChips={<ActiveQuickFilters compact />}
-                rows={rankingRows}
-                onToggle={handleRankingToggle}
-              />
-            ) : (
-              <>
-                {!minimalChrome && (
-                  <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
-                )}
-                <EngineComparisonConflictNotice className="mb-2" />
-                <ChartLegend
-                  variant="sidebar"
-                  onItemHover={handleLegendHover}
-                  onItemHoverEnd={handleLegendHoverEnd}
-                  onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
-                  legendItems={[
-                    ...(overlayData && unofficialRunInfos.length > 0
-                      ? unofficialRunInfos
-                          .map((info, idx) => {
-                            const hasPoints = overlayData.data.some(
-                              (d) =>
-                                overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
-                                selectedPrecisions.includes(d.precision),
-                            );
-                            if (!hasPoints) return null;
-                            const branch = info.branch || `run ${info.id}`;
-                            return {
-                              name: `✕ unofficial-run-${info.id}`,
-                              label: getInferenceRunLabel(
-                                `✕ ${branch}`,
-                                overlayData.data.filter(
-                                  (point) =>
-                                    overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
-                                    selectedPrecisions.includes(point.precision),
-                                ),
+            <>
+              {!minimalChrome && (
+                <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+              )}
+              <EngineComparisonConflictNotice className="mb-2" />
+              <ChartLegend
+                variant="sidebar"
+                onItemHover={handleLegendHover}
+                onItemHoverEnd={handleLegendHoverEnd}
+                onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
+                legendItems={[
+                  ...(overlayData && unofficialRunInfos.length > 0
+                    ? unofficialRunInfos
+                        .map((info, idx) => {
+                          const hasPoints = overlayData.data.some(
+                            (d) =>
+                              overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
+                              selectedPrecisions.includes(d.precision),
+                          );
+                          if (!hasPoints) return null;
+                          const branch = info.branch || `run ${info.id}`;
+                          return {
+                            name: `✕ unofficial-run-${info.id}`,
+                            label: getInferenceRunLabel(
+                              `✕ ${branch}`,
+                              overlayData.data.filter(
+                                (point) =>
+                                  overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
+                                  selectedPrecisions.includes(point.precision),
                               ),
-                              color: overlayRunColor(idx),
-                              lineDasharray:
-                                powerCompareMode === 'none'
-                                  ? overlayRooflineDasharray(idx)
-                                  : undefined,
-                              title: legendT.unofficialTitle(branch),
-                              isHighlighted: true,
-                              hw: `overlay-run-${info.id}`,
-                              isActive: true,
-                              onClick: () => {},
-                              onShowPoints: () => {
-                                setPointsTableTarget({
-                                  kind: 'overlay',
-                                  runIndex: idx,
-                                  runId: info.id,
-                                  branch,
-                                });
-                                track('inference_legend_points_table_opened', {
-                                  gpu: `overlay-run-${info.id}`,
-                                  framework: 'overlay',
-                                });
-                              },
-                              tooltip: (
-                                <div className="font-normal text-xs">
-                                  <div className="font-medium text-destructive">
-                                    {legendT.unofficialRun}
-                                  </div>
-                                  <div>
-                                    {legendT.branch}: {branch}
-                                  </div>
-                                  {info.url && (
-                                    <a
-                                      href={info.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="underline"
-                                    >
-                                      {legendT.viewWorkflow}
-                                    </a>
-                                  )}
-                                </div>
-                              ),
-                            };
-                          })
-                          .filter((x): x is NonNullable<typeof x> => x !== null)
-                      : []),
-                    ...Object.entries(hardwareConfig)
-                      .filter(([key]) =>
-                        showAllHardwareTypes
-                          ? effectiveActiveHwTypes.has(key)
-                          : hwTypesWithData.has(key),
-                      )
-                      .toSorted(
-                        ([a], [b]) =>
-                          getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                      )
-                      .map(([key, hwConfig]: [string, any]) => {
-                        const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
-                        const isActive =
-                          !aggregated &&
-                          (showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key));
-                        const blocked = isActive ? undefined : blockedHwToggles.get(key);
-                        return {
-                          name: hwConfig.name,
-                          label: aggregated
-                            ? `${getDisplayLabel(hwConfig)} · ${legendT.aggregatedTag}`
-                            : getDisplayLabel(hwConfig),
-                          color: resolveColor(key),
-                          lineDasharray:
-                            powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
-                          title: hwConfig.gpu,
-                          isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
-                          hw: key,
-                          isActive,
-                          blockedReason: aggregated
-                            ? legendT.aggregatedRoleReason
-                            : blocked
-                              ? describeEngineComparisonConflict(
-                                  { kind: 'blocked', ...blocked },
-                                  locale,
-                                )
-                              : undefined,
-                          onClick:
-                            showAllHardwareTypes || aggregated
-                              ? () => {}
-                              : () => {
-                                  handleToggleHwType(key);
-                                  track('latency_hw_type_toggled', { gpu: key });
-                                },
-                          onShowPoints: () => {
-                            setPointsTableTarget({ kind: 'official', hwKey: key });
-                            track('inference_legend_points_table_opened', {
-                              gpu: key,
-                              framework: hwConfig.framework ?? '',
-                            });
-                          },
-                          tooltip: legendChangelogs.has(key)
-                            ? formatChangelogDescription(
-                                legendChangelogs
-                                  .get(key)!
-                                  .entries.map((entry) => entry.description),
-                              )
-                            : null,
-                        };
-                      }),
-                    ...powerVariantLegendItems,
-                  ]}
-                  disableActiveSort={false}
-                  isLegendExpanded={isLegendExpanded}
-                  onExpandedChange={(expanded) => {
-                    setIsLegendExpanded(expanded);
-                    track('latency_legend_expanded', { enabled: expanded });
-                  }}
-                  switches={legendSwitches}
-                  onAdvancedExpandedChange={(expanded) => {
-                    track('latency_advanced_controls_toggled', { enabled: expanded });
-                  }}
-                  reset={{
-                    id: 'scatter-reset-filter',
-                    disabled:
-                      effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
-                      activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
-                      quickFilterCount === 0,
-                    onClick: () => {
-                      resetUnifiedSelection();
-                      clearQuickFilters();
-                      track('latency_legend_filter_reset');
-                    },
-                  }}
-                  actions={[
-                    ...(perfRulerState.rulers.length > 0
-                      ? [
-                          {
-                            id: 'scatter-clear-perf-rulers',
-                            label: legendT.clearPerfRulers(perfRulerState.rulers.length),
-                            onClick: () => {
-                              track('latency_perf_ruler_cleared', {
-                                count: perfRulerState.rulers.length,
+                            ),
+                            color: overlayRunColor(idx),
+                            lineDasharray:
+                              powerCompareMode === 'none'
+                                ? overlayRooflineDasharray(idx)
+                                : undefined,
+                            title: legendT.unofficialTitle(branch),
+                            isHighlighted: true,
+                            hw: `overlay-run-${info.id}`,
+                            isActive: true,
+                            onClick: () => {},
+                            onShowPoints: () => {
+                              setPointsTableTarget({
+                                kind: 'overlay',
+                                runIndex: idx,
+                                runId: info.id,
+                                branch,
                               });
-                              setPerfRulerState(clearPerfRulers);
-                              persistedRulers?.discardPending();
+                              track('inference_legend_points_table_opened', {
+                                gpu: `overlay-run-${info.id}`,
+                                framework: 'overlay',
+                              });
                             },
+                            tooltip: (
+                              <div className="font-normal text-xs">
+                                <div className="font-medium text-destructive">
+                                  {legendT.unofficialRun}
+                                </div>
+                                <div>
+                                  {legendT.branch}: {branch}
+                                </div>
+                                {info.url && (
+                                  <a
+                                    href={info.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline"
+                                  >
+                                    {legendT.viewWorkflow}
+                                  </a>
+                                )}
+                              </div>
+                            ),
+                          };
+                        })
+                        .filter((x): x is NonNullable<typeof x> => x !== null)
+                    : []),
+                  ...Object.entries(hardwareConfig)
+                    .filter(([key]) =>
+                      showAllHardwareTypes
+                        ? effectiveActiveHwTypes.has(key)
+                        : hwTypesWithData.has(key),
+                    )
+                    .toSorted(
+                      ([a], [b]) =>
+                        getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+                    )
+                    .map(([key, hwConfig]: [string, any]) => {
+                      const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
+                      const isActive =
+                        !aggregated &&
+                        (showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key));
+                      const blocked = isActive ? undefined : blockedHwToggles.get(key);
+                      return {
+                        name: hwConfig.name,
+                        label: aggregated
+                          ? `${getDisplayLabel(hwConfig)} · ${legendT.aggregatedTag}`
+                          : getDisplayLabel(hwConfig),
+                        color: resolveColor(key),
+                        lineDasharray:
+                          powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
+                        title: hwConfig.gpu,
+                        isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
+                        hw: key,
+                        isActive,
+                        blockedReason: aggregated
+                          ? legendT.aggregatedRoleReason
+                          : blocked
+                            ? describeEngineComparisonConflict(
+                                { kind: 'blocked', ...blocked },
+                                locale,
+                              )
+                            : undefined,
+                        onClick:
+                          showAllHardwareTypes || aggregated
+                            ? () => {}
+                            : () => {
+                                handleToggleHwType(key);
+                                track('latency_hw_type_toggled', { gpu: key });
+                              },
+                        onShowPoints: () => {
+                          setPointsTableTarget({ kind: 'official', hwKey: key });
+                          track('inference_legend_points_table_opened', {
+                            gpu: key,
+                            framework: hwConfig.framework ?? '',
+                          });
+                        },
+                        tooltip: legendChangelogs.has(key)
+                          ? formatChangelogDescription(
+                              legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                            )
+                          : null,
+                      };
+                    }),
+                  ...powerVariantLegendItems,
+                ]}
+                disableActiveSort={false}
+                isLegendExpanded={isLegendExpanded}
+                onExpandedChange={(expanded) => {
+                  setIsLegendExpanded(expanded);
+                  track('latency_legend_expanded', { enabled: expanded });
+                }}
+                switches={legendSwitches}
+                onAdvancedExpandedChange={(expanded) => {
+                  track('latency_advanced_controls_toggled', { enabled: expanded });
+                }}
+                reset={{
+                  id: 'scatter-reset-filter',
+                  disabled:
+                    effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
+                    activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
+                    quickFilterCount === 0,
+                  onClick: () => {
+                    resetUnifiedSelection();
+                    clearQuickFilters();
+                    track('latency_legend_filter_reset');
+                  },
+                }}
+                actions={[
+                  ...(perfRulerState.rulers.length > 0
+                    ? [
+                        {
+                          id: 'scatter-clear-perf-rulers',
+                          label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                          onClick: () => {
+                            track('latency_perf_ruler_cleared', {
+                              count: perfRulerState.rulers.length,
+                            });
+                            setPerfRulerState(clearPerfRulers);
+                            persistedRulers?.discardPending();
                           },
-                        ]
-                      : []),
-                    {
-                      id: 'scatter-quick-filters',
-                      label: legendT.quickFilters(quickFilterCount),
-                      onClick: () => {
-                        setQuickFiltersOpen(true);
-                        track('inference_quick_filters_dialog_opened', {
-                          source: 'scatter_legend',
-                        });
-                      },
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'scatter-quick-filters',
+                    label: legendT.quickFilters(quickFilterCount),
+                    onClick: () => {
+                      setQuickFiltersOpen(true);
+                      track('inference_quick_filters_dialog_opened', {
+                        source: 'scatter_legend',
+                      });
                     },
-                  ]}
-                  hideAtomFootnote
-                  readOnly={minimalChrome}
-                  collapsible={!minimalChrome}
-                  enableTooltips={true}
-                />
-              </>
-            )
+                  },
+                ]}
+                hideAtomFootnote
+                readOnly={minimalChrome}
+                collapsible={!minimalChrome}
+                enableTooltips={true}
+              />
+            </>
           }
         />
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}
-          bestPerSku={
-            rankingOn ? undefined : { checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }
-          }
-          advanced={
-            rankingOn ? (
-              <PowerXAdvancedSwitches
-                switches={legendSwitches.filter(
-                  (item) => !POWERX_RANKING_ELSEWHERE_SWITCHES.has(item.id),
-                )}
-              />
-            ) : undefined
-          }
+          bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
         />
         {pointsTable && (
           <LegendPointsDialog

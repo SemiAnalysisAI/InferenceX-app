@@ -21,7 +21,7 @@ const PowerXSurfaceContext = createContext(false);
 
 /**
  * Compare at: the interactivity every PowerX tab reads at (`i_at`, default 80 tok/s/user).
- * The context strip, the reading line on the chart and the Breakdown drill-down move it.
+ * The context strip and the Breakdown drill-down move it.
  * Split into value and setter so charts that only write it do not re-render when it changes.
  */
 const CompareTargetContext = createContext<number | null>(null);

@@ -6,7 +6,6 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
-import { PowerXHiddenRowsToggle } from './PowerXRanking';
 import { powerXFrameworkTag } from './powerx-ranking';
 
 const STRINGS = {
@@ -49,6 +48,43 @@ const STRINGS = {
     collapseHidden: '收起',
   },
 } as const;
+
+/** The one quiet "+4 hidden · Show" row the ranking folds its hidden GPUs into. */
+function PowerXHiddenRowsToggle({
+  testId,
+  count,
+  open,
+  labels,
+  onToggle,
+}: {
+  testId: string;
+  count: number;
+  open: boolean;
+  labels: {
+    hiddenCount: (n: number) => string;
+    showHidden: string;
+    collapseHidden: string;
+  };
+  onToggle: () => void;
+}) {
+  return (
+    <li className="border-b border-border">
+      <button
+        type="button"
+        aria-expanded={open}
+        data-testid={testId}
+        onClick={onToggle}
+        className="flex w-full cursor-pointer items-center gap-1.5 py-2.5 pl-[30px] text-left text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+      >
+        <span className="tabular-nums">{labels.hiddenCount(count)}</span>
+        <span aria-hidden>·</span>
+        <span className="underline decoration-border underline-offset-2">
+          {open ? labels.collapseHidden : labels.showHidden}
+        </span>
+      </button>
+    </li>
+  );
+}
 
 export interface PowerXSwingRankingRowView {
   key: string;

@@ -339,13 +339,8 @@ export interface ScatterGraphProps {
   runNumbering?: Map<string, number>;
   /** Plot height in px; the default is the shared 600 px chart height. */
   plotHeight?: number;
-  /**
-   * PowerX: the ranking at Compare at beside the plot (Energy and Power). When set it takes
-   * the legend's slot (it is the legend: a row hides or shows its GPU), the lines get short
-   * direct labels and a draggable Compare-at reading line. The value is the ranking's unit
-   * line (a string keeps the memoised chart from re-rendering on every parent render).
-   */
-  ranking?: string;
+  /** PowerX Energy and Power: short direct labels at the line ends instead of label pills. */
+  powerXDirectLabels?: boolean;
 }
 
 export interface LegendItemProps {

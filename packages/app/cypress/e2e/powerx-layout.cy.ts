@@ -166,12 +166,16 @@ describe('PowerX layout', () => {
               `${role}/${value} toolbar ${$options[0].scrollWidth}/${$options[0].clientWidth}`,
             ).to.be.at.most($options[0].clientWidth);
           });
-          // The column beside the plot scrolls on y only: anything wider than it (the
-          // ranking's Filter button once poked out by its negative margin) adds a stray
-          // horizontal scrollbar under the ranking.
-          // These rows draw the ranking on Power draw under every role.
-          if (value === 'power') {
-            cy.get('[data-testid="powerx-ranking"]', { timeout: 20000 }).should('be.visible');
+          // The column beside the plot scrolls on y only: anything wider than it adds a
+          // stray horizontal scrollbar under the legend.
+          // Energy and Power keep the shared chart legend there under every role, and no
+          // Compare-at reading line on the plot.
+          if (value === 'energy' || value === 'power') {
+            cy.get('[data-slot="chart-legend-frame"] [data-testid="scatter-quick-filters"]', {
+              timeout: 20000,
+            }).should('be.visible');
+            cy.get('[data-testid="powerx-ranking"]').should('not.exist');
+            cy.get('[data-testid="powerx-at-line"]').should('not.exist');
           }
           cy.document().then((doc) => {
             for (const frame of doc.querySelectorAll('[data-slot="chart-legend-frame"]')) {
