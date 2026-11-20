@@ -215,6 +215,10 @@ jobs:
           path: /tmp/cypress-timings/observation.json
           if-no-files-found: error
           retention-days: 14
+      # The background `next start` server keeps node_modules busy, which blocks the disk commit.
+      - name: Release sticky disks for commit
+        if: ${{ always() && env.CACHE_COMMIT != 'false' }}
+        run: sudo fuser -km ./node_modules ./packages/app/.next/cache /home/runner/.cache/Cypress || true
 
   result:
     name: E2E tests
