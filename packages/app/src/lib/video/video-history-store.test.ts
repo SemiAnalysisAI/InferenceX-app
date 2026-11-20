@@ -391,8 +391,9 @@ describe('history projection version', () => {
       projection: 7,
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
-      // imports, so the pin covers only the video sources that run plus gpu-keys.
-      sources: 'bb96b40d2afd5ed5a01130d061f396c5ec12eb4f6cd5a4814b5cec7681eba082',
+      // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
+      // uncalled helpers left bundle.ts and metrics.ts; entries are unchanged.
+      sources: 'bbfe21ac0c8adb0cb5236bf511d3e155a53d903441c80bfc8f8572bb70e2f864',
     });
   });
 });
