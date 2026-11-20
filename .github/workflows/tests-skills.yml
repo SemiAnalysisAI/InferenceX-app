@@ -5,10 +5,7 @@ on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/tests-skills.yml'
-      - '.github/workflows/publish-skills.yml'
-      - 'packages/skills/**'
+  merge_group:
 
 permissions: {}
 
@@ -17,9 +14,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed files
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # List the pull request's changed files.
+    outputs:
+      run: ${{ steps.match.outputs.run }}
+    steps:
+      # Pull requests skip the suite when nothing it covers changed; the merge queue always runs it.
+      - id: match
+        name: Match changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PATTERN: '^(\.github/workflows/(tests|publish)-skills\.yml$|packages/skills/|bun\.lock$)'
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            echo run=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+          if (( $(wc -l <<< "$files") >= 3000 )) || grep -qE "$PATTERN" <<< "$files"; then
+            echo run=true >> "$GITHUB_OUTPUT"
+          else
+            echo run=false >> "$GITHUB_OUTPUT"
+          fi
+
   pack-archive:
     name: Pack skills archive (Linux, Node 24)
-    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.pull_request.draft }}
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' && !github.event.pull_request.draft }}
     timeout-minutes: 5
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
@@ -166,3 +192,15 @@ jobs:
           path: ${{ runner.temp }}/inferencex-skills-platform-acceptance/
           if-no-files-found: error
           retention-days: 30
+
+  result:
+    name: Skills tests
+    needs: [changes, pack-archive, packed-skills]
+    if: ${{ always() }}
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail when a skills job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
