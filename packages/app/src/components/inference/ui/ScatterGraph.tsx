@@ -577,7 +577,8 @@ const SCATTER_STRINGS = {
 } as const;
 
 /**
- * PowerX: Unpin in the pinned strip also releases the chart's own pin (tooltip and details).
+ * PowerX: clearing the pinned point (a new view or GPU role) also releases the chart's own pin
+ * (tooltip and details).
  * A separate component so hover updates of the active point never re-render the scatter.
  */
 function PowerXChartPinSync({ chartRef }: { chartRef: React.RefObject<D3ChartHandle | null> }) {
@@ -613,8 +614,6 @@ const ScatterGraph = React.memo(
     plotHeight,
     powerXDirectLabels = false,
   }: ScatterGraphProps) => {
-    // Point details on these charts still open from the pinned strip, not the legend slot.
-    const rankingOn = powerXDirectLabels;
     const {
       hardwareConfig: contextHardwareConfig,
       hwTypesWithData,
@@ -706,8 +705,10 @@ const ScatterGraph = React.memo(
     // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
     const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
+    // View PowerX opens the PowerX telemetry dialog; on PowerX itself the page is already that.
     const showPowerTelemetry =
-      featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+      !powerXSurface &&
+      (featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined);
     const legendT = SCATTER_STRINGS[locale];
     const [hiddenSeriesChoice, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
       () => new Set(),
@@ -1334,7 +1335,10 @@ const ScatterGraph = React.memo(
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
     const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
 
-    const openPowerTrace = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(
+      chartRef,
+      powerXSurface ? 'powerx_details_trace_opened' : undefined,
+    );
 
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
@@ -2119,9 +2123,6 @@ const ScatterGraph = React.memo(
     // PowerX: the readout row under the caption follows the hovered or pinned point.
     const setActivePoint = useSetPowerXActivePoint();
     const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
-    const detailsRendererRef = useRef<
-      ((d: InferenceData, isOverlay: boolean, close: () => void) => React.ReactNode) | null
-    >(null);
     activePointRef.current = setActivePoint;
     // PowerX on a coarse pointer: the finger in flight on the plot (its pointer id).
     const scrubPointerRef = useRef<number | null>(null);
@@ -2528,14 +2529,14 @@ const ScatterGraph = React.memo(
           color={pointColor(d, isOverlay)}
           onClose={close}
           onAction={(action, event) => onAction(action, event, d, isOverlay)}
+          onRelease={powerXSurface ? () => activePointRef.current?.('clear') : undefined}
         />
       );
-      detailsRendererRef.current = renderDetails;
       return {
         rulerType: 'crosshair' as const,
         content: (d: InferenceData) => hoverCard(d, false),
-        // PowerX ranking: the ranking keeps the legend slot; the pinned strip opens details.
-        details: rankingOn ? undefined : renderDetails,
+        // The details panel takes the legend's slot while a point is pinned, PowerX included.
+        details: renderDetails,
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
@@ -2549,9 +2550,6 @@ const ScatterGraph = React.memo(
             point: d,
             source: 'pinned',
             color: pointColor(d, false),
-            details: rankingOn
-              ? (close) => detailsRendererRef.current?.(d, false, close) ?? null
-              : undefined,
           });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
@@ -2568,7 +2566,7 @@ const ScatterGraph = React.memo(
         },
         attachToLayer: 1,
       };
-    }, [pointDetails, pointColor, hoverCard, openPowerTrace, rankingOn]);
+    }, [pointDetails, pointColor, hoverCard, openPowerTrace, powerXSurface]);
 
     // PowerX Energy and Power: the lines carry short direct labels instead of the label pills.
     const pillLineLabels = showLineLabels && !powerXDirectLabels;

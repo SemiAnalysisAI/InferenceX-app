@@ -45,13 +45,8 @@ const SetIncludeFacilityContext = createContext<((value: boolean) => void) | nul
 export interface PowerXActivePoint {
   point: InferenceData;
   source: 'hover' | 'scrub' | 'pinned';
-  /** The point's series colour, so the pinned strip's dot matches the chart. */
+  /** The point's series colour, so a readout's dot matches the chart. */
   color?: string;
-  /**
-   * The chart's Point details panel for this point, when the ranking holds the legend
-   * slot: the pinned strip's Details action opens it in a popover instead.
-   */
-  details?: (close: () => void) => ReactNode;
 }
 const ActivePointContext = createContext<PowerXActivePoint | null>(null);
 /** `null` ends a hover (a pinned point stays); `'clear'` drops a pinned point too. */

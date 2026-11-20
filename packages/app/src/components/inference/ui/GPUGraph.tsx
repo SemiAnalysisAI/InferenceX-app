@@ -79,6 +79,7 @@ import {
   generateHoverTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
+import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { pointLabelText } from '@/components/inference/ui/point-label';
@@ -296,8 +297,11 @@ const GPUGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const featureGateUnlocked = useFeatureGate();
+    // View PowerX opens the PowerX telemetry dialog; on PowerX itself the page is already that.
+    const powerXSurface = usePowerXSurface();
     const showPowerTelemetry =
-      featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+      !powerXSurface &&
+      (featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined);
     const showPowerTelemetryRef = useRef(showPowerTelemetry);
     showPowerTelemetryRef.current = showPowerTelemetry;
     const legendT = GPU_STRINGS[locale];

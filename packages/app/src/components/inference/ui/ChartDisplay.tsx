@@ -85,10 +85,8 @@ import {
   POWERX_DEFAULT_METRIC,
   powerXShowsHeadroom,
   powerXViewFor,
-  selectPowerXView,
   type PowerXSelection,
 } from '@/components/inference/powerx/powerx-views';
-import { PowerXPinnedStrip } from '@/components/inference/powerx/PowerXPinnedStrip';
 import {
   hasPowerRoleData,
   powerRoleTableRows,
@@ -1679,23 +1677,12 @@ export default function ChartDisplay({
                       );
                       const chartFooter = (!powerXSurface || powerXLayout || hasAtomSeries) && (
                         <div className="mt-3">
-                          {powerXLayout && powerXMounted && powerXReadoutPoints && (
-                            <PowerXPinnedSlot>
-                              {powerXEnergyOrPower ? (
-                                <PowerXPinnedStrip
-                                  tab={powerXTab}
-                                  role={powerRole}
-                                  metric={selectedYAxisMetric}
-                                  formatValue={(point) =>
-                                    formatMetricValue(point.y, selectedYAxisMetric)
-                                  }
-                                  onSeeBreakdown={() =>
-                                    setPowerXSelection(
-                                      selectPowerXView('breakdown', powerXSelection),
-                                    )
-                                  }
-                                />
-                              ) : (
+                          {/* Energy and Power open the point's details in the legend slot. */}
+                          {powerXLayout &&
+                            powerXMounted &&
+                            powerXReadoutPoints &&
+                            !powerXEnergyOrPower && (
+                              <PowerXPinnedSlot>
                                 <PowerXReadout
                                   role={powerRole}
                                   points={powerXReadoutPoints}
@@ -1705,9 +1692,8 @@ export default function ChartDisplay({
                                       formatMetricValue(point.y, selectedYAxisMetric),
                                   }}
                                 />
-                              )}
-                            </PowerXPinnedSlot>
-                          )}
+                              </PowerXPinnedSlot>
+                            )}
                           {(!powerXSurface || powerXLayout) && chartContext}
                           {hasAtomSeries && <AtomEngineFootnote className="mt-2" />}
                         </div>
