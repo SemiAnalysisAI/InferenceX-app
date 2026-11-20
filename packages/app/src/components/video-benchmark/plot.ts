@@ -1,5 +1,5 @@
+import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
 import { deploymentKey, isQueueing, runtimeKey } from './deployment';
-import { paretoFrontier } from './frontier';
 import { hardwareLabel } from './hardware';
 import { metricValue, VIDEO_METRICS, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
@@ -57,12 +57,12 @@ export function plotVideoPoints(
     ];
   });
   const byRuntime = Map.groupBy(plotted, (p) => `${p.hardwareKey}:${runtimeKey(p)}`);
-  const xBetter = VIDEO_METRICS[state.x].polarity;
-  const yBetter = VIDEO_METRICS[state.y].polarity;
+  const maximizeX = VIDEO_METRICS[state.x].polarity === 'higher';
+  const maximizeY = VIDEO_METRICS[state.y].polarity === 'higher';
   const frontiers: Record<string, PlottedVideoPoint[]> = {};
   let multiLayout = false;
   for (const [key, list] of byRuntime) {
-    frontiers[key] = paretoFrontier(list, xBetter, yBetter);
+    frontiers[key] = globalParetoFrontier(list, maximizeX, maximizeY);
     for (const p of frontiers[key]) p.optimal = true;
     if (new Set(list.map(deploymentKey)).size > 1) multiLayout = true;
   }
