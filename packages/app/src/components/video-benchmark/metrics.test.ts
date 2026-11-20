@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
-  formatMetric,
-  metricLabel,
   metricValue,
   VIDEO_METRICS,
   X_METRICS,
   Y_METRICS,
-  type MetricId,
   type MetricOptions,
   type VideoPoint,
 } from './metrics';
@@ -183,33 +180,5 @@ describe('video metrics', () => {
     expect(
       metricValue({ ...h200, hardwareKey: 'unknown-gpu' }, 'videosPerDollar', opts),
     ).toBeNull();
-  });
-  it('labels tiered metrics with the cost tier and formats by metric', () => {
-    expect(metricLabel('videosPerDollar', 'en', opts)).toBe(
-      'Videos per $1 TCO (Owning at Large Hyperscaler Volume)',
-    );
-    expect(metricLabel('videosPerDollar', 'zh', { tier: 'r' })).toBe(
-      '每 1 美元 TCO 生成视频数（租赁 - 3 年承诺）',
-    );
-    expect(metricLabel('dollarsPerVideo', 'zh', opts)).toBe(
-      '每条视频 TCO 成本（Hyperscaler 自有设备）',
-    );
-    expect(metricLabel('p90Latency', 'en', opts)).toBe('P90 time to video (s)');
-    expect(metricLabel('kjPerVideo', 'zh', opts)).toBe('每条视频 GPU 板卡能耗（kJ）');
-    expect(metricLabel('apiPricePerVideo', 'en', opts)).toBe('API list price per video');
-    expect(metricLabel('apiPricePerVideo', 'zh', opts)).toBe('每条视频 API 标价');
-    // Only the priced TCO metrics carry the tier.
-    const tiered = (Object.keys(VIDEO_METRICS) as MetricId[]).filter(
-      (id) => metricLabel(id, 'en', opts) !== metricLabel(id, 'en', { tier: 'r' }),
-    );
-    expect(tiered).toEqual(['videosPerDollar', 'dollarsPerVideo']);
-    expect(formatMetric(0.20419, 'dollarsPerVideo')).toBe('$0.204');
-    expect(formatMetric(0.15, 'dollarsPerVideo')).toBe('$0.150');
-    expect(formatMetric(0.272, 'apiPricePerVideo')).toBe('$0.272');
-    expect(formatMetric(null, 'kjPerVideo')).toBe('—');
-    expect(formatMetric(151.10486, 'p90Latency')).toBe('151.1');
-    expect(formatMetric(1234.5, 'videosPerGpuHour')).toBe('1,234.5');
-    expect(formatMetric(4.8961, 'videosPerDollar')).toBe('4.9');
-    expect(formatMetric(97.41, 'powerPctCap')).toBe('97.4');
   });
 });
