@@ -232,21 +232,3 @@ export function metricValue(
   }
   return finite(value) ? value : null;
 }
-
-export function metricLabel(id: MetricId, locale: 'en' | 'zh', options: MetricOptions): string {
-  const def = VIDEO_METRICS[id];
-  const base = locale === 'zh' ? def.labelZh : def.label;
-  if (!def.tiered) return base;
-  const tier = TIER_LABELS[options.tier][locale];
-  return locale === 'zh' ? `${base}（${tier}）` : `${base} (${tier})`;
-}
-
-export function formatMetric(value: number | null, id: MetricId): string {
-  if (value === null) return '—';
-  const def = VIDEO_METRICS[id];
-  const text = value.toLocaleString('en-US', {
-    minimumFractionDigits: def.currency ? def.digits : 0,
-    maximumFractionDigits: def.digits,
-  });
-  return def.currency ? `$${text}` : text;
-}

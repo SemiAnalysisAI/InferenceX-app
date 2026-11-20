@@ -1696,7 +1696,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: 'bd8afa93f0fc002edc2f43fada8c0696440ff738717f04510d92f5dc68ff5870',
+    sourceSha256: 'c0da1a791472990c81b2346b3e2e47114978e6cabc711051e40c0c362a3fbbfb',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
