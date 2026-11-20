@@ -372,8 +372,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the first page began carrying older deployments; entries are unchanged.
-      sources: 'ffa72941ccd41231488583876e830337fd5d094ceb3413e5489382480118e2f9',
+      // Re-pinned after the engine point shapes moved to the results chart; entries are unchanged.
+      sources: '9ad126ddc67af2ad8949ca54759c56d6d504d9e22429838ceab2022f100ce4a7',
     });
   });
 });

@@ -47,7 +47,7 @@ import { useStageValue } from './use-stage-value';
 import type { VideoPoint } from './metrics';
 import VideoPointSheet from './VideoPointSheet';
 import { serverSplit } from './deployment';
-import { engineLabel, engineShape, engineSort } from './engines';
+import { engineLabel, engineSort, type EngineKey } from './engines';
 import { figures, kilojoules, reading, usd } from './format';
 import { isLossy, lossyLabel, runtimeLabel } from './optimizations';
 import { hardwareLabel, hardwareSort } from './hardware';
@@ -540,6 +540,22 @@ function pillText(item: ResultsChartSeries, s: Strings, history: boolean): strin
     .filter(Boolean)
     .join(' · ');
 }
+
+/** Color stays the hardware's; the engine sets the point shape. */
+const ENGINE_SHAPES: Record<EngineKey, ShapeKey> = {
+  sglang: 'circle',
+  'vllm-omni': 'diamond',
+  'sol-engine': 'triangle',
+};
+
+/** An engine outside the registry, or none recorded, still gets a shape no listed engine uses. */
+const UNLISTED_SHAPE: ShapeKey = 'square';
+
+const isListed = (engine: string | null): engine is EngineKey =>
+  engine !== null && Object.hasOwn(ENGINE_SHAPES, engine);
+
+const engineShape = (engine: string | null): ShapeKey =>
+  isListed(engine) ? ENGINE_SHAPES[engine] : UNLISTED_SHAPE;
 
 const SWATCH_SHAPES: Record<ShapeKey, ReactNode> = {
   circle: <circle cx="12" cy="6" r="3.5" />,
