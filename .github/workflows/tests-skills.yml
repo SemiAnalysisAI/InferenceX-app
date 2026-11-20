@@ -17,7 +17,7 @@ jobs:
   changes:
     name: Changed files
     timeout-minutes: 2
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions:
       pull-requests: read # List the pull request's changed files.
     outputs:
@@ -198,7 +198,7 @@ jobs:
     needs: [changes, pack-archive, packed-skills]
     if: ${{ always() }}
     timeout-minutes: 2
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Fail when a skills job failed or was cancelled
