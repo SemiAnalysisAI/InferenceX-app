@@ -47,8 +47,8 @@
     "db:sync-public": "bun --env-file=../../.env src/sync-public-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "db:verify-gpu-sample-blobs": "bun --env-file=../../.env src/verify-gpu-sample-blobs.ts",
-    "test:unit": "vitest run",
-    "test:unit:coverage": "vitest run --coverage",
+    "test:unit": "bun scripts/test-unit.ts",
+    "test:unit:coverage": "bun scripts/test-unit.ts --coverage",
     "db:migrate:operatorx": "bun --env-file=../../.env src/migrate-operatorx.ts",
     "db:ingest:operatorx": "bun --env-file=../../.env src/ingest-operatorx.ts",
     "db:ingest:operatorx:ci": "bun src/ingest-operatorx.ts",
@@ -71,9 +71,8 @@
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "@types/stream-json": "^1.7.8",
-    "@vitest/coverage-v8": "^5.1.0",
     "adm-zip": "^0.6.1",
-    "typescript": "^6.0.3",
-    "vitest": "^5.1.0"
+    "bun-types": "^1.4.4",
+    "typescript": "^6.0.3"
   }
 }

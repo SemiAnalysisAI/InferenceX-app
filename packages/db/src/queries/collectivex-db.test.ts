@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { PGlite } from '@electric-sql/pglite';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { type ChangelogEntry, linkRows } from '../collectivex/changelog';
 import { buildUploadedRun, validateResults } from '../collectivex/results-upload';

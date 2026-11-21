@@ -1,15 +1,18 @@
 import fs from 'node:fs';
 
 import { PGlite } from '@electric-sql/pglite';
-import { inject } from 'vitest';
 
 import type { DbClient } from '../connection';
 import type { Sql } from '../etl/db-utils';
+import { pgliteTemplate } from './test-pglite-template';
 
 export type PgliteSql = Sql & DbClient;
 
-export function migratedPglite(): Promise<PGlite> {
-  return PGlite.create({ loadDataDir: new Blob([fs.readFileSync(inject('pgliteTemplate'))]) });
+let template: Promise<string> | undefined;
+
+export async function migratedPglite(): Promise<PGlite> {
+  template ??= pgliteTemplate();
+  return PGlite.create({ loadDataDir: new Blob([fs.readFileSync(await template)]) });
 }
 
 type Rows = Record<string, unknown>[];

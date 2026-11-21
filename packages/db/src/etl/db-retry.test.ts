@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { isTransientDbError, withTransientDbRetry } from './db-retry';
 
@@ -21,10 +21,9 @@ describe('isTransientDbError', () => {
 
 describe('withTransientDbRetry', () => {
   it('retries transient errors with exponential backoff', async () => {
-    const sleep = vi.fn((_ms: number) => Promise.resolve());
-    const log = vi.fn();
-    const fn = vi
-      .fn<() => Promise<string>>()
+    const sleep = mock((_ms: number) => Promise.resolve());
+    const log = mock();
+    const fn = mock<() => Promise<string>>()
       .mockRejectedValueOnce(codeError('CONNECTION_CLOSED'))
       .mockRejectedValueOnce(new Error('Authentication timed out'))
       .mockResolvedValue('ok');
@@ -36,7 +35,7 @@ describe('withTransientDbRetry', () => {
   });
 
   it('gives up after the attempt limit', async () => {
-    const fn = vi.fn(() => Promise.reject(codeError('CONNECTION_CLOSED')));
+    const fn = mock(() => Promise.reject(codeError('CONNECTION_CLOSED')));
     await expect(
       withTransientDbRetry('x', fn, { attempts: 2, sleep: async () => {}, log: () => {} }),
     ).rejects.toMatchObject({ code: 'CONNECTION_CLOSED' });
@@ -44,7 +43,7 @@ describe('withTransientDbRetry', () => {
   });
 
   it('rethrows non-transient errors immediately', async () => {
-    const fn = vi.fn(() => Promise.reject(codeError('23505', 'duplicate key value')));
+    const fn = mock(() => Promise.reject(codeError('23505', 'duplicate key value')));
     await expect(withTransientDbRetry('x', fn, { sleep: async () => {} })).rejects.toThrow(
       'duplicate key value',
     );

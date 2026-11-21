@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
@@ -9,7 +9,7 @@ interface CapturedQuery {
 
 function captureSql() {
   let query: CapturedQuery = { text: '', values: [] };
-  const sql = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+  const sql = mock((strings: TemplateStringsArray, ...values: unknown[]) => {
     query = {
       text: strings.join('?').replaceAll(/\s+/gu, ' ').trim(),
       values,
@@ -127,7 +127,7 @@ describe('stored per-pool basis on read', () => {
     metrics: { tput_per_gpu: 1000, input_tput_per_gpu: 900, output_tput_per_gpu: 100 },
   };
   const sqlReturning = () =>
-    vi.fn(() => Promise.resolve([structuredClone(unbackfilled)])) as unknown as Parameters<
+    mock(() => Promise.resolve([structuredClone(unbackfilled)])) as unknown as Parameters<
       typeof getBenchmarksForRun
     >[0];
 

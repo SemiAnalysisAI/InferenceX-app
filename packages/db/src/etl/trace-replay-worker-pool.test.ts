@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { gunzipSync, inflateSync } from 'node:zlib';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { prepareTraceReplay, type PreparedTraceReplay } from './trace-replay-ingest';
 import { AsyncSemaphore } from './async-semaphore';

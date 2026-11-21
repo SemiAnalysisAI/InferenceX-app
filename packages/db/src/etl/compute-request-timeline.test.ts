@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { REQUEST_TIMELINE_VERSION, computeRequestTimeline } from './compute-request-timeline.js';
 

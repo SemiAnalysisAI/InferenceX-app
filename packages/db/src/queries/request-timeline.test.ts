@@ -1,10 +1,11 @@
 import { gzipSync } from 'node:zlib';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline, gzipRequestTimeline } from '../etl/request-timeline-codec';
 import type { DbClient } from '../connection.js';
+import { waitFor } from '../lib/test-helpers';
 
 import * as agenticShared from './agentic-shared';
 import {
@@ -13,14 +14,12 @@ import {
   readRequestTimelineGz,
 } from './request-timeline';
 
-vi.mock('./agentic-shared', async (importOriginal) => {
-  const actual = await importOriginal<typeof agenticShared>();
-  return { ...actual, writeBackRequestTimeline: vi.fn(actual.writeBackRequestTimeline) };
-});
+const writeBackRequestTimeline = mock(agenticShared.writeBackRequestTimeline);
+mock.module('./agentic-shared', () => ({ ...agenticShared, writeBackRequestTimeline }));
 
 afterEach(() => {
-  vi.mocked(agenticShared.writeBackRequestTimeline).mockClear();
-  vi.restoreAllMocks();
+  writeBackRequestTimeline.mockClear();
+  mock.restore();
 });
 
 interface SqlCall {
@@ -158,7 +157,7 @@ describe('readRequestTimelineGz', () => {
 
     const read = readRequestTimelineGz(sql, 870, stored.length, 10);
     const answerNewest = async (): Promise<void> => {
-      await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0));
+      await waitFor(() => expect(waiting.length).toBeGreaterThan(0));
       waiting.pop()?.();
     };
     for (let answered = 0; answered < stored.length / 10; answered++) await answerNewest();
@@ -226,7 +225,7 @@ describe('getRequestTimeline', () => {
   });
 
   it('fails decode on a same-length corrupted slice and logs the trace id', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     const stored = await gzipRequestTimeline(gzipTimeline);
     const corrupted = corruptedCopy(stored);
     const { sql } = sliceServingSql(corrupted, gzipMeta(corrupted.length));
@@ -240,7 +239,7 @@ describe('getRequestTimeline', () => {
   });
 
   it('logs and returns null for a gzip timeline without a requests array', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     const stored = gzipSync('{"version":6,"startNs":1}');
     const { sql } = sliceServingSql(stored, gzipMeta(stored.length));
 
@@ -311,7 +310,7 @@ describe('getRequestTimeline', () => {
     expect(result?.version).toBe(REQUEST_TIMELINE_VERSION);
     expect(result?.requests).toHaveLength(1);
     expect(log[1]!.text).toContain('profile_export_chunk_count as parts');
-    expect(agenticShared.writeBackRequestTimeline).toHaveBeenCalledWith(sql, 870, result);
+    expect(writeBackRequestTimeline).toHaveBeenCalledWith(sql, 870, result);
   });
 
   it('does not write back when the blob is missing (never persists a null timeline)', async () => {
@@ -323,7 +322,7 @@ describe('getRequestTimeline', () => {
     const { sql, log } = mockSql([[staleHeader], [{ blob: null }]]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
-    expect(agenticShared.writeBackRequestTimeline).not.toHaveBeenCalled();
+    expect(writeBackRequestTimeline).not.toHaveBeenCalled();
     expect(log).toHaveLength(2);
   });
 });
