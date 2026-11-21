@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import {
   comparisonView,
@@ -13,11 +14,11 @@ import { getComparison } from '@/lib/operatorx/service';
 
 import { GET } from './route';
 
-vi.mock('@/lib/operatorx/service', () => ({
+mock.module('@/lib/operatorx/service', () => ({
   getComparison: vi.fn(),
   isPartialComparison: vi.fn(() => false),
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: vi.fn((_request: Request, body: unknown) => NextResponse.json(body)),
   operatorXCacheTag: vi.fn(() => 'opx'),
 }));
@@ -56,11 +57,11 @@ function comparison(): Comparison {
   };
 }
 
-beforeEach(() => vi.mocked(getComparison).mockReset());
+beforeEach(() => mocked(getComparison).mockReset());
 
 it('returns the chart’s normalized distribution with resolved controls and source identities', async () => {
   const source = comparison();
-  vi.mocked(getComparison).mockResolvedValue(source);
+  mocked(getComparison).mockResolvedValue(source);
   const response = await GET(
     new NextRequest(
       'http://localhost/api/v1/operatorx/compare?op=gemm&distributionMetric=tflops&distributionNormalized=true&distributionMatchedOnly=true&distributionHardware=ascend950pr,h200',
@@ -85,14 +86,14 @@ it('returns the chart’s normalized distribution with resolved controls and sou
 });
 
 it('rejects invalid distribution selectors without changing the default comparison contract', async () => {
-  vi.mocked(getComparison).mockResolvedValue(comparison());
+  mocked(getComparison).mockResolvedValue(comparison());
   const invalid = await GET(
     new NextRequest(
       'http://localhost/api/v1/operatorx/compare?op=gemm&distributionNormalized=maybe',
     ),
   );
   expect(invalid.status).toBe(400);
-  expect(vi.mocked(getComparison)).not.toHaveBeenCalled();
+  expect(mocked(getComparison)).not.toHaveBeenCalled();
 
   const unknownHardware = await GET(
     new NextRequest(
@@ -111,7 +112,7 @@ it.each([false, true])(
   'returns matching summary controls and values with sharedOnly=%s',
   async (sharedOnly) => {
     const source = comparison();
-    vi.mocked(getComparison).mockResolvedValue(source);
+    mocked(getComparison).mockResolvedValue(source);
     const response = await GET(
       new NextRequest(
         `http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16&rooflineHardware=ascend950pr,h200&rooflineNormalized=false&rooflineSharedOnly=${sharedOnly}`,
@@ -135,7 +136,7 @@ it.each([false, true])(
 );
 
 it('defaults the roofline summary to the shared cohort', async () => {
-  vi.mocked(getComparison).mockResolvedValue(comparison());
+  mocked(getComparison).mockResolvedValue(comparison());
   const response = await GET(
     new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16'),
   );
@@ -150,7 +151,7 @@ it.each([
   'rooflineHardware=unknown',
   'rooflineHardware=',
 ])('rejects an invalid roofline selector: %s', async (query) => {
-  vi.mocked(getComparison).mockResolvedValue(comparison());
+  mocked(getComparison).mockResolvedValue(comparison());
   const response = await GET(
     new NextRequest(`http://localhost/api/v1/operatorx/compare?op=gemm&${query}`),
   );
@@ -158,7 +159,7 @@ it.each([
 });
 
 it('returns an empty summary when the selected workload has no measured hardware', async () => {
-  vi.mocked(getComparison).mockResolvedValue({ op: 'gemm', hardware: [], workloads: [], rows: [] });
+  mocked(getComparison).mockResolvedValue({ op: 'gemm', hardware: [], workloads: [], rows: [] });
   const response = await GET(
     new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm&rooflineNormalized=true'),
   );

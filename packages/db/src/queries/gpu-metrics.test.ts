@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
 import type { DbClient } from '../connection';
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
@@ -315,11 +315,9 @@ describe('getGpuMetricsPointRevision', () => {
 
 it('retries a transient telemetry transaction and stores one complete series and link', async () => {
   const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'telemetry-retry-'));
-  const begin = vi
-    .spyOn(sql, 'begin')
-    .mockRejectedValueOnce(
-      Object.assign(new Error('connection closed'), { code: 'CONNECTION_CLOSED' }),
-    );
+  const begin = spyOn(sql, 'begin').mockRejectedValueOnce(
+    Object.assign(new Error('connection closed'), { code: 'CONNECTION_CLOSED' }),
+  );
   try {
     fs.writeFileSync(
       path.join(artifactDir, 'gpu_metrics.csv'),

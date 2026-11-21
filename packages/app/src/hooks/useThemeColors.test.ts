@@ -1,10 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { runAllTimers, runOnlyPendingTimers, useFakeTimers, useRealTimers } from '@/test/helpers';
 
-const themeState = vi.hoisted(() => ({ resolvedTheme: 'dark' as string | undefined }));
-vi.mock('next-themes', () => ({
+const themeState = { resolvedTheme: 'dark' as string | undefined };
+mock.module('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: themeState.resolvedTheme }),
 }));
 
@@ -44,13 +45,13 @@ function renderHook<T>(hook: () => T): {
 const HW_KEYS = ['h100', 'mi300x', 'b200'];
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  useFakeTimers();
   themeState.resolvedTheme = 'dark';
 });
 
 afterEach(() => {
-  vi.runOnlyPendingTimers();
-  vi.useRealTimers();
+  runOnlyPendingTimers();
+  useRealTimers();
 });
 
 describe('useThemeColors mount behavior', () => {
@@ -63,7 +64,7 @@ describe('useThemeColors mount behavior', () => {
     const initialGetCssColor = result.current.getCssColor;
 
     act(() => {
-      vi.runAllTimers();
+      runAllTimers();
     });
     rerender();
 
@@ -82,7 +83,7 @@ describe('useThemeColors mount behavior', () => {
     themeState.resolvedTheme = 'dark';
     rerender();
     act(() => {
-      vi.runAllTimers();
+      runAllTimers();
     });
     rerender();
 
@@ -99,7 +100,7 @@ describe('useThemeColors mount behavior', () => {
     themeState.resolvedTheme = 'light';
     rerender();
     act(() => {
-      vi.runAllTimers();
+      runAllTimers();
     });
     rerender();
 
@@ -115,14 +116,14 @@ describe('useThemeColors mount behavior', () => {
     themeState.resolvedTheme = 'light';
     rerender();
     act(() => {
-      vi.runAllTimers();
+      runAllTimers();
     });
     rerender();
     const afterSwitch = result.current.themeColors;
 
     rerender();
     act(() => {
-      vi.runAllTimers();
+      runAllTimers();
     });
     rerender();
 

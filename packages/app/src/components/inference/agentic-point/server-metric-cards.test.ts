@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { localizeThroughputSeriesName } from './server-metric-cards';
 import { offloadHaloLabel } from '../ui/OffloadHaloLegendKey';

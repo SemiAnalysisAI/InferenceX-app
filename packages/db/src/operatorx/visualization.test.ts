@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { ComparisonCase, ComparisonColumns, ComputePrecision } from './compare';
 import { opLabels } from './describe';

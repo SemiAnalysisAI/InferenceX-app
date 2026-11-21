@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
@@ -13,7 +13,7 @@ import {
   type UnofficialRunContextType,
 } from './unofficial-run-provider';
 
-vi.mock('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => null }));
+mock.module('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => null }));
 
 interface PendingRequest {
   url: string;

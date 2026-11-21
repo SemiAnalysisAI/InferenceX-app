@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { FAQ_ITEMS } from '@/components/about/faq-data';
 import { FAQ_ITEMS_ZH } from '@/components/about/faq-data-zh';

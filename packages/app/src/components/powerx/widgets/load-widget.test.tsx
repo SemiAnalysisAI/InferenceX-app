@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { hardwareStore } from './hardware-store';
 import { LoadWidget } from './load-widget';
@@ -15,12 +16,12 @@ let frames: FrameRequestCallback[] = [];
 beforeEach(() => {
   frames = [];
   // Hold animation frames so a value still easing stays visibly behind its target.
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+  stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     frames.push(callback);
     return frames.length;
   });
-  vi.stubGlobal('cancelAnimationFrame', () => {});
-  vi.stubGlobal(
+  stubGlobal('cancelAnimationFrame', () => {});
+  stubGlobal(
     'matchMedia',
     (query: string) =>
       ({
@@ -40,7 +41,7 @@ afterEach(() => {
   host?.remove();
   root = null;
   host = null;
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 

@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'bun:test';
 import { installChunkLoadRecovery } from './chunk-load-recovery';
+import type * as ChunkLoadRecovery from './chunk-load-recovery';
 
 const KEY = 'chunk_reload';
 const reload = vi.fn();
@@ -74,8 +75,11 @@ describe('installChunkLoadRecovery', () => {
 
   it('installs each error listener only once', async () => {
     const addEventListener = vi.spyOn(window, 'addEventListener');
-    vi.resetModules();
-    const { installChunkLoadRecovery: install } = await import('./chunk-load-recovery');
+    // A copy loaded under a new specifier starts uninstalled, like a fresh page load.
+    const freshSpecifier = './chunk-load-recovery?fresh';
+    const { installChunkLoadRecovery: install }: typeof ChunkLoadRecovery = await import(
+      freshSpecifier
+    );
 
     install();
     install();

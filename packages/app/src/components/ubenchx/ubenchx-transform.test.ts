@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it } from 'bun:test';
 import { sizeAxisTicks } from './ubenchx-transform';
 
 it('spaces binary-size labels independently of dense sample clusters', () => {

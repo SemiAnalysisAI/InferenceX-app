@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { zeroAnchoredDomain } from './chart-domain';
 
 // Every Y metric the chart plots today is positive-only, but the helper stays

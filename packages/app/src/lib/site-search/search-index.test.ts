@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { relatedTerms } from './concepts';
 import { boundedEditDistance, buildSnippet, SiteSearchIndex } from './search-index';

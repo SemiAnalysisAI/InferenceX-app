@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import { NUDGE_SLOTS } from './inline-slot';
 import { isDismissed, markDismissed, markShown } from './persistence';
 
@@ -8,7 +9,7 @@ import {
   TPUV7_LAUNCH_MODAL_STORAGE_KEY,
 } from './registry';
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -95,7 +96,7 @@ describe('NUDGE_REGISTRY integrity', () => {
 
   it('keeps internal action destinations in the active Chinese route tree', () => {
     const location = { pathname: '/zh/infx/inference', href: '' };
-    vi.stubGlobal('window', { location });
+    stubGlobal('window', { location });
 
     const reproducibility = NUDGE_REGISTRY.find((nudge) => nudge.id === 'reproducibility');
     if (reproducibility?.type !== 'toast') throw new Error('Missing reproducibility toast');
@@ -149,7 +150,7 @@ describe('NUDGE_REGISTRY integrity', () => {
 
   it.each(['', '/zh'])('offers all four launch models in the %s route tree', (prefix) => {
     const location = { pathname: prefix || '/', href: '' };
-    vi.stubGlobal('window', { location });
+    stubGlobal('window', { location });
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     expect(modal?.content.title).toBe('TPUv7 preliminary results across multiple models');
     expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
@@ -194,7 +195,7 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('ignores the old launch dismissal and waits exactly three days after each new dismissal', () => {
     const oldKey = 'inferencex-tpuv7-agentx-modal-dismissed';
     const storage = new Map<string, string>([[oldKey, '1']]);
-    vi.stubGlobal('localStorage', {
+    stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => storage.set(key, value),
     });

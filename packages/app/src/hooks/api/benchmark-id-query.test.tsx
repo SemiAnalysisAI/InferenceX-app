@@ -1,13 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as ReactQuery from '@tanstack/react-query';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-const useQueryMock = vi.hoisted(() => vi.fn((options: unknown) => options));
+const useQueryMock = (() => vi.fn((options: unknown) => options))();
 
-vi.mock('@tanstack/react-query', async (importOriginal) => ({
-  ...(await importOriginal<typeof ReactQuery>()),
+const actual = { ...(await import('@tanstack/react-query')) };
+mock.module('@tanstack/react-query', () => ({
+  ...actual,
   useQuery: useQueryMock,
 }));
 
@@ -78,11 +79,11 @@ describe('useByIdQuery revalidation', () => {
     useQueryMock.mockClear();
     fetchMock.mockReset();
     cached = undefined;
-    vi.stubGlobal('fetch', fetchMock);
+    stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('revalidates on every mount and focus and reuses the cached payload on a 304', async () => {

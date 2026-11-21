@@ -1,13 +1,13 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 
-const { mockFetchBenchmarks } = vi.hoisted(() => ({ mockFetchBenchmarks: vi.fn() }));
-vi.mock('@/lib/api/api', () => ({ fetchBenchmarks: mockFetchBenchmarks }));
+const { mockFetchBenchmarks } = { mockFetchBenchmarks: vi.fn() };
+mock.module('@/lib/api/api', () => ({ fetchBenchmarks: mockFetchBenchmarks }));
 
 import { useBenchmarks } from './use-benchmarks';
 

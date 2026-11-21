@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 const replace = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('next/navigation', () => ({ useRouter: () => ({ replace }) }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import { FEATURE_GATE_KEY, relockFeatureGate } from '@/lib/runtime/use-feature-gate';
 

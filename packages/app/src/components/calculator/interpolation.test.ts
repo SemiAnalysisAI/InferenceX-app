@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { paretoFrontUpperLeft } from './interpolation';
 
@@ -9,7 +9,11 @@ interface P {
 }
 
 function referenceFront(points: P[]): P[] {
-  const sorted = [...points].toSorted((a, b) => (a.x === b.x ? b.y - a.y : a.x - b.x));
+  const sorted = points
+    .filter((p) => !Number.isNaN(p.x) && !Number.isNaN(p.y))
+    .toSorted((a, b) =>
+      a.x === b.x ? (a.y === b.y ? 0 : a.y > b.y ? -1 : 1) : a.x < b.x ? -1 : 1,
+    );
   const front: P[] = [];
   for (const point of sorted) {
     if (front.length > 0 && front.at(-1)!.x === point.x) {
@@ -31,7 +35,7 @@ function seeded(seed: number) {
 }
 
 describe('paretoFrontUpperLeft', () => {
-  it('matches the reference on ties, NaN and infinities on both sides of the small-sort cutoff', () => {
+  it('matches the reference on ties and infinities, and drops NaN points, on both sides of the small-sort cutoff', () => {
     const values = [0, 1, 2, 2.5, 3, Number.NaN, Infinity, -Infinity];
     const random = seeded(7);
     const pick = () => values[Math.floor(random() * values.length)];

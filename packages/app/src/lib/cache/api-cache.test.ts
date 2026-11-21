@@ -5,37 +5,40 @@ import {
   gunzipSync,
   gzipSync,
 } from 'node:zlib';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as WorkUnitStorage from 'next/dist/server/app-render/work-unit-async-storage.external';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, waitFor } from '@/test/helpers';
 
-vi.mock('next/cache', () => ({
+mock.module('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: vi.fn((fn: (...args: any[]) => any, _keys: string[], _opts: unknown) => fn),
 }));
 
-const afterTasks = vi.hoisted(() => ({ pending: [] as (() => Promise<unknown>)[] }));
-vi.mock('next/server', () => ({
+const afterTasks = { pending: [] as (() => Promise<unknown>)[] };
+mock.module('next/server', () => ({
   after: (task: () => Promise<unknown>) => {
     afterTasks.pending.push(task);
   },
 }));
 
-const workStore = vi.hoisted(() => ({
+const workStore = {
   current: undefined as { type: string; consumerWillServerCache?: boolean } | undefined,
-}));
-vi.mock('next/dist/server/app-render/work-unit-async-storage.external', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorkUnitStorage>()),
+};
+const actualWorkUnitStorage = {
+  ...(await import('next/dist/server/app-render/work-unit-async-storage.external')),
+};
+mock.module('next/dist/server/app-render/work-unit-async-storage.external', () => ({
+  ...actualWorkUnitStorage,
   workUnitAsyncStorage: { getStore: () => workStore.current },
 }));
 
-const fixtures = vi.hoisted(() => ({ mode: false }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  get FIXTURES_MODE() {
-    return fixtures.mode;
-  },
-}));
+// bun:test snapshots mocked exports, so a getter would be read once. Re-mocking the module
+// updates the FIXTURES_MODE binding api-cache already imported.
+function mockConnection(fixturesMode: boolean) {
+  mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: fixturesMode }));
+}
+mockConnection(false);
 
-vi.mock('./blob-cache', () => ({
+mock.module('./blob-cache', () => ({
   CONTENT_BLOB_KEY_PREFIX: 'content/',
   blobEnabled: vi.fn(() => true),
   blobGet: vi.fn(),
@@ -45,7 +48,7 @@ vi.mock('./blob-cache', () => ({
   blobPurge: vi.fn(),
 }));
 
-const generation = vi.hoisted(() => ({ value: 'g1' }));
+const generation = { value: 'g1' };
 
 import {
   cachedQuery,
@@ -61,14 +64,14 @@ import {
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobEnabled, blobGet, blobGetBytes, blobSet, blobSetBytes, blobPurge } from './blob-cache';
 
-const mockRevalidateTag = vi.mocked(revalidateTag);
-const mockUnstableCache = vi.mocked(unstable_cache);
-const mockBlobEnabled = vi.mocked(blobEnabled);
-const mockBlobGet = vi.mocked(blobGet);
-const mockBlobSet = vi.mocked(blobSet);
-const mockBlobGetBytes = vi.mocked(blobGetBytes);
-const mockBlobSetBytes = vi.mocked(blobSetBytes);
-const mockBlobPurge = vi.mocked(blobPurge);
+const mockRevalidateTag = mocked(revalidateTag);
+const mockUnstableCache = mocked(unstable_cache);
+const mockBlobEnabled = mocked(blobEnabled);
+const mockBlobGet = mocked(blobGet);
+const mockBlobSet = mocked(blobSet);
+const mockBlobGetBytes = mocked(blobGetBytes);
+const mockBlobSetBytes = mocked(blobSetBytes);
+const mockBlobPurge = mocked(blobPurge);
 const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 
 beforeEach(() => {
@@ -294,7 +297,7 @@ describe('cachedQuery', () => {
       const wrapped = cachedQuery(fn, 'stampede', { blobOnly: true });
 
       const calls = [wrapped(), wrapped(), wrapped()];
-      await vi.waitFor(() => expect(fn).toHaveBeenCalledOnce());
+      await waitFor(() => expect(fn).toHaveBeenCalledOnce());
       resolve({ rows: [1, 2] });
       const [first, second, third] = await Promise.all(calls);
 
@@ -309,7 +312,9 @@ describe('cachedQuery', () => {
 
     it('shares one blob read between concurrent hits', async () => {
       mockBlobGet.mockResolvedValue('{"rows":[1]}');
-      const wrapped = cachedQuery(() => Promise.resolve({ rows: [] }), 'hits', { blobOnly: true });
+      const wrapped = cachedQuery(() => Promise.resolve<{ rows: number[] }>({ rows: [] }), 'hits', {
+        blobOnly: true,
+      });
 
       const [first, second] = await Promise.all([wrapped(), wrapped()]);
 
@@ -328,6 +333,9 @@ describe('cachedQuery', () => {
       const wrapped = cachedQuery(fn, 'retry', { blobOnly: true });
 
       const failed = [wrapped(), wrapped()];
+      // bun's `rejects` settles the awaited promise before returning, so mark both handled
+      // first or the second caller's rejection counts as unhandled.
+      void Promise.allSettled(failed);
       await expect(failed[0]).rejects.toThrow('db down');
       await expect(failed[1]).rejects.toThrow('db down');
       await expect(wrapped()).resolves.toEqual({ ok: true });
@@ -690,12 +698,12 @@ describe('cachedJson', () => {
   });
 
   it('keeps fixture responses out of the browser cache so E2E intercepts see every request', () => {
-    fixtures.mode = true;
+    mockConnection(true);
     try {
       const res = cachedJson(apiRequest(), { ok: true }, { cacheControl: 'public, max-age=5' });
       expect(res.headers.get('Cache-Control')).toBe('no-store');
     } finally {
-      fixtures.mode = false;
+      mockConnection(false);
     }
   });
 
@@ -966,7 +974,7 @@ describe('cachedJsonResponse', () => {
     const respond = cachedJsonResponse(load, 'stampede');
 
     const calls = [respond(apiRequest()), respond(apiRequest())];
-    await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+    await waitFor(() => expect(load).toHaveBeenCalledOnce());
     resolve([1, 2]);
     const responses = await Promise.all(calls);
 

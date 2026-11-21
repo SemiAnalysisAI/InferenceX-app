@@ -6,21 +6,21 @@ import {
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
 import { Model } from '@/lib/catalog/data-mappings';
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { GET as collective } from './collectivex/route';
 import { GET as images } from './current-inferencex-image/route';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   runs: vi.fn(),
   run: vi.fn(),
   images: vi.fn(),
   releases: vi.fn(),
-}));
-vi.mock('@/app/api/v1/collectivex/runs/route', () => ({ GET: mocks.runs }));
-vi.mock('@/app/api/v1/collectivex/runs/[runId]/route', () => ({ GET: mocks.run }));
-vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
-vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
-vi.mock('@/lib/cache/api-cache', () => ({
+};
+mock.module('@/app/api/v1/collectivex/runs/route', () => ({ GET: mocks.runs }));
+mock.module('@/app/api/v1/collectivex/runs/[runId]/route', () => ({ GET: mocks.run }));
+mock.module('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
+mock.module('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
   collectiveXCacheTag: () => 'collectivex',

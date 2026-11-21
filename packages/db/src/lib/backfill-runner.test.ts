@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, type Mock, spyOn } from 'bun:test';
 import { gzipSync } from 'node:zlib';
 import { computeChartSeries } from '../etl/compute-chart-series.js';
 
@@ -34,16 +34,16 @@ describe('parseRunIdFlag', () => {
 
 describe('failed chart backfills', () => {
   afterEach(() => {
-    vi.restoreAllMocks();
-    process.exitCode = undefined;
+    mock.restore();
+    process.exitCode = 0;
   });
 
   it.each([Buffer.from('not gzip'), gzipSync('not json')])(
     'retains existing data and fails the job when the real parser rejects a blob',
     async (blob) => {
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'error').mockImplementation(() => {});
-      const write = vi.fn();
+      spyOn(console, 'log').mockImplementation(() => {});
+      spyOn(console, 'error').mockImplementation(() => {});
+      const write = mock();
       await runPerIdBackfill([1162], async () => {
         const series = requireBackfillPayload(await computeChartSeries(blob), 'chart_series');
         write(series);
@@ -51,7 +51,7 @@ describe('failed chart backfills', () => {
       });
       expect(write).not.toHaveBeenCalled();
       expect(process.exitCode).toBe(1);
-      expect(vi.mocked(console.error).mock.calls[0]?.[0]).toContain(
+      expect((console.error as Mock<typeof console.error>).mock.calls[0]?.[0]).toContain(
         'existing data was not changed',
       );
     },
@@ -120,23 +120,26 @@ describe('parseLimitForceFlags', () => {
 
 describe('runPerIdBackfill', () => {
   beforeEach(() => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    spyOn(console, 'log').mockImplementation(() => {});
+    spyOn(console, 'error').mockImplementation(() => {});
   });
   afterEach(() => {
-    vi.restoreAllMocks();
-    process.exitCode = undefined;
+    mock.restore();
+    // Bun ignores `process.exitCode = undefined`, so reset to the success code instead.
+    process.exitCode = 0;
   });
 
   it('processes ids serially and leaves exitCode unset on success', async () => {
+    // Bun cannot unset exitCode, so a sentinel proves the runner never writes it.
+    process.exitCode = 7;
     const seen: number[] = [];
     await runPerIdBackfill([1, 2, 3], (id) => {
       seen.push(id);
       return Promise.resolve(id === 2 ? 'skipped' : 'ok');
     });
     expect(seen).toEqual([1, 2, 3]);
-    expect(process.exitCode).toBeUndefined();
-    const logged = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
+    expect(process.exitCode).toBe(7);
+    const logged = (console.log as Mock<typeof console.log>).mock.calls.map((c) => String(c[0]));
     expect(logged.filter((l) => l.includes('✓')).length).toBe(2);
     expect(logged.at(-1)).toContain('=== backfill complete: 2 ok, 0 failed');
   });
@@ -149,9 +152,11 @@ describe('runPerIdBackfill', () => {
     });
     expect(seen).toEqual([1, 2, 3]);
     expect(process.exitCode).toBe(1);
-    const logged = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
+    const logged = (console.log as Mock<typeof console.log>).mock.calls.map((c) => String(c[0]));
     expect(logged.at(-1)).toContain('=== backfill complete: 1 ok, 2 failed');
-    const errors = vi.mocked(console.error).mock.calls.map((c) => String(c[0]));
+    const errors = (console.error as Mock<typeof console.error>).mock.calls.map((c) =>
+      String(c[0]),
+    );
     expect(errors).toEqual(['  ✗ id=1: boom 1', '  ✗ id=3: boom 3', '  failed ids: 1, 3']);
   });
 });
@@ -161,23 +166,23 @@ describe('runCandidateIdBackfill', () => {
 
   beforeEach(() => {
     process.argv = ['node', 'script.ts', '--yes'];
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
     process.argv = originalArgv;
-    vi.restoreAllMocks();
-    process.exitCode = undefined;
+    mock.restore();
+    process.exitCode = 0;
   });
 
   it('stops after candidate loading when there is nothing to do', async () => {
-    const processRow = vi.fn<(_: number) => Promise<'ok'>>(() => Promise.resolve('ok'));
+    const processRow = mock<(_: number) => Promise<'ok'>>(() => Promise.resolve('ok'));
 
     const processed = await runCandidateIdBackfill(() => Promise.resolve([]), processRow);
 
     expect(processRow).not.toHaveBeenCalled();
     expect(processed).toBe(false);
-    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toContain('Nothing to do');
+    expect((console.log as Mock<typeof console.log>).mock.calls[0]?.[0]).toContain('Nothing to do');
   });
 
   it('confirms and serially processes loaded candidate ids', async () => {
@@ -194,6 +199,8 @@ describe('runCandidateIdBackfill', () => {
 
     expect(seen).toEqual([4, 9]);
     expect(processed).toBe(true);
-    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toContain('2 custom candidates');
+    expect((console.log as Mock<typeof console.log>).mock.calls[0]?.[0]).toContain(
+      '2 custom candidates',
+    );
   });
 });

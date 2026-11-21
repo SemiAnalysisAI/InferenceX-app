@@ -1,18 +1,19 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import { getTimelines } from '@/lib/operatorx/service';
 
 import { GET } from './route';
 
-vi.mock('@/lib/operatorx/service', () => ({
+mock.module('@/lib/operatorx/service', () => ({
   getTimelines: vi.fn(),
 }));
 
-beforeEach(() => vi.mocked(getTimelines).mockReset());
+beforeEach(() => mocked(getTimelines).mockReset());
 
 it('does not cache a timeline reference whose stored result is gone', async () => {
-  vi.mocked(getTimelines).mockResolvedValue({ timelines: { '123:0:1': null }, known: false });
+  mocked(getTimelines).mockResolvedValue({ timelines: { '123:0:1': null }, known: false });
 
   const response = await GET(
     new NextRequest('http://localhost/api/v1/operatorx/timelines?op=gemm&r=123:0:1'),
@@ -29,5 +30,5 @@ it('rejects an unversioned result reference before reading any run', async () =>
   );
 
   expect(response.status).toBe(400);
-  expect(vi.mocked(getTimelines)).not.toHaveBeenCalled();
+  expect(mocked(getTimelines)).not.toHaveBeenCalled();
 });

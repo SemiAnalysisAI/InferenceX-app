@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { convertRedirects } from '@vercel/routing-utils/dist/superstatic';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import nextConfig from '../../../next.config';
 

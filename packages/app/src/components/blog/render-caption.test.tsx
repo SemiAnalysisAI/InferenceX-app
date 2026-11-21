@@ -1,5 +1,5 @@
 import { isValidElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { renderCaption } from '@/components/blog/mdx-components';
 

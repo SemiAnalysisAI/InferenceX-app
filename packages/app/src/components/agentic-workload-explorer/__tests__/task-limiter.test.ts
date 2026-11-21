@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { createTaskLimiter } from '@/lib/agentic-workload-explorer/task-limiter';
 
 interface Deferred<T> {

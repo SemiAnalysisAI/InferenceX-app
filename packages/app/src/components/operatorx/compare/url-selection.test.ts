@@ -1,16 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-const replaceClientSearch = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/routing/client-navigation', () => ({ replaceClientSearch }));
+const replaceClientSearch = (() => vi.fn())();
+mock.module('@/lib/routing/client-navigation', () => ({ replaceClientSearch }));
 
 import { parsePickedHardware, setPickedHardware, setSearchParam } from './url-selection';
 
 function stubSearch(search: string) {
-  vi.stubGlobal('window', { location: { search } });
+  stubGlobal('window', { location: { search } });
 }
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   replaceClientSearch.mockReset();
 });
 

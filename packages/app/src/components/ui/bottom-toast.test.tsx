@@ -1,11 +1,18 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import { BottomToast } from './bottom-toast';
 
@@ -18,7 +25,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  useFakeTimers();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -27,7 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.useRealTimers();
+  useRealTimers();
 });
 
 function touch(type: 'touchstart' | 'touchend', x: number, y: number) {
@@ -63,7 +70,7 @@ describe('BottomToast swipe to dismiss', () => {
       toast.dispatchEvent(touch('touchstart', 200, 700));
       toast.dispatchEvent(touch('touchend', 320, 705));
     });
-    act(() => vi.advanceTimersByTime(400));
+    act(() => advanceTimersByTime(400));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -74,7 +81,7 @@ describe('BottomToast swipe to dismiss', () => {
       toast.dispatchEvent(touch('touchstart', 200, 700));
       toast.dispatchEvent(touch('touchend', 210, 702));
     });
-    act(() => vi.advanceTimersByTime(400));
+    act(() => advanceTimersByTime(400));
     expect(onDismiss).not.toHaveBeenCalled();
   });
 
@@ -85,13 +92,13 @@ describe('BottomToast swipe to dismiss', () => {
       toast.dispatchEvent(touch('touchstart', 200, 600));
       toast.dispatchEvent(touch('touchend', 230, 760));
     });
-    act(() => vi.advanceTimersByTime(400));
+    act(() => advanceTimersByTime(400));
     expect(onDismiss).not.toHaveBeenCalled();
   });
 });
 
 function stubViewport(isPhone: boolean, height: number) {
-  vi.stubGlobal(
+  stubGlobal(
     'matchMedia',
     vi.fn((query: string) => ({
       matches: isPhone,
@@ -100,7 +107,7 @@ function stubViewport(isPhone: boolean, height: number) {
       removeEventListener: vi.fn(),
     })),
   );
-  vi.stubGlobal(
+  stubGlobal(
     'ResizeObserver',
     class {
       observe() {}
@@ -114,7 +121,7 @@ function stubViewport(isPhone: boolean, height: number) {
 
 describe('BottomToast phone layout', () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
     vi.restoreAllMocks();
     document.body.style.paddingBottom = '';
   });
@@ -127,7 +134,7 @@ describe('BottomToast phone layout', () => {
     act(() => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!.click();
     });
-    act(() => vi.advanceTimersByTime(400));
+    act(() => advanceTimersByTime(400));
     expect(document.body.style.paddingBottom).toBe('');
   });
 
@@ -144,14 +151,14 @@ describe('BottomToast phone layout', () => {
       ),
     );
     // The outgoing toast finishes its exit animation after the replacement mounted.
-    act(() => vi.advanceTimersByTime(400));
+    act(() => advanceTimersByTime(400));
     expect(container.querySelector('[data-testid="toast"]')).toBeNull();
     expect(document.body.style.paddingBottom).toBe('56px');
 
     act(() => {
       nextContainer.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!.click();
     });
-    act(() => vi.advanceTimersByTime(400));
+    act(() => advanceTimersByTime(400));
     expect(document.body.style.paddingBottom).toBe('');
 
     act(() => nextRoot.unmount());

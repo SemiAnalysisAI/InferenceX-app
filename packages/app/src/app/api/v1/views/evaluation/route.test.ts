@@ -1,23 +1,23 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetAllEvalResults, mockGetDb, mockUnofficial } = vi.hoisted(() => ({
+const { mockGetAllEvalResults, mockGetDb, mockUnofficial } = {
   mockGetAllEvalResults: vi.fn(),
   mockUnofficial: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
-vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
+};
+mock.module('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/evaluations', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/evaluations', () => ({
   getAllEvalResults: mockGetAllEvalResults,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
@@ -31,7 +31,8 @@ import {
 import type { EvalRow } from '@/lib/api/api';
 import { Model } from '@/lib/catalog/data-mappings';
 
-import { GET } from './route';
+// Imported after mock.module so the route builds its reader from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'http://localhost'));

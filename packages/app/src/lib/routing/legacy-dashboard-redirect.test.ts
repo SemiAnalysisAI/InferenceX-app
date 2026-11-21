@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { AGENTX_ROUTE, DASHBOARD_ROUTES, UBENCHX_ROUTE } from './dashboard-routes';
 import {

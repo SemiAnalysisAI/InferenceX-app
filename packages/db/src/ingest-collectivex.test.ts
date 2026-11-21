@@ -1,36 +1,35 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import type * as Queries from './queries/collectivex';
-import type * as ResultsUpload from './collectivex/results-upload';
-
-const reads: string[] = [];
-vi.mock('./queries/collectivex', async (importOriginal) => ({
-  ...(await importOriginal<typeof Queries>()),
-  getMaxCollectiveXRunId: vi.fn(() => {
-    reads.push('max');
-    return Promise.resolve('200');
-  }),
-  getLatestCollectiveXRun: vi.fn(() => {
-    reads.push('latest');
-    return Promise.resolve(null);
-  }),
-}));
-vi.mock('./collectivex/results-upload', async (importOriginal) => ({
-  ...(await importOriginal<typeof ResultsUpload>()),
-  readResultsDir: vi.fn(() => ({ files: new Map() })),
-  validateResults: vi.fn(() => ({ version: 1 })),
-  buildUploadedRun: vi.fn(() => ({ run: {}, docs: [], plan: {} })),
-}));
-
+import * as ResultsUpload from './collectivex/results-upload';
 import {
   describeUpload,
   invalidateCollectiveXCache,
   parseIngestArgs,
   planUpload,
 } from './ingest-collectivex';
+import * as Queries from './queries/collectivex';
+
+const reads: string[] = [];
+mock.module('./queries/collectivex', () => ({
+  ...Queries,
+  getMaxCollectiveXRunId: mock(() => {
+    reads.push('max');
+    return Promise.resolve('200');
+  }),
+  getLatestCollectiveXRun: mock(() => {
+    reads.push('latest');
+    return Promise.resolve(null);
+  }),
+}));
+mock.module('./collectivex/results-upload', () => ({
+  ...ResultsUpload,
+  readResultsDir: mock(() => ({ files: new Map() })),
+  validateResults: mock(() => ({ version: 1 })),
+  buildUploadedRun: mock(() => ({ run: {}, docs: [], plan: {} })),
+}));
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 describe('parseIngestArgs', () => {
@@ -110,8 +109,8 @@ describe('describeUpload', () => {
 
 describe('invalidateCollectiveXCache', () => {
   it('purges the collectivex scope with bearer auth and the protection bypass', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const fetch = vi.fn(() => Promise.resolve(new Response('{}')));
+    spyOn(console, 'log').mockImplementation(() => {});
+    const fetch = mock(() => Promise.resolve(new Response('{}')));
     await expect(
       invalidateCollectiveXCache({
         env: {
@@ -132,8 +131,8 @@ describe('invalidateCollectiveXCache', () => {
   });
 
   it('drops the cached responses outright when asked, as a deletion does', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const fetch = vi.fn(() => Promise.resolve(new Response('{}')));
+    spyOn(console, 'log').mockImplementation(() => {});
+    const fetch = mock(() => Promise.resolve(new Response('{}')));
     await expect(
       invalidateCollectiveXCache({
         immediate: true,
@@ -148,8 +147,8 @@ describe('invalidateCollectiveXCache', () => {
   });
 
   it('skips without APP_URL or the secret, and fails on an HTTP error', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const fetch = vi.fn(() => Promise.resolve(new Response('', { status: 401 })));
+    const log = spyOn(console, 'log').mockImplementation(() => {});
+    const fetch = mock(() => Promise.resolve(new Response('', { status: 401 })));
     await expect(
       invalidateCollectiveXCache({
         env: { APP_URL: 'https://app.example' },

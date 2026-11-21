@@ -1,15 +1,22 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, mock } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import { stubMatchMedia } from '@/test/match-media-stub';
 
 import { DURATION_MS, LEAD_OUT_MS } from './agentx-session-replay-model';
 import { AgentXSessionReplay } from './agentx-session-replay';
 
-const track = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/analytics/analytics', () => ({ track }));
+const track = (() => vi.fn())();
+mock.module('@/lib/analytics/analytics', () => ({ track }));
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -22,12 +29,12 @@ let root: Root;
 let showRows: (ratio: number) => void;
 
 const figure = () => container.querySelector<HTMLElement>('figure')!;
-const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+const advance = (ms: number) => act(() => void advanceTimersByTime(ms));
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  useFakeTimers();
   track.mockClear();
-  vi.stubGlobal(
+  stubGlobal(
     'IntersectionObserver',
     class {
       constructor(callback: (entries: Partial<IntersectionObserverEntry>[]) => void) {
@@ -46,8 +53,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
+  unstubAllGlobals();
+  useRealTimers();
 });
 
 it('rests on the finished chart, plays once when the rows show, and replays on request', () => {

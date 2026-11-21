@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest';
+// @test-environment jsdom
+import { describe, expect, it, vi } from 'bun:test';
 
 import { extractSections, parseLlmsTxt } from './extract';
 import { SiteSearchEngine } from './site-search-engine';

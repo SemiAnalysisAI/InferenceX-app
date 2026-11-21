@@ -1,11 +1,12 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 import { hashKey, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type * as NextNavigation from 'next/navigation';
+import * as NextNavigation from 'next/navigation';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import {
   throughputQueryOptions,
@@ -42,16 +43,19 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
-import type * as UnofficialRunProvider from '@/providers/unofficial-run-provider';
+import * as UnofficialRunProvider from '@/providers/unofficial-run-provider';
 
-const mocks = vi.hoisted(() => ({ pathname: '/' }));
+const mocks = { pathname: '/' };
 
-vi.mock('next/navigation', async (importOriginal) => ({
-  ...(await importOriginal<typeof NextNavigation>()),
+// Snapshots of the real exports, taken before mock.module swaps them in place.
+const actualNavigation = { ...NextNavigation };
+const actualUnofficialRun = { ...UnofficialRunProvider };
+mock.module('next/navigation', () => ({
+  ...actualNavigation,
   usePathname: () => mocks.pathname,
 }));
-vi.mock('@/providers/unofficial-run-provider', async (importOriginal) => ({
-  ...(await importOriginal<typeof UnofficialRunProvider>()),
+mock.module('@/providers/unofficial-run-provider', () => ({
+  ...actualUnofficialRun,
   useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
 }));
 
@@ -249,8 +253,8 @@ const calculatorPage = (
 );
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', fetchMock);
-  vi.stubGlobal(
+  stubGlobal('fetch', fetchMock);
+  stubGlobal(
     'ResizeObserver',
     class {
       observe() {}
@@ -273,7 +277,7 @@ afterEach(() => {
   root = null;
   container.remove();
   client.clear();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   setInferenceNavigationModel(undefined);
   writeUrlParams({ g_model: undefined });
   readUrlParams();
@@ -387,7 +391,7 @@ describe('selector option intent on the inference page', () => {
   const deepSeekPath = inferenceModelPath(inferenceModelSlugForModel(Model.DeepSeek_V4_Pro)!);
   beforeEach(() => {
     window.addEventListener(CLIENT_PATHNAME_CHANGE_EVENT, followPathname);
-    vi.stubGlobal(
+    stubGlobal(
       'matchMedia',
       vi.fn(() => ({
         matches: false,

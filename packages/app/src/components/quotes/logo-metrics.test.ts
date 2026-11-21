@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { BASE_ARTWORK_HEIGHT, LOGO_METRICS, logoSize } from './logo-metrics';
 import { SUPPORTER_GROUPS } from './supporter-groups';

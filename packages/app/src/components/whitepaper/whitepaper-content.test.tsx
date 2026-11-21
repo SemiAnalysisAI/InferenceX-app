@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
-vi.mock('next-themes', () => ({
+mock.module('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: undefined }),
 }));
 

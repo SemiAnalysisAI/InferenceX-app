@@ -1,11 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GET } from '@/app/api/video-runs/route';
+import type { NextRequest } from 'next/server';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 import { videoHistoryEntry } from '@/components/video-benchmark/history';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
-import { loadReferencePsnrEvidence, REFERENCE_PSNR_RUN_ID } from './reference-psnr-evidence';
 
-vi.mock('@/app/api/video-runs/route', () => ({ GET: vi.fn() }));
+// Mocked before anything imports it, so the real route module (and its storage and cache
+// clients) never loads in this file.
+const GET = vi.fn<(request: NextRequest) => Promise<Response>>();
+mock.module('@/app/api/video-runs/route', () => ({ GET }));
+const { loadReferencePsnrEvidence, REFERENCE_PSNR_RUN_ID } =
+  await import('./reference-psnr-evidence');
 afterEach(() => vi.resetAllMocks());
 
 /** One published artifact of the pinned run whose single clip scores 25 dB. */
@@ -43,7 +47,7 @@ function respond(query: URLSearchParams, failing?: number) {
 }
 
 function serve({ failing }: { failing?: number } = {}) {
-  vi.mocked(GET).mockImplementation((request) =>
+  GET.mockImplementation((request) =>
     Promise.resolve(respond(request.nextUrl.searchParams, failing)),
   );
 }

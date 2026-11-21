@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { InferenceData, OverlayData } from '@/components/inference/types';
 import { htmlText as text, pointDetailsText } from './point-details-test-helpers';

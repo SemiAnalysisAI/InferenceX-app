@@ -1,25 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockGetRun, mockFromRow, mockGetWriteDb, mockCachedJson } = vi.hoisted(() => ({
+const { mockGetRun, mockFromRow, mockGetWriteDb, mockCachedJson } = {
   mockGetRun: vi.fn(),
   mockFromRow: vi.fn(),
   mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
   mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getCollectiveXWriteDb: mockGetWriteDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/collectivex', () => ({
   getCollectiveXRun: mockGetRun,
   collectiveXDatasetFromRow: mockFromRow,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   collectiveXCacheTag: () => 'collectivex',
 }));
