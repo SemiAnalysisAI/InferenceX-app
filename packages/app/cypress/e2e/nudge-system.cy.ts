@@ -36,6 +36,24 @@ function tickUntilVisible(clock: Cypress.Clock, selector: string) {
   });
 }
 
+/** Toasts unmount after a `setTimeout` exit transition, so advance the faked clock until they do. */
+function tickUntilGone(clock: Cypress.Clock, selector: string) {
+  cy.get('body').should(($body) => {
+    clock.tick(100);
+    expect($body.find(selector), selector).to.have.length(0);
+  });
+}
+
+/** React renders what a faked timer showed on real frames, so wait two before asserting absence. */
+function waitForRender() {
+  cy.window().then(
+    (win) =>
+      new Cypress.Promise<void>((resolve) => {
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve()));
+      }),
+  );
+}
+
 describe('Landing nudges — modals', { testIsolation: true }, () => {
   it('shows the launch banner on fresh first load', () => {
     cy.visit('/', {
@@ -388,24 +406,26 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 
 describe('Dashboard nudges — reproducibility toast', () => {
   it('reproducibility nudge stays dismissed across reloads', () => {
-    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
-    cy.get('[data-testid="reproducibility-nudge"]').should('be.visible');
-    cy.get('[data-testid="reproducibility-nudge"] button[aria-label="Dismiss"]').click();
-    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+      cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
+        onBeforeLoad(win) {
+          clearAllNudgeStorage(win);
+        },
+      });
+      cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
+      tickUntilVisible(clock, '[data-testid="reproducibility-nudge"]');
+      cy.get('[data-testid="reproducibility-nudge"] button[aria-label="Dismiss"]').click();
+      tickUntilGone(clock, '[data-testid="reproducibility-nudge"]');
 
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
+      cy.window().then((win) => {
+        expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
+      });
+      cy.reload();
+      // The filter hint timer (2.5s) fires after the reproducibility timer (1.5s), so the inline
+      // filter hint appearing proves the reproducibility nudge stayed hidden.
+      tickUntilVisible(clock, '[data-testid="filter-hint-nudge"]');
+      cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     });
-    cy.reload();
-    // The filter hint timer (2.5s) fires after the reproducibility timer (1.5s), so the inline
-    // filter hint appearing proves the reproducibility nudge stayed hidden.
-    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
-    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
   });
 });
 
@@ -427,54 +447,76 @@ describe('Dashboard nudges — inline filter hint', () => {
   });
 
   it('arms the filter hint before a client transition into inference', () => {
-    cy.visit('/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
-    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+      cy.visit('/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
+      cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
 
-    cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.location('pathname').should('eq', '/infx/inference');
-    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.location('pathname').should('eq', '/infx/inference');
+      tickUntilVisible(clock, '[data-testid="filter-hint-nudge"]');
+    });
   });
 
   it('re-evaluates the localized filter hint after a Chinese tab transition', () => {
-    cy.visit('/zh/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
-    cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.location('pathname').should('eq', '/zh/infx/inference');
-    cy.get('[data-testid="filter-hint-nudge"]')
-      .should('be.visible')
-      .and('contain.text', '图表太拥挤？');
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+      cy.visit('/zh/infx/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.location('pathname').should('eq', '/zh/infx/inference');
+      tickUntilVisible(clock, '[data-testid="filter-hint-nudge"]');
+      cy.get('[data-testid="filter-hint-nudge"]')
+        .should('be.visible')
+        .and('contain.text', '图表太拥挤？');
+    });
   });
 
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
-    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
-      onBeforeLoad: suppressCompetingDashboardToasts,
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+      cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
+        onBeforeLoad: suppressCompetingDashboardToasts,
+      });
+      cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
+      tickUntilVisible(clock, '[data-testid="filter-hint-nudge"]');
+      cy.get('[data-testid="filter-hint-nudge"]')
+        .should('be.visible')
+        .and('have.css', 'position', 'static')
+        .closest('[data-slot="chart-legend-wrapper"]')
+        .should('exist');
+
+      cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
+      cy.window()
+        .its('localStorage')
+        .invoke('getItem', 'inferencex-filter-hint-nudge-dismissed')
+        .should('eq', '1');
+
+      // Let the reproducibility toast (1.5s) prove that the reloaded engine armed its timers.
+      // Showing it re-arms every pending trigger, so 2.5s more covers the filter-hint timer once
+      // its legend slot has mounted.
+      cy.window().then((win) => {
+        win.localStorage.removeItem('inferencex-reproducibility-nudge-dismissed');
+      });
+      cy.reload();
+      tickUntilVisible(clock, '[data-testid="reproducibility-nudge"]');
+      cy.get('body').should(($body) => {
+        clock.tick(100);
+        expect($body.find('[data-slot="chart-legend-wrapper"]')).to.have.length.at.least(1);
+      });
+      cy.tick(2500);
+      waitForRender();
+      cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
     });
-    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-    cy.get('[data-testid="filter-hint-nudge"]')
-      .should('be.visible')
-      .and('have.css', 'position', 'static')
-      .closest('[data-slot="chart-legend-wrapper"]')
-      .should('exist');
-
-    cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
-    cy.window()
-      .its('localStorage')
-      .invoke('getItem', 'inferencex-filter-hint-nudge-dismissed')
-      .should('eq', '1');
-
-    cy.reload();
-    cy.wait(3500);
-    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
   });
 });
 
 describe('Evaluation nudges — inline eval-samples hint', () => {
   it('eval-samples open event refreshes the cooldown timestamp', () => {
-    cy.visit('/infx/evaluation', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+      cy.visit('/infx/evaluation', {
+        onBeforeLoad(win) {
+          clearAllNudgeStorage(win);
+        },
+      });
+      tickUntilVisible(clock, '[data-testid="eval-samples-nudge"]');
     });
-    cy.get('[data-testid="eval-samples-nudge"]').should('be.visible');
 
     cy.window().then((win) => {
       const value = win.localStorage.getItem('inferencex-eval-samples-nudge-dismissed');
@@ -502,14 +544,19 @@ describe('Nudge scope isolation', () => {
   });
 
   it('dashboard nudges do not appear on landing page', () => {
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']);
     cy.visit('/', {
       onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
+        showLaunchModal(win);
         win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });
-    cy.wait(2000);
+    // The launch modal opens from an idle callback queued after the hydrated engines armed their
+    // timers, so the faked 2.5s that follows covers every dashboard nudge timer.
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.tick(2500);
+    waitForRender();
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="star-nudge"]').should('not.exist');
     cy.get('[data-testid="export-nudge"]').should('not.exist');

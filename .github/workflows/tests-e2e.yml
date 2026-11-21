@@ -32,33 +32,9 @@ jobs:
       - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: $/.github/actions/setup-workspace
         with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Mount node_modules
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-node-modules-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}
-          path: ./node_modules
-          commit: 'false'
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Mount Cypress binary
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-cypress-binary-${{ runner.arch }}
-          path: /home/runner/.cache/Cypress
-          commit: 'false'
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: bunx cypress verify || bunx cypress install
+          cypress-binary: 'true'
       - name: Run component tests
         working-directory: packages/app
         run: bunx cypress run --component --browser chrome
@@ -97,38 +73,14 @@ jobs:
       - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      # Sticky disks mount in about a second; bun reconciles node_modules to the lockfile.
-      - name: Mount node_modules
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-node-modules-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}
-          path: ./node_modules
-          commit: 'false'
-      # The Turbopack compiler cache (turbopackFileSystemCacheForBuild in next.config.ts)
-      # plus the incremental fetch cache, per
-      # https://nextjs.org/docs/pages/guides/ci-build-caching.
-      - name: Mount Next.js build cache
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-nextjs-cache-${{ runner.arch }}
-          path: ./packages/app/.next/cache
-          commit: 'false'
       - uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
         if: matrix.browser == 'firefox'
         with:
           firefox-version: latest
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
+      - uses: $/.github/actions/setup-workspace
+        with:
+          nextjs-cache: 'true'
+          cypress-binary: 'true'
       # Each shard builds the app itself: with the mounted compiler cache this is
       # faster than waiting for one build job and its artifact.
       - name: Build app
@@ -138,15 +90,6 @@ jobs:
       - name: Check client bundle
         if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
         run: bun run check:bundle
-      - name: Mount Cypress binary
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-cypress-binary-${{ runner.arch }}
-          path: /home/runner/.cache/Cypress
-          commit: 'false'
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: bunx cypress verify || bunx cypress install
       - name: Run integration tests
         uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060 # v7.4.6
         with:

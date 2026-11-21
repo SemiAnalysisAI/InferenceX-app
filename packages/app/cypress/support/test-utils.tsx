@@ -37,6 +37,14 @@ export function mountWithProviders(
   component: React.ReactElement,
   overrides: ProviderOverrides = {},
 ): void {
+  cy.mount(withProviders(component, overrides));
+}
+
+/** Wraps `component` in the mock providers `overrides` names. Bun component tests mount this too. */
+export function withProviders(
+  component: React.ReactElement,
+  overrides: ProviderOverrides = {},
+): React.ReactElement {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -81,7 +89,5 @@ export function mountWithProviders(
     tree = <UnofficialRunContext.Provider value={value}>{tree}</UnofficialRunContext.Provider>;
   }
 
-  tree = <QueryClientProvider client={queryClient}>{tree}</QueryClientProvider>;
-
-  cy.mount(tree);
+  return <QueryClientProvider client={queryClient}>{tree}</QueryClientProvider>;
 }

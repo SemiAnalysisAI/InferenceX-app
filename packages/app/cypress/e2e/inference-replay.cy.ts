@@ -1,6 +1,13 @@
 import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-point-registry';
 
+import { fastForwardQueryRetry } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+
+/**
+ * With reduced motion (CI's Chrome forces it) Play steps one date per 1.2s `setInterval`, and on
+ * animation frames otherwise. Faking only the interval lets the test advance playback on demand.
+ */
+const PLAYBACK_INTERVAL: ('setInterval' | 'clearInterval')[] = ['setInterval', 'clearInterval'];
 
 const openReplayDialog = () => {
   cy.get('[data-testid="chart-figure"]')
@@ -31,13 +38,17 @@ const replayAxisExtentFrom = (svg: Element) => {
   return `${lastTick('g.x-axis text')}|${lastTick('g.y-axis text')}`;
 };
 
-const visitChineseReplay = () => {
+const visitChineseInference = () => {
   cy.viewport(390, 900);
   cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
   });
+};
+
+const visitChineseReplay = () => {
+  visitChineseInference();
   openReplayDialog();
 };
 
@@ -59,12 +70,15 @@ describe('Inference Replay', () => {
     cy.get('[data-testid="replay-date-overlay"]')
       .invoke('text')
       .then((startDate) => {
-        cy.get('[data-testid="replay-play-pause"]').click();
-        cy.get('[data-testid="replay-scrubber"]')
-          .invoke('val')
-          .should((endVal) => {
-            expect(Number(endVal)).to.be.greaterThan(0);
-          });
+        cy.clock(Date.now(), PLAYBACK_INTERVAL).then((clock) => {
+          cy.get('[data-testid="replay-play-pause"]').click();
+          cy.get('[data-testid="replay-scrubber"]')
+            .invoke('val')
+            .should((endVal) => {
+              clock.tick(100);
+              expect(Number(endVal)).to.be.greaterThan(0);
+            });
+        });
         cy.get('[data-testid="replay-date-overlay"]')
           .invoke('text')
           .should((endDate) => {
@@ -171,11 +185,14 @@ describe('Inference Replay — Simplified Chinese', () => {
       cy.get('[data-testid="replay-scrubber"]')
         .invoke('val')
         .then((startValue) => {
-          cy.get('[data-testid="replay-play-pause"]').click();
-          cy.get('[data-testid="replay-scrubber"]').should(($scrubber) => {
-            expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(
-              Number(startValue),
-            );
+          cy.clock(Date.now(), PLAYBACK_INTERVAL).then((clock) => {
+            cy.get('[data-testid="replay-play-pause"]').click();
+            cy.get('[data-testid="replay-scrubber"]').should(($scrubber) => {
+              clock.tick(100);
+              expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(
+                Number(startValue),
+              );
+            });
           });
           cy.get('[data-testid="replay-play-pause"]')
             .should('have.attr', 'aria-label', '暂停回放')
@@ -209,7 +226,9 @@ describe('Inference Replay — Simplified Chinese', () => {
           failHistory ? { statusCode: 500, body: {} } : { statusCode: 200, body: history },
         );
       });
-      visitChineseReplay();
+      visitChineseInference();
+      cy.get('[data-testid="chart-figure"]').should('exist');
+      fastForwardQueryRetry('[data-testid="replay-history-query-error"]', openReplayDialog);
       cy.get('[data-testid="replay-history-query-error"]')
         .should('contain.text', '基准测试历史加载失败')
         .and('contain.text', '重试');

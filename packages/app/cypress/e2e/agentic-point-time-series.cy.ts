@@ -1,4 +1,4 @@
-import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, fastForwardQueryRetry, unlockAgenticGate } from '../support/e2e';
 
 const timelineRequest = (
   index: number,
@@ -356,7 +356,9 @@ describe('Agentic point request metric time series', () => {
       'contain.text',
       'INFO retained after failure',
     );
-    cy.get('[data-testid="load-more-server-log"]').click();
+    fastForwardQueryRetry(':contains("The next chunk could not be loaded")', () => {
+      cy.get('[data-testid="load-more-server-log"]').click();
+    });
     cy.wait('@failedLogChunkSettled');
     cy.contains('The next chunk could not be loaded').should('be.visible');
     cy.get('[data-testid="server-log-content"]').should(
@@ -541,8 +543,10 @@ describe('Agentic point request metric time series', () => {
             },
       );
     }).as('retryServerLogSearch');
-    cy.visit('/zh/infx/inference/agentic/206885?view=logs&e2e=log-retries', {
-      onBeforeLoad: unlockAgenticGate,
+    fastForwardQueryRetry('[data-testid="server-log-files-query-error"]', () => {
+      cy.visit('/zh/infx/inference/agentic/206885?view=logs&e2e=log-retries', {
+        onBeforeLoad: unlockAgenticGate,
+      });
     });
 
     cy.get('[data-testid="server-log-files-query-error"]')
@@ -552,7 +556,9 @@ describe('Agentic point request metric time series', () => {
       fileAttemptsBeforeRetry = fileAttempts;
       failFile = false;
     });
-    cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
+    fastForwardQueryRetry('[data-testid="server-log-content-query-error"]', () => {
+      cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
+    });
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
     cy.wrap(null).should(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 
@@ -569,7 +575,9 @@ describe('Agentic point request metric time series', () => {
       expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry),
     );
 
-    cy.get('[data-testid="server-log-search"]').type('recovered');
+    fastForwardQueryRetry('[data-testid="server-log-search-query-error"]', () => {
+      cy.get('[data-testid="server-log-search"]').type('recovered');
+    });
     cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
     cy.then(() => {
       searchAttemptsBeforeRetry = searchAttempts;
@@ -700,7 +708,9 @@ describe('Agentic point request metric time series', () => {
       );
     });
 
-    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    fastForwardQueryRetry('[data-testid="agentic-request-charts-query-error"]', () => {
+      cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    });
     cy.get('[data-testid="agentic-request-charts-query-error"]')
       .should('contain.text', '请求图表数据加载失败')
       .and('contain.text', '重试');
@@ -712,7 +722,9 @@ describe('Agentic point request metric time series', () => {
     cy.contains('h2', '输入序列长度分布').should('be.visible');
     cy.then(() => expect(requestChartAttempts).to.be.greaterThan(requestChartAttemptsBeforeRetry));
 
-    cy.get('[data-testid="detail-view-aggregates"]').click();
+    fastForwardQueryRetry('[data-testid="agentic-aggregates-query-error"]', () => {
+      cy.get('[data-testid="detail-view-aggregates"]').click();
+    });
     cy.get('[data-testid="agentic-aggregates-query-error"]')
       .should('contain.text', '跨配置聚合数据加载失败')
       .and('contain.text', '重试');
@@ -724,7 +736,9 @@ describe('Agentic point request metric time series', () => {
     cy.contains('h2', '各配置的 ISL 分布').should('be.visible');
     cy.then(() => expect(aggregateAttempts).to.be.greaterThan(aggregateAttemptsBeforeRetry));
 
-    cy.get('[data-testid="detail-view-timeline"]').click();
+    fastForwardQueryRetry('[data-testid="agentic-timeline-query-error"]', () => {
+      cy.get('[data-testid="detail-view-timeline"]').click();
+    });
     cy.get('[data-testid="agentic-timeline-query-error"]')
       .should('contain.text', '请求时间线加载失败')
       .and('contain.text', '重试');
@@ -754,7 +768,9 @@ describe('Agentic point request metric time series', () => {
         failSibling ? { statusCode: 500, body: {} } : { statusCode: 200, body: benchmarkSiblings },
       );
     });
-    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    fastForwardQueryRetry('[data-testid="agentic-trace-query-error"]', () => {
+      cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    });
 
     cy.get('[data-testid="agentic-trace-query-error"]')
       .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据')
@@ -763,7 +779,9 @@ describe('Agentic point request metric time series', () => {
       traceAttemptsBeforeRetry = traceAttempts;
       failTrace = false;
     });
-    cy.get('[data-testid="agentic-trace-query-error"]').contains('button', '重试').click();
+    fastForwardQueryRetry('[data-testid="agentic-siblings-query-error"]', () => {
+      cy.get('[data-testid="agentic-trace-query-error"]').contains('button', '重试').click();
+    });
     cy.get('[data-testid="agentic-trace-query-error"]').should('not.exist');
     cy.then(() => expect(traceAttempts).to.be.greaterThan(traceAttemptsBeforeRetry));
 
@@ -993,7 +1011,9 @@ describe('Agentic point orchestrator metric sources', () => {
     });
     cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="metric-source-select"]').click();
-    cy.contains('[role="option"]', '解码 · decode-a').click();
+    fastForwardQueryRetry('[data-testid="agentic-metric-source-query-error"]', () => {
+      cy.contains('[role="option"]', '解码 · decode-a').click();
+    });
 
     cy.get('[data-testid="agentic-metric-source-query-error"]')
       .should('contain.text', '无法加载所选服务器指标来源')
