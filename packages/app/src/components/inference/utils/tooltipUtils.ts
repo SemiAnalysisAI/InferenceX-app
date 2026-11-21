@@ -1192,6 +1192,8 @@ export const formatHoverValue = (value: number, metric?: string): string => {
   if (abs >= 1e4) return `${(value / 1e3).toFixed(1)}K`;
   if (abs >= 100) return value.toFixed(0);
   if (abs >= 10) return value.toFixed(1);
+  // Below 1, two significant figures: two decimals read 0.005 J/tok as 0.
+  if (abs < 1) return String(parseFloat(value.toPrecision(2)));
   return String(parseFloat(value.toFixed(2)));
 };
 
