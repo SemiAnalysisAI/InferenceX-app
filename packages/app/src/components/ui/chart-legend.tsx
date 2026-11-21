@@ -175,12 +175,19 @@ export default function ChartLegend({
       }
       setStripHeight(el.scrollHeight > room + 0.5 && lastRowBottom > 0 ? lastRowBottom : null);
     };
-    const observer = new ResizeObserver(update);
+    // Measuring in the observer callback resizes the observed strip in the same frame,
+    // which raises "ResizeObserver loop completed with undelivered notifications".
+    let frame: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    });
     observer.observe(el);
     if (panel) observer.observe(panel);
     el.addEventListener('scroll', updateScroll, { passive: true });
     return () => {
       observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
       el.removeEventListener('scroll', updateScroll);
     };
   }, [items, isLegendExpanded, isSidebar]);

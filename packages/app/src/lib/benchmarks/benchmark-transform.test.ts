@@ -1,5 +1,5 @@
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'bun:test';
 
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api/api';

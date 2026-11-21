@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   after: vi.fn(),
   computeAndPatchGraphsRefresh: vi.fn(),
   computeAndCacheModels: vi.fn(),
@@ -15,16 +15,16 @@ const mocks = vi.hoisted(() => ({
   patchStatsCache: vi.fn(),
   readStatsCache: vi.fn(),
   refreshRollupRequestsDaily: vi.fn(),
-}));
+};
 
-vi.mock('next/server', () => ({ after: mocks.after }));
+mock.module('next/server', () => ({ after: mocks.after }));
 
-vi.mock('@semianalysisai/inferencex-db/proxytrace/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/proxytrace/connection', () => ({
   createDirectDb: mocks.createDirectDb,
   getDb: mocks.getDb,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/proxytrace/stats', () => ({
+mock.module('@semianalysisai/inferencex-db/proxytrace/stats', () => ({
   computeAndPatchGraphsRefresh: mocks.computeAndPatchGraphsRefresh,
   computeAndCacheModels: mocks.computeAndCacheModels,
   computeAndCacheOverview: mocks.computeAndCacheOverview,
@@ -39,7 +39,7 @@ vi.mock('@semianalysisai/inferencex-db/proxytrace/stats', () => ({
     `graphs:${vis === null ? 'all' : vis.join(',')}:${version ?? 'all'}`,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/proxytrace/shared/trace', () => ({
+mock.module('@semianalysisai/inferencex-db/proxytrace/shared/trace', () => ({
   CURRENT_TRACE_VERSION: 17,
 }));
 

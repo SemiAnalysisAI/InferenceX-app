@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { INFERENCE_MODEL_SLUGS } from './inference-model-slug';
 import { powerXRedirectUrl } from './powerx-redirect';

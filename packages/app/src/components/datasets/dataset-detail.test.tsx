@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   act,
@@ -8,9 +8,10 @@ import {
   type ReactNode,
 } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { advanceTimersByTime, mocked, useFakeTimers, useRealTimers } from '@/test/helpers';
 
-const { conversationQueries, testState } = vi.hoisted(() => ({
+const { conversationQueries, testState } = {
   conversationQueries: [] as {
     slug: string | null;
     search?: string;
@@ -49,16 +50,16 @@ const { conversationQueries, testState } = vi.hoisted(() => ({
       isError: false,
     },
   },
-}));
+};
 
-vi.mock('next/link', () => ({
+mock.module('next/link', () => ({
   default: ({ children, href }: PropsWithChildren<{ href: string }>) =>
     createElement('a', { href }, children),
 }));
-vi.mock('@/components/ui/card', () => ({
+mock.module('@/components/ui/card', () => ({
   Card: ({ children }: PropsWithChildren) => createElement('div', null, children),
 }));
-vi.mock('@/components/ui/select', () => ({
+mock.module('@/components/ui/select', () => ({
   Select: ({ children }: PropsWithChildren) => createElement('div', null, children),
   SelectContent: ({ children }: PropsWithChildren) => createElement('div', null, children),
   SelectItem: ({ children }: PropsWithChildren) => createElement('div', null, children),
@@ -69,10 +70,10 @@ vi.mock('@/components/ui/select', () => ({
     createElement('button', props, children),
   SelectValue: () => null,
 }));
-vi.mock('@/components/datasets/distribution-card', () => ({ DistributionCard: () => null }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => testState.locale }));
-vi.mock('@/hooks/api/use-datasets', () => ({
+mock.module('@/components/datasets/distribution-card', () => ({ DistributionCard: () => null }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => testState.locale }));
+mock.module('@/hooks/api/use-datasets', () => ({
   useDataset: () => testState.dataset,
   useDatasetConversations: (args: (typeof conversationQueries)[number]) => {
     conversationQueries.push({ ...args });
@@ -114,7 +115,7 @@ afterEach(() => {
     isPlaceholderData: false,
     isError: false,
   };
-  vi.useRealTimers();
+  useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -175,7 +176,7 @@ describe('DatasetDetail conversation search', () => {
     act(() => retry?.click());
     expect(track).toHaveBeenCalledWith('datasets_detail_retry_clicked', { slug: 'trace' });
     expect(testState.dataset.refetch).toHaveBeenCalledOnce();
-    expect(vi.mocked(track).mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mocked(track).mock.invocationCallOrder[0]).toBeLessThan(
       testState.dataset.refetch.mock.invocationCallOrder[0]!,
     );
 
@@ -201,12 +202,12 @@ describe('DatasetDetail conversation search', () => {
   });
 
   it('keeps typing immediate and commits only the settled search with page zero', () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     const container = document.createElement('div');
     const root = createRoot(container);
 
     act(() => root.render(withQueryClient(createElement(DatasetDetail, { slug: 'trace' }))));
-    act(() => vi.advanceTimersByTime(250));
+    act(() => advanceTimersByTime(250));
 
     const next = [...container.querySelectorAll('button')].find(
       (button) => button.textContent === 'Next',
@@ -228,10 +229,10 @@ describe('DatasetDetail conversation search', () => {
     expect(conversationQueries.every((query) => query.offset === 50)).toBe(true);
     expect(next?.disabled).toBe(true);
 
-    act(() => vi.advanceTimersByTime(249));
+    act(() => advanceTimersByTime(249));
     expect(conversationQueries.at(-1)).toMatchObject({ search: '', offset: 50 });
 
-    act(() => vi.advanceTimersByTime(1));
+    act(() => advanceTimersByTime(1));
     expect(conversationQueries.at(-1)).toMatchObject({ search: 'abc', offset: 0 });
     expect(next?.disabled).toBe(false);
     expect(new Set(conversationQueries.map((query) => query.search))).toEqual(new Set(['', 'abc']));

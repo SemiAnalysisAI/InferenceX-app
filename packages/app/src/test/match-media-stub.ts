@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from 'bun:test';
 
 type Listener = () => void;
 

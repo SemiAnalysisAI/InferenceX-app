@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, spyOn } from 'bun:test';
 import {
   CPU_SIDE_POWER_METRIC_KEYS,
   MEASURED_POWER_METRIC_KEYS,
@@ -979,7 +979,7 @@ describe('mapBenchmarkRow', () => {
     });
 
     it('stores an unknown numeric field and reports it on the tracker instead of logging', () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warn = spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const tracker = createSkipTracker();
         const result = mapBenchmarkRow(makeV2Row({ brand_new_metric_ms: 12.5 }), tracker);

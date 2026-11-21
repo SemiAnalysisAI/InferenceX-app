@@ -1,14 +1,15 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
-const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', track: vi.fn() }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-vi.mock('@/lib/analytics/analytics', async (importOriginal) => ({
-  ...(await importOriginal<typeof analytics>()),
+const mocks = { locale: 'en' as 'en' | 'zh', track: vi.fn() };
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+const actual = { ...(await import('@/lib/analytics/analytics')) };
+mock.module('@/lib/analytics/analytics', () => ({
+  ...actual,
   track: mocks.track,
 }));
 
@@ -17,7 +18,6 @@ import {
   MetricAssumptionNotes,
   metricCostAssumptions,
 } from '@/components/ui/chart-display-helpers';
-import type * as analytics from '@/lib/analytics/analytics';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;

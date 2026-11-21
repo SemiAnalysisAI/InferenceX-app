@@ -1,22 +1,22 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, mock } from 'bun:test';
 
-const { mockGetBoundedServerLog, mockGetServerLogChunk, mockGetDb } = vi.hoisted(() => ({
+const { mockGetBoundedServerLog, mockGetServerLogChunk, mockGetDb } = {
   mockGetBoundedServerLog: vi.fn(),
   mockGetServerLogChunk: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   getBoundedServerLog: mockGetBoundedServerLog,
   getServerLogChunk: mockGetServerLogChunk,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (
     _request: Request,
@@ -49,8 +49,10 @@ function bounded(
   return { fileName, bytes, serverLog };
 }
 
-import { GET } from './route';
 import { NextRequest } from 'next/server';
+
+// Imported after mock.module so the route builds its readers from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));

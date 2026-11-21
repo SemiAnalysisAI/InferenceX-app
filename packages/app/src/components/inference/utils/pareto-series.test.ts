@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { globalParetoFrontier } from './global-pareto';
 import { frontierHardwareKeys } from './pareto-series';
 

@@ -1,14 +1,15 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import type { OverviewEngineScope, OverviewPageData } from '@/lib/overview/overview-data';
 
-const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const routerStub = { push: vi.fn(), replace: vi.fn() };
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   useRouter: () => routerStub,
 }));
 
@@ -86,12 +87,12 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('overview switcher focus', () => {
   it('moves focus to the option that replaces the activated link', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(pageData('all'))));
+    stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(pageData('all'))));
 
     renderSwitcher('community', '/overview');
 
@@ -113,7 +114,7 @@ describe('overview switcher focus', () => {
   });
 
   it('leaves focus alone when the click did not come from the focused element', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(pageData('all'))));
+    stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(pageData('all'))));
 
     renderSwitcher('community', '/overview');
 

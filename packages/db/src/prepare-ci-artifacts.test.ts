@@ -2,25 +2,31 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
-  metadata: vi.fn(),
-  artifacts: vi.fn(),
-  download: vi.fn(),
-  sleep: vi.fn((_ms: number) => Promise.resolve()),
-}));
-vi.mock('node:child_process', () => ({ execFile: vi.fn(), execFileSync: mocks.metadata }));
-vi.mock('./lib/github-artifacts.js', () => ({
+import { stubEnv, unstubAllEnvs } from './lib/test-helpers';
+
+const mocks = {
+  metadata: mock(),
+  artifacts: mock(),
+  download: mock(),
+  sleep: mock((_ms: number) => Promise.resolve()),
+};
+mock.module('node:child_process', () => ({ execFile: mock(), execFileSync: mocks.metadata }));
+mock.module('./lib/github-artifacts.js', () => ({
   listRunArtifacts: mocks.artifacts,
   downloadArtifact: mocks.download,
 }));
-vi.mock('node:timers/promises', () => ({ setTimeout: mocks.sleep }));
+mock.module('node:timers/promises', () => ({ setTimeout: mocks.sleep }));
+
+// The script runs main() on import. bun:test has no vi.resetModules(), so a unique query string
+// evaluates a fresh copy for every run.
+let generation = 0;
+const runScript = () => import(`./prepare-ci-artifacts?run=${++generation}`);
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.restoreAllMocks();
-  vi.resetModules();
+  unstubAllEnvs();
+  mock.restore();
 });
 
 describe('required-power preparation', () => {
@@ -34,22 +40,22 @@ describe('required-power preparation', () => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-power-'));
       const originalExitCode = process.exitCode;
       try {
-        vi.stubEnv('SOURCE_RUN_ID', runId);
-        vi.stubEnv('MERGE_RUN_ID', mergeRunId);
-        vi.stubEnv('ARTIFACTS_PATH', dir);
-        vi.stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
-        vi.stubEnv('INGEST_REQUIRE_POWER', 'true');
-        vi.stubEnv('GITHUB_OUTPUT', '');
+        stubEnv('SOURCE_RUN_ID', runId);
+        stubEnv('MERGE_RUN_ID', mergeRunId);
+        stubEnv('ARTIFACTS_PATH', dir);
+        stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
+        stubEnv('INGEST_REQUIRE_POWER', 'true');
+        stubEnv('GITHUB_OUTPUT', '');
         mocks.metadata.mockReturnValue(JSON.stringify({ run_attempt: attempt }));
         mocks.artifacts.mockReturnValue([
           { name: 'changelog-metadata', created_at: '2026-10-01', archive_download_url: 'unused' },
           { name: 'bmk_example', created_at: '2026-10-01', archive_download_url: 'unused' },
         ]);
         mocks.download.mockImplementation(() => {});
-        vi.spyOn(console, 'log').mockImplementation(() => {});
-        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        spyOn(console, 'log').mockImplementation(() => {});
+        const error = spyOn(console, 'error').mockImplementation(() => {});
         process.exitCode = 0;
-        await import('./prepare-ci-artifacts');
+        await runScript();
         expect(process.exitCode).toBe(purged ? 0 : 1);
         if (purged) {
           expect(error).not.toHaveBeenCalled();
@@ -68,7 +74,7 @@ describe('required-power preparation', () => {
           );
         }
       } finally {
-        process.exitCode = originalExitCode;
+        process.exitCode = originalExitCode ?? 0;
         fs.rmSync(dir, { recursive: true, force: true });
       }
     },
@@ -77,23 +83,23 @@ describe('required-power preparation', () => {
 
 describe('reuse metadata', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mock.clearAllMocks();
   });
 
   it('exits when INGEST_REPO is unset', async () => {
     const originalExitCode = process.exitCode;
     try {
-      vi.stubEnv('SOURCE_RUN_ID', '35855544139');
-      vi.stubEnv('MERGE_RUN_ID', '99999999999');
-      vi.stubEnv('INGEST_REPO', '');
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      stubEnv('SOURCE_RUN_ID', '35855544139');
+      stubEnv('MERGE_RUN_ID', '99999999999');
+      stubEnv('INGEST_REPO', '');
+      spyOn(console, 'log').mockImplementation(() => {});
+      const error = spyOn(console, 'error').mockImplementation(() => {});
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit');
       });
       process.exitCode = 0;
 
-      await import('./prepare-ci-artifacts');
+      await runScript();
 
       expect(exit).toHaveBeenCalledWith(1);
       expect(error).toHaveBeenCalledWith('INGEST_REPO is not set');
@@ -101,7 +107,7 @@ describe('reuse metadata', () => {
       expect(mocks.metadata).not.toHaveBeenCalled();
       expect(mocks.artifacts).not.toHaveBeenCalled();
     } finally {
-      process.exitCode = originalExitCode;
+      process.exitCode = originalExitCode ?? 0;
     }
   });
 
@@ -112,23 +118,23 @@ describe('reuse metadata', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-reuse-'));
     const originalExitCode = process.exitCode;
     try {
-      vi.stubEnv('SOURCE_RUN_ID', '35855544139');
-      vi.stubEnv('MERGE_RUN_ID', '99999999999');
-      vi.stubEnv('ARTIFACTS_PATH', dir);
-      vi.stubEnv('INGEST_REPO', ingestRepo);
-      vi.stubEnv('GITHUB_OUTPUT', '');
+      stubEnv('SOURCE_RUN_ID', '35855544139');
+      stubEnv('MERGE_RUN_ID', '99999999999');
+      stubEnv('ARTIFACTS_PATH', dir);
+      stubEnv('INGEST_REPO', ingestRepo);
+      stubEnv('GITHUB_OUTPUT', '');
       mocks.metadata.mockReturnValue(JSON.stringify({ run_attempt: 2 }));
       mocks.artifacts.mockReturnValue([
         { name: 'changelog-metadata', created_at: '2026-10-01', archive_download_url: 'unused' },
         { name: 'bmk_example', created_at: '2026-10-01', archive_download_url: 'unused' },
       ]);
       mocks.download.mockImplementation(() => {});
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      spyOn(console, 'log').mockImplementation(() => {});
+      const error = spyOn(console, 'error').mockImplementation(() => {});
       process.exitCode = 0;
 
       // The script runs main() on import, so it must load after the environment is stubbed.
-      await import('./prepare-ci-artifacts');
+      await runScript();
 
       expect(error).not.toHaveBeenCalled();
       expect(process.exitCode).toBe(0);
@@ -148,7 +154,7 @@ describe('reuse metadata', () => {
         ingest_run_url: `https://github.com/${repo}/actions/runs/99999999999`,
       });
     } finally {
-      process.exitCode = originalExitCode;
+      process.exitCode = originalExitCode ?? 0;
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -159,11 +165,11 @@ describe('artifact downloads', () => {
 
   async function prepare(download: (name: string, root: string) => Promise<void>) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-pool-'));
-    vi.stubEnv('SOURCE_RUN_ID', '35855544139');
-    vi.stubEnv('MERGE_RUN_ID', '35855544139');
-    vi.stubEnv('ARTIFACTS_PATH', dir);
-    vi.stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
-    vi.stubEnv('GITHUB_OUTPUT', '');
+    stubEnv('SOURCE_RUN_ID', '35855544139');
+    stubEnv('MERGE_RUN_ID', '35855544139');
+    stubEnv('ARTIFACTS_PATH', dir);
+    stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
+    stubEnv('GITHUB_OUTPUT', '');
     mocks.metadata.mockReturnValue(JSON.stringify({ run_attempt: 1 }));
     mocks.artifacts.mockReturnValue(
       names.toReversed().map((name) => ({
@@ -175,11 +181,11 @@ describe('artifact downloads', () => {
     mocks.download.mockImplementation(({ name }: { name: string }, root: string) =>
       download(name, root),
     );
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const log = spyOn(console, 'log').mockImplementation(() => {});
+    spyOn(console, 'warn').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     process.exitCode = 0;
-    await import('./prepare-ci-artifacts');
+    await runScript();
     const started = log.mock.calls
       .map(([line]) => String(line))
       .filter((line) => line.startsWith('Downloading artifact: '))
@@ -188,7 +194,7 @@ describe('artifact downloads', () => {
   }
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mock.clearAllMocks();
   });
 
   it('downloads eight at a time in plan order', async () => {
@@ -209,7 +215,7 @@ describe('artifact downloads', () => {
       expect(started).toEqual(names);
       expect(fs.readdirSync(dir).toSorted()).toEqual(names);
     } finally {
-      process.exitCode = originalExitCode;
+      process.exitCode = originalExitCode ?? 0;
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -232,7 +238,7 @@ describe('artifact downloads', () => {
         names.slice(0, 8).filter((n) => n !== 'bmk_02'),
       );
     } finally {
-      process.exitCode = originalExitCode;
+      process.exitCode = originalExitCode ?? 0;
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -273,7 +279,7 @@ describe('artifact downloads', () => {
       ]);
       expect(fs.readdirSync(dir).toSorted()).toEqual(names);
     } finally {
-      process.exitCode = originalExitCode;
+      process.exitCode = originalExitCode ?? 0;
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });

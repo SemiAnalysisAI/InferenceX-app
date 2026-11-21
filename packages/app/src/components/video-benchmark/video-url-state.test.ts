@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { H3_API_REFERENCE } from './api-reference';
 import { X_METRICS, Y_METRICS } from './metrics';
 import {

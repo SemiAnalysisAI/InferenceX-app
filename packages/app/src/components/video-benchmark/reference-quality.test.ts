@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { sha256 } from './bundle';
 import { referenceQualityFixture } from './reference-quality.fixture';
 import { verifiedQuality, verifiedQualityFiles } from './reference-quality';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { buildArtifactPlan } from './ci-artifact-preparation.js';
 import type { ArtifactMeta } from './github-artifacts.js';

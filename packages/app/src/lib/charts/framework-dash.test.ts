@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { SERIES_LINE_PATTERNS, frameworkDasharray, legendSwatchDasharray } from './framework-dash';
 

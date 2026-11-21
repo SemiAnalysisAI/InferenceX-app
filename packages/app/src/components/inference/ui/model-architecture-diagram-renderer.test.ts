@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { MODEL_ARCHITECTURES } from '@/lib/catalog/model-architectures';
 

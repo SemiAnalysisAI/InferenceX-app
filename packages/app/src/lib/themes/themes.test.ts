@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+// @test-environment jsdom
+import { describe, expect, it } from 'bun:test';
 import { chartPaletteTheme, hasDarkTheme, isDarkTheme, nextTheme } from './themes';
 
 describe('standard themes', () => {

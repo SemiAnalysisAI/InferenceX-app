@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';

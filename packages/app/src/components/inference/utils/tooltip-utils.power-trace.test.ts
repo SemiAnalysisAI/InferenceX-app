@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { detailsText } from '@/components/inference/utils/point-details-test-helpers';
@@ -71,7 +72,7 @@ function overlayConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 
 describe('View power trace tooltip action', () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('renders in overlay point details whose points carry id 0', () => {
@@ -85,7 +86,7 @@ describe('View power trace tooltip action', () => {
 
 describe('View power trace link', () => {
   it('opens Over time focused on the point, keeping the role and dropping a stale concurrency', () => {
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       location: {
         origin: 'https://inferencex.semianalysis.com',
         pathname: '/pwx',

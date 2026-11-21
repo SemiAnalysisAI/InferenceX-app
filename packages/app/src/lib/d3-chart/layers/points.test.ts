@@ -1,10 +1,11 @@
 import * as d3 from 'd3';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import { asMock, createMockGroup } from './test-helpers';
 import { renderPoints, updatePointsOnZoom, type PointConfig } from './points';
 
-vi.mock('../downsample', () => ({
+mock.module('../downsample', () => ({
   lttbDownsample: vi.fn((data: any[], target: number) => data.slice(0, target)),
 }));
 
@@ -188,7 +189,7 @@ describe('renderPoints', () => {
   });
 
   it('does not downsample when data is below maxPoints', () => {
-    vi.mocked(lttbDownsample).mockClear();
+    mocked(lttbDownsample).mockClear();
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
 
@@ -203,7 +204,7 @@ describe('renderPoints', () => {
   });
 
   it('respects custom maxPoints threshold', () => {
-    vi.mocked(lttbDownsample).mockClear();
+    mocked(lttbDownsample).mockClear();
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
 
@@ -229,7 +230,7 @@ describe('renderPoints', () => {
   });
 
   it('skips downsampling when getX/getY not provided even if data is large', () => {
-    vi.mocked(lttbDownsample).mockClear();
+    mocked(lttbDownsample).mockClear();
     const group = createMockGroup();
 
     const bigData: TestPoint[] = Array.from({ length: 5000 }, (_, i) => ({

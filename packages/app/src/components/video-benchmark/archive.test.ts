@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { archiveSources } from './archive';
 import { loadBundle } from './bundle';
 const artifact = { id: 20, name: 'h3-video-10-1', expired: false, size_in_bytes: 0 };

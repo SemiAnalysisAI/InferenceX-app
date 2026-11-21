@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { clampBrushRange } from '@/components/agentic-workload-explorer/brush-bar';
 
 describe('clampBrushRange', () => {

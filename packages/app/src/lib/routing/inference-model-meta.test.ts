@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { inferenceModelMeta, inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 import { computeParetoResponse, parseParetoRequest } from './pareto-api';
 

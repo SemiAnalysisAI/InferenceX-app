@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import sweep from '../../../../db/src/etl/fixtures/tpu-manual-sweep.json';
 import { normalizeArtifactRows, normalizeEvalArtifactRows } from '@/app/api/unofficial-run/route';
 import { buildChartData } from '@/providers/unofficial-chart-data';

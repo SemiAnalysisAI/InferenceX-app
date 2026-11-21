@@ -1,12 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
-import type * as MediaQueryHooks from '@/hooks/useMediaQuery';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -19,43 +18,44 @@ import {
   setCompareAt,
 } from '@/test/powerx-compare-at-probe';
 
-const urlState = vi.hoisted(() => ({
+const urlState = {
   params: {} as Record<string, string | undefined>,
   setUrlParams: vi.fn(),
-}));
-const track = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track }));
-vi.mock('@/hooks/useUrlState', () => ({
+};
+const track = (() => vi.fn())();
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/analytics/analytics', () => ({ track }));
+mock.module('@/hooks/useUrlState', () => ({
   useUrlState: () => ({
     getUrlParam: (key: string) => urlState.params[key],
     setUrlParams: urlState.setUrlParams,
   }),
 }));
-vi.mock('@/hooks/useThemeColors', () => ({
+mock.module('@/hooks/useThemeColors', () => ({
   useThemeColors: () => ({ resolveColor: (key: string) => `var(--${key})` }),
 }));
 // The overlay-run context, set per test for the `?unofficialrun=` cases.
-const unofficial = vi.hoisted(() => ({
+const unofficial = {
   runIndexByUrl: {} as Record<string, number>,
   unofficialRunInfos: [] as { id: number; branch: string }[],
-}));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+};
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => unofficial,
 }));
 // jsdom has no media queries: the pointer type and the viewport are flipped per test for
 // the touch and phone branches.
-const media = vi.hoisted(() => ({ coarsePointer: false, mobile: false }));
-vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
-  ...(await importOriginal<typeof MediaQueryHooks>()),
+const media = { coarsePointer: false, mobile: false };
+const actual = { ...(await import('@/hooks/useMediaQuery')) };
+mock.module('@/hooks/useMediaQuery', () => ({
+  ...actual,
   useIsCoarsePointer: () => media.coarsePointer,
   useIsMobileViewport: () => media.mobile,
 }));
 // The breakdown plot is D3 against a measured layout; jsdom has none, so the chart is a stub.
-vi.mock('@/lib/d3-chart/D3Chart', () => ({
+mock.module('@/lib/d3-chart/D3Chart', () => ({
   D3Chart: () => <div data-testid="d3-chart-stub" />,
 }));
-vi.mock('@/components/ui/chart-buttons', () => ({
+mock.module('@/components/ui/chart-buttons', () => ({
   ChartButtons: () => <div data-testid="chart-buttons" />,
 }));
 

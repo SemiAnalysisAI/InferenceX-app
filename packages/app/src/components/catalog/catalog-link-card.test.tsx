@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import { CatalogLinkCard } from './catalog-link-card';
 

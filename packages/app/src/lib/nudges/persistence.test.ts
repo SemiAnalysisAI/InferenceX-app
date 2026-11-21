@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import {
   clearDismissal,
@@ -27,12 +28,12 @@ let mockSession: ReturnType<typeof makeMockStorage>;
 beforeEach(() => {
   mockLocal = makeMockStorage();
   mockSession = makeMockStorage();
-  vi.stubGlobal('localStorage', mockLocal);
-  vi.stubGlobal('sessionStorage', mockSession);
+  stubGlobal('localStorage', mockLocal);
+  stubGlobal('sessionStorage', mockSession);
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -62,7 +63,7 @@ describe('session dismissal', () => {
   });
 
   it('returns false when sessionStorage throws', () => {
-    vi.stubGlobal('sessionStorage', {
+    stubGlobal('sessionStorage', {
       getItem: () => {
         throw new Error('SecurityError');
       },
@@ -179,7 +180,7 @@ describe('permanent suppress', () => {
 
   it('dispatches window event when event name provided', () => {
     const dispatchSpy = vi.fn();
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       ...globalThis.window,
       dispatchEvent: dispatchSpy,
     });
@@ -191,7 +192,7 @@ describe('permanent suppress', () => {
 
   it('does not dispatch event when event name is omitted', () => {
     const dispatchSpy = vi.fn();
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       ...globalThis.window,
       dispatchEvent: dispatchSpy,
     });

@@ -1,28 +1,28 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, mock } from 'bun:test';
 
-const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockGetDb } = vi.hoisted(() => ({
+const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockGetDb } = {
   mockGetLatestBenchmarks: vi.fn(),
   mockGetBenchmarksForRun: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getLatestBenchmarks: mockGetLatestBenchmarks,
   getBenchmarksForRun: mockGetBenchmarksForRun,
 }));
 
-const { mockCachedJson } = vi.hoisted(() => ({
+const { mockCachedJson } = {
   mockCachedJson: vi.fn((_request: Request, data: unknown, _options?: unknown) =>
     Response.json(data),
   ),
-}));
+};
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: mockCachedJson,
   cachedJsonResponse:

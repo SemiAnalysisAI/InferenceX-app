@@ -1,16 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/hooks/useThemeColors', () => ({
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/hooks/useThemeColors', () => ({
   useThemeColors: () => ({ resolveColor: (key: string) => `var(--${key})` }),
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ runIndexByUrl: { 'https://github.com/o/r/actions/runs/9': 3 } }),
 }));
 

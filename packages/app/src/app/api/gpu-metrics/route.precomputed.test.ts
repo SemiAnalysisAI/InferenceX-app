@@ -1,21 +1,22 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubEnv, stubGlobal, unstubAllEnvs, unstubAllGlobals } from '@/test/helpers';
 
 import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 import { storedPowerSeries } from '@semianalysisai/inferencex-db/power-series/stored-power-series';
 import { parseCsvData } from '@/components/gpu-power/types';
 
-const { readRun, readPrecomputed } = vi.hoisted(() => ({
+const { readRun, readPrecomputed } = {
   readRun: vi.fn(),
   readPrecomputed: vi.fn(),
-}));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+};
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: () => ({}),
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForRun: readRun,
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
   getPrecomputedPowerSeries: readPrecomputed,
 }));
 
@@ -87,15 +88,15 @@ beforeEach(() => {
   const series = [stored(NAME_A), stored(NAME_B, 300)];
   readRun.mockReset().mockResolvedValue({ workflowRun, series });
   readPrecomputed.mockReset().mockResolvedValue({ workflowRun, series: storedPowerSeries(series) });
-  vi.stubEnv('DATABASE_READONLY_URL', 'postgresql://readonly.example.test/test');
-  vi.stubEnv('GITHUB_TOKEN', 'test-token');
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Unexpected GitHub request')));
+  stubEnv('DATABASE_READONLY_URL', 'postgresql://readonly.example.test/test');
+  stubEnv('GITHUB_TOKEN', 'test-token');
+  stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Unexpected GitHub request')));
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
+  unstubAllEnvs();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 

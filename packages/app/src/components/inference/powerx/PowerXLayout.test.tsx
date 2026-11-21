@@ -1,20 +1,20 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { InferenceData } from '@/components/inference/types';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   locale: 'en' as 'en' | 'zh',
   track: vi.fn(),
-}));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+};
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 // jsdom has no matchMedia: render the desktop layout.
-vi.mock('@/hooks/useMediaQuery', () => ({
+mock.module('@/hooks/useMediaQuery', () => ({
   useIsMobileViewport: () => false,
   useIsCoarsePointer: () => false,
   useMediaQuery: () => false,

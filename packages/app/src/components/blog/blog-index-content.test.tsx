@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import type * as BlogLib from '@/lib/blog/blog';
 import type { BlogPostMeta } from '@/lib/blog/blog';
@@ -30,16 +30,14 @@ const THUMBNAILS: Record<string, BlogLib.PostThumbnail | null> = {
   mid: { light: '/images/mid/context.png', dark: '/images/mid/context.png' },
 };
 
-vi.mock('@/lib/blog/blog', async (importOriginal) => {
-  const actual = await importOriginal<typeof BlogLib>();
-  return {
-    ...actual,
-    getAllPosts: () => POSTS,
-    getPostThumbnail: (slug: string) => THUMBNAILS[slug] ?? null,
-  };
-});
+const actual = { ...(await import('@/lib/blog/blog')) };
+mock.module('@/lib/blog/blog', () => ({
+  ...actual,
+  getAllPosts: () => POSTS,
+  getPostThumbnail: (slug: string) => THUMBNAILS[slug] ?? null,
+}));
 
-vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: undefined }) }));
+mock.module('next-themes', () => ({ useTheme: () => ({ resolvedTheme: undefined }) }));
 
 import { BlogFeaturedPost } from './blog-featured-post';
 import { BlogIndexContent, blogIndexData } from './blog-index-content';

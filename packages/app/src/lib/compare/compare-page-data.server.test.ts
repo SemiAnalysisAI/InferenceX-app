@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   loadRows: vi.fn(),
   compute: vi.fn(),
   summarize: vi.fn((_: unknown, hardware: string) => ({ hardware })),
-}));
+};
 
-vi.mock('next/cache', () => ({
+mock.module('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: (fn: (...args: unknown[]) => Promise<unknown>) => {
     const entries = new Map<string, Promise<unknown>>();
@@ -23,15 +23,15 @@ vi.mock('next/cache', () => ({
   },
 }));
 
-vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({
+mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
   getCachedBenchmarks: mocks.loadRows,
 }));
 
-vi.mock('@/lib/compare/compare-pair-defaults', () => ({
+mock.module('@/lib/compare/compare-pair-defaults', () => ({
   pickPairDefaults: () => ({ sequence: '1k/1k', precision: 'fp8' }),
 }));
 
-vi.mock('@/lib/compare/compare-ssr', () => ({
+mock.module('@/lib/compare/compare-ssr', () => ({
   computeCompareTableData: mocks.compute,
   dateRangeForPair: () => ({ oldest: '2026-01-01', newest: '2026-02-01' }),
   summarize: mocks.summarize,
@@ -39,7 +39,9 @@ vi.mock('@/lib/compare/compare-ssr', () => ({
 
 import type { BenchmarkRow } from '@/lib/api/api';
 
-import { getComparePageDerivedData, initialCompareBenchmarkRows } from './compare-page-data.server';
+// Imported after mock.module so the derived-data cache is built on the mocked unstable_cache.
+const { getComparePageDerivedData, initialCompareBenchmarkRows } =
+  await import('./compare-page-data.server');
 
 const TABLE = {
   defaultTargets: [10],

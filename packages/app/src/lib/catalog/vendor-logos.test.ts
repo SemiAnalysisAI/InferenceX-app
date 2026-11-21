@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import { isMonochromeLogo } from './model-logos';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   VENDOR_LOGO_ICONS,

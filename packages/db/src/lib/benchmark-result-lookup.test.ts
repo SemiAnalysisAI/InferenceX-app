@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper';
 import { createSkipTracker } from '../etl/skip-tracker';

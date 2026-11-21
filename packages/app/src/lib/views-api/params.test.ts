@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { VENDOR_ORDER } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_TCO_BASIS } from '@/lib/catalog/constants';

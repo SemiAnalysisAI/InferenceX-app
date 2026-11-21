@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { TcoPriceTable } from './editable-tco-badges';
 import { ResultContext } from './result-context';

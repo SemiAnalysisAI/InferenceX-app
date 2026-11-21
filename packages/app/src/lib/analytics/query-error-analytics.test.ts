@@ -1,5 +1,6 @@
 import { CancelledError } from '@tanstack/react-query';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { ApiRequestError, requestEndpoint } from '../api/api-request-error';
 import { createAppQueryClient } from '@/providers/query-provider';
@@ -7,7 +8,7 @@ import { createAppQueryClient } from '@/providers/query-provider';
 import { trackOncePerPageview } from './analytics';
 import { describeDataQueryFailure, reportDataQueryFailure } from './query-error-analytics';
 
-vi.mock('./analytics', () => ({ trackOncePerPageview: vi.fn(() => true) }));
+mock.module('./analytics', () => ({ trackOncePerPageview: vi.fn(() => true) }));
 
 const request = {
   key: ['benchmarks', 'dsr1'],
@@ -65,14 +66,14 @@ describe('describeDataQueryFailure', () => {
 
 describe('reportDataQueryFailure', () => {
   beforeEach(() => {
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       location: new URL('https://inferencex.semianalysis.com/infx/evaluation'),
     });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.mocked(trackOncePerPageview).mockClear();
+    unstubAllGlobals();
+    mocked(trackOncePerPageview).mockClear();
   });
 
   it('dedupes per query hash and kind within a page view', () => {

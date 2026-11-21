@@ -1,14 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 
-const route = vi.hoisted(() => ({ pathname: '/infx/inference' }));
-vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
-const trackMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/analytics/analytics', () => ({ track: trackMock }));
+const route = { pathname: '/infx/inference' };
+mock.module('next/navigation', () => ({ usePathname: () => route.pathname }));
+const trackMock = (() => vi.fn())();
+mock.module('@/lib/analytics/analytics', () => ({ track: trackMock }));
 
 let container: HTMLDivElement;
 let root: Root;

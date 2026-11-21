@@ -1,11 +1,12 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import {
   buildTokenLengthSketch,
   mergeTokenLengthSketches,
 } from '@semianalysisai/inferencex-constants';
 
+import { waitFor } from '../lib/test-helpers';
 import type { DbClient } from '../connection.js';
 import {
   CHART_SERIES_SUMMARY_VERSION,
@@ -41,7 +42,7 @@ function mockSql(reject?: Error): {
 
 afterEach(() => {
   _resetWriteBackWarned();
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 describe('writeBackTraceReplayJsonb', () => {
@@ -63,7 +64,7 @@ describe('writeBackTraceReplayJsonb', () => {
   });
 
   it('swallows a rejected UPDATE (read-only replica) and warns exactly once', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
     expect(() => writeBackTraceReplayJsonb(sql, 'aggregate_stats', 1, { v: 1 })).not.toThrow();
@@ -114,12 +115,12 @@ describe('writeBackChartSeries', () => {
   });
 
   it('swallows a rejected UPDATE and warns naming chart_series', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
     writeBackChartSeries(sql, 1, series);
 
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
     expect(warn.mock.calls[0]![0]).toContain('could not persist chart_series');
   });
 });
@@ -169,7 +170,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
       version: STATS_VERSION,
       sequenceLengths,
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect(await storedVersion()).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
     });
     await expect(getResidentSequenceLengthSketches(pg, [88])).resolves.toEqual({
@@ -183,7 +184,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
       version: STATS_VERSION - 1,
       sequenceLengths,
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect(await storedVersion()).toBeNull();
     });
     await expect(getResidentSequenceLengthSketches(pg, [88])).resolves.toMatchObject({
@@ -280,7 +281,7 @@ describe('writeBackRequestTimeline', () => {
   });
 
   it('resolves after a rejected UPDATE and warns once with the gzip column name', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
     await expect(writeBackRequestTimeline(sql, 870, timeline)).resolves.toBeUndefined();

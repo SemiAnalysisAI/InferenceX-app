@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import { at, sha256, text, type Json } from './bundle';
 import { fidelityEvidence, fidelitySource, loadFidelityBundle } from './fidelity';
 import { fidelityFixture } from './fidelity.fixture';

@@ -1,19 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetAllBenchmarksForHistory } = vi.hoisted(() => ({
+const { mockGetAllBenchmarksForHistory } = {
   mockGetAllBenchmarksForHistory: vi.fn(),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: () => 'mock-sql',
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));

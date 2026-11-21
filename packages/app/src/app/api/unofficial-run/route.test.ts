@@ -1,18 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, mock } from 'bun:test';
+import { stubGlobal } from '@/test/helpers';
 import { NextRequest } from 'next/server';
 
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 
-import {
-  githubRateLimitRetryAfter,
-  normalizeArtifactRows,
-  normalizeEvalArtifactRows,
-  unofficialRunCacheControl,
-  withRunSpeculation,
-} from './route';
-
 const mockGetEntries = vi.fn();
-vi.mock('adm-zip', () => ({
+mock.module('adm-zip', () => ({
   default: class MockAdmZip {
     getEntries() {
       return mockGetEntries();
@@ -21,12 +14,23 @@ vi.mock('adm-zip', () => ({
 }));
 
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+stubGlobal('fetch', mockFetch);
 
 const mockGetCachedBenchmarks = vi.fn();
-vi.mock('@/lib/benchmarks/benchmark-query-cache.server', () => ({
+mock.module('@/lib/benchmarks/benchmark-query-cache.server', () => ({
   getCachedBenchmarks: (...args: unknown[]) => mockGetCachedBenchmarks(...args),
 }));
+
+// Imported after mock.module so the route and github-artifacts bind the mocked adm-zip.
+const {
+  GET,
+  githubRateLimitRetryAfter,
+  normalizeArtifactRows,
+  normalizeEvalArtifactRows,
+  unofficialRunCacheControl,
+  withRunSpeculation,
+} = await import('./route');
+const { resetGithubRunRepositories } = await import('@/lib/github/github-artifacts');
 
 function makeRequest(params: string) {
   return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
@@ -602,16 +606,13 @@ describe('githubRateLimitRetryAfter', () => {
 });
 
 describe('GET /api/unofficial-run', () => {
-  let GET: (req: Request) => Promise<Response>;
-
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
+    // The remembered run owners are the only state a route request leaves behind.
+    resetGithubRunRepositories();
     mockFetch.mockReset();
     mockGetEntries.mockReset();
     mockGetCachedBenchmarks.mockReset();
     process.env.GITHUB_TOKEN = 'test-token';
-    const mod = await import('./route');
-    GET = mod.GET as any;
   });
 
   it('returns 400 for missing runId', async () => {
@@ -635,9 +636,7 @@ describe('GET /api/unofficial-run', () => {
 
   it('returns 500 when GITHUB_TOKEN is not set', async () => {
     delete process.env.GITHUB_TOKEN;
-    const mod = await import('./route');
-    const handler = mod.GET as any;
-    const res = await handler(makeRequest('runId=123'));
+    const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain('token');
@@ -741,7 +740,7 @@ describe('GET /api/unofficial-run', () => {
     [true, 2],
     [false, 1],
   ])(
-    'stitches the published curve only when the changelog is append-only (%s)',
+    'stitches the published curve only when the changelog is append-only (%p)',
     async (appendOnly, expectedRows) => {
       const image = 'lmsysorg/sglang:v0.5.0';
       mockFetch.mockResolvedValueOnce({
@@ -1083,7 +1082,7 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it.each(['in_progress', 'queued', null])(
-    'caches a %s run for 30 seconds only',
+    'caches a %p run for 30 seconds only',
     async (status) => {
       mockRunWithBenchmarks(status);
       const res = await GET(makeRequest('runId=123'));

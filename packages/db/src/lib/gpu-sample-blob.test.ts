@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import type { StoredGpuMetricSample } from './gpu-metric-stats';
 import {

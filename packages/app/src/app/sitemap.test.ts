@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
@@ -15,8 +15,7 @@ import {
   modelRoutePath,
   modelRoutesForTab,
 } from '@/lib/routing/model-routes';
-const mocks = vi.hoisted(() => ({
-  fixturesMode: false,
+const mocks = {
   getDb: vi.fn(() => ({})),
   listDatasets: vi.fn(() =>
     Promise.resolve([{ slug: 'agentx-fixture', ingested_at: '2026-09-02 10:11:12.123+00' }]),
@@ -34,35 +33,39 @@ const mocks = vi.hoisted(() => ({
     ],
     zh: [{ slug: 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results', date: '2026-10-19' }],
   },
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  get FIXTURES_MODE() {
-    return mocks.fixturesMode;
-  },
-  getDb: mocks.getDb,
-}));
-vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
+// bun:test snapshots a mock factory's getters, so fixture mode flips by mocking the module again,
+// which rebinds FIXTURES_MODE in every module that already imported it.
+function mockConnection(fixturesMode: boolean) {
+  mock.module('@semianalysisai/inferencex-db/connection', () => ({
+    FIXTURES_MODE: fixturesMode,
+    getDb: mocks.getDb,
+  }));
+}
+
+mockConnection(false);
+mock.module('@semianalysisai/inferencex-db/queries/datasets', () => ({
   listDatasets: mocks.listDatasets,
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: <Args extends unknown[], T>(fn: (...args: Args) => Promise<T>) => fn,
 }));
-vi.mock('@/lib/agentx/agentx-optimizations', () => ({ AGENTX_OPTIMIZATION_SLUGS: [] }));
-vi.mock('@/lib/blog/blog', () => ({ getAllPosts: () => [] }));
-vi.mock('@/lib/hardware/hardware', () => ({
+mock.module('@/lib/agentx/agentx-optimizations', () => ({ AGENTX_OPTIMIZATION_SLUGS: [] }));
+mock.module('@/lib/blog/blog', () => ({ getAllPosts: () => [] }));
+mock.module('@/lib/hardware/hardware', () => ({
   getAllHardwarePages: (locale: 'en' | 'zh' = 'en') => mocks.hardwarePages[locale],
 }));
-vi.mock('@/lib/compare/compare-availability', () => ({
+mock.module('@/lib/compare/compare-availability', () => ({
   getAllComparableCompareSlugs: () => Promise.resolve([]),
   getCachedAvailability: () => Promise.resolve(mocks.availability),
 }));
-vi.mock('@/lib/compare/compare-variant-availability', () => ({
+mock.module('@/lib/compare/compare-variant-availability', () => ({
   getAllComparablePrecisionSlugs: () => Promise.resolve([]),
   getAllComparableSpecDecodeSlugs: () => Promise.resolve([]),
 }));
-vi.mock('@/lib/content/glossary', () => ({ getAllGlossaryEntries: () => [] }));
-vi.mock('@/lib/live-seo/run-rankings-data.server', () => ({
+mock.module('@/lib/content/glossary', () => ({ getAllGlossaryEntries: () => [] }));
+mock.module('@/lib/live-seo/run-rankings-data.server', () => ({
   getAvailableRunEntries: () => Promise.resolve([]),
 }));
 
@@ -70,7 +73,8 @@ import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { EXPLORER_SECTION_META } from '@/lib/agentic-workload-explorer/page-meta';
 
-import sitemap from './sitemap';
+// Imported after mock.module so the sitemap's dataset reader is built from the mocked cachedQuery.
+const { default: sitemap } = await import('./sitemap');
 
 describe('sitemap locale parity', () => {
   it('omits gated model URLs in both locales, even when observations exist', async () => {
@@ -97,7 +101,7 @@ describe('sitemap locale parity', () => {
   });
 
   beforeEach(() => {
-    mocks.fixturesMode = false;
+    mockConnection(false);
     vi.clearAllMocks();
   });
 
@@ -288,7 +292,7 @@ describe('sitemap locale parity', () => {
   });
 
   it('does not require a database connection in fixture mode', async () => {
-    mocks.fixturesMode = true;
+    mockConnection(true);
 
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));

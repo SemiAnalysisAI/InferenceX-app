@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { bucketPowerSeries, bucketTimeMs } from '@/components/gpu-power/power-series';
 import type { InferenceData } from '@/components/inference/types';

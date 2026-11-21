@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import {
   buildTokenLengthSketch,
@@ -33,7 +33,7 @@ function mockSql(responses: unknown[][]): { sql: DbClient; values: unknown[][] }
 }
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 describe('getResidentSequenceLengthSketches', () => {
@@ -61,7 +61,7 @@ describe('getResidentSequenceLengthSketches', () => {
   });
 
   it('reads the JSON of rows whose compact sketches cannot be decoded', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql, values } = mockSql([
       [
         { benchmark_result_id: 1, sketches: encoded(A), version: null, sequence_lengths: null },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import sweep from './fixtures/tpu-manual-sweep.json';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { mapAggEvalRow, mapEvalRow } from './eval-mapper';

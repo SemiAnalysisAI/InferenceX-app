@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+// @test-environment jsdom
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { plotBounds, plotClipSize } from './plot-bounds';
 

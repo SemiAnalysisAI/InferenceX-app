@@ -1,9 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock, mock } from 'bun:test';
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   usePathname: () => '/infx/inference',
 }));
 
