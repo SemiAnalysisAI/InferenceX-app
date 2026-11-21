@@ -1,3 +1,5 @@
+import { StrictMode } from 'react';
+
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import {
   PowerXSurfaceProvider,
@@ -66,7 +68,7 @@ const point = createMockInferenceData({
   measuredAvgPower: { y: 812, roof: false },
 });
 
-function mountEnergy() {
+function mountEnergy({ strict = false } = {}) {
   // Trace and log presence for the point, so View charts and View logs show as on AgentX.
   cy.intercept('GET', '/api/v1/benchmark-presence', {
     body: { trace: [42, 1], log: [42, 1] },
@@ -74,7 +76,7 @@ function mountEnergy() {
   // The page state a reader on Energy under the Decode role carries (and a stale trace load).
   writeUrlParams({ i_metric: ENERGY_METRIC, i_role: 'decode', i_ptconc: '8' });
   const setSelectedYAxisMetric = cy.stub().as('setMetric');
-  mountWithProviders(
+  const tree = (
     <PowerXSurfaceProvider>
       <div style={{ width: 1200 }}>
         <ScatterGraph
@@ -90,17 +92,17 @@ function mountEnergy() {
         <ActivePointProbe />
         <PresenceProbe />
       </div>
-    </PowerXSurfaceProvider>,
-    {
-      inference: {
-        hardwareConfig: createMockHardwareConfig(),
-        selectedPrecisions: [Precision.FP4],
-        selectedYAxisMetric: ENERGY_METRIC,
-        setSelectedYAxisMetric,
-      },
-      unofficial: {},
-    },
+    </PowerXSurfaceProvider>
   );
+  mountWithProviders(strict ? <StrictMode>{tree}</StrictMode> : tree, {
+    inference: {
+      hardwareConfig: createMockHardwareConfig(),
+      selectedPrecisions: [Precision.FP4],
+      selectedYAxisMetric: ENERGY_METRIC,
+      setSelectedYAxisMetric,
+    },
+    unofficial: {},
+  });
   cy.wait('@presence');
   cy.get('[data-testid="presence-ready"]').should('have.text', 'ready');
 }
@@ -159,6 +161,18 @@ describe('PowerX point details', () => {
       })
       .click();
     cy.get('@setMetric').should('have.been.calledWith', POWER_TIMELINE_METRIC_KEY);
+  });
+
+  // Strict Mode (next dev) replays effects on mount; an unmount-time release used to clear the
+  // PowerX pin there and dismiss the details the click had just opened.
+  it('keeps the details open under Strict Mode', () => {
+    mountEnergy({ strict: true });
+    pinPoint();
+    cy.get(panel).should('be.visible');
+    cy.get('[data-testid="active-point-source"]').should('have.text', 'pinned');
+    cy.wait(500);
+    cy.get(panel).should('be.visible');
+    cy.get('[data-testid="active-point-source"]').should('have.text', 'pinned');
   });
 
   it('restores the legend and releases the pinned point when the details close', () => {

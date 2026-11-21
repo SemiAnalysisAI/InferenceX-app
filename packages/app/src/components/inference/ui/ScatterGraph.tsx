@@ -2529,7 +2529,6 @@ const ScatterGraph = React.memo(
           color={pointColor(d, isOverlay)}
           onClose={close}
           onAction={(action, event) => onAction(action, event, d, isOverlay)}
-          onRelease={powerXSurface ? () => activePointRef.current?.('clear') : undefined}
         />
       );
       return {
@@ -2537,6 +2536,8 @@ const ScatterGraph = React.memo(
         content: (d: InferenceData) => hoverCard(d, false),
         // The details panel takes the legend's slot while a point is pinned, PowerX included.
         details: renderDetails,
+        // PowerX mirrors the pinned point, so it drops it once the details close.
+        onDetailsClose: powerXSurface ? () => activePointRef.current?.('clear') : undefined,
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {

@@ -164,6 +164,11 @@ export interface TooltipConfig<T = any> {
   /** With proximityHover, lock onto a point only within the scatter hit radius instead of by x alone. */
   getDataY?: (d: T) => number;
   details?: (d: T, isOverlay: boolean, close: () => void) => React.ReactNode;
+  /**
+   * Called when the pinned details go away (close, Escape, an outside or empty-plot click).
+   * Switching points keeps the details open, and a Strict Mode remount does not count.
+   */
+  onDetailsClose?: () => void;
 }
 
 export interface RenderContext {
