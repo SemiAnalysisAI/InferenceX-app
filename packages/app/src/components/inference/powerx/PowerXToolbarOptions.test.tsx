@@ -1,21 +1,21 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { POWER_PERCENT_TDP_METRIC, type PowerXSelection } from './powerx-views';
 
-const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh' }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/hooks/useMediaQuery', () => ({
+const mocks = { locale: 'en' as 'en' | 'zh' };
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/hooks/useMediaQuery', () => ({
   useIsMobileViewport: () => false,
   useIsCoarsePointer: () => false,
   useMediaQuery: () => false,
 }));
-vi.mock('@/components/inference/InferenceContext', () => ({
+mock.module('@/components/inference/InferenceContext', () => ({
   useInferenceAnalyticsContext: () => ({}),
   useInferenceDisplay: () => ({ selectedXAxisMode: 'default', defaultXAxisMode: 'default' }),
   useInferenceActions: () => ({ setSelectedXAxisMode: vi.fn() }),

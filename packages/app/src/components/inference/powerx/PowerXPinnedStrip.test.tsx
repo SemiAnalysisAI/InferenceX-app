@@ -1,10 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
-import type * as PowerXSurface from '@/components/inference/ui/powerx-surface';
 import {
   clearPowerTraceFocus,
   peekPowerTraceFocus,
@@ -18,19 +17,20 @@ declare global {
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   point: null as InferenceData | null,
   details: undefined as ((close: () => void) => ReactNode) | undefined,
   setSelectedYAxisMetric: vi.fn(),
   setActivePoint: vi.fn(),
-}));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/pwx' }));
-vi.mock('@/components/inference/InferenceContext', () => ({
+};
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('next/navigation', () => ({ usePathname: () => '/pwx' }));
+mock.module('@/components/inference/InferenceContext', () => ({
   useInferenceActions: () => ({ setSelectedYAxisMetric: mocks.setSelectedYAxisMetric }),
 }));
-vi.mock('@/components/inference/ui/powerx-surface', async (importOriginal) => ({
-  ...(await importOriginal<typeof PowerXSurface>()),
+const actual = { ...(await import('@/components/inference/ui/powerx-surface')) };
+mock.module('@/components/inference/ui/powerx-surface', () => ({
+  ...actual,
   usePowerXActivePoint: () =>
     mocks.point ? { point: mocks.point, source: 'pinned', details: mocks.details } : null,
   useSetPowerXActivePoint: () => mocks.setActivePoint,

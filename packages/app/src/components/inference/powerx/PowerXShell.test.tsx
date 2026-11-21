@@ -1,23 +1,24 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { PowerXStripParts } from '@/components/inference/ui/ChartControls';
 import { track } from '@/lib/analytics/analytics';
+import { mocked } from '@/test/helpers';
 
 import type { PowerXRole } from './powerx-role';
 
-const mocks = vi.hoisted(() => ({ phone: false }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/hooks/useMediaQuery', () => ({
+const mocks = { phone: false };
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/hooks/useMediaQuery', () => ({
   useIsMobileViewport: () => mocks.phone,
   useIsCoarsePointer: () => mocks.phone,
   useMediaQuery: () => mocks.phone,
 }));
-vi.mock('@/components/inference/InferenceContext', () => ({
+mock.module('@/components/inference/InferenceContext', () => ({
   useInferenceAnalyticsContext: () => ({}),
 }));
 
@@ -34,7 +35,7 @@ afterEach(() => {
   root = null;
   document.body.innerHTML = '';
   mocks.phone = false;
-  vi.mocked(track).mockClear();
+  mocked(track).mockClear();
 });
 
 function render(node: React.ReactNode) {
@@ -100,9 +101,6 @@ describe('PowerXTabs', () => {
     );
     act(() => byTestId('powerx-tab-power')!.click());
     act(() => byTestId('powerx-tab-breakdown')!.click());
-    expect(vi.mocked(track).mock.calls.map(([, payload]) => payload?.tab)).toEqual([
-      'draw',
-      'where',
-    ]);
+    expect(mocked(track).mock.calls.map(([, payload]) => payload?.tab)).toEqual(['draw', 'where']);
   });
 });

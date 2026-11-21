@@ -1,20 +1,23 @@
-// @vitest-environment jsdom
-import type * as NextNavigation from 'next/navigation';
+// @test-environment jsdom
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
-import type * as UnofficialRunProvider from '@/providers/unofficial-run-provider';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-const mocks = vi.hoisted(() => ({ pathname: '/pwx' }));
+const mocks = { pathname: '/pwx' };
 
-vi.mock('next/navigation', async (importOriginal) => ({
-  ...(await importOriginal<typeof NextNavigation>()),
+const actual = { ...(await import('next/navigation')) };
+mock.module('next/navigation', () => ({
+  ...actual,
   usePathname: () => mocks.pathname,
 }));
-vi.mock('@/providers/unofficial-run-provider', async (importOriginal) => ({
-  ...(await importOriginal<typeof UnofficialRunProvider>()),
+const actual2 = { ...(await import('@/providers/unofficial-run-provider')) };
+mock.module('@/providers/unofficial-run-provider', () => ({
+  ...actual2,
   useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
 }));
+
+let loadCount = 0;
 
 interface Read {
   view: string | null;
@@ -30,21 +33,24 @@ afterEach(() => {
   unmount?.();
   unmount = null;
   document.body.innerHTML = '';
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 /**
  * Opens `/pwx?<query>` as a fresh page load and returns what the page reads, plus the
  * address bar after the page rewrote it. URL state is read once per module load, so every
- * case loads the app modules (and React with them) anew.
+ * case loads a fresh url-state. Bun caches modules per specifier, so a query string loads a
+ * new copy, and mocking url-state with it hands that copy to the app modules.
  */
 async function open(query: string): Promise<{ read: Read; url: URLSearchParams }> {
   window.history.replaceState(null, '', `/pwx?${query}`);
-  vi.stubGlobal(
+  stubGlobal(
     'fetch',
     vi.fn(() => Promise.resolve(Response.json([]))),
   );
-  vi.resetModules();
+  loadCount += 1;
+  const urlState = await import(`@/lib/routing/url-state?load=${loadCount}`);
+  mock.module('@/lib/routing/url-state', () => urlState);
   const [
     { act },
     { createRoot },

@@ -1,16 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
 import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
 import type { InferenceData } from '@/components/inference/types';
 import type { PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/hooks/useMediaQuery', () => ({ useIsMobileViewport: () => false }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/hooks/useMediaQuery', () => ({ useIsMobileViewport: () => false }));
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
