@@ -2,7 +2,7 @@
 
 ## Structure
 
-**Unit tests**: colocated with source (`*.test.ts` next to `*.ts`). `packages/app` runs Vitest (config: `packages/app/vitest.config.ts`). `packages/db`, `packages/constants` and `packages/mcp` run `bun test`. The db suite starts through `packages/db/scripts/test-unit.ts`, which builds the migrated PGlite template once and runs files in parallel on half the CPUs, each file isolated.
+**Unit tests**: colocated with source (`*.test.ts` next to `*.ts`). `packages/app` runs Vitest (config: `packages/app/vitest.config.ts`). `packages/db`, `packages/constants` and `packages/mcp` run `bun test`. The db suite starts through `packages/db/scripts/test-unit.ts`, which builds the migrated PGlite template once and runs files in parallel on a third of the CPUs, each file isolated.
 
 Unit test workers are reused across files (`isolate: false`), with isolation restored per file by `src/test/file-isolation-runner.ts`. Before each file, the runner re-evaluates every inlined (source) module and clears mocks, matching Vitest's own per-file reset. It also restores `process.env` and `globalThis` to the worker's starting state and gives `@vitest-environment jsdom` files a fresh JSDOM window. Packages loaded from `node_modules` stay cached in the worker, so a package must not keep per-test state at import time. Next's `node-environment-baseline` is loaded before any test so that its `AsyncLocalStorage` global never depends on file order. `src/test/environment-grouped-sequencer.ts` runs files with the same environment back to back, so workers rarely restart. Transformed modules are cached on disk (`fsModuleCache`, `node_modules/.vitest-cache`). CI restores that cache between runs.
 
