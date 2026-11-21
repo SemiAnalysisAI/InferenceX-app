@@ -1,7 +1,7 @@
 import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
 
-import { availabilityBody } from '../support/e2e';
+import { availabilityBody, fastForwardQueryRetry } from '../support/e2e';
 
 /** Clicks the trend chart where its first point is drawn; the hover overlay above the dots takes the click. */
 const clickFirstTrendPoint = () =>
@@ -349,7 +349,9 @@ describe('Historical Trends — Chinese route', () => {
             : { body: benchmarkRows },
         );
       }).as('failedBenchmarks');
-      cy.reload();
+      fastForwardQueryRetry(':contains("历史基准测试数据加载失败")', () => {
+        cy.reload();
+      });
       cy.wait('@failedBenchmarks');
       cy.wait('@failedBenchmarks');
       cy.contains('历史基准测试数据加载失败').should('be.visible');
@@ -379,7 +381,9 @@ describe('Historical Trends — Chinese route', () => {
         );
       }).as('secondaryHistory');
 
-      cy.reload();
+      fastForwardQueryRetry('[data-testid="historical-trend-error"]', () => {
+        cy.reload();
+      });
       cy.wait('@secondaryHistory');
       cy.wait('@secondaryHistory');
       cy.get('[data-testid="historical-trend-error"]')
