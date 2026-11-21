@@ -186,7 +186,8 @@ function CacheReuseInner() {
     effectiveSequence: selectedSequence,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setSelectedRunId } =
+    useGlobalFilterActions();
   const warmThroughputChange = useWarmThroughputChange();
   const { selectedRunDate, requestedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -323,29 +324,33 @@ function CacheReuseInner() {
   const handleModelChange = useCallback(
     (value: string) => {
       setSelectedModel(value as Model);
+      // A pinned run belongs to the linked selection; another one reads the dated snapshot.
+      setSelectedRunId('');
       setRecipeInput('');
       writeUrlParams({ c_recipe: '' });
       track('cache_reuse_model_selected', { model: value });
     },
-    [setSelectedModel],
+    [setSelectedModel, setSelectedRunId],
   );
   const handleSequenceChange = useCallback(
     (value: string) => {
       setSelectedSequence(value as Sequence);
+      setSelectedRunId('');
       setRecipeInput('');
       writeUrlParams({ c_recipe: '' });
       track('cache_reuse_sequence_selected', { sequence: value });
     },
-    [setSelectedSequence],
+    [setSelectedSequence, setSelectedRunId],
   );
   const handlePrecisionChange = useCallback(
     (value: string[]) => {
       setSelectedPrecisions(value);
+      setSelectedRunId('');
       setRecipeInput('');
       writeUrlParams({ c_recipe: '' });
       track('cache_reuse_precision_selected', { precision: value.join(',') });
     },
-    [setSelectedPrecisions],
+    [setSelectedPrecisions, setSelectedRunId],
   );
   const handleRecipeChange = useCallback((key: string) => {
     setRecipeInput(key);

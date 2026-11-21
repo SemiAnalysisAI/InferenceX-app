@@ -1,4 +1,6 @@
+import { availabilityBody } from '../support/e2e';
 import {
+  availability,
   b300Rows,
   interceptCalculatorOverlayRun,
   interceptOverlayRun,
@@ -180,6 +182,31 @@ describe('Prefix Cache Reuse', () => {
       cy.wait('@sourceRun');
       firstRowCell('HBM').should('have.text', '60.0%');
       cy.location('search').should('include', 'g_runid=111');
+    });
+
+    it('drops the run pin when the model changes', () => {
+      interceptOverlayRun();
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody([...availability, { ...availability[0], model: 'kimik3' }]),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+        const pinned = new URL(req.url).searchParams.has('runId');
+        req.reply({
+          body: historicalRows().map((row) => ({
+            ...row,
+            metrics: { ...row.metrics, server_gpu_cache_hit_rate: pinned ? 0.6 : 0.8 },
+          })),
+        });
+      });
+      cy.visit(
+        '/infx/cache-reuse?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&g_rundate=2026-09-17&g_runid=111',
+        { onBeforeLoad: dismissNudges },
+      );
+      firstRowCell('HBM').should('have.text', '60.0%');
+      cy.get('#cache-reuse-model').click();
+      cy.contains('[role="option"]', 'Kimi K3').click();
+      cy.get('#cache-reuse-model').should('contain.text', 'Kimi K3');
+      firstRowCell('HBM').should('have.text', '80.0%');
     });
 
     it('does not substitute another chip when the linked configuration is missing', () => {
