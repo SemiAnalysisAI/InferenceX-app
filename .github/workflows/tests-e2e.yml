@@ -32,33 +32,9 @@ jobs:
       - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: $/.github/actions/setup-workspace
         with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Mount node_modules
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-node-modules-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}
-          path: ./node_modules
-          commit: 'false'
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Mount Cypress binary
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-cypress-binary-${{ runner.arch }}
-          path: /home/runner/.cache/Cypress
-          commit: 'false'
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: bunx cypress verify || bunx cypress install
+          cypress-binary: 'true'
       - name: Run component tests
         working-directory: packages/app
         run: bunx cypress run --component --browser chrome
@@ -81,63 +57,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  build:
-    name: Build E2E app
-    if: ${{ !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
-    timeout-minutes: 10
-    runs-on: blacksmith-16vcpu-ubuntu-2404
-    permissions:
-      contents: read
-    steps:
-      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
-        with:
-          persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Mount node_modules
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-node-modules-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}
-          path: ./node_modules
-          commit: 'false'
-      # The Turbopack compiler cache (turbopackFileSystemCacheForBuild in next.config.ts)
-      # plus the incremental fetch cache, per
-      # https://nextjs.org/docs/pages/guides/ci-build-caching.
-      - name: Mount Next.js build cache
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-nextjs-cache-${{ runner.arch }}
-          path: ./packages/app/.next/cache
-          commit: 'false'
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Build app
-        run: bun run build
-        env:
-          E2E_FIXTURES: '1'
-      - name: Check client bundle
-        run: bun run check:bundle
-      - name: Pack build output
-        run: tar --exclude=./cache -C packages/app/.next -I 'zstd -T0 -3' -cf "$RUNNER_TEMP/next-build.tar.zst" .
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: e2e-next-build
-          path: ${{ runner.temp }}/next-build.tar.zst
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 1
-
   cypress:
     name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
-    needs: build
     if: ${{ !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
     timeout-minutes: 10
     runs-on: blacksmith-8vcpu-ubuntu-2404
@@ -152,45 +73,23 @@ jobs:
       - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      # Sticky disks mount in about a second; bun reconciles node_modules to the lockfile.
-      - name: Mount node_modules
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-node-modules-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}
-          path: ./node_modules
-          commit: 'false'
       - uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
         if: matrix.browser == 'firefox'
         with:
           firefox-version: latest
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: $/.github/actions/setup-workspace
+        with:
+          nextjs-cache: 'true'
+          cypress-binary: 'true'
+      # Each shard builds the app itself: with the mounted compiler cache this is
+      # faster than waiting for one build job and its artifact.
+      - name: Build app
+        run: bun run build
         env:
-          CYPRESS_INSTALL_BINARY: '0'
-      # One build job serves every shard; next start only needs the built .next directory.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: e2e-next-build
-          path: ${{ runner.temp }}
-      - name: Unpack build output
-        run: mkdir -p packages/app/.next && tar -C packages/app/.next -I zstd -xf "$RUNNER_TEMP/next-build.tar.zst"
-      - name: Mount Cypress binary
-        uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
-        with:
-          key: ${{ github.repository }}-cypress-binary-${{ runner.arch }}
-          path: /home/runner/.cache/Cypress
-          commit: 'false'
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: bunx cypress verify || bunx cypress install
+          E2E_FIXTURES: '1'
+      - name: Check client bundle
+        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
+        run: bun run check:bundle
       - name: Run integration tests
         uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060 # v7.4.6
         with:
@@ -226,7 +125,7 @@ jobs:
 
   result:
     name: E2E tests
-    needs: [build, component-tests, cypress]
+    needs: [component-tests, cypress]
     if: ${{ always() }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
