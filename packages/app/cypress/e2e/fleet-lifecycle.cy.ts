@@ -761,7 +761,9 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       ['calc-lifecycle-horizon-input', '18'],
       ['calc-fleet-mw-input', '4'],
     ]) {
-      cy.get(`[data-testid="${testId}"]`).clear().type(value);
+      // Clearing can re-render the field (an empty budget swaps in the empty state), so re-query it.
+      cy.get(`[data-testid="${testId}"]`).clear();
+      cy.get(`[data-testid="${testId}"]`).type(value);
     }
 
     for (const [option, header] of [

@@ -1156,3 +1156,141 @@ describe('VideoGenX results share state', () => {
     unstubAllGlobals();
   });
 });
+
+describe('URL state ordering, debounce and route sync', () => {
+  beforeEach(() => {
+    useFakeTimers();
+    resetModules();
+  });
+
+  afterEach(() => {
+    useRealTimers();
+    unstubAllGlobals();
+  });
+
+  it('lets a navigated URL win over an edit still waiting for its debounce', async () => {
+    const { location } = setupWindow('', '/infx/inference');
+    const { buildShareUrl, readUrlParams, refreshUrlParams, writeUrlParams } =
+      await importUrlState();
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+    location.search = '?g_model=GLM-5.2';
+
+    expect(refreshUrlParams().g_model).toBe('GLM-5.2');
+    expect(readUrlParams().g_model).toBe('GLM-5.2');
+    expect(new URL(buildShareUrl()).searchParams.get('g_model')).toBe('GLM-5.2');
+  });
+
+  it('previews a navigation without applying it, dropping values a profit route omits', async () => {
+    setupWindow('?c_mw=20', '/infx/calculator');
+    const { peekNavigationUrlParams, readUrlParams } = await importUrlState();
+
+    expect(peekNavigationUrlParams('/infx/inference', '?i_seq=8k/1k')).toEqual({
+      params: { c_mw: '20', i_seq: '8k/1k' },
+      explicit: { i_seq: '8k/1k' },
+    });
+    expect(peekNavigationUrlParams('/infx/profit-estimator', '').params.c_mw).toBeUndefined();
+    expect(readUrlParams()).toEqual({ c_mw: '20' });
+  });
+
+  it('syncs a profit route path 150 ms after the last edit, once', async () => {
+    const { history } = setupWindow('', '/infx/profit-estimator/deepseek-v4');
+    const { writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ c_ivtarget: '24' });
+    await advanceTimersByTimeAsync(100);
+    writeUrlParams({ c_ivtarget: '30' });
+    await advanceTimersByTimeAsync(100);
+    expect(history.replaceState).not.toHaveBeenCalled();
+
+    await advanceTimersByTimeAsync(100);
+    expect(history.replaceState).toHaveBeenCalledTimes(1);
+    expect(history.replaceState).toHaveBeenLastCalledWith(
+      history.state,
+      '',
+      '/infx/profit-estimator/deepseek-v4/target/30',
+    );
+  });
+
+  it('drops unofficial-run query keys once the profit route path carries the runs', async () => {
+    const { history } = setupWindow(
+      '?unofficialrun=55&utm_source=x',
+      '/infx/profit-estimator/deepseek-v4',
+    );
+    const { writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ c_ivtarget: '24' });
+    await advanceTimersByTimeAsync(200);
+
+    const href = (history.replaceState.mock.calls.at(-1) as [unknown, string, string])[2];
+    expect(new URL(href, 'https://example.com').searchParams.toString()).toBe('utm_source=x');
+  });
+
+  it('syncs a profit route path at once when remembering chart state', async () => {
+    const { history } = setupWindow('', '/infx/profit-estimator/deepseek-v4');
+    const { rememberChartStateInUrl, writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ c_ivtarget: '24' });
+    rememberChartStateInUrl();
+
+    expect(history.replaceState).toHaveBeenLastCalledWith(
+      history.state,
+      '',
+      '/infx/profit-estimator/deepseek-v4/target/24',
+    );
+  });
+
+  it('drops a URL value the chart has since reset to its default when remembering state', async () => {
+    const { history } = setupWindow('?g_model=Kimi-K3&utm_source=x', '/infx/inference');
+    const { rememberChartStateInUrl, writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+    rememberChartStateInUrl();
+
+    expect(history.replaceState).toHaveBeenLastCalledWith(
+      history.state,
+      '',
+      '/infx/inference?utm_source=x',
+    );
+  });
+
+  it('carries only the model and profit-route state from a profit route', async () => {
+    setupWindow('', '/infx/profit-estimator');
+    const { currentChartSearch, writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ g_model: 'Kimi-K3', i_seq: '8k/1k', c_ivtarget: '24' });
+
+    expect(currentChartSearch()).toBe('g_model=Kimi-K3&c_ivtarget=24');
+  });
+
+  it('leaves the model out of chart state on a route that already names it', async () => {
+    setupWindow('', '/infx/historical/kimi-k3');
+    const { currentChartSearch, writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+
+    expect(currentChartSearch()).toBe('');
+  });
+
+  it('builds a chart href from the live URL, the chart state and overrides', async () => {
+    setupWindow(
+      '?utm_source=x&i_prec=fp4&unofficialrun=55&g_model=Kimi-K3',
+      '/infx/inference',
+      '#chart',
+    );
+    const { chartStateHref, writeUrlParams } = await importUrlState();
+
+    writeUrlParams({ i_prec: '', i_seq: '1k/1k' });
+
+    expect(chartStateHref({ i_metric: 'y_tpPerGpu' })).toBe(
+      'https://example.com/infx/inference?utm_source=x&g_model=Kimi-K3&i_seq=1k%2F1k&unofficialruns=55&i_metric=y_tpPerGpu#chart',
+    );
+  });
+
+  it('builds a bare chart href when there is no state to carry', async () => {
+    setupWindow('', '/infx/inference');
+    const { chartStateHref } = await importUrlState();
+
+    expect(chartStateHref({})).toBe('https://example.com/infx/inference');
+  });
+});
