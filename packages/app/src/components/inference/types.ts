@@ -401,6 +401,11 @@ export interface InferenceDataContextType {
 export interface InferenceFiltersContextType {
   activeHwTypes: Set<string>;
   bestPerSku: boolean;
+  /**
+   * The hardware the page asked for (`i_active` or `initialActiveHwTypes`), while it is still the
+   * active selection. Unofficial-run overlays seed their official selection from it.
+   */
+  requestedHwTypes: ReadonlySet<string> | null;
   /** Inactive hardware keys whose legend toggle the engine exclusion blocks. */
   blockedHwToggles: ReadonlyMap<string, BlockedComparisonToggle>;
   selectedModel: Model;

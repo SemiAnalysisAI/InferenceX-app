@@ -372,11 +372,12 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the first page began carrying older deployments, and after the PowerX
-      // layout added the i_at and i_ptsmooth URL keys, the live address bar, a ranking slot on the
-      // shared scatter props, renamed the PowerX view ids and added the GPU role chart title; no
-      // video entry reads the PowerX changes, so recorded entries are unchanged.
-      sources: 'b410790c9bb4f7629fd00321fe92a940c5d63c3208272d122a4434c53538f7b8',
+      // Re-pinned after the overlay selection gained a requested official hardware set, which
+      // only changes chart visibility, and after the PowerX layout added the i_at and i_ptsmooth
+      // URL keys, the live address bar, a ranking slot on the shared scatter props, renamed the
+      // PowerX view ids and added the GPU role chart title; no video entry reads the PowerX
+      // changes. Recorded entries are unchanged.
+      sources: '35439fbb8ee99df21f221519993752c82a395d797652422cb132df3698ce98bc',
     });
   });
 });

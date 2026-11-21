@@ -375,7 +375,7 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for filename, payload in outputs.items():
         # The small manifest is reviewed by hand; the fixture is stored minified
-        # (and excluded from formatting in .prettierignore).
+        # (and excluded from formatting in .oxfmtrc.json).
         indent = 2 if filename.endswith("manifest.json") else None
         separators = None if indent else (",", ":")
         (args.output_dir / filename).write_text(

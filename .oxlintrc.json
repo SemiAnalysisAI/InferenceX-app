@@ -1,4 +1,5 @@
 {
+  "ignorePatterns": [".claude/worktrees/"],
   "categories": {
     "correctness": "deny",
     "suspicious": "deny",

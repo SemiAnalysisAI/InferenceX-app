@@ -173,6 +173,19 @@ export const INFERENCE_CONTEXT_STRINGS = {
   },
 } as const;
 
+/** Selectable keys a hardware request names; a bare GPU (`b200`) covers every engine on it. */
+export function matchRequestedHw(
+  request: ReadonlySet<string>,
+  selectable: ReadonlySet<string>,
+): Set<string> {
+  const prefixes = [...request].filter((k) => !k.includes('_'));
+  return new Set(
+    [...selectable].filter(
+      (k) => request.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
+    ),
+  );
+}
+
 function useStableInferenceActions(
   actions: InferenceActionsContextType,
 ): InferenceActionsContextType {
@@ -608,7 +621,9 @@ export function InferenceProvider({
   const [bestPerSkuChoice, setBestPerSku] = useState<boolean | null>(() => {
     if (activeTab !== 'inference') return false;
     const raw = getUrlParam('i_best');
-    return raw === '0' ? false : raw === '1' ? true : null;
+    if (raw === '0' || raw === '1') return raw === '1';
+    // An explicit hardware request would otherwise be replaced by the best-per-SKU set.
+    return getUrlParam('i_active') || initialActiveHwTypes?.length ? false : null;
   });
   const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
   const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
@@ -665,6 +680,9 @@ export function InferenceProvider({
   const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState(() =>
     Boolean(getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus),
   );
+  const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
+  // The keys the page asked for, kept while that request is still the reader's selection.
+  const requestedHwKeysRef = useRef<ReadonlySet<string> | null>(null);
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -859,6 +877,7 @@ export function InferenceProvider({
         }
         setBestPerSku(activeTab === 'inference' ? null : false);
         setPendingActiveHwTypes(null);
+        requestedHwKeysRef.current = null;
         setHardwareDefaultsOverridden(Boolean(initialActiveHwTypes?.length || autoSelectAllGpus));
       }
       setSelectedModel(v);
@@ -1336,18 +1355,24 @@ export function InferenceProvider({
     [selectedModel, hideH200],
   );
 
+  // Other effects may rebuild the same selection as a new Set; the request holds while keys match.
+  const requestStillActive =
+    requestedHwSelection !== null &&
+    requestedHwSelection.size === activeHwTypes.size &&
+    [...requestedHwSelection].every((key) => activeHwTypes.has(key));
+  const requestedHwActiveRef = useRef(false);
+  requestedHwActiveRef.current = requestStillActive;
+
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
     if (pendingHwFilterRef.current) return;
     if (selectableHwTypes.size === 0) return;
-    const prefixes = [...pendingActiveHwTypes].filter((k) => !k.includes('_'));
-    let restored = new Set(
-      [...selectableHwTypes].filter(
-        (k) =>
-          pendingActiveHwTypes.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
-      ),
-    );
-    if (restored.size === 0) restored = selectableHwTypes;
+    let restored = matchRequestedHw(pendingActiveHwTypes, selectableHwTypes);
+    const matchedRequest = restored.size > 0;
+    // Seeded rows can list a subset of the hardware; wait for the full rows before giving up.
+    if (!matchedRequest && chartDataLoading) return;
+    requestedHwKeysRef.current = matchedRequest ? pendingActiveHwTypes : null;
+    if (!matchedRequest) restored = selectableHwTypes;
     if (exclusion) {
       const proposed = restored;
       const resolved = resolveHwSelection(restored, new Set());
@@ -1360,12 +1385,14 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(restored);
+    setRequestedHwSelection(matchedRequest ? restored : null);
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
     selectableHwTypes,
+    chartDataLoading,
     exclusion,
     selectedModel,
     effectiveSequence,
@@ -1390,6 +1417,19 @@ export function InferenceProvider({
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
     if (modelChanged) preferredHwTypesRef.current = new Set();
+    // Loading an overlay changes the scope; keep the page's request instead of the defaults.
+    const request = requestedHwKeysRef.current;
+    if (request && requestedHwActiveRef.current && !bestPerSku) {
+      const matched = matchRequestedHw(request, selectableHwTypes);
+      if (matched.size > 0) {
+        const selection = exclusion
+          ? resolveHwSelection(matched, previousSelection).result
+          : matched;
+        setActiveHwTypes(selection);
+        setRequestedHwSelection(selection);
+        return;
+      }
+    }
     if (presetFilter) {
       const filtered = new Set(
         [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
@@ -1804,10 +1844,13 @@ export function InferenceProvider({
     ],
   );
 
+  const requestedHwTypes = requestStillActive ? requestedHwSelection : null;
+
   const filtersValue = useMemo<InferenceFiltersContextType>(
     () => ({
       activeHwTypes,
       bestPerSku,
+      requestedHwTypes,
       blockedHwToggles,
       selectedModel,
       selectedSequence: effectiveSequence,
@@ -1830,6 +1873,7 @@ export function InferenceProvider({
     [
       activeHwTypes,
       bestPerSku,
+      requestedHwTypes,
       blockedHwToggles,
       selectedModel,
       effectiveSequence,

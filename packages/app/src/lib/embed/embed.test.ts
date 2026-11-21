@@ -34,6 +34,7 @@ describe('parseEmbedOptions', () => {
       sequence: undefined,
       yAxisMetric: 'y_tpPerGpu',
       chipBasis: 'pool',
+      hwTypes: [],
     });
   });
 
@@ -42,6 +43,25 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions({ g_chips: 'TOTAL' }).chipBasis).toBe('total');
     expect(parseEmbedOptions({ chips: 'pool', g_chips: 'total' }).chipBasis).toBe('pool');
     expect(parseEmbedOptions({ chips: 'decode' }).chipBasis).toBe('pool');
+  });
+
+  it('reads the official hardware from hw or the dashboard i_active param', () => {
+    expect(parseEmbedOptions({ hw: 'gb200_vllm' }).hwTypes).toEqual(['gb200_vllm']);
+    expect(parseEmbedOptions({ i_active: 'b200_sglang,h100' }).hwTypes).toEqual([
+      'b200_sglang',
+      'h100',
+    ]);
+    expect(parseEmbedOptions({ hw: 'b200_sglang', i_active: 'h100' }).hwTypes).toEqual([
+      'b200_sglang',
+    ]);
+  });
+
+  it('normalizes hardware keys and drops unknown SKUs', () => {
+    expect(
+      parseEmbedOptions({ hw: ' GB200_VLLM , gb200_vllm,,nope_vllm,h100_dynamo-trt' }).hwTypes,
+    ).toEqual(['gb200_vllm', 'h100_dynamo-trt']);
+    expect(parseEmbedOptions({ hw: 'nope' }).hwTypes).toEqual([]);
+    expect(parseEmbedOptions({ hw: ['h100_vllm', 'b200_vllm'] }).hwTypes).toEqual(['h100_vllm']);
   });
 
   it('locks to the requested framework families and drops unknown ones', () => {
