@@ -2,22 +2,23 @@
 
 import { Download, Info } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
-
 import type { InferenceData } from '@/components/inference/types';
-import type { PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
+import type { PowerPoolRole, PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 import { Switch } from '@/components/ui/switch';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
-import {
-  loadSwingStatsFromSeries,
-  NVL72_GPUS_PER_RACK,
-  type LoadSwingStats,
-} from '@/lib/power/load-swing-stats';
+import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
 
+import {
+  formatLoadSwingWatts,
+  loadSwingPercentTdp,
+  loadSwingRows,
+  type LoadSwingRow,
+} from './load-swing-rows';
 import { PowerBasisPill } from './PowerBasisPill';
+import type { PowerXRole } from './powerx-role';
 
 const STRINGS = {
   en: {
@@ -47,6 +48,11 @@ const STRINGS = {
     fixed: '1 s DCGM samples · single node · inference only · sub-second swings not captured',
     tdp: 'TDP',
     at: (conc: number) => `c${conc}`,
+    lane: { prefill: 'Prefill workers', decode: 'Decode workers' },
+    laneAll: (count: number) => `All ${count} GPU${count === 1 ? '' : 's'}`,
+    aggregated: 'aggregated',
+    perLane:
+      'Under a GPU role each row is one lane: the per-GPU mean of that pool’s GPUs only (all GPUs for the context row). Aggregated runs keep one row across every GPU.',
   },
   zh: {
     title: '负载波动',
@@ -75,41 +81,28 @@ const STRINGS = {
     fixed: '1 秒 DCGM 采样 · 单节点 · 仅推理 · 不包含亚秒级波动',
     tdp: 'TDP',
     at: (conc: number) => `c${conc}`,
+    lane: { prefill: '预填充 worker', decode: '解码 worker' },
+    laneAll: (count: number) => `全部 ${count} 个 GPU`,
+    aggregated: '聚合',
+    perLane:
+      '选择 GPU 角色时每行对应一个分组：仅该池 GPU 的每 GPU 均值（参考行为全部 GPU）。聚合运行仍以全部 GPU 显示为一行。',
   },
 } as const;
 
-interface LoadSwingTraceRow {
-  trace: PowerTimelineTrace;
+interface LoadSwingTraceRow extends LoadSwingRow {
   color: string;
   label: string;
-  stats: LoadSwingStats;
-  tdpWatts: number;
 }
 
-/** Statistics of every visible trace; traces without usable samples are left out. */
-function loadSwingRows(
-  traces: readonly PowerTimelineTrace[],
-  colorOf: (trace: PowerTimelineTrace) => string,
-  labelOf: (point: InferenceData) => string,
-): LoadSwingTraceRow[] {
-  return traces.flatMap((trace) => {
-    const stats = loadSwingStatsFromSeries(trace.series, trace.windowStartMs, trace.windowEndMs);
-    if (!stats) return [];
-    return [
-      {
-        trace,
-        color: colorOf(trace),
-        label: labelOf(trace.point),
-        stats,
-        tdpWatts: HW_REGISTRY[trace.point.hwKey.split('_')[0]]?.tdp ?? 0,
-      },
-    ];
-  });
-}
-
-function statsDownloadUrl(pointId: number, format: 'csv' | 'json', rack: boolean): string {
+function statsDownloadUrl(
+  pointId: number,
+  format: 'csv' | 'json',
+  rack: boolean,
+  pool: PowerPoolRole | undefined,
+): string {
   const params = new URLSearchParams({ id: String(pointId), format });
   if (rack) params.set('scale', 'nvl72');
+  if (pool && pool !== 'all') params.set('role', pool);
   return `/api/v1/gpu-metrics-point/stats?${params.toString()}`;
 }
 
@@ -118,25 +111,33 @@ export function PowerLoadSwings({
   traces,
   colorOf,
   labelOf,
+  role = 'all',
 }: {
   traces: readonly PowerTimelineTrace[];
   colorOf: (trace: PowerTimelineTrace) => string;
   labelOf: (point: InferenceData) => string;
+  /** PowerX GPU role: one row per lane (prefill, decode, and all GPUs for split). */
+  role?: PowerXRole;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [rack, setRack] = useState(false);
   const isPhone = useIsMobileViewport();
-  const rows = useMemo(() => loadSwingRows(traces, colorOf, labelOf), [traces, colorOf, labelOf]);
+  const rows = useMemo<LoadSwingTraceRow[]>(
+    () =>
+      loadSwingRows(traces, role).map((row) => ({
+        ...row,
+        color: colorOf(row.trace),
+        label: labelOf(row.trace.point),
+      })),
+    [traces, colorOf, labelOf, role],
+  );
   if (rows.length === 0) return null;
-  const unit = rack ? 'kW' : 'W';
-  const value = (watts: number | null) => {
-    if (watts === null) return '—';
-    const scaled = rack ? (watts * NVL72_GPUS_PER_RACK) / 1000 : watts;
-    return `${rack ? Number(scaled.toPrecision(3)).toLocaleString('en-US') : Math.round(scaled).toLocaleString('en-US')} ${unit}`;
+  const value = (watts: number | null) => formatLoadSwingWatts(watts, rack);
+  const pctTdp = (watts: number, tdp: number) => {
+    const pct = loadSwingPercentTdp(watts, tdp);
+    return pct === null ? '' : ` · ${pct}% ${t.tdp}`;
   };
-  const pctTdp = (watts: number, tdp: number) =>
-    tdp > 0 ? ` · ${Math.round((watts / tdp) * 100)}% ${t.tdp}` : '';
   // One column list feeds both the desktop table and the phone cards, so they cannot drift.
   const statCells = ({ stats, tdpWatts }: LoadSwingTraceRow) => [
     { key: 'peak', label: t.peak, value: value(stats.peak) },
@@ -162,7 +163,13 @@ export function PowerLoadSwings({
       value: stats.volatility === null ? '—' : `${(stats.volatility * 100).toFixed(1)}%`,
     },
   ];
-  const traceName = ({ trace, color, label, stats }: LoadSwingTraceRow) => (
+  const laneName = (lane: NonNullable<LoadSwingTraceRow['lane']>) =>
+    lane.kind === 'aggregated'
+      ? t.aggregated
+      : lane.role === 'all'
+        ? t.laneAll(lane.gpuCount)
+        : t.lane[lane.role];
+  const traceName = ({ trace, color, label, stats, lane }: LoadSwingTraceRow) => (
     <>
       <span
         aria-hidden
@@ -171,32 +178,49 @@ export function PowerLoadSwings({
       />
       <span className="font-medium">{label}</span>{' '}
       <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
+      {lane && (
+        <span
+          className={lane.kind === 'lane' ? 'ml-1' : 'ml-1 text-muted-foreground'}
+          data-testid="powerx-load-swings-lane"
+          data-lane={lane.kind}
+          data-pool={lane.role}
+        >
+          · {laneName(lane)}
+        </span>
+      )}
       {stats.gapCount > 0 && (
         <span className="ml-1 text-muted-foreground">· {t.gaps(stats.gapCount)}</span>
       )}
       {stats.mean === null && <span className="ml-1 text-muted-foreground">· {t.noWindow}</span>}
     </>
   );
-  const downloads = (id: number | undefined) =>
-    isPersistedBenchmarkId(id) ? (
+  const downloads = ({ trace, lane }: LoadSwingTraceRow) => {
+    const id = trace.point.id;
+    // The context and aggregated rows read every GPU, so they download the unfiltered stats.
+    const pool = lane?.kind === 'lane' ? lane.role : undefined;
+    return isPersistedBenchmarkId(id) ? (
       <>
         <a
-          href={statsDownloadUrl(id, 'csv', rack)}
+          href={statsDownloadUrl(id, 'csv', rack, pool)}
           download
           data-testid="powerx-swings-csv"
           className="inline-flex items-center gap-1 underline decoration-dotted hover:text-foreground"
-          onClick={() => track('inference_powerx_swings_exported', { format: 'csv' })}
+          onClick={() =>
+            track('inference_powerx_swings_exported', { format: 'csv', role: pool ?? 'all' })
+          }
         >
           <Download className="size-3" aria-hidden />
           {t.csv}
         </a>
         {' · '}
         <a
-          href={statsDownloadUrl(id, 'json', rack)}
+          href={statsDownloadUrl(id, 'json', rack, pool)}
           download
           data-testid="powerx-swings-json"
           className="underline decoration-dotted hover:text-foreground"
-          onClick={() => track('inference_powerx_swings_exported', { format: 'json' })}
+          onClick={() =>
+            track('inference_powerx_swings_exported', { format: 'json', role: pool ?? 'all' })
+          }
         >
           {t.json}
         </a>
@@ -204,6 +228,7 @@ export function PowerLoadSwings({
     ) : (
       '—'
     );
+  };
   return (
     <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -232,7 +257,7 @@ export function PowerLoadSwings({
         <ul className="divide-y divide-border/30" data-testid="powerx-load-swings-cards">
           {rows.map((row) => (
             <li
-              key={row.trace.key}
+              key={row.key}
               className="py-3 text-xs tabular-nums"
               data-testid="powerx-load-swings-row"
             >
@@ -245,9 +270,7 @@ export function PowerLoadSwings({
                   </div>
                 ))}
               </dl>
-              <p className="no-export mt-2 text-muted-foreground">
-                {downloads(row.trace.point.id)}
-              </p>
+              <p className="no-export mt-2 text-muted-foreground">{downloads(row)}</p>
             </li>
           ))}
         </ul>
@@ -278,16 +301,14 @@ export function PowerLoadSwings({
             </thead>
             <tbody className="border-t">
               {rows.map((row) => (
-                <tr key={row.trace.key} data-testid="powerx-load-swings-row">
+                <tr key={row.key} data-testid="powerx-load-swings-row">
                   <th className="p-2 align-top font-normal whitespace-nowrap">{traceName(row)}</th>
                   {statCells(row).map((cell) => (
                     <td key={cell.key} className="p-2 text-right align-top whitespace-nowrap">
                       {cell.value}
                     </td>
                   ))}
-                  <td className="no-export p-2 align-top whitespace-nowrap">
-                    {downloads(row.trace.point.id)}
-                  </td>
+                  <td className="no-export p-2 align-top whitespace-nowrap">{downloads(row)}</td>
                 </tr>
               ))}
             </tbody>
@@ -295,7 +316,8 @@ export function PowerLoadSwings({
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        {rack ? t.perRack : t.perGpu} {t.definitions}
+        {rack ? t.perRack : t.perGpu} {role !== 'all' && `${t.perLane} `}
+        {t.definitions}
         <PowerBasisPill tag="gpu" />
       </p>
     </section>

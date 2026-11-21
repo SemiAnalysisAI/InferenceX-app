@@ -6,7 +6,7 @@ import { describe, expect, it, vi, mock } from 'bun:test';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { InferenceData } from '@/components/inference/types';
-import { type PowerXSelection } from './powerx-views';
+import { POWER_PERCENT_TDP_METRIC, type PowerXSelection } from './powerx-views';
 
 const mocks = {
   locale: 'en' as 'en' | 'zh',
@@ -30,7 +30,7 @@ import {
   defaultReadoutPoint,
   PowerXCountControls,
   PowerXReadout,
-  PowerXSplitBy,
+  PowerXRoleControl,
 } from './PowerXLayout';
 
 const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
@@ -40,8 +40,6 @@ const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
   return container;
 };
 const noop = () => {};
-
-const where: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'breakdown' };
 
 describe('PowerXCountControls', () => {
   it('disables the IT and facility Counts unless energy is per output token', () => {
@@ -80,19 +78,41 @@ describe('PowerXCountControls', () => {
   });
 });
 
-describe('PowerXSplitBy', () => {
-  it('disables Prefill vs decode with the reason when there is no role telemetry', () => {
-    const container = render(
-      <PowerXSplitBy selection={where} onSelectionChange={noop} rolesHaveData={false} />,
+describe('PowerXRoleControl', () => {
+  it('offers the four GPU roles with the current one pressed', () => {
+    const container = render(<PowerXRoleControl role="decode" onRoleChange={noop} />);
+    const ids = [...container.querySelectorAll('[data-testid^="powerx-role-"]')]
+      .map((node) => (node as HTMLElement).dataset.testid)
+      .filter((id) => id !== 'powerx-role-toggle');
+    expect(ids).toEqual([
+      'powerx-role-all',
+      'powerx-role-prefill',
+      'powerx-role-decode',
+      'powerx-role-split',
+    ]);
+  });
+});
+
+describe('pinned controls under a GPU role', () => {
+  const energy: PowerXSelection = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' };
+  it('pins Count to GPU and says why, but leaves All untouched', () => {
+    const pinned = render(
+      <PowerXCountControls selection={energy} onSelectionChange={noop} role="decode" />,
     );
-    const buttons = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-split"] button'),
-    ];
-    expect(buttons.map((button) => button.textContent)).toEqual(['Boundary', 'Prefill vs decode']);
-    expect(buttons[1].disabled).toBe(true);
-    expect(
-      container.querySelector('[data-testid="powerx-roles-unavailable"]')?.textContent,
-    ).toContain('No validated prefill/decode telemetry');
+    expect(pinned.querySelector('[data-testid="powerx-count-pinned"]')).not.toBeNull();
+    expect(pinned.querySelector('[data-testid="powerx-per-pinned"]')).not.toBeNull();
+    const all = render(
+      <PowerXCountControls selection={energy} onSelectionChange={noop} role="all" />,
+    );
+    expect(all.querySelector('[data-testid="powerx-count-pinned"]')).toBeNull();
+  });
+
+  it('notes % of TDP is per pool on Power draw under a role', () => {
+    const draw: PowerXSelection = { metric: POWER_PERCENT_TDP_METRIC, compare: 'none' };
+    const container = render(
+      <PowerXCountControls selection={draw} onSelectionChange={noop} role="split" />,
+    );
+    expect(container.querySelector('[data-testid="powerx-headroom-pinned"]')).not.toBeNull();
   });
 });
 

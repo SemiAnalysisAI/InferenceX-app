@@ -372,9 +372,11 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front. It is reached
-      // only through a type import, so recorded entries are unchanged.
-      sources: '515f0ca74d2331a0310e5cbabfed34f22ac2b61dee036db95e2ad77629c19ba4',
+      // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front, reached only
+      // through a type import, and after the PowerX GPU role touched shared inference types and
+      // URL keys and chartStateHref learned to drop empty overrides; no video entry reads the
+      // PowerX changes. Recorded entries are unchanged.
+      sources: '548c79561db449d27d678afa5e97f9543f9683791c8a035adfa51dca4c769a39',
     });
   });
 });

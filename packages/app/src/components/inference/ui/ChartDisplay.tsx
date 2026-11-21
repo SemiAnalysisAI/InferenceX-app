@@ -59,7 +59,7 @@ import {
   PowerXChartConfig,
   PowerXFacilitySwitch,
   PowerXReadout,
-  PowerXSplitBy,
+  PowerXRoleControl,
   PowerXViewTabs,
   usePowerXStrings,
 } from '@/components/inference/powerx/PowerXLayout';
@@ -67,9 +67,16 @@ import {
   POWERX_DEFAULT_METRIC,
   powerXShowsHeadroom,
   powerXViewFor,
-  WHERE_COMPARE,
   type PowerXSelection,
 } from '@/components/inference/powerx/powerx-views';
+import {
+  hasPowerRoleData,
+  powerRoleTableRows,
+  type PowerXRole,
+} from '@/components/inference/powerx/powerx-role';
+import PowerXRoleSplitBars from '@/components/inference/powerx/PowerXRoleSplitBars';
+import { PowerXInsightCard } from '@/components/inference/powerx/PowerXInsightCard';
+import { PowerXRoleNoData } from '@/components/inference/powerx/PowerXRoleNoData';
 import {
   usePowerXSurface,
   useSetPowerXActivePoint,
@@ -150,7 +157,6 @@ import CustomPowers from './CustomPowers';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
-import { hasRoleTelemetry } from '../utils/power-chip-coverage';
 import { useFirstChartRenderTiming } from './use-first-chart-render-timing';
 import { useCenterOnEnter } from '@/hooks/useCenterOnEnter';
 
@@ -342,6 +348,9 @@ export default function ChartDisplay({
     showLineLabels,
     showOffloadingLabel,
     powerCompare,
+    storedYAxisMetric,
+    storedPowerCompare,
+    powerRole,
     tokenBasis,
   } = useInferenceDisplay();
   const {
@@ -350,6 +359,7 @@ export default function ChartDisplay({
     setIsLegendExpanded,
     setSelectedYAxisMetric,
     setPowerCompare,
+    setPowerRole,
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
   const powerXT = usePowerXStrings();
@@ -365,25 +375,37 @@ export default function ChartDisplay({
     }
   }, [powerXSurface, selectedYAxisMetric, setSelectedYAxisMetric]);
   // PowerX v2: the view tabs and legend toggles write metric + compare as one selection.
+  // Controls read and write the stored choice; a GPU role only changes what is drawn.
   const powerXSelection = useMemo<PowerXSelection>(
-    () => ({ metric: selectedYAxisMetric, compare: powerCompare }),
-    [selectedYAxisMetric, powerCompare],
+    () => ({ metric: storedYAxisMetric, compare: storedPowerCompare }),
+    [storedYAxisMetric, storedPowerCompare],
   );
   const setPowerXActivePoint = useSetPowerXActivePoint();
   const setPowerXSelection = useCallback(
     (next: PowerXSelection) => {
-      if (next.metric !== selectedYAxisMetric) setSelectedYAxisMetric(next.metric);
-      if (next.compare !== powerCompare) setPowerCompare(next.compare);
+      if (next.metric !== storedYAxisMetric) setSelectedYAxisMetric(next.metric);
+      if (next.compare !== storedPowerCompare) setPowerCompare(next.compare);
       // A new view or boundary drops the pinned readout point.
       setPowerXActivePoint?.('clear');
     },
     [
-      selectedYAxisMetric,
-      powerCompare,
+      storedYAxisMetric,
+      storedPowerCompare,
       setSelectedYAxisMetric,
       setPowerCompare,
       setPowerXActivePoint,
     ],
+  );
+  const powerXHardwareLabel = useCallback(
+    (hw: string) => getDisplayLabel(getHardwareConfig(hw)),
+    [],
+  );
+  const handlePowerRoleChange = useCallback(
+    (next: PowerXRole) => {
+      setPowerRole(next);
+      setPowerXActivePoint?.('clear');
+    },
+    [setPowerRole, setPowerXActivePoint],
   );
   const powerXHeadroom = powerXSurface && powerXShowsHeadroom(selectedYAxisMetric, powerCompare);
   // Phones: cap the plot so the legend rail and the footer notes stay within reach.
@@ -980,38 +1002,6 @@ export default function ChartDisplay({
     selectedPercentile,
   ]);
 
-  // PowerX: only offer the prefill/decode split when the loaded results carry it.
-  // Reads the same visible rows the prefill/decode panel would plot.
-  const rolesHaveData = useMemo(() => {
-    const graph = renderableGraphs[0];
-    if (!powerXSurface || !graph || graph.data.length === 0) return undefined;
-    const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-    const isGpuComparison =
-      selectedGPUs.length > 0 &&
-      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
-    const { officialRows, overlayRows } = isGpuComparison
-      ? visibleDateComparisonRows(graph.data, overlay)
-      : visibleComparisonRows(graph.data, overlay);
-    return hasRoleTelemetry(
-      [...officialRows, ...overlayRows],
-      graph.chartDefinition.x_scale_field as keyof AggDataEntry,
-    );
-  }, [
-    powerXSurface,
-    renderableGraphs,
-    selectedXAxisMode,
-    overlayDataByChartType,
-    selectedGPUs.length,
-    selectedDateRange.startDate,
-    selectedDateRange.endDate,
-    selectedDates.length,
-    visibleDateComparisonRows,
-    visibleComparisonRows,
-  ]);
-  useEffect(() => {
-    if (rolesHaveData === false && powerCompare === 'roles') setPowerCompare(WHERE_COMPARE);
-  }, [rolesHaveData, powerCompare, setPowerCompare]);
-
   const renderChartButtons = (graph: (typeof renderableGraphs)[number], graphIndex: number) => {
     const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
     const isTimelineMode = Boolean(
@@ -1080,16 +1070,19 @@ export default function ChartDisplay({
             isGpuComparison
               ? visibleDateComparisonRows(exportData, exportOverlay)
               : visibleComparisonRows(exportData, exportOverlay);
+          const roleRows = <T extends InferenceData>(rows: T[]) =>
+            powerXSurface ? powerRoleTableRows(rows, powerRole) : rows;
           const { headers, rows } = inferenceChartToCsv(
-            visibleData,
+            roleRows(visibleData),
             graph.model,
             graph.sequence,
-            visibleOverlayRowsForExport,
+            roleRows(visibleOverlayRowsForExport),
             {
               yHeader: metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
               yPath: (graph.chartDefinition as ChartDefinition)[selectedYAxisMetric] as string,
               xHeader: resolvedXLabel,
             },
+            { role: powerXSurface ? powerRole : 'all' },
           );
           const issueNotes = matchKnownConfigIssues(graph.model, [
             ...visibleData,
@@ -1111,9 +1104,9 @@ export default function ChartDisplay({
   };
 
   // PowerX readout row: the visible plotted points the hovered/pinned readout reads from.
-  const powerXReadoutPoints = useMemo(() => {
+  const powerXVisibleRows = useMemo(() => {
     const graph = renderableGraphs[0];
-    if (!powerXLayout || !graph || powerXTab === 'where' || powerXTab === 'time') return null;
+    if (!powerXLayout || !graph) return null;
     const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
     const isGpuComparison =
       selectedGPUs.length > 0 &&
@@ -1124,7 +1117,6 @@ export default function ChartDisplay({
     return [...officialRows, ...overlayRows];
   }, [
     powerXLayout,
-    powerXTab,
     renderableGraphs,
     selectedXAxisMode,
     overlayDataByChartType,
@@ -1135,6 +1127,13 @@ export default function ChartDisplay({
     visibleDateComparisonRows,
     visibleComparisonRows,
   ]);
+  const powerXReadoutPoints = useMemo(() => {
+    if (powerXTab === 'where' || powerXTab === 'time' || !powerXVisibleRows) return null;
+    if (powerRole === 'all') return powerXVisibleRows;
+    // Under a role the readout opens on a row that splits; aggregated rows are the fallback.
+    const split = powerXVisibleRows.filter(hasPowerRoleData);
+    return split.length > 0 ? split : powerXVisibleRows;
+  }, [powerXTab, powerXVisibleRows, powerRole]);
 
   const displayGraphs =
     isFirstLoad || isDerivedXAxisLoading
@@ -1163,8 +1162,7 @@ export default function ChartDisplay({
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
-            const powerXWherePanelsOnly =
-              powerXLayout && powerXTab === 'where' && powerCompare !== 'roles' && !isGpuComparison;
+            const powerXWherePanelsOnly = powerXLayout && powerXTab === 'where' && !isGpuComparison;
             const footerOverlay = overlayDataByChartType[graph.chartDefinition.chartType];
             const footerPoints = [
               ...graph.data,
@@ -1438,11 +1436,27 @@ export default function ChartDisplay({
                               chipBasis={readOnlyChipBasisControl}
                             />
                           )}
+                          {powerXLayout && powerXMounted && powerXVisibleRows && powerXTab && (
+                            <>
+                              <PowerXRoleNoData role={powerRole} points={powerXVisibleRows} />
+                              {/* Over time renders its card from the power traces instead. */}
+                              {powerXTab !== 'time' && (
+                                <PowerXInsightCard
+                                  view={powerXTab}
+                                  role={powerRole}
+                                  points={powerXVisibleRows}
+                                  onRoleChange={handlePowerRoleChange}
+                                  hardwareLabel={powerXHardwareLabel}
+                                />
+                              )}
+                            </>
+                          )}
                           {powerXLayout &&
                             powerXMounted &&
                             powerXReadoutPoints &&
                             getViewMode(graphIndex) === 'chart' && (
                               <PowerXReadout
+                                role={powerRole}
                                 points={powerXReadoutPoints}
                                 yMetric={{
                                   label: metricLabel(
@@ -1532,9 +1546,14 @@ export default function ChartDisplay({
                           <>
                             {chartCaption}
                             <InferenceTable
-                              data={[...officialRows, ...overlayRows]}
+                              data={
+                                powerXSurface
+                                  ? powerRoleTableRows([...officialRows, ...overlayRows], powerRole)
+                                  : [...officialRows, ...overlayRows]
+                              }
                               chartDefinition={graph.chartDefinition}
                               selectedYAxisMetric={selectedYAxisMetric}
+                              role={powerXSurface ? powerRole : 'all'}
                             />
                             {chartFooter}
                           </>
@@ -1545,6 +1564,7 @@ export default function ChartDisplay({
                         return (
                           <div className="relative">
                             <PowerTimeline
+                              role={powerXSurface ? powerRole : 'all'}
                               chartId={`chart-${graphIndex}`}
                               data={[
                                 ...graph.data,
@@ -1557,6 +1577,20 @@ export default function ChartDisplay({
                               footer={chartFooter}
                               comparison={Boolean(isGpuComparison)}
                               runNumbering={runNumbering}
+                              insight={
+                                powerXLayout && powerXMounted && powerXVisibleRows
+                                  ? (traces) => (
+                                      <PowerXInsightCard
+                                        view="time"
+                                        role={powerRole}
+                                        points={powerXVisibleRows}
+                                        traces={traces}
+                                        onRoleChange={handlePowerRoleChange}
+                                        hardwareLabel={powerXHardwareLabel}
+                                      />
+                                    )
+                                  : undefined
+                              }
                             />
                           </div>
                         );
@@ -1603,6 +1637,23 @@ export default function ChartDisplay({
                       // under Count: All.
                       if (powerXWherePanelsOnly)
                         return <div className="order-first">{chartCaption}</div>;
+                      // Energy under Prefill vs decode: one stacked bar per point splits the
+                      // J per output token into its prefill and decode share.
+                      if (powerXLayout && powerXTab === 'energy' && powerRole === 'split') {
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(graph.data, footerOverlay)
+                          : visibleComparisonRows(graph.data, footerOverlay);
+                        return (
+                          <>
+                            {chartCaption}
+                            <PowerXRoleSplitBars
+                              points={officialRows}
+                              overlayPoints={overlayRows}
+                            />
+                            {chartFooter}
+                          </>
+                        );
+                      }
                       if (powerXLayout && powerXHeadroom) {
                         const { officialRows, overlayRows } = isGpuComparison
                           ? visibleDateComparisonRows(graph.data, footerOverlay)
@@ -1635,20 +1686,13 @@ export default function ChartDisplay({
                                 className="order-first mb-3 flex flex-wrap items-start gap-x-6"
                                 data-testid="powerx-where-controls"
                               >
-                                <PowerXSplitBy
-                                  selection={powerXSelection}
-                                  onSelectionChange={setPowerXSelection}
-                                  rolesHaveData={rolesHaveData}
+                                <PowerXFacilitySwitch
+                                  pues={[...officialRows, ...overlayRows].flatMap((point) =>
+                                    point.modeledSystemPower?.status === 'supported'
+                                      ? [point.modeledSystemPower.pue]
+                                      : [],
+                                  )}
                                 />
-                                {powerCompare !== 'roles' && (
-                                  <PowerXFacilitySwitch
-                                    pues={[...officialRows, ...overlayRows].flatMap((point) =>
-                                      point.modeledSystemPower?.status === 'supported'
-                                        ? [point.modeledSystemPower.pue]
-                                        : [],
-                                    )}
-                                  />
-                                )}
                               </div>
                             )}
                             <PowerAnalysisPanels
@@ -1658,8 +1702,8 @@ export default function ChartDisplay({
                               overlayData={overlayRows}
                               xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
                               xLabel={resolvedXLabel}
-                              showRoles={powerCompare === 'roles'}
-                              placement={powerCompare === 'roles' ? 'after' : 'before'}
+                              role={powerRole}
+                              placement="before"
                             />
                             {powerXWherePanelsOnly && hasAtomSeries && (
                               <AtomEngineFootnote className="mt-2" />
@@ -1721,10 +1765,13 @@ export default function ChartDisplay({
                     }
                   />
                   {powerXLayout && powerXMounted && (
-                    <PowerXViewTabs
-                      selection={powerXSelection}
-                      onSelectionChange={setPowerXSelection}
-                    />
+                    <>
+                      <PowerXViewTabs
+                        selection={powerXSelection}
+                        onSelectionChange={setPowerXSelection}
+                      />
+                      <PowerXRoleControl role={powerRole} onRoleChange={handlePowerRoleChange} />
+                    </>
                   )}
                   <ChartControls
                     scenarioInFooter={!powerXSurface}
@@ -1734,6 +1781,7 @@ export default function ChartDisplay({
                       powerXLayout && powerXMounted
                         ? (slots) => (
                             <PowerXChartConfig
+                              role={powerRole}
                               selection={powerXSelection}
                               onSelectionChange={setPowerXSelection}
                               slots={slots}

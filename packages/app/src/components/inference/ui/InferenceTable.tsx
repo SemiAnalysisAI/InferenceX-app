@@ -21,6 +21,13 @@ import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
+import type { PowerXRole } from '@/components/inference/powerx/powerx-role';
+import {
+  roleGpuCountLabel,
+  roleGpuCounts,
+  showRoleGpuColumns,
+  type RoleGpuCount,
+} from '@/components/inference/powerx/powerx-role-split';
 
 const ReproduceDrawer = dynamic(
   () =>
@@ -34,6 +41,12 @@ interface InferenceTableProps {
   data: InferenceData[];
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
+  /** PowerX GPU role. Any role but All GPUs adds the Prefill GPUs / Decode GPUs columns. */
+  role?: PowerXRole;
+}
+
+function roleGpuSortValue(count: RoleGpuCount): number {
+  return count === 'aggregated' ? -1 : count;
 }
 
 export function formatInferenceTableNumber(value: number | null, decimals?: number): string {
@@ -59,6 +72,8 @@ export function inferenceTableHeaderLabels(
     physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     series: locale === 'zh' ? '系列' : 'Series',
+    prefillGpus: locale === 'zh' ? '预填充 GPU' : 'Prefill GPUs',
+    decodeGpus: locale === 'zh' ? '解码 GPU' : 'Decode GPUs',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
@@ -72,6 +87,7 @@ export default function InferenceTable({
   data,
   chartDefinition,
   selectedYAxisMetric,
+  role,
 }: InferenceTableProps) {
   const locale = useLocale();
   // PowerX names the measured boundaries the way its Count control does.
@@ -88,6 +104,7 @@ export default function InferenceTable({
     [data, chartDefinition, selectedYAxisMetric],
   );
   const powerCompare = useMemo(() => inferPowerCompare(data), [data]);
+  const showRoleGpus = showRoleGpuColumns(role, powerCompare);
   const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
 
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
@@ -181,6 +198,26 @@ export default function InferenceTable({
             },
           ]
         : []),
+      ...(showRoleGpus
+        ? (['prefill', 'decode'] as const).map((pool) => ({
+            header: pool === 'prefill' ? headers.prefillGpus : headers.decodeGpus,
+            align: 'right' as const,
+            cell: (row: InferenceData) => {
+              const count = roleGpuCounts(row)[pool];
+              const text = roleGpuCountLabel(count, locale);
+              return count === 'aggregated' ? (
+                <span className="text-muted-foreground" data-role-gpus="aggregated">
+                  {text}
+                </span>
+              ) : (
+                text
+              );
+            },
+            sortValue: (row: InferenceData) => roleGpuSortValue(roleGpuCounts(row)[pool]),
+            className: 'tabular-nums whitespace-nowrap',
+            importance: 'key' as const,
+          }))
+        : []),
       {
         header: headers.xMetric,
         align: 'right',
@@ -220,6 +257,7 @@ export default function InferenceTable({
       headers,
       showAllInMeasured,
       powerCompare,
+      showRoleGpus,
       selectedYAxisMetric,
       locale,
       seriesLabelStyle,

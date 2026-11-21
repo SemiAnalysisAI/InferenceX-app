@@ -1,3 +1,5 @@
+// @test-environment jsdom
+
 import { describe, it, expect } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -160,5 +162,67 @@ describe('formatInferenceTableNumber', () => {
     expect(formatInferenceTableNumber(12.34)).toBe('12.3');
     expect(formatInferenceTableNumber(0.1234)).toBe('0.123');
     expect(formatInferenceTableNumber(0.00123)).toBe('0.0012');
+  });
+});
+
+function cellText(cell: Element) {
+  return cell.textContent ?? '';
+}
+
+function tableCells(html: string) {
+  // Read cells as text through a real DOM rather than stripping tags by hand.
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const head = [...doc.querySelectorAll('thead th')].map(cellText);
+  const rows = [...doc.querySelectorAll('tbody tr')].map((row) =>
+    [...row.querySelectorAll('td')].map(cellText),
+  );
+  return { head, rows };
+}
+
+describe('InferenceTable GPU role columns', () => {
+  it('shows pool sizes for disaggregated rows and "aggregated", never 0, for aggregated rows', () => {
+    const disagg = makePoint({
+      hwKey: 'gb300_dynamo-trt',
+      disagg: true,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 32,
+      measuredJPerOutputToken: { y: 25.21, roof: false },
+    });
+    const aggregated = makePoint({
+      hwKey: 'mi355x_sglang',
+      disagg: false,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 0,
+      measuredJPerOutputToken: { y: 30, roof: false },
+    });
+    const html = renderToStaticMarkup(
+      createElement(InferenceTable, {
+        data: [disagg, aggregated],
+        chartDefinition: chartDefinitions[0],
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        role: 'decode',
+      }),
+    );
+    const { head, rows } = tableCells(html);
+    const prefillCol = head.indexOf('Prefill GPUs');
+    const decodeCol = head.indexOf('Decode GPUs');
+    expect(prefillCol).toBeGreaterThan(-1);
+    expect(decodeCol).toBeGreaterThan(-1);
+    const byPools = rows.map((row) => [row[prefillCol], row[decodeCol]]);
+    expect(byPools).toContainEqual(['8', '32']);
+    expect(byPools).toContainEqual(['aggregated', 'aggregated']);
+    expect(byPools.flat()).not.toContain('0');
+  });
+
+  it('leaves the role columns off under All GPUs', () => {
+    const html = renderToStaticMarkup(
+      createElement(InferenceTable, {
+        data: [makePoint({ disagg: true, num_prefill_gpu: 8, num_decode_gpu: 32 })],
+        chartDefinition: chartDefinitions[0],
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        role: 'all',
+      }),
+    );
+    expect(tableCells(html).head).not.toContain('Prefill GPUs');
   });
 });

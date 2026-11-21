@@ -62,6 +62,11 @@ import { Sequence } from '@/lib/catalog/data-mappings';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
+import {
+  pointPowerRole,
+  powerRolePoints,
+  type PowerRoleSelection,
+} from '@/lib/views-api/power-role';
 
 /**
  * Server-side equivalent of `useChartData`'s official-data path for the views
@@ -101,6 +106,11 @@ export interface InferenceSeriesOptions {
   readonly userPowers?: Record<string, number>;
   readonly pricing?: TokenRevenuePricing;
   readonly derivedMetrics?: DerivedAgenticMetricMap;
+  /**
+   * PowerX GPU role, from `resolvePowerRoleParams` (its metric must equal
+   * `metricConfigKey`). Omitted or `all`: every GPU, as before.
+   */
+  readonly powerRole?: PowerRoleSelection;
 }
 
 export interface InferenceSeriesPoint {
@@ -128,7 +138,20 @@ export interface InferenceSeriesEntry {
   readonly deployment: string;
   readonly kvOffload: boolean;
   readonly bestPerSku: boolean;
+  /** GPU pool the series draws under a role other than All GPUs. */
+  readonly powerRole?: 'prefill' | 'decode';
   readonly points: readonly InferenceSeriesPoint[];
+}
+
+/** A chip whose rows have no prefill/decode telemetry under the requested GPU role. */
+export interface InferenceRoleAggregatedEntry {
+  readonly hwKey: string;
+  readonly gpu: string;
+  readonly framework: string;
+  readonly label: string;
+  /** Aggregated serving: every GPU does both prefill and decode, so it cannot be split. */
+  readonly reason: 'aggregated';
+  readonly points: number;
 }
 
 export interface InferenceTableRow extends Omit<InferenceSeriesPoint, 'x' | 'y'> {
@@ -159,6 +182,8 @@ export interface InferenceSeriesMetricMeta {
 
 export interface InferenceSeriesResult {
   readonly series: readonly InferenceSeriesEntry[];
+  /** Under a GPU role other than All GPUs: chips listed but not drawn (never 0 W). */
+  readonly roleAggregated?: readonly InferenceRoleAggregatedEntry[];
   /** All in Measured table population, including unavailable system estimates. */
   readonly tableRows?: readonly InferenceTableRow[];
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
@@ -303,17 +328,29 @@ export function buildInferenceSeries(
   const remapped = scoped
     .filter((point) => metricKey in point && supportsPointTokenMetric(point, tokenType))
     .map((point) => remapInferencePoint(point, metricKey, resolved.xAxisField));
-  const partition = partitionChartDataByLimits(remapped, chartDef, metricConfigKey, {
-    isTtftX: resolved.xAxisField.endsWith('_ttft'),
-    isAgentic,
-  });
-  let mapped = options.allPoints ? remapped : partition.data;
-  if (xmode === 'e2e-normalized-interactivity')
-    mapped = mapped.flatMap((point) => {
-      const derived = point.id === undefined ? point : options.derivedMetrics?.[point.id];
-      const x = percentile === 'p75' ? derived?.p75_e2e_norm_intvty : derived?.p90_e2e_norm_intvty;
-      return typeof x === 'number' && Number.isFinite(x) && x > 0 ? [{ ...point, x }] : [];
-    });
+  // 5b. GPU role: the page expands each disaggregated row per pool before clipping, then
+  //     draws only the role's pools; aggregated rows are listed, not drawn.
+  const powerRole = options.powerRole?.role === 'all' ? undefined : options.powerRole;
+  const roleView = powerRole ? powerRolePoints(remapped, powerRole) : null;
+  const plotLimits = (points: InferenceData[]) => {
+    let kept = options.allPoints
+      ? points
+      : partitionChartDataByLimits(points, chartDef, metricConfigKey, {
+          isTtftX: resolved.xAxisField.endsWith('_ttft'),
+          isAgentic,
+        }).data;
+    if (xmode === 'e2e-normalized-interactivity')
+      kept = kept.flatMap((point) => {
+        const derived = point.id === undefined ? point : options.derivedMetrics?.[point.id];
+        const x =
+          percentile === 'p75' ? derived?.p75_e2e_norm_intvty : derived?.p90_e2e_norm_intvty;
+        return typeof x === 'number' && Number.isFinite(x) && x > 0 ? [{ ...point, x }] : [];
+      });
+    return kept;
+  };
+  // Panels (role share, fits, breakdowns, headroom) read the unsplit rows.
+  const observed = plotLimits(remapped);
+  const mapped = roleView ? plotLimits(roleView.points) : observed;
 
   // 6. Pareto direction: the chart's configured corner, flipped when the x-axis
   //    good-direction reverses (same rule as useChartData).
@@ -348,9 +385,10 @@ export function buildInferenceSeries(
         !openBucket ||
         point.hwKey !== openBucketPoint!.hwKey ||
         point.precision !== openBucketPoint!.precision ||
-        point.date !== openBucketPoint!.date
+        point.date !== openBucketPoint!.date ||
+        pointPowerRole(point) !== pointPowerRole(openBucketPoint!)
       ) {
-        const key = `${point.hwKey}|${point.precision}|${point.date}`;
+        const key = `${point.hwKey}|${point.precision}|${point.date}|${pointPowerRole(point) ?? ''}`;
         openBucket = byHwDate.get(key);
         if (!openBucket) {
           openBucket = [];
@@ -373,24 +411,36 @@ export function buildInferenceSeries(
   // 8. Best series per SKU over the full mapped point set.
   const bestHwKeys = direction ? bestSeriesPerSkuOnce(mapped, direction) : new Set<string>();
 
-  // 9. Group into series by hwKey.
-  const byHwKey = new Map<string, InferenceData[]>();
+  // 9. Group into series by hwKey (and GPU pool under a role: prefill before decode).
+  const byHwKey = new Map<string, Map<'prefill' | 'decode' | null, InferenceData[]>>();
   for (const point of mapped) {
-    const bucket = byHwKey.get(point.hwKey);
+    let pools = byHwKey.get(point.hwKey);
+    if (!pools) {
+      pools = new Map();
+      byHwKey.set(point.hwKey, pools);
+    }
+    const pool = pointPowerRole(point);
+    const bucket = pools.get(pool);
     if (bucket) bucket.push(point);
-    else byHwKey.set(point.hwKey, [point]);
+    else pools.set(pool, [point]);
   }
 
   const hwKeys = [...byHwKey.keys()].toSorted(
     (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
   );
+  const POOL_ORDER = [null, 'prefill', 'decode'] as const;
+  const groups = hwKeys.flatMap((hwKey) =>
+    POOL_ORDER.flatMap((pool) => {
+      const points = byHwKey.get(hwKey)!.get(pool);
+      return points ? [{ hwKey, pool, points }] : [];
+    }),
+  );
 
   const series: InferenceSeriesEntry[] = [];
-  for (const hwKey of hwKeys) {
+  for (const { hwKey, pool, points: allPoints } of groups) {
     const seriesIsBest = bestHwKeys.has(hwKey);
     if (best && bestHwKeys.size > 0 && !seriesIsBest) continue;
 
-    const allPoints = byHwKey.get(hwKey)!;
     const kept = optimal ? allPoints.filter((point) => frontierPoints.has(point)) : allPoints;
     if (kept.length === 0) continue;
 
@@ -412,6 +462,7 @@ export function buildInferenceSeries(
         }),
       ),
       bestPerSku: seriesIsBest,
+      ...(powerRole && pool ? { powerRole: pool } : {}),
       points: kept
         .toSorted((a, b) => a.x - b.x)
         .map((point) => {
@@ -492,8 +543,11 @@ export function buildInferenceSeries(
         })
     : undefined;
 
+  const roleAggregated = roleView ? aggregatedEntries(roleView.aggregated, best, bestHwKeys) : null;
+
   return {
     series,
+    ...(roleAggregated ? { roleAggregated } : {}),
     ...(tableRows === undefined ? {} : { tableRows }),
     hardware: series.map((entry) => ({
       key: entry.hwKey,
@@ -529,7 +583,32 @@ export function buildInferenceSeries(
               String(resolved.xAxisField),
             ),
     },
-    observedPoints: mapped,
+    observedPoints: observed,
     count,
   };
+}
+
+/** Chips with rows a GPU role cannot split, in chart order; best-per-SKU still applies. */
+function aggregatedEntries(
+  points: readonly InferenceData[],
+  best: boolean,
+  bestHwKeys: ReadonlySet<string>,
+): InferenceRoleAggregatedEntry[] {
+  const byHwKey = new Map<string, InferenceData[]>();
+  for (const point of points) {
+    if (best && bestHwKeys.size > 0 && !bestHwKeys.has(point.hwKey)) continue;
+    const bucket = byHwKey.get(point.hwKey);
+    if (bucket) bucket.push(point);
+    else byHwKey.set(point.hwKey, [point]);
+  }
+  return [...byHwKey.entries()]
+    .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+    .map(([hwKey, rows]) => ({
+      hwKey,
+      gpu: hwKey.split('_')[0],
+      framework: rows[0].framework ?? '',
+      label: hardwareLegendLabel(hwKey, rows[0].model, rows),
+      reason: 'aggregated',
+      points: rows.length,
+    }));
 }

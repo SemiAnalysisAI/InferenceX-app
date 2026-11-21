@@ -4,14 +4,17 @@ import { bucketPowerSeries, bucketTimeMs } from '@/components/gpu-power/power-se
 import type { InferenceData } from '@/components/inference/types';
 
 import {
+  poolSubsetSeries,
   powerTimelineStatus,
   prioritizeRuns,
+  traceLanes,
   summarizeTraceWindow,
   tracePools,
   windowPhase,
   type PowerTimelineTrace,
   mostCoveredConcurrency,
 } from './powerTimeline';
+import { AGGREGATED_GB200_C1_SERIES, DISAGG_GB200_C16_SERIES } from './powerTimeline.fixture';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716669498';
 const NAME_B =
@@ -193,5 +196,108 @@ describe('powerTimelineStatus', () => {
       missing: 2,
       blocking: true,
     });
+  });
+});
+
+function shape(lanes: ReturnType<typeof traceLanes>): string[] {
+  return lanes.map((lane) => `${lane.kind}:${lane.role}:${lane.rows.join(',')}`);
+}
+
+describe('traceLanes', () => {
+  const disagg = {
+    power: [
+      [500, 510],
+      [520, 530],
+      [300, 310],
+      [320, 330],
+      [340, 350],
+    ],
+    devices: [
+      { id: 'p/0', role: 'prefill' as const },
+      { id: 'p/1', role: 'prefill' as const },
+      { id: 'd/0', role: 'decode' as const },
+      { id: 'd/1', role: 'decode' as const },
+      { id: 'd/2', role: 'decode' as const },
+    ],
+  };
+  const aggregated = { power: [[400], [410]], devices: [{ id: 'g/0' }, { id: 'g/1' }] };
+
+  it('keeps the single all-GPU lane under All GPUs', () => {
+    expect(shape(traceLanes(disagg, 'all'))).toEqual(['lane:all:0,1,2,3,4']);
+  });
+
+  it('draws only the selected pool under prefill or decode', () => {
+    expect(shape(traceLanes(disagg, 'prefill'))).toEqual(['lane:prefill:0,1']);
+    expect(shape(traceLanes(disagg, 'decode'))).toEqual(['lane:decode:2,3,4']);
+  });
+
+  it('draws both pools in front of a faint all-GPU line under split', () => {
+    expect(shape(traceLanes(disagg, 'split'))).toEqual([
+      'context:all:0,1,2,3,4',
+      'lane:prefill:0,1',
+      'lane:decode:2,3,4',
+    ]);
+  });
+
+  it('keeps an aggregated trace as one dimmed all-GPU lane under every role', () => {
+    for (const role of ['prefill', 'decode', 'split'] as const) {
+      expect(shape(traceLanes(aggregated, role))).toEqual(['aggregated:all:0,1']);
+    }
+  });
+});
+
+describe('poolSubsetSeries', () => {
+  const series = {
+    artifact: 'gpu_metrics_x',
+    startMs: 0,
+    bucketSeconds: 1,
+    gpus: [0, 1, 2],
+    t: [0, 1],
+    power: [
+      [100, 110],
+      [200, 210],
+      [300, 310],
+    ],
+    devices: [
+      { id: 'p/0', role: 'prefill' as const },
+      { id: 'd/0', role: 'decode' as const },
+      { id: 'd/1', role: 'decode' as const },
+    ],
+  };
+
+  it('keeps only the rows of the requested pool, buckets unchanged', () => {
+    const decode = poolSubsetSeries(series, 'decode')!;
+    expect(decode.gpus).toEqual([1, 2]);
+    expect(decode.power).toEqual([
+      [200, 210],
+      [300, 310],
+    ]);
+    expect(decode.t).toEqual(series.t);
+  });
+
+  it('returns null for a trace without that pool', () => {
+    expect(poolSubsetSeries({ ...series, devices: undefined }, 'prefill')).toBeNull();
+  });
+});
+
+describe('role lanes on production-shaped telemetry', () => {
+  it('splits a disaggregated GB200 trace into its 16 prefill and 16 decode GPUs', () => {
+    const lanes = traceLanes(DISAGG_GB200_C16_SERIES, 'split');
+    expect(lanes.map((lane) => [lane.kind, lane.role, lane.rows.length])).toEqual([
+      ['context', 'all', 32],
+      ['lane', 'prefill', 16],
+      ['lane', 'decode', 16],
+    ]);
+    const decode = poolSubsetSeries(DISAGG_GB200_C16_SERIES, 'decode')!;
+    expect(decode.devices!.every((device) => device.role === 'decode')).toBe(true);
+    expect(decode.power).toHaveLength(16);
+    expect(decode.t).toEqual(DISAGG_GB200_C16_SERIES.t);
+  });
+
+  it('keeps an aggregated p1x8_d0x8 trace, whose devices carry no role, as aggregated', () => {
+    expect(traceLanes(AGGREGATED_GB200_C1_SERIES, 'split')).toEqual([
+      { role: 'all', kind: 'aggregated', rows: Array.from({ length: 16 }, (_, row) => row) },
+    ]);
+    expect(poolSubsetSeries(AGGREGATED_GB200_C1_SERIES, 'prefill')).toBeNull();
   });
 });

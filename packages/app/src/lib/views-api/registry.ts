@@ -162,6 +162,7 @@ export const VIEW_QUERY_PARAMS = {
     'power',
     'precisions',
     'priceSource',
+    'role',
     'runId',
     'sequence',
     'spec',

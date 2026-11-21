@@ -841,7 +841,11 @@ const pointLinks = ({
       href:
         typeof window === 'undefined'
           ? '#'
-          : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY }),
+          : chartStateHref({
+              i_metric: POWER_TIMELINE_METRIC_KEY,
+              i_ptfocus: traceKeyForPoint(point) ?? '',
+              i_ptconc: '',
+            }),
     });
   }
   links.push({ action: 'reproduce', label: t.reproduce });

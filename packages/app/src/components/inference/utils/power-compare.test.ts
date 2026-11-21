@@ -13,7 +13,12 @@ const ids = (metric: string, mode: 'boundaries' | 'provisioned' | 'all') =>
 
 describe('power comparison on J per total token', () => {
   it('draws the measured boundaries and the rated bound on total-token fields', () => {
-    expect(powerCompareVariants('y_measuredJPerTotalToken', 'boundaries')).toEqual([
+    expect(
+      powerCompareVariants('y_measuredJPerTotalToken', 'boundaries').map(({ variant, field }) => ({
+        variant,
+        field,
+      })),
+    ).toEqual([
       { variant: { kind: 'basis', id: 'it-modeled' }, field: 'itModeledJPerTotalToken' },
       { variant: { kind: 'basis', id: 'utility-modeled' }, field: 'utilityModeledJPerTotalToken' },
     ]);
