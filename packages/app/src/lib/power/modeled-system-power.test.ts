@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
-import { modelSystemPower } from '@/lib/power/modeled-system-power';
+import { isNvl72Hardware, modelSystemPower } from '@/lib/power/modeled-system-power';
 import {
   gb300AggregateRow,
   gb300DisaggRow,
@@ -577,6 +577,138 @@ describe('modeled system power admission and accounting', () => {
       expect(points[0].utilityModeledWatts).toBeUndefined();
       expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
     }
+  });
+});
+
+/** `supported`, or the reason the row is not modeled. */
+function admission(source: BenchmarkRow) {
+  const result = modelSystemPower(source);
+  return result.status === 'supported' ? 'supported' : result.reason;
+}
+
+/** An aggregate deployment on two 8-GPU hosts without worker telemetry. */
+function uniformHostsRow(overrides: Partial<BenchmarkRow>, widths: Record<string, number> = {}) {
+  return row({
+    is_multinode: true,
+    num_prefill_gpu: 16,
+    num_decode_gpu: 16,
+    decode_num_workers: 1,
+    ...overrides,
+    metrics: {
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 715.095,
+      avg_total_gpu_power_w: 715.095 * 16,
+      ...widths,
+    },
+  });
+}
+
+/** An aggregate deployment whose 8-GPU workers report their own power. */
+function aggregateWorkersRow(workers: NonNullable<BenchmarkRow['workers']>, avg_power_w: number) {
+  return row({
+    is_multinode: true,
+    workers,
+    metrics: {
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w,
+      avg_total_gpu_power_w: avg_power_w * workers.length * 8,
+    },
+  });
+}
+
+function aggregateWorker(hosts: string[], avg_power_w: number, role = 'agg') {
+  return { role, worker_idx: 0, num_gpus: 8, hosts, avg_power_w };
+}
+
+/** A prefill pool at 300 W per GPU and an 8-GPU decode pool whose workers draw 700 W per GPU. */
+function disaggRow(prefillGpus: number, decodeAverage: number) {
+  return row({
+    disagg: true,
+    is_multinode: true,
+    num_prefill_gpu: prefillGpus,
+    num_decode_gpu: 8,
+    workers: [
+      { role: 'prefill', worker_idx: 0, num_gpus: prefillGpus, hosts: ['p'], avg_power_w: 300 },
+      { role: 'decode', worker_idx: 0, num_gpus: 8, hosts: ['d'], avg_power_w: 700 },
+    ],
+    metrics: {
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: (300 * prefillGpus + 5600) / (prefillGpus + 8),
+      avg_total_gpu_power_w: 300 * prefillGpus + 5600,
+      prefill_avg_power_w: 300,
+      decode_avg_power_w: decodeAverage,
+    },
+  });
+}
+
+describe('modeled system power validation edges', () => {
+  it('recognises NVL72 hardware in any case', () => {
+    expect(['GB200', 'gb300', 'b200', 'h100'].map(isNvl72Hardware)).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it('accepts a total within (GPUs + 1) × 0.5 mW of the per-GPU mean × count, and no further', () => {
+    // 349.859 W × 8 = 2798.872 W; the slack for 8 GPUs is 4.501 mW.
+    const [within, beyond] = [0.0044, 0.0047].map((shortfall) =>
+      admission(
+        row({ metrics: { ...row().metrics, avg_total_gpu_power_w: 349.859 * 8 - shortfall } }),
+      ),
+    );
+    expect([within, beyond]).toEqual(['supported', 'gpu-count']);
+  });
+
+  it('reads the single-node tensor width from decode, else prefill, and only as a whole GPU count', () => {
+    expect(admission(row({ decode_tp: 0 }))).toBe('supported');
+    const oneGpu = row({ decode_tp: 1, num_prefill_gpu: 1, num_decode_gpu: 1 });
+    oneGpu.metrics.avg_total_gpu_power_w = oneGpu.metrics.avg_power_w;
+    expect(modelSystemPower(oneGpu)).toMatchObject({ status: 'supported', gpuCount: 1 });
+    // 0.5 × PP 16 is the 8 measured GPUs, but half a tensor-parallel GPU is not a width.
+    const halfWidth = row({ decode_tp: 0.5, metrics: { ...row().metrics, pp: 16 } });
+    expect(admission(halfWidth)).toBe('gpu-count');
+  });
+
+  it('checks every width of an aggregate multinode deployment against its GPU count', () => {
+    // 8 × 2 replicas, 1 × 16 replicas and 8 × PCP 2 are all 16 GPUs; prefill TP is not read.
+    expect(
+      admission(uniformHostsRow({ decode_tp: 8, prefill_tp: 16, decode_num_workers: 2 })),
+    ).toBe('supported');
+    expect(
+      admission(uniformHostsRow({ decode_tp: 1, prefill_tp: 8, decode_num_workers: 16 })),
+    ).toBe('supported');
+    expect(admission(uniformHostsRow({ decode_tp: 8 }, { decode_pcp_size: 2 }))).toBe('supported');
+    // Products that reach 16 only through a fractional width.
+    expect(admission(uniformHostsRow({ decode_tp: 0.5 }, { pp: 32 }))).toBe('gpu-count');
+    expect(admission(uniformHostsRow({ decode_tp: 10 }, { pp: 1.6 }))).toBe('gpu-count');
+    expect(admission(uniformHostsRow({ decode_tp: 10 }, { pcp_size: 1.6 }))).toBe('gpu-count');
+  });
+
+  it('rejects aggregate workers on two hosts, without power, or in another role', () => {
+    const verdicts = [
+      aggregateWorker(['node0'], 349.859),
+      aggregateWorker(['node0', 'node1'], 349.859),
+      aggregateWorker(['node0'], 349.859, 'decode'),
+    ].map((worker) => admission(aggregateWorkersRow([worker], 349.859)));
+    expect(verdicts).toEqual(['supported', 'topology', 'role-power']);
+    // The deployment total balances, but one worker reports no power.
+    const unpowered = [aggregateWorker(['node0'], 0), aggregateWorker(['node1'], 700)];
+    expect(admission(aggregateWorkersRow(unpowered, 350))).toBe('role-power');
+  });
+
+  it('checks each disaggregated role against its recorded average, within twice the slack', () => {
+    expect(modelSystemPower(disaggRow(1, 700))).toMatchObject({
+      status: 'supported',
+      gpuCount: 9,
+    });
+    // Decode workers draw 5600 W; 8 × the recorded average may differ by up to 8.501 mW.
+    expect(admission(disaggRow(4, 700 + 0.007 / 8))).toBe('supported');
+    expect(admission(disaggRow(4, 650))).toBe('role-power');
   });
 });
 

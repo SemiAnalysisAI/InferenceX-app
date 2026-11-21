@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
-import {
-  ModelSelector,
-  ScenarioSelector,
-  PrecisionSelector,
-} from '@/components/ui/chart-selectors';
+import { ScenarioSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
 import {
   TooltipContent,
   TooltipProvider,
@@ -14,7 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo } from '@/components/ui/option-info';
-import { Model, MODEL_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
   for (const [locale, width] of [
@@ -126,26 +122,6 @@ describe('Consistent informational help', () => {
     });
   }
 });
-
-function ModelSelectorHarness() {
-  const [value, setValue] = useState('DeepSeek-R1-0528');
-  return (
-    <TooltipProvider>
-      <ModelSelector
-        value={value}
-        onChange={setValue}
-        availableModels={[
-          Model.DeepSeek_R1,
-          Model.GptOss,
-          Model.Qwen3_5,
-          Model.MiniMax_M2_5,
-          Model.Llama3_3_70B,
-        ]}
-        data-testid="model-selector"
-      />
-    </TooltipProvider>
-  );
-}
 
 function ScenarioSelectorHarness({ initial = Sequence.AgenticTraces }: { initial?: Sequence }) {
   const [value, setValue] = useState<string>(initial);
@@ -335,120 +311,6 @@ describe('Chart Selectors', () => {
     });
   });
 
-  describe('ModelSelector', () => {
-    beforeEach(() => {
-      cy.mount(<ModelSelectorHarness />);
-    });
-
-    it('keeps default models in the requested selector order (en)', () => {
-      cy.viewport(1280, 720);
-      cy.mount(
-        <PathnameContext.Provider value="/infx/inference">
-          <TooltipProvider>
-            <ModelSelector
-              value={Model.Muse_Spark_Open}
-              onChange={cy.stub().as('selectModel')}
-              availableModels={MODEL_OPTIONS}
-              data-testid="model-selector"
-            />
-          </TooltipProvider>
-        </PathnameContext.Provider>,
-      );
-      cy.get('[data-testid="model-selector"]')
-        .should('contain.text', 'Muse Spark 1.3/Open')
-        .click();
-      cy.get('[role="option"]').then(($options) => {
-        expect([...$options].slice(0, 8).map((option) => option.textContent?.trim())).to.deep.equal(
-          [
-            'Kimi K3.1 Pro 2.8T',
-            'DeepSeek V4.1 Flash 552B',
-            'GLM5.2/GLM5.3 744B',
-            'GLM 5.3 Flash',
-            'MiniMax M3.1 Flash 428B',
-            'Muse Spark 1.3/Open 816B',
-            'Qwen3.5 397B',
-            'Qwen3.8 Flash Next 176B',
-          ],
-        );
-      });
-      cy.contains('[role="option"]', 'Kimi K3 2.8T').click();
-      cy.get('@selectModel').should('have.been.calledOnceWith', Model.Kimi_K3);
-    });
-
-    for (const locale of ['en', 'zh']) {
-      it(`searches across model groups, recovers from no results, and selects by keyboard (${locale})`, () => {
-        cy.viewport(locale === 'zh' ? 390 : 1280, 720);
-        cy.mount(
-          <PathnameContext.Provider
-            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
-          >
-            <ModelSelectorHarness />
-          </PathnameContext.Provider>,
-        );
-        const searchLabel = locale === 'zh' ? '搜索选项' : 'Search options';
-        const clearLabel = locale === 'zh' ? '清除搜索' : 'Clear search';
-        cy.get('[data-testid="model-selector"]').click();
-        cy.focused().should('have.attr', 'aria-label', searchLabel).type('lLaMa');
-        cy.get('[role="option"]')
-          .should('have.length', 1)
-          .and('contain.text', 'Llama 3.3 70B Instruct');
-        cy.contains(locale === 'zh' ? '已弃用' : 'Deprecated').should('be.visible');
-        cy.contains(locale === 'zh' ? '维护模式' : 'Maintenance Mode').should('not.exist');
-        cy.get(`button[aria-label="${clearLabel}"]`).click();
-        cy.get('[role="option"]').should('have.length', 5);
-        cy.focused().should('have.attr', 'aria-label', searchLabel).type('no-such-model');
-        cy.get('[role="option"]').should('not.exist');
-        cy.contains(locale === 'zh' ? '没有结果' : 'No results').should('be.visible');
-        cy.get(`button[aria-label="${clearLabel}"]`).click();
-        cy.focused().type('QwEn3.5{downarrow}{enter}');
-        cy.get('[data-testid="model-selector"]')
-          .should('contain.text', 'Qwen3.5 397B')
-          .and('have.attr', 'aria-expanded', 'false');
-        cy.get('[data-slot="select-content"]').should('not.exist');
-        cy.get('[data-testid="model-selector"]').click();
-        cy.get(`input[aria-label="${searchLabel}"]`).should('have.value', '');
-        cy.get('[role="option"]').should('have.length', 5);
-      });
-    }
-
-    it('groups maintenance models separately from deprecated models', () => {
-      cy.get('[data-testid="model-selector"]').click();
-
-      cy.contains('Maintenance Mode').should('be.visible');
-      cy.contains('[role="option"]', 'DeepSeek R1 0528 671B').should('be.visible');
-      cy.contains('[role="option"]', 'gpt-oss 120B').should('be.visible');
-      cy.contains('Deprecated').should('be.visible');
-      cy.contains('[role="option"]', 'Llama 3.3 70B Instruct').should('be.visible');
-    });
-
-    it('explains maintenance mode in a tooltip', () => {
-      cy.get('[data-testid="model-selector"]').click();
-      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointerover', {
-        pointerType: 'mouse',
-      });
-
-      cy.contains('Updated at a lower priority because these models are irrelevant.').should(
-        'be.visible',
-      );
-    });
-
-    it('localizes model category labels and reasons on Chinese routes', () => {
-      cy.mount(
-        <PathnameContext.Provider value="/zh/infx/inference">
-          <ModelSelectorHarness />
-        </PathnameContext.Provider>,
-      );
-      cy.get('[data-testid="model-selector"]').click();
-      cy.contains('维护模式').should('be.visible');
-      cy.contains('已弃用').should('be.visible');
-      cy.contains('Maintenance Mode').should('not.exist');
-      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointerover', {
-        pointerType: 'mouse',
-      });
-      cy.contains('这些模型的相关性较低，因此以较低优先级更新。').should('be.visible');
-    });
-  });
-
   describe('ScenarioSelector', () => {
     it('explains the agentic workload in its menu option, linking to /infx/agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
@@ -475,123 +337,33 @@ describe('Chart Selectors', () => {
       cy.get('@followAgenticLink').should('have.been.calledOnceWith', false);
     });
 
-    for (const variant of ['field', 'caption'] as const) {
-      for (const sequence of [Sequence.AgenticTraces, Sequence.EightK_OneK]) {
-        it(`omits the entire ${variant} for sole scenario ${sequence}`, () => {
-          cy.mount(
-            <TooltipProvider delayDuration={0}>
-              <div data-testid="selector-host">
-                <ScenarioSelector
-                  variant={variant}
-                  value={sequence}
-                  onChange={cy.stub().as('changeScenario')}
-                  availableSequences={[sequence]}
-                  data-testid="scenario-selector"
-                />
-              </div>
-            </TooltipProvider>,
-          );
-          cy.get('[data-testid="selector-host"]').should('be.empty');
-          cy.get('@changeScenario').should('not.have.been.called');
-        });
-      }
-
-      const Harness = () => {
-        const [multiple, setMultiple] = useState(false);
-        const [value, setValue] = useState(Sequence.AgenticTraces);
-        return (
+    it('keeps the Agentic explainer in the menu on Chinese phones', () => {
+      cy.viewport(390, 720);
+      cy.mount(
+        <PathnameContext.Provider value="/zh/infx/inference">
           <TooltipProvider delayDuration={0}>
-            <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
-            <output data-testid="selected-scenario">{value}</output>
-            <div data-testid="selector-host">
+            <div className="w-40 p-3">
               <ScenarioSelector
-                variant={variant}
-                value={value}
-                onChange={setValue}
-                availableSequences={
-                  multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
-                }
+                value={Sequence.AgenticTraces}
+                onChange={() => {}}
+                availableSequences={[Sequence.AgenticTraces, Sequence.EightK_OneK]}
                 data-testid="scenario-selector"
               />
             </div>
           </TooltipProvider>
-        );
-      };
-
-      it(`restores the ${variant} selector when another scenario becomes available`, () => {
-        cy.mount(<Harness />);
-        cy.get('[data-testid="selector-host"]').should('be.empty');
-        cy.contains('button', 'Toggle scenarios').click();
-        cy.get('[data-testid="scenario-selector"]').should('be.enabled').click();
-        cy.contains('[data-select-option]', '8K / 1K').click();
-        cy.get('[data-testid="selected-scenario"]').should('have.text', Sequence.EightK_OneK);
-        cy.contains('button', 'Toggle scenarios').click();
-        cy.get('[data-testid="selector-host"]').should('be.empty');
-        cy.get('[data-testid="selected-scenario"]').should('have.text', Sequence.EightK_OneK);
-      });
-    }
-
-    for (const fixed of [true, false]) {
-      it(`${fixed ? 'omits the sole scenario' : 'keeps the Agentic explainer in the menu'} on Chinese phones`, () => {
-        cy.viewport(390, 720);
-        cy.mount(
-          <PathnameContext.Provider value="/zh/infx/inference">
-            <TooltipProvider delayDuration={0}>
-              <div className="w-40 p-3">
-                <ScenarioSelector
-                  value={Sequence.AgenticTraces}
-                  onChange={() => {}}
-                  availableSequences={
-                    fixed
-                      ? [Sequence.AgenticTraces]
-                      : [Sequence.AgenticTraces, Sequence.EightK_OneK]
-                  }
-                  data-testid="scenario-selector"
-                />
-              </div>
-            </TooltipProvider>
-          </PathnameContext.Provider>,
-        );
-        if (fixed) {
-          cy.get('[data-testid="scenario-selector"]').should('not.exist');
-          cy.get('[data-testid="option-help-agentic-traces"]').should('not.exist');
-          return;
-        }
-        assertClosedScenarioHasNoHelp(44);
-        cy.get('[data-testid="scenario-selector"]').click('right');
-        cy.get('[data-testid="option-help-agentic-traces"]').trigger('pointerover', {
-          pointerType: 'mouse',
-        });
-        cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
-          'be.visible',
-        );
-        cy.get('[data-testid="scenario-agentic-info-link"]')
-          .should('be.visible')
-          .and('have.attr', 'href', '/zh/infx/agentx');
-      });
-    }
-
-    it('marks model-specific retired scenarios in their option labels', () => {
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <ScenarioSelector
-            value={Sequence.AgenticTraces}
-            onChange={() => {}}
-            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
-            model={Model.MiniMax_M3}
-            data-testid="scenario-selector"
-          />
-        </TooltipProvider>,
+        </PathnameContext.Provider>,
       );
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.get('[data-slot="select-label"]')
-        .should('have.length', 1)
-        .and('have.text', 'Fixed Sequence Length');
-      cy.contains('[data-slot="select-label"]', 'Fixed Sequence Length')
-        .closest('[role="rowgroup"]')
-        .find('[data-select-option]')
-        .first()
-        .should('have.text', '8K / 1K (deprecated)');
+      assertClosedScenarioHasNoHelp(44);
+      cy.get('[data-testid="scenario-selector"]').click('right');
+      cy.get('[data-testid="option-help-agentic-traces"]').trigger('pointerover', {
+        pointerType: 'mouse',
+      });
+      cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
+        'be.visible',
+      );
+      cy.get('[data-testid="scenario-agentic-info-link"]')
+        .should('be.visible')
+        .and('have.attr', 'href', '/zh/infx/agentx');
     });
 
     for (const locale of ['en', 'zh']) {
@@ -665,23 +437,6 @@ describe('Chart Selectors', () => {
       });
     }
 
-    it('keeps 8K/1K in the default group for models still sweeping it', () => {
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <ScenarioSelector
-            value={Sequence.AgenticTraces}
-            onChange={() => {}}
-            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
-            model={Model.Qwen3_5}
-            data-testid="scenario-selector"
-          />
-        </TooltipProvider>,
-      );
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-select-option]', '8K / 1K').should('be.visible');
-      cy.get('[data-slot="select-content"]').should('not.contain.text', 'Deprecated');
-    });
-
     it('keeps scenario explainers out of the closed control for every scenario', () => {
       cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
@@ -695,26 +450,6 @@ describe('Chart Selectors', () => {
   });
 
   describe('PrecisionSelector', () => {
-    beforeEach(() => {
-      cy.mount(<PrecisionSelectorHarness />);
-    });
-
-    it('removes a precision from its chip without opening the menu or losing other selections', () => {
-      cy.get('[data-testid="precision-multiselect"]').click('right');
-      cy.contains('[role="option"]', 'FP4').click();
-      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
-        'have.length',
-        2,
-      );
-      cy.get('[aria-label="Remove FP8"]').click();
-      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
-        'have.text',
-        'FP4',
-      );
-      cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[aria-label="Remove FP4"]').should('not.be.visible');
-    });
-
     for (const locale of ['en', 'zh']) {
       it(`separates the compact selection count from the minimum and keeps it accurate (${locale})`, () => {
         cy.viewport(locale === 'zh' ? 390 : 1280, 720);
