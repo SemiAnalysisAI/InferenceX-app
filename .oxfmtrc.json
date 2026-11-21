@@ -3,5 +3,12 @@
   "singleQuote": true,
   "trailingComma": "all",
   "bracketSpacing": true,
-  "arrowParens": "always"
+  "arrowParens": "always",
+  "ignorePatterns": [
+    "packages/app/cypress/fixtures/api/collectivex-latest.json",
+    "packages/app/cypress/fixtures/api/collectivex-run-*.json",
+    "packages/app/cypress/fixtures/api/collectivex-runs.json",
+    "packages/app/src/lib/power/power-model.parity.json",
+    "packages/app/src/components/video-benchmark/fixtures/native-serving-bundle/"
+  ]
 }

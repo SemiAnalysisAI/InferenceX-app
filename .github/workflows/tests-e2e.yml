@@ -4,17 +4,6 @@ on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/tests-e2e.yml'
-      - 'package.json'
-      - 'packages/app/**'
-      - 'packages/constants/**'
-      - 'packages/db/**'
-      - 'bunfig.toml'
-      - 'bun.lock'
-      - 'patches/**'
-      - 'tsconfig.json'
-      - 'tsconfig.base.json'
   # Firefox runs only here: in the merge queue, nightly, and on demand.
   merge_group:
   schedule:
@@ -28,9 +17,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed files
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # List the pull request's changed files.
+    outputs:
+      run: ${{ steps.match.outputs.run }}
+    steps:
+      # Pull requests skip the suite when nothing it covers changed; the merge queue always runs it.
+      - id: match
+        name: Match changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PATTERN: '^(\.github/workflows/tests-e2e\.yml$|package\.json$|packages/(app|constants|db)/|bunfig\.toml$|bun\.lock$|patches/|tsconfig(\.base)?\.json$)'
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            echo run=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+          if (( $(wc -l <<< "$files") >= 3000 )) || grep -qE "$PATTERN" <<< "$files"; then
+            echo run=true >> "$GITHUB_OUTPUT"
+          else
+            echo run=false >> "$GITHUB_OUTPUT"
+          fi
+
   component-tests:
     name: Component tests (shard ${{ matrix.shard }})
-    if: ${{ !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' && !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
     timeout-minutes: 15
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
@@ -99,7 +117,8 @@ jobs:
 
   cypress:
     name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
-    if: ${{ !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' && !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
     timeout-minutes: 15
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
@@ -231,6 +250,18 @@ jobs:
           path: /tmp/cypress-timings/observation.json
           if-no-files-found: error
           retention-days: 14
+
+  result:
+    name: E2E tests
+    needs: [changes, component-tests, cypress]
+    if: ${{ always() }}
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail when an E2E job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
 
   timings:
     name: Validate timings and shard balance

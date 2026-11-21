@@ -38,8 +38,8 @@ step installs the pinned development dependency from `bun.lock` and validates ac
 packed outputs. The suite also runs the Python release-verifier tests. Publication
 remains on Node 24 with one publisher runtime. Pull requests run the full suite on
 Linux/Node 24 and only the installer, CLI and filesystem tests on the other three
-cells, so they record one platform acceptance; dispatch the workflow manually to run
-the full suite on all four cells and record the release-qualification matrix.
+cells, so they record one platform acceptance. The merge queue and manual dispatch
+run the full suite on all four cells; dispatch records the release-qualification matrix.
 
 1. Modify the source, choose a new stable version, and update package metadata,
    the unified CLI version, installation examples, and installed-version
