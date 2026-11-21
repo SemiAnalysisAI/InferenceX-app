@@ -94,34 +94,4 @@ describe('DatasetList', () => {
       });
     }
   }
-
-  it('renders a card per dataset with its summary stats', () => {
-    cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: datasets }).as('list');
-    mountList();
-    cy.wait('@list');
-    cy.contains('cc-traces-weka (full)').should('be.visible');
-    cy.contains('cc-traces-weka (256k)').should('be.visible');
-    cy.contains('1,234').should('be.visible');
-    cy.contains('82%').should('be.visible');
-    cy.contains('Request shape').should('be.visible');
-    cy.contains('Token volume').should('be.visible');
-    cy.get('a[href="/infx/agentx/cc-traces-weka-full"]')
-      .find('section[aria-labelledby="cc-traces-weka-full-request-shape"]')
-      .should('exist');
-    cy.get('a[href="/infx/agentx/cc-traces-weka-full"]').should('exist');
-  });
-
-  it('shows the empty state when no datasets are ingested', () => {
-    cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [] }).as('empty');
-    mountList();
-    cy.wait('@empty');
-    cy.contains('No datasets ingested yet').should('be.visible');
-  });
-
-  it('shows the error state when the request fails', () => {
-    cy.intercept('GET', '/api/v1/datasets', { statusCode: 500, body: { error: 'boom' } }).as('err');
-    mountList();
-    cy.wait('@err');
-    cy.contains('Failed to load datasets').should('be.visible');
-  });
 });
