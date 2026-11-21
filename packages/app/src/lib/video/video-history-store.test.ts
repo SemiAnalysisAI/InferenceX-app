@@ -374,10 +374,10 @@ describe('history projection version', () => {
       projection: 6,
       // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front, reached only
       // through a type import, and after the PowerX layout added the i_at and i_ptsmooth URL keys,
-      // the live address bar, a ranking slot on the shared scatter props, renamed the PowerX view
-      // ids and added the GPU role chart title; no video entry reads the PowerX changes. Recorded
-      // entries are unchanged.
-      sources: '0064327e25e8611b71d176c8b79786becc6df09d52d13cd4b5eb8733137e5157',
+      // the live address bar, a direct-labels flag on the shared scatter props, renamed the PowerX
+      // view ids and added the GPU role chart title; no video entry reads the PowerX changes.
+      // Recorded entries are unchanged.
+      sources: 'd8b41c716a7b99497d3260d3d59c218a1d44494160cf673df68e88e9484e4ccc',
     });
   });
 });
