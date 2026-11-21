@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, inject, it } from 'vitest';
 
 describe('purged CI ingestion', () => {
   it.each([
@@ -140,6 +140,7 @@ function ingest(rows: unknown[]) {
         INGEST_ARTIFACTS_PATH: dir,
         INGEST_REPO: 'SemiAnalysisAI/InferenceX',
         POWER_PUBLICATION_MANIFEST: path.join(dir, 'publication.json'),
+        PGLITE_TEMPLATE: inject('pgliteTemplate'),
       },
       encoding: 'utf8',
       timeout: 20_000,
