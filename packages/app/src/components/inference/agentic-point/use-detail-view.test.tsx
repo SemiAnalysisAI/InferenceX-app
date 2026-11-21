@@ -1,13 +1,13 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { track } from '@/lib/analytics/analytics';
 
 import { useDetailView } from './use-detail-view';
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 let container: HTMLDivElement;
 let root: Root;

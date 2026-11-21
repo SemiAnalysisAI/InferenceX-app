@@ -1,18 +1,19 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubGlobal } from '@/test/helpers';
 import { sha256 } from '@/components/video-benchmark/bundle';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { artifactFiles, type GithubRead } from './video-live-run';
 import { publishVideoQuality, readTrustedQuality, trustedQualityArtifact } from './video-quality';
 import { readStoredQuality, storeReferenceMedia, storeVideoQuality } from './video-storage';
 
-vi.mock('./video-live-run', () => ({ artifactFiles: vi.fn() }));
-vi.mock('./video-storage', () => ({
+mock.module('./video-live-run', () => ({ artifactFiles: vi.fn() }));
+mock.module('./video-storage', () => ({
   readStoredQuality: vi.fn(),
   storeReferenceMedia: vi.fn(),
   storeVideoQuality: vi.fn((_artifact, quality) => Promise.resolve(quality)),
 }));
 const fetchMock = vi.fn<typeof fetch>();
-vi.stubGlobal('fetch', fetchMock);
+stubGlobal('fetch', fetchMock);
 afterEach(() => vi.clearAllMocks());
 const encode = (value: string) => new TextEncoder().encode(value);
 
@@ -87,15 +88,15 @@ async function stage(
   f.attachment.references.descriptor_sha256 = await sha256(new Blob([descriptor]));
   const quality = JSON.stringify(f.attachment);
   const sums = `${await sha256(new Blob([descriptor]))}  h3-v2.json\n${await sha256(new Blob([quality]))}  quality.json\n`;
-  vi.mocked(artifactFiles).mockResolvedValue(
+  mocked(artifactFiles).mockResolvedValue(
     new Map([
       ['SHA256SUMS', encode(sums)],
       ['quality.json', encode(quality)],
       ['h3-v2.json', encode(descriptor)],
     ]),
   );
-  vi.mocked(readStoredQuality).mockResolvedValue(null);
-  vi.mocked(storeReferenceMedia).mockImplementation(async (_sha, name, download) => {
+  mocked(readStoredQuality).mockResolvedValue(null);
+  mocked(storeReferenceMedia).mockImplementation(async (_sha, name, download) => {
     await download();
     return `https://blob.test/${name}`;
   });
@@ -123,7 +124,7 @@ describe('quality publication', () => {
       unreadable: false,
     });
     const read = github({ 2: trusted });
-    vi.mocked(readStoredQuality).mockResolvedValue(stored);
+    mocked(readStoredQuality).mockResolvedValue(stored);
     expect(await publishVideoQuality(saved, read, AbortSignal.timeout(1000))).toBe(stored);
     expect(read).not.toHaveBeenCalled();
     expect(storeVideoQuality).toHaveBeenCalledTimes(1);

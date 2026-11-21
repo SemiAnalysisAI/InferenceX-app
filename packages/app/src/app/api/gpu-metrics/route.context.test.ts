@@ -1,13 +1,14 @@
 import AdmZip from 'adm-zip';
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubEnv, stubGlobal, unstubAllEnvs, unstubAllGlobals } from '@/test/helpers';
 
-const { readStored } = vi.hoisted(() => ({ readStored: vi.fn() }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+const { readStored } = { readStored: vi.fn() };
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForRun: readStored,
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
   getPrecomputedPowerSeries: () => Promise.resolve(null),
 }));
 
@@ -19,20 +20,20 @@ const CSV = `${HEADER}\n2026/09/21 00:00:00.000, 0, 100 W, 40, 1500, 2000, 90, 8
 
 beforeEach(() => {
   readStored.mockReset().mockResolvedValue(null);
-  vi.stubEnv('GITHUB_TOKEN', 'controlled-not-a-real-token');
-  vi.stubEnv('DATABASE_READONLY_URL', 'postgresql://controlled.invalid/never-contacted');
+  stubEnv('GITHUB_TOKEN', 'controlled-not-a-real-token');
+  stubEnv('DATABASE_READONLY_URL', 'postgresql://controlled.invalid/never-contacted');
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+  unstubAllGlobals();
+  unstubAllEnvs();
 });
 
 function liveArtifact(files: Record<string, string>) {
   const zip = new AdmZip();
   for (const [entry, contents] of Object.entries(files)) zip.addFile(entry, Buffer.from(contents));
   const bytes = zip.toBuffer();
-  vi.stubGlobal(
+  stubGlobal(
     'fetch',
     vi.fn((input: unknown) => {
       const url = String(input);

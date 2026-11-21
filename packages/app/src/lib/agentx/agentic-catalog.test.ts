@@ -1,6 +1,6 @@
 import type { AgenticCatalogEntry } from '@semianalysisai/inferencex-db/queries/agentic-catalog';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { groupAgenticCatalog } from './agentic-catalog';
 

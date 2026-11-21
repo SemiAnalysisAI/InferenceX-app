@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { preferVrDefaultRun, VR_DEFAULT_RUN } from './default-run-preference';
 
@@ -74,7 +74,7 @@ describe('VR default curve', () => {
     { candidate: [row({ ...preferred, hardware: 'gb300' })] },
   ])('keeps the existing curve when the preferred snapshot is absent (%#)', ({ candidate }) => {
     const rows = [row()];
-    expect(preferVrDefaultRun(rows, candidate)).toBe(rows);
+    expect(preferVrDefaultRun(rows, [...candidate])).toBe(rows);
   });
 
   it('preserves producer dates, public IDs and metrics in an imported logical snapshot', () => {

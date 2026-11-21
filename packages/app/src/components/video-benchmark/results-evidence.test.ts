@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { at, loadBundle, type Json } from './bundle';
 import { powerTrace, resultsEvidence } from './results-evidence';
 import { servingCells } from './serving';

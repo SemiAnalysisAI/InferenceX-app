@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { compareBlogPair } from '../i18n/zh-objective-guard';
 

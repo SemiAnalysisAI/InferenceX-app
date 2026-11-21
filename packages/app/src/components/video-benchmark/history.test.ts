@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { servingFixture } from './serving.fixture';
 import { at, entries, type Json } from './bundle';
 import { videoHistoryEntry } from './history';

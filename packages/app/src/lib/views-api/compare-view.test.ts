@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));
+mock.module('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { computeCompareTableData } from '@/lib/compare/compare-ssr';

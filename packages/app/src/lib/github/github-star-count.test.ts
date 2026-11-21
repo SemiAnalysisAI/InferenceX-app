@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import {
   STAR_COUNT_FAILURE_BACKOFF_MS,
@@ -12,16 +13,16 @@ let storage: Map<string, string>;
 
 beforeEach(() => {
   storage = new Map();
-  vi.stubGlobal('localStorage', {
+  stubGlobal('localStorage', {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => storage.set(key, value),
   });
-  vi.stubGlobal('fetch', fetchMock);
+  stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 const ok = (count: number) => ({

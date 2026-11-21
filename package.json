@@ -18,7 +18,7 @@
     "build": "bun run --cwd packages/app build",
     "start": "bun run --cwd packages/app start",
     "preview": "bun run --cwd packages/app preview",
-    "typecheck": "bun check",
+    "typecheck": "bun check && bun check -p packages/app",
     "security": "bun audit",
     "lint": "oxlint --no-error-on-unmatched-pattern",
     "lint:fix": "oxlint --fix --no-error-on-unmatched-pattern",

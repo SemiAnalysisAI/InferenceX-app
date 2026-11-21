@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { quickFilterSummary } from './quick-filter-summary';
 import { EMPTY_QUICK_FILTERS } from './quickFilters';
 

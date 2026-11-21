@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';

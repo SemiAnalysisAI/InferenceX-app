@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
+import { runAllTimersAsync, useFakeTimers, useRealTimers } from '@/test/helpers';
 
 import type { NextRequest } from 'next/server';
 
@@ -60,13 +61,13 @@ describe('withExplorerRoute', () => {
   });
 
   it('retries replica recovery conflicts (40001) and then succeeds', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     const conflict = Object.assign(new Error('conflict with recovery'), { code: '40001' });
     const flaky = vi.fn().mockRejectedValueOnce(conflict).mockResolvedValueOnce({ data: 'ok' });
     const pending = withExplorerRoute(flaky)(makeRequest());
-    await vi.runAllTimersAsync();
+    await runAllTimersAsync();
     const res = await pending;
-    vi.useRealTimers();
+    useRealTimers();
     expect(res.status).toBe(200);
     expect(flaky).toHaveBeenCalledTimes(2);
   });

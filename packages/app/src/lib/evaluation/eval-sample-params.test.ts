@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { EVAL_SAMPLE_FILTER_ERROR, parseEvalSampleWindow } from './eval-sample-params';
 

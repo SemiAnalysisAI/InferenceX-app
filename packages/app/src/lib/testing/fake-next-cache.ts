@@ -4,8 +4,8 @@
  * a rejected callback, rereads an entry once its `revalidate` seconds pass
  * (Next serves it stale and refreshes in the background; either way the source
  * is read again), and `revalidateTag` drops every entry carrying the tag.
- * Use with `vi.mock('next/cache', () => fakeNextCache)` and call
- * `resetFakeNextCache()` between tests.
+ * Use with `mock.module('next/cache', () => fakeNextCache)`, import the code under
+ * test after that call, and call `resetFakeNextCache()` between tests.
  */
 interface Entry {
   value: unknown;

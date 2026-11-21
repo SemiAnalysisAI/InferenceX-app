@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { AutumnLeaves } from './autumn-leaves';
 

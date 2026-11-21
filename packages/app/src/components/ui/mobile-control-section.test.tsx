@@ -1,9 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'bun:test';
 import { MobileControlSection } from './mobile-control-section';
 
 const renderSection = (count: number) => (

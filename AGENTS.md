@@ -70,7 +70,7 @@ the human reference, Chinese copy, examples, or OpenAPI schema also need changes
 Run the synchronization guard from `packages/app`:
 
 ```bash
-bun --env-file=../../.env vitest run src/lib/api/api-route-catalog.test.ts
+bun run test:unit src/lib/api/api-route-catalog.test.ts
 ```
 
 ## Code Style & Tooling

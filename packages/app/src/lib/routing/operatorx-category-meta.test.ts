@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { OPERATORX_CATEGORIES } from '@/lib/routing/operatorx-category';
 import {

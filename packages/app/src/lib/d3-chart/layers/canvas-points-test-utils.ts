@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
-import { vi } from 'vitest';
+import { vi } from 'bun:test';
+import { stubGlobal } from '@/test/helpers';
 
 import { ensureCanvasPointLayer } from './canvas-points';
 
@@ -31,7 +32,7 @@ export function mountLayer() {
 export function installFrames() {
   let callback: FrameRequestCallback | null = null;
   let requests = 0;
-  vi.stubGlobal('requestAnimationFrame', (next: FrameRequestCallback) => {
+  stubGlobal('requestAnimationFrame', (next: FrameRequestCallback) => {
     callback = next;
     requests++;
     return requests;
@@ -99,7 +100,7 @@ export function installRecordingContext(): unknown[][] {
       },
     },
   );
-  vi.stubGlobal('Path2D', RecordingPath);
+  stubGlobal('Path2D', RecordingPath);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
     context as unknown as CanvasRenderingContext2D,
   );

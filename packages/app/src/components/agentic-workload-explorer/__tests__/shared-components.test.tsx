@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { TrendsLineChart, TrendsStackedChart, type LineSeries } from '../trends-charts';
 import { buildHistogram, DistributionHistogram } from '../distribution-histogram';
@@ -10,20 +11,21 @@ import { DAY_RANGES, RangeToggle } from '../range-toggle';
 import { ModelFilter } from '../model-filter';
 import { stubMatchMedia } from '@/test/match-media-stub';
 
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+const actual = { ...(await import('@/lib/d3-chart/dynamic-margins')) };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actual,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/hooks/useMediaQuery', () => ({
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => false,
   useIsMobileViewport: () => false,
   useIsCoarsePointer: () => false,
 }));
-vi.mock('@/hooks/useResponsiveChartDimensions', () => ({
+mock.module('@/hooks/useResponsiveChartDimensions', () => ({
   useResponsiveChartDimensions: ({ height }: { height: number }) => ({
     dimensions: { width: 640, height },
     setContainerRef: () => {},
@@ -35,7 +37,7 @@ let root: Root;
 
 beforeEach(() => {
   stubMatchMedia();
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -44,7 +46,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 const SERIES: LineSeries[] = [

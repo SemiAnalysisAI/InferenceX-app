@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import * as d3 from 'd3';
-import { expect, it } from 'vitest';
+import { expect, it } from 'bun:test';
 
 import { SHAPE_ORDER, type ShapeKey } from '@/lib/charts/chart-rendering';
 

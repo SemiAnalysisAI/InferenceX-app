@@ -1,20 +1,19 @@
 import * as d3 from 'd3';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { createMockGroup, mockD3Select, type MockElement } from './test-helpers';
 
-vi.mock('d3', async () => {
-  const actual = await vi.importActual<typeof d3>('d3');
-  return {
-    ...actual,
-    select: (node: any) => {
-      if (node && typeof node === 'object' && 'attrs' in node && 'styles' in node) {
-        return mockD3Select(node as MockElement);
-      }
-      return actual.select(node);
-    },
-  };
-});
+// Snapshot of the real d3 namespace, taken before the mock replaces its bindings.
+const realD3 = { ...d3 };
+mock.module('d3', () => ({
+  ...realD3,
+  select: (node: any) => {
+    if (node && typeof node === 'object' && 'attrs' in node && 'styles' in node) {
+      return mockD3Select(node as MockElement);
+    }
+    return realD3.select(node);
+  },
+}));
 
 import {
   renderRooflines,

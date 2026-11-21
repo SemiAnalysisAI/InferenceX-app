@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 

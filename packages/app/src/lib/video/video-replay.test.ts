@@ -2,16 +2,17 @@ import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/pro
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NextRequest } from 'next/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubEnv, stubGlobal, unstubAllEnvs } from '@/test/helpers';
 import { readVideoReplay } from '@/components/video-benchmark/replay';
 import { GET } from '@/app/api/video-runs/route';
 import { sha256 } from '@/components/video-benchmark/bundle';
 import { diagnosticQualityFixture } from '@/components/video-benchmark/diagnostic-quality.fixture';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 
-vi.mock('@/components/video-benchmark/replay', () => ({ readVideoReplay: vi.fn() }));
+mock.module('@/components/video-benchmark/replay', () => ({ readVideoReplay: vi.fn() }));
 const fetchMock = vi.fn<typeof fetch>();
-vi.stubGlobal('fetch', fetchMock);
+stubGlobal('fetch', fetchMock);
 const dirs: string[] = [];
 const mediaPath = 'gpu/c1/baseline/artifacts/clip.mp4';
 const assetUrl = `http://localhost/api/video-runs?run=123&artifact=7&format=replay-asset&source=123&path=${encodeURIComponent(mediaPath)}`;
@@ -32,9 +33,9 @@ async function configure() {
       expectedPlanSha256: 'f'.repeat(64),
     }),
   );
-  vi.stubEnv('NODE_ENV', 'development');
-  vi.stubEnv('E2E_FIXTURES', '1');
-  vi.stubEnv('E2E_VIDEO_REPLAY_MANIFEST', manifest);
+  stubEnv('NODE_ENV', 'development');
+  stubEnv('E2E_FIXTURES', '1');
+  stubEnv('E2E_VIDEO_REPLAY_MANIFEST', manifest);
   const source = {
     id: '123',
     documents: [
@@ -55,7 +56,7 @@ async function configure() {
     },
     media: new Map([['123', new Map([[mediaPath, new Blob(['0123456789'])]])]]),
   } as unknown as Awaited<ReturnType<typeof readVideoReplay>>;
-  vi.mocked(readVideoReplay).mockResolvedValue(replay);
+  mocked(readVideoReplay).mockResolvedValue(replay);
   return replay;
 }
 
@@ -74,7 +75,7 @@ async function configureCollection(artifactIds: number[], invalidArtifact?: numb
     }),
   );
   await writeFile(manifest, JSON.stringify({ artifacts }));
-  vi.mocked(readVideoReplay).mockImplementation(async (zip, metadata, expectedPlanSha256) => {
+  mocked(readVideoReplay).mockImplementation(async (zip, metadata, expectedPlanSha256) => {
     if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata))
       throw new Error('Expected artifact metadata');
     const id = Number(metadata.id);
@@ -140,8 +141,8 @@ async function configureDiagnostic() {
 }
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
-  vi.mocked(readVideoReplay).mockReset();
+  unstubAllEnvs();
+  mocked(readVideoReplay).mockReset();
   fetchMock.mockReset();
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -268,15 +269,15 @@ describe('original-artifact development replay', () => {
 
   it('requires development fixture mode and fails closed on an unreadable replay manifest', async () => {
     await configure();
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     const production = await GET(new NextRequest(assetUrl));
     expect(production.status).toBe(404);
-    vi.stubEnv('NODE_ENV', 'development');
-    vi.stubEnv('E2E_FIXTURES', '0');
+    stubEnv('NODE_ENV', 'development');
+    stubEnv('E2E_FIXTURES', '0');
     const disabled = await GET(new NextRequest(assetUrl));
     expect(disabled.status).toBe(404);
-    vi.stubEnv('E2E_FIXTURES', '1');
-    vi.stubEnv('E2E_VIDEO_REPLAY_MANIFEST', '/missing/replay-manifest.json');
+    stubEnv('E2E_FIXTURES', '1');
+    stubEnv('E2E_VIDEO_REPLAY_MANIFEST', '/missing/replay-manifest.json');
     const failed = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
     expect(failed.status).toBe(503);
     const failure = await failed.json();

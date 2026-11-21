@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useTheme } from 'next-themes';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from './theme-provider';
 

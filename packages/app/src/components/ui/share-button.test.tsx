@@ -1,18 +1,18 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('@/lib/routing/url-state', () => ({
+mock.module('@/lib/routing/url-state', () => ({
   buildShareUrl: () => 'https://inferencex.semianalysis.com/?g_model=dsr1#inference',
 }));
 
-vi.mock('@/lib/analytics/analytics', () => ({
+mock.module('@/lib/analytics/analytics', () => ({
   track: vi.fn(),
 }));
 
-const localeState = vi.hoisted(() => ({ pathname: '/' }));
-vi.mock('next/navigation', () => ({ usePathname: () => localeState.pathname }));
+const localeState = { pathname: '/' };
+mock.module('next/navigation', () => ({ usePathname: () => localeState.pathname }));
 
 import { ShareButton } from '@/components/ui/share-button';
 

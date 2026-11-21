@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetDb, sqlControl } = vi.hoisted(() => {
+const { mockGetDb, sqlControl } = (() => {
   let response: unknown[] = [];
   let shouldThrow = false;
   const sql = ((_strings: TemplateStringsArray, ..._values: unknown[]) => {
@@ -22,9 +22,9 @@ const { mockGetDb, sqlControl } = vi.hoisted(() => {
       },
     },
   };
-});
+})();
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
 }));
 

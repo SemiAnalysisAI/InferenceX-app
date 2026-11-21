@@ -1,13 +1,13 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 const track = vi.fn();
-vi.mock('@/lib/analytics/analytics', () => ({ track: (...args: unknown[]) => track(...args) }));
+mock.module('@/lib/analytics/analytics', () => ({ track: (...args: unknown[]) => track(...args) }));
 
 let locale: 'en' | 'zh' = 'en';
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
 
 import { PromoVideo } from '@/components/about/promo-video';
 

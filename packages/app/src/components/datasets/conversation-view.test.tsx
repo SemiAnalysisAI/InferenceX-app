@@ -1,10 +1,10 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement, type PropsWithChildren } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { testState } = vi.hoisted(() => ({
+const { testState } = {
   testState: {
     locale: 'en' as 'en' | 'zh',
     conversation: {
@@ -14,24 +14,24 @@ const { testState } = vi.hoisted(() => ({
       refetch: vi.fn(),
     },
   },
-}));
+};
 
-vi.mock('next/link', () => ({
+mock.module('next/link', () => ({
   default: ({ children, href }: PropsWithChildren<{ href: string }>) =>
     createElement('a', { href }, children),
 }));
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock('@/components/ui/card', () => ({
+mock.module('@/components/ui/card', () => ({
   Card: ({ children }: PropsWithChildren) => createElement('div', null, children),
 }));
-vi.mock('@/components/datasets/trace-flamegraph', () => ({ TraceFlamegraph: () => null }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/hooks/api/use-datasets', () => ({
+mock.module('@/components/datasets/trace-flamegraph', () => ({ TraceFlamegraph: () => null }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/hooks/api/use-datasets', () => ({
   useDatasetConversation: () => testState.conversation,
 }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => testState.locale }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => testState.locale }));
 
 import { ConversationView } from './conversation-view';
 import { track } from '@/lib/analytics/analytics';
