@@ -831,6 +831,11 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     margin-top: -0.75rem;
     margin-bottom: -0.75rem;
   }
+  /* The last row's touch target reaches 0.75rem below the row; pad the list to match
+   * so a list that fits doesn't scroll by a few pixels and fade its last row. */
+  [data-powerx-surface] .legend-container ul.custom-scrollbar:has([data-testid^='legend-points-']) {
+    padding-bottom: 0.75rem;
+  }
   [data-powerx-surface] [data-testid='legend-close-button'],
   [data-powerx-surface] [data-testid='legend-open-button'] {
     width: 2.75rem;
