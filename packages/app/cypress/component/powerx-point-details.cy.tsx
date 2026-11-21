@@ -3,6 +3,7 @@ import {
   PowerXSurfaceProvider,
   usePowerXActivePoint,
 } from '@/components/inference/ui/powerx-surface';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
 import { Precision } from '@/lib/catalog/data-mappings';
 import { writeUrlParams } from '@/lib/routing/url-state';
@@ -22,6 +23,13 @@ const AUDIT_NAME = 'dsv4_8k1k_fp4_sglang_disagg-true_conc504_gb200-host-0123';
 function ActivePointProbe() {
   const active = usePowerXActivePoint();
   return <output data-testid="active-point-source">{active?.source ?? 'none'}</output>;
+}
+
+// The pinned panel reads presence when it opens, so a click before the query lands drops View
+// charts and View logs. This probe shares the query and renders in the same commit as the chart.
+function PresenceProbe() {
+  const { data } = useBenchmarkPresence(true);
+  return <output data-testid="presence-ready">{data ? 'ready' : 'pending'}</output>;
 }
 
 const point = createMockInferenceData({
@@ -80,6 +88,7 @@ function mountEnergy() {
           powerXDirectLabels
         />
         <ActivePointProbe />
+        <PresenceProbe />
       </div>
     </PowerXSurfaceProvider>,
     {
@@ -93,6 +102,7 @@ function mountEnergy() {
     },
   );
   cy.wait('@presence');
+  cy.get('[data-testid="presence-ready"]').should('have.text', 'ready');
 }
 
 const pinPoint = () =>
