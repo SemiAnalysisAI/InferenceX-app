@@ -1,9 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act, useRef } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { centeredScrollTop, useCenterOnEnter } from './useCenterOnEnter';
 

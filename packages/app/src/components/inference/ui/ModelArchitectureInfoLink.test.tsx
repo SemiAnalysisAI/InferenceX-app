@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
 import { Model, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 // Registered for ingest ahead of sourced architecture data and an article.
 const UNSOURCED_MODELS: readonly Model[] = [Model.GLM_5_3_Flash, Model.Kimi_K3_1_Pro];

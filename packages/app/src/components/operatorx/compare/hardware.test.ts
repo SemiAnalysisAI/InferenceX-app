@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';

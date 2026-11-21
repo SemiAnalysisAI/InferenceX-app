@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { Socket } from 'node:net';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 // Next 16.4.2 includes the image-optimizer fix: a local source image used a mocked request
 // that reused the browser's socket. If the browser cancelled the image (a navigation or a new

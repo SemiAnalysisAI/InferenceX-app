@@ -1,13 +1,13 @@
 import { isValidElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { OverviewPageData } from './overview-data';
 
-const { mockGetOverviewPageData } = vi.hoisted(() => ({
+const { mockGetOverviewPageData } = {
   mockGetOverviewPageData: vi.fn(),
-}));
+};
 
-vi.mock('@/lib/overview/overview-data.server', () => ({
+mock.module('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 

@@ -1,7 +1,35 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, mock } from 'bun:test';
+import type * as AgenticDetailLink from '@/lib/agentx/agentic-detail-link';
+import type * as UrlState from '@/lib/routing/url-state';
+import {
+  advanceTimersByTimeAsync,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
+
+// The link reads chart state from url-state, which keeps module-level state and reads the URL at
+// import time. bun:test has no resetModules, so each test loads fresh copies of both under a new
+// specifier and points the link's url-state import at the fresh copy.
+let moduleGeneration = 0;
+function resetModules() {
+  moduleGeneration += 1;
+}
+async function importUrlState(): Promise<typeof UrlState> {
+  const urlState: typeof UrlState = await import(
+    `@/lib/routing/url-state?generation=${moduleGeneration}`
+  );
+  mock.module('@/lib/routing/url-state', () => urlState);
+  return urlState;
+}
+async function importAgenticDetailLink(): Promise<typeof AgenticDetailLink> {
+  await importUrlState();
+  return import(`@/lib/agentx/agentic-detail-link?generation=${moduleGeneration}`);
+}
 
 function setupWindow(search = '', pathname = '/infx/inference') {
-  vi.stubGlobal('window', {
+  stubGlobal('window', {
     location: { search, pathname, hash: '', origin: 'https://example.com' },
     history: { replaceState: vi.fn(), state: null },
   });
@@ -9,18 +37,18 @@ function setupWindow(search = '', pathname = '/infx/inference') {
 
 describe('agenticDetailHref', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.resetModules();
+    useFakeTimers();
+    resetModules();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
+    useRealTimers();
+    unstubAllGlobals();
   });
 
   it('keeps a Chinese reader on /zh', async () => {
     setupWindow('', '/zh/infx/inference');
-    const { agenticDetailHref } = await import('@/lib/agentx/agentic-detail-link');
+    const { agenticDetailHref } = await importAgenticDetailLink();
 
     expect(agenticDetailHref(440106, 'zh')).toBe('/zh/infx/inference/agentic/440106');
     expect(agenticDetailHref(440106, 'en')).toBe('/infx/inference/agentic/440106');
@@ -28,14 +56,14 @@ describe('agenticDetailHref', () => {
 
   it('defaults to the English path when no locale is given', async () => {
     setupWindow('', '/infx/inference');
-    const { agenticDetailHref } = await import('@/lib/agentx/agentic-detail-link');
+    const { agenticDetailHref } = await importAgenticDetailLink();
     expect(agenticDetailHref(440106)).toBe('/infx/inference/agentic/440106');
   });
 
   it('carries the chart state so the detail page can link back to it', async () => {
     setupWindow('', '/infx/inference');
-    const { agenticDetailHref } = await import('@/lib/agentx/agentic-detail-link');
-    const { writeUrlParams } = await import('@/lib/routing/url-state');
+    const { agenticDetailHref } = await importAgenticDetailLink();
+    const { writeUrlParams } = await importUrlState();
 
     writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm' });
     const href = agenticDetailHref(440106, 'en');
@@ -48,8 +76,8 @@ describe('agenticDetailHref', () => {
 
   it('carries an unofficial-run overlay so the round trip keeps the overlay', async () => {
     setupWindow('?unofficialruns=987654321', '/infx/inference');
-    const { agenticDetailHref } = await import('@/lib/agentx/agentic-detail-link');
-    const { writeUrlParams } = await import('@/lib/routing/url-state');
+    const { agenticDetailHref } = await importAgenticDetailLink();
+    const { writeUrlParams } = await importUrlState();
 
     writeUrlParams({ g_model: 'Kimi-K3' });
     const href = agenticDetailHref(440106, 'zh');
@@ -61,11 +89,11 @@ describe('agenticDetailHref', () => {
 
   it('stays a bare path when the chart is on defaults', async () => {
     setupWindow('', '/infx/inference');
-    const { agenticDetailHref } = await import('@/lib/agentx/agentic-detail-link');
-    const { writeUrlParams } = await import('@/lib/routing/url-state');
+    const { agenticDetailHref } = await importAgenticDetailLink();
+    const { writeUrlParams } = await importUrlState();
 
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
-    await vi.advanceTimersByTimeAsync(200);
+    await advanceTimersByTimeAsync(200);
 
     expect(agenticDetailHref(440106, 'en')).toBe('/infx/inference/agentic/440106');
   });

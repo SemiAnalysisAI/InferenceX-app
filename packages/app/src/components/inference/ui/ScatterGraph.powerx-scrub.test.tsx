@@ -1,9 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
-import type * as PowerXSurface from '@/components/inference/ui/powerx-surface';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 
 import {
@@ -18,19 +17,21 @@ import {
 
 // The chart renders as the PowerX tab on a touch-primary device; the readout setter is
 // captured so the test can read what the scrub reports.
-const mocks = vi.hoisted(() => ({ coarse: true, setActivePoint: vi.fn() }));
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+const mocks = { coarse: true, setActivePoint: vi.fn() };
+const actual = { ...(await import('@/lib/d3-chart/dynamic-margins')) };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actual,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
 
-vi.mock('@/components/inference/ui/powerx-surface', async (importOriginal) => ({
-  ...(await importOriginal<typeof PowerXSurface>()),
+const actual2 = { ...(await import('@/components/inference/ui/powerx-surface')) };
+mock.module('@/components/inference/ui/powerx-surface', () => ({
+  ...actual2,
   usePowerXSurface: () => true,
   useSetPowerXActivePoint: () => mocks.setActivePoint,
 }));
-vi.mock('@/hooks/useMediaQuery', () => ({
+mock.module('@/hooks/useMediaQuery', () => ({
   useIsMobileViewport: () => true,
   useIsCoarsePointer: () => mocks.coarse,
   useMediaQuery: () => false,

@@ -9,11 +9,10 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "test:unit": "vitest run",
-    "test:unit:coverage": "vitest run --coverage"
+    "test:unit": "bun test",
+    "test:unit:coverage": "bun test --coverage"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^5.1.0",
-    "vitest": "^5.1.0"
+    "bun-types": "^1.4.4"
   }
 }

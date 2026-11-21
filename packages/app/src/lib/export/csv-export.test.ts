@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { buildCsv, csvLicensePreamble, downloadCsv, exportToCsv } from './csv-export';
 
@@ -94,10 +95,10 @@ describe('downloadCsv', () => {
     });
     mockRevokeObjectURL = vi.fn();
 
-    vi.stubGlobal('document', {
+    stubGlobal('document', {
       createElement: vi.fn(() => mockLink),
     });
-    vi.stubGlobal('URL', {
+    stubGlobal('URL', {
       createObjectURL: mockCreateObjectURL,
       revokeObjectURL: mockRevokeObjectURL,
     });
@@ -105,7 +106,7 @@ describe('downloadCsv', () => {
 
   afterEach(() => {
     capturedBlob = undefined;
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('creates a Blob with correct content and type', () => {
@@ -172,10 +173,10 @@ describe('exportToCsv', () => {
     mockLink = { href: '', download: '', click: mockClick };
     capturedBlob = undefined;
 
-    vi.stubGlobal('document', {
+    stubGlobal('document', {
       createElement: vi.fn(() => mockLink),
     });
-    vi.stubGlobal('URL', {
+    stubGlobal('URL', {
       createObjectURL: vi.fn((blob: Blob) => {
         capturedBlob = blob;
         return 'blob:mock-url';
@@ -185,7 +186,7 @@ describe('exportToCsv', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('builds CSV and triggers download in one call', async () => {

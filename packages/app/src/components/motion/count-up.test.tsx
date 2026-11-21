@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { CountUp } from '@/components/motion/count-up';
 
@@ -17,7 +18,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('CountUp', () => {
@@ -27,7 +28,7 @@ describe('CountUp', () => {
   });
 
   it('keeps the final value when the visitor prefers reduced motion', () => {
-    vi.stubGlobal(
+    stubGlobal(
       'IntersectionObserver',
       class {
         observe = vi.fn();
@@ -35,10 +36,7 @@ describe('CountUp', () => {
         unobserve = vi.fn();
       },
     );
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn() }),
-    );
+    stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn() }));
     act(() => root.render(<CountUp value={1000} />));
     expect(container.textContent).toBe('1,000');
   });

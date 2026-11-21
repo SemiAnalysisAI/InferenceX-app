@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'bun:test';
+import { stubGlobal } from '@/test/helpers';
 
 import { contrastColors, readableTextColor } from './contrast-colors';
 
@@ -14,7 +15,7 @@ const mockCtx = {
 };
 
 beforeEach(() => {
-  vi.stubGlobal('document', {
+  stubGlobal('document', {
     documentElement: {},
     createElement: vi.fn(() => ({
       width: 0,
@@ -22,7 +23,7 @@ beforeEach(() => {
       getContext: () => mockCtx,
     })),
   });
-  vi.stubGlobal(
+  stubGlobal(
     'getComputedStyle',
     vi.fn(() => ({
       getPropertyValue: (name: string) => {

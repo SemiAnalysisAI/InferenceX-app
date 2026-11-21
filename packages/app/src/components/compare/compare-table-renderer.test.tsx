@@ -1,12 +1,13 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-const locale = vi.hoisted(() => ({ current: 'en' as 'en' | 'zh' }));
+const locale = { current: 'en' as 'en' | 'zh' };
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale.current }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => locale.current }));
 
 import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import type { CompareTableData } from '@/lib/compare/compare-table-view';
@@ -21,7 +22,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  vi.stubGlobal(
+  stubGlobal(
     'ResizeObserver',
     class {
       observe() {}
@@ -37,7 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function renderTable(overrides: Partial<React.ComponentProps<typeof CompareTableRenderer>>) {

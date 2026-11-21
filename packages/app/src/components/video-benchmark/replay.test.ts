@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { strToU8, zipSync } from 'fflate';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import { replayVideoArtifact } from './replay';
 
 const fixture = join(import.meta.dirname, 'fixtures', 'native-serving-bundle');
@@ -44,7 +45,7 @@ async function archive(change?: (files: Record<string, string>) => void) {
   return { blob: new Blob([new Uint8Array(zip)]), metadata };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => unstubAllGlobals());
 
 describe('offline original CI ZIP replay', () => {
   it('reuses the sealed reader, keeps both GPU counts, and never grants local publication approval', async () => {
@@ -57,7 +58,7 @@ describe('offline original CI ZIP replay', () => {
     const fetch = vi.fn(() => {
       throw new Error('offline');
     });
-    vi.stubGlobal('fetch', fetch);
+    stubGlobal('fetch', fetch);
     const report = await replayVideoArtifact(blob, metadata, planHash);
     expect(report).toMatchObject({
       ok: true,

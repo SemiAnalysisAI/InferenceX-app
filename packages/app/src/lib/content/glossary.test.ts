@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { acceleratorEntries } from './glossary-accelerators';
 
 import { getAllPosts, getPostBySlug } from '../blog/blog';

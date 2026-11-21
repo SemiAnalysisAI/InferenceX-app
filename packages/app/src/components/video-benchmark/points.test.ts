@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
 import { dashboardCells, latestVideoCells, namedRunPoints, videoPoints } from './points';
 import type { ResultsEvidence } from './results-evidence';

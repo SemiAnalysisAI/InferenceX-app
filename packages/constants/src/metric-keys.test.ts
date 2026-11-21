@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   CPU_SIDE_POWER_METRIC_KEY_LIST,

@@ -1,5 +1,6 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+// @test-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { unstubAllGlobals } from '@/test/helpers';
 
 import { CANVAS_POINT_LAYER_SELECTOR } from './canvas-point-registry';
 import type { CanvasPointLayerElement, PointPointerHandlers } from './canvas-points';
@@ -37,7 +38,7 @@ function labelAnchors(svg: Element) {
 }
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
   document.body.replaceChildren();
 });

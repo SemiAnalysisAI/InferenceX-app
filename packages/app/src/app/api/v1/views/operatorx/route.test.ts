@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import type { Comparison, ComparisonRow } from '@semianalysisai/inferencex-db/operatorx/compare';
 
@@ -8,11 +9,11 @@ import { getComparison } from '@/lib/operatorx/service';
 
 import { GET } from './route';
 
-vi.mock('@/lib/operatorx/service', () => ({
+mock.module('@/lib/operatorx/service', () => ({
   getComparison: vi.fn(),
   isPartialComparison: vi.fn(() => false),
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: vi.fn((_request: Request, body: unknown) => NextResponse.json(body)),
   operatorXCacheTag: vi.fn(() => 'opx'),
 }));
@@ -55,7 +56,7 @@ function comparison(): Comparison {
 const get = (query: string) =>
   GET(new NextRequest(`http://localhost/api/v1/views/operatorx?op=gemm&${query}`));
 
-beforeEach(() => vi.mocked(getComparison).mockResolvedValue(comparison()));
+beforeEach(() => mocked(getComparison).mockResolvedValue(comparison()));
 
 it('filters rows by the model view precision and token bin, using the UI bin function', async () => {
   const bin = sizeBin(128);

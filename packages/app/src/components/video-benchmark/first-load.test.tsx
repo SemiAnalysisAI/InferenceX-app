@@ -1,9 +1,10 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import VideoResultsClips from './VideoResultsClips';
 import { videoHistoryEntry, type VideoHistoryPage } from './history';
 import { namedRunPoints } from './points';
@@ -12,23 +13,23 @@ import { publishedResultsSide } from './results-clips';
 import { useVideoPoints } from './use-video-points';
 import { videoClipSourceKey } from './initial-data';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 afterEach(() => {
   if (root) act(() => root?.unmount());
   container?.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 it.each([true, false])(
   'renders seeded points/media (available=%s) before effects and hydrates without refetching',
   async (available) => {
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
+    stubGlobal('fetch', fetch);
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     const fixture = referenceQualityFixture(20);
@@ -108,7 +109,7 @@ it.each([true, false])(
 );
 
 it('shows a newly read clip while another selected source is still pending', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   const fast = referenceQualityFixture(20, '123', 7);
@@ -124,7 +125,7 @@ it('shows a newly read clip while another selected source is still pending', asy
     ).find((candidate) => candidate.cell === 'c1')!;
   });
   const pending = Promise.withResolvers<Response>();
-  vi.stubGlobal(
+  stubGlobal(
     'fetch',
     vi.fn((url: string) =>
       url.includes('run=123') ? Promise.resolve(Response.json(fast.stored)) : pending.promise,
@@ -162,9 +163,9 @@ it('shows a newly read clip while another selected source is still pending', asy
 });
 
 it('holds the prompt row and stage with a skeleton while the subject is read', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  vi.stubGlobal(
+  stubGlobal(
     'fetch',
     vi.fn(() => new Promise<Response>(() => {})),
   );
@@ -195,7 +196,7 @@ it('holds the prompt row and stage with a skeleton while the subject is read', (
 });
 
 it('waits for a newly wanted side before a reveal scrolls, even after an earlier read failed', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   const scroll = vi.fn();
@@ -213,7 +214,7 @@ it('waits for a newly wanted side before a reveal scrolls, even after an earlier
     ).find((candidate) => candidate.cell === 'c1')!;
   });
   const pending = Promise.withResolvers<Response>();
-  vi.stubGlobal(
+  stubGlobal(
     'fetch',
     vi.fn((url: string) =>
       url.includes('run=123')

@@ -1,5 +1,5 @@
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { ZH_OG_LOCALE } from '../i18n/i18n';
 import { OVERVIEW_HARDWARE, overviewHardwareLabel } from './overview-data';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { COMPARE_MODEL_ALIASES } from '../compare/compare-slug';
 import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './historical-model-redirects';

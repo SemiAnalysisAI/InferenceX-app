@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { Model } from '@/lib/catalog/data-mappings';
 import { overviewApiPrice } from '@/lib/overview/overview-api-pricing';
@@ -12,8 +12,8 @@ import type {
   OverviewScenario,
 } from '@/lib/overview/overview-data';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import { overviewApiTooltip } from './overview-api-cell';
 import {

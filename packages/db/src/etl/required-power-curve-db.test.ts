@@ -2,7 +2,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'vitest';
+import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'bun:test';
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import { preflightRequiredPowerCurves } from './required-power-curve';

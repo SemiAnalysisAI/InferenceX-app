@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import type postgres from 'postgres';
-import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it } from 'bun:test';
 import { ingestEvalRow, type EvalPersistenceInput } from './eval-ingest';
 
 type Sql = postgres.Sql;

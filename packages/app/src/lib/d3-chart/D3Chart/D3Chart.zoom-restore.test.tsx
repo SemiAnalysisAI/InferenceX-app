@@ -1,14 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { renderChartForExport } from '../export-renderer';
 import { D3Chart } from './D3Chart';
 import type { D3ChartProps } from './types';
 
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+const actual = { ...(await import('@/lib/d3-chart/dynamic-margins')) };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actual,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
@@ -46,7 +48,7 @@ function flushFrames() {
 
 beforeEach(() => {
   frames = [];
-  vi.stubGlobal(
+  stubGlobal(
     'ResizeObserver',
     class {
       observe() {}
@@ -54,8 +56,8 @@ beforeEach(() => {
       disconnect() {}
     },
   );
-  vi.stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
-  vi.stubGlobal('cancelAnimationFrame', () => {});
+  stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
+  stubGlobal('cancelAnimationFrame', () => {});
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
     DOMRect.fromRect({ width: 800, height: 400 }),
   );
@@ -68,7 +70,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function draw(props: D3ChartProps<Datum>) {

@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { RouteTransition } from '@/components/motion/route-transition';
 import {

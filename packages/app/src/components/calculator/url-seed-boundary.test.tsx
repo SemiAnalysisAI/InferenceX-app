@@ -1,18 +1,19 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act, useEffect, useState } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import type { CalculatorUrlSeed } from './url-seed';
 import { CalculatorUrlSeedBoundary } from './url-seed-boundary';
 
-const navigation = vi.hoisted(() => ({ prerendering: false }));
+const navigation = { prerendering: false };
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   usePathname: () => window.location.pathname,
   useSearchParams: () => {
     if (navigation.prerendering) {
@@ -49,7 +50,7 @@ function prerender(url: string): HTMLDivElement {
     container.innerHTML = renderToString(page());
   } finally {
     navigation.prerendering = false;
-    vi.mocked(console.error).mockRestore();
+    mocked(console.error).mockRestore();
   }
   document.body.append(container);
   window.history.replaceState(null, '', url);

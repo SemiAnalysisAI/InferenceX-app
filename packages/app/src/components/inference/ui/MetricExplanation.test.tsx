@@ -1,16 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   track: vi.fn(),
   locale: { value: 'en' as 'en' | 'zh' },
-}));
+};
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale.value }));
+mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale.value }));
 
 import { MetricExplanation } from './MetricExplanation';
 import ChartNotices from './ChartNotices';

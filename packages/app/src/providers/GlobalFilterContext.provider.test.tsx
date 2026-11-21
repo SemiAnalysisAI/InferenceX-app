@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, memo, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
@@ -12,7 +12,7 @@ import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
 const indexRows = (rows: readonly object[]) =>
   indexAvailability(compactAvailability(rows as AvailabilityRow[]));
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   featureGateUnlocked: false,
   featureGateHydratesUnlocked: false,
   availability: {
@@ -40,9 +40,9 @@ const mocks = vi.hoisted(() => ({
   setUrlParams: vi.fn(),
   setNavigationModel: vi.fn(),
   workflowDates: vi.fn(),
-}));
+};
 
-vi.mock('@/lib/runtime/use-feature-gate', async () => {
+mock.module('@/lib/runtime/use-feature-gate', async () => {
   const react = await import('react');
   return {
     useFeatureGate: () => {
@@ -56,22 +56,22 @@ vi.mock('@/lib/runtime/use-feature-gate', async () => {
   };
 });
 
-vi.mock('@/hooks/api/use-availability', () => ({
+mock.module('@/hooks/api/use-availability', () => ({
   useAvailability: () => mocks.availability,
 }));
-vi.mock('@/hooks/api/use-workflow-info', () => ({
+mock.module('@/hooks/api/use-workflow-info', () => ({
   useWorkflowInfo: (date: string) => {
     mocks.workflowDates(date);
     return mocks.workflow;
   },
 }));
-vi.mock('@/lib/routing/inference-navigation-state', () => ({
+mock.module('@/lib/routing/inference-navigation-state', () => ({
   setInferenceNavigationModel: mocks.setNavigationModel,
 }));
-vi.mock('@/hooks/useUrlState', () => ({
+mock.module('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: mocks.getUrlParam, setUrlParams: mocks.setUrlParams }),
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ availableModelsAndSequences: mocks.unofficialAvailable }),
 }));
 

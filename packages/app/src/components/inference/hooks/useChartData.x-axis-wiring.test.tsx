@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
@@ -11,16 +11,16 @@ import { processOverlayChartData } from '@/components/inference/utils';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { buildReplayTimeline } from '@/components/inference/replay/buildReplayTimeline';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   rows: [] as BenchmarkRow[],
   loading: false,
-}));
+};
 
-vi.mock('@tanstack/react-query', () => ({
+mock.module('@tanstack/react-query', () => ({
   useQueries: () => [],
   useQuery: () => ({ data: mocks.rows, isLoading: mocks.loading, error: null }),
 }));
-vi.mock('@/hooks/api/use-benchmarks', () => ({
+mock.module('@/hooks/api/use-benchmarks', () => ({
   benchmarkQueryOptions: vi.fn(),
 }));
 

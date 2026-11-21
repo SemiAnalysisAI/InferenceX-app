@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   DB_MODEL_TO_DISPLAY,
   DISPLAY_MODEL_TO_DB,

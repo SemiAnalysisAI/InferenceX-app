@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { isAnthropicHealthPing } from '@/lib/agentic-workload-explorer/anthropic-ping';
 
 const CANONICAL_PING = {

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import manifest from './power-model.manifest.json';
 import { create_power_model, ValidationError, ValueError } from './power_model';
@@ -84,7 +84,7 @@ function expectClose(actual: unknown, expected: unknown, path = '$'): void {
   if (typeof expected === 'number' && typeof actual === 'number') {
     const tolerance = Math.max(Math.abs(expected), Math.abs(actual)) * REL_TOL;
     if (Math.abs(actual - expected) > tolerance) {
-      expect.fail(`${path}: ${actual} != ${expected}`);
+      throw new Error(`${path}: ${actual} != ${expected}`);
     }
     return;
   }

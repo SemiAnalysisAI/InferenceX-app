@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import {
   buildEqualServiceComparison,
@@ -9,27 +9,26 @@ import { buildInferenceSeries } from '@/lib/views-api/series';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import type { BenchmarkRow } from '@/lib/api/api';
 
-const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } =
-  vi.hoisted(() => ({
-    mockGetLatestBenchmarks: vi.fn(),
-    mockGetBenchmarksForRun: vi.fn(),
-    mockUnofficialRun: vi.fn(),
-    mockGetDb: vi.fn(() => 'mock-sql'),
-  }));
+const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } = {
+  mockGetLatestBenchmarks: vi.fn(),
+  mockGetBenchmarksForRun: vi.fn(),
+  mockUnofficialRun: vi.fn(),
+  mockGetDb: vi.fn(() => 'mock-sql'),
+};
 
-vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficialRun }));
+mock.module('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficialRun }));
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getLatestBenchmarks: mockGetLatestBenchmarks,
   getBenchmarksForRun: mockGetBenchmarksForRun,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedDerivedData: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),

@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import { NextRequest } from 'next/server';
 
 import { GET } from './route';
 
-const mocks = vi.hoisted(() => ({ images: vi.fn() }));
-vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
+const mocks = { images: vi.fn() };
+mock.module('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 
 const release = (tag_name: string, published_at: string, extra = {}) => ({
   tag_name,
@@ -31,7 +32,7 @@ beforeEach(() => {
   mocks.images.mockImplementation(() => Response.json([]));
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('framework releases', () => {
@@ -50,7 +51,7 @@ describe('framework releases', () => {
         release('v0.5.22', '2026-10-10T00:00:00Z'),
       ],
     };
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn((url: string) =>
         Response.json(lists[url.includes('vllm-project') ? 'vllm' : 'sglang']),
@@ -81,7 +82,7 @@ describe('framework releases', () => {
       'sgl-project/sglang/compare/v0.5.22...eeee555': { status: 'ahead' },
     };
     const calls: string[] = [];
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn((url: string) => {
         if (url.includes('/releases'))
@@ -108,7 +109,7 @@ describe('framework releases', () => {
   });
 
   it('returns null for a failed lookup or no stable versioned release', async () => {
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn((url: string) =>
         url.includes('vllm-project')

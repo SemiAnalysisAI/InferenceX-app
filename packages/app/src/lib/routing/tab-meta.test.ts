@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { DASHBOARD_ROUTE_KEYS } from './dashboard-routes';
 import { Model } from '@/lib/catalog/data-mappings';

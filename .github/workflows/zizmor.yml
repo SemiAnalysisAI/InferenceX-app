@@ -20,7 +20,7 @@ jobs:
   zizmor:
     name: Audit GitHub Actions
     if: ${{ !github.event.pull_request.draft }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read

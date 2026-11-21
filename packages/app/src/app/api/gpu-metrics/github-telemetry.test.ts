@@ -1,16 +1,16 @@
 import AdmZip from 'adm-zip';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubEnv, unstubAllEnvs, waitFor } from '@/test/helpers';
 
-import type * as GithubArtifacts from '@/lib/github/github-artifacts';
-
-const { download, readRun, listArtifacts } = vi.hoisted(() => ({
+const { download, readRun, listArtifacts } = {
   download: vi.fn(),
   readRun: vi.fn(),
   listArtifacts: vi.fn(),
-}));
+};
 
-vi.mock('@/lib/github/github-artifacts', async (importOriginal) => ({
-  ...(await importOriginal<typeof GithubArtifacts>()),
+const actual = { ...(await import('@/lib/github/github-artifacts')) };
+mock.module('@/lib/github/github-artifacts', () => ({
+  ...actual,
   downloadGithubArtifact: download,
   fetchGithubWorkflowRun: readRun,
   fetchGithubRunArtifacts: listArtifacts,
@@ -20,11 +20,11 @@ import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv('GITHUB_TOKEN', 'controlled-not-a-real-token');
+  stubEnv('GITHUB_TOKEN', 'controlled-not-a-real-token');
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
 });
 
 function csvArchive(power: number): Response {
@@ -63,11 +63,11 @@ describe('live telemetry acquisition', () => {
     download.mockImplementation((url: string) => pending[Number(url.split('/').at(-1))].promise);
 
     const response = fetchGpuMetricsFromGithub('12345', 'dsr1_', false);
-    await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(download).toHaveBeenCalledTimes(4));
     pending[3].resolve(csvArchive(303));
-    await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(download).toHaveBeenCalledTimes(5));
     pending[1].reject(new Error('archive unavailable'));
-    await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(6));
+    await waitFor(() => expect(download).toHaveBeenCalledTimes(6));
     for (const index of [5, 4, 2, 0]) pending[index].resolve(csvArchive(300 + index));
 
     const result = await response;

@@ -7,7 +7,7 @@ import type { BenchmarkRequestParams } from '@/lib/benchmarks/benchmark-request-
 import { Model } from '@/lib/catalog/data-mappings';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { GET as cache } from './cache-reuse/route';
 import { GET as first } from './first-token/route';
 import { GET as gpu } from './gpu-metrics/route';
@@ -16,25 +16,26 @@ import { GET as profit } from './profit-estimator/route';
 import { GET as submissions } from './submissions/route';
 import { GET as video } from './video/route';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   metrics: vi.fn(),
   video: vi.fn(),
   benchmarks: vi.fn(),
   unofficial: vi.fn(),
   submissions: vi.fn(),
-}));
-vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
-vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
-vi.mock('@/lib/benchmarks/benchmarks-endpoint.server', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+};
+mock.module('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
+mock.module('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
+const benchmarksEndpoint = { ...(await import('@/lib/benchmarks/benchmarks-endpoint.server')) };
+mock.module('@/lib/benchmarks/benchmarks-endpoint.server', () => ({
+  ...benchmarksEndpoint,
   loadBenchmarks: async (query: BenchmarkRequestParams) => {
     const response: Response = await mocks.benchmarks(query);
     return response.json();
   },
 }));
-vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
-vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
+mock.module('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
@@ -684,7 +685,7 @@ describe('new dashboard projections', () => {
   );
   it.each(['modeled'])(
     'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
-    async (powerBasis) => {
+    async (powerBasis: string) => {
       const rows = [
         agenticRow({ id: 90, hardware: 'mi355x', date: '2026-09-09' }),
         agenticRow({ id: 100 }),
@@ -847,7 +848,7 @@ describe('new dashboard projections', () => {
   });
   it.each(['modeled'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
-    async (powerBasis) => {
+    async (powerBasis: string) => {
       const partial = agenticRow({
         prefill_tp: 4,
         decode_tp: 4,

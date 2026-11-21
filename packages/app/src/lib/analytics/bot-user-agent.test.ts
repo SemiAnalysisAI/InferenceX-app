@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { isBotBrowser, isBotUserAgent } from './bot-user-agent';
 
@@ -52,17 +53,17 @@ describe('isBotUserAgent', () => {
 });
 
 describe('isBotBrowser', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => unstubAllGlobals());
 
   it('reads navigator.userAgent', () => {
-    vi.stubGlobal('navigator', { userAgent: BOTS.pinterest });
+    stubGlobal('navigator', { userAgent: BOTS.pinterest });
     expect(isBotBrowser()).toBe(true);
-    vi.stubGlobal('navigator', { userAgent: HUMANS.chromeMac });
+    stubGlobal('navigator', { userAgent: HUMANS.chromeMac });
     expect(isBotBrowser()).toBe(false);
   });
 
   it('is false where navigator does not exist', () => {
-    vi.stubGlobal('navigator', undefined);
+    stubGlobal('navigator', undefined);
     expect(isBotBrowser()).toBe(false);
   });
 });

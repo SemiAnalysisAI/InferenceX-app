@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),

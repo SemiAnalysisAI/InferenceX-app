@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { VIDEO_REPRODUCE_URL, detailLinks } from './detail-links';
 
 describe('detailLinks', () => {

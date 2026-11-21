@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import {
   QueryClientProvider,
   useQuery,
@@ -7,7 +7,17 @@ import {
 } from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import {
+  advanceTimersByTimeAsync,
+  getTimerCount,
+  stubEnv,
+  stubGlobal,
+  unstubAllEnvs,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import { createAppQueryClient, QueryProvider } from '@/providers/query-provider';
 
@@ -27,10 +37,10 @@ describe('auditWarmedQueries', () => {
   let client: QueryClient;
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    useFakeTimers();
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     client = createAppQueryClient();
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   });
 
   afterEach(() => {
@@ -38,18 +48,18 @@ describe('auditWarmedQueries', () => {
     root = undefined;
     client.clear();
     warn.mockRestore();
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
+    unstubAllEnvs();
+    unstubAllGlobals();
+    useRealTimers();
   });
 
   it('warns once with the key when a warmed query is never observed', async () => {
     const stop = auditWarmedQueries(client);
     await client.prefetchQuery(options);
 
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS - 1);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS - 1);
     expect(warn).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS * 2);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS * 2);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('warmed but never read'), KEY);
     stop();
@@ -58,7 +68,7 @@ describe('auditWarmedQueries', () => {
   it('stays quiet when a useQuery observer reads the warmed key in time', async () => {
     const stop = auditWarmedQueries(client);
     await client.prefetchQuery(options);
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS / 2);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS / 2);
 
     root = createRoot(document.createElement('div'));
     act(() =>
@@ -69,7 +79,7 @@ describe('auditWarmedQueries', () => {
       ),
     );
 
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS * 2);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS * 2);
     expect(warn).not.toHaveBeenCalled();
     stop();
   });
@@ -81,19 +91,19 @@ describe('auditWarmedQueries', () => {
     client.removeQueries({ queryKey: KEY });
     stop();
 
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS * 2);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS * 2);
     expect(warn).not.toHaveBeenCalled();
   });
 
   it('adds no subscription or timers in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     const subscribe = vi.spyOn(client.getQueryCache(), 'subscribe');
 
     const stop = auditWarmedQueries(client);
     await client.prefetchQuery(options);
 
     expect(subscribe).not.toHaveBeenCalled();
-    expect(vi.getTimerCount()).toBe(0);
+    expect(getTimerCount()).toBe(0);
     stop();
   });
 
@@ -113,13 +123,13 @@ describe('auditWarmedQueries', () => {
       ),
     );
     await providedClient!.prefetchQuery(options);
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS);
     expect(warn).toHaveBeenCalledTimes(1);
 
     await providedClient!.prefetchQuery({ ...options, queryKey: ['after-unmount'] });
     act(() => root!.unmount());
     root = undefined;
-    await vi.advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS);
+    await advanceTimersByTimeAsync(WARM_AUDIT_DELAY_MS);
     expect(warn).toHaveBeenCalledTimes(1);
   });
 });

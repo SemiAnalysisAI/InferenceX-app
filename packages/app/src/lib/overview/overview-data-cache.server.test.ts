@@ -1,7 +1,6 @@
-import type * as Constants from '@semianalysisai/inferencex-constants';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   loadRows: vi.fn(),
   buildCube: vi.fn((_rows: unknown, engineScope: string, modelScope: string) => ({
     engineScope,
@@ -25,9 +24,9 @@ const mocks = vi.hoisted(() => ({
       models: [],
     }),
   ),
-}));
+};
 
-vi.mock('next/cache', () => ({
+mock.module('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: (fn: (...args: unknown[]) => Promise<unknown>) => {
     const bodies = new Map<string, Promise<string>>();
@@ -43,19 +42,21 @@ vi.mock('next/cache', () => ({
   },
 }));
 
-vi.mock('@semianalysisai/inferencex-constants', async (importOriginal) => ({
-  ...(await importOriginal<typeof Constants>()),
+// The factory cannot import the module it replaces, so the real exports are captured first.
+const actual = { ...(await import('@semianalysisai/inferencex-constants')) };
+mock.module('@semianalysisai/inferencex-constants', () => ({
+  ...actual,
   DISPLAY_MODEL_TO_DB: { TestModel: ['test-model'] },
 }));
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
 
-vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({
+mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
   getCachedBenchmarks: mocks.loadRows,
   getCachedBenchmarksAsOf: () => Promise.resolve([]),
 }));
 
-vi.mock('@/lib/overview/overview-data', () => ({
+mock.module('@/lib/overview/overview-data', () => ({
   applyOverviewHardwareRowScope: (data: object, hardwareRowScope: string) => ({
     ...data,
     hardwareRowScope,
@@ -75,7 +76,8 @@ vi.mock('@/lib/overview/overview-data', () => ({
   overviewSnapshotDate: mocks.snapshotDate,
 }));
 
-import { getOverviewPageData } from './overview-data.server';
+// Imported after mock.module so the derived cache is built on the mocked unstable_cache.
+const { getOverviewPageData } = await import('./overview-data.server');
 
 describe('getOverviewPageData derived cache', () => {
   beforeEach(() => {

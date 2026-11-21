@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubEnv, stubGlobal, unstubAllEnvs, unstubAllGlobals } from '@/test/helpers';
 
 import { apiRouteCatalog } from '../api/api-route-catalog';
 import { captureClientRequest } from './cli-request-analytics';
@@ -11,18 +12,18 @@ const request = (path = '/api/v1/benchmarks?model=private-client', headers = {},
   });
 
 beforeEach(() => {
-  vi.stubEnv('VERCEL_ENV', 'production');
-  vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'test-key');
-  vi.stubEnv('NEXT_PUBLIC_POSTHOG_HOST', 'https://us.i.posthog.com');
-  vi.stubEnv('INFERENCEX_REQUEST_ANALYTICS', '1');
-  vi.stubGlobal(
+  stubEnv('VERCEL_ENV', 'production');
+  stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'test-key');
+  stubEnv('NEXT_PUBLIC_POSTHOG_HOST', 'https://us.i.posthog.com');
+  stubEnv('INFERENCEX_REQUEST_ANALYTICS', '1');
+  stubGlobal(
     'fetch',
     send.mockReset().mockImplementation(() => Promise.resolve(new Response('{}'))),
   );
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+  unstubAllGlobals();
+  unstubAllEnvs();
 });
 
 describe('client request attribution', () => {
@@ -117,20 +118,20 @@ describe('client request attribution', () => {
   });
 
   it('separates preview and CI and disables local, unconfigured and switched-off collection', async () => {
-    vi.stubEnv('VERCEL_ENV', 'preview');
+    stubEnv('VERCEL_ENV', 'preview');
     await captureClientRequest(request(undefined, { 'x-inferencex-traffic': 'ci' }));
     expect(JSON.parse(send.mock.calls[0][1].body).properties).toMatchObject({
       environment: 'preview',
       traffic: 'ci',
     });
     send.mockClear();
-    vi.stubEnv('VERCEL_ENV', 'development');
+    stubEnv('VERCEL_ENV', 'development');
     await captureClientRequest(request());
-    vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('INFERENCEX_REQUEST_ANALYTICS', '0');
+    stubEnv('VERCEL_ENV', 'production');
+    stubEnv('INFERENCEX_REQUEST_ANALYTICS', '0');
     await captureClientRequest(request());
-    vi.stubEnv('INFERENCEX_REQUEST_ANALYTICS', '1');
-    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', '');
+    stubEnv('INFERENCEX_REQUEST_ANALYTICS', '1');
+    stubEnv('NEXT_PUBLIC_POSTHOG_KEY', '');
     await captureClientRequest(request());
     expect(send).not.toHaveBeenCalled();
   });

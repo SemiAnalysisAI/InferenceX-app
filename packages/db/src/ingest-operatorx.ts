@@ -71,10 +71,12 @@ export async function sweepBundle(repo: string, runId: string, dir: string, down
   }
   const manifestPath = path.join(dir, manifestName, MANIFEST_FILE);
   if (!fs.existsSync(manifestPath)) throw new Error(`run ${runId} has no ${manifestName} artifact`);
+  // Bun's readdir, unlike Node's, returns entries unsorted; sort so shards keep a stable order.
   const available = fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    .map((e) => e.name);
+    .map((e) => e.name)
+    .toSorted();
   const bundle: OperatorXRawBundle = {
     run: {
       run_id: runId,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import {

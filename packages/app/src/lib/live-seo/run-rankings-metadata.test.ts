@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import {
   OG_IMAGE,
@@ -20,9 +20,9 @@ import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 import { getAllRunPageEntries } from '@/lib/live-seo/run-pages';
 import { META_DESCRIPTION_MAX, META_TITLE_MAX } from '@/lib/seo/meta-text';
 
-const hoisted = vi.hoisted(() => ({ withData: true }));
+const hoisted = { withData: true };
 
-vi.mock('@/lib/live-seo/run-rankings-data.server', () => ({
+mock.module('@/lib/live-seo/run-rankings-data.server', () => ({
   getAvailableRunEntries: () => Promise.resolve([]),
   getRunPageData: () =>
     Promise.resolve(

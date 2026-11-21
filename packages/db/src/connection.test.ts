@@ -1,14 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 
+import { stubEnv, unstubAllEnvs } from './lib/test-helpers';
 import { getCollectiveXDb, getDb, resolveDatabaseConnection } from './connection';
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
 });
 
 describe('resolveDatabaseConnection', () => {
   it('resolves an environment URL and Neon HTTP defaults', () => {
-    vi.stubEnv('TEST_DATABASE_URL', 'postgres://user:pass@ep-test-123.us-east-1.aws.neon.tech/app');
+    stubEnv('TEST_DATABASE_URL', 'postgres://user:pass@ep-test-123.us-east-1.aws.neon.tech/app');
 
     expect(resolveDatabaseConnection({ envVar: 'TEST_DATABASE_URL' })).toEqual({
       url: 'postgres://user:pass@ep-test-123.us-east-1.aws.neon.tech/app',
@@ -18,7 +19,7 @@ describe('resolveDatabaseConnection', () => {
   });
 
   it('uses an explicit URL instead of the configured environment URL', () => {
-    vi.stubEnv('TEST_DATABASE_URL', 'postgres://user:pass@db.example.com/app');
+    stubEnv('TEST_DATABASE_URL', 'postgres://user:pass@db.example.com/app');
 
     expect(
       resolveDatabaseConnection({
@@ -114,7 +115,7 @@ describe('resolveDatabaseConnection', () => {
   });
 
   it('reports the selected environment variable when no URL is configured', () => {
-    vi.stubEnv('MISSING_DATABASE_URL', '');
+    stubEnv('MISSING_DATABASE_URL', '');
     expect(() => resolveDatabaseConnection({ envVar: 'MISSING_DATABASE_URL' })).toThrow(
       'MISSING_DATABASE_URL is not set',
     );

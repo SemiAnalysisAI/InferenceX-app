@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { APP_THEMES } from './themes/themes';
 
 const src = path.resolve(import.meta.dirname, '..');

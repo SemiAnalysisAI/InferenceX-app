@@ -1,5 +1,13 @@
 import AdmZip from 'adm-zip';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import {
+  setSystemTime,
+  stubEnv,
+  stubGlobal,
+  unstubAllEnvs,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
@@ -15,13 +23,13 @@ import {
 } from './github-artifacts';
 
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+stubGlobal('fetch', mockFetch);
 
 afterEach(() => {
   mockFetch.mockReset();
   resetGithubRunRepositories();
-  vi.useRealTimers();
-  vi.unstubAllEnvs();
+  useRealTimers();
+  unstubAllEnvs();
 });
 
 const authHeaders = {
@@ -82,8 +90,8 @@ describe('getRunDate', () => {
   });
 
   it('falls back to the current UTC date when created_at is missing', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-03T12:34:56Z'));
+    useFakeTimers();
+    setSystemTime(new Date('2026-04-03T12:34:56Z'));
 
     expect(getRunDate(workflowRun({ created_at: '' }))).toBe('2026-04-03');
   });
@@ -91,7 +99,7 @@ describe('getRunDate', () => {
 
 describe('fetchGithubWorkflowRun', () => {
   it('reads only the primary repository when no source repositories are configured', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
+    stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
     const notFound = new Response(null, { status: 404, statusText: 'Not Found' });
     mockFetch.mockResolvedValueOnce(notFound);
 
@@ -104,7 +112,7 @@ describe('fetchGithubWorkflowRun', () => {
   });
 
   it('falls back to configured source repositories in order', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
       .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
@@ -121,7 +129,7 @@ describe('fetchGithubWorkflowRun', () => {
   });
 
   it('asks the known owner first for artifacts after the run lookup found it', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 404 }))
       .mockResolvedValueOnce(new Response(null, { status: 404 }))
@@ -138,7 +146,7 @@ describe('fetchGithubWorkflowRun', () => {
   });
 
   it('stops at the first repository that has the run', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
     mockFetch.mockResolvedValueOnce(Response.json(workflowRun({ id: 456 })));
 
     const response = await fetchGithubWorkflowRun('456', 'token-123');
@@ -147,7 +155,7 @@ describe('fetchGithubWorkflowRun', () => {
   });
 
   it('reports an API failure instead of a later repository 404', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
       .mockResolvedValueOnce(new Response(null, { status: 502, statusText: 'Bad Gateway' }))
@@ -201,7 +209,7 @@ describe('fetchGithubRunArtifacts', () => {
   });
 
   it('returns no artifacts after a single request by default', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
+    stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
     mockFetch.mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }));
 
     await expect(fetchGithubRunArtifacts('456', 'token-123')).resolves.toEqual([]);
@@ -209,7 +217,7 @@ describe('fetchGithubRunArtifacts', () => {
   });
 
   it('falls back to the next source repository when a run listing fails', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
     const sourceArtifacts = [artifact(7, 'results_bmk')];
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
@@ -229,7 +237,7 @@ describe('fetchGithubRunArtifacts', () => {
   });
 
   it('keeps the owning repository listing even when it is empty or partial', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
     mockFetch.mockResolvedValueOnce(Response.json({ artifacts: [] }));
     await expect(fetchGithubRunArtifacts('456', 'token-123')).resolves.toEqual([]);
     expect(mockFetch).toHaveBeenCalledOnce();

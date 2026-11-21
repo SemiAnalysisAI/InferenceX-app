@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { StagedChartScope } from '@semianalysisai/inferencex-db/queries/staged-chart-links';
 import { buildComparisonDates } from '@/components/inference/hooks/chart-data-core';
 import {

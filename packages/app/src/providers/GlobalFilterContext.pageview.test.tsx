@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, memo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
@@ -11,9 +11,8 @@ import {
   CLIENT_PATHNAME_CHANGE_EVENT,
   isPageviewPathnameChange,
 } from '@/lib/routing/client-navigation';
-import type * as UrlStateModule from '@/lib/routing/url-state';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   pathname: '/',
   availability: {
     data: undefined as AvailabilityIndex | undefined,
@@ -25,26 +24,27 @@ const mocks = vi.hoisted(() => ({
   workflow: { data: undefined, isLoading: false, error: null as Error | null },
   getUrlParam: vi.fn((_key: string): string | undefined => undefined),
   setUrlParams: vi.fn(),
-}));
+};
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   usePathname: () => mocks.pathname,
 }));
-vi.mock('@/hooks/api/use-availability', () => ({
+mock.module('@/hooks/api/use-availability', () => ({
   useAvailability: () => mocks.availability,
 }));
-vi.mock('@/hooks/api/use-workflow-info', () => ({
+mock.module('@/hooks/api/use-workflow-info', () => ({
   useWorkflowInfo: () => mocks.workflow,
 }));
-vi.mock('@/hooks/useUrlState', () => ({
+mock.module('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: mocks.getUrlParam, setUrlParams: mocks.setUrlParams }),
 }));
-vi.mock('@/lib/routing/url-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof UrlStateModule>()),
+const actual = { ...(await import('@/lib/routing/url-state')) };
+mock.module('@/lib/routing/url-state', () => ({
+  ...actual,
   hasExplicitUrlParam: () => false,
   refreshUrlParams: () => ({}),
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
 }));
 

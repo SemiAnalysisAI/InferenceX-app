@@ -1,24 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { DbClient } from '../connection.js';
 import { DOWNSTREAM_ID_START } from './downstream-ids';
+import type * as PayloadDb from './payload-db';
+import { stubEnv, unstubAllEnvs } from './test-helpers';
 
-const { clients, own } = vi.hoisted(() => {
-  const state = { ingestedRuns: new Set<number>(), unreserved: [] as string[] };
-  const client = (isOwn: boolean) =>
-    ((strings: TemplateStringsArray, value: unknown) => {
-      const text = strings.join('?');
-      if (text.includes('pg_sequences')) {
-        return Promise.resolve(isOwn ? state.unreserved.map((name) => ({ name })) : []);
-      }
-      return Promise.resolve(
-        isOwn && state.ingestedRuns.has(value as number) ? [{ present: 1 }] : [],
-      );
-    }) as never;
-  return { clients: { own: client(true), public: client(false) }, own: state };
-});
+const own = { ingestedRuns: new Set<number>(), unreserved: [] as string[] };
+const client = (isOwn: boolean) =>
+  ((strings: TemplateStringsArray, value: unknown) => {
+    const text = strings.join('?');
+    if (text.includes('pg_sequences')) {
+      return Promise.resolve(isOwn ? own.unreserved.map((name) => ({ name })) : []);
+    }
+    return Promise.resolve(isOwn && own.ingestedRuns.has(value as number) ? [{ present: 1 }] : []);
+  }) as never;
+const clients = { own: client(true), public: client(false) };
 
-vi.mock('../connection', () => ({
+mock.module('../connection', () => ({
   getDb: (overrides?: { url?: string }) => (overrides?.url ? clients.public : clients.own),
 }));
 
@@ -27,20 +25,21 @@ const publicDb = clients.public as DbClient;
 const BELOW = DOWNSTREAM_ID_START - 1;
 const echo = (sql: DbClient, ids: number[]) => Promise.resolve([sql, ids]);
 
-const load = () => import('./payload-db');
+// bun:test has no vi.resetModules(); a unique query string loads a copy with fresh module state.
+let generation = 0;
+const load = () => import(`./payload-db?fresh=${++generation}`) as Promise<typeof PayloadDb>;
 
 function setPublicDb(set: boolean) {
-  vi.stubEnv('PUBLIC_DATABASE_READONLY_URL', set ? 'postgres://public.example/db' : '');
+  stubEnv('PUBLIC_DATABASE_READONLY_URL', set ? 'postgres://public.example/db' : '');
 }
 
 beforeEach(() => {
-  vi.resetModules();
   own.ingestedRuns.clear();
   own.unreserved = [];
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
 });
 
 describe('database routing', () => {
