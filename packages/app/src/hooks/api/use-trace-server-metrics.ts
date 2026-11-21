@@ -34,6 +34,8 @@ export interface PointMeta {
   num_prefill_gpu: number;
   num_decode_gpu: number;
   recipe_fingerprint: string | null;
+  /** Parallelism widths (PP/DCP/PCP, DWDP) that the cache-reuse recipe key reads. */
+  metrics?: Record<string, number>;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;

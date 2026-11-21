@@ -133,6 +133,15 @@ export function cacheReuseRecipeKey(
     | 'spec_method'
   > & { offload_mode: string | null; metrics?: BenchmarkRow['metrics'] },
 ): string {
+  const m = row.metrics ?? {};
+  const parallelism = [
+    m.prefill_pp ?? 1,
+    m.decode_pp ?? 1,
+    m.prefill_dcp_size ?? m.dcp_size ?? 1,
+    m.decode_dcp_size ?? m.dcp_size ?? 1,
+    m.prefill_pcp_size ?? m.pcp_size ?? 1,
+    m.decode_pcp_size ?? m.pcp_size ?? 1,
+  ];
   const dwdp = row.metrics?.prefill_dwdp_size ?? 1;
   return [
     row.disagg ? 'disagg' : 'agg',
@@ -144,6 +153,10 @@ export function cacheReuseRecipeKey(
     `spec-${row.spec_method || 'none'}`,
     `offload-${row.offload_mode || 'off'}`,
     row.recipe_fingerprint ? `fp-${row.recipe_fingerprint}` : '',
+    // Fingerprints already distinguish complete recipes; keep their existing links stable.
+    ...(!row.recipe_fingerprint && parallelism.some((size) => size > 1)
+      ? [`parallel-${parallelism.join('/')}`]
+      : []),
   ].join('|');
 }
 
@@ -151,6 +164,14 @@ export function recipeLabelOf(point: GPUDataPoint): string {
   const row = point.sourceRow;
   if (!row) return `TP${point.tp}`;
   const decodeOnly = !row.disagg && row.decode_tp > 0;
+  const m = row.metrics;
+  // Default each role to 1 so a role without a width never borrows the other role's.
+  const prefillPp = m.prefill_pp ?? 1;
+  const decodePp = m.decode_pp ?? 1;
+  const prefillDcp = m.prefill_dcp_size ?? m.dcp_size ?? 1;
+  const decodeDcp = m.decode_dcp_size ?? m.dcp_size ?? 1;
+  const prefillPcp = m.prefill_pcp_size ?? m.pcp_size ?? 1;
+  const decodePcp = m.decode_pcp_size ?? m.pcp_size ?? 1;
   const parallel = parallelismLabel({
     tp: decodeOnly ? row.decode_tp : row.prefill_tp,
     ep: decodeOnly ? row.decode_ep : row.prefill_ep,
@@ -166,6 +187,15 @@ export function recipeLabelOf(point: GPUDataPoint): string {
     decodeEp: row.decode_ep,
     decodeDpAttention: row.decode_dp_attention,
     decodeNumWorkers: row.decode_num_workers,
+    pp: Math.max(prefillPp, decodePp),
+    dcp: Math.max(prefillDcp, decodeDcp),
+    pcp: Math.max(prefillPcp, decodePcp),
+    prefillPp,
+    decodePp,
+    prefillDcp,
+    decodeDcp,
+    prefillPcp,
+    decodePcp,
   });
   const workers = !row.disagg && row.decode_num_workers > 1 ? `${row.decode_num_workers}×` : '';
   const bareTp = [...parallel].every((c) => c >= '0' && c <= '9');
@@ -199,7 +229,7 @@ export function resolveRecipe(
   requested: string | undefined,
 ): string | null {
   const recipes = cacheReuseRecipes(points);
-  if (requested && recipes.some((r) => r.key === requested)) return requested;
+  if (requested) return recipes.some((r) => r.key === requested) ? requested : null;
   return recipes[0]?.key ?? null;
 }
 
@@ -219,6 +249,17 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const recipePoints = input.official.length > 0 ? input.official : [...perSeries.values()].flat();
   const recipes = cacheReuseRecipes(recipePoints);
   const recipe = resolveRecipe(recipePoints, input.recipe);
+  if (input.recipe && recipe === null) {
+    return {
+      series: [],
+      concurrencies: [],
+      bars: [],
+      unmeasured: [],
+      anyCombined: false,
+      recipes,
+      recipe,
+    };
+  }
   const ofRecipe = (points: readonly GPUDataPoint[], wanted: string | null) => {
     const key = points.some((p) => recipeKeyOf(p) === wanted)
       ? wanted

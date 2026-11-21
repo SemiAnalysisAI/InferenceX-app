@@ -318,3 +318,5 @@ main run picker selected that run. The base query can carry other runs forward
 and stamps its points with a plain date; reusing it would lose the run-qualified
 series key. This leaves ordinary date comparisons and unofficial-run overlays
 unchanged.
+
+Cache reuse uses the global run context’s `requestedRunId` for exact historical snapshots; `selectedRunId` is the picker’s resolved/default choice. An unavailable explicit run must not turn into a newer run. A manual date selection, or a model, scenario or precision change on the tab, clears the previous run pin.

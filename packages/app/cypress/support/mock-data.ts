@@ -417,6 +417,7 @@ export function createMockGlobalFilterContexts(
     selectedRunDate: '2025-03-01',
     setSelectedRunDate: namedStub('setSelectedRunDate_global'),
     selectedRunDateRev: 0,
+    requestedRunId: '',
     selectedRunId: '12345678',
     setSelectedRunId: namedStub('setSelectedRunId_global'),
     previewFilterChange: namedStub('previewFilterChange_global'),
@@ -460,6 +461,7 @@ export function createMockGlobalFilterContexts(
     run: {
       selectedRunDate: values.selectedRunDate,
       selectedRunDateRev: values.selectedRunDateRev,
+      requestedRunId: values.requestedRunId,
       selectedRunId: values.selectedRunId,
       effectiveRunDate: values.effectiveRunDate,
     },

@@ -51,7 +51,7 @@ export const getCachedBenchmarksForRun = cachedQuery(
 export const getCachedCalculatorBenchmarks = cachedQuery(
   async (dbModelKeys: string[], sequence: string, date?: string) =>
     toCalculatorBenchmarkRows(await getCachedBenchmarks(dbModelKeys, date), sequence),
-  'benchmarks-calculator-agentic-curve-scope-v2',
+  'benchmarks-calculator-agentic-curve-scope-v3',
   { blobOnly: true },
 );
 
