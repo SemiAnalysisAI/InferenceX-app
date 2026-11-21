@@ -164,7 +164,8 @@ function verifyRequiredPowerBundle(
   for (const topology of ['single_node', 'multi_node']) {
     const buckets = object(matrix[topology], topology);
     for (const [scenario, entries] of Object.entries(buckets)) {
-      if (!Array.isArray(entries)) throw new Error(`Required power: invalid ${scenario} matrix`);
+      if (!Array.isArray(entries))
+        throw new TypeError(`Required power: invalid ${scenario} matrix`);
       for (const value of entries) {
         const row = object(value, 'matrix row');
         if (row['require-power'] !== true || row['eval-only'] === true) continue;
@@ -282,7 +283,8 @@ export function verifyRequiredPowerArtifacts(
   );
   for (const pointValue of Array.isArray(manifest.points) ? manifest.points : []) {
     const point = object(pointValue, 'point');
-    if (!Array.isArray(point.artifacts)) throw new Error('Required power: missing point artifacts');
+    if (!Array.isArray(point.artifacts))
+      throw new TypeError('Required power: missing point artifacts');
     for (const value of point.artifacts) {
       const artifact = object(value, 'artifact');
       const relative = safeArtifactPath(artifact.path);
@@ -517,7 +519,7 @@ function verifyPhysicalGpuCount(topology: JsonRow, matrix: JsonRow, key: string)
     throw new Error(`Required power: physical GPU count differs from required matrix for ${key}`);
   const gpuCount = positive(topology.num_gpus, 'topology num_gpus');
   if (!Number.isSafeInteger(gpuCount))
-    throw new Error('Required power: invalid physical GPU count');
+    throw new TypeError('Required power: invalid physical GPU count');
   return gpuCount;
 }
 

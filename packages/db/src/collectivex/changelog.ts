@@ -35,7 +35,7 @@ interface RequestedCase {
 }
 
 export function parseChangelog(raw: unknown): ChangelogEntry[] {
-  if (!Array.isArray(raw)) throw new Error('perf-changelog.yaml is not a list');
+  if (!Array.isArray(raw)) throw new TypeError('perf-changelog.yaml is not a list');
   return raw.map((entry: Record<string, unknown>, index) => {
     const pr = PR_LINK.exec(String(entry['pr-link']))?.groups?.pr;
     if (!pr || !Array.isArray(entry.pools) || !Array.isArray(entry.description)) {
