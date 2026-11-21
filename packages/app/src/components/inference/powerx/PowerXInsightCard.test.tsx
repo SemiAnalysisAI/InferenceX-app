@@ -1,19 +1,19 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   track: vi.fn(),
   setSelectedModel: vi.fn(),
   setPowerRole: vi.fn(),
-}));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
-vi.mock('@/hooks/api/use-availability', () => ({
+};
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+mock.module('@/hooks/api/use-availability', () => ({
   useAvailability: () => ({
     data: {
       dates: [],
@@ -27,7 +27,7 @@ vi.mock('@/hooks/api/use-availability', () => ({
     },
   }),
 }));
-vi.mock('@/components/inference/InferenceContext', () => ({
+mock.module('@/components/inference/InferenceContext', () => ({
   useInferenceFilters: () => ({
     selectedModel: 'DeepSeek-V4-Pro',
     selectedSequence: 'agentic-traces',
