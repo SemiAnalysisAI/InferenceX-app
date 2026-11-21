@@ -15,7 +15,7 @@ import {
   maxServerLogFileBytes,
   type CappedServerLogText,
 } from './server-log-limits';
-import { TRACE_DERIVED_METRIC_KEYS } from './trace-replay-ingest';
+import { TRACE_DERIVED_METRIC_KEYS, TRACE_ITL_METRIC_KEYS } from './trace-replay-ingest';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -121,7 +121,16 @@ export async function bulkIngestBenchmarkRows(
         then coalesce((
           select jsonb_object_agg(key, value) from jsonb_each(benchmark_results.metrics)
           where key = any(${sql.array(TRACE_DERIVED_METRIC_KEYS)}::text[])
-            and not (excluded.metrics ? key)
+            and (
+              not (excluded.metrics ? key)
+              -- Runner-only *_itl must not split from the stored full-response
+              -- stats it mirrors; nothing recomputes a linked trace.
+              or (
+                key = any(${sql.array(TRACE_ITL_METRIC_KEYS)}::text[])
+                and benchmark_results.metrics ? 'median_full_response_itl'
+                and not (excluded.metrics ? 'median_full_response_itl')
+              )
+            )
         ), '{}'::jsonb)
         else '{}'::jsonb
       end,

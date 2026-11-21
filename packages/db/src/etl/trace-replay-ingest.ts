@@ -29,15 +29,18 @@ import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
 
+/** Written together from the trace profile: each `*_itl` mirrors its `*_full_response_itl`. */
+export const TRACE_ITL_METRIC_KEYS = [...FULL_RESPONSE_STAT_KEYS, 'std'].flatMap((statistic) => [
+  `${statistic}_full_response_itl`,
+  `${statistic}_full_response_intvty`,
+  `${statistic}_itl`,
+  `${statistic}_intvty`,
+]);
+
 export const TRACE_DERIVED_METRIC_KEYS = [
   'server_gpu_cache_hit_rate',
   'server_cpu_cache_hit_rate',
-  ...[...FULL_RESPONSE_STAT_KEYS, 'std'].flatMap((statistic) => [
-    `${statistic}_full_response_itl`,
-    `${statistic}_full_response_intvty`,
-    `${statistic}_itl`,
-    `${statistic}_intvty`,
-  ]),
+  ...TRACE_ITL_METRIC_KEYS,
 ];
 
 export type TraceReplayInput = Buffer | string | null;

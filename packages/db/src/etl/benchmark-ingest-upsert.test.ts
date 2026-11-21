@@ -116,6 +116,40 @@ describe('bulkIngestBenchmarkRows — linked trace metrics', () => {
       expect(stored?.trace_replay_id).toBe(linked ? 1 : null);
     }
   });
+
+  it('keeps the trace full-response family whole against runner-only stats', async () => {
+    await ingest(row({ metrics: { output_tput_tps: 1, median_itl: 0.04, median_intvty: 25 } }));
+    // The state persistPreparedTraceReplay leaves: *_itl mirrors *_full_response_itl.
+    const traced = {
+      median_full_response_itl: 0.05,
+      median_full_response_intvty: 20,
+      median_itl: 0.05,
+      median_intvty: 20,
+    };
+    await db.exec(`
+      INSERT INTO agentic_trace_replay (id) VALUES (2);
+      UPDATE benchmark_results SET trace_replay_id=2, metrics = metrics || '${JSON.stringify(traced)}';
+    `);
+    const stored = async () => {
+      const { rows } = await db.query<{ metrics: unknown }>(
+        'SELECT metrics FROM benchmark_results',
+      );
+      return rows[0]?.metrics;
+    };
+
+    await ingest(row({ metrics: { output_tput_tps: 689, median_itl: 0.04, median_intvty: 25 } }));
+    expect(await stored()).toEqual({ output_tput_tps: 689, ...traced });
+
+    const fresh = {
+      output_tput_tps: 700,
+      median_full_response_itl: 0.02,
+      median_full_response_intvty: 50,
+      median_itl: 0.02,
+      median_intvty: 50,
+    };
+    await ingest(row({ metrics: fresh }));
+    expect(await stored()).toEqual(fresh);
+  });
 });
 
 describe('insertServerLog', () => {

@@ -148,7 +148,9 @@ The raw reader's rows and file hashes remain unchanged for PowerX verification.
 
 Selection logs include source hashes and the winner. Ordinary AgentX upserts
 preserve missing trace-owned metric fields only while a trace link exists;
-fresh artifact values remain authoritative. Historical conflicting artifacts
+fresh artifact values remain authoritative, except that stored full-response ITL
+and interactivity statistics stay together with the `*_itl` and `*_intvty` values
+that mirror them when the fresh artifact carries no full-response statistics. Historical conflicting artifacts
 require a separate explicit recovery; ordinary ingestion has no run-specific exceptions.
 
 For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
