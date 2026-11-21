@@ -34,7 +34,7 @@ import {
 } from '@/lib/routing/inference-navigation-state';
 import { cn } from '@/lib/shared/utils';
 
-const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
+export const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   inference: 'Inference Performance',
   powerx: 'PowerX',
   evaluation: 'Accuracy Evals',

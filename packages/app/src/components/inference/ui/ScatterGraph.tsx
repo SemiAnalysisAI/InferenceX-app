@@ -4331,12 +4331,7 @@ const ScatterGraph = React.memo(
     }
 
     return (
-      <div
-        className="contents"
-        data-orange-chicken-eligible={
-          selectedSequence === Sequence.AgenticTraces ? 'true' : undefined
-        }
-      >
+      <div className="contents">
         <D3Chart<InferenceData>
           ref={chartRef}
           // PowerX drops the interaction hint under its charts; /infx/inference keeps it.

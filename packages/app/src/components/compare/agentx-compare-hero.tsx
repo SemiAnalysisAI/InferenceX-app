@@ -1,7 +1,6 @@
 import { ArrowRight, ChevronRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
-import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
 import {
   agentxDashboardHref,
@@ -504,12 +503,9 @@ export function AgentXCompareHero({
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
           <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
-            <div className="relative">
-              <Heading className="max-w-2xl text-3xl font-semibold text-foreground lg:text-4xl lg:tracking-heading">
-                {t.title}
-              </Heading>
-              {surface === 'landing' && <MinecraftSplash />}
-            </div>
+            <Heading className="max-w-2xl text-3xl font-semibold text-foreground lg:text-4xl lg:tracking-heading">
+              {t.title}
+            </Heading>
             <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
               {t.description}
             </p>

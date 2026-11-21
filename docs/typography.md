@@ -14,7 +14,7 @@ Defined in the `@theme` block of `packages/app/src/app/globals.css`:
 | `--text-title`        | `text-title`        | 1.75rem (28px), 36px line height  | Desktop size of the dashboard page title           |
 | `--container-measure` | `max-w-measure`     | 45rem (720px)                     | The one column for text and media on reading pages |
 | `--leading-reading`   | `leading-reading`   | 1.65 (1.8 under `:lang(zh)`)      | Body text line height on reading pages             |
-| `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | Easter-egg theme decorations only (no app UI)      |
+| `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | SemiAnalysis theme eyebrow labels                  |
 | `--tracking-heading`  | `tracking-heading`  | -0.04em                           | Display headings at `text-4xl` and larger only     |
 
 Rules of thumb:
@@ -63,7 +63,7 @@ All help surfaces share `HELP_CONTENT_CLASS_NAME`: `text-sm`, relaxed line heigh
 
 ## Chart text
 
-Chart font sizes live in TypeScript, not CSS variables: `CHART_TYPE` in `src/lib/d3-chart/typography.ts`, with the `px()` helper for `.attr('font-size', …)`. The PNG export path (`src/lib/export/chart-image-export.ts`, loaded by `useChartExport` on click) serializes the chart with html-to-image, which cannot resolve `var(--*)`; its `resolveCssVarsForExport()` only bakes color-type attributes, so a CSS-variable font-size silently collapses in exports. The shared export font stacks (`CHART_FONT_SANS`, `CHART_FONT_MINECRAFT`) live in the same module.
+Chart font sizes live in TypeScript, not CSS variables: `CHART_TYPE` in `src/lib/d3-chart/typography.ts`, with the `px()` helper for `.attr('font-size', …)`. The PNG export path (`src/lib/export/chart-image-export.ts`, loaded by `useChartExport` on click) serializes the chart with html-to-image, which cannot resolve `var(--*)`; its `resolveCssVarsForExport()` only bakes color-type attributes, so a CSS-variable font-size silently collapses in exports. The shared export font stack (`CHART_FONT_SANS`) lives in the same module.
 
 OG-image renderers (Satori: `opengraph-image.tsx`, `og-image-render.tsx`, `compare-og.tsx`) draw on a fixed canvas and intentionally hardcode display sizes — they are exempt from all of this.
 

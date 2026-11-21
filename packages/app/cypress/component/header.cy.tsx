@@ -178,30 +178,17 @@ describe('Header', () => {
     });
   });
 
-  it('uses the same resting icon color and shape for all three header utilities in light and dark', () => {
+  it('uses the same resting icon color and shape for the header utilities', () => {
     cy.viewport(390, 844);
-    for (const theme of ['light', 'dark']) {
-      cy.get('[data-testid="theme-toggle"]').should(
-        'have.attr',
-        'aria-label',
-        `Switch theme (currently ${theme} mode)`,
-      );
-      cy.get('[data-testid="language-toggle"]').then(($language) => {
-        const language = getComputedStyle($language[0]);
-        for (const selector of ['theme-toggle', 'mobile-menu-toggle']) {
-          cy.get(`[data-testid="${selector}"]`).should(($control) => {
-            const style = getComputedStyle($control[0]);
-            expect(style.color, `${theme}: ${selector} color`).to.equal(language.color);
-            expect(style.borderRadius, `${theme}: ${selector} shape`).to.equal(
-              language.borderRadius,
-            );
-          });
-        }
+    cy.get('[data-testid="theme-toggle"]').should('not.exist');
+    cy.get('[data-testid="language-toggle"]').then(($language) => {
+      const language = getComputedStyle($language[0]);
+      cy.get('[data-testid="mobile-menu-toggle"]').should(($control) => {
+        const style = getComputedStyle($control[0]);
+        expect(style.color, 'mobile menu color').to.equal(language.color);
+        expect(style.borderRadius, 'mobile menu shape').to.equal(language.borderRadius);
       });
-      if (theme === 'light') {
-        cy.get('[data-testid="theme-toggle"]').click();
-      }
-    }
+    });
   });
 
   it('fits a 320px phone that shows a classic 15px scrollbar (305px content width)', () => {
@@ -277,7 +264,6 @@ describe('Header', () => {
           '[data-testid="header-brand"]',
           '[data-testid="site-search-toggle"]',
           '[data-testid="language-toggle"]',
-          '[data-testid="theme-toggle"]',
           '[data-testid="mobile-menu-toggle"]',
         ];
         selectors.forEach((selector) => {
@@ -298,16 +284,14 @@ describe('Header', () => {
     });
 
     it('gives the icon controls a 44px touch target in both dimensions', () => {
-      [
-        '[data-testid="site-search-toggle"]',
-        '[data-testid="theme-toggle"]',
-        '[data-testid="mobile-menu-toggle"]',
-      ].forEach((selector) => {
-        rectOf(selector).then((rect) => {
-          expect(rect.width, `${selector} width`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
-          expect(rect.height, `${selector} height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
-        });
-      });
+      ['[data-testid="site-search-toggle"]', '[data-testid="mobile-menu-toggle"]'].forEach(
+        (selector) => {
+          rectOf(selector).then((rect) => {
+            expect(rect.width, `${selector} width`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
+            expect(rect.height, `${selector} height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
+          });
+        },
+      );
     });
 
     it('still opens the menu and exposes its links', () => {

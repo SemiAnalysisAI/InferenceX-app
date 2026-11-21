@@ -1,4 +1,4 @@
-import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
+import { CHART_FONT_SANS } from '@/lib/d3-chart/typography';
 import {
   drawExportFooter,
   getExportFooterStyle,
@@ -30,15 +30,6 @@ function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration
 const CSS_VAR_RE = /var\(--(?<varName>[^)]+)\)/u;
 
 export function getExportFontFamily(): string {
-  const isMinecraftTheme =
-    typeof document !== 'undefined' &&
-    (document.documentElement.classList.contains('minecraft') ||
-      document.body.classList.contains('minecraft'));
-
-  if (isMinecraftTheme) {
-    return CHART_FONT_MINECRAFT;
-  }
-
   return CHART_FONT_SANS;
 }
 

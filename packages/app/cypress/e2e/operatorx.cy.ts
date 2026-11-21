@@ -481,7 +481,7 @@ const bandwidthPoints = () =>
         (element as unknown as { __data__: { gpuKey: string } }).__data__.gpuKey === 'Huawei 950PR',
     );
 
-it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switch', () => {
+it('uses shared Huawei colors in OperatorX and uBenchX on the site theme', () => {
   const ascend = normalizeBundle(run('201', 'ascend950pr-external', [64, 128]));
   const nvidia = normalizeBundle(run('202', 'h200-dgxc', [64, 128]));
   for (const dataset of [ascend, nvidia]) {
@@ -515,24 +515,15 @@ it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switc
     .find('.rounded-full')
     .first()
     .should('have.css', 'background-color', 'rgb(148, 106, 0)');
-  cy.get('[data-testid="theme-toggle"]').click();
-  cy.get('html').should('have.class', 'dark');
-  operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
-  cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
-    .find('.rounded-full')
-    .first()
-    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
 
   cy.visit('/ubx/mem-bw', visitOptions);
   bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
-  cy.get('[data-testid="theme-toggle"]').click();
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
   bandwidthPoints().eq(20).trigger('mouseenter', { force: true });
   cy.get('[data-chart-tooltip="ubenchx-mbu"]')
     .should('contain', 'Huawei 950PR')
     .find('span')
     .first()
-    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+    .should('have.css', 'background-color', 'rgb(148, 106, 0)');
 });
 
 it('reopens shared roofline and summary controls independently', () => {
