@@ -47,6 +47,8 @@ const rows = (hardware: 'b200' | 'h200') =>
       decode_avg_power_w: decodeWatts,
       joules_per_output_token: jOut,
       joules_per_input_token: jOut / 8,
+      // 1k output tokens per 9k total, so Energy per token draws under All GPUs too.
+      joules_per_total_token: jOut / 9,
       prefill_joules_per_input_token: (jOut - decodeJOut) / 8,
       decode_joules_per_output_token: decodeJOut,
     },
@@ -168,9 +170,9 @@ describe('PowerX layout', () => {
           });
           // The column beside the plot scrolls on y only: anything wider than it adds a
           // stray horizontal scrollbar under the legend.
-          // Energy and Power keep the shared chart legend there under every role, and no
-          // Compare-at reading line on the plot.
-          if (value === 'energy' || value === 'power') {
+          // Energy and Power keep the shared chart legend there, and no Compare-at reading
+          // line on the plot. Energy under Prefill vs decode draws stacked bars instead.
+          if (value === 'power' || (value === 'energy' && role !== 'split')) {
             cy.get('[data-slot="chart-legend-frame"] [data-testid="scatter-quick-filters"]', {
               timeout: 20000,
             }).should('be.visible');
