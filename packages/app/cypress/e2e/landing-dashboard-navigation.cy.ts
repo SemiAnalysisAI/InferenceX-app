@@ -448,9 +448,15 @@ describe('landing → full dashboard navigation', () => {
       ).to.eq(false);
     });
 
-    cy.get('[data-testid="compare-agentx-dashboard-link"]').should('be.visible');
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(1500);
+    // Click only once React owns the link, so the click is a client navigation.
+    cy.get('[data-testid="compare-agentx-dashboard-link"]')
+      .should('be.visible')
+      .and(($link) => {
+        expect(
+          Object.keys($link[0]).some((key) => key.startsWith('__reactProps')),
+          'dashboard link is hydrated',
+        ).to.equal(true);
+      });
 
     cy.window().then((win) => {
       cy.wrap(win.history.length).as('historyLenBefore');

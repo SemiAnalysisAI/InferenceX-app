@@ -10,6 +10,7 @@ import {
 import {
   availabilityBody,
   expectNoPageOverflow,
+  fastForwardQueryRetry,
   unlockAgenticGate,
   interceptBenchmarkPresence,
   interceptDerivedAgenticMetrics,
@@ -326,7 +327,9 @@ describe('Inference Chart', () => {
     cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
       'availabilityFailure',
     );
-    cy.visit('/infx/inference');
+    fastForwardQueryRetry('h2:contains("Something went wrong")', () => {
+      cy.visit('/infx/inference');
+    });
     cy.wait('@availabilityFailure');
     cy.contains('h2', 'Something went wrong').should('be.visible');
   });

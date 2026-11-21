@@ -5,7 +5,11 @@ import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benc
 import { withChipBasis } from '@/lib/benchmarks/chip-basis';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
 import {
+  gpusPerMegawatt,
+  modeledFacilityWattsPerGpu,
+  modeledItWattsPerGpu,
   POWER_BASIS_FIELDS,
+  powerBasisLabel,
   powerBasisNormalization,
   writePowerBasisChartFields,
   type PowerBasisChartFields,
@@ -440,5 +444,41 @@ describe('writePowerBasisChartFields', () => {
       utilityModeledJPerTotalToken: true,
     });
     expect(Object.keys(fields)).toEqual(['utilityModeledJPerTotalToken']);
+  });
+});
+
+describe('power basis helpers', () => {
+  it('counts the GPUs one megawatt of IT power supports', () => {
+    expect(gpusPerMegawatt(1250)).toBe(800);
+    for (const watts of [0, -5, Number.NaN, null, undefined]) {
+      expect(gpusPerMegawatt(watts)).toBeNull();
+    }
+  });
+
+  it('names a boundary in the registry or the PowerX Count vocabulary', () => {
+    expect(powerBasisLabel('gpu-measured', 'en')).toBe('GPU Level Measured');
+    expect(powerBasisLabel('gpu-measured', 'en', 'count')).toBe('GPU only');
+    expect(powerBasisLabel('utility-modeled', 'zh', 'count')).toBe('数据中心（含 PUE）');
+    expect(powerBasisLabel('gpu-provisioned', 'en', 'count')).toBe('GPU Level Provisioned (TDP)');
+  });
+
+  it('divides modeled deployment watts by a whole positive GPU count only', () => {
+    const perGpu = [8, 2.5, 0, -8].map((gpuCount) => {
+      const entry = {
+        modeledSystemPower: {
+          status: 'supported',
+          gpuCount,
+          deploymentItWatts: 4000,
+          deploymentFacilityWatts: 5000,
+        },
+      } as unknown as Parameters<typeof modeledFacilityWattsPerGpu>[0];
+      return [modeledItWattsPerGpu(entry), modeledFacilityWattsPerGpu(entry)];
+    });
+    expect(perGpu).toEqual([
+      [500, 625],
+      [null, null],
+      [null, null],
+      [null, null],
+    ]);
   });
 });

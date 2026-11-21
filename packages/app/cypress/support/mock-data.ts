@@ -24,8 +24,16 @@ import { computeToggle } from '@/hooks/useTogglableSet';
 import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
 import React from 'react';
 
+/**
+ * Builds the named stubs below. Bun component tests swap in a factory that records vi.fn mocks.
+ * A stub stands in for any context callback, so it is typed to fit every slot.
+ */
+export const stubFactory = {
+  create: (alias: string): never => cy.stub().as(alias) as never,
+};
+
 function namedStub(alias: string) {
-  return (cy.stub() as any).as(alias);
+  return stubFactory.create(alias);
 }
 
 export function createMockHardwareConfig(): HardwareConfig {
@@ -502,9 +510,7 @@ export function createMockUnofficialRunContext(
     clearUnofficialRun: namedStub('clearUnofficialRun'),
     dismissRun: namedStub('dismissRun'),
     availableModelsAndSequences: [],
-    getOverlayData: cy
-      .stub()
-      .returns(null) as unknown as UnofficialRunContextType['getOverlayData'],
+    getOverlayData: () => null,
     activeOverlayHwTypes: new Set<string>(),
     allOverlayHwTypes: new Set<string>(),
     localOfficialOverride: null,

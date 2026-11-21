@@ -19,6 +19,9 @@ function saveMediaOptIns(win: Window, enabled: boolean) {
   }
 }
 
+/** Script and style URLs whose bodies were already checked; build assets do not change per URL. */
+const resourcesWithoutFeatureCode = new Set<string>();
+
 function expectNoOptionalResources(requests: string[]) {
   cy.window().then((win) => {
     expect(requests.filter(isFeatureAsset), 'optional requests started').to.deep.equal([]);
@@ -29,8 +32,15 @@ function expectNoOptionalResources(requests: string[]) {
         /monocraft|pricedown|chalet|industry|halo|excalifont/i.test(font.family),
       ),
     ).to.have.length(0);
-    for (const resource of resources.filter((entry) => /\.(?:js|css)(?:\?|$)/.test(entry.name)))
-      cy.request(resource.name).its('body').should('not.match', featureCode);
+    for (const resource of resources.filter((entry) => /\.(?:js|css)(?:\?|$)/.test(entry.name))) {
+      if (resourcesWithoutFeatureCode.has(resource.name)) continue;
+      cy.request(resource.name)
+        .its('body')
+        .should('not.match', featureCode)
+        .then(() => {
+          resourcesWithoutFeatureCode.add(resource.name);
+        });
+    }
   });
   cy.get(featureElements).should('not.exist');
   cy.get('audio, video, iframe[src*="youtube"]').should('not.exist');
