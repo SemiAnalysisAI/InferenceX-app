@@ -94,9 +94,9 @@ jobs:
         browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     env:
-      # Chrome shard 1 of a nightly or manual run is the only writer of the sticky disks.
+      # Chrome shard 1 of a nightly or manual run on main is the only writer of the sticky disks.
       CACHE_COMMIT: >-
-        ${{ matrix.browser == 'chrome' && matrix.shard == 1 &&
+        ${{ matrix.browser == 'chrome' && matrix.shard == 1 && github.ref == 'refs/heads/main' &&
             (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
             'on-change' || 'false' }}
     steps:
@@ -186,9 +186,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       # The background `next start` server keeps node_modules busy, which blocks the disk commit.
+      # Stickydisk skips the commit after a failed step, so this only runs on success. A mount
+      # that failed leaves its path on /, so only kill processes on paths that are mount points.
       - name: Release sticky disks for commit
-        if: ${{ always() && env.CACHE_COMMIT != 'false' }}
-        run: sudo fuser -km ./node_modules ./packages/app/.next/cache /home/runner/.cache/Cypress || true
+        if: ${{ success() && env.CACHE_COMMIT != 'false' }}
+        run: |
+          for disk in ./node_modules ./packages/app/.next/cache /home/runner/.cache/Cypress; do
+            if mountpoint -q "$disk"; then sudo fuser -km "$disk" || true; fi
+          done
 
   result:
     name: E2E tests
