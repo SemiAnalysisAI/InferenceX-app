@@ -372,9 +372,10 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the page settings began remembering the run whose workload they opened on;
-      // entries are unchanged.
-      sources: '1364b8b7886f28962093521b3a14bd2c770cb933a342d23009ee7c1bf07eb59c',
+      // Re-pinned after the overlay selection gained a requested official hardware set, which only
+      // changes chart visibility, and the page settings began remembering the run whose workload
+      // they opened on. Recorded entries are unchanged.
+      sources: '7f8486f7ffa1af1516995bfc20605ebb3eed05bd02cec9706a7e6ef10b0ee1f3',
     });
   });
 });

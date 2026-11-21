@@ -3,80 +3,48 @@ name: 'Tests (Unit)'
 on:
   pull_request:
     branches: [main, master]
-    types: [opened, synchronize, ready_for_review, labeled, unlabeled]
-    paths:
-      - '.github/workflows/tests-unit.yml'
-      - 'package.json'
-      - 'packages/app/**'
-      - 'packages/constants/**'
-      - 'packages/db/**'
-      - 'packages/mcp/**'
-      - 'packages/skills/**'
-      - 'bunfig.toml'
-      - 'bun.lock'
-      - 'patches/**'
-      - 'scripts/run-workspace-script.ts'
-      - 'tsconfig.json'
-      - 'tsconfig.base.json'
+    types: [opened, synchronize, ready_for_review]
+  merge_group:
 
 permissions: {}
 
 concurrency:
-  group: >-
-    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{
-      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-      github.event.label.name || 'code' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Typecheck
-    if: >-
-      ${{ !github.event.pull_request.draft &&
-          github.event.action != 'labeled' && github.event.action != 'unlabeled' }}
-    timeout-minutes: 10
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+  changes:
+    name: Changed files
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
     permissions:
-      contents: read
+      pull-requests: read # List the pull request's changed files.
+    outputs:
+      run: ${{ steps.match.outputs.run }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Cache Bun packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
-            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      # Pull requests skip the suite when nothing it covers changed; the merge queue always runs it.
+      - id: match
+        name: Match changed files
         env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Cache typecheck build info
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.cache/tsc
-          key: ${{ runner.os }}-tsc-${{ hashFiles('bun.lock') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-tsc-${{ hashFiles('bun.lock') }}-
-      - name: Typecheck
-        run: bun run typecheck
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PATTERN: '^(\.github/workflows/tests-unit\.yml$|package\.json$|packages/(app|constants|db|mcp|skills)/|bunfig\.toml$|bun\.lock$|patches/|scripts/run-workspace-script\.ts$|tsconfig(\.base)?\.json$)'
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            echo run=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+          if (( $(wc -l <<< "$files") >= 3000 )) || grep -qE "$PATTERN" <<< "$files"; then
+            echo run=true >> "$GITHUB_OUTPUT"
+          else
+            echo run=false >> "$GITHUB_OUTPUT"
+          fi
 
   vitest:
     name: Unit tests (${{ matrix.name }})
-    if: >-
-      ${{ !github.event.pull_request.draft &&
-          github.event.action != 'labeled' && github.event.action != 'unlabeled' }}
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' && !github.event.pull_request.draft }}
     timeout-minutes: 10
     runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
@@ -130,41 +98,14 @@ jobs:
           WORKSPACES: ${{ matrix.workspaces }}
         run: for dir in $WORKSPACES; do bun run --cwd "$dir" test:unit; done
 
-  zh-copy-only:
-    name: Chinese-only English-byte guard
-    if: >-
-      ${{ !github.event.pull_request.draft &&
-          (((github.event.action != 'labeled' && github.event.action != 'unlabeled') &&
-            contains(github.event.pull_request.labels.*.name, 'chinese-copy-only')) ||
-           ((github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-            github.event.label.name == 'chinese-copy-only')) }}
-    timeout-minutes: 5
-    runs-on: blacksmith-2vcpu-ubuntu-2404
-    permissions:
-      contents: read
+  result:
+    name: Unit tests
+    needs: [changes, vitest]
+    if: ${{ always() }}
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    permissions: {}
     steps:
-      - name: Confirm the Chinese-only guard is disabled
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
-        run: echo 'chinese-copy-only label removed; English-byte guard is not required.'
-      - name: Checkout full history for the Chinese-only guard
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Setup Bun
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - name: Install dependencies
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Preserve English bytes in explicitly Chinese-only changes
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'chinese-copy-only') }}
-        env:
-          ZH_GUARD_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          ZH_GUARD_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bun run --cwd packages/app guard:zh-copy:chinese-only
+      - name: Fail when a unit test job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1

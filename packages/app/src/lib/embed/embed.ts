@@ -1,5 +1,6 @@
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
+import { isKnownGpu } from '@/lib/catalog/constants';
 import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
 import { toSequence } from '@/lib/compare/compare-enum-coerce';
 import { sequenceForScenarioSegment } from '@/lib/compare/compare-scenario-route';
@@ -42,6 +43,8 @@ export interface EmbedOptions {
   yAxisMetric: string;
   /** Disaggregated throughput denominator; `chips` or the dashboard's `g_chips`. */
   chipBasis: ChipBasis;
+  /** Official hardware keys to show, from `hw` or the dashboard's `i_active`. */
+  hwTypes: string[];
 }
 
 export const EMBED_DEFAULT_Y_AXIS_METRIC = 'y_tpPerGpu';
@@ -84,7 +87,17 @@ export function parseEmbedOptions(
   const rawChips = (first(searchParams.chips) ?? first(searchParams.g_chips))?.trim().toLowerCase();
   const chipBasis: ChipBasis = rawChips === 'total' ? 'total' : DEFAULT_CHIP_BASIS;
 
-  return { frameworks, theme, skin, sequence, yAxisMetric, chipBasis };
+  const rawHw = first(searchParams.hw) ?? first(searchParams.i_active) ?? '';
+  const hwTypes = [
+    ...new Set(
+      rawHw
+        .split(',')
+        .map((key) => key.trim().toLowerCase())
+        .filter((key) => key && isKnownGpu(key)),
+    ),
+  ];
+
+  return { frameworks, theme, skin, sequence, yAxisMetric, chipBasis, hwTypes };
 }
 
 export const EMBED_RESIZE_MESSAGE_TYPE = 'inferencex:embed-resize';

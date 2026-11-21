@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, ready_for_review]
+  merge_group:
 
 permissions: {}
 
@@ -13,10 +14,10 @@ concurrency:
 
 jobs:
   oxc:
-    name: Lint and format
+    name: Lint, format and typecheck
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 5
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
     steps:
@@ -49,3 +50,5 @@ jobs:
         run: bun run fmt
       - name: Typography gate
         run: bun run check:typography
+      - name: Typecheck
+        run: bun run typecheck
