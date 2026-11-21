@@ -372,8 +372,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the run context began exposing the requested run ID; entries are unchanged.
-      sources: 'e332439763d163bc3acf537e5b1f41d23d0ace93eb0d18883378482030be70da',
+      // Re-pinned after the overlay selection gained a requested official hardware set and the
+      // run context began exposing the requested run ID. Recorded entries are unchanged.
+      sources: '3cfff2cd37f5c53524f2756e8a640fd85a259176b40ef54ab4b98ba22a1b5a1f',
     });
   });
 });
