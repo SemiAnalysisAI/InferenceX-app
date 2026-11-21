@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { useHeldHeight } from './useHeldHeight';
 
@@ -40,7 +41,7 @@ let root: Root;
 
 beforeEach(() => {
   observers = [];
-  vi.stubGlobal('ResizeObserver', StubResizeObserver);
+  stubGlobal('ResizeObserver', StubResizeObserver);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -49,7 +50,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function Probe({ hold }: { hold: boolean }) {

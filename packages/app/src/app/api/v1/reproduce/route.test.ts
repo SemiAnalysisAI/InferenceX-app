@@ -1,23 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 import type { ReproduceSource } from '@semianalysisai/inferencex-db/queries/reproduce';
 
-const { mockGetReproduceSource, mockGetDb } = vi.hoisted(() => ({
+const { mockGetReproduceSource, mockGetDb } = {
   mockGetReproduceSource: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/reproduce', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/reproduce', () => ({
   getReproduceSource: mockGetReproduceSource,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: <T>(fn: T) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
@@ -25,7 +25,9 @@ vi.mock('@/lib/cache/api-cache', () => ({
 import { NextRequest } from 'next/server';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { buildReproduceConfig } from '@/lib/reproduce/reproduce-config';
-import { GET } from './route';
+
+// Imported after mock.module so the route builds its reader from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 const req = (url: string) => new NextRequest(new URL(url, 'http://localhost'));
 

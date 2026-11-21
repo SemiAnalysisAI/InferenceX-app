@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { readZipEntries } from './zip-range';
 
 describe('readZipEntries', () => {

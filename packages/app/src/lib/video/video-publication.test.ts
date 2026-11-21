@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 import { publishVideoResults } from './video-publication';
 
 describe('explicit video publication job', () => {

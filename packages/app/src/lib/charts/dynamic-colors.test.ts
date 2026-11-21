@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { hsl, rgb } from 'd3';
 
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';

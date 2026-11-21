@@ -1,14 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({ track: vi.fn(), locale: 'en' as 'en' | 'zh' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-vi.mock('next/link', () => ({
+const mocks = { track: vi.fn(), locale: 'en' as 'en' | 'zh' };
+mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+mock.module('next/link', () => ({
   default: ({ href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
     <a href={href} {...props} />
   ),

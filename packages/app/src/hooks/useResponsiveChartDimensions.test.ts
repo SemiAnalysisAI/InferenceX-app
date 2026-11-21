@@ -1,7 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import {
   RESIZE_COALESCE_MS,
@@ -93,15 +100,15 @@ function makeContainer(width: number): HTMLDivElement {
 beforeEach(() => {
   MockResizeObserver.instances = [];
   frames = [];
-  vi.stubGlobal('ResizeObserver', MockResizeObserver);
-  vi.stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+  stubGlobal('ResizeObserver', MockResizeObserver);
+  stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
+  stubGlobal('cancelAnimationFrame', (id: number) => {
     frames[id - 1] = null;
   });
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -210,7 +217,7 @@ describe('useResponsiveChartDimensions', () => {
   });
 
   it('applies the first width change at once and coalesces a burst into its final width', () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
         useResponsiveChartDimensions({ height: 600 }),
@@ -227,15 +234,15 @@ describe('useResponsiveChartDimensions', () => {
       observer.trigger(990);
       expect(result.current.dimensions.width).toBe(1024);
 
-      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      act(() => advanceTimersByTime(RESIZE_COALESCE_MS));
       expect(result.current.dimensions).toEqual({ width: 990, height: 600 });
 
-      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      act(() => advanceTimersByTime(RESIZE_COALESCE_MS));
       observer.trigger(700);
       expect(result.current.dimensions.width).toBe(700);
       unmount();
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 });

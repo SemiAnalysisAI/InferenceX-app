@@ -1,33 +1,37 @@
 import { brotliDecompressSync } from 'node:zlib';
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-import type * as ApiCache from '@/lib/cache/api-cache';
-
-const { readRevision, readCached, fixtures } = vi.hoisted(() => ({
+const { readRevision, readCached } = {
   readRevision: vi.fn(),
   readCached: vi.fn(),
-  fixtures: { mode: false },
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getDb: () => ({}),
-  get FIXTURES_MODE() {
-    return fixtures.mode;
-  },
-}));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics-revision', () => ({
+// bun:test snapshots a mock factory's getters, so fixture mode flips by mocking the module again,
+// which rebinds FIXTURES_MODE in every module that already imported it.
+function mockConnection(fixturesMode: boolean) {
+  mock.module('@semianalysisai/inferencex-db/connection', () => ({
+    getDb: () => ({}),
+    FIXTURES_MODE: fixturesMode,
+  }));
+}
+
+mockConnection(false);
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics-revision', () => ({
   getGpuMetricsPointRevision: readRevision,
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForPoint: vi.fn(),
 }));
-vi.mock('@/lib/cache/api-cache', async (importOriginal) => ({
-  ...(await importOriginal<typeof ApiCache>()),
+// The factory cannot import the module it replaces, so the real exports are captured first.
+const actual = { ...(await import('@/lib/cache/api-cache')) };
+mock.module('@/lib/cache/api-cache', () => ({
+  ...actual,
   cachedQuery: () => readCached,
 }));
 
-import { GET } from './route';
+// Imported after mock.module so the route's payload reader is the mocked cachedQuery result.
+const { GET } = await import('./route');
 
 function request(id = '7', headers: Record<string, string> = {}) {
   return new NextRequest(`http://localhost/api/v1/gpu-metrics-point?id=${id}`, { headers });
@@ -154,7 +158,7 @@ describe('GET /api/v1/gpu-metrics-point', () => {
   });
 
   it('keeps fixture responses out of the browser cache', async () => {
-    fixtures.mode = true;
+    mockConnection(true);
     try {
       readRevision.mockResolvedValue('rev-1');
       readCached.mockResolvedValue(payload);
@@ -162,7 +166,7 @@ describe('GET /api/v1/gpu-metrics-point', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
     } finally {
-      fixtures.mode = false;
+      mockConnection(false);
     }
   });
 

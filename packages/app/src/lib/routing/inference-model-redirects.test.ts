@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './inference-model-redirects';
 import { INFERENCE_MODEL_ALIASES } from './inference-model-slug';

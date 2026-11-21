@@ -1,5 +1,5 @@
 import { MODEL_RELEASE_DATES, getModelReleaseDate } from '@semianalysisai/inferencex-constants';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { MODEL_OPTIONS, Model } from '@/lib/catalog/data-mappings';
 

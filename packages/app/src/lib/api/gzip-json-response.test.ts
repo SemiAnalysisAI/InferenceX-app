@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { GZIP_JSON_CONTENT_TYPE, readJsonResponse } from './gzip-json-response';
 

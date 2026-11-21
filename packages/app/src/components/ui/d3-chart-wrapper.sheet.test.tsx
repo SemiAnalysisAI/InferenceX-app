@@ -1,18 +1,21 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { COARSE_POINTER_QUERY, MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { stubMatchMedia } from '@/test/match-media-stub';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
+import * as DynamicMargins from '@/lib/d3-chart/dynamic-margins';
 import { D3ChartWrapper } from './d3-chart-wrapper';
 
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+// Snapshot of the real exports, taken before mock.module swaps them in place.
+const actualDynamicMargins = { ...DynamicMargins };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actualDynamicMargins,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));

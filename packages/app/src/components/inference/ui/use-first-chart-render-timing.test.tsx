@@ -1,20 +1,35 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+
+import type { markNavigationStart } from '@/lib/analytics/navigation-timing';
 
 import type { useFirstChartRenderTiming } from './use-first-chart-render-timing';
 
-const track = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/analytics/analytics', () => ({ track }));
+const track = vi.fn();
+mock.module('@/lib/analytics/analytics', () => ({ track }));
 
 let container: HTMLDivElement;
 let root: Root;
 
-async function loadHook() {
-  vi.resetModules();
-  const timingModule = await import('./use-first-chart-render-timing');
-  return timingModule.useFirstChartRenderTiming;
+let loadCount = 0;
+
+// Both the hook and navigation-timing keep per-navigation state at module level, so every test
+// needs fresh copies. Bun caches modules per specifier, so a query string loads a new copy, and
+// mocking navigation-timing with its fresh copy hands that same instance to the hook.
+async function loadHook(): Promise<{
+  useTiming: typeof useFirstChartRenderTiming;
+  markNavigationStart: typeof markNavigationStart;
+}> {
+  loadCount += 1;
+  const navigationTiming = await import(`@/lib/analytics/navigation-timing?load=${loadCount}`);
+  mock.module('@/lib/analytics/navigation-timing', () => navigationTiming);
+  const timingModule = await import(`./use-first-chart-render-timing?load=${loadCount}`);
+  return {
+    useTiming: timingModule.useFirstChartRenderTiming,
+    markNavigationStart: navigationTiming.markNavigationStart,
+  };
 }
 
 function Chart({ useTiming }: { useTiming: typeof useFirstChartRenderTiming }) {
@@ -48,7 +63,7 @@ afterEach(() => {
 
 describe('useFirstChartRenderTiming', () => {
   it('waits for the first data point, then reports once with the time since navigation', async () => {
-    const useTiming = await loadHook();
+    const { useTiming } = await loadHook();
     vi.spyOn(performance, 'now').mockReturnValue(1234.6);
     act(() => root.render(<Chart useTiming={useTiming} />));
     expect(track).not.toHaveBeenCalled();
@@ -68,7 +83,7 @@ describe('useFirstChartRenderTiming', () => {
   });
 
   it('does not report again for later charts in the same navigation', async () => {
-    const useTiming = await loadHook();
+    const { useTiming } = await loadHook();
     act(() => root.render(<Chart useTiming={useTiming} />));
     await act(async () => {
       drawPoint();
@@ -84,8 +99,7 @@ describe('useFirstChartRenderTiming', () => {
   });
 
   it('reports again after a soft navigation, timed from that navigation', async () => {
-    const useTiming = await loadHook();
-    const { markNavigationStart } = await import('@/lib/analytics/navigation-timing');
+    const { useTiming, markNavigationStart } = await loadHook();
     const now = vi.spyOn(performance, 'now').mockReturnValue(800);
     act(() => root.render(<Chart useTiming={useTiming} />));
     await act(async () => {
@@ -115,8 +129,7 @@ describe('useFirstChartRenderTiming', () => {
   });
 
   it('ignores stale points and control updates after a soft navigation until new points render', async () => {
-    const useTiming = await loadHook();
-    const { markNavigationStart } = await import('@/lib/analytics/navigation-timing');
+    const { useTiming, markNavigationStart } = await loadHook();
     const now = vi.spyOn(performance, 'now').mockReturnValue(500);
     act(() => root.render(<Chart useTiming={useTiming} />));
     await act(async () => {
@@ -149,8 +162,7 @@ describe('useFirstChartRenderTiming', () => {
   });
 
   it('reports when a canvas point layer joins new points, not when an empty layer mounts', async () => {
-    const useTiming = await loadHook();
-    const { markNavigationStart } = await import('@/lib/analytics/navigation-timing');
+    const { useTiming, markNavigationStart } = await loadHook();
     const now = vi.spyOn(performance, 'now').mockReturnValue(300);
     act(() => root.render(<Chart useTiming={useTiming} />));
     const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');

@@ -1,16 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   pathname: { value: '/zh/infx/inference' },
   track: vi.fn(),
-}));
+};
 
-vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+mock.module('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
+mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 
 import { RetryableQueryError } from './retryable-query-error';
 

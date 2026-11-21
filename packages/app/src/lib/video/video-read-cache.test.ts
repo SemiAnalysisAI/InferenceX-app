@@ -1,24 +1,27 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { advanceTimersByTime, mocked, useFakeTimers, useRealTimers } from '@/test/helpers';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
-import { publishedVideoHistory } from './video-history-store';
-import { readPublishedArtifact, derivedMedia, storedArtifacts } from './video-storage';
-import {
-  cachedPublishedArtifact,
-  cachedVideoHistory,
-  RENDITION_LISTING_REVALIDATE_SECONDS,
-  VIDEO_CACHE_REVALIDATE_SECONDS,
-} from './video-read-cache';
-import { purgeVideo } from '@/lib/cache/api-cache';
 
-vi.mock('next/cache', () => fakeNextCache);
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-vi.mock('./video-history-store', () => ({ publishedVideoHistory: vi.fn() }));
-vi.mock('./video-storage', () => ({
+mock.module('next/cache', () => fakeNextCache);
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+mock.module('./video-history-store', () => ({ publishedVideoHistory: vi.fn() }));
+mock.module('./video-storage', () => ({
   storedArtifacts: vi.fn(),
   readPublishedArtifact: vi.fn(),
   derivedMedia: vi.fn(),
 }));
+
+// Imported after mock.module so the read cache and purgeVideo are built on the fake next/cache.
+const { publishedVideoHistory } = await import('./video-history-store');
+const { readPublishedArtifact, derivedMedia, storedArtifacts } = await import('./video-storage');
+const {
+  cachedPublishedArtifact,
+  cachedVideoHistory,
+  RENDITION_LISTING_REVALIDATE_SECONDS,
+  VIDEO_CACHE_REVALIDATE_SECONDS,
+} = await import('./video-read-cache');
+const { purgeVideo } = await import('@/lib/cache/api-cache');
 
 const page = (entries: VideoHistoryPage['entries'] = []): VideoHistoryPage => ({
   schemaVersion: 1,
@@ -38,7 +41,7 @@ const artifact = { id: 20, name: 'h3-results-10-1', expired: false, size_in_byte
 const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
 
 beforeEach(() => {
-  vi.mocked(derivedMedia).mockResolvedValue(new Map());
+  mocked(derivedMedia).mockResolvedValue(new Map());
 });
 afterEach(() => {
   resetFakeNextCache();
@@ -47,7 +50,7 @@ afterEach(() => {
 
 describe('shared VideoGenX read cache', () => {
   it('serves a retained History page, unapproved entries included, without rereading storage', async () => {
-    vi.mocked(publishedVideoHistory).mockImplementation((number) =>
+    mocked(publishedVideoHistory).mockImplementation((number) =>
       Promise.resolve({ page: page([entry(String(number), number === 1)]), complete: true }),
     );
     const first = await cachedVideoHistory(1, 1);
@@ -65,7 +68,7 @@ describe('shared VideoGenX read cache', () => {
   });
 
   it('keeps an empty first page but not pages past the end, so arbitrary page numbers add no entries', async () => {
-    vi.mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
+    mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
     await cachedVideoHistory(1, 1);
     await cachedVideoHistory(1, 1);
     await cachedVideoHistory(9000, 1);
@@ -74,26 +77,26 @@ describe('shared VideoGenX read cache', () => {
   });
 
   it('rereads a retained page after the backstop TTL, so a read racing a purge cannot stay stale', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     try {
-      vi.mocked(publishedVideoHistory).mockResolvedValue({
+      mocked(publishedVideoHistory).mockResolvedValue({
         page: page([entry('10', true)]),
         complete: true,
       });
       await cachedVideoHistory(1, 1);
-      vi.advanceTimersByTime(VIDEO_CACHE_REVALIDATE_SECONDS * 1000 - 1);
+      advanceTimersByTime(VIDEO_CACHE_REVALIDATE_SECONDS * 1000 - 1);
       await cachedVideoHistory(1, 1);
       expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
-      vi.advanceTimersByTime(1);
+      advanceTimersByTime(1);
       await cachedVideoHistory(1, 1);
       expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 
   it('returns an incomplete page but rereads it, because a failed approval lookup appears as unapproved', async () => {
-    vi.mocked(publishedVideoHistory).mockResolvedValue({
+    mocked(publishedVideoHistory).mockResolvedValue({
       page: page([entry('10', false)]),
       complete: false,
     });
@@ -106,10 +109,10 @@ describe('shared VideoGenX read cache', () => {
   });
 
   it('retains a published artifact but keeps looking for an absent one', async () => {
-    vi.mocked(storedArtifacts).mockImplementation((runId) =>
+    mocked(storedArtifacts).mockImplementation((runId) =>
       Promise.resolve(runId === '10' ? [artifact] : []),
     );
-    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
+    mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
     await expect(cachedPublishedArtifact('10', '20')).resolves.toEqual(saved);
     await expect(cachedPublishedArtifact('10', '20')).resolves.toEqual(saved);
     expect(readPublishedArtifact).toHaveBeenCalledTimes(1);
@@ -117,32 +120,32 @@ describe('shared VideoGenX read cache', () => {
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     expect(storedArtifacts).toHaveBeenCalledTimes(3);
     // A failed quality read still serves the media but is read again next time.
-    vi.mocked(storedArtifacts).mockResolvedValue([{ ...artifact, id: 21 }]);
-    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: false });
+    mocked(storedArtifacts).mockResolvedValue([{ ...artifact, id: 21 }]);
+    mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: false });
     await expect(cachedPublishedArtifact('12', '21')).resolves.toEqual(saved);
     await expect(cachedPublishedArtifact('12', '21')).resolves.toEqual(saved);
     expect(readPublishedArtifact).toHaveBeenCalledTimes(3);
   });
 
   it('relists renditions on a short clock, because they are encoded after the publication purge', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     try {
-      vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
-      vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
+      mocked(storedArtifacts).mockResolvedValue([artifact]);
+      mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
       await cachedPublishedArtifact('10', '20');
-      vi.advanceTimersByTime(RENDITION_LISTING_REVALIDATE_SECONDS * 1000);
+      advanceTimersByTime(RENDITION_LISTING_REVALIDATE_SECONDS * 1000);
       await cachedPublishedArtifact('10', '20');
       expect(derivedMedia).toHaveBeenCalledTimes(2);
       expect(readPublishedArtifact).toHaveBeenCalledTimes(1);
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 
   it('rereads every page and artifact after a publication purge', async () => {
-    vi.mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
-    vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
-    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
+    mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
+    mocked(storedArtifacts).mockResolvedValue([artifact]);
+    mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
     await cachedVideoHistory(1, 1);
     await cachedPublishedArtifact('10', '20');
     purgeVideo();

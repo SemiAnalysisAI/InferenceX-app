@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 import type { InferenceData, HardwareConfig } from '@/components/inference/types';
 import type { TooltipConfig } from '@/components/inference/utils/tooltipUtils';

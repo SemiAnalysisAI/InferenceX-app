@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { Model } from '@/lib/catalog/data-mappings';
 import { MODEL_ARCHITECTURES } from '@/lib/catalog/model-architectures';

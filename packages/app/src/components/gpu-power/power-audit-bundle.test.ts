@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   BUNDLE_MANIFEST_ENTRY,
   BUNDLE_SAMPLES_ENTRY,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { normalizeGpuData } from '@/components/gpu-specs/gpu-specs-radar-chart';
 import {

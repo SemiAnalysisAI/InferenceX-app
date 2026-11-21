@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { interpolateForGPU } from '@/components/calculator/interpolation';

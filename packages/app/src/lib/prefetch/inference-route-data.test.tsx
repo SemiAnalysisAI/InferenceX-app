@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 import { hashKey, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type * as NextNavigation from 'next/navigation';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals, waitFor } from '@/test/helpers';
 
 import { calculatorUrlSeed } from '@/components/calculator/url-seed';
 import {
@@ -36,17 +36,18 @@ import {
 } from '@/providers/GlobalFilterContext';
 
 import { prefetchInferenceRouteData, resolveInferenceRoute } from './inference-route-data';
-import type * as UnofficialRunProvider from '@/providers/unofficial-run-provider';
 import { warmInferenceRoute } from './inference-route-warm';
 
-const mocks = vi.hoisted(() => ({ pathname: '/' }));
+const mocks = { pathname: '/' };
 
-vi.mock('next/navigation', async (importOriginal) => ({
-  ...(await importOriginal<typeof NextNavigation>()),
+const actual = { ...(await import('next/navigation')) };
+mock.module('next/navigation', () => ({
+  ...actual,
   usePathname: () => mocks.pathname,
 }));
-vi.mock('@/providers/unofficial-run-provider', async (importOriginal) => ({
-  ...(await importOriginal<typeof UnofficialRunProvider>()),
+const actual2 = { ...(await import('@/providers/unofficial-run-provider')) };
+mock.module('@/providers/unofficial-run-provider', () => ({
+  ...actual2,
   useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
 }));
 
@@ -125,7 +126,7 @@ async function warm(path: string): Promise<QueryClient> {
   expect(route).not.toBeNull();
   const client = freshClient();
   await warmInferenceRoute(client, route!);
-  await vi.waitFor(() => expect(client.isFetching()).toBe(0));
+  await waitFor(() => expect(client.isFetching()).toBe(0));
   return client;
 }
 
@@ -190,7 +191,7 @@ function ThroughputProbe() {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', fetchMock);
+  stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
   window.history.replaceState(null, '', '/');
 });
@@ -198,7 +199,7 @@ beforeEach(() => {
 afterEach(() => {
   if (root) act(() => root!.unmount());
   root = null;
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   setInferenceNavigationModel(undefined);
   writeUrlParams({ g_model: undefined });
   readUrlParams();
@@ -418,6 +419,6 @@ describe('prefetchInferenceRouteData', () => {
     expect(prefetchInferenceRouteData(client, '/infx/calculator', new URLSearchParams())).toBe(
       true,
     );
-    await vi.waitFor(() => expect(client.getQueryState(availabilityKey)?.status).toBe('error'));
+    await waitFor(() => expect(client.getQueryState(availabilityKey)?.status).toBe('error'));
   });
 });

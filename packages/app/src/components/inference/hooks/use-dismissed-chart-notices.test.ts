@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 import type { KnownIssueAnnotation } from '@/components/inference/utils/knownIssueAnnotations';
 import { KNOWN_CONFIG_ISSUES } from '@/lib/benchmarks/known-issues';

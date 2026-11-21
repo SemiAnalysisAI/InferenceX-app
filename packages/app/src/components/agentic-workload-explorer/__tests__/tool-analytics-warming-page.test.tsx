@@ -1,11 +1,20 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import {
+  advanceTimersByTimeAsync,
+  runOnlyPendingTimersAsync,
+  setSystemTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 import ToolAnalyticsPage from '@/components/agentic-workload-explorer/views/tool-analytics-view';
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/tool-analytics',
@@ -69,10 +78,10 @@ let analyticsRequestNumber: number;
 let workflowRequestNumber: number;
 
 beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-07-07T12:05:00.000Z'));
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('fetch', fetchMock);
+  useFakeTimers();
+  setSystemTime(new Date('2026-07-07T12:05:00.000Z'));
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('fetch', fetchMock);
   analyticsRequestNumber = 0;
   workflowRequestNumber = 0;
 
@@ -103,8 +112,8 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   fetchMock.mockReset();
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
+  useRealTimers();
+  unstubAllGlobals();
 });
 
 function requestCount(url: string) {
@@ -144,7 +153,7 @@ describe('tool analytics without a cached snapshot', () => {
   it('only re-reads the analytics and workflow caches on explicit reload', async () => {
     act(() => root.render(<ToolAnalyticsPage />));
     await act(async () => {
-      await vi.runOnlyPendingTimersAsync();
+      await runOnlyPendingTimersAsync();
     });
     await flushMicrotasks();
 
@@ -155,13 +164,13 @@ describe('tool analytics without a cached snapshot', () => {
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics/sequences')).toBe(0);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1_000);
+      await advanceTimersByTimeAsync(60 * 60 * 1_000);
     });
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics')).toBe(1);
 
     await click('Reload tool analytics');
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
+      await advanceTimersByTimeAsync(0);
     });
     await flushMicrotasks();
 
@@ -172,7 +181,7 @@ describe('tool analytics without a cached snapshot', () => {
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics/sequences')).toBe(1);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1_000);
+      await advanceTimersByTimeAsync(60 * 60 * 1_000);
     });
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics')).toBe(2);
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics/sequences')).toBe(1);

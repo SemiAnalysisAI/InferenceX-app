@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockSearchServerLogs, mockGetDb } = vi.hoisted(() => ({
+const { mockSearchServerLogs, mockGetDb } = {
   mockSearchServerLogs: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   searchServerLogs: mockSearchServerLogs,
   ServerLogSearchTimeoutError: class ServerLogSearchTimeoutError extends Error {
     constructor() {
@@ -20,7 +20,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   },
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 

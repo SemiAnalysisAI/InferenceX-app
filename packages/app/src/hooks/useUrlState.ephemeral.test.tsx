@@ -1,19 +1,19 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   writeUrlParams: vi.fn(),
   refreshUrlParamsOnNavigation: vi.fn(() => true),
   readUrlParams: vi.fn(() => ({}) as Record<string, string>),
-}));
+};
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   usePathname: () => '/model/test-model',
 }));
 
-vi.mock('@/lib/routing/url-state', () => ({
+mock.module('@/lib/routing/url-state', () => ({
   readUrlParams: mocks.readUrlParams,
   refreshUrlParamsOnNavigation: mocks.refreshUrlParamsOnNavigation,
   writeUrlParams: mocks.writeUrlParams,
