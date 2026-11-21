@@ -9,6 +9,14 @@ import {
   type UseResponsiveChartDimensionsResult,
 } from './useResponsiveChartDimensions';
 
+let frames: (FrameRequestCallback | null)[] = [];
+
+function flushFrames() {
+  act(() => {
+    for (const frame of frames.splice(0)) frame?.(0);
+  });
+}
+
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
   callback: ResizeObserverCallback;
@@ -30,13 +38,18 @@ class MockResizeObserver {
 
   unobserve() {}
 
-  trigger(width: number) {
+  report(width: number) {
     act(() => {
       this.callback(
         [{ contentRect: { width } } as unknown as ResizeObserverEntry],
         this as unknown as ResizeObserver,
       );
     });
+  }
+
+  trigger(width: number) {
+    this.report(width);
+    flushFrames();
   }
 }
 
@@ -79,7 +92,12 @@ function makeContainer(width: number): HTMLDivElement {
 
 beforeEach(() => {
   MockResizeObserver.instances = [];
+  frames = [];
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  vi.stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    frames[id - 1] = null;
+  });
 });
 
 afterEach(() => {
@@ -131,6 +149,25 @@ describe('useResponsiveChartDimensions', () => {
 
     expect(result.current.dimensions).not.toBe(initial);
     expect(result.current.dimensions).toEqual({ width: 1024, height: 600 });
+    unmount();
+  });
+
+  it('applies an observed width on the next frame, not inside the observer callback', () => {
+    const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
+      useResponsiveChartDimensions({ height: (width) => width / 2 }),
+    );
+
+    act(() => {
+      result.current.setContainerRef(makeContainer(800));
+    });
+    const observer = MockResizeObserver.instances.at(-1)!;
+
+    observer.report(1000);
+    observer.report(1024);
+    expect(result.current.dimensions).toEqual({ width: 800, height: 400 });
+
+    flushFrames();
+    expect(result.current.dimensions).toEqual({ width: 1024, height: 512 });
     unmount();
   });
 
