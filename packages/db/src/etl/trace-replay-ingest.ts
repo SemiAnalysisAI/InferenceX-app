@@ -19,12 +19,29 @@ import { CHART_SERIES_SUMMARY_VERSION, encodeChartSeriesSummary } from './chart-
 import type { PromptTokenTotals } from './compute-chart-series.js';
 import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
-import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
+import {
+  FULL_RESPONSE_STAT_KEYS,
+  fullResponseMetricsFromGzip,
+} from './full-response-interactivity.js';
 import { encodeRequestChartColumns } from './request-chart-columns.js';
 import { gzipRequestTimeline } from './request-timeline-codec.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
+
+/** Written together from the trace profile: each `*_itl` mirrors its `*_full_response_itl`. */
+export const TRACE_ITL_METRIC_KEYS = [...FULL_RESPONSE_STAT_KEYS, 'std'].flatMap((statistic) => [
+  `${statistic}_full_response_itl`,
+  `${statistic}_full_response_intvty`,
+  `${statistic}_itl`,
+  `${statistic}_intvty`,
+]);
+
+export const TRACE_DERIVED_METRIC_KEYS = [
+  'server_gpu_cache_hit_rate',
+  'server_cpu_cache_hit_rate',
+  ...TRACE_ITL_METRIC_KEYS,
+];
 
 export type TraceReplayInput = Buffer | string | null;
 

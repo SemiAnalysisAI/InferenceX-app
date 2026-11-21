@@ -133,6 +133,26 @@ metrics for those points.
 
 ### AgentX Curve Replacement Scope
 
+AgentX ingestion selects one measurement per complete point identity across the
+whole run before metric or attachment writes. Selection runs on what retry handling
+leaves: preparation has already removed superseded retry copies, and `results_*`
+aggregate rows of a point that a per-job file holds are not candidates (see
+[Required Power Publication](#required-power-publication)). Identical raw copies collapse to
+their per-job source when available; a unique legacy measurement remains valid.
+Explicit failed outcomes are excluded from selection and retained as publication
+warnings. New attempt outcomes require a nonempty attempt ID and a boolean
+finalization field; passed attempts must be finalized. Malformed outcomes are
+refused, and two different eligible measurements fail ingestion. Passed status does not outrank
+conflicting legacy content. Different recipe fingerprints remain separate points.
+The raw reader's rows and file hashes remain unchanged for PowerX verification.
+
+Selection logs include source hashes and the winner. Ordinary AgentX upserts
+preserve missing trace-owned metric fields only while a trace link exists;
+fresh artifact values remain authoritative, except that stored full-response ITL
+and interactivity statistics stay together with the `*_itl` and `*_intvty` values
+that mirror them when the fresh artifact carries no full-response statistics. Historical conflicting artifacts
+require a separate explicit recovery; ordinary ingestion has no run-specific exceptions.
+
 For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
 and workload (benchmark type and sequence lengths). AGG/disagg, parallelism,
 speculative decoding, offload mode, and recipe fingerprint describe individual

@@ -15,6 +15,7 @@ import {
   maxServerLogFileBytes,
   type CappedServerLogText,
 } from './server-log-limits';
+import { TRACE_DERIVED_METRIC_KEYS, TRACE_ITL_METRIC_KEYS } from './trace-replay-ingest';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -115,7 +116,24 @@ export async function bulkIngestBenchmarkRows(
       -- upsert from the aggregated results_bmk artifact would silently wipe it.
       metrics = excluded.metrics || jsonb_strip_nulls(
         jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
-      ),
+      ) || case
+        when excluded.benchmark_type = 'agentic_traces' and benchmark_results.trace_replay_id is not null
+        then coalesce((
+          select jsonb_object_agg(key, value) from jsonb_each(benchmark_results.metrics)
+          where key = any(${sql.array(TRACE_DERIVED_METRIC_KEYS)}::text[])
+            and (
+              not (excluded.metrics ? key)
+              -- Runner-only *_itl must not split from the stored full-response
+              -- stats it mirrors; nothing recomputes a linked trace.
+              or (
+                key = any(${sql.array(TRACE_ITL_METRIC_KEYS)}::text[])
+                and benchmark_results.metrics ? 'median_full_response_itl'
+                and not (excluded.metrics ? 'median_full_response_itl')
+              )
+            )
+        ), '{}'::jsonb)
+        else '{}'::jsonb
+      end,
       image = excluded.image,
       workers = excluded.workers,
       -- Like workers, the fresh artifact is authoritative for provenance: a
