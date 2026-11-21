@@ -189,6 +189,9 @@ describe('PowerX measured power timeline', () => {
     );
     cy.wait(['@series', '@unofficialRun', '@overlaySeries']);
     cy.get('[data-testid="power-timeline-focus"]').should('contain.text', 'c64');
+    // The Trace control names the focused trace; the line options live under More.
+    cy.get('[data-testid="power-timeline-trace"] option:selected').should('contain.text', 'c64');
+    cy.get('[data-testid="powerx-more"]').click();
     cy.get('[data-testid="power-timeline-per-gpu"]').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="power-timeline-window-only"]').should(
       'have.attr',
@@ -206,7 +209,26 @@ describe('PowerX measured power timeline', () => {
       i_ptwindow: 'window',
       i_ptfocus: focus,
     });
+    cy.get('body').type('{esc}');
     cy.get('[data-testid="power-timeline-focus-clear"]').click();
     assertShareLinkParams({ i_ptfocus: null, i_ptlines: 'gpu', i_ptwindow: 'window' });
+  });
+
+  it('draws each GPU at its trace nearest Compare at and ranks its Max 5 s swing', () => {
+    visitChart('&i_metric=y_measuredPowerTimeline');
+    cy.wait('@series');
+    // Compare at defaults to 80 tok/s/user (clamped into the 30–90 sweep): c16 at 90 is nearest.
+    cy.get('[data-testid="power-timeline-trace"]').should('have.value', 'nearest');
+    cy.get('[data-testid="power-timeline-trace"] option:selected').should('contain.text', 'c16');
+    cy.get('path.power-trace').should('have.length.at.least', 1);
+    cy.get('[data-testid="powerx-swing-ranking-row"]').should('have.length', 1);
+    cy.get('[data-testid="powerx-swing-ranking-row"]')
+      .find('[data-testid="powerx-swing-ranking-value"]')
+      .invoke('text')
+      .should('match', /\d W/u);
+    // An explicit concurrency in the URL still wins.
+    visitChart('&i_metric=y_measuredPowerTimeline&i_ptconc=64');
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-trace"]').should('have.value', 'c64');
   });
 });

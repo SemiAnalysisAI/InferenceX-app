@@ -173,12 +173,3 @@ export function roleSplitRows(
   }
   return { groups: [...groups.values()], unsplit };
 }
-
-/** Largest bar extent across groups, so every bar shares one scale. */
-export function roleSplitScaleMax(groups: readonly RoleSplitGroup[]): number {
-  let max = 0;
-  for (const group of groups) {
-    for (const row of group.rows) max = Math.max(max, row.prefillJ + row.decodeJ, row.measuredJ);
-  }
-  return max;
-}

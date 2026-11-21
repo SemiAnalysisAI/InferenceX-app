@@ -22,6 +22,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
 import type { PowerXRole } from '@/components/inference/powerx/powerx-role';
+import { surfaceMetricText } from '@/components/inference/powerx/powerx-gpu-wording';
 import {
   roleGpuCountLabel,
   roleGpuCounts,
@@ -64,8 +65,9 @@ export function inferenceTableHeaderLabels(
   chartDefinition: ChartDefinition,
   selectedYAxisMetric: string,
   locale: Locale,
+  powerX = false,
 ) {
-  return {
+  const labels = {
     chip: locale === 'zh' ? '芯片' : 'Chip',
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
@@ -81,6 +83,12 @@ export function inferenceTableHeaderLabels(
     estimateStatus: locale === 'zh' ? '整体估算状态' : 'All-in Estimate Status',
     reproduce: locale === 'zh' ? '复现' : 'Reproduce',
   };
+  // PowerX says GPU where the shared headers say Chip; /infx keeps the shared headers.
+  return powerX
+    ? (Object.fromEntries(
+        Object.entries(labels).map(([key, label]) => [key, surfaceMetricText(label, true, locale)]),
+      ) as typeof labels)
+    : labels;
 }
 
 export default function InferenceTable({
@@ -91,12 +99,13 @@ export default function InferenceTable({
 }: InferenceTableProps) {
   const locale = useLocale();
   // PowerX names the measured boundaries the way its Count control does.
-  const seriesLabelStyle = usePowerXSurface() ? 'count' : 'basis';
+  const powerX = usePowerXSurface();
+  const seriesLabelStyle = powerX ? 'count' : 'basis';
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const showAllInMeasured = isAllInMeasuredConfigKey(selectedYAxisMetric);
   const headers = useMemo(
-    () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale),
-    [chartDefinition, selectedYAxisMetric, locale],
+    () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale, powerX),
+    [chartDefinition, selectedYAxisMetric, locale, powerX],
   );
 
   const sorted = useMemo(

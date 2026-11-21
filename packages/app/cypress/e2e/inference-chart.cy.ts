@@ -635,11 +635,11 @@ it('replots measured settings for official and unofficial data and preserves ove
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.wait('@measuredOverlay');
-  cy.get('#scatter-hide-non-optimal').then(($toggle) => {
-    if ($toggle.attr('data-state') === 'checked') cy.wrap($toggle).click();
-  });
+  // PowerX: the ranking's Show menu stands in for the legend's Hide non-optimal switch.
+  cy.get('[data-testid="powerx-show"]').click();
+  cy.get('[data-testid="powerx-show-points"]').click();
   cy.get('[data-testid="measured-power-statistic-p75"]').click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per Chip');
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per GPU');
   assertMeasuredValues('scatter', [500, 510, 520, 530]);
   assertMeasuredValues('.unofficial-overlay-pt', [550, 560, 570, 580]);
   cy.get('[data-testid="powerx-tab-energy"]').click();
@@ -651,14 +651,17 @@ it('replots measured settings for official and unofficial data and preserves ove
   assertMeasuredValues('scatter', [2, 3, 4, 5]);
 });
 
-it('says when chosen chip configs report no measured power, and plots them on other metrics', () => {
+it('says when chosen GPU configs report no measured power, and plots them on other metrics', () => {
   interceptMeasuredComparison(singleTurnRows(null), []);
   cy.viewport(1440, 900);
   cy.visit(
     '/pwx?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
     { onBeforeLoad: unlockAgenticGate },
   );
+  // PowerX keeps the history GPU picker in the Run popover of the context strip.
+  cy.get('[data-testid="powerx-run"]').click();
   cy.get('[data-testid="gpu-multiselect"]').should('contain', 'B300 (SGLang)');
+  cy.get('body').type('{esc}');
   cy.get('[data-testid="scatter-empty-state"]')
     .should('have.attr', 'data-reason', 'selection')
     .and('contain', 'No measured GPU power is reported for this selection.');
@@ -818,7 +821,8 @@ describe('Exact topology quick filter', () => {
     );
     cy.wait('@measuredOverlay');
     assertVisibleLoads([1, 1, 2, 2, 8, 8, 48, 48]);
-    cy.get('[data-testid="scatter-quick-filters"]').click();
+    // PowerX: the ranking's Filter (n) opens the quick filters.
+    cy.get('[data-testid="powerx-filter"]').click();
     cy.contains('[data-testid="quick-filter-topology-options"] button', /GPU=?4.*TP=?4/u).click();
     cy.get('body').type('{esc}');
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');

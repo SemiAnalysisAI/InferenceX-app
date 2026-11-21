@@ -295,7 +295,7 @@ detour through another setting. Which comparison rows a reader hid from the lege
 [PowerX Permanent View](./powerx-permanent-view.md#comparison-series-i_pcompare).
 
 `i_pbpoint` (inference scope, default `''`) is the set of per-chip compared points on the
-Where the power goes view: `seriesKey:concurrency` pairs joined by commas, one per chip
+Breakdown view: `seriesKey:concurrency` pairs joined by commas, one per chip
 pinned by a column click in its drill-down, owned by `PowerAnalysisPanels` component state
 (`comparedPoints`) and written through `useUrlState` whenever it changes (`''` when no chip
 is pinned, so the parameter leaves the link). It is read once on mount; a pair naming a chip

@@ -10,6 +10,7 @@ import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
+import { cn } from '@/lib/shared/utils';
 
 import {
   formatLoadSwingWatts,
@@ -39,6 +40,8 @@ const STRINGS = {
     downloads: 'Download',
     csv: 'CSV (1 s trace)',
     json: 'stats (JSON)',
+    csvShort: 'CSV',
+    jsonShort: 'JSON',
     perGpu: 'W per GPU: the mean of each 1 s sample across the config’s GPUs.',
     perRack: `kW per NVL72 rack: the per-GPU trace × ${NVL72_GPUS_PER_RACK}, assuming every GPU swings together (an upper bound).`,
     definitions:
@@ -72,6 +75,8 @@ const STRINGS = {
     downloads: '下载',
     csv: 'CSV（1 秒曲线）',
     json: '统计（JSON）',
+    csvShort: 'CSV',
+    jsonShort: 'JSON',
     perGpu: '每 GPU 瓦数：该配置所有 GPU 每个 1 秒采样的均值。',
     perRack: `每 NVL72 机架 kW：每 GPU 曲线 × ${NVL72_GPUS_PER_RACK}，假设全部 GPU 同步波动（上限）。`,
     definitions:
@@ -106,22 +111,34 @@ function statsDownloadUrl(
   return `/api/v1/gpu-metrics-point/stats?${params.toString()}`;
 }
 
-/** The load-swing statistics row above the Over time chart on PowerX. */
+/**
+ * The load-swing statistics of the Over time traces on PowerX: above the chart on the old
+ * surface, below it (with the ×72 switch in the toolbar, so `rack` is controlled) on the
+ * PowerX layout.
+ */
 export function PowerLoadSwings({
   traces,
   colorOf,
   labelOf,
   role = 'all',
+  rack: controlledRack,
+  note,
 }: {
   traces: readonly PowerTimelineTrace[];
   colorOf: (trace: PowerTimelineTrace) => string;
   labelOf: (point: InferenceData) => string;
   /** PowerX GPU role: one row per lane (prefill, decode, and all GPUs for split). */
   role?: PowerXRole;
+  /** kW per NVL72 rack, set by the toolbar; the table then has no switch of its own. */
+  rack?: boolean;
+  /** A short line beside the title, e.g. which trace each GPU reads. */
+  note?: string;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [rack, setRack] = useState(false);
+  const [ownRack, setRack] = useState(false);
+  const rack = controlledRack ?? ownRack;
+  const compact = controlledRack !== undefined;
   const isPhone = useIsMobileViewport();
   const rows = useMemo<LoadSwingTraceRow[]>(
     () =>
@@ -180,7 +197,11 @@ export function PowerLoadSwings({
       <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
       {lane && (
         <span
-          className={lane.kind === 'lane' ? 'ml-1' : 'ml-1 text-muted-foreground'}
+          // The PowerX layout puts the lane on its own line so the table fits the page width.
+          className={cn(
+            lane.kind === 'lane' ? 'ml-1' : 'ml-1 text-muted-foreground',
+            compact && 'block pl-4 max-md:inline max-md:pl-0',
+          )}
           data-testid="powerx-load-swings-lane"
           data-lane={lane.kind}
           data-pool={lane.role}
@@ -204,25 +225,27 @@ export function PowerLoadSwings({
           href={statsDownloadUrl(id, 'csv', rack, pool)}
           download
           data-testid="powerx-swings-csv"
+          title={compact ? t.csv : undefined}
           className="inline-flex items-center gap-1 underline decoration-dotted hover:text-foreground"
           onClick={() =>
             track('inference_powerx_swings_exported', { format: 'csv', role: pool ?? 'all' })
           }
         >
           <Download className="size-3" aria-hidden />
-          {t.csv}
+          {compact ? t.csvShort : t.csv}
         </a>
         {' · '}
         <a
           href={statsDownloadUrl(id, 'json', rack, pool)}
           download
           data-testid="powerx-swings-json"
+          title={compact ? t.json : undefined}
           className="underline decoration-dotted hover:text-foreground"
           onClick={() =>
             track('inference_powerx_swings_exported', { format: 'json', role: pool ?? 'all' })
           }
         >
-          {t.json}
+          {compact ? t.jsonShort : t.json}
         </a>
       </>
     ) : (
@@ -233,24 +256,31 @@ export function PowerLoadSwings({
     <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h3 className="text-sm font-medium">{t.title}</h3>
-        <label className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
-          <Switch
-            checked={rack}
-            onCheckedChange={(checked) => {
-              setRack(checked);
-              track('inference_powerx_swings_rack_toggled', { enabled: checked });
-            }}
-            data-testid="powerx-swings-rack"
-          />
-          <span>{t.rack}</span>
-          <span
-            title={t.rackHelp}
-            className="text-muted-foreground"
-            data-testid="powerx-swings-rack-help"
-          >
-            <Info className="size-3.5" aria-label={t.rackHelp} />
+        {note && (
+          <span className="text-xs text-muted-foreground" data-testid="powerx-load-swings-note">
+            {note}
           </span>
-        </label>
+        )}
+        {!compact && (
+          <label className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
+            <Switch
+              checked={rack}
+              onCheckedChange={(checked) => {
+                setRack(checked);
+                track('inference_powerx_swings_rack_toggled', { enabled: checked });
+              }}
+              data-testid="powerx-swings-rack"
+            />
+            <span>{t.rack}</span>
+            <span
+              title={t.rackHelp}
+              className="text-muted-foreground"
+              data-testid="powerx-swings-rack-help"
+            >
+              <Info className="size-3.5" aria-label={t.rackHelp} />
+            </span>
+          </label>
+        )}
       </div>
       {isPhone ? (
         // Eleven columns cannot fit a phone, so each trace gets its own row with a two-column stat grid.

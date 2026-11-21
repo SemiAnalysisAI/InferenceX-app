@@ -373,10 +373,11 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front, reached only
-      // through a type import, and after the PowerX GPU role touched shared inference types and
-      // URL keys and chartStateHref learned to drop empty overrides; no video entry reads the
-      // PowerX changes. Recorded entries are unchanged.
-      sources: '548c79561db449d27d678afa5e97f9543f9683791c8a035adfa51dca4c769a39',
+      // through a type import, and after the PowerX layout added the i_at and i_ptsmooth URL keys,
+      // the live address bar, a ranking slot on the shared scatter props, renamed the PowerX view
+      // ids and added the GPU role chart title; no video entry reads the PowerX changes. Recorded
+      // entries are unchanged.
+      sources: '0064327e25e8611b71d176c8b79786becc6df09d52d13cd4b5eb8733137e5157',
     });
   });
 });

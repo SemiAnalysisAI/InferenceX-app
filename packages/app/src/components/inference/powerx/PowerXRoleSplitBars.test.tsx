@@ -96,4 +96,28 @@ describe('PowerXRoleSplitBars', () => {
     );
     expect(container.textContent).not.toMatch(/\b0 (?:prefill|decode)\b/u);
   });
+
+  it('fills each bar to its own split, so one 31 J outlier does not shrink the rest', () => {
+    act(() =>
+      root.render(
+        <PowerXRoleSplitBars
+          points={[
+            split(),
+            split({
+              hwKey: 'gb300_dynamo-tilert',
+              reconstructedPrefillJPerOutputToken: { y: 1.68, roof: false },
+              measuredDecodeJPerOutputToken: { y: 30, roof: false },
+              measuredJPerOutputToken: { y: 31.68, roof: false },
+            }),
+          ]}
+        />,
+      ),
+    );
+    const bars = [...container.querySelectorAll('[data-testid="powerx-role-split-row"]')].map(
+      (row) => row.querySelector<HTMLElement>('[data-role="prefill"]')!.style.width,
+    );
+    expect(bars.map((width) => Math.round(Number.parseFloat(width)))).toEqual(
+      expect.arrayContaining([18, 5]),
+    );
+  });
 });

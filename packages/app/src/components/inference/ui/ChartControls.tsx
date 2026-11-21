@@ -62,7 +62,6 @@ import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
 import { usePowerXModelBadges } from '../powerx/PowerXModelBadges';
 import { powerXChangedCount } from '../powerx/powerx-views';
-import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -74,6 +73,8 @@ import { TokenBasisToggle } from './TokenBasisToggle';
 import {
   Sequence,
   type Model,
+  type Precision,
+  getPrecisionLabel,
   MODEL_OPTIONS,
   isModelVisible,
   isRegisteredModel,
@@ -109,6 +110,10 @@ const STRINGS = {
     gpuConfigTooltip:
       'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
     gpuConfigPlaceholder: 'Select Chip Config',
+    powerXGpuConfig: 'GPU config',
+    powerXGpuConfigTooltip:
+      'Pick up to 4 GPU configurations to compare across run dates, for example to see how a software update changed one setup.',
+    powerXGpuConfigPlaceholder: 'Select GPU config',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
@@ -150,6 +155,10 @@ const STRINGS = {
     gpuConfigTooltip:
       '最多选择 4 个芯片配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
     gpuConfigPlaceholder: '选择芯片配置',
+    powerXGpuConfig: 'GPU 配置',
+    powerXGpuConfigTooltip:
+      '最多选择 4 个 GPU 配置做跨日期对比，例如查看某次软件更新对某个配置的影响。',
+    powerXGpuConfigPlaceholder: '选择 GPU 配置',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表将展示所选芯片配置在此时间范围内的性能数据。',
@@ -194,11 +203,36 @@ interface ChartControlsProps {
   showXAxisMode?: boolean;
   runContext?: ReactNode;
   trailingPanel?: ReactNode;
-  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
-  /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
-  powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
   /** Extra details on each model's row in the model dropdown, e.g. its benchmark history. */
   modelDetails?: ReadonlyMap<string, ReactNode>;
+  /**
+   * PowerX: render the benchmark pickers as parts of one context strip instead of the
+   * Benchmark / Chart Config / Compare history panels.
+   */
+  powerXStrip?: (parts: PowerXStripParts) => ReactNode;
+}
+
+/** The pickers ChartControls hands the PowerX context strip. */
+export interface PowerXStripParts {
+  model: ReactNode;
+  scenario: ReactNode;
+  /** The selected precisions as text (PowerX has one precision with power data). */
+  precision: string;
+  /** Compare history: chip configs, then the date range once a config is picked. */
+  history: ReactNode;
+  /** True while a history comparison is active. */
+  historyActive: boolean;
+  /** The P/D badge when the selected model has prefill/decode data. */
+  modelBadge?: ReactNode;
+  /** The phone settings sheet lists models and scenarios as one-tap rows. */
+  models: readonly string[];
+  selectedModel: string;
+  onModelChange: (model: Model) => void;
+  scenarios: readonly string[];
+  selectedScenario: string;
+  onScenarioChange: (scenario: Sequence) => void;
+  /** P/D badges by model, as in the Model menu. */
+  modelBadges?: ReadonlyMap<string, ReactNode>;
 }
 
 export default function ChartControls({
@@ -208,8 +242,8 @@ export default function ChartControls({
   showXAxisMode = false,
   runContext,
   trailingPanel,
-  powerXControls,
   modelDetails,
+  powerXStrip,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -561,6 +595,100 @@ export default function ChartControls({
         history: 'lg:col-span-4',
       };
 
+  const historyFields = (
+    <div className="grid min-w-0 gap-3">
+      <div className="flex min-w-0 flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="gpu-config-select"
+          label={powerXStrip ? t.powerXGpuConfig : t.gpuConfig}
+          tooltip={powerXStrip ? t.powerXGpuConfigTooltip : t.gpuConfigTooltip}
+        />
+        <div data-testid="gpu-multiselect" className="min-w-0">
+          <MultiSelect
+            options={availableGPUs}
+            value={selectedGPUs}
+            onChange={handleGPUChange}
+            open={openDropdown === 'gpu'}
+            onOpenChange={handleDropdownOpenChange('gpu')}
+            placeholder={powerXStrip ? t.powerXGpuConfigPlaceholder : t.gpuConfigPlaceholder}
+            maxSelections={4}
+            searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+            noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+            clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+            selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+          />
+        </div>
+      </div>
+
+      {selectedGPUs.length > 0 && (
+        <div className="flex min-w-0 flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="date-picker"
+            label={t.comparisonDateRange}
+            tooltip={t.comparisonDateRangeTooltip}
+          />
+          <DateRangePicker
+            dateRange={selectedDateRange}
+            onChange={handleDateRangeChange}
+            placeholder={t.dateRangePlaceholder}
+            availableDates={dateRangeAvailableDates}
+            isCheckingAvailableDates={isCheckingAvailableDates}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  if (powerXStrip) {
+    return (
+      <TooltipProvider delayDuration={0}>
+        {powerXStrip({
+          model: (
+            <ModelSelector
+              variant="strip"
+              value={selectedModel}
+              onChange={handleModelChange}
+              open={openDropdown === 'model'}
+              onOpenChange={handleDropdownOpenChange('model')}
+              onOptionIntent={handleModelIntent}
+              availableModels={selectableModels}
+              data-testid="model-selector"
+              newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
+              modelDetails={modelDetails}
+              modelBadges={powerXModelBadges}
+            />
+          ),
+          scenario: (
+            <ScenarioSelector
+              variant="strip"
+              value={selectedSequence}
+              onChange={handleSequenceChange}
+              open={openDropdown === 'sequence'}
+              onOpenChange={handleDropdownOpenChange('sequence')}
+              onOptionIntent={(sequence) => warmFilterChange({ sequence })}
+              availableSequences={availableSequences}
+              model={selectedModel}
+              data-testid="scenario-selector"
+            />
+          ),
+          precision: selectedPrecisions
+            .map((precision) => getPrecisionLabel(precision as Precision))
+            .join(', '),
+          history: historyFields,
+          historyActive: selectedGPUs.length > 0,
+          modelBadge: powerXModelBadges?.get(selectedModel),
+          models: selectableModels,
+          selectedModel,
+          onModelChange: handleModelChange,
+          scenarios: availableSequences,
+          selectedScenario: selectedSequence,
+          onScenarioChange: handleSequenceChange,
+          modelBadges: powerXModelBadges,
+        })}
+      </TooltipProvider>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={0}>
       <div className="grid min-w-0 items-start gap-x-6 gap-y-4 lg:grid-cols-12">
@@ -615,12 +743,7 @@ export default function ChartControls({
             className={spans.chart}
           >
             <div className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass}`}>
-              {powerXSurface && powerXControls
-                ? powerXControls({
-                    xAxisSelector: showXAxisMode ? <XAxisModeSelector /> : null,
-                    xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
-                  })
-                : showXAxisMode && <XAxisModeSelector />}
+              {showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
                 hidden={powerXSurface}
@@ -794,47 +917,7 @@ export default function ChartControls({
           {runContext && <div className={`min-w-0 ${spans.run}`}>{runContext}</div>}
           {!hideGpuComparison && (
             <ControlPanel legend={t.compareHistory} className={spans.history}>
-              <div className="grid min-w-0 gap-3">
-                <div className="flex min-w-0 flex-col space-y-1.5">
-                  <LabelWithTooltip
-                    htmlFor="gpu-config-select"
-                    label={t.gpuConfig}
-                    tooltip={t.gpuConfigTooltip}
-                  />
-                  <div data-testid="gpu-multiselect" className="min-w-0">
-                    <MultiSelect
-                      options={availableGPUs}
-                      value={selectedGPUs}
-                      onChange={handleGPUChange}
-                      open={openDropdown === 'gpu'}
-                      onOpenChange={handleDropdownOpenChange('gpu')}
-                      placeholder={t.gpuConfigPlaceholder}
-                      maxSelections={4}
-                      searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
-                      noResultsLabel={locale === 'zh' ? '无结果' : undefined}
-                      clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-                      selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
-                    />
-                  </div>
-                </div>
-
-                {selectedGPUs.length > 0 && (
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="date-picker"
-                      label={t.comparisonDateRange}
-                      tooltip={t.comparisonDateRangeTooltip}
-                    />
-                    <DateRangePicker
-                      dateRange={selectedDateRange}
-                      onChange={handleDateRangeChange}
-                      placeholder={t.dateRangePlaceholder}
-                      availableDates={dateRangeAvailableDates}
-                      isCheckingAvailableDates={isCheckingAvailableDates}
-                    />
-                  </div>
-                )}
-              </div>
+              {historyFields}
             </ControlPanel>
           )}
         </MobileControlSection>

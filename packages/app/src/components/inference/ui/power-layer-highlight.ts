@@ -25,7 +25,7 @@ interface PowerLayerHighlightControls {
  * modeled band anywhere lights it everywhere. A parts-list row drives it
  * through its component (`partTarget`), which lights the row and raises its
  * band; the plot and the legends drive it by band alone (`bandTarget`).
- * The Where view lifts the state above the panels. Escape unpins.
+ * The Breakdown view lifts the state above the panels. Escape unpins.
  */
 export function usePowerLayerHighlight(
   highlight: PowerLayerHighlight | null,

@@ -81,7 +81,7 @@ import {
 } from '../utils/power-breakdown';
 import { powerXRolePools, type PowerXRole } from '../powerx/powerx-role';
 
-type PowerBreakdownView = 'bars' | 'area';
+export type PowerBreakdownView = 'bars' | 'area';
 
 const STRINGS = {
   en: {
@@ -105,10 +105,10 @@ const STRINGS = {
     graceModeled: 'Grace sockets are modeled (no validated socket telemetry).',
     clickToCompare: (label: string) => `Click to compare at ${label}`,
     comparedHere: 'Compared here',
-    compareAt: (x: string) => `Compare chips at ${x} tok/s/user`,
-    sliderAt: (x: string) => `Slider ${x} tok/s/user`,
-    sliderAbove: (x: string) => `Slider ${x} tok/s/user →`,
-    sliderBelow: (x: string) => `← Slider ${x} tok/s/user`,
+    compareAt: (x: string) => `Compare GPUs at ${x} tok/s/user`,
+    sliderAt: (x: string) => `Compare at ${x} tok/s/user`,
+    sliderAbove: (x: string) => `Compare at ${x} tok/s/user →`,
+    sliderBelow: (x: string) => `← Compare at ${x} tok/s/user`,
     note: (revision: string) =>
       `Power model revision ${revision}. Every part is the deployment's share divided by its allocated GPUs, so the stack equals the chart's All in Measured W/GPU. TDP and All in Provisioned are rated references, not measurements.`,
     empty:
@@ -159,10 +159,10 @@ const STRINGS = {
     graceModeled: 'Grace 插槽功耗为建模值（无有效插槽遥测）。',
     clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
     comparedHere: '当前对比点',
-    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各芯片`,
-    sliderAt: (x: string) => `滑块 ${x} tok/s/user`,
-    sliderAbove: (x: string) => `滑块 ${x} tok/s/user →`,
-    sliderBelow: (x: string) => `← 滑块 ${x} tok/s/user`,
+    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各 GPU`,
+    sliderAt: (x: string) => `对比点 ${x} tok/s/user`,
+    sliderAbove: (x: string) => `对比点 ${x} tok/s/user →`,
+    sliderBelow: (x: string) => `← 对比点 ${x} tok/s/user`,
     note: (revision: string) =>
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点',
@@ -1593,6 +1593,7 @@ export default function PowerBreakdownPanel({
   onPinComparedPoint,
   onUnpinComparedPoint,
   role = 'all',
+  view: controlledView,
 }: {
   chartId: string;
   data: InferenceData[];
@@ -1613,7 +1614,7 @@ export default function PowerBreakdownPanel({
   /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
   xField?: keyof AggDataEntry;
   xLabel?: string;
-  /** Shared with the chip comparison's legend on the Where view. */
+  /** Shared with the chip comparison's legend on the Breakdown view. */
   layerHighlight: PowerLayerHighlight | null;
   onLayerHighlight: (next: PowerLayerHighlight | null) => void;
   /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
@@ -1624,6 +1625,11 @@ export default function PowerBreakdownPanel({
   onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
   /** The PowerX GPU role: off All GPUs each column's GPU segment splits by pool. */
   role?: PowerXRole;
+  /**
+   * PowerX layout: the chart style comes from the Breakdown toolbar's More, so the
+   * drill-down drops its own Stacked bars | Stacked area toggle.
+   */
+  view?: PowerBreakdownView;
 }) {
   const pools = powerXRolePools(role);
   const locale = useLocale();
@@ -1633,12 +1639,13 @@ export default function PowerBreakdownPanel({
   const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
   const { getUrlParam, setUrlParams } = useUrlState();
   // Stacked area by default: one chip's layers read as bands across load.
-  const [view, setView] = useState<PowerBreakdownView>(() =>
+  const [ownView, setView] = useState<PowerBreakdownView>(() =>
     getUrlParam('i_pbview') === 'bars' ? 'bars' : 'area',
   );
+  const view = controlledView ?? ownView;
   useEffect(() => {
-    setUrlParams({ i_pbview: view });
-  }, [view, setUrlParams]);
+    if (controlledView === undefined) setUrlParams({ i_pbview: ownView });
+  }, [controlledView, ownView, setUrlParams]);
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
@@ -1845,28 +1852,30 @@ export default function PowerBreakdownPanel({
                 </SelectContent>
               </Select>
             </div>
-            <SegmentedToggle<PowerBreakdownView>
-              value={view}
-              ariaLabel={t.view}
-              testId="power-breakdown-view"
-              role="group"
-              onValueChange={(next) => {
-                setView(next);
-                track('inference_power_breakdown_view_changed', { view: next });
-              }}
-              options={[
-                {
-                  value: 'bars',
-                  label: t.bars,
-                  testId: 'power-breakdown-view-bars',
-                },
-                {
-                  value: 'area',
-                  label: t.area,
-                  testId: 'power-breakdown-view-area',
-                },
-              ]}
-            />
+            {controlledView === undefined && (
+              <SegmentedToggle<PowerBreakdownView>
+                value={view}
+                ariaLabel={t.view}
+                testId="power-breakdown-view"
+                role="group"
+                onValueChange={(next) => {
+                  setView(next);
+                  track('inference_power_breakdown_view_changed', { view: next });
+                }}
+                options={[
+                  {
+                    value: 'bars',
+                    label: t.bars,
+                    testId: 'power-breakdown-view-bars',
+                  },
+                  {
+                    value: 'area',
+                    label: t.area,
+                    testId: 'power-breakdown-view-area',
+                  },
+                ]}
+              />
+            )}
           </div>
           {/* Overview left, detail right from `lg`; the list stacks under the plot below. */}
           <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">

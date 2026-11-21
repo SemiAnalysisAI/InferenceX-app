@@ -12,7 +12,7 @@ import { formatLoadSwingWatts, loadSwingPercentTdp } from './load-swing-rows';
 
 import { powerXInsight, type PoolPair, type PowerXInsight } from './powerx-insight';
 import type { PowerXRole } from './powerx-role';
-import type { PowerXView } from './powerx-views';
+import { POWERX_VIEW_ANALYTICS_ID, type PowerXView } from './powerx-views';
 
 const rate = (value: number) => String(value >= 10 ? Math.round(value) : value.toFixed(1));
 const watts = (value: number) => Math.round(value).toLocaleString('en-US');
@@ -291,10 +291,10 @@ export function PowerXInsightCard({
       : `${role === 'split' ? t.split : t.poolGpus[role]} · ${hw}`;
   const onClick = () => {
     if (role === 'all') {
-      track('powerx_insight_split_clicked', { view });
+      track('powerx_insight_split_clicked', { view: POWERX_VIEW_ANALYTICS_ID[view] });
       onRoleChange('split');
     } else {
-      track('powerx_insight_back_clicked', { view, role });
+      track('powerx_insight_back_clicked', { view: POWERX_VIEW_ANALYTICS_ID[view], role });
       onRoleChange('all');
     }
   };

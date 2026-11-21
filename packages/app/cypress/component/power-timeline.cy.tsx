@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import type { GpuPowerSeries, GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import type { PowerXRole } from '@/components/inference/powerx/powerx-role';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
 import type { InferenceData } from '@/components/inference/types';
@@ -26,7 +27,10 @@ const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/ru
 const SECOND_RUN_ID = '34716669499';
 const SECOND_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${SECOND_RUN_ID}`;
 const START_MS = Date.UTC(2026, 8, 12, 20, 20, 0);
-const hwConfig = createMockHardwareConfig();
+const hwConfig = {
+  ...createMockHardwareConfig(),
+  gb200: { name: 'gb200', label: 'GB200 NVL72', suffix: '', gpu: 'NVIDIA GB200 NVL72' },
+};
 const HW_TYPES = new Set(['b200', 'h100']);
 
 const resultName = (hardware: string, conc: number) =>
@@ -97,7 +101,7 @@ function providerOverrides(
       selectedYAxisMetric: 'y_measuredPowerTimeline',
       hardwareConfig: hwConfig,
       activeHwTypes: new Set(activeHwTypes ?? HW_TYPES),
-      hwTypesWithData: new Set(HW_TYPES),
+      hwTypesWithData: new Set([...HW_TYPES, ...(activeHwTypes ?? [])]),
     },
     unofficial,
   };
@@ -113,11 +117,17 @@ function mountTimeline(
     width?: number | string;
     /** Render on the PowerX surface (load-swing stats, validated-window summary). */
     powerx?: boolean;
+    role?: PowerXRole;
   } = {},
 ) {
   const timeline = (
     <div style={{ width: options.width ?? 1100, height: 700 }}>
-      <PowerTimeline chartId="power-timeline-test" data={data} overlayData={options.overlay} />
+      <PowerTimeline
+        chartId="power-timeline-test"
+        data={data}
+        overlayData={options.overlay}
+        role={options.role}
+      />
     </div>
   );
   mountWithProviders(
@@ -631,6 +641,40 @@ describe('PowerTimeline', () => {
       cy.get('[data-testid="legend-toolbar"] [data-testid="power-timeline-reset-filter"]')
         .should('have.text', 'Reset filter')
         .and('be.disabled');
+    });
+
+    it('keeps Prefill vs decode lane labels inside the chart on desktop', () => {
+      const devices = [0, 1, 2, 3].map((gpu) => ({
+        id: `node/GPU-${gpu}`,
+        role: gpu < 2 ? ('prefill' as const) : ('decode' as const),
+      }));
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+        body: {
+          ...response,
+          series: [{ ...series('gb200', 48, 900, [0, 1, 2, 3]), devices }, series('b200', 16, 700)],
+        },
+      }).as('series');
+      mountTimeline([measuredPoint('gb200', 48, 900), measuredPoint('b200', 16, 700)], {
+        activeHwTypes: ['gb200', 'b200'],
+        role: 'split',
+      });
+      cy.wait('@series');
+      cy.get('text.power-trace-label[data-lane="lane"]').then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          'GB200 NVL72 c48 · Prefill',
+          'GB200 NVL72 c48 · Decode',
+        ]);
+      });
+      cy.get('[data-testid="power-timeline-chart-svg"] svg[data-testid="d3-chart-svg"]').then(
+        ($svg) => {
+          const right = $svg[0].getBoundingClientRect().right;
+          for (const label of $svg[0].querySelectorAll('text.power-trace-label')) {
+            expect(label.getBoundingClientRect().right, label.textContent ?? '').to.be.at.most(
+              right + 0.5,
+            );
+          }
+        },
+      );
     });
 
     it('keeps the end-of-line labels in the gutter on desktop', () => {

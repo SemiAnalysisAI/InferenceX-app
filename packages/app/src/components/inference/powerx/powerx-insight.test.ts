@@ -40,7 +40,7 @@ const aggregated = (x: number) =>
 
 describe('powerXInsight', () => {
   it('has no finding when every visible row is aggregated', () => {
-    for (const view of ['energy', 'draw', 'where'] as const) {
+    for (const view of ['energy', 'power', 'breakdown'] as const) {
       expect(powerXInsight({ view, role: 'all', points: [aggregated(80)] })).toBeNull();
     }
   });
@@ -55,7 +55,7 @@ describe('powerXInsight', () => {
     const clone = row(80, { powerVariant: { kind: 'role', id: 'prefill' } });
     const hidden = row(81, { hidden: true });
     const insight = powerXInsight({
-      view: 'draw',
+      view: 'power',
       role: 'prefill',
       points: [row(20), near, clone, hidden, aggregated(80), row(400)],
     });
@@ -72,7 +72,7 @@ describe('powerXInsight', () => {
   });
 
   it('scales % of TDP per pool from the pool’s average draw', () => {
-    const finding = powerXInsight({ view: 'draw', role: 'all', points: [row(80)] })?.finding;
+    const finding = powerXInsight({ view: 'power', role: 'all', points: [row(80)] })?.finding;
     expect(finding?.kind).toBe('power');
     if (finding?.kind !== 'power') return;
     expect(finding.percentTdp?.prefill).toBeCloseTo((57.1 * 1000) / 800);
@@ -81,7 +81,7 @@ describe('powerXInsight', () => {
 
   it('weights the GPU layer share by each pool’s GPU count', () => {
     const finding = powerXInsight({
-      view: 'where',
+      view: 'breakdown',
       role: 'all',
       points: [row(80, { utilityModeledWatts: m(1600) })],
     })?.finding;

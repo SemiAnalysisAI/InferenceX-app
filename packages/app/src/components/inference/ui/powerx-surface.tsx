@@ -2,6 +2,14 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+
+import {
+  parsePowerXCompareAt,
+  POWERX_COMPARE_AT_DEFAULT,
+  resolvePowerXCompareAt,
+  serializePowerXCompareAt,
+} from '../powerx/powerx-compare-at';
 import type { InferenceData } from '../types';
 
 /**
@@ -12,16 +20,19 @@ import type { InferenceData } from '../types';
 const PowerXSurfaceContext = createContext(false);
 
 /**
- * The interactivity the chip comparison is read at. The main chart, the
- * comparison slider and the per-chip drill-down all move it, so the overview
- * and the detail stay on the same point. Split into value and setter so charts
- * that only write it do not re-render when it changes.
+ * Compare at: the interactivity every PowerX tab reads at (`i_at`, default 80 tok/s/user).
+ * The context strip, the reading line on the chart and the Breakdown drill-down move it.
+ * Split into value and setter so charts that only write it do not re-render when it changes.
  */
 const CompareTargetContext = createContext<number | null>(null);
 const SetCompareTargetContext = createContext<((value: number | null) => void) | null>(null);
+/** The page publishes the interactivity range its visible GPUs cover (see the default clamp). */
+const SetCompareRangeContext = createContext<
+  ((range: readonly [number, number] | null) => void) | null
+>(null);
 
 /**
- * Whether the Where view counts the facility (PUE) overhead. On by default so
+ * Whether the Breakdown view counts the facility (PUE) overhead. On by default so
  * PowerX shows facility power like the rest of the site; switch it off for IT only.
  */
 const IncludeFacilityContext = createContext(true);
@@ -34,6 +45,13 @@ const SetIncludeFacilityContext = createContext<((value: boolean) => void) | nul
 export interface PowerXActivePoint {
   point: InferenceData;
   source: 'hover' | 'scrub' | 'pinned';
+  /** The point's series colour, so the pinned strip's dot matches the chart. */
+  color?: string;
+  /**
+   * The chart's Point details panel for this point, when the ranking holds the legend
+   * slot: the pinned strip's Details action opens it in a popover instead.
+   */
+  details?: (close: () => void) => ReactNode;
 }
 const ActivePointContext = createContext<PowerXActivePoint | null>(null);
 /** `null` ends a hover (a pinned point stays); `'clear'` drops a pinned point too. */
@@ -43,7 +61,30 @@ const SetActivePointContext = createContext<((value: PowerXActivePointUpdate) =>
 );
 
 export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
-  const [target, setTarget] = useState<number | null>(null);
+  const [stored, setStored] = useState<{ value: number; explicit: boolean }>(() => {
+    const raw = readUrlParams().i_at;
+    return { value: parsePowerXCompareAt(raw), explicit: Boolean(raw) };
+  });
+  const [range, setRangeState] = useState<readonly [number, number] | null>(null);
+  const setRange = useMemo(
+    () => (next: readonly [number, number] | null) =>
+      setRangeState((current) =>
+        current?.[0] === next?.[0] && current?.[1] === next?.[1] ? current : next,
+      ),
+    [],
+  );
+  const target = resolvePowerXCompareAt(stored.value, stored.explicit, range);
+  // A pick is explicit and lands in `i_at`; `null` returns to the (clamped) default.
+  const setTarget = useMemo(
+    () => (value: number | null) => {
+      const next = parsePowerXCompareAt(
+        value === null ? String(POWERX_COMPARE_AT_DEFAULT) : String(value),
+      );
+      setStored({ value: next, explicit: value !== null });
+      writeUrlParams({ i_at: value === null ? '' : serializePowerXCompareAt(next) });
+    },
+    [],
+  );
   const [includeFacility, setIncludeFacility] = useState(true);
   const [activePoint, setActivePointState] = useState<PowerXActivePoint | null>(null);
   // A hover never replaces a pinned point; hover end only clears a hover. A scrub
@@ -62,17 +103,19 @@ export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
   return (
     <PowerXSurfaceContext.Provider value>
       <SetCompareTargetContext.Provider value={setTarget}>
-        <CompareTargetContext.Provider value={target}>
-          <SetIncludeFacilityContext.Provider value={setIncludeFacility}>
-            <IncludeFacilityContext.Provider value={includeFacility}>
-              <SetActivePointContext.Provider value={setActivePoint}>
-                <ActivePointContext.Provider value={activePoint}>
-                  {children}
-                </ActivePointContext.Provider>
-              </SetActivePointContext.Provider>
-            </IncludeFacilityContext.Provider>
-          </SetIncludeFacilityContext.Provider>
-        </CompareTargetContext.Provider>
+        <SetCompareRangeContext.Provider value={setRange}>
+          <CompareTargetContext.Provider value={target}>
+            <SetIncludeFacilityContext.Provider value={setIncludeFacility}>
+              <IncludeFacilityContext.Provider value={includeFacility}>
+                <SetActivePointContext.Provider value={setActivePoint}>
+                  <ActivePointContext.Provider value={activePoint}>
+                    {children}
+                  </ActivePointContext.Provider>
+                </SetActivePointContext.Provider>
+              </IncludeFacilityContext.Provider>
+            </SetIncludeFacilityContext.Provider>
+          </CompareTargetContext.Provider>
+        </SetCompareRangeContext.Provider>
       </SetCompareTargetContext.Provider>
     </PowerXSurfaceContext.Provider>
   );
@@ -82,7 +125,7 @@ export function usePowerXSurface(): boolean {
   return useContext(PowerXSurfaceContext);
 }
 
-/** Shared comparison interactivity; null outside PowerX or before anyone picks one. */
+/** Compare at (tok/s/user) on PowerX; null outside PowerX. */
 export function usePowerXCompareTarget(): number | null {
   return useContext(CompareTargetContext);
 }
@@ -90,6 +133,13 @@ export function usePowerXCompareTarget(): number | null {
 /** Setter for the shared comparison interactivity; null outside PowerX. */
 export function useSetPowerXCompareTarget(): ((value: number | null) => void) | null {
   return useContext(SetCompareTargetContext);
+}
+
+/** Publishes the covered interactivity range the default Compare at clamps into. */
+export function useSetPowerXCompareRange():
+  | ((range: readonly [number, number] | null) => void)
+  | null {
+  return useContext(SetCompareRangeContext);
 }
 
 /** Whether breakdown stacks include the facility (PUE) part; always true outside PowerX. */

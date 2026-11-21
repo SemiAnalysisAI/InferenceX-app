@@ -23,7 +23,7 @@ import {
   type PowerLayerTarget,
 } from '../utils/power-breakdown';
 
-/** Where the readout's point comes from: the finger, this chip's pin, or the slider. */
+/** Where the readout's point comes from: the finger, this chip's pin, or Compare at. */
 export type PowerBreakdownReadoutSource = 'scrub' | 'pinned' | 'compared';
 
 const STRINGS = {
@@ -36,10 +36,10 @@ const STRINGS = {
     share: (part: string) => `${part} of this point's W/GPU`,
     source: {
       scrub: 'Drag to read · tap to hold',
-      pinned: 'Held here, off the slider',
-      compared: 'Nearest the slider · drag across the chart to read other points',
+      pinned: 'Held here, off Compare at',
+      compared: 'Nearest Compare at · drag across the chart to read other points',
     } satisfies Record<PowerBreakdownReadoutSource, string>,
-    followSlider: 'Follow slider',
+    followSlider: 'Follow Compare at',
     parts: 'Power layers at this point',
     bands: {
       gpu: 'GPU',
@@ -67,10 +67,10 @@ const STRINGS = {
     share: (part: string) => `占该点 W/GPU 的 ${part}`,
     source: {
       scrub: '拖动读取 · 点按固定',
-      pinned: '已固定，不随滑块移动',
-      compared: '最接近滑块的点 · 在图上拖动可读取其他数据点',
+      pinned: '已固定，不随对比点移动',
+      compared: '最接近对比点的数据点 · 在图上拖动可读取其他数据点',
     } satisfies Record<PowerBreakdownReadoutSource, string>,
-    followSlider: '跟随滑块',
+    followSlider: '跟随对比点',
     parts: '该点的功耗分层',
     bands: {
       gpu: 'GPU',
@@ -103,7 +103,7 @@ const percent = d3.format('.0%');
  * below reads) on an even two-column grid, four across once the card is wide.
  * Tapping a tile isolates that layer, as the legend does; the isolated tile
  * takes the chip's colour as its outline. A held point says so and offers
- * the way back to the slider. It sits in normal flow, so unlike the cursor
+ * the way back to Compare at. It sits in normal flow, so unlike the cursor
  * label it never clips at the plot's edge.
  */
 export default function PowerBreakdownReadout({
@@ -124,7 +124,7 @@ export default function PowerBreakdownReadout({
   source: PowerBreakdownReadoutSource;
   highlight: PowerLayerHighlight | null;
   onTogglePin: (target: PowerLayerTarget) => void;
-  /** A held point goes back to the slider's nearest point (shown only while held). */
+  /** A held point goes back to the point nearest Compare at (shown only while held). */
   onFollowSlider?: () => void;
 }) {
   const locale = useLocale();
