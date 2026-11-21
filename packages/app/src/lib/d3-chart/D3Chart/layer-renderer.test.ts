@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest';
+// @test-environment jsdom
+import { describe, expect, it, vi } from 'bun:test';
 import * as d3 from 'd3';
 
 import { setupChartStructure } from '../chart-setup';

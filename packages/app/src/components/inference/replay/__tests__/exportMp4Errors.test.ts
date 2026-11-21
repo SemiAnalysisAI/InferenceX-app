@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { Mp4ExportError, isMp4ExportError } from '../exportMp4';
 

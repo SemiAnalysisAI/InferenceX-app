@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { SEQUENCE_LENGTH_SKETCHES_VERSION, STATS_VERSION } from './agentic-shared';
 import type { DbClient } from '../connection.js';

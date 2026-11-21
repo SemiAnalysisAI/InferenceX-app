@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import {
   describeEngineComparisonConflict,
@@ -11,8 +12,8 @@ import {
 } from './engine-comparison-conflict-notice';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: vi.fn(() => 'en') }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: vi.fn(() => 'en') }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -24,7 +25,7 @@ describe('EngineComparisonConflictNotice', () => {
     ['en', 'vLLM & SGLang on same SKU can’t share a graph'],
     ['zh', '同一 SKU 上的 vLLM 和 SGLang 无法在同一图表中显示'],
   ] as const)('renders the %s title once inline across legends', (locale, title) => {
-    vi.mocked(useLocale).mockReturnValue(locale);
+    mocked(useLocale).mockReturnValue(locale);
     const container = document.createElement('div');
     const root = createRoot(container);
     act(() =>

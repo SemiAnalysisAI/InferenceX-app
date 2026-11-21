@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { Activity, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import VideoResultsClips from './VideoResultsClips';
 import { videoHistoryEntry, type VideoHistoryPage } from './history';
 import { namedRunPoints } from './points';
@@ -11,19 +12,19 @@ import { verifiedQuality } from './reference-quality';
 import { publishedResultsSide } from './results-clips';
 import { videoClipSourceKey } from './initial-data';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 afterEach(() => {
   if (root) act(() => root?.unmount());
   container?.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 it('keeps one clip audible, including after the overview is hidden and revealed', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   const fixture = referenceQualityFixture(20);

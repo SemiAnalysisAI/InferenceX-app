@@ -2,16 +2,17 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubEnv, unstubAllEnvs } from '@/test/helpers';
 
-const splitAfterRun = vi.hoisted(() => vi.fn());
-vi.mock('cypress-split', () => ({
+const splitAfterRun = (() => vi.fn())();
+mock.module('cypress-split', () => ({
   default: (on: Cypress.PluginEvents) => {
     on('after:run', splitAfterRun);
     on('before:run', () => {});
   },
 }));
-vi.mock('./cypress-source-fingerprint', () => ({
+mock.module('./cypress-source-fingerprint', () => ({
   cypressSourceFingerprint: () => 'current-source',
 }));
 
@@ -19,7 +20,7 @@ import { setupTimingSplit } from '../../../cypress/plugins/timings';
 
 const temporary: string[] = [];
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
   vi.clearAllMocks();
   for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
@@ -28,12 +29,12 @@ function harness() {
   const directory = mkdtempSync(join(tmpdir(), 'cypress-observation-'));
   temporary.push(directory);
   const output = join(directory, 'nested', 'observation.json');
-  vi.stubEnv('CYPRESS_TIMING_OUTPUT', output);
-  vi.stubEnv('SPLIT', '8');
-  vi.stubEnv('SPLIT_INDEX1', '3');
-  vi.stubEnv('GITHUB_SHA', 'revision');
-  vi.stubEnv('GITHUB_RUN_ID', 'run');
-  vi.stubEnv('GITHUB_RUN_ATTEMPT', '2');
+  stubEnv('CYPRESS_TIMING_OUTPUT', output);
+  stubEnv('SPLIT', '8');
+  stubEnv('SPLIT_INDEX1', '3');
+  stubEnv('GITHUB_SHA', 'revision');
+  stubEnv('GITHUB_RUN_ID', 'run');
+  stubEnv('GITHUB_RUN_ATTEMPT', '2');
   const events = new Map<string, (...args: unknown[]) => unknown>();
   const on = ((event: string, callback: (...args: unknown[]) => unknown) => {
     if (events.has(event)) throw new Error(`Overwritten Cypress handler: ${event}`);

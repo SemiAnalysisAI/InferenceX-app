@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { AvailableModelSequence } from '@/providers/unofficial-run-provider';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';

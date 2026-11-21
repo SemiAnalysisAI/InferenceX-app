@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { ALL_SECTIONS, isActiveSection } from '@/components/agentic-workload-explorer/section-nav';
 

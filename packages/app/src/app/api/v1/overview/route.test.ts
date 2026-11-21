@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { NextRequest } from 'next/server';
 
-const { mockGetOverviewPageData, mockCachedJson } = vi.hoisted(() => ({
+const { mockGetOverviewPageData, mockCachedJson } = {
   mockGetOverviewPageData: vi.fn(),
   mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
-}));
+};
 
-vi.mock('@/lib/overview/overview-data.server', () => ({
+mock.module('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
 }));
 

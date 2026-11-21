@@ -1,19 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
 const keys: string[] = [];
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
   getDb: vi.fn(() => ({})),
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getLatestBenchmarks: vi.fn(() => Promise.resolve([])),
   getBenchmarksForRun: vi.fn(() => Promise.resolve([])),
   getAllBenchmarksForHistory: vi.fn(() => Promise.resolve([])),
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: unknown, key: string) => {
     keys.push(key);
     return fn;

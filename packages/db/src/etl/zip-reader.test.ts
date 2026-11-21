@@ -1,11 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
-  admZip: vi.fn(),
-  getEntries: vi.fn(),
-}));
+import { readZipJsonAndText } from './zip-reader';
 
-vi.mock('adm-zip', () => ({
+const mocks = {
+  admZip: mock(),
+  getEntries: mock(),
+};
+
+mock.module('adm-zip', () => ({
   default: class MockAdmZip {
     constructor(zipPath: string) {
       mocks.admZip(zipPath);
@@ -17,18 +19,16 @@ vi.mock('adm-zip', () => ({
   },
 }));
 
-import { readZipJsonAndText } from './zip-reader';
-
 afterEach(() => {
-  vi.clearAllMocks();
+  mock.clearAllMocks();
 });
 
 describe('readZipJsonAndText', () => {
   it('collects JSON and selected text with one archive traversal', () => {
-    const metaData = vi.fn(() => Buffer.from('{"model":"test"}'));
-    const resultsData = vi.fn(() => Buffer.from('{"results":{"task":{}}}'));
-    const samplesData = vi.fn(() => Buffer.from('{"doc_id":1}\n'));
-    const serverLogData = vi.fn(() => Buffer.from('deferred server log'));
+    const metaData = mock(() => Buffer.from('{"model":"test"}'));
+    const resultsData = mock(() => Buffer.from('{"results":{"task":{}}}'));
+    const samplesData = mock(() => Buffer.from('{"doc_id":1}\n'));
+    const serverLogData = mock(() => Buffer.from('deferred server log'));
     mocks.getEntries.mockReturnValue([
       { isDirectory: false, name: 'meta_env.json', getData: metaData },
       { isDirectory: false, name: 'results_task.json', getData: resultsData },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { RequestRecord, RequestTimeline } from '@/hooks/api/use-request-timeline';
 import type { RequestChartData } from '@/hooks/api/use-request-chart-data';

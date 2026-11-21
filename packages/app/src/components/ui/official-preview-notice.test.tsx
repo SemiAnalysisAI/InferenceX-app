@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import {
   includesJalapenoResult,
@@ -12,9 +12,9 @@ import {
   VeraRubinOfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 
-const localeState = vi.hoisted(() => ({ pathname: '/infx/inference' }));
+const localeState = { pathname: '/infx/inference' };
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   usePathname: () => localeState.pathname,
 }));
 

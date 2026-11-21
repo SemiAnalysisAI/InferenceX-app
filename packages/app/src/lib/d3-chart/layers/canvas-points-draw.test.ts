@@ -1,6 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { easeCubicInOut, select } from 'd3';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 
@@ -48,14 +49,14 @@ function drawnAlphas(calls: unknown[][]): unknown[] {
 }
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
   document.body.replaceChildren();
 });
 
 describe('CanvasPointLayer drawing', () => {
   it('records the exact draw calls for shapes, halos, fades, hover and the plot margin', () => {
-    vi.stubGlobal('devicePixelRatio', 2);
+    stubGlobal('devicePixelRatio', 2);
     const frames = installFrames();
     const calls = installRecordingContext();
     const { svg, layer } = mountLayer();
@@ -231,7 +232,7 @@ describe('CanvasPointLayer drawing', () => {
   });
 
   it('sizes the canvas backing store by device pixel ratio', () => {
-    vi.stubGlobal('devicePixelRatio', 2);
+    stubGlobal('devicePixelRatio', 2);
     const { svg, layer } = mountLayer();
     layer.join([point('a', 1, 1)], key, 100.4, 80);
     layer.place(identity, identity);
@@ -240,7 +241,7 @@ describe('CanvasPointLayer drawing', () => {
     expect([canvas.style.width, canvas.style.height]).toEqual(['100.4px', '80px']);
     layer.join([point('a', 1, 1)], key, 50, 30);
     expect([canvas.width, canvas.height]).toEqual([100, 60]);
-    vi.stubGlobal('devicePixelRatio', undefined);
+    stubGlobal('devicePixelRatio', undefined);
     layer.join([point('a', 1, 1)], key, 50, 40);
     expect([canvas.width, canvas.height]).toEqual([50, 40]);
     layer.join([point('a', 1, 1)], key, 0, 0);
@@ -248,7 +249,7 @@ describe('CanvasPointLayer drawing', () => {
   });
 
   it('draws a zero-size plot at unit scale', () => {
-    vi.stubGlobal('devicePixelRatio', 2);
+    stubGlobal('devicePixelRatio', 2);
     const frames = installFrames();
     const calls = installRecordingContext();
     const { layer } = mountLayer();

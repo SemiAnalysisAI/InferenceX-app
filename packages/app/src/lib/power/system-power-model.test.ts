@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { create_power_model, type PowerEstimate, ValueError } from './power_model';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';

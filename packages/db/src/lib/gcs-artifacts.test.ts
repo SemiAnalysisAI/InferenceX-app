@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import {
   listGcsServerLogArtifacts,
@@ -43,8 +43,7 @@ describe('GCS artifact backup', () => {
   });
 
   it('paginates the public bucket index and groups useful artifacts by run', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
+    const fetchMock = mock<typeof fetch>()
       .mockResolvedValueOnce(
         Response.json({
           items: [

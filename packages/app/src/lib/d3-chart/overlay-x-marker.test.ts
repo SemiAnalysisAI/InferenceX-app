@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { overlayMarkerPosition } from './overlay-x-marker';
 

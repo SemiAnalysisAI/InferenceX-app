@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { createMockGroup } from './test-helpers';
 import { renderBarLabels, updateBarLabelsOnZoom, type BarLabelConfig } from './bar-labels';

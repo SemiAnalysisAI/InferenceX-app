@@ -1,43 +1,49 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import type { AvailabilityRow } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
-import {
-  getPrecisionPairsByModelSlug,
-  getAllComparablePrecisionSlugs,
-  getSpecDecodePairsByModelSlug,
-  getAllComparableSpecDecodeSlugs,
-} from './compare-variant-availability';
-
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
   getDb: vi.fn(),
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
   getAvailabilityData: vi.fn(),
 }));
 
-vi.mock('next/cache', () => ({
+mock.module('next/cache', () => ({
   unstable_cache: <T>(fn: T) => fn,
   revalidateTag: vi.fn(),
 }));
 
-vi.mock('../cache/blob-cache', () => ({
+// api-cache imports more blob-cache exports than this test stubs, and bun links them eagerly, so
+// the real module supplies the rest. The factory cannot import it, so it is captured first.
+const actualBlobCache = { ...(await import('../cache/blob-cache')) };
+mock.module('../cache/blob-cache', () => ({
+  ...actualBlobCache,
   blobEnabled: () => false,
   blobGet: vi.fn().mockResolvedValue(null),
   blobSet: vi.fn(),
   blobPurge: vi.fn(),
 }));
 
-vi.mock('../testing/test-fixtures', () => ({
+mock.module('../testing/test-fixtures', () => ({
   loadFixture: vi.fn(),
 }));
+
+// Imported after mock.module so the availability reader is built on the mocked unstable_cache.
+const {
+  getPrecisionPairsByModelSlug,
+  getAllComparablePrecisionSlugs,
+  getSpecDecodePairsByModelSlug,
+  getAllComparableSpecDecodeSlugs,
+} = await import('./compare-variant-availability');
 
 const { getAvailabilityData: mockGetAvailability } =
   await import('@semianalysisai/inferencex-db/queries/workflow-info');
 
-const mockFn = vi.mocked(mockGetAvailability);
+const mockFn = mocked(mockGetAvailability);
 
 function stubAvailRow(overrides: Partial<AvailabilityRow> = {}): AvailabilityRow {
   return {

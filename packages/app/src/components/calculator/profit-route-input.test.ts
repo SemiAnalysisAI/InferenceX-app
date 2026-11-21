@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   notFound: () => {
     throw new Error('404');
   },

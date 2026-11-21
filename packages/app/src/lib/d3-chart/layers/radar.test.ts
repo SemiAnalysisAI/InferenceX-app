@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { asMock, createMockGroup } from './test-helpers';
 import { renderRadar, type RadarConfig } from './radar';

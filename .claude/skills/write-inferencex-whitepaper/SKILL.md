@@ -145,7 +145,7 @@ Update or extend, never delete:
 
 ```bash
 PATH=$HOME/.bun/bin:$PATH bun run lint && bun run check:typography && bunx oxfmt --check
-cd packages/app && bunx vitest run src/lib/content/whitepapers.test.ts src/components/whitepaper src/app/sitemap.test.ts src/lib/i18n/i18n.test.ts
+cd packages/app && bun run test:unit src/lib/content/whitepapers.test.ts src/components/whitepaper src/app/sitemap.test.ts src/lib/i18n/i18n.test.ts
 bunx tsc --noEmit -p tsconfig.json 2>&1 | rg -i whitepaper   # must print nothing
 ```
 

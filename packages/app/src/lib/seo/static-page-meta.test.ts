@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { Metadata } from 'next';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 

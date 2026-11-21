@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { DB_WRITE_KINDS, createSkipTracker } from './skip-tracker';
 
 describe('createSkipTracker', () => {

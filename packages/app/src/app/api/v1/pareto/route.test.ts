@@ -1,12 +1,13 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { load } = vi.hoisted(() => ({ load: vi.fn() }));
-vi.mock('@/lib/benchmarks/benchmarks-endpoint.server', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+const load = vi.fn();
+const actual = { ...(await import('@/lib/benchmarks/benchmarks-endpoint.server')) };
+mock.module('@/lib/benchmarks/benchmarks-endpoint.server', () => ({
+  ...actual,
   loadBenchmarks: load,
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));

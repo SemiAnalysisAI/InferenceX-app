@@ -1,26 +1,38 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import {
+  runAllTimersAsync,
+  stubEnv,
+  stubGlobal,
+  unstubAllEnvs,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
+import type * as PostHogProviderModule from './posthog-provider';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   init: vi.fn(),
   register: vi.fn(),
   registerAnalyticsClient: vi.fn(),
-}));
+};
 
-vi.mock('posthog-js', () => ({
+mock.module('posthog-js', () => ({
   default: { init: mocks.init, register: mocks.register, capture: vi.fn() },
 }));
-vi.mock('@/lib/analytics/analytics', () => ({
+mock.module('@/lib/analytics/analytics', () => ({
   hasPendingAnalyticsEvents: () => false,
   registerAnalyticsClient: mocks.registerAnalyticsClient,
   trackPageview: vi.fn(),
   trackVirtualPageview: vi.fn(),
 }));
-vi.mock('@/lib/runtime/chunk-load-recovery', () => ({ installChunkLoadRecovery: vi.fn() }));
-vi.mock('@/lib/analytics/outbound-links', () => ({ installOutboundLinkTracking: () => () => {} }));
-vi.mock('@/lib/nudges/landing-banner', () => ({
+mock.module('@/lib/runtime/chunk-load-recovery', () => ({ installChunkLoadRecovery: vi.fn() }));
+mock.module('@/lib/analytics/outbound-links', () => ({
+  installOutboundLinkTracking: () => () => {},
+}));
+mock.module('@/lib/nudges/landing-banner', () => ({
   assignedLandingBannerVariant: () => undefined,
   LANDING_BANNER_VARIANT_PROPERTY: 'landing_banner_variant',
 }));
@@ -30,13 +42,19 @@ const PINTEREST_BOT =
 const CHROME =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
+let moduleGeneration = 0;
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 
 async function mountProvider(userAgent: string) {
-  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
-  // POSTHOG_KEY and NODE_ENV are read when the module loads.
-  const { PostHogProvider } = await import('./posthog-provider');
+  // bun's spyOn cannot spy on getters; shadow the prototype getter with an own property instead.
+  Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => userAgent });
+  // POSTHOG_KEY and NODE_ENV are read when the module loads, so each test loads a fresh copy
+  // under a new specifier (bun:test has no resetModules).
+  moduleGeneration += 1;
+  const { PostHogProvider }: typeof PostHogProviderModule = await import(
+    `./posthog-provider?generation=${moduleGeneration}`
+  );
   container = document.createElement('div');
   root = createRoot(container);
   act(() => {
@@ -44,19 +62,18 @@ async function mountProvider(userAgent: string) {
   });
   // Initialization waits for an idle callback or a 1s fallback timer, then imports posthog-js.
   await act(async () => {
-    await vi.runAllTimersAsync();
+    await runAllTimersAsync();
   });
 }
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.resetModules();
-  vi.useFakeTimers();
-  vi.stubEnv('NODE_ENV', 'production');
-  vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+  useFakeTimers();
+  stubEnv('NODE_ENV', 'production');
+  stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
   // jsdom has no idle callbacks; run them on a fake timer.
-  vi.stubGlobal('requestIdleCallback', (callback: () => void) => setTimeout(callback, 0));
-  vi.stubGlobal('cancelIdleCallback', (id: number) => clearTimeout(id));
+  stubGlobal('requestIdleCallback', (callback: () => void) => setTimeout(callback, 0));
+  stubGlobal('cancelIdleCallback', (id: number) => clearTimeout(id));
   mocks.init.mockClear();
   mocks.registerAnalyticsClient.mockClear();
 });
@@ -65,10 +82,10 @@ afterEach(() => {
   act(() => root?.unmount());
   root = undefined;
   container = undefined;
-  vi.useRealTimers();
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
+  useRealTimers();
+  unstubAllEnvs();
+  unstubAllGlobals();
+  Reflect.deleteProperty(navigator, 'userAgent');
 });
 
 describe('PostHogProvider bot filtering', () => {

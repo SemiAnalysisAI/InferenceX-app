@@ -1,6 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import * as d3 from 'd3';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import {
   applyNormalState,
@@ -185,7 +186,7 @@ const rect = (width: number, height: number, left = 0, top = 0) => ({
 describe('computeTooltipPosition', () => {
   it('caches same-frame geometry and invalidates it by frame and content lifecycle', () => {
     let nextFrame: FrameRequestCallback | undefined;
-    vi.stubGlobal(
+    stubGlobal(
       'requestAnimationFrame',
       vi.fn((callback: FrameRequestCallback) => {
         nextFrame = callback;
@@ -252,7 +253,7 @@ describe('computeTooltipPosition', () => {
     computeTooltipPosition(40, 50, tooltip, container);
     expect(tooltipBounds).toHaveBeenCalledTimes(4);
     nextFrame!(16);
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('keeps a tall pinned tooltip inside the visible viewport', () => {
@@ -303,7 +304,7 @@ describe('computeTooltipPosition', () => {
 
   it('keeps the tooltip below the sticky site header instead of underneath it', () => {
     let frame: FrameRequestCallback | undefined;
-    vi.stubGlobal(
+    stubGlobal(
       'requestAnimationFrame',
       vi.fn((callback: FrameRequestCallback) => {
         frame = callback;
@@ -339,7 +340,7 @@ describe('computeTooltipPosition', () => {
     } finally {
       header.remove();
       frame?.(0);
-      vi.unstubAllGlobals();
+      unstubAllGlobals();
     }
   });
 });

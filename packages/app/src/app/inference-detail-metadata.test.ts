@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { generateMetadata as enAgenticMetadata } from './(dashboard)/infx/inference/agentic/[id]/page';
 import { generateMetadata as enLogMetadata } from './(dashboard)/infx/inference/logs/[id]/page';

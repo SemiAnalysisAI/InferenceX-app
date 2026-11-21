@@ -34,6 +34,7 @@ export function useResponsiveChartDimensions(
   const appliedWidthRef = useRef(0);
   const pendingWidthRef = useRef<number | null>(null);
   const coalesceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   const updateDimensions = useCallback((width: number) => {
     appliedWidthRef.current = width;
@@ -47,6 +48,8 @@ export function useResponsiveChartDimensions(
     clearTimeout(coalesceTimerRef.current ?? undefined);
     coalesceTimerRef.current = null;
     pendingWidthRef.current = null;
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
   }, []);
 
   const observeWidth = useCallback(
@@ -85,8 +88,16 @@ export function useResponsiveChartDimensions(
       if (element) {
         updateDimensions(element.getBoundingClientRect().width);
 
+        // Resizing the chart inside the observer callback grows the observed container in
+        // the same frame, which raises "ResizeObserver loop completed with undelivered notifications".
         resizeObserverRef.current = new ResizeObserver((entries) => {
-          if (entries[0]) observeWidth(entries[0].contentRect.width);
+          const width = entries[0]?.contentRect.width;
+          if (width === undefined) return;
+          if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+          frameRef.current = requestAnimationFrame(() => {
+            frameRef.current = null;
+            observeWidth(width);
+          });
         });
 
         resizeObserverRef.current.observe(element);

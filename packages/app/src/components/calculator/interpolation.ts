@@ -14,12 +14,16 @@ export function paretoFrontUpperLeft<T>(
   for (let i = 0; i < n; i++) {
     xs.push(getX(points[i]));
     ys.push(getY(points[i]));
-    order.push(i);
+    // A point with a NaN coordinate is not comparable, so it is never on the front.
+    if (!Number.isNaN(xs[i]) && !Number.isNaN(ys[i])) order.push(i);
   }
-  if (n > 32 || !xs.every(Number.isFinite) || !ys.every(Number.isFinite)) {
-    order.sort((a, b) => (xs[a] === xs[b] ? ys[b] - ys[a] : xs[a] - xs[b]));
+  // Comparisons, not subtraction: Infinity - Infinity is NaN, which makes the sort order engine-defined.
+  if (order.length > 32) {
+    order.sort((a, b) =>
+      xs[a] === xs[b] ? (ys[a] === ys[b] ? 0 : ys[a] > ys[b] ? -1 : 1) : xs[a] < xs[b] ? -1 : 1,
+    );
   } else {
-    for (let i = 1; i < n; i++) {
+    for (let i = 1; i < order.length; i++) {
       const current = order[i];
       const cx = xs[current];
       const cy = ys[current];

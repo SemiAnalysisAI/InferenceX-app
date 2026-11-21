@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { getChangelogDatesInRange } from './workflow-info';
 
@@ -38,7 +38,7 @@ const runConfig = (date: string, id: number, model: string) => ({
 function mockSql(results: { changelogs: unknown[]; runs: unknown[]; runConfigs: unknown[] }) {
   const texts: string[] = [];
   const values: unknown[][] = [];
-  const sql = vi.fn((strings: TemplateStringsArray, ...vals: unknown[]) => {
+  const sql = mock((strings: TemplateStringsArray, ...vals: unknown[]) => {
     const text = strings.join('?').replaceAll(/\s+/gu, ' ').trim();
     if (!text.startsWith('SELECT')) return { fragment: text };
     texts.push(text);

@@ -1,6 +1,6 @@
 import { POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import { POWER_AUDIT_CPU_SENSOR_KINDS } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { apiOperations, buildOpenApiDocument, getApiDocumentation } from './api-documentation';
 import { POWER_VALIDITY_FILTERS } from '../benchmarks/benchmark-power-validity';

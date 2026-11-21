@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { VIDEO_ALIAS_REDIRECTS, VIDEO_ROUTE_ALIASES } from './video-alias-redirects';
 

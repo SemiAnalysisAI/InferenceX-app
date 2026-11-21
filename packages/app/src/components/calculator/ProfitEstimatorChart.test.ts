@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';

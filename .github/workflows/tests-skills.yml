@@ -16,7 +16,7 @@ concurrency:
 jobs:
   changes:
     name: Changed files
-    timeout-minutes: 2
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read # List the pull request's changed files.
@@ -46,7 +46,7 @@ jobs:
     name: Pack skills archive (Linux, Node 24)
     needs: changes
     if: ${{ needs.changes.outputs.run == 'true' && !github.event.pull_request.draft }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
@@ -197,7 +197,7 @@ jobs:
     name: Skills tests
     needs: [changes, pack-archive, packed-skills]
     if: ${{ always() }}
-    timeout-minutes: 2
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions: {}
     steps:

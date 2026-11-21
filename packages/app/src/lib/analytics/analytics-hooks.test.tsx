@@ -1,13 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { advanceTimersByTime, mocked, useFakeTimers, useRealTimers } from '@/test/helpers';
 
 import { track } from './analytics';
 import { useDialogCloseTracking } from './use-dialog-close-tracking';
 import { SEARCH_TRACK_DELAY_MS, useSearchTracking } from './use-search-tracking';
 
-vi.mock('./analytics', () => ({ track: vi.fn() }));
+mock.module('./analytics', () => ({ track: vi.fn() }));
 
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, writable: true });
 
@@ -24,14 +25,14 @@ function SearchProbe({ query }: { query: string }) {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  useFakeTimers();
   root = createRoot(document.createElement('div'));
 });
 
 afterEach(() => {
   act(() => root.unmount());
-  vi.useRealTimers();
-  vi.mocked(track).mockClear();
+  useRealTimers();
+  mocked(track).mockClear();
 });
 
 describe('useDialogCloseTracking', () => {
@@ -39,7 +40,7 @@ describe('useDialogCloseTracking', () => {
     act(() => root.render(<DialogProbe open={false} />));
     expect(track).not.toHaveBeenCalled();
     act(() => root.render(<DialogProbe open />));
-    vi.advanceTimersByTime(1500);
+    advanceTimersByTime(1500);
     act(() => root.render(<DialogProbe open={false} />));
     act(() => root.render(<DialogProbe open={false} />));
     expect(track).toHaveBeenCalledTimes(1);
@@ -54,27 +55,27 @@ describe('useSearchTracking', () => {
   it('sends query_length after typing pauses, never the text, and skips repeats', () => {
     act(() => root.render(<SearchProbe query="h" />));
     act(() => root.render(<SearchProbe query="h100 " />));
-    act(() => vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
-    expect(vi.mocked(track).mock.calls).toEqual([
+    act(() => advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
+    expect(mocked(track).mock.calls).toEqual([
       ['glossary_searched', { results: 5, query_length: 4 }],
     ]);
 
     act(() => root.render(<SearchProbe query="h100" />));
-    act(() => vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
+    act(() => advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
     expect(track).toHaveBeenCalledTimes(1);
 
     act(() => root.render(<SearchProbe query="" />));
     act(() => root.render(<SearchProbe query="h100" />));
-    act(() => vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
+    act(() => advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
     expect(track).toHaveBeenCalledTimes(2);
   });
 
   it('drops a pending search event when the component unmounts first', () => {
     act(() => root.render(<SearchProbe query="h100" />));
-    act(() => vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS - 1));
+    act(() => advanceTimersByTime(SEARCH_TRACK_DELAY_MS - 1));
     act(() => root.unmount());
     root = createRoot(document.createElement('div'));
-    vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS);
+    advanceTimersByTime(SEARCH_TRACK_DELAY_MS);
     expect(track).not.toHaveBeenCalled();
   });
 });

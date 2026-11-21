@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
-const localeState = vi.hoisted(() => ({ pathname: '/infx/inference/agentic/206885' }));
-vi.mock('next/navigation', () => ({
+const localeState = { pathname: '/infx/inference/agentic/206885' };
+mock.module('next/navigation', () => ({
   usePathname: () => localeState.pathname,
 }));
 

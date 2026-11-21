@@ -1,31 +1,32 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model } from '@/lib/catalog/data-mappings';
 import { buildOverviewModelSummary } from '@/lib/overview/overview-data';
 import { buildRankingRows } from '@/lib/live-seo/rankings';
 
-const { mockGetCachedBenchmarks, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
+const { mockGetCachedBenchmarks, mockCachedJson, mockCachedText } = {
   mockGetCachedBenchmarks: vi.fn(),
   mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),
   ),
-}));
+};
 
-vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({
+mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
   getCachedBenchmarks: mockGetCachedBenchmarks,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedDerivedData: <T, Args extends unknown[]>(fn: (...args: Args) => Promise<T>) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));
 
-import { GET } from './route';
+// Imported after mock.module so the route builds its reader from the mocked cachedDerivedData.
+const { GET } = await import('./route');
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'http://localhost'));

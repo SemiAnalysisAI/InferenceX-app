@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import matter from 'gray-matter';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { Model, getModelLogo } from '@/lib/catalog/data-mappings';
 import {

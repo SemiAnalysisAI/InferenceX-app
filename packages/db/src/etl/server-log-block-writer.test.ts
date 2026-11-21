@@ -1,6 +1,7 @@
 import type { TransactionSql } from 'postgres';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 
+import { stubEnv, unstubAllEnvs } from '../lib/test-helpers';
 import {
   countCodePoints,
   encodeServerLogBlocks,
@@ -94,7 +95,7 @@ describe('writeServerLogBlocks', () => {
 
   it('writes nothing when the file already has a marker', async () => {
     const { tx, batches, markers } = recordingTx(true);
-    const readRange = vi.fn((start: number, length: number) =>
+    const readRange = mock((start: number, length: number) =>
       Promise.resolve(sliceCodePoints(text, ascii, start, length)),
     );
 
@@ -131,15 +132,15 @@ describe('writeTextAsBlocks', () => {
 
 describe('serverLogBlocksEnabled', () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    unstubAllEnvs();
   });
 
   it('is on only for SERVER_LOG_BLOCKS=1', () => {
-    vi.stubEnv('SERVER_LOG_BLOCKS', '1');
+    stubEnv('SERVER_LOG_BLOCKS', '1');
     expect(serverLogBlocksEnabled()).toBe(true);
-    vi.stubEnv('SERVER_LOG_BLOCKS', '0');
+    stubEnv('SERVER_LOG_BLOCKS', '0');
     expect(serverLogBlocksEnabled()).toBe(false);
-    vi.stubEnv('SERVER_LOG_BLOCKS', 'true');
+    stubEnv('SERVER_LOG_BLOCKS', 'true');
     expect(serverLogBlocksEnabled()).toBe(false);
   });
 });

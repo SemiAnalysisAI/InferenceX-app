@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, spyOn } from 'bun:test';
 
+import { waitFor } from '../lib/test-helpers';
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { encodeRequestChartColumns } from '../etl/request-chart-columns';
 import { gzipRequestTimeline } from '../etl/request-timeline-codec';
@@ -98,7 +99,7 @@ describe('getTraceHistograms', () => {
   });
 
   it('logs and omits a point whose gzip timeline cannot be read', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     const { sql } = mockSql([
       [
         {
@@ -257,9 +258,9 @@ describe('getTraceHistograms', () => {
     }) as unknown as DbClient;
 
     const result = getTraceHistograms(sql, ids);
-    await vi.waitFor(() => expect(held).toHaveLength(4));
+    await waitFor(() => expect(held).toHaveLength(4));
     for (const release of held.splice(0)) release();
-    await vi.waitFor(() => expect(held).toHaveLength(1));
+    await waitFor(() => expect(held).toHaveLength(1));
     held[0]!();
 
     await expect(result).resolves.toEqual(

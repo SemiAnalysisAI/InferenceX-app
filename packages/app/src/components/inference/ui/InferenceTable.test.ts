@@ -1,5 +1,6 @@
-// @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+// @test-environment jsdom
+
+import { describe, it, expect } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 

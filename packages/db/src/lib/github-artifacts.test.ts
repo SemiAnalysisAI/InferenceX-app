@@ -2,13 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
-
-const { mockExecSync, mockSpawn } = vi.hoisted(() => ({
-  mockExecSync: vi.fn(),
-  mockSpawn: vi.fn(),
-}));
-vi.mock('node:child_process', () => ({ execSync: mockExecSync, spawn: mockSpawn }));
+import { describe, expect, it, mock, spyOn } from 'bun:test';
 
 import {
   RUNNER_SUFFIX_RE,
@@ -17,6 +11,10 @@ import {
   downloadArtifact,
   fetchRunAttempt,
 } from './github-artifacts.js';
+
+const mockExecSync = mock();
+const mockSpawn = mock();
+mock.module('node:child_process', () => ({ execSync: mockExecSync, spawn: mockSpawn }));
 
 const ZIP_MAGIC = 'PK\u0003\u0004';
 
@@ -152,11 +150,11 @@ async function withStaging(run: (root: string, stagingDirs: string[]) => Promise
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-download-'));
   const stagingDirs: string[] = [];
   const realMkdtemp = fs.mkdtempSync.bind(fs);
-  const mkdtemp = vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix: string) => {
+  const mkdtemp = spyOn(fs, 'mkdtempSync').mockImplementation(((prefix: string) => {
     const dir = realMkdtemp(prefix);
     stagingDirs.push(dir);
     return dir;
-  });
+  }) as typeof fs.mkdtempSync);
   try {
     await run(root, stagingDirs);
   } finally {
@@ -194,7 +192,7 @@ describe('downloadArtifact tool failures and cleanup', () => {
 
   it('closes each zip, removes its staging dir and downloads the same artifact again', async () => {
     fakeTools();
-    const closeSync = vi.spyOn(fs, 'closeSync');
+    const closeSync = spyOn(fs, 'closeSync');
     await withStaging(async (root, stagingDirs) => {
       const artifact = art('bmk_a', '2026-06-01T00:00:00Z');
 

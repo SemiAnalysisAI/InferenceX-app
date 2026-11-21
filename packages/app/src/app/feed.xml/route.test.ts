@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import type { BlogPostMeta } from '@/lib/blog/blog';
 
@@ -13,7 +13,7 @@ const FAKE_POSTS: BlogPostMeta[] = [
   },
 ];
 
-vi.mock('@/lib/blog/blog', () => ({
+mock.module('@/lib/blog/blog', () => ({
   getAllPosts: () => FAKE_POSTS,
 }));
 
