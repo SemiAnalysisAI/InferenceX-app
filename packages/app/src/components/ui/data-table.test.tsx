@@ -1,9 +1,9 @@
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { DataTable } from './data-table';
 
-vi.mock('@/lib/i18n/use-locale', () => ({
+mock.module('@/lib/i18n/use-locale', () => ({
   useLocale: () => 'en',
 }));
 

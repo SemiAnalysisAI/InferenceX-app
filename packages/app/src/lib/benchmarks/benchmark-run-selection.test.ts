@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { mergeRunScopedRows } from './benchmark-transform';
 import { dedupeAgenticHistoryRuns, dedupeRowsToLatestPerConfig } from './benchmark-run-selection';

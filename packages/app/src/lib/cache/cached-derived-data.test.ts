@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const cacheBodies = vi.hoisted(() => new Map<string, string>());
+const cacheBodies = (() => new Map<string, string>())();
 
-vi.mock('next/cache', () => ({
+mock.module('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: vi.fn(
     (source: (...args: unknown[]) => Promise<unknown>, keyParts: string[]) =>
@@ -14,7 +14,7 @@ vi.mock('next/cache', () => ({
   ),
 }));
 
-vi.mock('./blob-cache', () => ({
+mock.module('./blob-cache', () => ({
   blobEnabled: () => false,
   blobGet: vi.fn(),
   blobSet: vi.fn(),

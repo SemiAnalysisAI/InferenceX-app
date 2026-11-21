@@ -1,9 +1,10 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-vi.mock('@/lib/analytics/analytics', () => ({
+mock.module('@/lib/analytics/analytics', () => ({
   track: vi.fn(),
 }));
 
@@ -35,7 +36,7 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   (document as unknown as { startViewTransition: () => void }).startViewTransition = () => {};
-  vi.stubGlobal(
+  stubGlobal(
     'matchMedia',
     (query: string) =>
       ({ matches: query === '(prefers-reduced-motion: no-preference)' }) as MediaQueryList,
@@ -46,7 +47,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   delete (document as unknown as { startViewTransition?: () => void }).startViewTransition;
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 const cardProps = {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { getModelPage, getModelPageSlugs } from './model-pages';
 import { MODEL_PAGE_ZH, getLocalizedModelPage } from './model-pages-zh';

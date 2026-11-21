@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';

@@ -1,23 +1,24 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { setSystemTime, useFakeTimers, useRealTimers } from '@/test/helpers';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 
-const { mockGetAllBenchmarksForHistory, mockGetDb } = vi.hoisted(() => ({
+const { mockGetAllBenchmarksForHistory, mockGetDb } = {
   mockGetAllBenchmarksForHistory: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
@@ -143,8 +144,8 @@ function curve(date: string, hardware: string, framework: string, scale = 1): Be
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-03-15T00:30:00Z'));
+  useFakeTimers();
+  setSystemTime(new Date('2026-03-15T00:30:00Z'));
   mockGetAllBenchmarksForHistory.mockResolvedValue([
     ...curve('2026-02-01', 'h200', 'trt'),
     ...curve('2026-03-01', 'h200', 'trt', 1.2),
@@ -152,7 +153,7 @@ beforeEach(() => {
   ]);
 });
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => useRealTimers());
 
 // Median and P90 disagree on purpose: at target 35, the P90 axis reads
 // 300 → 360 (+60) while the median axis would read ~397 → 476.

@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   STATS_VERSION,

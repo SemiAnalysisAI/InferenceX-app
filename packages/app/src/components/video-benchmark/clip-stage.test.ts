@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import {
   pairedGroup,
   parseStage,
@@ -12,6 +13,7 @@ import {
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';
+import type * as PageSearch from './page-search';
 import { setVideoSearch, subscribeVideoSearch, videoSearch } from './page-search';
 import { resultsClipGroups, type ResultsClipSide } from './results-clips';
 
@@ -43,7 +45,7 @@ const point = (hardwareKey: string, runId = 'official') =>
   ({ id: hardwareKey, hardwareKey, runId }) as VideoPoint;
 
 describe('clip stage', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => unstubAllGlobals());
 
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
     const search = stageSearch(
@@ -95,10 +97,11 @@ describe('clip stage', () => {
   });
 
   it('keeps the settings across a remount and replaces them only for a new link', async () => {
-    vi.resetModules();
     const location = { search: '?r_engine=sglang&unofficialRun=7' };
-    vi.stubGlobal('window', { location });
-    const page = await import('./page-search');
+    stubGlobal('window', { location });
+    // A copy loaded under a new specifier has read no link yet, like a fresh document.
+    const freshSpecifier = './page-search?fresh';
+    const page: typeof PageSearch = await import(freshSpecifier);
     // The document's first read takes the link.
     expect(page.videoSearch()).toBe('r_engine=sglang&unofficialRun=7');
     page.setVideoSearch(new URLSearchParams('r_engine=vllm-omni&r_prompt=crane'));

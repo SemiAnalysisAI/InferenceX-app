@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it } from 'bun:test';
 import { OPERATORX_SHARE_CONTROLS } from '@/lib/routing/dashboard-routes';
 import { shareBin, shareBoolean, sharePrecision } from './share-state';
 

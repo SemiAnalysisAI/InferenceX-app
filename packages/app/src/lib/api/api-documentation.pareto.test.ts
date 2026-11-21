@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { apiOperations, buildOpenApiDocument, getApiDocumentation } from './api-documentation';
 import { PARETO_PARAMETERS, parseParetoRequest } from './pareto-api';
 

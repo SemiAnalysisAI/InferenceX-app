@@ -1,13 +1,13 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { Sequence } from '@/lib/catalog/data-mappings';
 
 import ComparisonChangelog from './ComparisonChangelog';
 
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 type Props = ComponentProps<typeof ComparisonChangelog>;
 

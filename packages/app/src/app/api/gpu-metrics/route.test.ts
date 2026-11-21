@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach, mock } from 'bun:test';
 
-const { mockParseCsvData, zipArchives } = vi.hoisted(() => ({
+const { mockParseCsvData, zipArchives } = {
   mockParseCsvData: vi.fn((csv: string) => {
     if (csv.trim().length === 0) return [];
     return [
@@ -17,33 +17,33 @@ const { mockParseCsvData, zipArchives } = vi.hoisted(() => ({
     ];
   }),
   zipArchives: { byKey: new Map<string, { entryName: string; data: string }[]>() },
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-constants', () => ({
+mock.module('@semianalysisai/inferencex-constants', () => ({
   GITHUB_API_BASE: 'https://api.github.com',
   benchmarkSourceRepos: () => ['TestOwner/TestRepo'],
 }));
 
-vi.mock('@/components/gpu-power/types', () => ({
+mock.module('@/components/gpu-power/types', () => ({
   parseCsvData: mockParseCsvData,
 }));
 
-const { mockGetGpuMetricsForRun } = vi.hoisted(() => ({
+const { mockGetGpuMetricsForRun } = {
   mockGetGpuMetricsForRun: vi.fn(),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: () => ({}),
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForRun: mockGetGpuMetricsForRun,
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
   getPrecomputedPowerSeries: () => Promise.resolve(null),
 }));
 
-vi.mock('adm-zip', () => {
+mock.module('adm-zip', () => {
   const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
     private readonly buffer: Buffer;

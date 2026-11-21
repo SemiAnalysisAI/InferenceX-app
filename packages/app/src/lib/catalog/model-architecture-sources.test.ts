@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { Model, MODEL_OPTIONS } from './data-mappings';
 import fixtures from './fixtures/model-architecture-configs.json';

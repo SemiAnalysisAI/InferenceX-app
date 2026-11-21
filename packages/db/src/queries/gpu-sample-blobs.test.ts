@@ -3,8 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { stubEnv, unstubAllEnvs } from '../lib/test-helpers';
 import type { DbClient } from '../connection';
 import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
 import { GPU_SAMPLE_BLOB_FORMAT_VERSION } from '../lib/gpu-sample-blob';
@@ -235,11 +236,11 @@ describe('ingest with GPU_SAMPLE_BLOBS=1', () => {
         artifact: { artifactName: 'gpu_metrics_blob', artifactDir },
         benchmarkResultIds: [12],
       };
-      vi.stubEnv('GPU_SAMPLE_BLOBS', '1');
+      stubEnv('GPU_SAMPLE_BLOBS', '1');
       try {
         await ingestGpuMetricsArtifact(sql, input);
       } finally {
-        vi.unstubAllEnvs();
+        unstubAllEnvs();
       }
       const expected = await getGpuMetricsForPoint(sql, 12, { sampleBlobs: false });
       const observed = observe();

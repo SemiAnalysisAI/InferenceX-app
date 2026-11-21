@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import * as d3 from 'd3';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { attachOverlayXMarkerHandlers } from './overlay-x-marker';
 import {

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "mcp": "bun --env-file=../../.env src/mcp.ts",
-    "test:unit": "vitest run",
+    "test:unit": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "typescript": "^6.0.3",
-    "vitest": "^5.1.0"
+    "bun-types": "^1.4.4",
+    "typescript": "^6.0.3"
   }
 }

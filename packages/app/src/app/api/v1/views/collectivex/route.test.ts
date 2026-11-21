@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 import { buildDatasetFromNeutral } from '@semianalysisai/inferencex-db/collectivex/reader';
 import {
   makeSwapDoc,
@@ -9,27 +9,27 @@ import {
 } from '@semianalysisai/inferencex-db/collectivex/swap-test-fixture';
 import { swapChartPoints, swapRangeBands, swapRooflines } from '@/components/collectivex/swap-data';
 
-const { cachedJson } = vi.hoisted(() => ({
+const { cachedJson } = {
   cachedJson: vi.fn((_request: Request, data: unknown, _options?: { tag?: string }) =>
     Response.json(data),
   ),
-}));
+};
 
 const h200 = buildDatasetFromNeutral(swapMatrix, [makeSwapDoc()], swapMeta);
 // The run the mocked routes serve; one test swaps in another pool.
 let dataset = h200;
 
-vi.mock('@/app/api/v1/collectivex/runs/route', () => ({
+mock.module('@/app/api/v1/collectivex/runs/route', () => ({
   GET: () =>
     Response.json({
       runs: [{ run_id: dataset.run.run_id, measured_cases: 1, requested_cases: 1 }],
       discovery_complete: true,
     }),
 }));
-vi.mock('@/app/api/v1/collectivex/runs/[runId]/route', () => ({
+mock.module('@/app/api/v1/collectivex/runs/[runId]/route', () => ({
   GET: () => Response.json(dataset),
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson,
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   collectiveXCacheTag: () => 'collectivex',

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { buildCorrelationData, buildGroupedData, buildTelemetryData } from './chart-data';
 import type { GpuMetricRow } from './types';
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { harnessFromUserAgent } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
 import { normalizePlatformOs } from '@semianalysisai/inferencex-db/proxytrace/shared/platform';
 import { compareVersions, parseUserAgent } from '@/lib/agentic-workload-explorer/user-agent';

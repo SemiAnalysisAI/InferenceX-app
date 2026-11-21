@@ -5,7 +5,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
 import type postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { PROFILE_INLINE_BYTES, readTraceProfileGz } from '../lib/trace-profile-storage';

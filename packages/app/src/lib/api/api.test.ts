@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'bun:test';
+import { stubGlobal } from '@/test/helpers';
 
 import {
   fetchBenchmarks,
@@ -15,7 +16,7 @@ import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reade
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
 
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+stubGlobal('fetch', mockFetch);
 
 beforeEach(() => {
   mockFetch.mockReset();

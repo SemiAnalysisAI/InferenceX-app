@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
 import { applyBenchmarkPointBackfill } from '@semianalysisai/inferencex-db/etl/run-overrides';

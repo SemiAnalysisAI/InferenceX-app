@@ -1,12 +1,13 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import * as d3 from 'd3';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { waitFor } from '@/test/helpers';
 
-const exportMocks = vi.hoisted(() => ({ pathname: '/infx/inference', toPng: vi.fn() }));
-vi.mock('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
-vi.mock('@jpinsonneau/html-to-image', () => ({
+const exportMocks = { pathname: '/infx/inference', toPng: vi.fn() };
+mock.module('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
+mock.module('@jpinsonneau/html-to-image', () => ({
   toPng: exportMocks.toPng,
   getFontEmbedCSS: undefined,
 }));
@@ -104,7 +105,7 @@ describe('useChartExport failure messages', () => {
     let pending = Promise.resolve();
     await act(async () => {
       pending = current.exportToImage();
-      await vi.waitFor(() => expect(exportMocks.toPng).toHaveBeenCalledOnce());
+      await waitFor(() => expect(exportMocks.toPng).toHaveBeenCalledOnce());
     });
     expect(current.isExporting).toBe(true);
     await act(async () => {

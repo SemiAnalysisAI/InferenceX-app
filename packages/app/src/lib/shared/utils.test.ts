@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, mock } from 'bun:test';
 
-import type * as ConstantsModule from '@/lib/catalog/constants';
 import { Model, MODEL_PREFIX_MAPPING } from '@/lib/catalog/data-mappings';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import {
@@ -30,14 +29,12 @@ describe('cn merging of custom typography tokens', () => {
   });
 });
 
-vi.mock('@/lib/catalog/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof ConstantsModule>();
-  return {
-    ...actual,
-    getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costr: 0.7 })),
-  };
-});
+const actual = { ...(await import('@/lib/catalog/constants')) };
+mock.module('@/lib/catalog/constants', () => ({
+  ...actual,
+  getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
+  getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costr: 0.7 })),
+}));
 
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   return {

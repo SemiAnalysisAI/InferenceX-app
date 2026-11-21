@@ -1,11 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { retryArtifactOperation } from './artifact-retry.js';
 
 describe('retryArtifactOperation', () => {
   it('retries transient failures using the configured delays', async () => {
-    const operation = vi
-      .fn<() => string>()
+    const operation = mock<() => string>()
       .mockImplementationOnce(() => {
         throw new Error('temporary DNS failure');
       })
@@ -13,8 +12,8 @@ describe('retryArtifactOperation', () => {
         throw new Error('temporary TLS failure');
       })
       .mockReturnValue('downloaded');
-    const wait = vi.fn<(delayMs: number) => Promise<void>>(() => Promise.resolve());
-    const warn = vi.fn<(message: string) => void>();
+    const wait = mock<(delayMs: number) => Promise<void>>(() => Promise.resolve());
+    const warn = mock<(message: string) => void>();
 
     await expect(
       retryArtifactOperation('artifact', operation, { delaysMs: [5, 15], wait, warn }),
@@ -26,7 +25,7 @@ describe('retryArtifactOperation', () => {
 
   it('throws the final error after exhausting retries', async () => {
     const failure = new Error('still unavailable');
-    const wait = vi.fn<(delayMs: number) => Promise<void>>(() => Promise.resolve());
+    const wait = mock<(delayMs: number) => Promise<void>>(() => Promise.resolve());
 
     await expect(
       retryArtifactOperation(

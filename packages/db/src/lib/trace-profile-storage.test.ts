@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { computeRequestTimeline } from '../etl/compute-request-timeline';
 import {

@@ -1,12 +1,12 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-const themeState = vi.hoisted(() => ({ resolvedTheme: undefined as string | undefined }));
+const themeState = { resolvedTheme: undefined as string | undefined };
 
-vi.mock('next-themes', () => ({
+mock.module('next-themes', () => ({
   useTheme: () => themeState,
 }));
 

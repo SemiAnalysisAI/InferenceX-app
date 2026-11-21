@@ -1,24 +1,19 @@
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createServer } from './server.js';
-
-const { mockState, mockDb } = vi.hoisted(() => {
-  const state = {
-    dbRows: [] as Record<string, unknown>[],
-    queryError: null as Error | null,
-  };
-  const db = Object.assign(() => Promise.resolve(state.dbRows), {
-    unsafe: () => {
-      if (state.queryError) return Promise.reject(state.queryError);
-      return Promise.resolve(state.dbRows);
-    },
-  });
-  return { mockState: state, mockDb: db };
+const mockState = {
+  dbRows: [] as Record<string, unknown>[],
+  queryError: null as Error | null,
+};
+const mockDb = Object.assign(() => Promise.resolve(mockState.dbRows), {
+  unsafe: () => {
+    if (mockState.queryError) return Promise.reject(mockState.queryError);
+    return Promise.resolve(mockState.dbRows);
+  },
 });
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   resolveDatabaseConnection: () => ({
     url: 'postgres://test@localhost/test',
     driver: 'postgres',
@@ -26,9 +21,12 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   }),
 }));
 
-vi.mock('postgres', () => ({
+mock.module('postgres', () => ({
   default: () => mockDb,
 }));
+
+// server.ts connects at module load and bun does not hoist mock.module, so import it after the mocks.
+const { createServer } = await import('./server.js');
 
 let client: Client;
 let closeServer: () => Promise<void>;

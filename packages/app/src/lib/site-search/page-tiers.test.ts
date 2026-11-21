@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { PAGE_TIER, pageTier } from './page-tiers';
 import { SiteSearchIndex } from './search-index';

@@ -1,10 +1,10 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh' }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-vi.mock('../InferenceContext', () => ({
+const mocks = { locale: 'en' as 'en' | 'zh' };
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+mock.module('../InferenceContext', () => ({
   useInferenceDisplay: () => ({ selectedXAxisMode: 'interactivity', selectedPercentile: 'p90' }),
   useInferenceActions: () => ({ setSelectedXAxisMode: vi.fn() }),
   useInferenceFilters: () => ({ selectedSequence: 'agentic-traces' }),

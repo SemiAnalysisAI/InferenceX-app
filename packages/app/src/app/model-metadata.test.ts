@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { HW_REGISTRY, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-vi.mock('@/lib/compare/compare-availability', () => ({
+mock.module('@/lib/compare/compare-availability', () => ({
   getHardwareByModelSlug: () =>
     Promise.resolve(
       new Map([
@@ -12,11 +12,13 @@ vi.mock('@/lib/compare/compare-availability', () => ({
     ),
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedDerivedData: <T>(fn: () => Promise<T>) => fn,
 }));
 
-import { modelDetailMetadata, modelIndexMetadata } from '@/lib/catalog/model-page-metadata';
+// Imported after mock.module so the measured-hardware reader is built from the mocked cachedDerivedData.
+const { modelDetailMetadata, modelIndexMetadata } =
+  await import('@/lib/catalog/model-page-metadata');
 
 describe('model page metadata locale pairing', () => {
   it('pairs the English and Chinese index canonicals and hreflang values', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { configCacheKey } from './config-cache';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';

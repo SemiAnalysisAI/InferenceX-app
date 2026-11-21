@@ -1,10 +1,10 @@
 import { hsl } from 'd3';
 import { generateVendorColors } from './dynamic-colors';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import iwanthue from 'iwanthue';
 
-import type * as ConstantsModule from '@/lib/catalog/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
@@ -26,16 +26,16 @@ import {
 } from '@/lib/charts/chart-utils';
 import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
 
-vi.mock('@/lib/catalog/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof ConstantsModule>();
-  return {
-    ...actual,
-    getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costr: 0.7 })),
-  };
-});
+const actual = { ...(await import('@/lib/catalog/constants')) };
+mock.module('@/lib/catalog/constants', () => ({
+  ...actual,
+  getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
+  getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costr: 0.7 })),
+}));
 
-vi.mock('iwanthue', { spy: true });
+// Keeps iwanthue's real palettes and records each call, as Vitest's spy mode did.
+const iwanthueSpy = vi.fn(iwanthue);
+mock.module('iwanthue', () => ({ default: iwanthueSpy }));
 
 function pt(
   x: number,
@@ -352,33 +352,33 @@ describe('generateHighContrastColors', () => {
   it('caches palettes — a repeated request does not re-run iwanthue', () => {
     const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm', 'gb200_vllm'];
 
-    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const callsBefore = mocked(iwanthue).mock.calls.length;
     const first = generateHighContrastColors(keys, 'light');
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
 
     const second = generateHighContrastColors(keys, 'light');
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
     expect(second).toEqual(first);
   });
 
   it('cache is key-name independent — same vendor/count/theme reuses the palette', () => {
-    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const callsBefore = mocked(iwanthue).mock.calls.length;
     const result = generateHighContrastColors(
       ['h100_sglang', 'h200_sglang', 'b200_sglang', 'b300_sglang', 'gb300_sglang'],
       'light',
     );
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore);
     expect(Object.keys(result)).toHaveLength(5);
     expect(new Set(Object.values(result)).size).toBe(5);
   });
 
   it('a different count is a different cache entry', () => {
-    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const callsBefore = mocked(iwanthue).mock.calls.length;
     generateHighContrastColors(
       ['h100_trt', 'h200_trt', 'b200_trt', 'b300_trt', 'gb200_trt', 'gb300_trt', 'gb200_vllm'],
       'light',
     );
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
   });
 });
 

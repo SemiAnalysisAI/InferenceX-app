@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 import { getStagedChartScopes } from './staged-chart-links';
 import type { DbClient } from '../connection';

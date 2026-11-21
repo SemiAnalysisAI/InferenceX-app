@@ -1,6 +1,6 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { RequestChartDataWire, RequestChartTuple } from '../queries/request-chart-data';
 import {
