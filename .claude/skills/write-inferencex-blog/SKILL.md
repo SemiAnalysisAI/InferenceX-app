@@ -328,7 +328,7 @@ git push -u origin blog/{slug}
 gh pr create --title "feat(blog): ..." --body "..."
 ```
 
-The pre-commit hook runs `oxlint`, `oxfmt`, `tsc --noEmit`, and the typography check (`bun run check:typography`). All four must pass. If lint/format fails, run `bun run lint:fix && bun run fmt:fix` and re-commit (don't `--no-verify`).
+The pre-commit hook runs `oxlint`, `oxfmt`, `bun check` (typecheck), and the typography check (`bun run check:typography`). All four must pass. If lint/format fails, run `bun run lint:fix && bun run fmt:fix` and re-commit (don't `--no-verify`).
 
 After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose (numeric overstatement, claims contradicted by tables, wrong attribution). Treat its findings as real review comments — fix them in a follow-up commit, then resolve the threads. Branch protection on master requires resolved review threads before auto-merge fires.
 

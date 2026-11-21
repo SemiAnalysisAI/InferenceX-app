@@ -330,6 +330,7 @@ export default function ChartDisplay({
     selectedRunDate,
     activeHwTypes,
     bestPerSku,
+    requestedHwTypes,
     activeDates,
     compareGpuPair,
     quickFilters,
@@ -782,6 +783,7 @@ export default function ChartDisplay({
             bestOfficialHwTypes: scopedBestSelections.official,
             bestOverlayHwTypes: scopedBestSelections.overlay,
             bestPerSku,
+            requestedOfficialHwTypes: requestedHwTypes,
             ready: !loading || officialScope.size > 0,
           }
         : null,
@@ -792,6 +794,7 @@ export default function ChartDisplay({
       overlayScope,
       scopedBestSelections,
       bestPerSku,
+      requestedHwTypes,
       loading,
       activeOverlayHwTypes,
       localOfficialOverride,

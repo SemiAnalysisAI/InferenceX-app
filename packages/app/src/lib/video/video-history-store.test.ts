@@ -372,10 +372,11 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the first page began carrying older deployments, and after the PowerX GPU
-      // role touched shared inference types and URL keys and chartStateHref learned to drop empty
-      // overrides; no video entry reads the PowerX changes, so recorded entries are unchanged.
-      sources: '492a1148060b3d93b4735e5c03386696be064249b3074e0a041df22967ada776',
+      // Re-pinned after the overlay selection gained a requested official hardware set, which
+      // only changes chart visibility, and after the PowerX GPU role touched shared inference
+      // types and URL keys and chartStateHref learned to drop empty overrides; no video entry
+      // reads the PowerX changes. Recorded entries are unchanged.
+      sources: '39b49d8967ac47596ead7fd4d494837771f1fd9e2787826afbdaa472deccd91b',
     });
   });
 });
