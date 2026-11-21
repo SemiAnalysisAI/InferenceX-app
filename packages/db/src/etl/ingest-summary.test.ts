@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, spyOn } from 'bun:test';
 
 import { printIngestSummaryFooter } from './ingest-summary';
 import { createSkipTracker } from './skip-tracker';
@@ -15,7 +15,7 @@ const totals = {
 function printedLines(unexpectedMetrics: string[], withTotals = true): string[] {
   const tracker = createSkipTracker();
   for (const key of unexpectedMetrics) tracker.unexpectedMetrics.add(key);
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const log = spyOn(console, 'log').mockImplementation(() => {});
   try {
     printIngestSummaryFooter(withTotals ? totals : null, tracker);
     return log.mock.calls.map(([line]) => String(line));

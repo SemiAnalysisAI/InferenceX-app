@@ -102,8 +102,7 @@
       "name": "@semianalysisai/inferencex-constants",
       "version": "0.1.0",
       "devDependencies": {
-        "@vitest/coverage-v8": "^5.1.0",
-        "vitest": "^5.1.0",
+        "bun-types": "^1.4.4",
       },
     },
     "packages/db": {
@@ -126,10 +125,9 @@
         "@types/node": "^26.6.6",
         "@types/pg": "^8.23.1",
         "@types/stream-json": "^1.7.8",
-        "@vitest/coverage-v8": "^5.1.0",
         "adm-zip": "^0.6.1",
+        "bun-types": "^1.4.4",
         "typescript": "^6.0.3",
-        "vitest": "^5.1.0",
       },
     },
     "packages/mcp": {
@@ -144,8 +142,8 @@
       },
       "devDependencies": {
         "@types/node": "^26.6.6",
+        "bun-types": "^1.4.4",
         "typescript": "^6.0.3",
-        "vitest": "^5.1.0",
       },
     },
     "packages/skills": {
@@ -1013,6 +1011,8 @@
     "buffer": ["buffer@5.7.1", "", { "dependencies": { "base64-js": "^1.3.1", "ieee754": "^1.1.13" } }, "sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ=="],
 
     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
+
+    "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "bytes": ["bytes@3.1.2", "", {}, "sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg=="],
 

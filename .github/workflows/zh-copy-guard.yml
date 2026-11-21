@@ -23,7 +23,7 @@ jobs:
             contains(github.event.pull_request.labels.*.name, 'chinese-copy-only')) ||
            ((github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
             github.event.label.name == 'chinese-copy-only')) }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read

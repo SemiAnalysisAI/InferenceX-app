@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   DEFAULT_MAX_SERVER_LOG_FILE_BYTES,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { DbClient } from '../connection.js';
 import { escapeLikePattern, getConversation, listConversations, listDatasets } from './datasets.js';

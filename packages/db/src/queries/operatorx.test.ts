@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { PGlite } from '@electric-sql/pglite';
-import { beforeAll, expect, it } from 'vitest';
+import { beforeAll, expect, it } from 'bun:test';
 
 import type { DbClient } from '../connection';
 import type { Sql } from '../etl/db-utils';
