@@ -14,6 +14,10 @@ const flags = args.filter((arg) => arg.startsWith('-'));
 const files = globSync('src/**/*.test.{ts,tsx}', { cwd: root })
   .filter((file) => filters.length === 0 || filters.some((filter) => file.includes(filter)))
   .toSorted();
+if (files.length === 0) {
+  console.error(`No test files match ${filters.join(', ')}`);
+  process.exit(1);
+}
 const isDom = (file: string) =>
   /^\/\/ @test-environment jsdom$/m.test(readFileSync(path.join(root, file), 'utf8'));
 const dom = files.filter(isDom);
@@ -23,9 +27,10 @@ const node = files.filter((file) => !dom.includes(file));
 // (bun 1.4.5) hang loading src/lib/video/video-history-store.test.ts.
 const workers = Math.max(1, Math.floor(availableParallelism() / 2));
 let failed = false;
-for (const [preloads, group] of [
-  [['./src/test/setup.ts'], node],
-  [['./src/test/setup-dom.ts', './src/test/setup.ts'], dom],
+const coverage = flags.includes('--coverage');
+for (const [name, preloads, group] of [
+  ['node', ['./src/test/setup.ts'], node],
+  ['jsdom', ['./src/test/setup-dom.ts', './src/test/setup.ts'], dom],
 ] as const) {
   if (group.length === 0) continue;
   const { status } = spawnSync(
@@ -35,6 +40,8 @@ for (const [preloads, group] of [
       `--parallel=${workers}`,
       ...preloads.flatMap((preload) => ['--preload', preload]),
       ...flags,
+      // Each pass writes its own report; one shared directory would keep only the last pass.
+      ...(coverage ? [`--coverage-dir=coverage/${name}`] : []),
       ...group.map((file) => `./${file}`),
     ],
     {

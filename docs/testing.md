@@ -2,7 +2,7 @@
 
 ## Structure
 
-**Unit tests**: colocated with source (`*.test.ts` next to `*.ts`), run with `bun test` in every package. `bun run test:unit` in a package runs its suite; in `packages/app`, path substrings filter files (`bun run test:unit src/lib/api`).
+**Unit tests**: colocated with source (`*.test.ts` next to `*.ts`), run with `bun test` in every package. `bun run test:unit` in a package runs its suite; in `packages/app`, path substrings filter files (`bun run test:unit src/lib/api`), and a filter that matches no file fails. `bun run test:unit:coverage` in `packages/app` writes one report per pass, to `coverage/node` and `coverage/jsdom`.
 
 `packages/app/scripts/test-unit.ts` runs files in parallel on half the CPUs, and `bun test --parallel` gives each file a fresh global object and module registry, so stubs, mocks and module state never leak between files. Files whose first lines include `// @test-environment jsdom` run in a second pass with `src/test/setup-dom.ts` preloaded, which installs a fresh jsdom window; every other file runs without DOM globals, as server code does. `src/test/setup.ts` is preloaded for all files. `mock.module` patches modules that are already imported, but a module whose import-time code reads a mocked dependency must be imported after the mock. Helpers bun:test does not ship (`stubGlobal`, `stubEnv`, `mocked`, `waitFor`, and fake timers backed by `@sinonjs/fake-timers`) live in `src/test/helpers.ts`. Unit tests never read the developer's `.env`. The db suite starts through `packages/db/scripts/test-unit.ts`, which builds the migrated PGlite template once and runs files on a third of the CPUs.
 
