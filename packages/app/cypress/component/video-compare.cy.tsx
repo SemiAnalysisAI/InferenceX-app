@@ -1,8 +1,9 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { useState } from 'react';
-import { parseStage, writeStage } from '@/components/video-benchmark/clip-stage';
+import { setStage } from '@/components/video-benchmark/clip-stage';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
+import { setVideoSearch, videoSearch } from '@/components/video-benchmark/page-search';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import type { ResultCell } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
@@ -315,7 +316,7 @@ function mountResultsClips(
           onAgainstChange={setAgainst}
           onSubjectChange={(clip) => {
             setAgainst(null);
-            writeStage({ ...parseStage(window.location.search), clip });
+            setStage({ clip });
           }}
           onShow={() => {}}
           reveal={0}
@@ -345,8 +346,8 @@ function mountLossyPair(twinP50: number | null) {
 
 describe('Video results clip stage', () => {
   beforeEach(() => {
-    // The stage keeps its view and prompt in the URL, which outlives one test's mount.
-    cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
+    // The stage keeps its view and prompt in the page's in-memory settings, which outlive one test's mount.
+    setVideoSearch(new URLSearchParams());
   });
 
   it('keeps one audible side, also across a prompt switch', () => {
@@ -679,8 +680,9 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-toggle-a"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="video-results-stage"]').focus().type('t');
     cy.get('[data-testid="video-results-toggle-b"]').should('have.attr', 'aria-pressed', 'true');
-    cy.location('search').should('contain', 'r_view=toggle');
+    cy.wrap(null).should(() => expect(videoSearch()).to.contain('r_view=toggle'));
     cy.get('[data-testid="video-results-view-wipe"]').click();
+    cy.wrap(null).should(() => expect(videoSearch()).not.to.contain('r_view'));
     cy.location('search').should('not.contain', 'r_view');
   });
 

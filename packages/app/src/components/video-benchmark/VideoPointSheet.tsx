@@ -217,7 +217,7 @@ export default function VideoPointSheet({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Without clipboard access the address bar still holds the link.
+      // Clipboard access was refused, so nothing is copied.
     }
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {

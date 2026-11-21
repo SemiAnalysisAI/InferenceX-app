@@ -1,6 +1,13 @@
 'use client';
 
-import { curveLinear, select, timer, type ScaleContinuousNumeric, type Timer } from 'd3';
+import {
+  curveLinear,
+  curveMonotoneX,
+  select,
+  timer,
+  type ScaleContinuousNumeric,
+  type Timer,
+} from 'd3';
 import {
   useCallback,
   useEffect,
@@ -42,7 +49,7 @@ import {
   tapTarget,
   type Box,
 } from './chart-marks';
-import { mayHaveClips, parseStage, writeStage } from './clip-stage';
+import { mayHaveClips, setStage } from './clip-stage';
 import { useStageValue } from './use-stage-value';
 import type { VideoPoint } from './metrics';
 import VideoPointSheet from './VideoPointSheet';
@@ -221,6 +228,8 @@ interface MarkInputs {
   link: ClipLink | undefined;
   /** The hovered point's series. */
   hover: string | null;
+  /** The hardware of the hovered legend row, which dims every other hardware. */
+  spotlight: string | null;
   pills: readonly SeriesPill[];
   /** The point whose sheet a touch screen has open. */
   sheet: string | null;
@@ -272,6 +281,9 @@ function drawHollow(root: Element) {
 }
 
 const PILLS = 'series-pills';
+/** Opacity of the hardware a hovered legend row does not name, as on the inference chart. */
+const DIMMED = 0.15;
+const pointOpacity = (point: PlotPoint) => (point.optimal ? 1 : 0.35);
 /** How long points and lines glide to new data, as on the inference scatter chart. */
 const TRANSITION_MS = 300;
 /** One display frame, so the marks' last redraw lands after the points' last step. */
@@ -331,15 +343,21 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       .attr('stroke', 'var(--foreground)')
       .attr('stroke-width', 2)
       .attr('pointer-events', 'none');
-  const { link, hover } = inputs;
+  const { link, hover, spotlight } = inputs;
   const nodes = new Map<string, SVGGElement>();
   const focus = new Set<string>(hover === null ? [] : [hover]);
+  const dimmed = new Set<string>();
   for (const node of points) {
     const point = select<SVGGElement, PlotPoint>(node).datum();
     nodes.set(point.key, node);
+    const dim = spotlight !== null && point.hardwareKey !== spotlight;
+    if (dim) dimmed.add(point.series);
+    node.style.opacity = String(dim ? DIMMED : pointOpacity(point));
     if (link && (point.key === link.playing || point.key === link.baseline))
       focus.add(point.series);
   }
+  for (const path of root.querySelectorAll<SVGPathElement>('.line-path'))
+    path.style.opacity = dimmed.has(path.dataset.lineKey ?? '') ? String(DIMMED) : '';
 
   // Badges on the two points the stage plays go first, so labels and pills keep clear of them;
   // their layer is raised over the pills at the end.
@@ -368,6 +386,7 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       .append('g')
       .attr('data-clip-badge', role)
       .attr('data-point', point.key)
+      .attr('opacity', dimmed.has(point.series) ? DIMMED : null)
       .attr('transform', node.getAttribute('transform'));
     badge
       .append('circle')
@@ -459,7 +478,8 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
     const group = pillLayer
       .append('g')
       .attr('data-series-pill', pill.key)
-      .attr('data-lossy', String(pill.lossy));
+      .attr('data-lossy', String(pill.lossy))
+      .attr('opacity', dimmed.has(pill.key) ? DIMMED : null);
     const rect = group
       .append('rect')
       .attr('height', PILL_HEIGHT)
@@ -711,6 +731,7 @@ export default function VideoResultsChart({
   const link = useRef(clipLink);
   link.current = clipLink;
   const hover = useRef<string | null>(null);
+  const spotlight = useRef<string | null>(null);
   /** The point under the pointer, whose hover card may still wait for its first frame. */
   const hovered = useRef<string | null>(null);
   const peekTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -799,8 +820,20 @@ export default function VideoResultsChart({
   }, []);
   /** The last point a tap opened, which a tap on the same spot steps past. */
   const lastTapped = useRef<string | null>(null);
-  const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills, sheet: null });
-  marks.current = { link: clipLink, hover: hover.current, pills, sheet: sheetPoint?.key ?? null };
+  const marks = useRef<MarkInputs>({
+    link: clipLink,
+    hover: null,
+    spotlight: null,
+    pills,
+    sheet: null,
+  });
+  marks.current = {
+    link: clipLink,
+    hover: hover.current,
+    spotlight: spotlight.current,
+    pills,
+    sheet: sheetPoint?.key ?? null,
+  };
   // On a touch screen a tap opens the sheet of the point `tapTarget` picks; the plot's own
   // handlers, which pin the panel a mouse uses, never see it.
   const openAt = useCallback((clientX: number, clientY: number) => {
@@ -836,7 +869,7 @@ export default function VideoResultsChart({
       playable: point.clips,
     });
     if (point.clips) link.current?.onPeek(point.key);
-    writeStage({ ...parseStage(location.search), sheet: point.key });
+    setStage({ sheet: point.key });
     return true;
   }, []);
   useEffect(() => {
@@ -852,10 +885,7 @@ export default function VideoResultsChart({
     () => chart.current?.getSvgElement()?.querySelector(`.${SHEET_RING}`) ?? null,
     [],
   );
-  const closeSheet = useCallback(
-    () => writeStage({ ...parseStage(location.search), sheet: null }),
-    [],
-  );
+  const closeSheet = useCallback(() => setStage({ sheet: null }), []);
   // A link that opens on a sheet reads its point's clips too.
   const sheetClips = sheetPoint?.clips ? sheetPoint.key : null;
   useEffect(() => {
@@ -894,7 +924,8 @@ export default function VideoResultsChart({
           getColor: (key) => lineColors.get(key) ?? 'var(--foreground)',
           getStrokeDasharray: (key) => lineDashes.get(key) ?? 'none',
           strokeWidth: 2,
-          curve: curveLinear,
+          // The inference chart's curve; a history line joins runs in time order, so x can turn back.
+          curve: history ? curveLinear : curveMonotoneX,
         },
       },
       {
@@ -905,7 +936,7 @@ export default function VideoResultsChart({
         config: {
           getColor: (point) => point.color,
           getShapeKey: (point) => (byEngine ? engineShape(point.engine) : 'circle'),
-          getOpacity: (point) => (point.optimal ? 1 : 0.35),
+          getOpacity: pointOpacity,
           getLabelText: (point) =>
             history ? (point.cell.metadata.date ?? '') : s.gpus(point.cell.point.participating),
           foreground: 'var(--foreground)',
@@ -944,6 +975,15 @@ export default function VideoResultsChart({
     if (svg) drawMarks(svg, size.current, marks.current, s);
   }, [s]);
   useLayoutEffect(redraw, [playing, baseline, pulse, pills, sheetPoint?.key, redraw]);
+  // A hovered legend row dims the other hardware through the marks redraw, so the plot is not rebuilt.
+  const spotlightHardware = useCallback(
+    (key: string | null) => {
+      spotlight.current = key;
+      marks.current = { ...marks.current, spotlight: key };
+      redraw();
+    },
+    [redraw],
+  );
   // A first frame read after its card opened fills the box the card reserved for it.
   useEffect(() => {
     const key = hovered.current;
@@ -987,7 +1027,12 @@ export default function VideoResultsChart({
       const root = layout.zoomGroup.node();
       if (!root) return;
       const { link: live } = marks.current;
-      const still = { ...marks.current, hover: null, link: live && { ...live, pulse: false } };
+      const still = {
+        ...marks.current,
+        hover: null,
+        spotlight: null,
+        link: live && { ...live, pulse: false },
+      };
       drawMarks(root, { width, height }, still, s);
     },
     [s],
@@ -1232,6 +1277,8 @@ export default function VideoResultsChart({
     const next = new Set(hidden);
     if (next.has(key)) next.delete(key);
     else next.add(key);
+    // A hidden row no longer reports the pointer leaving it.
+    spotlight.current = null;
     onUpdate({ hidden: [...next] });
     track('video_results_hardware_toggled', { gpu: key, enabled: !next.has(key) });
   };
@@ -1475,6 +1522,8 @@ export default function VideoResultsChart({
             variant="sidebar"
             legendItems={legendItems}
             onItemRemove={toggle}
+            onItemHover={touch ? undefined : spotlightHardware}
+            onItemHoverEnd={touch ? undefined : () => spotlightHardware(null)}
             isLegendExpanded={legendExpanded}
             onExpandedChange={(expanded) => {
               onLegendExpandedChange(expanded);

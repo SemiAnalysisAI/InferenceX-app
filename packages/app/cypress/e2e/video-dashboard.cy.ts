@@ -57,7 +57,19 @@ describe('VideoGenX results routes', () => {
     hardwarePoints('h200').should('exist');
     cy.get('label[for="checkbox-b200"]').click();
     hardwarePoints('b200').should('exist');
-    cy.location('search').should('not.contain', 'r_hidden=');
+    // A change stays in memory: the address bar keeps the link, and Share carries the change.
+    cy.location('search').should('contain', 'r_hidden=b200');
+    cy.get('[data-testid="share-button"]:visible').click();
+    cy.get('[data-testid="share-url-input"]')
+      .should('contain.value', 'r_tier=r')
+      .and('not.contain.value', 'r_hidden=');
+    cy.get('body').type('{esc}');
+    // The language switch carries the address bar's link; the change in memory survives it.
+    cy.get('[data-testid="language-toggle"]:visible').click();
+    cy.location('pathname').should('equal', '/vgx');
+    cy.get('#video-results-chart-title').should('contain', 'Videos per GPU-hour');
+    hardwarePoints('b200').should('exist');
+    cy.get('#checkbox-b200').should('be.checked');
     hardwarePoints('h200').find('.visible-shape').click({ force: true });
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
@@ -95,11 +107,10 @@ describe('VideoGenX results routes', () => {
     cy.get('[data-testid="video-results-chart"] .dot-group[data-hardware="h200"]').should(
       'not.exist',
     );
-    cy.location('search').should((search) => {
-      const params = new URLSearchParams(search);
-      expect(params.get('unofficialruns')).to.equal('34342452354');
-      expect(params.has('unofficialrun')).to.equal(false);
-    });
+    cy.location('search').should(
+      'equal',
+      '?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour',
+    );
     cy.get('label[for="checkbox-h200"]').click();
     hardwarePoints('h200').should('exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();

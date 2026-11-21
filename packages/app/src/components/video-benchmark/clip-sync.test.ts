@@ -175,6 +175,12 @@ describe('stepClipGroup', () => {
     const waiting = stepClipGroup(decoding, 'tick');
     expect(waiting).toMatchObject({ phase: 'loading', ready: false });
     expect(waiting.buffered).toBeCloseTo(0.08);
+    // Firefox ends the buffered range of a whole clip a few milliseconds before its duration.
+    const whole = [
+      clip('b200', { bufferedEnd: 5.166666 }),
+      clip('h100', { bufferedEnd: 5.166666 }),
+    ];
+    expect(stepClipGroup(group(whole, { duration: 5.175 }), 'tick').buffered).toBe(1);
   });
 
   it('hiding the page pauses the clips, and keeps a pending start for when it is back', () => {

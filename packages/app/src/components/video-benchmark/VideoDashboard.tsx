@@ -19,9 +19,7 @@ import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
 import { MOBILE_VIEWPORT_QUERY, useIsCoarsePointer, useMediaQuery } from '@/hooks/useMediaQuery';
-import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { isDarkTheme } from '@/lib/themes/themes';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { Button } from '@/components/ui/button';
 import { ShareButton } from '@/components/ui/share-button';
@@ -41,7 +39,6 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
-import { videoHardwareColor } from './hardware-colors';
 import { compareDeployments, layoutLabel, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
@@ -85,11 +82,11 @@ import {
   defaultPairing,
   isStageParam,
   officialCounterpart,
-  parseStage,
+  setStage,
   stagePointKey,
-  writeStage,
   type StagePair,
 } from './clip-stage';
+import { claimRunWorkload, readVideoLink, setVideoSearch, videoSearch } from './page-search';
 import { useStageValue } from './use-stage-value';
 import { seeChangesPair } from './quality-method';
 import { READOUT_ID } from './VideoClipReadout';
@@ -256,7 +253,6 @@ function MetricSelect({
   );
 }
 
-/** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
 /**
  * `ChartSection`'s markup with wrappers a phone dissolves (results.module.css), so the chart and
  * the clip blocks join the page column and each draws its own card. The first child, the chart,
@@ -285,9 +281,21 @@ function LiftedChartSection({
   );
 }
 
+/** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
+
+/** The address bar as the link wrote it, naming the open deployment and without a dismissed run. */
+function addressSearch(state: ResultsState): URLSearchParams {
+  const params = new URLSearchParams(
+    [...new URLSearchParams(location.search)].filter(
+      ([key]) => key !== 'r_point' && (state.unofficialRun || !isUnofficialRunParam(key)),
+    ),
+  );
+  if (state.point) params.set('r_point', state.point);
+  return params;
+}
 
 export default function VideoDashboard({
   initialData,
@@ -331,7 +339,7 @@ export default function VideoDashboard({
   const peekAt = useCallback((key: string) => startTransition(() => setPeek(key)), []);
   const pickAgainst = useCallback((value: string | null) => {
     setPicked(true);
-    writeStage({ ...parseStage(location.search), vs: value });
+    setStage({ vs: value });
   }, []);
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
@@ -340,8 +348,7 @@ export default function VideoDashboard({
   const pickClip = useCallback(
     (key: string) => {
       setPicked(true);
-      const stage = parseStage(location.search);
-      writeStage({ ...stage, clip: key, vs: key === stagePair.playing ? stage.vs : null });
+      setStage(key === stagePair.playing ? { clip: key } : { clip: key, vs: null });
     },
     [stagePair.playing],
   );
@@ -364,28 +371,33 @@ export default function VideoDashboard({
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
-  useEffect(() => {
-    const read = () => {
-      const next = parseResultsState(location.search);
-      latest.current = next;
-      setState(next);
-    };
-    read();
-    window.addEventListener('popstate', read);
-    return () => window.removeEventListener('popstate', read);
-  }, []);
   const commit = useCallback((next: ResultsState, mode: 'replace' | 'push') => {
     latest.current = next;
     const params = new URLSearchParams(
-      [...new URLSearchParams(location.search)].filter(
+      [...new URLSearchParams(videoSearch())].filter(
         ([key]) => (!key.startsWith('r_') || isStageParam(key)) && !isUnofficialRunParam(key),
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
-    if (mode === 'push') pushClientSearch(params, { [DETAIL_ENTRY]: true });
-    else replaceClientSearch(params);
+    setVideoSearch(params);
+    const address = addressSearch(next);
+    if (mode === 'push') pushClientSearch(address, { [DETAIL_ENTRY]: true });
+    else if (`${address}` !== `${new URLSearchParams(location.search)}`)
+      replaceClientSearch(address);
     setState(next);
   }, []);
+  useEffect(() => {
+    // The open deployment and the named run follow the address bar, also on Back and Forward;
+    // the other settings are the page's memory, which only a new link replaces.
+    const follow = () => {
+      readVideoLink();
+      const { point, unofficialRun } = parseResultsState(location.search);
+      commit({ ...parseResultsState(videoSearch()), point, unofficialRun }, 'replace');
+    };
+    follow();
+    window.addEventListener('popstate', follow);
+    return () => window.removeEventListener('popstate', follow);
+  }, [commit]);
   const update = useCallback(
     (patch: Partial<ResultsState>) => {
       commit({ ...latest.current, ...patch }, 'replace');
@@ -418,12 +430,11 @@ export default function VideoDashboard({
   const { options, roster } = projection;
   // A link that names a run but no workload opens on the workload that run measured, as the
   // inference charts open on an unofficial run's model. Decided once per run, so a later pick stays.
-  const openedRun = useRef<string | null>(null);
   useEffect(() => {
     const run = state.unofficialRun;
-    if (run === null || openedRun.current === run) return;
-    if (namedSource !== 'history' && namedSource !== 'live') return;
-    openedRun.current = run;
+    // A named run waits for its points; a dismissed one is forgotten at once.
+    if (run !== null && namedSource !== 'history' && namedSource !== 'live') return;
+    if (!claimRunWorkload(run)) return;
     if (state.workload !== null || projection.overlayDeploymentCells.length > 0) return;
     let best: { workload: string; hardware: number } | null = null;
     for (const { key, slug } of options.workloads) {
@@ -545,15 +556,10 @@ export default function VideoDashboard({
     () => true,
     () => false,
   );
-  const { resolvedTheme } = useTheme();
-  const paletteTheme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
-  // VideoGenX's own hues first, so H100 and H200 never share the site's NVIDIA green.
+  // The site palette, as on the inference chart.
   const colorFor = useCallback(
-    (key: string) =>
-      mounted
-        ? (videoHardwareColor(key, paletteTheme) ?? getCssColor(resolveColor(key)))
-        : 'var(--muted-foreground)',
-    [mounted, paletteTheme, getCssColor, resolveColor],
+    (key: string) => (mounted ? getCssColor(resolveColor(key)) : 'var(--muted-foreground)'),
+    [mounted, getCssColor, resolveColor],
   );
   const color = (cell: ResultCell) =>
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');
@@ -601,11 +607,10 @@ export default function VideoDashboard({
       officialOpenings,
       state.unofficialRun ?? undefined,
     );
-    writeStage({
-      ...parseStage(location.search),
+    setStage({
       clip: stagePointKey(point),
       view: 'wipe',
-      // A default stays out of the URL, except on a phone, which opens on another pair.
+      // A default stays out of a link, except on a phone, which opens on another pair.
       vs: compare === defaultPairing(point, own) && !phone ? null : compare,
     });
     requestReveal();

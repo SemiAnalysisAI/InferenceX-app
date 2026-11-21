@@ -108,7 +108,8 @@ function bufferedShare({ clips, duration }: ClipGroup) {
   const end = duration > 0 ? duration : Math.min(...clips.map((clip) => clip.duration));
   if (!(end > 0)) return 0;
   const slowest = Math.min(...clips.map((clip) => clip.bufferedEnd));
-  return Math.max(0, Math.min(1, slowest / end));
+  // A browser may end the buffered range of a whole clip just before its duration (Firefox).
+  return slowest >= end - END_EPSILON ? 1 : Math.max(0, slowest / end);
 }
 
 function resetRates({ clips, speed }: ClipGroup, actions: ClipAction[]) {

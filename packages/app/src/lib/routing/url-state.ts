@@ -1,4 +1,5 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
+import { videoSearch } from '@/components/video-benchmark/page-search';
 import {
   dashboardRouteForPathname,
   getDashboardRoute,
@@ -368,14 +369,15 @@ function collectTabParams(): URLSearchParams {
     filtered.delete('g_model');
   }
 
-  const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
-  // Video controls own their URL state; share every registered video scope
-  // from the live address bar, including the results view's r_ parameters.
-  if (prefixes.some((prefix) => prefix === 'v_')) {
-    for (const [key, value] of liveParams) {
+  // VideoGenX keeps its settings in its own memory (`page-search.ts`): its r_ keys are not
+  // URL_STATE_KEYS, and reliability uses the same prefix.
+  if (route?.key === 'video') {
+    for (const [key, value] of new URLSearchParams(videoSearch())) {
       if (prefixes.some((prefix) => key.startsWith(prefix))) filtered.set(key, value);
     }
   }
+
+  const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
 
   // Pages such as OperatorX keep their selections in plain address-bar params.
   for (const key of shareLiveParamsFor(route)) {
