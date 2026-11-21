@@ -25,22 +25,10 @@ jobs:
     steps:
       # Pull requests skip the suite when nothing it covers changed; the merge queue always runs it.
       - id: match
-        name: Match changed files
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          PATTERN: '^(\.github/workflows/(tests|publish)-skills\.yml$|packages/skills/|bun\.lock$)'
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            echo run=true >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
-          if (( $(wc -l <<< "$files") >= 3000 )) || grep -qE "$PATTERN" <<< "$files"; then
-            echo run=true >> "$GITHUB_OUTPUT"
-          else
-            echo run=false >> "$GITHUB_OUTPUT"
-          fi
+        uses: $/.github/actions/changed-files
+        with:
+          token: ${{ github.token }}
+          pattern: '^(\.github/workflows/(tests|publish)-skills\.yml$|\.github/actions/changed-files/|packages/skills/|bun\.lock$)'
 
   pack-archive:
     name: Pack skills archive (Linux, Node 24)

@@ -1,0 +1,36 @@
+name: Changed files
+description: >-
+  On pull requests, reports whether any changed path matches a pattern. Every other event (merge
+  queue, schedule, dispatch) reports a match, so those runs always test everything.
+inputs:
+  pattern:
+    description: Extended regular expression matched against each changed path, old names of renames included.
+    required: true
+  token:
+    description: Token that can list the pull request's files.
+    required: true
+outputs:
+  run:
+    description: "'true' when the suite should run."
+    value: ${{ steps.match.outputs.run }}
+runs:
+  using: composite
+  steps:
+    - id: match
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PATTERN: ${{ inputs.pattern }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+          echo run=true >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+        # The files API stops at 3000 entries, so a larger pull request runs everything.
+        if (( $(wc -l <<< "$files") >= 3000 )) || grep -qE "$PATTERN" <<< "$files"; then
+          echo run=true >> "$GITHUB_OUTPUT"
+        else
+          echo run=false >> "$GITHUB_OUTPUT"
+        fi

@@ -7,32 +7,6 @@ import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 import { mountWithProviders } from '../support/test-utils';
 
 describe('App error boundary localization', () => {
-  it('preserves the accessible English recovery UI and tracks its lifecycle', () => {
-    const capture = cy.stub().as('capture');
-    const reset = cy.stub().as('reset');
-    registerAnalyticsClient({ capture });
-    cy.stub(console, 'error');
-
-    cy.mount(
-      <PathnameContext.Provider value="/infx/inference">
-        <AppError
-          error={Object.assign(new Error('fixture failure'), { digest: 'en-1' })}
-          reset={reset}
-        />
-      </PathnameContext.Provider>,
-    );
-
-    cy.get('[role="alert"]').should('have.attr', 'lang', 'en');
-    cy.get('@capture').should('have.been.calledWith', 'error_page_shown', {
-      message: 'fixture failure',
-      digest: 'en-1',
-      locale: 'en',
-    });
-    cy.contains('button', 'Try again').click();
-    cy.get('@reset').should('have.been.calledOnce');
-    cy.get('@capture').should('have.been.calledWith', 'error_page_retry', { locale: 'en' });
-  });
-
   it('keeps the localized Chinese recovery flow usable on mobile', () => {
     const message = 'x'.repeat(400);
     const capture = cy.stub().as('capture');

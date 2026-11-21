@@ -1,14 +1,14 @@
+// @test-environment jsdom
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
-import { useState } from 'react';
+import { describe, expect, it } from 'bun:test';
 
-import type { PowerXRole } from '@/components/inference/powerx/powerx-role';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
-import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
+import { $, $$, eventually, fakeLayout, isVisible, render } from '@/test/dom';
+import { createMockInferenceData, withProviders } from '@/test/mock-providers';
 
-import { createMockInferenceData } from '../support/mock-data';
-import { mountWithProviders } from '../support/test-utils';
+import PowerAnalysisPanels from './PowerAnalysisPanels';
 
 const metric = (y: number) => ({ y, roof: false });
 const point = (overrides: Partial<InferenceData> = {}) =>
@@ -31,17 +31,6 @@ const point = (overrides: Partial<InferenceData> = {}) =>
     ...overrides,
   });
 const OVERLAY_RUN_URL = 'https://example.invalid/runs/900000002';
-const overlayPoints = [100, 200].map((rate, index) =>
-  point({
-    id: 3 + index,
-    hwKey: 'b300_sglang',
-    run_url: OVERLAY_RUN_URL,
-    conc: 2 ** index,
-    output_tput_per_gpu: rate,
-    measuredAvgPower: metric(600 + 2 * rate),
-    measuredJPerOutputToken: metric(8 + 8 * index),
-  }),
-);
 // The Where view under a GPU role: a disaggregated chip's measured GPU layer splits into
 // its prefill and decode pools, a disaggregated overlay run splits in its run colour, and
 // an aggregated chip stays listed with its GPU layer whole.
@@ -123,105 +112,56 @@ const overlayRun = [
   modeled('h200_sglang', 60, 28, 380, { ...pools, run_url: OVERLAY_RUN_URL }),
   modeled('h200_sglang', 61, 25, 400, { ...pools, run_url: OVERLAY_RUN_URL }),
 ];
+const rows = '[data-testid="power-chip-compare-row"]';
 const poolSegments = '[data-testid="power-chip-compare-segment"][data-pool]';
 
-function PanelsHarness({
-  initial,
-  added = [],
-  overlay = overlayPoints,
-  xField = 'mean_tpot_intvty',
-  role = 'all',
-}: {
-  initial: InferenceData[];
-  added?: InferenceData[];
-  overlay?: InferenceData[];
-  xField?: keyof AggDataEntry;
-  role?: PowerXRole;
-}) {
-  const [extra, setExtra] = useState<InferenceData[]>([]);
-  return (
-    <PathnameContext.Provider value="/infx/inference">
-      <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
-        {added.length > 0 && (
-          <button type="button" data-testid="add-source" onClick={() => setExtra(added)}>
-            add source
-          </button>
-        )}
-        <PowerAnalysisPanels
-          data={[...initial, ...extra]}
-          overlayData={overlay}
-          xField={xField}
-          xLabel="Interactivity (output tok/s/user)"
-          chartId="power-analysis-test"
-          role={role}
-        />
-      </div>
-    </PathnameContext.Provider>
-  );
-}
-
-const providers = {
-  inference: {},
-  unofficial: { runIndexByUrl: { [OVERLAY_RUN_URL]: 0 } },
-};
-
 describe('PowerAnalysisPanels', () => {
-  beforeEach(() => {
-    cy.on('uncaught:exception', (error) => {
-      if (error.message.includes('ResizeObserver loop')) return false;
-    });
-  });
-
   for (const [role, percentile, emphasis] of [
     ['split', 'p75', ['shown', 'shown']],
     ['decode', 'p90', ['dimmed', 'shown']],
   ] as const) {
-    it(`splits the GPU layer by pool under role ${role} on the derived ${percentile.toUpperCase()} axis`, () => {
-      mountWithProviders(
-        <PanelsHarness
-          initial={[...disaggChip, ...aggregatedChip, ...overlayRun]}
-          overlay={overlayRun}
-          xField={`${percentile}_e2e_norm_intvty` as keyof AggDataEntry}
-          role={role}
-        />,
-        providers,
+    it(`splits the GPU layer by pool under role ${role} on the derived ${percentile.toUpperCase()} axis`, async () => {
+      fakeLayout(1120);
+      render(
+        withProviders(
+          <PathnameContext.Provider value="/infx/inference">
+            <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
+              <PowerAnalysisPanels
+                data={[...disaggChip, ...aggregatedChip, ...overlayRun]}
+                overlayData={overlayRun}
+                xField={`${percentile}_e2e_norm_intvty` as keyof AggDataEntry}
+                xLabel="Interactivity (output tok/s/user)"
+                chartId="power-analysis-test"
+                role={role}
+              />
+            </div>
+          </PathnameContext.Provider>,
+          { inference: {}, unofficial: { runIndexByUrl: { [OVERLAY_RUN_URL]: 0 } } },
+        ),
       );
-      cy.get('[data-testid="power-chip-compare-row"]').should('have.length', 3);
-      cy.get('[data-testid="power-chip-compare-row"][data-role-split="split"]').should(
-        'have.length',
-        2,
-      );
+      await eventually(() => expect($$(rows)).toHaveLength(3));
+      const split = $$(`${rows}[data-role-split="split"]`);
+      expect(split).toHaveLength(2);
       // The official disaggregated chip: prefill then decode, emphasis by role.
-      cy.get('[data-testid="power-chip-compare-row"][data-role-split="split"]')
-        .first()
-        .find(poolSegments)
-        .then((segments) => {
-          expect([...segments].map((segment) => segment.dataset.pool)).to.deep.equal([
-            'prefill',
-            'decode',
-          ]);
-          expect([...segments].map((segment) => segment.dataset.poolEmphasis)).to.deep.equal([
-            ...emphasis,
-          ]);
-        });
+      const official = $$(poolSegments, split[0]);
+      expect(official.map((segment) => segment.dataset.pool)).toEqual(['prefill', 'decode']);
+      expect(official.map((segment) => segment.dataset.poolEmphasis)).toEqual([...emphasis]);
       // The overlay run splits too, in its run colour.
-      cy.get('[data-testid="power-chip-compare-row"][data-role-split="split"]')
-        .last()
-        .find(poolSegments)
-        .should('have.length', 2)
-        .each((segment) => expect(segment.attr('style')).to.contain('--overlay-run-0'));
+      const overlay = $$(poolSegments, split[1]);
+      expect(overlay).toHaveLength(2);
+      for (const segment of overlay)
+        expect(segment.getAttribute('style')).toContain('--overlay-run-0');
       // The aggregated chip stays listed, its GPU layer whole.
-      cy.get('[data-testid="power-chip-compare-row"][data-role-split="whole"]')
-        .should('have.length', 1)
-        .within(() => {
-          cy.get(poolSegments).should('not.exist');
-          cy.get('[data-testid="power-chip-compare-segment"][data-band="gpu"]').should(
-            'have.length',
-            1,
-          );
-          cy.get('[data-testid="power-chip-compare-unsplit"]').should('contain.text', 'Aggregated');
-        });
-      cy.get('[data-testid="power-chip-compare-role-note"]').should('be.visible');
+      const whole = $$(`${rows}[data-role-split="whole"]`);
+      expect(whole).toHaveLength(1);
+      expect($$(poolSegments, whole[0])).toHaveLength(0);
+      expect(
+        $$('[data-testid="power-chip-compare-segment"][data-band="gpu"]', whole[0]),
+      ).toHaveLength(1);
+      expect($('[data-testid="power-chip-compare-unsplit"]', whole[0])?.textContent).toContain(
+        'Aggregated',
+      );
+      expect(isVisible($('[data-testid="power-chip-compare-role-note"]'))).toBe(true);
     });
   }
 });

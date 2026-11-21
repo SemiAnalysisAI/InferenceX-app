@@ -10,49 +10,6 @@
   },
   "durations": [
     {
-      "spec": "cypress/component/agentic-distribution.cy.tsx",
-      "duration": 217,
-      "tests": [
-        {
-          "title": ["Agentic ISL/OSL distribution", "bins on a log axis without a fitted overlay"],
-          "duration": 81,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Agentic ISL/OSL distribution",
-            "spreads mass across the axis instead of piling it into the first bins"
-          ],
-          "duration": 29,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Agentic ISL/OSL distribution",
-            "reports zero-token requests that a log axis cannot place"
-          ],
-          "duration": 36,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Agentic ISL/OSL distribution",
-            "still draws the histogram when every request is the same length"
-          ],
-          "duration": 31,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Agentic ISL/OSL distribution",
-            "shows the empty placeholder when nothing can be plotted"
-          ],
-          "duration": 33,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/autumn-leaves-gutter.cy.tsx",
       "duration": 296,
       "tests": [
@@ -69,20 +26,6 @@
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 1536px"],
           "duration": 117,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/blog-shared-chrome.cy.tsx",
-      "duration": 159,
-      "tests": [
-        {
-          "title": [
-            "Blog shared chrome",
-            "localizes heading-link feedback and tracks a Chinese copy interaction"
-          ],
-          "duration": 156,
           "attempts": 1
         }
       ]
@@ -452,7 +395,7 @@
     },
     {
       "spec": "cypress/component/chart-selectors.cy.tsx",
-      "duration": 11024,
+      "duration": 7439,
       "tests": [
         {
           "title": [
@@ -497,56 +440,6 @@
         {
           "title": [
             "Chart Selectors",
-            "ModelSelector",
-            "keeps default models in the requested selector order (en)"
-          ],
-          "duration": 183,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ModelSelector",
-            "searches across model groups, recovers from no results, and selects by keyboard (en)"
-          ],
-          "duration": 816,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ModelSelector",
-            "searches across model groups, recovers from no results, and selects by keyboard (zh)"
-          ],
-          "duration": 805,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ModelSelector",
-            "groups maintenance models separately from deprecated models"
-          ],
-          "duration": 120,
-          "attempts": 1
-        },
-        {
-          "title": ["Chart Selectors", "ModelSelector", "explains maintenance mode in a tooltip"],
-          "duration": 166,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ModelSelector",
-            "localizes model category labels and reasons on Chinese routes"
-          ],
-          "duration": 184,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
             "ScenarioSelector",
             "explains the agentic workload in its menu option, linking to /infx/agentx"
           ],
@@ -557,81 +450,9 @@
           "title": [
             "Chart Selectors",
             "ScenarioSelector",
-            "omits the entire field for sole scenario agentic-traces"
-          ],
-          "duration": 29,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "omits the entire field for sole scenario 8k/1k"
-          ],
-          "duration": 28,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "restores the field selector when another scenario becomes available"
-          ],
-          "duration": 349,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "omits the entire caption for sole scenario agentic-traces"
-          ],
-          "duration": 27,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "omits the entire caption for sole scenario 8k/1k"
-          ],
-          "duration": 25,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "restores the caption selector when another scenario becomes available"
-          ],
-          "duration": 352,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "omits the sole scenario on Chinese phones"
-          ],
-          "duration": 7,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
             "keeps the Agentic explainer in the menu on Chinese phones"
           ],
           "duration": 169,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
-            "marks model-specific retired scenarios in their option labels"
-          ],
-          "duration": 113,
           "attempts": 1
         },
         {
@@ -656,27 +477,9 @@
           "title": [
             "Chart Selectors",
             "ScenarioSelector",
-            "keeps 8K/1K in the default group for models still sweeping it"
-          ],
-          "duration": 104,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "ScenarioSelector",
             "keeps scenario explainers out of the closed control for every scenario"
           ],
           "duration": 199,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Chart Selectors",
-            "PrecisionSelector",
-            "removes a precision from its chip without opening the menu or losing other selections"
-          ],
-          "duration": 277,
           "attempts": 1
         },
         {
@@ -704,17 +507,6 @@
             "keeps the fixed precision visible without a one-option menu"
           ],
           "duration": 25,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/collectivex-swap.cy.tsx",
-      "duration": 561,
-      "tests": [
-        {
-          "title": ["keeps comparison runs independently toggleable and distinguishes their lines"],
-          "duration": 556,
           "attempts": 1
         }
       ]
@@ -868,58 +660,8 @@
     },
     {
       "spec": "cypress/component/cost-tier-selector.cy.tsx",
-      "duration": 1548,
+      "duration": 169,
       "tests": [
-        {
-          "title": ["CostTierSelector", "renders nothing for metrics without a pricing basis"],
-          "duration": 47,
-          "attempts": 1
-        },
-        {
-          "title": ["CostTierSelector", "does not reseed $/hr the reader has already entered"],
-          "duration": 219,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "CostTierSelector",
-            "leaves Custom User Values out when the chart has no custom pricing path"
-          ],
-          "duration": 118,
-          "attempts": 1
-        },
-        {
-          "title": ["CostTierSelector", "shows the rental tier on rental-tier metrics"],
-          "duration": 38,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "CostTierSelector",
-            "on a hyperscaler-tier cost metric",
-            "shows published tiers, custom values and locked rental terms"
-          ],
-          "duration": 202,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "CostTierSelector",
-            "on a hyperscaler-tier cost metric",
-            "switches to the custom axis and seeds the per-chip $/hr from the current tier"
-          ],
-          "duration": 200,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "CostTierSelector",
-            "on a hyperscaler-tier cost metric",
-            "opens the TCO model dialog for locked rental tiers instead of changing the axis"
-          ],
-          "duration": 555,
-          "attempts": 1
-        },
         {
           "title": [
             "CostTierSelector",
@@ -963,7 +705,7 @@
     },
     {
       "spec": "cypress/component/dataset-list.cy.tsx",
-      "duration": 449,
+      "duration": 311,
       "tests": [
         {
           "title": [
@@ -995,21 +737,6 @@
             "describes the 256K dataset with missing metadata in zh at 390px"
           ],
           "duration": 43,
-          "attempts": 1
-        },
-        {
-          "title": ["DatasetList", "renders a card per dataset with its summary stats"],
-          "duration": 71,
-          "attempts": 1
-        },
-        {
-          "title": ["DatasetList", "shows the empty state when no datasets are ingested"],
-          "duration": 33,
-          "attempts": 1
-        },
-        {
-          "title": ["DatasetList", "shows the error state when the request fails"],
-          "duration": 34,
           "attempts": 1
         }
       ]
@@ -1062,121 +789,9 @@
       ]
     },
     {
-      "spec": "cypress/component/date-range-picker.cy.tsx",
-      "duration": 1523,
-      "tests": [
-        {
-          "title": ["DateRangePicker", "apply is disabled when no dates selected"],
-          "duration": 175,
-          "attempts": 1
-        },
-        {
-          "title": ["DateRangePicker", "cancel closes the dialog"],
-          "duration": 536,
-          "attempts": 1
-        },
-        {
-          "title": ["DateRangePicker", "shows overlay when no available dates"],
-          "duration": 128,
-          "attempts": 1
-        },
-        {
-          "title": ["DateRangePicker", "shows overlay when only 1 available date"],
-          "duration": 125,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "DateRangePicker",
-            "view anyway button selects the single available date and closes dialog"
-          ],
-          "duration": 534,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/distribution-card.cy.tsx",
-      "duration": 345,
-      "tests": [
-        {
-          "title": ["DistributionCard", "renders the title, summary stats, and one bar per bin"],
-          "duration": 85,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "DistributionCard",
-            "shows a \"No data\" placeholder when no distribution is provided"
-          ],
-          "duration": 34,
-          "attempts": 1
-        },
-        {
-          "title": ["DistributionCard", "marks the chart as log scale when scale=\"log\""],
-          "duration": 28,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "DistributionCard",
-            "renders older v1 stats without unavailable percentile guides"
-          ],
-          "duration": 35,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "DistributionCard",
-            "exposes localized bin values to keyboard and screen-reader users"
-          ],
-          "duration": 127,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "DistributionCard",
-            "renders each distribution tick only once for small bin counts"
-          ],
-          "duration": 24,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/engine-comparison-confirmation.cy.tsx",
-      "duration": 813,
-      "tests": [
-        {
-          "title": [
-            "Engine comparison confirmation",
-            "requires an affirmative agreement and focuses Cancel first"
-          ],
-          "duration": 464,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Engine comparison confirmation",
-            "treats Escape as cancellation, not acceptance"
-          ],
-          "duration": 341,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/error-boundary.cy.tsx",
-      "duration": 405,
+      "duration": 256,
       "tests": [
-        {
-          "title": [
-            "App error boundary localization",
-            "preserves the accessible English recovery UI and tracks its lifecycle"
-          ],
-          "duration": 149,
-          "attempts": 1
-        },
         {
           "title": [
             "App error boundary localization",
@@ -1317,25 +932,9 @@
       ]
     },
     {
-      "spec": "cypress/component/faq-question-link.cy.tsx",
-      "duration": 150,
-      "tests": [
-        {
-          "title": ["FaqQuestionLink", "shows an icon-only control and copies the direct URL"],
-          "duration": 148,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/footer.cy.tsx",
-      "duration": 523,
+      "duration": 272,
       "tests": [
-        {
-          "title": ["Footer", "marks star and share clicks as coming from the footer"],
-          "duration": 251,
-          "attempts": 1
-        },
         {
           "title": [
             "Footer",
@@ -1363,85 +962,9 @@
       ]
     },
     {
-      "spec": "cypress/component/frontier-points-panel.cy.tsx",
-      "duration": 117,
-      "tests": [
-        {
-          "title": [
-            "FrontierPointsPanel",
-            "lists each frontier point with its run and marks the ?unofficialrun= point"
-          ],
-          "duration": 114,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/gpu-graph.cy.tsx",
-      "duration": 5375,
+      "duration": 1777,
       "tests": [
-        {
-          "title": [
-            "GPUGraph",
-            "uses compact date-colored hover and full details for each history curve"
-          ],
-          "duration": 486,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPUGraph",
-            "toggles framework suffixes while keeping comparison dates and hardware labels"
-          ],
-          "duration": 303,
-          "attempts": 1
-        },
-        {
-          "title": ["GPUGraph", "keeps GPU-count and parallelism labels independent"],
-          "duration": 531,
-          "attempts": 1
-        },
-        {
-          "title": ["GPUGraph", "shows empty state when data is empty"],
-          "duration": 39,
-          "attempts": 1
-        },
-        {
-          "title": ["GPUGraph", "explains missing role-local energy in GPU comparison mode"],
-          "duration": 102,
-          "attempts": 1
-        },
-        {
-          "title": ["GPUGraph", "localizes the Chinese comparison empty state"],
-          "duration": 38,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPUGraph",
-            "shows spec decoding only on hover while retaining the offload halo"
-          ],
-          "duration": 132,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPUGraph",
-            "renders date line labels along each roofline when showLineLabels is on"
-          ],
-          "duration": 38,
-          "attempts": 1
-        },
-        {
-          "title": ["GPUGraph", "hides line labels when showLineLabels is off"],
-          "duration": 22,
-          "attempts": 1
-        },
-        {
-          "title": ["GPUGraph", "renders legend with GPU and date entries"],
-          "duration": 38,
-          "attempts": 1
-        },
         {
           "title": [
             "GPUGraph",
@@ -1453,41 +976,9 @@
         {
           "title": [
             "GPU comparison power envelopes",
-            "reveals off-boundary measurements without changing power envelopes or axes"
-          ],
-          "duration": 335,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison power envelopes",
-            "keeps boundary measurements toward higher E2E Normalized Interactivity"
-          ],
-          "duration": 31,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison power envelopes",
             "measures power boundaries by comparison date and resets rulers when the metric changes"
           ],
           "duration": 817,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison power envelopes",
-            "keeps boundary measurements by default toward lower latency"
-          ],
-          "duration": 31,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison power envelopes",
-            "uses the same boundary toggle for percent TDP and fleet percentiles while preserving energy Pareto"
-          ],
-          "duration": 740,
           "attempts": 1
         },
         {
@@ -1509,44 +1000,9 @@
         {
           "title": [
             "GPU comparison with unofficial runs",
-            "toggles official and unofficial offload halos without removing history points"
-          ],
-          "duration": 350,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison with unofficial runs",
-            "keeps unofficial runs on the date comparison in the run color and dash"
-          ],
-          "duration": 222,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison with unofficial runs",
             "measures an unofficial curve from its point and removes the ruler when hidden"
           ],
           "duration": 363,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "GPU comparison with unofficial runs",
-            "opens the power trace from an official point on the date comparison"
-          ],
-          "duration": 160,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/gpu-specs-bar-chart.cy.tsx",
-      "duration": 311,
-      "tests": [
-        {
-          "title": ["GpuSpecsBarChart", "changing metric re-renders chart"],
-          "duration": 309,
           "attempts": 1
         }
       ]
@@ -1714,40 +1170,8 @@
     },
     {
       "spec": "cypress/component/inference-chart-controls.cy.tsx",
-      "duration": 10931,
+      "duration": 3782,
       "tests": [
-        {
-          "title": [
-            "Inference ChartControls",
-            "offers pending Flash only while the shared feature gate is unlocked"
-          ],
-          "duration": 547,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls",
-            "offers no measured power or energy metrics; they live on the PowerX tab"
-          ],
-          "duration": 343,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls",
-            "lists each tiered metric once in the Y-axis selector, without the tier suffix"
-          ],
-          "duration": 114,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls",
-            "opens tiered metrics on the hyperscaler tier from an untiered metric"
-          ],
-          "duration": 217,
-          "attempts": 1
-        },
         {
           "title": [
             "Inference ChartControls",
@@ -1762,14 +1186,6 @@
             "aligns the X and Y fields with equal desktop heights"
           ],
           "duration": 59,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls",
-            "selects an axis through the existing action and closes the menu"
-          ],
-          "duration": 209,
           "attempts": 1
         },
         {
@@ -1803,86 +1219,6 @@
         },
         {
           "title": [
-            "Inference ChartControls",
-            "localizes the mobile secondary changed-count label"
-          ],
-          "duration": 60,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "switches the global TCO basis for Kimi K3 on 8k/1k"
-          ],
-          "duration": 118,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "switches the global TCO basis for Kimi K3 on agentic-traces"
-          ],
-          "duration": 106,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "switches the global TCO basis for Muse-Spark-Open on AgentX"
-          ],
-          "duration": 112,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "switches the global TCO basis for GLM-5.2 on AgentX"
-          ],
-          "duration": 108,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "switches the global TCO basis for GLM-5.3-Flash on AgentX"
-          ],
-          "duration": 108,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "hides the TCO basis toggle for other models and scenarios"
-          ],
-          "duration": 62,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "hides TCO for y_tpPerGpu even with visible TPU hardware"
-          ],
-          "duration": 25,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "hides TCO for y_tpPerMw even with visible TPU hardware"
-          ],
-          "duration": 31,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "hides TCO for a cost metric when no TPU hardware is visible"
-          ],
-          "duration": 30,
-          "attempts": 1
-        },
-        {
-          "title": [
             "Inference ChartControls cost metrics",
             "sizes the TCO basis toggle to its buttons on desktop and mobile"
           ],
@@ -1891,106 +1227,10 @@
         },
         {
           "title": [
-            "Inference ChartControls cost metrics",
-            "shows cost per million and tokens per dollar as separate Y-axis options"
-          ],
-          "duration": 120,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls cost metrics",
-            "selects tokens per dollar through the Y-axis metric control on the active tier"
-          ],
-          "duration": 227,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls infrastructure tokens per dollar",
-            "keeps the rental tier when switching between tiered metrics"
-          ],
-          "duration": 217,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls infrastructure tokens per dollar",
-            "does not show the token sale-price source control"
-          ],
-          "duration": 40,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls with GPUs selected",
-            "shows the date range picker when GPUs are selected"
-          ],
-          "duration": 52,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls with GPUs selected",
-            "leaves the optional date range unflagged for a selected current config"
-          ],
-          "duration": 39,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls with GPUs selected",
-            "leaves the date range unflagged when exact comparison entries are pinned"
-          ],
-          "duration": 34,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference ChartControls with hideGpuComparison",
-            "hides GPU config selector when hideGpuComparison is true"
-          ],
-          "duration": 25,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Inference axis selector — Chinese Agentic controls",
-            "keeps every full option name and a localized FAQ link on phones"
-          ],
-          "duration": 267,
-          "attempts": 1
-        },
-        {
-          "title": [
             "Axis option help",
             "lets Tab leave the help grid in both directions (searchable=true)"
           ],
           "duration": 593,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Axis option help",
-            "keeps metric help in the open #y-axis-select menu, not the closed control"
-          ],
-          "duration": 198,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Axis option help",
-            "keeps hover help readable across the pointer gap without taking search focus"
-          ],
-          "duration": 841,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Axis option help",
-            "dismisses hover help with Escape and still allows clicking it to keep it open"
-          ],
-          "duration": 713,
           "attempts": 1
         },
         {
@@ -2007,22 +1247,6 @@
             "aligns help with the first line of wrapped options at 1280px"
           ],
           "duration": 113,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Axis option help",
-            "opens descriptions and formulas without selecting an option or losing the search"
-          ],
-          "duration": 960,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Axis option help",
-            "navigates to help with arrow keys and restores focus on Escape"
-          ],
-          "duration": 763,
           "attempts": 1
         },
         {
@@ -2052,14 +1276,6 @@
             "folds run context into mobile controls without duplicating desktop controls (zh)"
           ],
           "duration": 598,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Workflow run dropdown",
-            "steps between runs and keeps date navigation, status, run selection, and external links"
-          ],
-          "duration": 463,
           "attempts": 1
         },
         {
@@ -2233,45 +1449,12 @@
       ]
     },
     {
-      "spec": "cypress/component/landing-banner-ab.cy.tsx",
-      "duration": 291,
-      "tests": [
-        {
-          "title": [
-            "Landing banner A/B arms",
-            "hands each arm its own definition on click and dismiss"
-          ],
-          "duration": 289,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/measured-metric-controls.cy.tsx",
       "duration": 668,
       "tests": [
         {
           "title": ["Power boundary labels", "keeps boundary selection clear (en)"],
           "duration": 663,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/mode-toggle.cy.tsx",
-      "duration": 240,
-      "tests": [
-        {
-          "title": [
-            "ModeToggle",
-            "switches from light to dark, persists the selection, and reports analytics"
-          ],
-          "duration": 128,
-          "attempts": 1
-        },
-        {
-          "title": ["ModeToggle", "keeps a native button and retains focus after activation"],
-          "duration": 105,
           "attempts": 1
         }
       ]
@@ -2355,22 +1538,6 @@
         {
           "title": ["MultiSelect", "click outside closes dropdown"],
           "duration": 163,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/power-analysis-panels.cy.tsx",
-      "duration": 176,
-      "tests": [
-        {
-          "title": ["PowerAnalysisPanels", "renders role observations on the derived P75 axis"],
-          "duration": 127,
-          "attempts": 1
-        },
-        {
-          "title": ["PowerAnalysisPanels", "renders role observations on the derived P90 axis"],
-          "duration": 42,
           "attempts": 1
         }
       ]
@@ -2760,7 +1927,7 @@
     },
     {
       "spec": "cypress/component/quick-filters-dialog.cy.tsx",
-      "duration": 5406,
+      "duration": 3206,
       "tests": [
         {
           "title": [
@@ -2776,67 +1943,6 @@
             "explains every filter on hover without changing selections (zh, 1280px)"
           ],
           "duration": 1566,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "keeps hovered help readable without stealing filter focus"
-          ],
-          "duration": 464,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "supports keyboard help without dismissing the dialog or blocking filter selection"
-          ],
-          "duration": 330,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "removes only the chosen visible filter without resetting the benchmark scope"
-          ],
-          "duration": 103,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "localizes active filter values and leaves inapplicable AgentX spec filters untouched"
-          ],
-          "duration": 101,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "toggles visible options with one keyboard press and lets Escape close the dialog"
-          ],
-          "duration": 340,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "removes speculative decoding from agentic charts and toggles supported filters"
-          ],
-          "duration": 283,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "QuickFiltersDialog",
-            "keeps stale selections removable and disables unavailable options"
-          ],
-          "duration": 272,
-          "attempts": 1
-        },
-        {
-          "title": ["QuickFiltersDialog", "clears every filter category from one action"],
-          "duration": 307,
           "attempts": 1
         }
       ]
@@ -3425,52 +2531,6 @@
       ]
     },
     {
-      "spec": "cypress/component/submissions-table.cy.tsx",
-      "duration": 782,
-      "tests": [
-        {
-          "title": [
-            "SubmissionsTable — Spec Method column",
-            "renders canonical spec_method labels and shows an em-dash for \"none\""
-          ],
-          "duration": 71,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "SubmissionsTable — Spec Method column",
-            "sorts by spec_method when the header is clicked"
-          ],
-          "duration": 219,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "SubmissionsTable — Spec Method column",
-            "filters rows when the search query matches a spec_method"
-          ],
-          "duration": 227,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "SubmissionsTable — Image diff in expanded row",
-            "shows previous → current image on the bump-day row"
-          ],
-          "duration": 111,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "SubmissionsTable — Image diff in expanded row",
-            "renders just the current image when there is no preceding run"
-          ],
-          "duration": 136,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/tab-nav.cy.tsx",
       "duration": 1725,
       "tests": [
@@ -3645,43 +2705,8 @@
       ]
     },
     {
-      "spec": "cypress/component/trace-flamegraph.cy.tsx",
-      "duration": 502,
-      "tests": [
-        {
-          "title": [
-            "TraceFlamegraph",
-            "keeps subagent children collapsed until the group is expanded"
-          ],
-          "duration": 146,
-          "attempts": 1
-        },
-        {
-          "title": ["TraceFlamegraph", "expand all / collapse all toggles every subagent group"],
-          "duration": 205,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "TraceFlamegraph",
-            "auto-expands and highlights the target group child for a request-timeline deep link"
-          ],
-          "duration": 28,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "TraceFlamegraph",
-            "exposes bar values on keyboard focus without regressing pointer tooltips"
-          ],
-          "duration": 108,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/unofficial-banner.cy.tsx",
-      "duration": 424,
+      "duration": 390,
       "tests": [
         {
           "title": [
@@ -3705,14 +2730,6 @@
             "aligns with compare and model page content at 1920px"
           ],
           "duration": 108,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Standalone unofficial-run banner",
-            "adds no banner or spacing when no runs are loaded"
-          ],
-          "duration": 34,
           "attempts": 1
         }
       ]
@@ -3861,112 +2878,8 @@
     },
     {
       "spec": "cypress/component/video-dashboard.cy.tsx",
-      "duration": 22201,
+      "duration": 13195,
       "tests": [
-        {
-          "title": [
-            "VideoGenX Results",
-            "shows the loading state without reading History while the server streams the cohort"
-          ],
-          "duration": 232,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "ignores retired controls and plots every named-run GPU count on either X axis"
-          ],
-          "duration": 694,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "names the latency in the zh hover card, where the GPU axis title does not"
-          ],
-          "duration": 105,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "shows a named unapproved run without an approved cohort and clears it without promotion"
-          ],
-          "duration": 378,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "shows a lossy named run’s clip, which leads no card, in the overlay color"
-          ],
-          "duration": 176,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "opens a link that names only a run on the workload that run measured"
-          ],
-          "duration": 253,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "restores the approved workload after dismissing an explicitly selected named-only workload"
-          ],
-          "duration": 233,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "switches between approved models from the benchmark config"
-          ],
-          "duration": 408,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "opens the named re-export, not the official cell, when both share an observation ID"
-          ],
-          "duration": 1155,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "applies the sample floor, preserves unknown allocation and drops every planned placeholder"
-          ],
-          "duration": 343,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "views results as of an earlier run and compares a chip config over time"
-          ],
-          "duration": 928,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "plots the selected Y metric with participating GPUs and median latency"
-          ],
-          "duration": 291,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "plots each GPU’s best lossless engine or one engine, and asks before showing two"
-          ],
-          "duration": 1128,
-          "attempts": 1
-        },
         {
           "title": [
             "VideoGenX Results",
@@ -3994,38 +2907,6 @@
         {
           "title": [
             "VideoGenX Results",
-            "plays the config picked in the Compare row against its default pairing"
-          ],
-          "duration": 766,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "pairs an unofficial run with the official cell of the same deployment"
-          ],
-          "duration": 146,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "opens and pairs B200 on the middle of its frontier, not its most efficient end"
-          ],
-          "duration": 489,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "shows a point’s first frame in its hover card, reading clips the pointer rests on"
-          ],
-          "duration": 786,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
             "keeps the pair on screen, dimmed, while a clicked point’s clips are read"
           ],
           "duration": 4840,
@@ -4037,19 +2918,6 @@
             "glides points to new data, with the playing badge on its point every frame"
           ],
           "duration": 1936,
-          "attempts": 1
-        },
-        {
-          "title": ["VideoGenX Results", "pulses playable points until the first clip is picked"],
-          "duration": 230,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoGenX Results",
-            "falls back to the overview for an unknown or hidden deployment and drops its key"
-          ],
-          "duration": 265,
           "attempts": 1
         },
         {
