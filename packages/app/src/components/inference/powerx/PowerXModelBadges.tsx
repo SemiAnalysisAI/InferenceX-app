@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo } from 'react';
 
 import { useInferenceFilters } from '@/components/inference/InferenceContext';
+import { Badge } from '@/components/ui/badge';
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -34,14 +35,15 @@ export function usePowerXModelBadges(
     return new Map<string, ReactNode>(
       withRoles.map((model) => [
         model,
-        <span
+        <Badge
           key="pd"
+          variant="outline"
           title={t.title}
           data-testid="powerx-model-pd-badge"
-          className="inline-flex h-4 shrink-0 items-center rounded-sm border border-border px-1 text-3xs font-semibold leading-none text-muted-foreground"
+          className="h-4 border-border px-1 py-0 text-3xs font-semibold leading-none"
         >
           P/D
-        </span>,
+        </Badge>,
       ]),
     );
   }, [enabled, availability, selectedSequence, selectedPrecisions, models, t]);

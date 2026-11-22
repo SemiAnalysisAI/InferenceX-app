@@ -7,6 +7,7 @@ import { PowerBasisPill } from '../powerx/PowerBasisPill';
 import { swatchStyle } from './power-layer-style';
 import { PIN_ACCENT_CLASS } from './PowerChipCompare';
 
+import { Button } from '@/components/ui/button';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { formatInteractivity } from '../utils/interactivity-format';
@@ -254,14 +255,15 @@ export default function PowerBreakdownReadout({
           <span>{t.source[source]}</span>
         </p>
         {source === 'pinned' && onFollowSlider && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             data-testid="power-breakdown-readout-follow"
             onClick={onFollowSlider}
-            className="min-h-11 shrink-0 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
           >
             {t.followSlider}
-          </button>
+          </Button>
         )}
       </div>
     </div>

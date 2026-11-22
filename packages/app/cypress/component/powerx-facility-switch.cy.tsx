@@ -154,10 +154,10 @@ describe('PowerX Include facility switch (mobile)', () => {
     cy.get('[data-testid="power-chip-compare-legend"]').should('not.be.visible');
     keyToggle().click();
     keyToggle().should('have.attr', 'aria-expanded', 'true');
-    cy.get('[data-testid="power-chip-compare-legend-item"]').first().should('be.visible');
+    cy.get('[data-testid="power-chip-compare-legend"] label').first().should('be.visible');
 
     cy.viewport(1360, 900);
     keyToggle().should('not.exist');
-    cy.get('[data-testid="power-chip-compare-legend-item"]').first().should('be.visible');
+    cy.get('[data-testid="power-chip-compare-legend"] label').first().should('be.visible');
   });
 });

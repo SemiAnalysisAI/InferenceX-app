@@ -14,6 +14,9 @@ mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ runIndexByUrl: { 'https://github.com/o/r/actions/runs/9': 3 } }),
 }));
 
+// Runs the chart's D3 layers on fixed scales.
+mock.module('@/lib/d3-chart/D3Chart', () => import('../ui/d3-chart-test-stub'));
+
 import PowerXRoleSplitBars from './PowerXRoleSplitBars';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -47,6 +50,11 @@ const split = (extra: Partial<InferenceData> = {}) =>
     measuredJPerOutputToken: { y: 25.21, roof: false },
     ...extra,
   });
+
+const segment = (group: Element, role: string) =>
+  group.querySelector<SVGRectElement>(
+    `[data-testid="powerx-role-split-segment"][data-role="${role}"]`,
+  )!;
 
 let container: HTMLDivElement;
 let root: Root;
@@ -82,12 +90,10 @@ describe('PowerXRoleSplitBars', () => {
     expect(text).toContain('82% decode');
 
     const groups = container.querySelectorAll('[data-testid="powerx-role-split-group"]');
-    const overlayPrefill = groups[1].querySelector<HTMLElement>('[data-role="prefill"]')!;
-    expect(overlayPrefill.style.borderColor).toBe('var(--overlay-run-3)');
-    expect(overlayPrefill.style.borderStyle).toBe('dashed');
-    expect(groups[1].querySelector<HTMLElement>('[data-role="decode"]')!.style.borderStyle).toBe(
-      'dotted',
-    );
+    // The overlay run draws in its own colour; prefill dashed, decode dotted.
+    expect(segment(groups[1], 'prefill').getAttribute('stroke')).toBe('var(--overlay-run-3)');
+    expect(segment(groups[1], 'prefill').getAttribute('stroke-dasharray')).toBe('4 2');
+    expect(segment(groups[1], 'decode').getAttribute('stroke-dasharray')).toBe('1.5 1.5');
 
     const unsplit = container.querySelector('[data-testid="powerx-role-split-unsplit"]')!;
     expect(unsplit.className).toContain('opacity-60');
@@ -113,10 +119,13 @@ describe('PowerXRoleSplitBars', () => {
         />,
       ),
     );
-    const bars = [...container.querySelectorAll('[data-testid="powerx-role-split-row"]')].map(
-      (row) => row.querySelector<HTMLElement>('[data-role="prefill"]')!.style.width,
-    );
-    expect(bars.map((width) => Math.round(Number.parseFloat(width)))).toEqual(
+    const prefill = [
+      ...container.querySelectorAll<SVGRectElement>(
+        '[data-testid="powerx-role-split-segment"][data-role="prefill"]',
+      ),
+    ];
+    expect(prefill).toHaveLength(2);
+    expect(prefill.map((bar) => Math.round(Number(bar.dataset.share)))).toEqual(
       expect.arrayContaining([18, 5]),
     );
   });

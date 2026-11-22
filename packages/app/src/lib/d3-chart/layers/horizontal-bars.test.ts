@@ -231,3 +231,78 @@ describe('updateHorizontalBarsOnZoom', () => {
     updateHorizontalBarsOnZoom(group as any, xScale, (d: TestDatum) => d.value);
   });
 });
+
+describe('stacked and per-bar options', () => {
+  interface Segment {
+    row: string;
+    start: number;
+    value: number;
+    band: string;
+  }
+  const segments: Segment[] = [
+    { row: 'GPU-A', start: 0, value: 100, band: 'gpu' },
+    { row: 'GPU-A', start: 100, value: 50, band: 'server' },
+  ];
+  const stackedConfig = (
+    overrides?: Partial<HorizontalBarConfig<Segment>>,
+  ): HorizontalBarConfig<Segment> => ({
+    getY: (d) => d.row,
+    getX: (d) => d.value,
+    getX0: (d) => d.start,
+    getColor: () => '#f00',
+    keyFn: (d) => `${d.row}-${d.band}`,
+    ...overrides,
+  });
+
+  it('places each segment at its stack start', () => {
+    const group = createMockGroup();
+    const { yScale, xScale } = makeScales();
+    const result = asMock(
+      renderHorizontalBars(group as any, segments, yScale, xScale, stackedConfig()),
+    );
+    expect(result.elements[0].attrs['x']).toBe(0);
+    expect(result.elements[0].attrs['width']).toBe(200);
+    expect(result.elements[1].attrs['x']).toBe(200);
+    expect(result.elements[1].attrs['width']).toBe(100);
+  });
+
+  it('moves stacked segments on zoom', () => {
+    const group = createMockGroup();
+    const { yScale, xScale } = makeScales();
+    renderHorizontalBars(group as any, segments, yScale, xScale, stackedConfig());
+    const newXScale = d3.scaleLinear().domain([0, 150]).range([0, 600]);
+    updateHorizontalBarsOnZoom(
+      group as any,
+      newXScale,
+      (d: Segment) => d.value,
+      (d: Segment) => d.start,
+    );
+    const bars = group.selectAll('.bar');
+    expect(bars.elements[1].attrs['x']).toBe(400);
+    expect(bars.elements[1].attrs['width']).toBe(200);
+  });
+
+  it('applies per-bar stroke, dash, opacity and attributes', () => {
+    const group = createMockGroup();
+    const { yScale, xScale } = makeScales();
+    const result = asMock(
+      renderHorizontalBars(
+        group as any,
+        segments,
+        yScale,
+        xScale,
+        stackedConfig({
+          getStroke: (d) => (d.band === 'gpu' ? '#111' : '#222'),
+          getStrokeDasharray: (d) => (d.band === 'gpu' ? '3 2' : null),
+          getOpacity: (d) => (d.band === 'gpu' ? 1 : 0.4),
+          getAttrs: (d) => ({ 'data-band': d.band, 'data-pool': undefined }),
+        }),
+      ),
+    );
+    expect(result.elements[0].attrs['stroke']).toBe('#111');
+    expect(result.elements[0].attrs['stroke-dasharray']).toBe('3 2');
+    expect(result.elements[1].attrs['stroke-dasharray']).toBeUndefined();
+    expect(result.elements[1].attrs['opacity']).toBe(0.4);
+    expect(result.elements[1].attrs['data-band']).toBe('server');
+  });
+});

@@ -41,72 +41,8 @@ mock.module('@/providers/unofficial-run-provider', () => ({
 mock.module('@/components/ui/chart-buttons', () => ({
   ChartButtons: () => <div data-testid="chart-buttons" />,
 }));
-// jsdom has no measured layout, so the chart shell is replaced by one that runs the
-// panel's custom D3 layers against fixed scales; the layers' own output is what is tested.
-mock.module('@/lib/d3-chart/D3Chart', async () => {
-  const ReactModule = await import('react');
-  const d3 = await import('d3');
-  const PLOT_WIDTH = 600;
-  function D3Chart(props: {
-    data: unknown[];
-    height: number;
-    margin: { top: number; right: number; bottom: number; left: number };
-    xScale: { domain: [number, number] };
-    yScale: { domain: [number, number] };
-    layers: { render?: (group: unknown, ctx: unknown) => unknown }[];
-    tooltip?: { content: (d: unknown, pinned: boolean) => string };
-    xAxis?: {
-      tickValues?: (scale: unknown) => number[];
-      tickFormat?: (d: number) => string;
-    };
-  }) {
-    const svgRef = ReactModule.useRef<SVGSVGElement>(null);
-    const tooltipRef = ReactModule.useRef<HTMLDivElement>(null);
-    ReactModule.useLayoutEffect(() => {
-      const svg = d3.select(svgRef.current!);
-      let g = svg.select<SVGGElement>('g.root');
-      if (g.empty()) {
-        g = svg.append('g').attr('class', 'root');
-        g.append('g').attr('class', 'zoom');
-      }
-      const zoomGroup = g.select<SVGGElement>('g.zoom');
-      const width = PLOT_WIDTH - props.margin.left - props.margin.right;
-      const height = props.height - props.margin.top - props.margin.bottom;
-      const xScale = d3.scaleLinear().domain(props.xScale.domain).range([0, width]);
-      const yScale = d3.scaleLinear().domain(props.yScale.domain).range([height, 0]).nice();
-      const ctx = {
-        layout: { svg, g, zoomGroup, width, height, margin: props.margin },
-        tooltipElement: tooltipRef.current!,
-        xScale,
-        yScale,
-        width,
-        height,
-      };
-      for (const layer of props.layers) layer.render?.(zoomGroup, ctx);
-      // The x axis as D3Chart draws it: the tick values for this scale, then their format.
-      const ticks = props.xAxis?.tickValues?.(xScale) ?? [];
-      g.selectAll('g.x-axis-stub')
-        .data([null])
-        .join('g')
-        .attr('class', 'x-axis-stub')
-        .selectAll('text')
-        .data(ticks)
-        .join('text')
-        .attr('data-testid', 'x-tick')
-        .text((d) => props.xAxis?.tickFormat?.(d) ?? String(d));
-      if (props.tooltip && tooltipRef.current) {
-        tooltipRef.current.innerHTML = props.tooltip.content(props.data[0], false);
-      }
-    });
-    return (
-      <div>
-        <svg ref={svgRef} data-testid="d3-chart-stub" data-margin-right={props.margin.right} />
-        <div ref={tooltipRef} data-testid="tooltip-probe" />
-      </div>
-    );
-  }
-  return { D3Chart };
-});
+// Runs the panel's D3 layers on fixed scales; the layers' own output is what is tested.
+mock.module('@/lib/d3-chart/D3Chart', () => import('./d3-chart-test-stub'));
 
 import PowerAnalysisPanels from './PowerAnalysisPanels';
 import { nearestColumnIndex, sliderGuideRange } from './PowerBreakdownPanel';
@@ -279,12 +215,20 @@ const marker = () =>
 const partsHeading = () =>
   container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
 
+const drilldownWatermark = () =>
+  container.querySelector<SVGSVGElement>(
+    '[data-testid="power-chip-compare-drilldown"] [data-testid="d3-chart-stub"]',
+  )?.dataset.watermark;
+
 const chipRows = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
 ];
 
-const chipRow = (name: string) =>
-  chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
+const bandOf = (label: HTMLLabelElement) => label.htmlFor.split('-').at(-1);
+const chipName = (row: Element) =>
+  row.querySelector<SVGTextElement>('[data-testid="power-chip-compare-name"]')?.dataset.label;
+
+const chipRow = (name: string) => chipRows().find((row) => chipName(row) === name)!;
 
 const renderPanelInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
   render(
@@ -335,9 +279,8 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
     expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
     expect(
-      chipRow('B200 (vLLM) FP8')
-        .querySelector('[data-testid="power-chip-compare-unpin"]')
-        ?.getAttribute('title'),
+      chipRow('B200 (vLLM) FP8').querySelector('[data-testid="power-chip-compare-unpin"] title')
+        ?.textContent,
     ).toBe('Pinned to c64 · click to follow Compare at');
     expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe(sglangBefore);
     expect(chipRow('B200 (SGLang) FP8').dataset.pinned).toBeUndefined();
@@ -360,9 +303,7 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
   it('keeps the pin through opening another chip and collapsing, drops it when Compare at moves', () => {
     renderPanelInline([...sglang, ...vllm]);
     setCompareAt(60);
-    const order = chipRows().map(
-      (row) => row.querySelector('span span span.truncate')?.textContent,
-    );
+    const order = chipRows().map((row) => chipName(row));
     mouse(drilldownHits()[2], 'click');
     expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
     // Another chip's drill-down: the vLLM pin stays on its row.
@@ -386,15 +327,13 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     setCompareAt(20);
     expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
     expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
-    expect(
-      chipRows().map((row) => row.querySelector('span span span.truncate')?.textContent),
-    ).toEqual(order);
+    expect(chipRows().map((row) => chipName(row))).toEqual(order);
   });
 
   it('pins a point of an unofficial-run series by its own key', () => {
     renderPanelInline([...sglang, ...overlay], overlay);
     const overlayRow = chipRows().find((row) => row.textContent?.includes('single-hue'))!;
-    const overlayName = overlayRow.querySelector('span span span.truncate')!.textContent!;
+    const overlayName = chipName(overlayRow)!;
     expect(chipRows().map((row) => row.dataset.pinned)).toEqual([undefined, undefined]);
     mouse(overlayRow, 'click');
     expect(drilldownTitle()).toContain('single-hue');
@@ -412,6 +351,18 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
       concurrency: 64,
     });
   });
+
+  it('stamps an unofficial-run breakdown with the unofficial watermark', () => {
+    renderPanelInline([...sglang, ...overlay], overlay);
+    expect(drilldownTitle()).toBe('B200 (SGLang) FP8 across load');
+    expect(drilldownWatermark()).toBe('logo');
+    mouse(
+      chipRows().find((row) => row.textContent?.includes('single-hue'))!,
+      'click',
+    );
+    expect(drilldownTitle()).toContain('single-hue');
+    expect(drilldownWatermark()).toBe('unofficial');
+  });
 });
 
 describe('PowerChipCompare legend highlight', () => {
@@ -427,60 +378,56 @@ describe('PowerChipCompare legend highlight', () => {
         />
       </PowerXSurfaceProvider>,
     );
+    // The band key is the shared ChartLegend: one checkbox + label per layer.
     const legend = [
-      ...container.querySelectorAll<HTMLButtonElement>(
-        '[data-testid="power-chip-compare-legend-item"]',
+      ...container.querySelectorAll<HTMLLabelElement>(
+        '[data-testid="power-chip-compare-legend"] label',
       ),
     ];
+    const checkbox = (label: HTMLLabelElement) =>
+      container.querySelector<HTMLInputElement>(`input[id="${label.htmlFor}"]`)!;
     // PowerX counts the facility overhead by default: the PUE layer tops the stack.
-    expect(legend.map((item) => item.dataset.band)).toEqual([
-      'gpu',
-      'server',
-      'fansPsu',
-      'network',
-      'facility',
-    ]);
+    expect(legend.map(bandOf)).toEqual(['gpu', 'server', 'fansPsu', 'network', 'facility']);
     expect(legend.map((item) => item.textContent)).toEqual([
-      'GPU· Measured',
-      'Server parts· Modeled (hatched)',
-      'Fans + PSU loss· Modeled (hatched)',
-      'Network share· Modeled (hatched)',
-      'Facility (PUE)· Modeled (hatched)',
+      'GPU · Measured',
+      'Server parts · Modeled (hatched)',
+      'Fans + PSU loss · Modeled (hatched)',
+      'Network share · Modeled (hatched)',
+      'Facility (PUE) · Modeled (hatched)',
     ]);
     const item = legend[1];
-    expect(item.querySelector('span[title]')?.getAttribute('title')).toBe('Modeled (hatched)');
-    // The shared legend's swatches are the stack's steps and hatches on the muted foreground.
-    const legendSwatch = (index: number) =>
-      legend[index].querySelector('span[title]') as HTMLElement;
-    expect(legendSwatch(0).style.backgroundColor).toBe(
-      'color-mix(in oklab, var(--muted-foreground) 90%, transparent)',
-    );
-    expect(legendSwatch(1).style.backgroundImage).toContain('repeating-linear-gradient(135deg');
-    expect(legendSwatch(2).style.backgroundImage).toContain('repeating-linear-gradient(225deg');
     const segments = (band: string) => [
-      ...container.querySelectorAll<HTMLElement>(
+      ...container.querySelectorAll<SVGRectElement>(
         `[data-testid="power-chip-compare-segment"][data-band="${band}"]`,
       ),
     ];
     expect(segments('server')).toHaveLength(2);
     expect(segments('facility')).toHaveLength(2);
+    // Segments stack left to right inside each chip's bar.
+    const [gpuA] = segments('gpu');
+    const [serverA] = segments('server');
+    expect(Number(serverA.getAttribute('x'))).toBeCloseTo(
+      Number(gpuA.getAttribute('x')) + Number(gpuA.getAttribute('width')),
+    );
     // Each chip's segments repeat the plot in that chip's colour; a layer made of several
     // parts lists them in its hover card.
-    const hoverCard = (segment: HTMLElement) => {
-      mouse(segment, 'mouseover');
+    const hoverCard = (segment: SVGRectElement) => {
+      mouse(segment, 'mouseenter');
       const text =
         document.querySelector('[data-testid="power-chip-compare-hover-card"]')?.textContent ?? '';
-      mouse(segment, 'mouseout');
+      mouse(segment, 'mouseleave');
       return text;
     };
     const gpuSegment = segments('gpu')[0];
-    expect(gpuSegment.style.backgroundColor).toContain('90%');
-    expect(gpuSegment.style.backgroundColor).toContain('var(--b200_');
-    expect(gpuSegment.style.backgroundImage).toBe('');
+    expect(gpuSegment.getAttribute('fill')).toContain('var(--b200_');
+    expect(gpuSegment.getAttribute('fill-opacity')).toBe('0.9');
     expect(hoverCard(gpuSegment)).toMatch(/GPU · Measured[\d,]+W\/GPU/u);
     const serverSegment = segments('server')[0];
-    expect(serverSegment.style.backgroundImage).toContain('repeating-linear-gradient(135deg');
-    expect(serverSegment.style.backgroundImage).toContain('var(--b200_');
+    // Modeled layers fill with a hatch pattern in the chip's colour.
+    const hatch = /^url\(#(?<id>.+)\)$/u.exec(serverSegment.getAttribute('fill') ?? '')?.groups?.id;
+    const pattern = container.querySelector(`pattern[id="${hatch}"]`)!;
+    expect(pattern.getAttribute('patternTransform')).toBe('rotate(45)');
+    expect(pattern.querySelector('line')?.getAttribute('stroke')).toContain('var(--b200_');
     const serverCard = hoverCard(serverSegment);
     expect(serverCard).toMatch(/Server parts · Modeled \(hatched\)[\d,]+W\/GPU/u);
     expect(serverCard).toContain('NICs');
@@ -494,24 +441,31 @@ describe('PowerChipCompare legend highlight', () => {
     mouse(item, 'mouseover');
     for (const segment of segments('server')) {
       expect(segment.dataset.emphasis).toBe('highlighted');
-      expect(segment.style.opacity).toBe('1');
-      expect(segment.style.backgroundColor).toContain('50%');
+      expect(segment.getAttribute('opacity')).toBe('1');
     }
     for (const segment of segments('gpu')) {
       expect(segment.dataset.emphasis).toBe('faded');
-      expect(segment.style.opacity).toBe('0.25');
+      expect(segment.getAttribute('opacity')).toBe('0.25');
     }
     expect(area('server').dataset.emphasis).toBe('highlighted');
     expect(area('gpu').dataset.emphasis).toBe('faded');
-    mouse(item, 'click');
-    expect(item.getAttribute('aria-pressed')).toBe('true');
+    // A click pins the layer: the others read unchecked.
+    act(() => checkbox(item).click());
+    expect(legend.map((label) => checkbox(label).checked)).toEqual([
+      false,
+      true,
+      false,
+      false,
+      false,
+    ]);
     mouse(item, 'mouseout');
     expect(area('server').dataset.emphasis).toBe('highlighted');
     // Hovering a segment itself does not steal a pin; unpinning restores every layer.
-    mouse(segments('gpu')[0], 'mouseover');
+    mouse(segments('gpu')[0], 'mouseenter');
     expect(segments('gpu')[0].dataset.emphasis).toBe('faded');
-    mouse(item, 'click');
-    expect(item.getAttribute('aria-pressed')).toBe('false');
+    mouse(segments('gpu')[0], 'mouseleave');
+    act(() => checkbox(item).click());
+    expect(legend.every((label) => checkbox(label).checked)).toBe(true);
     for (const segment of segments('gpu')) expect(segment.dataset.emphasis).toBe('plain');
     expect(area('gpu').dataset.emphasis).toBe('plain');
     // The drill-down's list follows Compare at's chip and point: SGLang c4 at 80 tok/s/user.

@@ -14,7 +14,9 @@ import { LAYER_STROKE_OPACITY, layerStyle } from './power-layer-style';
 import PowerBreakdownReadout, { type PowerBreakdownReadoutSource } from './PowerBreakdownReadout';
 import PowerPartsList from './PowerPartsList';
 
+import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import {
   Select,
@@ -41,6 +43,7 @@ import {
   SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_REVISION,
 } from '@/lib/power/system-power-model';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
@@ -530,8 +533,11 @@ function BreakdownChart({
   scrub,
   plotHeight = PLOT_HEIGHT,
   pools = [],
+  unofficial = false,
 }: {
   sectionId: string;
+  /** An overlay (unofficial) run's series: stamped with the unofficial watermark. */
+  unofficial?: boolean;
   series: PowerBreakdownSeries;
   color: string;
   view: PowerBreakdownView;
@@ -1527,7 +1533,7 @@ function BreakdownChart({
       data={columns}
       height={plotHeight}
       testId={`${sectionId}-plot`}
-      watermark="logo"
+      watermark={getChartWatermark(unofficial)}
       zoom={{ enabled: false }}
       grabCursor={false}
       instructions=""
@@ -1795,21 +1801,25 @@ export default function PowerBreakdownPanel({
           </Heading>
           <p className="text-xs text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           onClick={onCollapse}
           data-testid="power-breakdown-collapse"
           aria-label={t.collapse}
           title={t.collapse}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-border/60 text-xs font-medium text-muted-foreground hover:text-foreground md:h-8 md:w-auto md:px-3"
+          className="max-md:w-11 max-md:px-0"
         >
           <ChevronUp className="size-4 md:hidden" aria-hidden />
           <span className="hidden md:inline">{t.collapse}</span>
-        </button>
+        </Button>
       </div>
       <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {series === null ? (
-        <p className="py-6 text-sm text-muted-foreground">{t.empty}</p>
+        <EmptyState bare className="py-6">
+          {t.empty}
+        </EmptyState>
       ) : (
         <>
           <div className="no-export flex min-w-0 flex-wrap items-end gap-3">
@@ -1898,6 +1908,7 @@ export default function PowerBreakdownPanel({
                 key={`${series.key}-${view}-${role}`}
                 sectionId={sectionId}
                 series={series}
+                unofficial={series.overlayRunIndex !== undefined}
                 color={color}
                 view={view}
                 xLabel={interactivityLabel}
@@ -1920,15 +1931,17 @@ export default function PowerBreakdownPanel({
                 pools={pools}
               />
               {touchScrub && readoutEntry && setCompareTarget && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   data-testid="power-breakdown-compare-at"
                   disabled={comparedAt !== null && readoutEntry.interactivity === comparedAt}
                   onClick={compareAtScrub}
-                  className="no-export mt-2 flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium text-foreground disabled:opacity-50"
+                  // Touch-only, so it keeps a 44px target from md up too.
+                  className="no-export mt-2 w-full md:h-11"
                 >
                   {t.compareAt(formatInteractivity(readoutEntry.interactivity))}
-                </button>
+                </Button>
               )}
             </div>
             {listEntry && (

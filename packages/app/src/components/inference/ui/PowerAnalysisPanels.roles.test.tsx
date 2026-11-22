@@ -114,6 +114,9 @@ const overlayRun = [
 ];
 const rows = '[data-testid="power-chip-compare-row"]';
 const poolSegments = '[data-testid="power-chip-compare-segment"][data-pool]';
+// Segments are drawn in the chart's bar layer; data-row names the row they belong to.
+const segmentsOf = (row: HTMLElement, selector: string) =>
+  $$(selector).filter((segment) => segment.dataset.row === row.dataset.key);
 
 describe('PowerAnalysisPanels', () => {
   for (const [role, percentile, emphasis] of [
@@ -143,20 +146,20 @@ describe('PowerAnalysisPanels', () => {
       const split = $$(`${rows}[data-role-split="split"]`);
       expect(split).toHaveLength(2);
       // The official disaggregated chip: prefill then decode, emphasis by role.
-      const official = $$(poolSegments, split[0]);
+      const official = segmentsOf(split[0], poolSegments);
       expect(official.map((segment) => segment.dataset.pool)).toEqual(['prefill', 'decode']);
       expect(official.map((segment) => segment.dataset.poolEmphasis)).toEqual([...emphasis]);
       // The overlay run splits too, in its run colour.
-      const overlay = $$(poolSegments, split[1]);
+      const overlay = segmentsOf(split[1], poolSegments);
       expect(overlay).toHaveLength(2);
       for (const segment of overlay)
-        expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+        expect(segment.getAttribute('stroke')).toContain('--overlay-run-0');
       // The aggregated chip stays listed, its GPU layer whole.
       const whole = $$(`${rows}[data-role-split="whole"]`);
       expect(whole).toHaveLength(1);
-      expect($$(poolSegments, whole[0])).toHaveLength(0);
+      expect(segmentsOf(whole[0], poolSegments)).toHaveLength(0);
       expect(
-        $$('[data-testid="power-chip-compare-segment"][data-band="gpu"]', whole[0]),
+        segmentsOf(whole[0], '[data-testid="power-chip-compare-segment"][data-band="gpu"]'),
       ).toHaveLength(1);
       expect($('[data-testid="power-chip-compare-unsplit"]', whole[0])?.textContent).toContain(
         'Aggregated',

@@ -1,9 +1,9 @@
 'use client';
 
 import * as d3 from 'd3';
-import { ChevronDown } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 
+import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -304,10 +304,9 @@ export default function PowerPartsList({
       </ul>
       {folded && rest.length > 0 && (
         <>
-          <button
-            type="button"
+          <DisclosureToggle
+            open={expanded}
             data-testid="power-parts-toggle"
-            aria-expanded={expanded}
             aria-controls={restId}
             onClick={() => {
               setExpanded(!expanded);
@@ -316,14 +315,10 @@ export default function PowerPartsList({
                 gpu: series.hwKey,
               });
             }}
-            className="mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
+            className="mt-2 text-xs"
           >
-            <span>{t.allParts(rows.length)}</span>
-            <ChevronDown
-              aria-hidden="true"
-              className={cn('size-4 shrink-0 transition-transform', expanded && 'rotate-180')}
-            />
-          </button>
+            {t.allParts(rows.length)}
+          </DisclosureToggle>
           <ul id={restId} className="mt-1 space-y-px" data-testid="power-parts-rest">
             {expanded && rest.map(renderRow)}
           </ul>

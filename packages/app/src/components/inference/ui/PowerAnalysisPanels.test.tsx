@@ -51,10 +51,8 @@ mock.module('@/hooks/useMediaQuery', () => ({
   useIsCoarsePointer: () => media.coarsePointer,
   useIsMobileViewport: () => media.mobile,
 }));
-// The breakdown plot is D3 against a measured layout; jsdom has none, so the chart is a stub.
-mock.module('@/lib/d3-chart/D3Chart', () => ({
-  D3Chart: () => <div data-testid="d3-chart-stub" />,
-}));
+// jsdom has no measured layout; the stub runs the charts' D3 layers on fixed scales.
+mock.module('@/lib/d3-chart/D3Chart', () => import('./d3-chart-test-stub'));
 mock.module('@/components/ui/chart-buttons', () => ({
   ChartButtons: () => <div data-testid="chart-buttons" />,
 }));
@@ -213,13 +211,18 @@ const drilldowns = () => container.querySelectorAll('[data-testid="power-chip-co
 const drilldownTitle = () =>
   container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent;
 const expandedRow = () =>
-  container.querySelector<HTMLButtonElement>(
+  container.querySelector<SVGGElement>(
     '[data-testid="power-chip-compare-row"][aria-expanded="true"]',
   );
+// Chip rows are SVG groups (role=button): the full name is on the name text's data-label.
+const cardName = (row: Element) =>
+  row.querySelector<SVGTextElement>('[data-testid="power-chip-compare-name"]')?.dataset.label;
 const rowFor = (title: string) =>
-  [...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]')].find(
-    (row) => title.startsWith(row.querySelector('span span span.truncate')?.textContent ?? '\0'),
+  [...container.querySelectorAll<SVGGElement>('[data-testid="power-chip-compare-row"]')].find(
+    (row) => title.startsWith(cardName(row) ?? '\0'),
   );
+const clickRow = (row: Element) =>
+  act(() => row.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 describe('PowerAnalysisPanels inline drill-down', () => {
   it('follows Compare at to the chip nearest the new interactivity, parts list included', () => {
     const heading = () =>
@@ -256,27 +259,28 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     expect(expandedRow()).toBeNull();
     setCompareAt(20);
     expect(drilldowns()).toHaveLength(0);
-    act(() => rowFor(VLLM_TITLE)!.click());
+    clickRow(rowFor(VLLM_TITLE)!);
     expect(drilldowns()).toHaveLength(1);
     expect(drilldownTitle()).toBe(VLLM_TITLE);
     // Clicking the open bar closes it again.
-    act(() => rowFor(VLLM_TITLE)!.click());
+    clickRow(rowFor(VLLM_TITLE)!);
     expect(drilldowns()).toHaveLength(0);
   });
 });
 
 const rows = () => [
-  ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+  ...container.querySelectorAll<SVGGElement>('[data-testid="power-chip-compare-row"]'),
 ];
 const partRows = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-part-row"]'),
 ];
 const partsToggle = () =>
   container.querySelector<HTMLButtonElement>('[data-testid="power-parts-toggle"]');
-const cardName = (row: HTMLElement) => row.querySelector('.truncate')?.textContent;
-const segmentsOf = (row: HTMLElement) => [
-  ...row.querySelectorAll<HTMLElement>('[data-testid="power-chip-compare-segment"]'),
-];
+// Segments sit in the chart's bar layer; data-row names their row's data-key.
+const segmentsOf = (row: SVGElement) =>
+  [
+    ...container.querySelectorAll<SVGRectElement>('[data-testid="power-chip-compare-segment"]'),
+  ].filter((segment) => segment.dataset.row === row.dataset.key);
 
 const phone = (data = [...sglang, ...vllm], overlayData: InferenceData[] = []) => {
   unmount();
@@ -302,15 +306,16 @@ describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded part
     const card = cards[2];
     expect(card.dataset.layout).toBe('compact');
     expect(cardName(card)).toContain('phone-rows');
-    expect(card.querySelector('span[aria-hidden]')?.getAttribute('style')).toContain(
-      overlayRunColor(0),
-    );
+    expect(
+      card.querySelector('[data-testid="power-chip-compare-swatch"]')?.getAttribute('fill'),
+    ).toBe(overlayRunColor(0));
+    expect(segmentsOf(card).length).toBeGreaterThan(0);
     for (const segment of segmentsOf(card)) {
-      expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+      expect(segment.getAttribute('stroke')).toContain('--overlay-run-0');
       expect(segment.textContent).toBe('');
     }
     // Its drill-down lists the run's parts in the run colour, folded like an official chip's.
-    if (card.getAttribute('aria-expanded') !== 'true') act(() => card.click());
+    if (card.getAttribute('aria-expanded') !== 'true') clickRow(card);
     expect(cardName(expandedRow()!)).toContain('phone-rows');
     expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toContain(
       'phone-rows',
@@ -340,7 +345,7 @@ const remount = (data: InferenceData[], overlayData: InferenceData[], role: Powe
   unmount();
   mount(data, overlayData, role);
 };
-const poolSegments = (row: HTMLElement) =>
+const poolSegments = (row: SVGElement) =>
   segmentsOf(row).filter((segment) => segment.dataset.pool !== undefined);
 
 describe('PowerAnalysisPanels under a GPU role', () => {
@@ -413,7 +418,8 @@ describe('PowerAnalysisPanels under a GPU role', () => {
     const aggRow = rows().find((row) => cardName(row)?.includes('agg-run'))!;
     const pools = poolSegments(pdRow);
     expect(pools.map((segment) => segment.dataset.poolEmphasis)).toEqual(['dimmed', 'shown']);
-    for (const segment of pools) expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+    for (const segment of pools)
+      expect(segment.getAttribute('stroke')).toContain('--overlay-run-0');
     expect(aggRow).toBeDefined();
     expect(aggRow.dataset.roleSplit).toBe('whole');
   });
