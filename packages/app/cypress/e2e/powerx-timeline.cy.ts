@@ -167,17 +167,23 @@ describe('PowerX measured power timeline', () => {
   });
 
   it('moves old /powerx links to /pwx with the query intact', () => {
+    const query = '?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4';
+    // Read the server redirect itself: once the page hydrates, the URL-state writer may drop
+    // defaults such as g_model, so the address bar is not a stable place to check the query.
+    cy.request({ url: `/powerx${query}`, followRedirect: false }).then((response) => {
+      expect(response.status).to.be.oneOf([301, 302, 307, 308]);
+      const target = new URL(String(response.headers.location), 'http://localhost');
+      expect(target.pathname).to.eq('/pwx');
+      expect(target.search).to.eq(query);
+    });
     interceptRows();
-    cy.visit('/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4', {
+    cy.visit(`/powerx${query}`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
       },
     });
-    cy.location().should((location) => {
-      expect(location.pathname).to.eq('/pwx');
-      expect(location.search).to.eq('?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4');
-    });
+    cy.location('pathname').should('eq', '/pwx');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 
