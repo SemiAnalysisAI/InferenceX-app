@@ -114,6 +114,7 @@ describe('PowerX layout', () => {
         if (value === 'breakdown') expect(params.get('i_pcompare')).to.eq('breakdown');
         if (value === 'time') expect(params.get('i_metric')).to.eq('y_measuredPowerTimeline');
         if (value === 'power') expect(params.get('i_metric')).to.match(/Power|Watts/u);
+        if (value === 'energy') expect(params.get('i_metric')).to.match(/^y_measuredJPer/u);
       });
       cy.reload();
       expectTab(value);
