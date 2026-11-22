@@ -1785,8 +1785,10 @@ export default function ChartDisplay({
                     description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}
                     actions={
                       powerXSurface ? (
-                        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-                          <PowerXTutorialCta locale={locale} className="min-w-0 flex-1" />
+                        // Phones keep Share on the title row, as Inference Performance does;
+                        // the tutorial card moves under the description.
+                        <div className="flex min-w-0 items-center gap-2">
+                          <PowerXTutorialCta locale={locale} className="min-w-0 max-sm:hidden" />
                           <ShareButton />
                         </div>
                       ) : (
@@ -1794,6 +1796,9 @@ export default function ChartDisplay({
                       )
                     }
                   />
+                  {powerXSurface && (
+                    <PowerXTutorialCta locale={locale} className="-mt-2 self-start sm:hidden" />
+                  )}
                   {powerXLayout && powerXMounted && (
                     <PowerXViewTabs
                       selection={powerXSelection}

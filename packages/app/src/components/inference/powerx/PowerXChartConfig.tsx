@@ -17,7 +17,14 @@ import { powerVariantDash } from '@/components/inference/utils/power-compare';
 import { SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -75,6 +82,7 @@ const STRINGS = {
   en: {
     views: 'PowerX views',
     tabs: POWERX_VOCAB.en.tabs,
+    tabsShort: { energy: 'Energy', power: 'Power', breakdown: 'Breakdown', time: 'Over time' },
     tabHints: {
       energy: 'Joules per token or Wh per query vs interactivity',
       power: 'Watts per GPU vs interactivity',
@@ -167,6 +175,7 @@ const STRINGS = {
   zh: {
     views: 'PowerX 视图',
     tabs: POWERX_VOCAB.zh.tabs,
+    tabsShort: { energy: '能耗', power: '功耗', breakdown: '功耗构成', time: '随时间变化' },
     tabHints: {
       energy: '每 Token 焦耳数或每次查询 Wh vs 交互性',
       power: '每 GPU 瓦数 vs 交互性',
@@ -298,9 +307,9 @@ export function powerXPinFor(
 }
 
 /**
- * The four views as a tab strip under the section header. Under md the strip is a 2×2
- * grid of 48 px buttons, so Over time is on screen without a sideways scroll; from md up
- * it is the underlined row.
+ * The four views as the underlined tab row under the section header. Under md each tab
+ * takes a quarter of the row and shows its short name, so all four fit 390 px without a
+ * sideways scroll.
  */
 export function PowerXViewTabs({
   selection,
@@ -317,7 +326,7 @@ export function PowerXViewTabs({
       role="tablist"
       aria-label={t.views}
       data-testid="powerx-tabs"
-      className="-mt-1 flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-border/60 max-md:grid max-md:grid-cols-2 max-md:gap-1.5 max-md:border-b-0 max-md:pb-1"
+      className="-mt-1 flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-border/60 max-md:gap-0"
     >
       {POWERX_VIEWS.map((value) => {
         const selected = value === view;
@@ -339,11 +348,12 @@ export function PowerXViewTabs({
             }}
             className={cn(
               '-mb-px inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground md:min-h-9',
-              'max-md:mb-0 max-md:min-h-12 max-md:justify-center max-md:rounded-md max-md:border max-md:bg-muted/30 max-md:px-2',
-              selected && 'border-brand text-foreground max-md:bg-muted',
+              'max-md:flex-1 max-md:justify-center max-md:px-1.5',
+              selected && 'border-brand text-foreground',
             )}
           >
-            {t.tabs[value]}
+            <span className="md:hidden">{t.tabsShort[value]}</span>
+            <span className="max-md:hidden">{t.tabs[value]}</span>
           </button>
         );
       })}
@@ -391,6 +401,56 @@ function Field({
 /** A segmented toggle at its natural width inside a Chart Config cell. */
 const CELL_TOGGLE_CLASS = 'self-start max-sm:w-full';
 const CELL_SEGMENT_CLASS = 'whitespace-nowrap';
+
+/**
+ * A Chart Config choice: segments from sm up, and on phones a full-width select whose trigger
+ * shows only the short label while each option adds the segment's hint (or why it is off).
+ */
+function CellToggle<TValue extends string>(props: Parameters<typeof SegmentedToggle<TValue>>[0]) {
+  if (props.variant !== 'select') return <SegmentedToggle<TValue> {...props} />;
+  const { value, options, onValueChange, ariaLabel, testId } = props;
+  const selected = options.find((option) => option.value === value);
+  return (
+    <Select value={value} onValueChange={(next) => onValueChange(next as TValue)}>
+      <SelectTrigger aria-label={ariaLabel} data-testid={testId} className="h-11 w-full">
+        <SelectValue>{selected && <CellOptionLabel option={selected} />}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            disabled={option.disabled}
+            data-testid={option.testId}
+          >
+            <span className="flex min-w-0 flex-col gap-0.5 py-0.5">
+              <CellOptionLabel option={option} />
+              {option.title && (
+                <span className="text-xs whitespace-normal text-muted-foreground">
+                  {option.title}
+                </span>
+              )}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function CellOptionLabel<TValue extends string>({
+  option,
+}: {
+  option: SegmentedToggleOption<TValue>;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {option.icon}
+      <span className="truncate">{option.label ?? option.ariaLabel}</span>
+      {option.badge && <span className="text-xs text-muted-foreground">{option.badge}</span>}
+    </span>
+  );
+}
 
 /** A line-style swatch for each GPU role, matching the chart: solid, dashed, dotted, both. */
 function swatchLine(dash: string, y: number) {
@@ -550,7 +610,8 @@ export function PowerXChartConfig({
   const locale = useLocale();
   const t = STRINGS[locale];
   const analyticsContext = useInferenceAnalyticsContext();
-  // Phones get one native select per group, with each segment's hint in its option.
+  // Phones get one full-width select per group: the trigger shows the short label and each
+  // option carries the segment's hint, which touch never shows.
   const variant: 'select' | 'segments' = useIsMobileViewport() ? 'select' : 'segments';
   const view = powerXViewFor(selection.metric, selection.compare);
   const pin = powerXPinFor(selection, role, locale);
@@ -569,7 +630,7 @@ export function PowerXChartConfig({
       aside={pin && <PowerXPinLine pin={pin} />}
       testId="powerx-role"
     >
-      <SegmentedToggle<PowerXRole>
+      <CellToggle<PowerXRole>
         {...toggle}
         value={role}
         ariaLabel={t.role}
@@ -602,7 +663,7 @@ export function PowerXChartConfig({
     const modeledDisabled = view === 'energy' && !energyPerHasBoundaries(energyPer);
     cells.push(
       <Field key="boundary" label={t.boundary} tooltip={t.boundaryHelp} locked={countLocked}>
-        <SegmentedToggle<PowerXCount>
+        <CellToggle<PowerXCount>
           {...toggle}
           value={count}
           ariaLabel={t.boundary}
@@ -635,7 +696,7 @@ export function PowerXChartConfig({
       const perLocked = pinned.includes('per');
       cells.push(
         <Field key="per" label={t.energyPer} tooltip={t.energyPerHelp} locked={perLocked}>
-          <SegmentedToggle<EnergyPer>
+          <CellToggle<EnergyPer>
             {...toggle}
             value={energyPer}
             ariaLabel={t.energyPer}
@@ -670,7 +731,7 @@ export function PowerXChartConfig({
             tooltip={t.provisionedHelp}
             locked={ratedPinned}
           >
-            <SegmentedToggle<'none' | 'provisioned'>
+            <CellToggle<'none' | 'provisioned'>
               {...toggle}
               value={ratedOn ? 'provisioned' : 'none'}
               ariaLabel={t.provisioned}
@@ -698,7 +759,7 @@ export function PowerXChartConfig({
       const showAs = powerXShowAsFor(effective.metric);
       cells.push(
         <Field key="show-as" label={t.showAs} tooltip={t.showAsHelp}>
-          <SegmentedToggle<PowerXShowAs>
+          <CellToggle<PowerXShowAs>
             {...toggle}
             value={showAs}
             ariaLabel={t.showAs}
@@ -735,7 +796,7 @@ export function PowerXChartConfig({
             tooltip={t.statisticHelp}
             locked={statisticLocked}
           >
-            <SegmentedToggle<Statistic>
+            <CellToggle<Statistic>
               {...toggle}
               value={statistic}
               ariaLabel={t.statistic}
@@ -775,7 +836,7 @@ export function PowerXChartConfig({
         <PowerXFacilitySwitch pues={breakdown.pues} compact />
       </Field>,
       <Field key="chart-style" label={t.chartStyle} tooltip={t.chartStyleHelp}>
-        <SegmentedToggle<PowerBreakdownView>
+        <CellToggle<PowerBreakdownView>
           {...toggle}
           value={breakdown.view}
           ariaLabel={t.chartStyle}

@@ -515,9 +515,10 @@ export default function ChartControls({
     countsInputTokens(selectedYAxisMetric);
   // Chart Config cells: the X and Y pickers share the row evenly. PowerX's cells (X-Axis
   // Metric, GPU role, then the tab's options) are segmented toggles of different widths, so
-  // they flow left to right at their natural width and wrap. Below sm every cell is a row.
+  // they flow left to right at their natural width and wrap. Below sm every cell is a
+  // full-width row, as on Infx.
   const chartConfigGridClass = powerXSurface
-    ? 'flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-3'
+    ? 'flex flex-col max-sm:items-stretch sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-3'
     : 'grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
 
   const scenarioSelector = !scenarioInFooter && (
@@ -578,7 +579,13 @@ export default function ChartControls({
                 modelBadges={powerXModelBadges}
               />
             </div>
-            {!isMobile && <div className="hidden md:contents">{scenarioSelector}</div>}
+            {/* PowerX keeps Scenario in Benchmark Config on phones too, so the fold opens on
+                Chart Config as on Infx. */}
+            {powerXSurface
+              ? scenarioSelector && (
+                  <div className="col-span-2 min-w-0 md:col-span-1">{scenarioSelector}</div>
+                )
+              : !isMobile && <div className="hidden md:contents">{scenarioSelector}</div>}
             <div className="min-w-0 col-span-2 md:col-span-1">
               <PrecisionSelector
                 value={selectedPrecisions}
@@ -599,7 +606,7 @@ export default function ChartControls({
           countLabel={t.changed}
           testId="inference-secondary-controls"
         >
-          {isMobile && scenarioSelector && (
+          {isMobile && !powerXSurface && scenarioSelector && (
             <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:hidden">
               {scenarioSelector}
             </div>
