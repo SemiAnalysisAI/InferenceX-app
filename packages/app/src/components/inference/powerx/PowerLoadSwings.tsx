@@ -176,13 +176,16 @@ export function PowerLoadSwings({
         : t.lane[lane.role];
   const traceName = ({ trace, color, label, stats, lane }: LoadSwingTraceRow) => (
     <>
-      <span
-        aria-hidden
-        className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
-        style={{ backgroundColor: color }}
-      />
-      <span className="font-medium">{label}</span>{' '}
-      <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
+      {/* The pinned cell wraps by default; the dot, name and concurrency stay on one line. */}
+      <span className="whitespace-nowrap">
+        <span
+          aria-hidden
+          className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
+          style={{ backgroundColor: color }}
+        />
+        <span className="font-medium">{label}</span>{' '}
+        <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
+      </span>
       {lane && (
         <span
           // The lane goes on its own line so the table fits the page width.
@@ -197,10 +200,17 @@ export function PowerLoadSwings({
           · {laneName(lane)}
         </span>
       )}
+      {/* Notes go on their own line in the table, inline on phone cards. */}
       {stats.gapCount > 0 && (
-        <span className="ml-1 text-muted-foreground">· {t.gaps(stats.gapCount)}</span>
+        <span className="ml-1 block pl-4 text-muted-foreground max-md:inline max-md:pl-0">
+          · {t.gaps(stats.gapCount)}
+        </span>
       )}
-      {stats.mean === null && <span className="ml-1 text-muted-foreground">· {t.noWindow}</span>}
+      {stats.mean === null && (
+        <span className="ml-1 block pl-4 text-muted-foreground max-md:inline max-md:pl-0">
+          · {t.noWindow}
+        </span>
+      )}
     </>
   );
   const downloads = ({ trace, lane }: LoadSwingTraceRow) => {
