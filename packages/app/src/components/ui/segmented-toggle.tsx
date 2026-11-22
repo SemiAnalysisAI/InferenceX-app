@@ -39,6 +39,8 @@ interface SegmentedToggleProps<TValue extends string> {
   options: SegmentedToggleOption<TValue>[];
   onValueChange: (value: TValue) => void;
   ariaLabel: string;
+  /** Lets a `<label htmlFor>` name the control. */
+  id?: string;
   testId?: string;
   className?: string;
   buttonClassName?: string;
@@ -69,6 +71,7 @@ export function SegmentedToggle<TValue extends string>({
   options,
   onValueChange,
   ariaLabel,
+  id,
   testId,
   className,
   buttonClassName,
@@ -82,6 +85,7 @@ export function SegmentedToggle<TValue extends string>({
     return (
       <div className={cn('relative min-w-0', className)}>
         <select
+          id={id}
           aria-label={ariaLabel}
           data-testid={testId}
           value={value}
@@ -117,6 +121,7 @@ export function SegmentedToggle<TValue extends string>({
         size === 'sm' ? 'md:min-h-8' : 'md:min-h-9',
         className,
       )}
+      id={id}
       role={role}
       aria-label={ariaLabel}
       data-testid={testId}

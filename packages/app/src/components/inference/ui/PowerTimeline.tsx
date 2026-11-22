@@ -2,7 +2,7 @@
 
 import * as d3 from 'd3';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
-import { ChartNoAxesCombined, ChevronDown, Loader2, TriangleAlert } from 'lucide-react';
+import { ChartNoAxesCombined, Loader2, TriangleAlert } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { getParetoLabel } from '@/components/inference/utils/paretoLabels';
@@ -21,8 +21,10 @@ import {
   comparisonEntryLabel,
 } from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
-import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
+import { EmptyState } from '@/components/ui/empty-state';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
@@ -168,7 +170,7 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
-    traceKey: 'Trace colours',
+    traceKey: 'Traces',
     laneName: { prefill: 'Prefill workers', decode: 'Decode workers' } satisfies Record<
       'prefill' | 'decode',
       string
@@ -259,7 +261,7 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
-    traceKey: '曲线颜色',
+    traceKey: '曲线',
     laneName: { prefill: '预填充 worker', decode: '解码 worker' } satisfies Record<
       'prefill' | 'decode',
       string
@@ -416,45 +418,6 @@ function ToolbarField({
   );
 }
 
-/** Native select styled like the segmented toggle's phone variant, so all toolbar controls match. */
-function ToolbarSelect({
-  id,
-  testId,
-  value,
-  onChange,
-  className,
-  children,
-}: {
-  id: string;
-  testId: string;
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn('relative min-w-0', className)}>
-      <select
-        id={id}
-        data-testid={testId}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          SELECT_TRIGGER_STYLE,
-          CONTROL_HEIGHT.sm,
-          'w-full appearance-none truncate pr-9 text-foreground',
-        )}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
-      />
-    </div>
-  );
-}
-
 /**
  * Loading, error and empty states. A blocking status is a centred panel over the hidden plot; a
  * non-blocking one (more runs still loading) is a small notice that leaves drawn lines visible.
@@ -516,11 +479,18 @@ function PowerTimelineStatusPanel({
       aria-live="polite"
       aria-busy={status.kind === 'loading'}
     >
-      <div className="flex max-w-xs flex-col items-center gap-2 text-center">
-        {icon}
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-      </div>
+      <EmptyState
+        bare
+        className="max-w-xs"
+        title={
+          <span className="flex flex-col items-center gap-2">
+            {icon}
+            {title}
+          </span>
+        }
+      >
+        {detail}
+      </EmptyState>
     </div>
   );
 }
@@ -1213,8 +1183,10 @@ export default function PowerTimeline({
     (results: UseQueryResult<GpuPowerSeriesResponse, Error>[]) => ({
       loadingRuns: results.filter((query) => query.isPending).length,
       errors: fetchedRequests.flatMap((request, index) => {
-        const error = results[index]?.error;
-        return error instanceof Error ? [{ request, error }] : [];
+        const result = results[index];
+        return result?.error instanceof Error
+          ? [{ request, error: result.error, refetch: result.refetch }]
+          : [];
       }),
       resolved: fetchedRequests.flatMap((request, index) => {
         const response = results[index]?.data;
@@ -1522,8 +1494,8 @@ export default function PowerTimeline({
 
   const margin = useMemo(
     () =>
-      // A phone cannot spare a label gutter: the plot takes the card width and the colour key
-      // above it names the traces.
+      // A phone cannot spare a label gutter: the plot takes the card width and the legend's
+      // trace section names the traces.
       isPhone
         ? { ...MARGIN, right: PHONE_MARGIN_RIGHT }
         : { ...MARGIN, right: powerTimelineGutter(model.labels) },
@@ -2028,19 +2000,46 @@ export default function PowerTimeline({
     track('inference_power_timeline_filter_reset');
   };
 
+  // A phone has no label gutter, so the legend names each drawn trace in its own section.
+  // Tapping one focuses it; tapping it again shows all.
+  const phoneTraceItems = isPhone
+    ? model.labels.map((label) => ({
+        // One shared first word keeps these in a single group in the grouped (comparison) legend.
+        name: `power-trace-key ${label.id}`,
+        hw: `power-trace-key:${label.id}`,
+        label: label.text,
+        title: t.traceKey,
+        section: t.traceKey,
+        color: label.color,
+        lineDasharray: (label.pool && poolDash(label.pool)) || 'none',
+        forceLineSwatch: true,
+        isActive: !focusedTrace || focusedTrace.key === label.traceKey,
+        isRemovable: false,
+        onClick: () => {
+          const next = focusedTrace?.key === label.traceKey ? null : label.traceKey;
+          setFocusKey(next);
+          track('powerx_timeline_key_focus_toggled', { focused: next !== null });
+        },
+        tooltip: null,
+      }))
+    : [];
+  const traceKeyOf = new Map(
+    model.labels.map((label) => [`power-trace-key:${label.id}`, label.traceKey]),
+  );
+
   const legendElement = (
     <ChartLegend
       variant="sidebar"
       grouped={comparison}
       disableActiveSort={comparison}
-      legendItems={legendItems}
+      legendItems={phoneTraceItems.length > 0 ? [...legendItems, ...phoneTraceItems] : legendItems}
       onItemRemove={(hw) => legendItems.find((item) => item.hw === hw)?.onClick()}
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
         track('latency_legend_expanded', { enabled: expanded });
       }}
-      onItemHover={(id) => setHighlight(id)}
+      onItemHover={(id) => setHighlight(traceKeyOf.get(id) ?? id)}
       onItemHoverEnd={() => setHighlight(null)}
       hideAtomFootnote
       switches={switches}
@@ -2062,45 +2061,50 @@ export default function PowerTimeline({
       data-testid="power-timeline-toolbar"
     >
       <ToolbarField label={t.concurrency} htmlFor={`${chartId}-power-timeline-concurrency`}>
-        <ToolbarSelect
+        <SegmentedToggle<string>
+          variant="select"
           id={`${chartId}-power-timeline-concurrency`}
+          ariaLabel={t.concurrency}
           testId="power-timeline-concurrency"
           value={concurrency === null ? '' : String(concurrency)}
-          onChange={(selected) => {
+          options={[
+            { value: '', label: t.allConcurrencies },
+            ...[
+              ...(concurrency !== null && !concurrencyOptions.includes(concurrency)
+                ? [concurrency]
+                : []),
+              ...concurrencyOptions,
+            ].map((conc) => ({ value: String(conc), label: `c${conc}` })),
+          ]}
+          onValueChange={(selected) => {
             const value = selected === '' ? null : Number(selected);
             setConcurrency(value);
             track('inference_power_timeline_concurrency_changed', { concurrency: value });
           }}
-        >
-          <option value="">{t.allConcurrencies}</option>
-          {concurrency !== null && !concurrencyOptions.includes(concurrency) && (
-            <option value={concurrency}>{`c${concurrency}`}</option>
-          )}
-          {concurrencyOptions.map((conc) => (
-            <option key={conc} value={conc}>{`c${conc}`}</option>
-          ))}
-        </ToolbarSelect>
+        />
       </ToolbarField>
       {visibleTraces.length > 1 && (
         <ToolbarField label={t.highlight} htmlFor={`${chartId}-power-timeline-highlight`}>
-          <ToolbarSelect
+          <SegmentedToggle<string>
+            variant="select"
             id={`${chartId}-power-timeline-highlight`}
+            ariaLabel={t.highlight}
             testId="power-timeline-highlight"
             className="md:max-w-56"
             value={focusedTrace?.key ?? ''}
-            onChange={(selected) => {
+            options={[
+              { value: '', label: t.highlightNone },
+              ...visibleTraces.map((trace) => ({
+                value: trace.key,
+                label: `${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`,
+              })),
+            ]}
+            onValueChange={(selected) => {
               const key = selected === '' ? null : selected;
               setFocusKey(key);
               track('inference_power_timeline_highlight_changed', { highlighted: key !== null });
             }}
-          >
-            <option value="">{t.highlightNone}</option>
-            {visibleTraces.map((trace) => (
-              <option key={trace.key} value={trace.key}>
-                {`${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`}
-              </option>
-            ))}
-          </ToolbarSelect>
+          />
         </ToolbarField>
       )}
       <ToolbarField label={t.timeAxis}>
@@ -2248,35 +2252,6 @@ export default function PowerTimeline({
           <>
             {caption}
             {toolbar}
-            {isPhone && model.labels.length > 0 && (
-              <ul
-                className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
-                aria-label={t.traceKey}
-                data-testid="power-timeline-key"
-              >
-                {model.labels.map((label) => (
-                  <li
-                    key={label.id}
-                    className="flex items-center gap-1.5 font-medium whitespace-nowrap"
-                    style={{ opacity: labelOpacity(label, activeHighlight) }}
-                    data-hw={label.hwKey}
-                  >
-                    <svg aria-hidden="true" width="14" height="6" className="shrink-0">
-                      <line
-                        x1="0"
-                        x2="14"
-                        y1="3"
-                        y2="3"
-                        stroke={label.color}
-                        strokeWidth="3"
-                        strokeDasharray={(label.pool && poolDash(label.pool)) || undefined}
-                      />
-                    </svg>
-                    {label.text}
-                  </li>
-                ))}
-              </ul>
-            )}
           </>
         }
         noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
@@ -2298,9 +2273,11 @@ export default function PowerTimeline({
                 `${seriesLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
               )}
             </span>
-            <button
+            <Button
               type="button"
-              className="underline decoration-dotted hover:text-foreground"
+              variant="link"
+              size="2xs"
+              className="h-auto px-0"
               data-testid="power-timeline-focus-clear"
               onClick={() => {
                 setFocusKey(null);
@@ -2308,16 +2285,20 @@ export default function PowerTimeline({
               }}
             >
               {t.showAll}
-            </button>
+            </Button>
           </p>
         )}
         {focusKey && !focusedTrace && loadingRuns === 0 && (
           <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
         )}
-        {errors.map(({ request, error }) => (
-          <p key={request.runId} className="text-destructive" role="alert">
-            {t.loadError(request.runId, error.message)}
-          </p>
+        {errors.map(({ request, error, refetch }) => (
+          <RetryableQueryError
+            key={request.runId}
+            message={t.loadError(request.runId, error.message)}
+            analyticsEvent="powerx_timeline_run_retry_clicked"
+            onRetry={refetch}
+            testId="power-timeline-load-error"
+          />
         ))}
         {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
         {hasAggregatedLane && <p data-testid="power-timeline-aggregated">{t.aggregatedNote}</p>}

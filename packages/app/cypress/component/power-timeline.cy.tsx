@@ -293,7 +293,7 @@ describe('PowerTimeline', () => {
       `[data-testid="power-timeline-summary-trace"][data-trace="${traceKeyForPoint(overlayPoint)}"]`,
     )
       .should('contain.text', 'unofficial')
-      .find('th > span')
+      .find('td > span')
       .first()
       .should('have.attr', 'style')
       .and('contain', overlayRunColor(0));
@@ -572,7 +572,7 @@ describe('PowerTimeline', () => {
       status().should('have.attr', 'data-status', 'empty').and('contain.text', 'predate');
       plotSvg().should('have.css', 'visibility', 'hidden');
     });
-    it('gives the plot the card width on a phone and names traces in a key above it', () => {
+    it('gives the plot the card width on a phone and names traces in the legend', () => {
       cy.viewport(PHONE, 800);
       cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
         body: { ...response, series: [series('b200', 16, 700), series('h100', 16, 500)] },
@@ -581,8 +581,17 @@ describe('PowerTimeline', () => {
         width: '100%',
       });
       cy.wait('@series');
-      cy.get('[data-testid="power-timeline-key"] li').should('have.length', 2);
-      cy.get('[data-testid="power-timeline-key"] li[data-hw="b200"]').should('be.visible');
+      cy.get('[data-testid="chart-legend"] [data-testid="legend-section-heading"]').should(
+        'have.text',
+        'Traces',
+      );
+      cy.get('[data-testid="chart-legend"] input[id^="checkbox-power-trace-key:"]').should(
+        'have.length',
+        2,
+      );
+      cy.get('[data-testid="chart-legend"] label[for^="checkbox-power-trace-key:"]')
+        .contains('B200')
+        .should('be.visible');
       cy.get('text.power-trace-label').should('not.exist');
       cy.get('[data-testid="power-timeline-chart-svg"] svg[data-testid="d3-chart-svg"]').then(
         ($svg) => {
@@ -682,7 +691,7 @@ describe('PowerTimeline', () => {
       mountTimeline([measuredPoint('b200', 16, 700)]);
       cy.wait('@series');
       cy.get('text.power-trace-label').should('have.length', 1);
-      cy.get('[data-testid="power-timeline-key"]').should('not.exist');
+      cy.get('[data-testid="legend-section-heading"]').should('not.exist');
     });
 
     it('lays the PowerX stats out as cards on a phone, below the chart, without clipping', () => {

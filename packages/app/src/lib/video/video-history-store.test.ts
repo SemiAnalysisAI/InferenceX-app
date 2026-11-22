@@ -377,7 +377,7 @@ describe('history projection version', () => {
       // the live address bar, a direct-labels flag on the shared scatter props, renamed the PowerX
       // view ids and added the GPU role chart title; no video entry reads the PowerX changes.
       // Recorded entries are unchanged.
-      sources: 'ac1069df88079c9cf9d993387bcecc564ffe94149c76e66506be34c7b5050f42',
+      sources: '266bd07e891ab7efec8ffc34c76d9af9432b866830c2562cd8d1e57a54abef22',
     });
   });
 });
