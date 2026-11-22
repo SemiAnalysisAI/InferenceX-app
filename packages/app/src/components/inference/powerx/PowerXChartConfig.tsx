@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown, Lock } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import {
@@ -14,17 +14,12 @@ import {
   useSetPowerXCompareTarget,
 } from '@/components/inference/ui/powerx-surface';
 import { powerVariantDash } from '@/components/inference/utils/power-compare';
-import { SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
+import { Button } from '@/components/ui/button';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { RangeField } from '@/components/ui/range-field';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -322,42 +317,40 @@ export function PowerXViewTabs({
   const analyticsContext = useInferenceAnalyticsContext();
   const view = powerXViewFor(selection.metric, selection.compare);
   return (
-    <div
-      role="tablist"
-      aria-label={t.views}
-      data-testid="powerx-tabs"
-      className="-mt-1 flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-border/60 max-md:gap-0"
+    <Tabs
+      value={view ?? ''}
+      // Manual: arrow keys move focus, Enter or Space switches, so each key press does not redraw.
+      activationMode="manual"
+      onValueChange={(next) => {
+        const value = next as PowerXView;
+        if (value === view) return;
+        track('inference_powerx_tab_selected', {
+          ...analyticsContext,
+          tab: POWERX_VIEW_ANALYTICS_ID[value],
+        });
+        onSelectionChange(selectPowerXView(value, selection));
+      }}
+      className="-mt-1 min-w-0 max-w-full gap-0"
     >
-      {POWERX_VIEWS.map((value) => {
-        const selected = value === view;
-        return (
-          <button
+      <TabsList
+        aria-label={t.views}
+        data-testid="powerx-tabs"
+        className="flex min-w-0 max-w-full flex-nowrap items-stretch overflow-x-auto border-b border-border/60 max-md:gap-0"
+      >
+        {POWERX_VIEWS.map((value) => (
+          <TabsTrigger
             key={value}
-            type="button"
-            role="tab"
-            aria-selected={selected}
+            value={value}
             title={t.tabHints[value]}
             data-testid={`powerx-tab-${value}`}
-            onClick={() => {
-              if (selected) return;
-              track('inference_powerx_tab_selected', {
-                ...analyticsContext,
-                tab: POWERX_VIEW_ANALYTICS_ID[value],
-              });
-              onSelectionChange(selectPowerXView(value, selection));
-            }}
-            className={cn(
-              '-mb-px inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground md:min-h-9',
-              'max-md:flex-1 max-md:justify-center max-md:px-1.5',
-              selected && 'border-brand text-foreground',
-            )}
+            className="-mb-px min-h-11 shrink-0 cursor-pointer px-3 py-0 md:min-h-9 max-md:flex-1 max-md:px-1.5"
           >
             <span className="md:hidden">{t.tabsShort[value]}</span>
             <span className="max-md:hidden">{t.tabs[value]}</span>
-          </button>
-        );
-      })}
-    </div>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
 
@@ -401,56 +394,6 @@ function Field({
 /** A segmented toggle at its natural width inside a Chart Config cell. */
 const CELL_TOGGLE_CLASS = 'self-start max-sm:w-full';
 const CELL_SEGMENT_CLASS = 'whitespace-nowrap';
-
-/**
- * A Chart Config choice: segments from sm up, and on phones a full-width select whose trigger
- * shows only the short label while each option adds the segment's hint (or why it is off).
- */
-function CellToggle<TValue extends string>(props: Parameters<typeof SegmentedToggle<TValue>>[0]) {
-  if (props.variant !== 'select') return <SegmentedToggle<TValue> {...props} />;
-  const { value, options, onValueChange, ariaLabel, testId } = props;
-  const selected = options.find((option) => option.value === value);
-  return (
-    <Select value={value} onValueChange={(next) => onValueChange(next as TValue)}>
-      <SelectTrigger aria-label={ariaLabel} data-testid={testId} className="h-11 w-full">
-        <SelectValue>{selected && <CellOptionLabel option={selected} />}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem
-            key={option.value}
-            value={option.value}
-            disabled={option.disabled}
-            data-testid={option.testId}
-          >
-            <span className="flex min-w-0 flex-col gap-0.5 py-0.5">
-              <CellOptionLabel option={option} />
-              {option.title && (
-                <span className="text-xs whitespace-normal text-muted-foreground">
-                  {option.title}
-                </span>
-              )}
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function CellOptionLabel<TValue extends string>({
-  option,
-}: {
-  option: SegmentedToggleOption<TValue>;
-}) {
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      {option.icon}
-      <span className="truncate">{option.label ?? option.ariaLabel}</span>
-      {option.badge && <span className="text-xs text-muted-foreground">{option.badge}</span>}
-    </span>
-  );
-}
 
 /** A line-style swatch for each GPU role, matching the chart: solid, dashed, dotted, both. */
 function swatchLine(dash: string, y: number) {
@@ -496,14 +439,16 @@ function PowerXPinLine({ pin }: { pin: PowerXPin }) {
       <span className="min-w-0 truncate">{t.setBy(pin.by)}</span>
       <Popover>
         <PopoverTrigger asChild>
-          <button
+          <Button
             type="button"
-            className="shrink-0 cursor-pointer text-foreground/80 underline decoration-border underline-offset-2 hover:decoration-current"
+            variant="link"
+            size="2xs"
+            className="h-auto px-0 underline decoration-border underline-offset-2 hover:decoration-current"
             data-testid="powerx-pin-why"
             onClick={() => track('powerx_pin_why_opened', { by: pin.by })}
           >
             {t.why}
-          </button>
+          </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 text-sm" data-testid="powerx-pin-reasons">
           <h3 className="mb-2 font-semibold">{t.whyTitle}</h3>
@@ -528,9 +473,20 @@ export function PowerXCompareAtPicker({ range }: { range?: readonly [number, num
   const setValue = useSetPowerXCompareTarget();
   const lo = Math.max(1, Math.floor(range?.[0] ?? POWERX_COMPARE_AT_MIN));
   const hi = Math.max(lo + 1, Math.ceil(range?.[1] ?? POWERX_COMPARE_AT_MAX));
-  const change = (next: number, how: 'preset' | 'slider') => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const trackChange = (at: number, how: 'preset' | 'slider' | 'input') =>
+    track('powerx_compare_at_changed', { ...analyticsContext, at, how, source: 'config' });
+  const change = (next: number, how: 'preset' | 'input') => {
     setValue?.(next);
-    track('powerx_compare_at_changed', { ...analyticsContext, at: next, how, source: 'config' });
+    trackChange(next, how);
+  };
+  const commitDraft = () => {
+    if (draft === null) return;
+    setDraft(null);
+    const parsed = Math.round(Number(draft));
+    if (draft.trim() === '' || !Number.isFinite(parsed)) return;
+    const next = Math.min(hi, Math.max(lo, parsed));
+    if (next !== value) change(next, 'input');
   };
   const preset = POWERX_COMPARE_AT_PRESETS.find((option) => option === value);
   return (
@@ -550,22 +506,29 @@ export function PowerXCompareAtPicker({ range }: { range?: readonly [number, num
           testId: `powerx-compare-at-preset-${option}`,
         }))}
       />
-      <label className="flex items-center gap-3 text-sm">
-        <span className="sr-only">{t.compareAt}</span>
-        <input
-          type="range"
-          min={lo}
-          max={hi}
-          step={1}
-          value={Math.min(hi, Math.max(lo, value))}
-          onChange={(event) => change(Number(event.target.value), 'slider')}
-          data-testid="powerx-compare-at-slider"
-          className="h-11 min-w-0 flex-1 accent-powerx-at"
-        />
-        <span className="w-24 shrink-0 text-right tabular-nums">
-          {value} {t.tokPerUser}
-        </span>
-      </label>
+      <RangeField
+        label={`${t.compareAt} (${t.tokPerUser})`}
+        min={lo}
+        max={hi}
+        value={Math.min(hi, Math.max(lo, value))}
+        onSliderChange={(next) => setValue?.(next)}
+        // One event per drag, as the other RangeField callers do.
+        onSliderCommit={() => trackChange(value, 'slider')}
+        sliderTestId="powerx-compare-at-slider"
+        compact
+        input={{
+          value: draft ?? String(value),
+          min: lo,
+          max: hi,
+          onChange: (event) => setDraft(event.target.value),
+          onBlur: commitDraft,
+          onKeyDown: (event) => {
+            if (event.key === 'Enter') commitDraft();
+          },
+          className: 'tabular-nums',
+          'data-testid': 'powerx-compare-at-input',
+        }}
+      />
       <p className="text-xs text-muted-foreground">{t.compareAtHelp}</p>
     </div>
   );
@@ -610,8 +573,8 @@ export function PowerXChartConfig({
   const locale = useLocale();
   const t = STRINGS[locale];
   const analyticsContext = useInferenceAnalyticsContext();
-  // Phones get one full-width select per group: the trigger shows the short label and each
-  // option carries the segment's hint, which touch never shows.
+  // Phones get one full-width native select per group, as on other pages; each option
+  // carries the segment's hint, which touch never shows.
   const variant: 'select' | 'segments' = useIsMobileViewport() ? 'select' : 'segments';
   const view = powerXViewFor(selection.metric, selection.compare);
   const pin = powerXPinFor(selection, role, locale);
@@ -630,7 +593,7 @@ export function PowerXChartConfig({
       aside={pin && <PowerXPinLine pin={pin} />}
       testId="powerx-role"
     >
-      <CellToggle<PowerXRole>
+      <SegmentedToggle<PowerXRole>
         {...toggle}
         value={role}
         ariaLabel={t.role}
@@ -663,7 +626,7 @@ export function PowerXChartConfig({
     const modeledDisabled = view === 'energy' && !energyPerHasBoundaries(energyPer);
     cells.push(
       <Field key="boundary" label={t.boundary} tooltip={t.boundaryHelp} locked={countLocked}>
-        <CellToggle<PowerXCount>
+        <SegmentedToggle<PowerXCount>
           {...toggle}
           value={count}
           ariaLabel={t.boundary}
@@ -696,7 +659,7 @@ export function PowerXChartConfig({
       const perLocked = pinned.includes('per');
       cells.push(
         <Field key="per" label={t.energyPer} tooltip={t.energyPerHelp} locked={perLocked}>
-          <CellToggle<EnergyPer>
+          <SegmentedToggle<EnergyPer>
             {...toggle}
             value={energyPer}
             ariaLabel={t.energyPer}
@@ -731,7 +694,7 @@ export function PowerXChartConfig({
             tooltip={t.provisionedHelp}
             locked={ratedPinned}
           >
-            <CellToggle<'none' | 'provisioned'>
+            <SegmentedToggle<'none' | 'provisioned'>
               {...toggle}
               value={ratedOn ? 'provisioned' : 'none'}
               ariaLabel={t.provisioned}
@@ -759,7 +722,7 @@ export function PowerXChartConfig({
       const showAs = powerXShowAsFor(effective.metric);
       cells.push(
         <Field key="show-as" label={t.showAs} tooltip={t.showAsHelp}>
-          <CellToggle<PowerXShowAs>
+          <SegmentedToggle<PowerXShowAs>
             {...toggle}
             value={showAs}
             ariaLabel={t.showAs}
@@ -796,7 +759,7 @@ export function PowerXChartConfig({
             tooltip={t.statisticHelp}
             locked={statisticLocked}
           >
-            <CellToggle<Statistic>
+            <SegmentedToggle<Statistic>
               {...toggle}
               value={statistic}
               ariaLabel={t.statistic}
@@ -836,7 +799,7 @@ export function PowerXChartConfig({
         <PowerXFacilitySwitch pues={breakdown.pues} compact />
       </Field>,
       <Field key="chart-style" label={t.chartStyle} tooltip={t.chartStyleHelp}>
-        <CellToggle<PowerBreakdownView>
+        <SegmentedToggle<PowerBreakdownView>
           {...toggle}
           value={breakdown.view}
           ariaLabel={t.chartStyle}
@@ -875,9 +838,10 @@ function PowerXCompareAtCell({ range }: { range?: readonly [number, number] }) {
     <Field label={t.compareAt} tooltip={t.compareAtHelp}>
       <Popover>
         <PopoverTrigger asChild>
-          <button
+          <Button
             type="button"
-            className={cn(SELECT_TRIGGER_STYLE, 'h-11 cursor-pointer tabular-nums sm:w-44 md:h-9')}
+            variant="outline"
+            className="justify-between px-3 font-normal tabular-nums sm:w-44 has-[>svg]:px-3"
             data-testid="powerx-compare-at"
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -885,7 +849,7 @@ function PowerXCompareAtCell({ range }: { range?: readonly [number, number] }) {
               {value} {t.tokPerUser}
             </span>
             <ChevronDown aria-hidden className="size-4 opacity-50" />
-          </button>
+          </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-[22rem] max-w-[calc(100vw-2rem)]">
           <PowerXCompareAtPicker range={range} />

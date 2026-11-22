@@ -210,9 +210,12 @@ describe('PowerXViewTabs', () => {
     const { container, unmount } = mount(
       <PowerXViewTabs selection={facilityTotal} onSelectionChange={noop} />,
     );
-    act(() =>
-      container.querySelector<HTMLButtonElement>('[data-testid="powerx-tab-power"]')!.click(),
-    );
+    // Radix tabs switch on mousedown, not click.
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="powerx-tab-power"]')!
+        .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    });
     expect(mocks.track).toHaveBeenCalledWith('inference_powerx_tab_selected', { tab: 'draw' });
     unmount();
   });
