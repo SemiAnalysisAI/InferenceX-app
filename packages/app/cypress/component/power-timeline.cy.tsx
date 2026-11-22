@@ -361,17 +361,17 @@ describe('PowerTimeline', () => {
     cy.wait(['@earlier', '@later']);
 
     cy.get('[data-testid="chart-legend"] .gpu-legend-title').should('have.text', 'B200');
-    cy.get('[data-testid="chart-legend"] label').then(($labels) => {
+    cy.get('[data-testid="chart-legend"] label').should(($labels) => {
       const rows = $labels.toArray().map((label) => label.textContent?.trim());
       expect(rows).to.include.members(DATES);
     });
     svg().within(() => {
-      cy.get('path.power-trace[data-segment="window"]').then(($paths) => {
+      cy.get('path.power-trace[data-segment="window"]').should(($paths) => {
         expect($paths).to.have.length(2);
         const strokes = new Set($paths.toArray().map((path) => path.getAttribute('stroke')));
         expect(strokes.size, 'each date has its own colour').to.equal(2);
       });
-      cy.get('text.power-trace-label').then(($labels) => {
+      cy.get('text.power-trace-label').should(($labels) => {
         expect($labels.toArray().map((label) => label.textContent)).to.have.members(
           DATES.map((date) => `${date} c16`),
         );
@@ -439,14 +439,14 @@ describe('PowerTimeline', () => {
     );
     cy.wait(['@range-earlier', '@range-later']);
 
-    cy.get('[data-testid="chart-legend"] label').then(($labels) => {
+    cy.get('[data-testid="chart-legend"] label').should(($labels) => {
       const rows = $labels.toArray().map((label) => label.textContent?.trim());
       expect(rows).to.include.members([...DATES]);
       expect(rows.join(' ')).not.to.match(/#\d/u);
     });
     svg().within(() => {
       cy.get('path.power-trace[data-segment="window"]').should('have.length', 2);
-      cy.get('text.power-trace-label').then(($labels) => {
+      cy.get('text.power-trace-label').should(($labels) => {
         expect($labels.toArray().map((label) => label.textContent)).to.have.members([
           `${DATES[0]} c16`,
           `${DATES[1]} c16`,
