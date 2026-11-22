@@ -3,6 +3,7 @@
 import { Download } from 'lucide-react';
 import { useMemo } from 'react';
 import type { PowerPoolRole, PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
@@ -239,6 +240,48 @@ export function PowerLoadSwings({
       '—'
     );
   };
+  const statSort: Record<string, (stats: LoadSwingTraceRow['stats']) => number | null> = {
+    peak: (stats) => stats.peak,
+    min: (stats) => stats.min,
+    idle: (stats) => stats.idleFloor,
+    mean: (stats) => stats.mean,
+    p5p95: (stats) => stats.p95,
+    d1: (stats) => stats.maxDelta1s,
+    d5: (stats) => stats.maxDelta5s,
+    up: (stats) => stats.rampUpPerSecond,
+    down: (stats) => stats.rampDownPerSecond,
+    volatility: (stats) => stats.volatility,
+  };
+  // Headers come from the same stat list as the cells, so their order cannot drift.
+  const statColumns = statCells(rows[0]).map((head, index): DataTableColumn<LoadSwingTraceRow> => ({
+    header: head.label,
+    headerContent:
+      head.key === 'peak' ? (
+        <>
+          {head.label}
+          <PowerBasisPill tag="gpu" />
+        </>
+      ) : undefined,
+    align: 'right',
+    className: 'align-top whitespace-nowrap',
+    cell: (row) => statCells(row)[index].value,
+    sortValue: (row) => statSort[head.key](row.stats) ?? Number.NEGATIVE_INFINITY,
+  }));
+  const columns: DataTableColumn<LoadSwingTraceRow>[] = [
+    {
+      header: t.trace,
+      pinned: true,
+      className: 'align-top whitespace-nowrap',
+      cell: (row) => traceName(row),
+      sortValue: (row) => row.label,
+    },
+    ...statColumns,
+    {
+      header: t.downloads,
+      className: 'no-export align-top whitespace-nowrap',
+      cell: (row) => downloads(row),
+    },
+  ];
   return (
     <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
       <h3 className="text-sm font-medium">{t.title}</h3>
@@ -265,45 +308,18 @@ export function PowerLoadSwings({
           ))}
         </ul>
       ) : (
-        <div className="max-h-96 min-w-0 overflow-auto">
-          <table
-            className="w-full min-w-[64rem] text-left text-xs tabular-nums"
-            data-testid="powerx-load-swings-table"
-          >
-            <thead className="sticky top-0 bg-card">
-              <tr>
-                <th className="p-2">{t.trace}</th>
-                <th className="p-2 text-right">
-                  {t.peak}
-                  <PowerBasisPill tag="gpu" />
-                </th>
-                <th className="p-2 text-right">{t.min}</th>
-                <th className="p-2 text-right">{t.idle}</th>
-                <th className="p-2 text-right">{t.mean}</th>
-                <th className="p-2 text-right">{t.p5p95}</th>
-                <th className="p-2 text-right">{t.d1}</th>
-                <th className="p-2 text-right">{t.d5}</th>
-                <th className="p-2 text-right">{t.up}</th>
-                <th className="p-2 text-right">{t.down}</th>
-                <th className="p-2 text-right">{t.volatility}</th>
-                <th className="p-2 no-export">{t.downloads}</th>
-              </tr>
-            </thead>
-            <tbody className="border-t">
-              {rows.map((row) => (
-                <tr key={row.key} data-testid="powerx-load-swings-row">
-                  <th className="p-2 align-top font-normal whitespace-nowrap">{traceName(row)}</th>
-                  {statCells(row).map((cell) => (
-                    <td key={cell.key} className="p-2 text-right align-top whitespace-nowrap">
-                      {cell.value}
-                    </td>
-                  ))}
-                  <td className="no-export p-2 align-top whitespace-nowrap">{downloads(row)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={rows}
+          columns={columns}
+          testId="powerx-load-swings-table"
+          analyticsPrefix="powerx_load_swings"
+          searchable={false}
+          columnPresets={false}
+          paginated={false}
+          rowAttributes={() => ({ 'data-testid': 'powerx-load-swings-row' })}
+          scrollClassName="max-h-96"
+          tableClassName="min-w-[64rem] text-xs"
+        />
       )}
       <p className="text-xs text-muted-foreground">
         {rack ? t.perRack : t.perGpu} {role !== 'all' && `${t.perLane} `}

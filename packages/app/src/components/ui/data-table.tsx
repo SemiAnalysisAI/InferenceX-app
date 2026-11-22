@@ -17,9 +17,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 export interface DataTableColumn<T> {
+  /** Plain label, also used for analytics. */
   header: string;
+  /** Rendered in place of `header` when set, e.g. a label with a pill. */
+  headerContent?: React.ReactNode;
   align?: 'left' | 'right' | 'center';
   cell: (row: T, index: number) => React.ReactNode;
   sortValue?: (row: T) => number | string;
@@ -27,7 +31,17 @@ export interface DataTableColumn<T> {
   className?: string;
   importance?: 'key' | 'secondary';
   pinned?: boolean;
+  /** With `rowGroupKey`, render once per group with a rowSpan over the group's rows. */
+  spanGroup?: boolean;
 }
+
+export interface DataTableHeaderGroup {
+  header: React.ReactNode;
+  colSpan: number;
+  className?: string;
+}
+
+type RowAttributes = Record<`data-${string}`, string | number | undefined>;
 
 type SortDir = 'asc' | 'desc' | null;
 
@@ -45,6 +59,20 @@ interface DataTableProps<T> {
   searchable?: boolean;
   /** Offers the key-metrics / all-data column toggle when columns carry an importance. */
   columnPresets?: boolean;
+  /** Set false to show every row without the pager. */
+  paginated?: boolean;
+  /** data-* attributes per row, e.g. a row testid. */
+  rowAttributes?: (row: T, index: number) => RowAttributes;
+  /** A header row above the column headers; the colSpans should cover the visible columns. */
+  headerGroups?: DataTableHeaderGroup[];
+  /** Puts consecutive rows with the same key in one tbody, for `spanGroup` columns. */
+  rowGroupKey?: (row: T) => string;
+  /** data-* attributes per row group tbody, from the group's first row. */
+  rowGroupAttributes?: (row: T) => RowAttributes;
+  /** Extra classes for the scroll box, e.g. a max height. */
+  scrollClassName?: string;
+  /** Extra classes for the table, e.g. a min width. */
+  tableClassName?: string;
 }
 
 type TablePreset = 'key' | 'all';
@@ -113,12 +141,19 @@ export function DataTable<T>({
   watermark = true,
   searchable = true,
   columnPresets = true,
+  paginated = true,
+  rowAttributes,
+  headerGroups,
+  rowGroupKey,
+  rowGroupAttributes,
+  scrollClassName,
+  tableClassName,
 }: DataTableProps<T>) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const isUnofficialDomain = useUnofficialDomain();
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSizeState, setPageSize] = useState<number>(10);
   const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
   const [search, setSearch] = useState('');
   const hasPresets =
@@ -193,9 +228,60 @@ export function DataTable<T>({
     });
   }, [filtered, sort, columns]);
 
+  const pageSize = paginated ? pageSizeState : Math.max(1, sorted.length);
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
   const pageData = sorted.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
+  const groups = rowGroupKey
+    ? pageData.reduce<{ key: string; start: number; rows: T[] }[]>((acc, row, rowIndex) => {
+        const key = rowGroupKey(row);
+        const last = acc.at(-1);
+        if (last && last.key === key) last.rows.push(row);
+        else acc.push({ key, start: rowIndex, rows: [row] });
+        return acc;
+      }, [])
+    : null;
+
+  // groupOffset/groupSize place the row in its row group; spanGroup cells render on the first row.
+  const renderRow = (row: T, rowIndex: number, groupOffset: number, groupSize: number) => {
+    let covered = 0;
+    const dataIndex = safePage * pageSize + rowIndex;
+    return (
+      <tr
+        key={rowIndex}
+        className="border-b border-border/50 hover:bg-muted/30"
+        {...rowAttributes?.(row, dataIndex)}
+      >
+        {visibleColumns.map((col) => {
+          if (covered > 0) {
+            covered -= 1;
+            return null;
+          }
+          const grouped = Boolean(groups && col.spanGroup);
+          if (grouped && groupOffset > 0) return null;
+          const span = col.colSpan?.(row) ?? 1;
+          covered = span - 1;
+          return (
+            <td
+              key={columns.indexOf(col)}
+              colSpan={span > 1 ? span : undefined}
+              rowSpan={grouped && groupSize > 1 ? groupSize : undefined}
+              className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/50 bg-card md:border-r-0' : ''}`}
+            >
+              {col.pinned ? (
+                <div className="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere] sm:w-auto sm:max-w-none">
+                  {col.cell(row, dataIndex)}
+                </div>
+              ) : (
+                col.cell(row, dataIndex)
+              )}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  };
 
   if (data.length === 0) {
     return <p className="text-sm text-muted-foreground py-8 text-center">{t.noData}</p>;
@@ -243,7 +329,7 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="overflow-x-auto relative">
+      <div className={cn('overflow-x-auto relative', scrollClassName)}>
         {watermark && isUnofficialDomain === false && (
           <div
             className="absolute inset-0 pointer-events-none flex items-center justify-center"
@@ -252,8 +338,21 @@ export function DataTable<T>({
             <img src="/brand/logo-color.webp" alt="" className="w-48 opacity-10" />
           </div>
         )}
-        <table className="w-full text-sm relative">
+        <table className={cn('w-full text-sm relative', tableClassName)}>
           <thead className="sticky top-0 bg-card z-1">
+            {headerGroups && (
+              <tr className={TABLE_HEAD_ROW_STYLE}>
+                {headerGroups.map((group, i) => (
+                  <th
+                    key={i}
+                    colSpan={group.colSpan > 1 ? group.colSpan : undefined}
+                    className={`${TABLE_HEAD_CELL_STYLE} py-2 px-3 text-center ${group.className ?? ''}`}
+                  >
+                    {group.header}
+                  </th>
+                ))}
+              </tr>
+            )}
             <tr className={TABLE_HEAD_ROW_STYLE}>
               {visibleColumns.map((col) => {
                 const i = columns.indexOf(col);
@@ -288,7 +387,7 @@ export function DataTable<T>({
                         <SortIndicator dir={activeDir} />
                       </span>
                     )}
-                    {col.header}
+                    {col.headerContent ?? col.header}
                     {sortable && col.align !== 'right' && (
                       <span className="ml-1">
                         <SortIndicator dir={activeDir} />
@@ -299,8 +398,8 @@ export function DataTable<T>({
               })}
             </tr>
           </thead>
-          <tbody>
-            {pageData.length === 0 ? (
+          {pageData.length === 0 ? (
+            <tbody>
               <tr>
                 <td
                   colSpan={visibleColumns.length}
@@ -322,43 +421,22 @@ export function DataTable<T>({
                   </div>
                 </td>
               </tr>
-            ) : (
-              pageData.map((row, rowIndex) => {
-                let covered = 0;
-                return (
-                  <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
-                    {visibleColumns.map((col) => {
-                      if (covered > 0) {
-                        covered -= 1;
-                        return null;
-                      }
-                      const span = col.colSpan?.(row) ?? 1;
-                      covered = span - 1;
-                      return (
-                        <td
-                          key={columns.indexOf(col)}
-                          colSpan={span > 1 ? span : undefined}
-                          className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/50 bg-card md:border-r-0' : ''}`}
-                        >
-                          {col.pinned ? (
-                            <div className="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere] sm:w-auto sm:max-w-none">
-                              {col.cell(row, safePage * pageSize + rowIndex)}
-                            </div>
-                          ) : (
-                            col.cell(row, safePage * pageSize + rowIndex)
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
+            </tbody>
+          ) : groups ? (
+            groups.map((group) => (
+              <tbody key={group.start} {...rowGroupAttributes?.(group.rows[0])}>
+                {group.rows.map((row, offset) =>
+                  renderRow(row, group.start + offset, offset, group.rows.length),
+                )}
+              </tbody>
+            ))
+          ) : (
+            <tbody>{pageData.map((row, rowIndex) => renderRow(row, rowIndex, 0, 1))}</tbody>
+          )}
         </table>
       </div>
 
-      {data.length > PAGE_SIZE_OPTIONS[0] && (
+      {paginated && data.length > PAGE_SIZE_OPTIONS[0] && (
         <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             <span data-testid="data-table-pagination-summary">
