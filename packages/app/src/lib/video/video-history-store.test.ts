@@ -189,6 +189,13 @@ describe('published video history', () => {
     expect(
       new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
     ).toEqual(new Set(['h100', 'h200']));
+    // A named run is a different read: its own stored artifacts with their approval, nothing older.
+    const named = await publishedVideoHistoryRead(1, VIDEO_HISTORY_MAX_PAGES, '150');
+    expect(named.page.entries.map(({ runId, approved }) => [runId, approved])).toEqual([
+      ['150', true],
+    ]);
+    expect(named.page.nextPage).toBeNull();
+    expect(named.complete).toBe(true);
   });
 
   it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
