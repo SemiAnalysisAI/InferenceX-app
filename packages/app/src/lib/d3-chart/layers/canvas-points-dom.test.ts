@@ -155,8 +155,8 @@ describe('CanvasPointLayer labels', () => {
         anchor.style.transition,
       ]);
     expect(anchors()).toEqual([
-      ['a', 'translate(10,20)', '1', '', 'opacity 150ms ease'],
-      ['b', 'translate(30,40)', '1', '', 'opacity 150ms ease'],
+      ['a', 'translate(10,20)', '1', '', 'opacity 150ms'],
+      ['b', 'translate(30,40)', '1', '', 'opacity 150ms'],
     ]);
     expect(svg.querySelector('.point-label')!.getAttribute('fill')).toBe('ink');
 
@@ -190,7 +190,7 @@ describe('CanvasPointLayer labels', () => {
     expect(labelAnchors(svg)[0].style.transition).toBe('');
     layer.setOpacityTransition(1);
     layer.setOpacity(() => 0.5);
-    expect(labelAnchors(svg)[0].style.transition).toBe('opacity 1ms ease');
+    expect(labelAnchors(svg)[0].style.transition).toBe('opacity 1ms');
   });
 });
 
