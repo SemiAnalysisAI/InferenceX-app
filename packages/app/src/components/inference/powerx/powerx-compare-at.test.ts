@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  nearestByInteractivity,
   parsePowerXCompareAt,
   powerXCoveredRange,
   resolvePowerXCompareAt,
@@ -54,13 +53,5 @@ describe('default Compare at clamp', () => {
   it('never changes an explicit pick', () => {
     expect(resolvePowerXCompareAt(200, true, [2, 9])).toBe(200);
     expect(resolvePowerXCompareAt(80, true, [2, 9])).toBe(80);
-  });
-});
-
-describe('nearestByInteractivity', () => {
-  it('measures distance on a log scale', () => {
-    // 40 is 2x below 80 and 150 is under 2x above it: 150 is nearer in ratio terms.
-    expect(nearestByInteractivity([40, 150], 80, (x) => x)).toBe(150);
-    expect(nearestByInteractivity([0, -3], 80, (x) => x)).toBeNull();
   });
 });

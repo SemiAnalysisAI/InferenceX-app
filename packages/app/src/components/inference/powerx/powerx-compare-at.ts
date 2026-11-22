@@ -28,26 +28,6 @@ export function serializePowerXCompareAt(value: number): string {
   return clamped === POWERX_COMPARE_AT_DEFAULT ? '' : String(clamped);
 }
 
-/** The item whose x is closest to `at` on a log scale (interactivity spans decades). */
-export function nearestByInteractivity<T>(
-  items: readonly T[],
-  at: number,
-  x: (item: T) => number,
-): T | null {
-  let best: T | null = null;
-  let bestDistance = Infinity;
-  for (const item of items) {
-    const value = x(item);
-    if (!(value > 0)) continue;
-    const distance = Math.abs(Math.log(value / at));
-    if (distance < bestDistance) {
-      best = item;
-      bestDistance = distance;
-    }
-  }
-  return best;
-}
-
 /**
  * The interactivity range every GPU can be read at: the overlap of the per-GPU ranges, or
  * the full span when they do not overlap. Null when no GPU has a positive value.

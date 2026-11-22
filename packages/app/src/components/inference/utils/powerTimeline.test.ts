@@ -4,11 +4,7 @@ import { bucketPowerSeries, bucketTimeMs } from '@/components/gpu-power/power-se
 import type { InferenceData } from '@/components/inference/types';
 
 import {
-  parsePowerTimelineParams,
   poolSubsetSeries,
-  powerXTimelineSmoothChoice,
-  powerXTimelineSmoothParam,
-  resolvePowerXTimelineSmooth,
   powerTimelineStatus,
   prioritizeRuns,
   traceLanes,
@@ -303,29 +299,5 @@ describe('role lanes on production-shaped telemetry', () => {
       { role: 'all', kind: 'aggregated', rows: Array.from({ length: 16 }, (_, row) => row) },
     ]);
     expect(poolSubsetSeries(AGGREGATED_GB200_C1_SERIES, 'prefill')).toBeNull();
-  });
-});
-
-const smoothFor = (i_ptsmooth: string | undefined, isPhone: boolean) =>
-  resolvePowerXTimelineSmooth(parsePowerTimelineParams({ i_ptsmooth }).smooth, isPhone);
-
-describe('PowerX Over time 5 s smoothing default', () => {
-  it('smooths on phones and draws raw samples on desktop when the URL is silent', () => {
-    expect(smoothFor(undefined, true)).toBe(true);
-    expect(smoothFor(undefined, false)).toBe(false);
-  });
-
-  it('lets an explicit i_ptsmooth win on either breakpoint', () => {
-    expect(smoothFor('0', true)).toBe(false);
-    expect(smoothFor('1', false)).toBe(true);
-    expect(smoothFor('1', true)).toBe(true);
-    expect(smoothFor('0', false)).toBe(false);
-  });
-
-  it('keeps the URL clean when a toggle lands on the breakpoint default', () => {
-    expect(powerXTimelineSmoothParam(powerXTimelineSmoothChoice(true, true))).toBe('');
-    expect(powerXTimelineSmoothParam(powerXTimelineSmoothChoice(false, true))).toBe('0');
-    expect(powerXTimelineSmoothParam(powerXTimelineSmoothChoice(false, false))).toBe('');
-    expect(powerXTimelineSmoothParam(powerXTimelineSmoothChoice(true, false))).toBe('1');
   });
 });

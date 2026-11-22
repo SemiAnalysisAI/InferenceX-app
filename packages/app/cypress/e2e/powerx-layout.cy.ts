@@ -129,11 +129,15 @@ describe('PowerX layout', () => {
     expectTab('breakdown');
   });
 
-  it('reads Compare at from i_at, defaults to 80 and writes a preset back', () => {
+  it('reads Compare at from i_at on Breakdown, defaults to 80 and writes a preset back', () => {
     visit(pwx());
+    // Compare at only moves the Breakdown bars, so the other tabs leave it out of Chart Config.
+    cy.get('[data-testid="powerx-chart-config"]').should('exist');
+    cy.get('[data-testid="powerx-compare-at"]').should('not.exist');
+    tab('breakdown').click();
     cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '80');
     cy.location('search').should('not.contain', 'i_at=');
-    visit(pwx({ i_at: '30' }));
+    visit(pwx({ i_pcompare: 'breakdown', i_at: '30' }));
     cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '30').click();
     cy.get('[data-testid="powerx-compare-at-preset-50"]').click();
     cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '50');
@@ -142,43 +146,42 @@ describe('PowerX layout', () => {
     cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '50');
   });
 
+  it('keeps the PowerX controls in the shared Chart Config on phones', () => {
+    cy.viewport(390, 844);
+    visit(pwx());
+    cy.get('[data-testid="powerx-tabs"]').should('be.visible');
+    cy.get('[data-testid="model-selector"]').should('be.visible');
+    cy.get('[data-testid="powerx-role"]').should('not.be.visible');
+    cy.get('[data-testid="inference-secondary-controls"]').find('button').first().click();
+    cy.get('[data-testid="powerx-role"]').should('be.visible');
+  });
+
   for (const [width, height] of [
     [1360, 900],
     [390, 844],
   ] as const) {
-    it(`keeps the chart header one height on every tab and GPU role at ${width}px`, () => {
+    it(`keeps the chart top in place across GPU roles on every tab at ${width}px`, () => {
       cy.viewport(width, height);
-      const heights: string[] = [];
+      const tops: Record<string, string[]> = {};
       for (const role of ROLES) {
         visit(pwx({ i_role: role }));
         for (const value of TABS) {
           tab(value).click();
           expectTab(value);
-          cy.get('[data-testid="powerx-chart-header"]')
+          cy.get('[data-testid="chart-figure"]', { timeout: 20000 })
             .should('be.visible')
-            .then(($header) => {
-              heights.push(
-                `${role}/${value}:${Math.round($header[0].getBoundingClientRect().height)}`,
-              );
+            .then(($figure) => {
+              const top = $figure[0].getBoundingClientRect().top + window.scrollY;
+              (tops[value] ??= []).push(`${role}:${Math.round(top)}`);
             });
-          // The options scroller must fit: an overflow clips the last control (More read "M").
-          cy.get('[data-testid="powerx-toolbar-options"]').should(($options) => {
-            expect(
-              $options[0].scrollWidth,
-              `${role}/${value} toolbar ${$options[0].scrollWidth}/${$options[0].clientWidth}`,
-            ).to.be.at.most($options[0].clientWidth);
-          });
-          // The column beside the plot scrolls on y only: anything wider than it adds a
-          // stray horizontal scrollbar under the legend.
-          // Energy and Power keep the shared chart legend there, and no Compare-at reading
-          // line on the plot. Energy under Prefill vs decode draws stacked bars instead.
+          // Energy and Power keep the shared chart legend beside the plot.
           if (value === 'power' || (value === 'energy' && role !== 'split')) {
             cy.get('[data-slot="chart-legend-frame"] [data-testid="scatter-quick-filters"]', {
               timeout: 20000,
             }).should('be.visible');
-            cy.get('[data-testid="powerx-ranking"]').should('not.exist');
-            cy.get('[data-testid="powerx-at-line"]').should('not.exist');
           }
+          // The column beside the plot scrolls on y only: anything wider than it adds a
+          // stray horizontal scrollbar under the legend.
           cy.document().then((doc) => {
             for (const frame of doc.querySelectorAll('[data-slot="chart-legend-frame"]')) {
               expect(
@@ -186,15 +189,17 @@ describe('PowerX layout', () => {
                 `${role}/${value} beside-plot column ${frame.scrollWidth}/${frame.clientWidth}`,
               ).to.be.at.most(frame.clientWidth);
             }
+            expect(doc.documentElement.scrollWidth, `${role}/${value} page width`).to.be.at.most(
+              width,
+            );
           });
         }
-        cy.document().then((doc) => {
-          expect(doc.documentElement.scrollWidth, 'no horizontal overflow').to.be.at.most(width);
-        });
       }
       cy.then(() => {
-        const distinct = new Set(heights.map((entry) => entry.split(':')[1]));
-        expect(distinct.size, heights.join(', ')).to.eq(1);
+        for (const [value, entries] of Object.entries(tops)) {
+          const distinct = new Set(entries.map((entry) => entry.split(':')[1]));
+          expect(distinct.size, `${value}: ${entries.join(', ')}`).to.eq(1);
+        }
       });
     });
   }

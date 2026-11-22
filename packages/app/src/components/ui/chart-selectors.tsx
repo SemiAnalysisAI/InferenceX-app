@@ -150,13 +150,7 @@ interface ModelSelectorProps {
   modelBadges?: ReadonlyMap<string, ReactNode>;
   /** Called with a model once the user shows intent toward its option. */
   onOptionIntent?: (value: Model) => void;
-  /** `strip`: a quiet trigger with no visible label, for a one-line context strip. */
-  variant?: 'field' | 'strip';
 }
-
-/** The quiet trigger a context strip uses: no border or fill until hovered. */
-export const STRIP_TRIGGER_CLASS =
-  'w-auto max-w-full border-transparent bg-transparent px-2 font-semibold shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted';
 
 export function ModelSelector({
   id = 'model-select',
@@ -171,7 +165,6 @@ export function ModelSelector({
   modelDetails,
   modelBadges,
   onOptionIntent,
-  variant = 'field',
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels.filter(isRegisteredModel), (m) =>
@@ -250,50 +243,36 @@ export function ModelSelector({
       : []),
   ];
 
-  const select = (
-    <MultiSelect
-      sections={sections}
-      missingSelectedOption={toOption}
-      value={[value]}
-      onChange={(values) => {
-        const next = values[0];
-        if (!next) return;
-        track('selector_model_changed', { model: next });
-        onChange(next as Model);
-      }}
-      open={open}
-      onOpenChange={onOpenChange}
-      onOptionIntent={onOptionIntent && ((values) => onOptionIntent(values[0] as Model))}
-      triggerId={id}
-      triggerTestId={testId}
-      placeholder={t.model}
-      minSelections={1}
-      maxSelections={1}
-      showClearAll={false}
-      searchable
-      plainSelectedText
-      showSelectionSummary={false}
-      contentClassName={modelDetails ? 'w-[min(44rem,calc(100vw-2rem))]' : undefined}
-      size={variant === 'strip' ? 'sm' : undefined}
-      className={variant === 'strip' ? STRIP_TRIGGER_CLASS : undefined}
-    />
-  );
-  if (variant === 'strip') {
-    return (
-      <div className="flex min-w-0 items-center gap-1">
-        <label htmlFor={id} className="sr-only">
-          {t.model}
-        </label>
-        {select}
-        {trailing}
-      </div>
-    );
-  }
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-2">
       <LabelWithTooltip htmlFor={id} label={t.model} tooltip={t.modelTooltip} />
       <div className="flex items-center gap-1.5">
-        <div className="min-w-0 flex-1">{select}</div>
+        <div className="min-w-0 flex-1">
+          <MultiSelect
+            sections={sections}
+            missingSelectedOption={toOption}
+            value={[value]}
+            onChange={(values) => {
+              const next = values[0];
+              if (!next) return;
+              track('selector_model_changed', { model: next });
+              onChange(next as Model);
+            }}
+            open={open}
+            onOpenChange={onOpenChange}
+            onOptionIntent={onOptionIntent && ((values) => onOptionIntent(values[0] as Model))}
+            triggerId={id}
+            triggerTestId={testId}
+            placeholder={t.model}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable
+            plainSelectedText
+            showSelectionSummary={false}
+            contentClassName={modelDetails ? 'w-[min(44rem,calc(100vw-2rem))]' : undefined}
+          />
+        </div>
         {trailing}
       </div>
     </div>
@@ -385,7 +364,7 @@ export function SequenceSelector({
 }
 
 interface ScenarioSelectorProps {
-  variant?: 'field' | 'caption' | 'strip';
+  variant?: 'field' | 'caption';
   id?: string;
   value: string;
   onChange: (value: Sequence) => void;
@@ -452,14 +431,8 @@ export function ScenarioSelector({
 
   const select = (
     <SearchableSelect
-      size={variant === 'field' ? undefined : 'sm'}
-      className={
-        variant === 'caption'
-          ? 'w-auto max-w-full text-xs'
-          : variant === 'strip'
-            ? STRIP_TRIGGER_CLASS
-            : undefined
-      }
+      size={variant === 'caption' ? 'sm' : undefined}
+      className={variant === 'caption' ? 'w-auto max-w-full text-xs' : undefined}
       value={value}
       initialLabel={scenarioLabel(value)}
       contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
@@ -483,17 +456,6 @@ export function ScenarioSelector({
       ].filter((group) => group.options.length > 0)}
     />
   );
-
-  if (variant === 'strip') {
-    return (
-      <div className="flex min-w-0 items-center">
-        <label htmlFor={id} className="sr-only">
-          {t.scenario}
-        </label>
-        {select}
-      </div>
-    );
-  }
 
   // The chart footer's controls row: a standard small control whose label is only read by
   // screen readers and printed in exported images, like the cost tier and TCO basis beside it.

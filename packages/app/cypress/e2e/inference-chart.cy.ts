@@ -661,10 +661,7 @@ it('says when chosen GPU configs report no measured power, and plots them on oth
     '/pwx?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
     { onBeforeLoad: unlockAgenticGate },
   );
-  // PowerX keeps the history GPU picker in the Run popover of the context strip.
-  cy.get('[data-testid="powerx-run"]').click();
   cy.get('[data-testid="gpu-multiselect"]').should('contain', 'B300 (SGLang)');
-  cy.get('body').type('{esc}');
   cy.get('[data-testid="scatter-empty-state"]')
     .should('have.attr', 'data-reason', 'selection')
     .and('contain', 'No measured GPU power is reported for this selection.');

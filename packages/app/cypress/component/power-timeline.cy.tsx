@@ -720,5 +720,20 @@ describe('PowerTimeline', () => {
         expect($cell.css('white-space')).to.equal('nowrap');
       });
     });
+
+    it('scales the y axis and the load swings to kW per NVL72 rack from the legend switch', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 1237)], { powerx: true });
+      cy.wait('@series');
+      cy.get('[data-testid="powerx-load-swings-table"]').should('contain.text', ' W');
+      cy.get('[data-testid="power-timeline-rack"]').click();
+      cy.get('[data-testid="power-timeline-rack"]').should('have.attr', 'aria-checked', 'true');
+      cy.get('[data-testid="power-timeline-chart-svg"]').should(
+        'contain.text',
+        'Power per GPU × 72 (kW)',
+      );
+      cy.get('[data-testid="powerx-load-swings-table"]').should('contain.text', ' kW');
+      cy.get('[data-testid="powerx-load-swings"]').should('contain.text', 'kW per NVL72 rack');
+    });
   });
 });

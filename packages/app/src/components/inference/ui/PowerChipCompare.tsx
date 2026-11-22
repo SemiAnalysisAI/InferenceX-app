@@ -276,7 +276,7 @@ export default function PowerChipCompare({
   });
 
   const fallback = useMemo(() => defaultComparisonInteractivity(series), [series]);
-  // Compare at (the shell's control) is shared with the drill-down and the other tabs; the
+  // Compare at (a Chart Config control) is shared with the drill-down and the other tabs; the
   // geometric middle is only a fallback outside PowerX.
   const target = usePowerXCompareTarget();
   const value = target ?? fallback;

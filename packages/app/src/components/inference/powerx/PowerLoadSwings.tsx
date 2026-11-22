@@ -1,10 +1,9 @@
 'use client';
 
-import { Download, Info } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Download } from 'lucide-react';
+import { useMemo } from 'react';
 import type { InferenceData } from '@/components/inference/types';
 import type { PowerPoolRole, PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
-import { Switch } from '@/components/ui/switch';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
@@ -24,8 +23,6 @@ import type { PowerXRole } from './powerx-role';
 const STRINGS = {
   en: {
     title: 'Load swings',
-    rack: `× ${NVL72_GPUS_PER_RACK} per NVL72 rack`,
-    rackHelp: `Multiplies the per-GPU trace by ${NVL72_GPUS_PER_RACK} and shows kW per rack. Assumes all ${NVL72_GPUS_PER_RACK} GPUs swing together, so it is an upper bound on rack-level swings.`,
     trace: 'Trace',
     peak: 'Peak',
     min: 'Min',
@@ -59,8 +56,6 @@ const STRINGS = {
   },
   zh: {
     title: '负载波动',
-    rack: `× ${NVL72_GPUS_PER_RACK}（每 NVL72 机架）`,
-    rackHelp: `将每 GPU 曲线乘以 ${NVL72_GPUS_PER_RACK}，以每机架 kW 显示。假设全部 ${NVL72_GPUS_PER_RACK} 颗 GPU 同步波动，因此是机架级波动的上限。`,
     trace: '曲线',
     peak: '峰值',
     min: '最小值',
@@ -112,33 +107,26 @@ function statsDownloadUrl(
 }
 
 /**
- * The load-swing statistics of the Over time traces on PowerX: above the chart on the old
- * surface, below it (with the ×72 switch in the toolbar, so `rack` is controlled) on the
- * PowerX layout.
+ * The load-swing statistics of the Over time traces on PowerX, under the chart; the ×72 per
+ * NVL72 rack switch that scales them lives in the chart legend.
  */
 export function PowerLoadSwings({
   traces,
   colorOf,
   labelOf,
   role = 'all',
-  rack: controlledRack,
-  note,
+  rack,
 }: {
   traces: readonly PowerTimelineTrace[];
   colorOf: (trace: PowerTimelineTrace) => string;
   labelOf: (point: InferenceData) => string;
   /** PowerX GPU role: one row per lane (prefill, decode, and all GPUs for split). */
   role?: PowerXRole;
-  /** kW per NVL72 rack, set by the toolbar; the table then has no switch of its own. */
-  rack?: boolean;
-  /** A short line beside the title, e.g. which trace each GPU reads. */
-  note?: string;
+  /** kW per NVL72 rack, set by the chart legend's switch. */
+  rack: boolean;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [ownRack, setRack] = useState(false);
-  const rack = controlledRack ?? ownRack;
-  const compact = controlledRack !== undefined;
   const isPhone = useIsMobileViewport();
   const rows = useMemo<LoadSwingTraceRow[]>(
     () =>
@@ -197,10 +185,10 @@ export function PowerLoadSwings({
       <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
       {lane && (
         <span
-          // The PowerX layout puts the lane on its own line so the table fits the page width.
+          // The lane goes on its own line so the table fits the page width.
           className={cn(
             lane.kind === 'lane' ? 'ml-1' : 'ml-1 text-muted-foreground',
-            compact && 'block pl-4 max-md:inline max-md:pl-0',
+            'block pl-4 max-md:inline max-md:pl-0',
           )}
           data-testid="powerx-load-swings-lane"
           data-lane={lane.kind}
@@ -225,27 +213,27 @@ export function PowerLoadSwings({
           href={statsDownloadUrl(id, 'csv', rack, pool)}
           download
           data-testid="powerx-swings-csv"
-          title={compact ? t.csv : undefined}
+          title={t.csv}
           className="inline-flex items-center gap-1 underline decoration-dotted hover:text-foreground"
           onClick={() =>
             track('inference_powerx_swings_exported', { format: 'csv', role: pool ?? 'all' })
           }
         >
           <Download className="size-3" aria-hidden />
-          {compact ? t.csvShort : t.csv}
+          {t.csvShort}
         </a>
         {' · '}
         <a
           href={statsDownloadUrl(id, 'json', rack, pool)}
           download
           data-testid="powerx-swings-json"
-          title={compact ? t.json : undefined}
+          title={t.json}
           className="underline decoration-dotted hover:text-foreground"
           onClick={() =>
             track('inference_powerx_swings_exported', { format: 'json', role: pool ?? 'all' })
           }
         >
-          {compact ? t.jsonShort : t.json}
+          {t.jsonShort}
         </a>
       </>
     ) : (
@@ -254,34 +242,7 @@ export function PowerLoadSwings({
   };
   return (
     <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h3 className="text-sm font-medium">{t.title}</h3>
-        {note && (
-          <span className="text-xs text-muted-foreground" data-testid="powerx-load-swings-note">
-            {note}
-          </span>
-        )}
-        {!compact && (
-          <label className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
-            <Switch
-              checked={rack}
-              onCheckedChange={(checked) => {
-                setRack(checked);
-                track('inference_powerx_swings_rack_toggled', { enabled: checked });
-              }}
-              data-testid="powerx-swings-rack"
-            />
-            <span>{t.rack}</span>
-            <span
-              title={t.rackHelp}
-              className="text-muted-foreground"
-              data-testid="powerx-swings-rack-help"
-            >
-              <Info className="size-3.5" aria-label={t.rackHelp} />
-            </span>
-          </label>
-        )}
-      </div>
+      <h3 className="text-sm font-medium">{t.title}</h3>
       {isPhone ? (
         // Eleven columns cannot fit a phone, so each trace gets its own row with a two-column stat grid.
         <ul className="divide-y divide-border/30" data-testid="powerx-load-swings-cards">

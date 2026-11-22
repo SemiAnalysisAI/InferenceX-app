@@ -99,28 +99,34 @@ link still opens that view for locked visitors.
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
   draw, Breakdown, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
-  Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
-  Metric beside `PowerXChartConfig`: Boundary, Energy per or Show as, then Scope and Power statistic
-  on the views they apply to (the Energy view opens on Per: All tokens, J per input + output
-  token, because aggregated serving shares GPUs between prefill and decode and cannot split
-  their energy by phase; only All tokens and Output carry the IT, Facility and rated
-  boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Provisioned bound toggle where rated lines exist, all as
-  plain labelled controls with no expander) in place of the Y-axis metric pick, the
-  **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
-  Compare history fieldsets fold into "More chart controls" exactly as on `/infx/inference`. Under `md`
-  the view tabs become a 2×2 grid of 48 px buttons, Boundary and Energy per (or Show as) render as native
-  selects (`SegmentedToggle` `variant="select"`, each option carrying the segment's hover hint),
-  and the X-Axis Metric, Scope, Power statistic and Provisioned bound sit behind one "More" row
-  (`powerx-more`, "More · N changed" via `powerXSecondaryChangedCount`); dashboard toasts stay
-  off there and the pinned point sheet says Tap. From `md` up nothing changes.
-- The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
-  `/infx/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
-  line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
-  the footer notes. On phones the plot height is capped at 55 % of the viewport.
+  Scenario, Precision through the shared selectors), the **Chart Config** fieldset
+  (`PowerXChartConfig`, in place of the Y-axis metric pick: the X-Axis Metric on Energy per token
+  and Power draw, the GPU role on every view, with its lock, "Set by …" and "Why?" when a role
+  pins a control, then the view's own controls: Boundary, Energy per and the Provisioned bound
+  toggle where rated lines exist on Energy per token (the view opens on Energy per: All tokens,
+  J per input + output token, because aggregated serving shares GPUs between prefill and decode
+  and cannot split their energy by phase; only All tokens and Output carry the IT, Facility and
+  rated boundaries, `ENERGY_METRICS` in `powerx-views.ts`); Boundary, Show as and Statistic on
+  Power draw; Compare at, Facility and Chart style on Breakdown; nothing more on Over time, whose
+  Concurrency, Highlight and Time axis controls stay in the chart card), each a labelled
+  `SegmentedToggle` with an info icon, then the **Run context** (`WorkflowInfoDisplay`) and
+  **Compare history** fieldsets. On phones Chart Config, Run context and Compare history fold into
+  "More chart controls" exactly as on `/infx/inference`; under `md` the view tabs become a 2×2
+  grid of 48 px buttons and the segmented controls render as native selects (`SegmentedToggle`
+  `variant="select"`, each option carrying the segment's hover hint).
+- The chart card is AgentX's: the h2 caption (model logo + title) and the Updated / Source line,
+  with Chart/Table, Export and Reset at its top right, the shared legend (no PowerX controls in
+  the rail) or a clicked point's details beside the plot in one 276 px column, and the footer
+  notes. On phones the plot height is capped at 55 % of the viewport.
+- Over time is the base trace chart: the Concurrency select (`i_ptconc`, the most covered
+  concurrency by default), Highlight and Time axis sit in the card, lines draw a centered 5 s
+  rolling mean (Raw 1-s samples, `i_ptraw`, is off by default; tooltips and the summary table
+  always read recorded values), Prefill vs decode labels its lanes inside the plot, and the
+  legend beside the chart carries the × 72 per NVL72 rack switch.
 - Breakdown (`i_pcompare=breakdown`): the caption stays at the top of the card and
   the chip comparison is the visual. The compared chip's drill-down (the "across load"
-  stacked bars / stacked area, with its Hardware select, Stacked bars | Stacked area toggle
-  (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
+  stacked bars / stacked area, with its Hardware select, drawn in the Chart style Chart Config
+  sets (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
   inline under that chip's bar from the first render and follows the slider to whichever
   chip is nearest; clicking a bar or picking another chip in the Hardware select moves it,
   Collapse hides it for the session (`PowerAnalysisPanels`). The stack
@@ -223,7 +229,8 @@ link still opens that view for locked visitors.
 - **Load swings** (Over time, PowerX only): `PowerLoadSwings` computes
   `lib/power/load-swing-stats.ts` per visible trace (peak, min, idle floor = P5 before the
   window, window mean, P5/P95, max Δ1s / Δ5s in W and % TDP, ramp up/down W/s, volatility =
-  std ÷ mean; telemetry gaps are counted, never bridged), a × 72 per NVL72 rack switch, and
+  std ÷ mean; telemetry gaps are counted, never bridged) in a table under the chart, scaled by
+  the legend's × 72 per NVL72 rack switch (which also rescales the y-axis), and
   per-point CSV / JSON links to `GET /api/v1/gpu-metrics-point/stats?id=N[&format=csv|json]
   [&scale=gpu|nvl72][&role=all|prefill|decode|split]`, which runs the same function over the same stored buckets
   (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·

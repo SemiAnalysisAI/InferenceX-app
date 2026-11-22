@@ -951,14 +951,15 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 }
 
 /*
- * PowerX on desktop: the Energy and Power legend column is AgentX's width, and the
- * point details that replace it keep that width (so the plot never reflows on click)
+ * PowerX on desktop: the Energy, Power and Over time legend column is AgentX's width, and
+ * the point details that replace it keep that width (so the plot never reflows on click)
  * and start at the top of the chart so the body and the pinned actions get its full
  * height.
  */
 @media (min-width: 1024px) {
   [data-powerx-surface]
     [data-slot='chart-legend-wrapper']:has([data-testid='scatter-quick-filters']),
+  [data-powerx-surface] [data-slot='chart-legend-wrapper']:has([data-testid='power-timeline-raw']),
   [data-powerx-surface] [data-slot='chart-legend-wrapper']:has([data-slot='chart-details-frame']) {
     width: 276px;
     min-width: 276px;

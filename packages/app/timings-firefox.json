@@ -4878,7 +4878,7 @@
     },
     {
       "spec": "cypress/e2e/powerx-layout.cy.ts",
-      "duration": 8704,
+      "duration": 9112,
       "tests": [
         {
           "title": [
@@ -4899,7 +4899,7 @@
         {
           "title": [
             "PowerX layout",
-            "reads Compare at from i_at, defaults to 80 and writes a preset back"
+            "reads Compare at from i_at on Breakdown, defaults to 80 and writes a preset back"
           ],
           "duration": 1020,
           "attempts": 1
@@ -4907,7 +4907,15 @@
         {
           "title": [
             "PowerX layout",
-            "keeps the chart header one height on every tab and GPU role at 1360px"
+            "keeps the PowerX controls in the shared Chart Config on phones"
+          ],
+          "duration": 408,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX layout",
+            "keeps the chart top in place across GPU roles on every tab at 1360px"
           ],
           "duration": 2040,
           "attempts": 1
@@ -4915,7 +4923,7 @@
         {
           "title": [
             "PowerX layout",
-            "keeps the chart header one height on every tab and GPU role at 390px"
+            "keeps the chart top in place across GPU roles on every tab at 390px"
           ],
           "duration": 2280,
           "attempts": 1

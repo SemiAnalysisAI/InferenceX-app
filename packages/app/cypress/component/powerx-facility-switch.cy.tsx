@@ -122,7 +122,7 @@ describe('PowerX Include facility switch (mobile)', () => {
 
   it('starts on, shows the facility layer and labels the PUE range of the chips', () => {
     mountBreakdown();
-    // Compare at lives in the PowerX context strip now; the bars are the readiness signal.
+    // Compare at lives in Chart Config now; the bars are the readiness signal.
     cy.get('[data-testid="power-chip-compare-segment"]').should('have.length.greaterThan', 0);
     cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').should(
       'have.attr',

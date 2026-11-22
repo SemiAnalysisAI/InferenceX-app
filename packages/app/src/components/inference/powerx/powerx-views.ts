@@ -224,8 +224,8 @@ export function powerXShowsHeadroom(metric: string, compare: PowerCompare): bool
 /**
  * How many PowerX Chart Config controls are off their default, for the mobile
  * "More chart controls (N changed)" fold: Boundary (GPU only), Energy per (all tokens),
- * Show as (W per GPU), Scope (all GPUs), Power statistic (average) and Rated
- * boundaries (off). The Where and Over time views keep their controls in the card.
+ * Show as (W per GPU), Scope (all GPUs), Power statistic (average) and Provisioned
+ * bound (off). The GPU role is counted by the caller.
  */
 export function powerXChangedCount(selection: PowerXSelection): number {
   const view = powerXViewFor(selection.metric, selection.compare);
@@ -240,21 +240,6 @@ export function powerXChangedCount(selection: PowerXSelection): number {
     if (powerXShowAsFor(selection.metric) === 'tdp') changed += 1;
     if (config?.family === 'power' && config.statistic !== 'average') changed += 1;
   }
-  return changed;
-}
-
-/**
- * How many of the controls behind the phone "More" row are off their default:
- * Scope (all GPUs), Power statistic (average) and Provisioned bound (off). Boundary,
- * Energy per and Show as stay in front of the row, so they are not counted here; the
- * X-Axis Metric, which the row also holds, is counted by its owner.
- */
-export function powerXSecondaryChangedCount(selection: PowerXSelection): number {
-  const config = getMeasuredMetricConfig(selection.metric);
-  let changed = 0;
-  if (config?.scope !== undefined && config.scope !== 'all') changed += 1;
-  if (config?.family === 'power' && config.statistic !== 'average') changed += 1;
-  if (powerXRatedAvailable(selection.metric) && powerXRatedOn(selection.compare)) changed += 1;
   return changed;
 }
 
