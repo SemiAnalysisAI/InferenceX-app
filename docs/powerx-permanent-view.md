@@ -110,10 +110,18 @@ link still opens that view for locked visitors.
   Power draw; Compare at, Facility and Chart style on Breakdown; nothing more on Over time, whose
   Concurrency, Highlight and Time axis controls stay in the chart card), each a labelled
   `SegmentedToggle` with an info icon, then the **Run context** (`WorkflowInfoDisplay`) and
-  **Compare history** fieldsets. On phones Chart Config, Run context and Compare history fold into
-  "More chart controls" exactly as on `/infx/inference`; under `md` the view tabs become a 2×2
-  grid of 48 px buttons and the segmented controls render as native selects (`SegmentedToggle`
-  `variant="select"`, each option carrying the segment's hover hint).
+  **Compare history** fieldsets. On phones the title row holds "PowerX" and an icon-only Share
+  at its right edge, with the "How we measure power" card under the description, and
+  Benchmark Config keeps Model, Scenario and Precision in view; Chart Config, Run context and
+  Compare history fold into "More chart controls" exactly as on `/infx/inference`. Under `md`
+  the view tabs stay one underline row with short names (Energy, Power, Breakdown, Over time)
+  that fits 390 px without scrolling, and each Chart Config cell is a full-width select whose
+  trigger shows only the short option label; the option's hover hint is the muted second line
+  of its dropdown item. On Run context, Changelog sits at the far right as on `/infx/inference`.
+- Over time end labels and Load swings rows name the GPU and concurrency. When two drawn
+  traces would still read the same, they add the framework, then the parallelism, then the
+  GPU count, only where those differ (`traceDistinctions`): H200 vLLM at TP8 and TP4 read
+  "H200 TP8 c16" and "H200 TP4 c16".
 - The chart card is AgentX's: the h2 caption (model logo + title) and the Updated / Source line,
   with Chart/Table, Export and Reset at its top right, the shared legend (no PowerX controls in
   the rail) or a clicked point's details beside the plot in one 276 px column, and the footer
