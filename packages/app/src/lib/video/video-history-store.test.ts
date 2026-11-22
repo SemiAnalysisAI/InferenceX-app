@@ -214,14 +214,14 @@ describe('published video history', () => {
     expect(artifactReads()).toBe(10);
     expect(put).not.toHaveBeenCalled();
     // Run 100 is outside page 1. Only its own index and receipt should determine this read.
-    vi.mocked(list).mockClear();
+    mocked(list).mockClear();
     const named = await publishedVideoHistoryRead(1, 1, '100');
     expect(named.complete).toBe(true);
     expect(named.page.entries.map(({ runId, approved }) => [runId, approved])).toEqual([
       ['100', false],
     ]);
     expect(named.page.nextPage).toBeNull();
-    expect(vi.mocked(list).mock.calls.map(([options]) => options?.prefix)).toEqual([
+    expect(mocked(list).mock.calls.map(([options]) => options?.prefix)).toEqual([
       'h3-video-media/v1/runs/100/',
     ]);
   });
