@@ -349,7 +349,7 @@ export function groupPoolsBySize(
 }
 
 /** Seconds of the centered rolling mean the timeline draws unless raw samples are requested. */
-export const POWER_TIMELINE_SMOOTH_SECONDS = 5;
+export const POWER_TIMELINE_SMOOTH_SECONDS = 30;
 
 /**
  * Centered rolling mean over `window` samples. Nulls are skipped inside a window and stay null

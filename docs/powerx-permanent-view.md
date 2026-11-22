@@ -127,7 +127,7 @@ link still opens that view for locked visitors.
   the rail) or a clicked point's details beside the plot in one 276 px column, and the footer
   notes. On phones the plot height is capped at 55 % of the viewport.
 - Over time is the base trace chart: the Concurrency select (`i_ptconc`, the most covered
-  concurrency by default), Highlight and Time axis sit in the card, lines draw a centered 5 s
+  concurrency by default), Highlight and Time axis sit in the card, lines draw a centered 30 s
   rolling mean (Raw 1-s samples, `i_ptraw`, is off by default; tooltips and the summary table
   always read recorded values), Prefill vs decode labels its lanes inside the plot, and the
   legend beside the chart carries the × 72 per NVL72 rack switch.
