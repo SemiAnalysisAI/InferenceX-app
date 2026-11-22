@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/lib/shared/utils';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
@@ -793,7 +794,20 @@ export default function ChartControls({
             </div>
           </ControlPanel>
 
-          {runContext && <div className={`min-w-0 ${spans.run}`}>{runContext}</div>}
+          {runContext && (
+            <div
+              className={cn(
+                'min-w-0',
+                spans.run,
+                // PowerX's run context shares its row with Compare history, so the date and run
+                // fields share the width and Changelog keeps the far right, as on Infx.
+                powerXSurface &&
+                  'lg:[&_[data-testid=inference-run-context]>div]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]',
+              )}
+            >
+              {runContext}
+            </div>
+          )}
           {!hideGpuComparison && (
             <ControlPanel legend={t.compareHistory} className={spans.history}>
               <div className="grid min-w-0 gap-3">
