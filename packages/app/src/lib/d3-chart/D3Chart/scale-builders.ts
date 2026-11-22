@@ -12,11 +12,15 @@ export type BuiltScale =
 export function buildScale(config: ScaleConfig, range: [number, number]): BuiltScale {
   switch (config.type) {
     case 'band': {
-      return d3
+      const scale = d3
         .scaleBand<string>()
         .domain(config.domain)
         .range(range)
         .padding(config.padding ?? 0.1);
+      // Optional outer padding and alignment, for bands with labels on one side only.
+      if (config.paddingOuter !== undefined) scale.paddingOuter(config.paddingOuter);
+      if (config.align !== undefined) scale.align(config.align);
+      return scale;
     }
 
     case 'linear': {

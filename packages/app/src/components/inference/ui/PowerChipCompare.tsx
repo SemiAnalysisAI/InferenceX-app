@@ -190,9 +190,12 @@ const PIN_PATH =
 /** Row geometry: the band step and the bar's height inside it. */
 const ROW = {
   desktop: { step: 52, bar: 28, labelWidth: 192 },
-  compact: { step: 64, bar: 16, labelWidth: 132 },
+  // Phones: name + total, point, then shares sit above a full-width bar (49 px above, 7 below).
+  compact: { step: 72, bar: 16, labelWidth: 12 },
 } as const;
 const MARGIN_TOP = 4;
+/** Phones: px from a row's top to its bar (name + total, point, shares). */
+const COMPACT_LABEL_SPACE = 49;
 const MARGIN_BOTTOM = 40;
 /** Rough tabular-figure widths, so the readout margin fits its longest line. */
 const TOTAL_CHAR_PX = 7.6;
@@ -232,6 +235,47 @@ interface ChipRow {
 }
 
 const safeId = (value: string) => value.replaceAll(/[^a-zA-Z0-9_-]/g, '_');
+
+/** The key's swatch: the segment's own fill (solid GPU, each layer's hatch, pool dash). */
+function BandSwatch({ id, band, pool }: { id: string; band: PowerBand; pool: GpuPool | null }) {
+  const hatched = isHatchedBand(band);
+  const style = layerStyle(band, null);
+  return (
+    <svg width="24" height="12" viewBox="0 0 24 12" data-band={band} data-pool={pool ?? undefined}>
+      {hatched ? (
+        <defs>
+          <pattern
+            id={id}
+            patternUnits="userSpaceOnUse"
+            width="6"
+            height="6"
+            patternTransform={`rotate(${HATCH_ANGLE[band]})`}
+          >
+            <rect
+              width="6"
+              height="6"
+              fill={LEGEND_COLOR}
+              fillOpacity={powerBandFillOpacity(band)}
+            />
+            <line x1="0" y1="0" x2="0" y2="6" stroke={LEGEND_COLOR} strokeWidth="2" />
+          </pattern>
+        </defs>
+      ) : null}
+      <rect
+        x="1"
+        y="1"
+        width="22"
+        height="10"
+        rx="2"
+        fill={hatched ? `url(#${id})` : LEGEND_COLOR}
+        fillOpacity={style.fillOpacity}
+        stroke={LEGEND_COLOR}
+        strokeWidth={pool ? 1.5 : 1}
+        strokeDasharray={pool ? POOL_DASH[pool] : undefined}
+      />
+    </svg>
+  );
+}
 
 /** Legend item id → band (the GPU pools share the GPU band). */
 const bandOfItem = (id: string): PowerBand => (id.startsWith('gpu') ? 'gpu' : (id as PowerBand));
@@ -445,25 +489,35 @@ export default function PowerChipCompare({
 
   const geometry = compactRows ? ROW.compact : ROW.desktop;
   const padding = 1 - geometry.bar / geometry.step;
-  const marginRight = Math.ceil(
-    Math.max(
-      48,
-      ...chipRows.map((row) =>
-        compactRows
-          ? row.total.length * TOTAL_CHAR_PX
-          : Math.max(row.total.length * TOTAL_CHAR_PX, row.shareLine.length * SHARE_CHAR_PX),
-      ),
-    ) + 16,
-  );
+  // Phones: the gap between bars holds the next row's labels, so the outer space goes on
+  // top (49 px for the first row's labels) with 7 px under the last bar.
+  const bandScale = compactRows
+    ? {
+        padding,
+        paddingOuter: padding / 2,
+        align: COMPACT_LABEL_SPACE / (geometry.step - geometry.bar),
+      }
+    : { padding };
+  const bandSteps = compactRows ? chipRows.length : chipRows.length + padding;
+  const marginRight = compactRows
+    ? 12
+    : Math.ceil(
+        Math.max(
+          48,
+          ...chipRows.map((row) =>
+            compactRows
+              ? row.total.length * TOTAL_CHAR_PX
+              : Math.max(row.total.length * TOTAL_CHAR_PX, row.shareLine.length * SHARE_CHAR_PX),
+          ),
+        ) + 16,
+      );
   const margin = {
     top: MARGIN_TOP,
     right: marginRight,
     bottom: MARGIN_BOTTOM,
     left: geometry.labelWidth,
   };
-  const chartHeight = Math.round(
-    geometry.step * (chipRows.length + padding) + MARGIN_TOP + MARGIN_BOTTOM,
-  );
+  const chartHeight = Math.round(geometry.step * bandSteps + MARGIN_TOP + MARGIN_BOTTOM);
 
   const selectRow = useCallback(
     (row: ChipRow, clicked: EventTarget | null) => {
@@ -571,7 +625,11 @@ export default function PowerChipCompare({
       rowGroups.each(function (row) {
         const g = d3.select(this);
         g.selectAll('*').remove();
-        const top = (yScale(row.key) ?? 0) - (step - yScale.bandwidth()) / 2;
+        const barTop = yScale(row.key) ?? 0;
+        // Desktop centres the row on its bar; phones put the label lines above the bar.
+        const top = compactRows
+          ? barTop - COMPACT_LABEL_SPACE
+          : barTop - (step - yScale.bandwidth()) / 2;
         const mid = top + step / 2;
         g.append('rect')
           .attr('class', 'chip-compare-row-hit')
@@ -583,16 +641,19 @@ export default function PowerChipCompare({
           .attr('fill', row.active ? 'var(--muted)' : 'transparent')
           .attr('fill-opacity', row.active ? 0.6 : 1)
           .attr('stroke', row.active ? 'var(--border)' : 'none');
-        const labelX = -margin.left + 10;
+        const labelX = compactRows ? 0 : -margin.left + 10;
         const lineGap = compactRows ? 14 : 15;
-        const firstLine = compactRows ? mid - lineGap : mid - lineGap / 2;
+        const firstLine = compactRows ? barTop - 36 : mid - lineGap / 2;
         g.append('circle')
           .attr('data-testid', 'power-chip-compare-swatch')
           .attr('cx', labelX + 4)
           .attr('cy', firstLine - 4)
           .attr('r', 4)
           .attr('fill', row.color);
-        const maxChars = Math.max(6, Math.floor((margin.left - 32) / NAME_CHAR_PX));
+        const nameWidth = compactRows
+          ? ctx.width - row.total.length * TOTAL_CHAR_PX - 28
+          : margin.left - 32;
+        const maxChars = Math.max(6, Math.floor(nameWidth / NAME_CHAR_PX));
         const name =
           row.series.label.length > maxChars
             ? `${row.series.label.slice(0, maxChars - 1)}…`
@@ -664,35 +725,25 @@ export default function PowerChipCompare({
             .text(disagg ? t.noPoolTelemetry : t.aggregated);
           tag.append('title').text(disagg ? t.noPoolTelemetryNote : t.aggregatedNote);
         }
-        const readoutX = ctx.width + margin.right - 10;
-        if (compactRows) {
-          g.append('text')
-            .attr('data-testid', 'power-chip-compare-share')
-            .attr('x', labelX + 14)
-            .attr('y', pointY + lineGap)
-            .attr('font-size', 10)
-            .attr('fill', 'var(--muted-foreground)')
-            .text(row.shareLine);
-        }
+        // The readout: right margin on desktop, the plot's right edge above the bar on phones.
+        const readoutX = compactRows ? ctx.width : ctx.width + margin.right - 10;
         g.append('text')
           .attr('data-testid', 'power-chip-compare-total')
           .attr('x', readoutX)
-          .attr('y', compactRows ? mid + 4 : firstLine)
+          .attr('y', firstLine)
           .attr('text-anchor', 'end')
           .attr('font-size', 13)
           .attr('font-weight', 600)
           .attr('fill', 'var(--foreground)')
           .text(row.total);
-        if (!compactRows) {
-          g.append('text')
-            .attr('data-testid', 'power-chip-compare-share')
-            .attr('x', readoutX)
-            .attr('y', pointY)
-            .attr('text-anchor', 'end')
-            .attr('font-size', 11)
-            .attr('fill', 'var(--muted-foreground)')
-            .text(row.shareLine);
-        }
+        g.append('text')
+          .attr('data-testid', 'power-chip-compare-share')
+          .attr('x', compactRows ? labelX + 14 : readoutX)
+          .attr('y', compactRows ? pointY + lineGap : pointY)
+          .attr('text-anchor', compactRows ? 'start' : 'end')
+          .attr('font-size', compactRows ? 10 : 11)
+          .attr('fill', 'var(--muted-foreground)')
+          .text(row.shareLine);
       });
     },
   };
@@ -811,8 +862,7 @@ export default function PowerChipCompare({
       label: `${pool ? t.pools[pool] : t.bands[band]} · ${basis}`,
       title: basis,
       color: LEGEND_COLOR,
-      lineDasharray: pool ? POOL_DASH[pool] : undefined,
-      forceLineSwatch: pool !== null,
+      swatch: <BandSwatch id={`${chartId}-key-${key}`} band={band} pool={pool} />,
       // A pinned layer leaves the others unchecked; a click pins or unpins that layer.
       isActive: !pinnedBand || highlight.band === band,
       onClick: () => layers.togglePin(bandTarget(band)),
@@ -881,7 +931,7 @@ export default function PowerChipCompare({
             clipContent={false}
             grabCursor={false}
             xScale={{ type: 'linear', domain: [0, maxTotal] }}
-            yScale={{ type: 'band', domain: chipRows.map((row) => row.key), padding }}
+            yScale={{ type: 'band', domain: chipRows.map((row) => row.key), ...bandScale }}
             xAxis={{
               label: includeFacility ? t.perGpu : t.perGpuIt,
               tickCount: compactRows ? 3 : 6,

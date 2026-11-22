@@ -407,6 +407,7 @@ export default function ChartLegend({
         color={item.color}
         lineDasharray={item.lineDasharray}
         forceLineSwatch={item.forceLineSwatch}
+        swatch={item.swatch}
         title={item.title}
         isHighlighted={item.isHighlighted}
         hw={item.hw}

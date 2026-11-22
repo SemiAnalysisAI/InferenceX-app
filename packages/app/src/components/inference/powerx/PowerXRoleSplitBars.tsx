@@ -6,6 +6,7 @@ import { useId, useMemo } from 'react';
 import type { InferenceData } from '@/components/inference/types';
 import ChartLegend from '@/components/ui/chart-legend';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
@@ -67,12 +68,80 @@ const STRINGS = {
 const ROLE_DASH = { prefill: '4 2', decode: '1.5 1.5' } as const;
 type Role = keyof typeof ROLE_DASH;
 
-/** Row geometry: label line, 16 px bar, share line. */
-const ROW_STEP = 56;
+/** Row geometry: label line(s) above a 16 px bar, the share line under it. */
 const BAR_HEIGHT = 16;
-const MARGIN = { top: 4, right: 8, bottom: 36, left: 8 };
-/** Rough 11 px text width, to keep the label clear of the right-side totals. */
+const LINE_HEIGHT = 13;
+/** Space above a bar: one label line (desktop) or two (phones, where the label wraps). */
+const labelSpace = (lines: number) => lines * LINE_HEIGHT + 8;
+/** Space under a bar for the share line. */
+const SHARE_SPACE = 20;
+/** Bottom margin fits the tick labels and, under them, the axis title. */
+const MARGIN = { top: 4, right: 8, bottom: 44, left: 8 };
+/** Rough 11 px and 10 px text widths, to keep labels clear of each other. */
 const LABEL_CHAR_PX = 6;
+const SHARE_CHAR_PX = 5.5;
+const PREFILL_HATCH = { angle: 45, opacity: 0.45, width: 3 } as const;
+const decodeTint = (color: string) => `color-mix(in srgb, ${color} 40%, transparent)`;
+
+/** The key's swatch: the bar's own fill (prefill hatched, decode tinted) and dash. */
+function RoleSwatch({ id, role, color }: { id: string; role: Role; color: string }) {
+  return (
+    <svg width="24" height="12" viewBox="0 0 24 12" data-role={role}>
+      {role === 'prefill' ? (
+        <defs>
+          <pattern
+            id={id}
+            patternUnits="userSpaceOnUse"
+            width="6"
+            height="6"
+            patternTransform={`rotate(${PREFILL_HATCH.angle})`}
+          >
+            <line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="6"
+              stroke={color}
+              strokeOpacity={PREFILL_HATCH.opacity}
+              strokeWidth={PREFILL_HATCH.width}
+            />
+          </pattern>
+        </defs>
+      ) : null}
+      <rect
+        x="1"
+        y="1"
+        width="22"
+        height="10"
+        rx="2"
+        fill={role === 'prefill' ? `url(#${id})` : decodeTint(color)}
+        stroke={color}
+        strokeWidth="1.5"
+        strokeDasharray={ROLE_DASH[role]}
+      />
+    </svg>
+  );
+}
+
+/** Cuts text to max chars with an ellipsis. */
+const clip = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, Math.max(1, max - 1))}…` : text;
+
+/**
+ * Splits a run label at its " · " into two lines when it is too wide for one; the first line
+ * shares its row with the totals (firstChars), a second line has the full width (restChars).
+ */
+export function wrapRoleLabel(
+  label: string,
+  firstChars: number,
+  restChars: number,
+  maxLines: number,
+): string[] {
+  if (label.length <= firstChars) return [label];
+  const cut = label.indexOf(' · ');
+  if (maxLines < 2 || cut === -1) return [clip(label, firstChars)];
+  return [clip(label.slice(0, cut), firstChars), clip(label.slice(cut + 3), restChars)];
+}
 
 /** One stacked segment: a row's prefill or decode share of its own 100%. */
 interface RoleSegment {
@@ -128,6 +197,7 @@ export default function PowerXRoleSplitBars({
   const locale = useLocale();
   const t = STRINGS[locale];
   const legendScope = `powerx-role-split-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, '_')}`;
+  const compact = useIsMobileViewport();
   const { runIndexByUrl, isUnofficialRun } = useUnofficialRun();
   const { groups, unsplit } = useMemo(
     () => roleSplitRows(points, overlayPoints),
@@ -166,8 +236,13 @@ export default function PowerXRoleSplitBars({
               name: role,
               label: role === 'prefill' ? t.prefill : t.decode,
               color: 'var(--muted-foreground)',
-              lineDasharray: ROLE_DASH[role],
-              forceLineSwatch: true,
+              swatch: (
+                <RoleSwatch
+                  id={`${legendScope}-key-${role}`}
+                  role={role}
+                  color="var(--muted-foreground)"
+                />
+              ),
               isActive: true,
               onClick: () => {},
               idScope: legendScope,
@@ -204,6 +279,7 @@ export default function PowerXRoleSplitBars({
               name={name}
               color={color}
               watermark={getChartWatermark(isUnofficialRun)}
+              compact={compact}
               rows={group.rows.map((row, index) => ({
                 key: `${row.point.x}-${row.point.conc}-${index}`,
                 row,
@@ -256,6 +332,7 @@ function RoleSplitChart({
   name,
   color,
   watermark,
+  compact,
   rows,
   strings: t,
 }: {
@@ -263,6 +340,7 @@ function RoleSplitChart({
   name: string;
   color: string;
   watermark: 'logo' | 'unofficial';
+  compact: boolean;
   rows: RoleRowDatum[];
   strings: (typeof STRINGS)[Locale];
 }) {
@@ -274,7 +352,12 @@ function RoleSplitChart({
     ];
   });
   const hatchId = `${chartId}-prefill-hatch`;
-  const padding = 1 - BAR_HEIGHT / ROW_STEP;
+  // Phones wrap the run label to two lines. The outer band space goes above the first bar
+  // (its label) and below the last (its shares), so the plot has no dead space.
+  const labelLines = compact ? 2 : 1;
+  const above = labelSpace(labelLines);
+  const rowStep = above + BAR_HEIGHT + SHARE_SPACE;
+  const padding = 1 - BAR_HEIGHT / rowStep;
 
   const defsLayer: CustomLayerConfig = {
     type: 'custom',
@@ -290,7 +373,7 @@ function RoleSplitChart({
             .attr('patternUnits', 'userSpaceOnUse')
             .attr('width', 6)
             .attr('height', 6)
-            .attr('patternTransform', 'rotate(45)');
+            .attr('patternTransform', `rotate(${PREFILL_HATCH.angle})`);
           created.append('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 6);
           return created;
         })
@@ -298,8 +381,8 @@ function RoleSplitChart({
       pattern
         .select('line')
         .attr('stroke', color)
-        .attr('stroke-opacity', 0.45)
-        .attr('stroke-width', 3);
+        .attr('stroke-opacity', PREFILL_HATCH.opacity)
+        .attr('stroke-width', PREFILL_HATCH.width);
     },
   };
 
@@ -322,32 +405,51 @@ function RoleSplitChart({
           g.selectAll('*').remove();
           const barTop = yScale(d.key) ?? 0;
           const totalsWidth = d.totals.length * LABEL_CHAR_PX + 12;
-          const maxChars = Math.max(8, Math.floor((ctx.width - totalsWidth) / LABEL_CHAR_PX));
-          const label = d.label.length > maxChars ? `${d.label.slice(0, maxChars - 1)}…` : d.label;
-          const labelText = g
-            .append('text')
-            .attr('y', barTop - 6)
-            .attr('font-size', 11)
-            .attr('fill', 'var(--muted-foreground)')
-            .text(label);
-          if (label !== d.label) labelText.append('title').text(d.label);
+          const lines = wrapRoleLabel(
+            d.label,
+            Math.max(8, Math.floor((ctx.width - totalsWidth) / LABEL_CHAR_PX)),
+            Math.max(8, Math.floor(ctx.width / LABEL_CHAR_PX)),
+            labelLines,
+          );
+          const firstY = barTop - 6 - (lines.length - 1) * LINE_HEIGHT;
+          const labelG = g.append('g');
+          lines.forEach((line, index) => {
+            labelG
+              .append('text')
+              .attr('y', firstY + index * LINE_HEIGHT)
+              .attr('font-size', 11)
+              .attr('fill', 'var(--muted-foreground)')
+              .text(line);
+          });
+          if (lines.some((line) => line.endsWith('…'))) labelG.append('title').text(d.label);
           g.append('text')
             .attr('x', ctx.width)
-            .attr('y', barTop - 6)
+            .attr('y', firstY)
             .attr('text-anchor', 'end')
             .attr('font-size', 11)
             .attr('font-weight', 500)
             .attr('fill', 'var(--foreground)')
             .text(d.totals);
+          // Each share sits under its own segment, from that segment's x; a narrow prefill
+          // pushes the decode share right, and a narrow decode end-aligns it at the edge.
           const below = barTop + BAR_HEIGHT + 13;
+          const xScale = ctx.xScale as d3.ScaleLinear<number, number>;
+          const prefill = Math.min(1, Math.max(0, d.row.prefillShare));
+          const decodeWidth = d.decodeLabel.length * SHARE_CHAR_PX;
+          const decodeX = Math.max(xScale(prefill), d.prefillLabel.length * SHARE_CHAR_PX + 8);
+          const endAligned = decodeX + decodeWidth > ctx.width;
           g.append('text')
+            .attr('data-share-role', 'prefill')
+            .attr('x', xScale(0))
             .attr('y', below)
             .attr('font-size', 10)
             .attr('fill', 'var(--muted-foreground)')
             .text(d.prefillLabel);
           g.append('text')
-            .attr('x', d.prefillLabel.length * 5.5 + 12)
+            .attr('data-share-role', 'decode')
+            .attr('x', endAligned ? ctx.width : decodeX)
             .attr('y', below)
+            .attr('text-anchor', endAligned ? 'end' : 'start')
             .attr('font-size', 10)
             .attr('fill', 'var(--muted-foreground)')
             .text(d.decodeLabel);
@@ -363,8 +465,7 @@ function RoleSplitChart({
       getY: (d) => d.rowKey,
       getX: (d) => d.share,
       getX0: (d) => d.x0,
-      getColor: (d) =>
-        d.role === 'prefill' ? `url(#${hatchId})` : `color-mix(in srgb, ${color} 40%, transparent)`,
+      getColor: (d) => (d.role === 'prefill' ? `url(#${hatchId})` : decodeTint(color)),
       stroke: color,
       strokeWidth: 2,
       getStrokeDasharray: (d) => ROLE_DASH[d.role],
@@ -400,14 +501,24 @@ function RoleSplitChart({
       chartId={chartId}
       testId="powerx-role-split-chart"
       data={segments}
-      height={Math.round(ROW_STEP * (rows.length + padding) + MARGIN.top + MARGIN.bottom)}
+      height={Math.round(rowStep * rows.length + MARGIN.top + MARGIN.bottom)}
       margin={MARGIN}
       watermark={watermark}
       clipContent={false}
       grabCursor={false}
       xScale={{ type: 'linear', domain: [0, 1] }}
-      yScale={{ type: 'band', domain: rows.map((row) => row.key), padding }}
-      xAxis={{ label: t.split, tickCount: 5, tickFormat: (d) => `${Math.round(Number(d) * 100)}%` }}
+      yScale={{
+        type: 'band',
+        domain: rows.map((row) => row.key),
+        padding,
+        paddingOuter: padding / 2,
+        align: above / (rowStep - BAR_HEIGHT),
+      }}
+      xAxis={{
+        label: t.split,
+        tickCount: compact ? 3 : 5,
+        tickFormat: (d) => `${Math.round(Number(d) * 100)}%`,
+      }}
       yAxis={{
         grid: false,
         tickFormat: () => '',

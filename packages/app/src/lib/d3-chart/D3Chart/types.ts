@@ -16,7 +16,15 @@ import type { CanvasPointLayer } from '../layers/canvas-points';
 import type { RadarConfig } from '../layers/radar';
 
 export type ScaleConfig =
-  | { type: 'band'; domain: string[]; padding?: number }
+  | {
+      type: 'band';
+      domain: string[];
+      padding?: number;
+      /** Outer padding in steps; defaults to `padding`. */
+      paddingOuter?: number;
+      /** Where the outer padding goes: 0 all after, 1 all before; default 0.5. */
+      align?: number;
+    }
   | { type: 'linear'; domain: [number, number]; nice?: boolean }
   | { type: 'log'; domain: [number, number]; nice?: boolean }
   /** Square-root axis: compresses the low end less than log, spreading out the top. */

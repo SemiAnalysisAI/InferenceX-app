@@ -33,7 +33,13 @@ interface StubProps {
   height: number;
   margin: { top: number; right: number; bottom: number; left: number };
   xScale: { domain: [number, number] };
-  yScale: { type?: string; domain: unknown[]; padding?: number };
+  yScale: {
+    type?: string;
+    domain: unknown[];
+    padding?: number;
+    paddingOuter?: number;
+    align?: number;
+  };
   layers: StubLayer[];
   tooltip?: StubTooltip;
   legendElement?: ReactNode;
@@ -65,6 +71,8 @@ export function D3Chart(props: StubProps) {
             .domain(props.yScale.domain as string[])
             .range([0, height])
             .padding(props.yScale.padding ?? 0)
+            .paddingOuter(props.yScale.paddingOuter ?? props.yScale.padding ?? 0)
+            .align(props.yScale.align ?? 0.5)
         : d3
             .scaleLinear()
             .domain(props.yScale.domain as [number, number])

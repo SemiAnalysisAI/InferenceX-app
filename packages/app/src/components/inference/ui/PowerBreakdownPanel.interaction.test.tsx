@@ -224,6 +224,9 @@ const chipRows = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
 ];
 
+// A key swatch's fill, as its segment draws it.
+const swatchFill = (label: HTMLLabelElement) =>
+  label.querySelector('[data-testid="legend-custom-swatch"] rect[rx]')?.getAttribute('fill');
 const bandOf = (label: HTMLLabelElement) => label.htmlFor.split('-').at(-1);
 const chipName = (row: Element) =>
   row.querySelector<SVGTextElement>('[data-testid="power-chip-compare-name"]')?.dataset.label;
@@ -395,6 +398,10 @@ describe('PowerChipCompare legend highlight', () => {
       'Network share · Modeled (hatched)',
       'Facility (PUE) · Modeled (hatched)',
     ]);
+    // Each key swatch draws its segment's fill: solid GPU, a hatch pattern per modeled layer.
+    expect(swatchFill(legend[0])).toBe('var(--muted-foreground)');
+    for (const label of legend.slice(1)) expect(swatchFill(label)).toMatch(/^url\(#.+\)$/u);
+    expect(new Set(legend.slice(1).map(swatchFill)).size).toBe(4);
     const item = legend[1];
     const segments = (band: string) => [
       ...container.querySelectorAll<SVGRectElement>(

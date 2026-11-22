@@ -17,7 +17,7 @@ mock.module('@/providers/unofficial-run-provider', () => ({
 // Runs the chart's D3 layers on fixed scales.
 mock.module('@/lib/d3-chart/D3Chart', () => import('../ui/d3-chart-test-stub'));
 
-import PowerXRoleSplitBars from './PowerXRoleSplitBars';
+import PowerXRoleSplitBars, { wrapRoleLabel } from './PowerXRoleSplitBars';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -95,6 +95,19 @@ describe('PowerXRoleSplitBars', () => {
     expect(segment(groups[1], 'prefill').getAttribute('stroke-dasharray')).toBe('4 2');
     expect(segment(groups[1], 'decode').getAttribute('stroke-dasharray')).toBe('1.5 1.5');
 
+    // Each share label starts under its own segment.
+    const decodeShare = rows[0].querySelector('[data-share-role="decode"]')!;
+    expect(Number(decodeShare.getAttribute('x'))).toBeCloseTo(
+      Number(segment(groups[0], 'decode').getAttribute('x')),
+    );
+    // The key draws the bars' fills: prefill hatched, decode tinted.
+    const keySwatch = (role: string) =>
+      container
+        .querySelector(`[data-testid="powerx-role-split-key"] svg[data-role="${role}"] rect`)
+        ?.getAttribute('fill');
+    expect(keySwatch('prefill')).toMatch(/^url\(#.+\)$/u);
+    expect(keySwatch('decode')).toContain('color-mix');
+
     const unsplit = container.querySelector('[data-testid="powerx-role-split-unsplit"]')!;
     expect(unsplit.className).toContain('opacity-60');
     expect(unsplit.textContent).toContain(
@@ -128,5 +141,17 @@ describe('PowerXRoleSplitBars', () => {
     expect(prefill.map((bar) => Math.round(Number(bar.dataset.share)))).toEqual(
       expect.arrayContaining([18, 5]),
     );
+  });
+});
+
+describe('wrapRoleLabel', () => {
+  it('wraps a long run label at its " · " instead of cutting it off', () => {
+    const label = '132 tok/s/user / c32 · 16 prefill + 48 decode GPUs';
+    expect(wrapRoleLabel(label, 30, 50, 2)).toEqual([
+      '132 tok/s/user / c32',
+      '16 prefill + 48 decode GPUs',
+    ]);
+    expect(wrapRoleLabel(label, 60, 60, 2)).toEqual([label]);
+    expect(wrapRoleLabel(label, 30, 50, 1)).toEqual(['132 tok/s/user / c32 · 16 pre…']);
   });
 });

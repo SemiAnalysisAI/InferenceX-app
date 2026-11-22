@@ -47,6 +47,8 @@ export interface CommonLegendItemProps {
   idScope?: string;
   /** Always draw the line swatch, for keys whose dash is the meaning (e.g. GPU role). */
   forceLineSwatch?: boolean;
+  /** Custom 24×12 swatch drawn instead of the dot or line, e.g. a chart's hatched fill. */
+  swatch?: React.ReactNode;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
@@ -71,6 +73,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   blockedReason,
   idScope,
   forceLineSwatch = false,
+  swatch,
 }) => {
   const locale = useLocale();
   const lineDasharray = forceLineSwatch
@@ -116,40 +119,54 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         <span
           className={cn(
             'relative inline-flex h-3 items-center justify-center mr-2 flex-shrink-0',
-            lineDasharray === undefined ? 'w-3' : 'w-6',
+            lineDasharray === undefined && swatch === undefined ? 'w-3' : 'w-6',
           )}
         >
-          {lineDasharray === undefined ? (
-            <span
-              className={cn(
-                'size-3 rounded-full transition-opacity',
-                (canRemove || canRestore) && 'group-hover/item:opacity-0!',
-              )}
-              style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
-            />
+          {swatch === undefined ? (
+            lineDasharray === undefined ? (
+              <span
+                className={cn(
+                  'size-3 rounded-full transition-opacity',
+                  (canRemove || canRestore) && 'group-hover/item:opacity-0!',
+                )}
+                style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
+              />
+            ) : (
+              <svg
+                width="24"
+                height="12"
+                viewBox="0 0 24 12"
+                data-testid="legend-line-swatch"
+                className={cn(
+                  'transition-opacity',
+                  (canRemove || canRestore) && 'group-hover/item:opacity-0!',
+                )}
+                style={{ opacity: sidebarMode && !isActive ? 0.3 : 1 }}
+                aria-hidden="true"
+              >
+                <line
+                  x1="1"
+                  y1="6"
+                  x2="23"
+                  y2="6"
+                  stroke={color}
+                  strokeWidth="2.25"
+                  strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
+                />
+              </svg>
+            )
           ) : (
-            <svg
-              width="24"
-              height="12"
-              viewBox="0 0 24 12"
-              data-testid="legend-line-swatch"
+            <span
+              data-testid="legend-custom-swatch"
               className={cn(
-                'transition-opacity',
+                'inline-flex transition-opacity',
                 (canRemove || canRestore) && 'group-hover/item:opacity-0!',
               )}
               style={{ opacity: sidebarMode && !isActive ? 0.3 : 1 }}
               aria-hidden="true"
             >
-              <line
-                x1="1"
-                y1="6"
-                x2="23"
-                y2="6"
-                stroke={color}
-                strokeWidth="2.25"
-                strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
-              />
-            </svg>
+              {swatch}
+            </span>
           )}
           {canRemove && (
             <span

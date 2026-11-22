@@ -305,6 +305,13 @@ describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded part
     expect(cards).toHaveLength(3);
     const card = cards[2];
     expect(card.dataset.layout).toBe('compact');
+    // On a phone the label lines sit above a bar that starts at the plot's left edge.
+    const [firstSegment] = segmentsOf(card);
+    const nameY = Number(
+      card.querySelector('[data-testid="power-chip-compare-name"]')?.getAttribute('y'),
+    );
+    expect(nameY).toBeLessThan(Number(firstSegment.getAttribute('y')));
+    expect(Number(firstSegment.getAttribute('x'))).toBe(0);
     expect(cardName(card)).toContain('phone-rows');
     expect(
       card.querySelector('[data-testid="power-chip-compare-swatch"]')?.getAttribute('fill'),
