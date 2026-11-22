@@ -1049,11 +1049,16 @@ media are not retained; successful publication or History backfill clears that
 process cache. Page preloading, independent
 clip loading and real first-frame preloading are presentation-only exclusions:
 they add no API selectors and change no metrics or official/unofficial membership.
+The page keeps control changes in memory, so its address bar shows the link it opened
+on and Share carries the current `r_*` settings. That, the chart's hardware colours and
+line curve, legend-row highlighting and clip read-ahead are presentation-only too.
 
 中文：HTTP 响应仍为 `private, no-store`。底层已发布 History 和媒体元数据在服务进程内
 最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回。错误、不完整或未批准的 History
 和缺失媒体不保留，发布或 History 补建成功后清空当前进程缓存。页面预读、独立加载视频及真实首帧预读
-只影响展示，不新增 API 选择项，也不改变指标或正式／指定运行的归属。
+只影响展示，不新增 API 选择项，也不改变指标或正式／指定运行的归属。页面把控件改动保存在内存中，
+地址栏保持打开时的链接，当前的 `r_*` 设置由“分享”链接给出；这一点以及图表的硬件配色、曲线样式、
+图例悬停高亮和视频预读同样只影响展示。
 
 `roster` retains GB200, B200, MI355X and H200 as default slots. H100 is added when
 qualified approved evidence or the exact named diagnostic run is available; the
@@ -1066,7 +1071,7 @@ A100 have no default slot; each appears only with qualified evidence or the name
 | --------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Model and frozen workload         | `r_model`, `r_workload`                              | Model slug (`options.workloads[].slug`, such as `minimax-h3`) selects that model's best-covered workload; a compact key from options.workloads selects any other. Both resolve to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                         |
 | Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value (`duration_seconds`, or `frame_count ÷ fps` for frame-count plans), not decoded output duration. No mode inferred from model names.                                                                                                                                                           |
-| Engine, execution date            | `r_engine`, `r_date`                                 | Recorded engine and as-of execution date. All GPU counts are included.                                                                                                                                                                                                                                                                                      |
+| Engine, execution date            | `r_engine`, `r_date`                                 | Recorded engine and as-of execution date. The engine narrows the selected workload's cells and never changes which workload is selected. All GPU counts are included.                                                                                                                                                                                       |
 | X metric                          | `r_x`                                                | `p50` per-clip latency (default) or `gpus` (participating GPUs per deployment, log axis). Presentation only; the GPU axis keeps the median-latency frontier and Best engine, and Chip config history plots median latency for `gpus`. The retired `p90` falls back to `p50`.                                                                                |
 | Fixed overview settings           | `r_gpus`, `r_basis` (deprecated)                     | Accepted but ignored: `params.gpuCount=null`, `params.costBasis=participating`. New share/export URLs omit these keys.                                                                                                                                                                                                                                      |
 | Representative deployments table  | None                                                 | Removed from the UI; representative cells, deadline metrics and both GPU cost bases remain in the read-only evidence.                                                                                                                                                                                                                                       |
@@ -1076,7 +1081,7 @@ A100 have no default slot; each appears only with qualified evidence or the name
 | Profit estimator (removed)        | `r_api`, `r_price_*`, `r_utilization` (retired keys) | Accepted but ignored. `params` omits them and cells carry no revenue or profit.                                                                                                                                                                                                                                                                             |
 | Named run overlay                 | `unofficialrun` / `unofficialruns`                   | Exact run only, in separate `overlayCells` and `overlayDeploymentCells`, excluded from official cells, deployments and workload mix. A stored run keeps its actual approval. A run absent from History is read live from the JSON documents of its public `h3-results` artifacts: unapproved, `publishedAt` null, no media. Nothing is stored or published. |
 
-中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50` 延迟（默认）或 `gpus`（每个部署参与计算的 GPU 数，对数坐标），已停用的 `p90` 按 `p50` 处理；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表和利润估算器已移除；旧的 `r_api`、`r_price_*`、`r_utilization` 参数仍接受但会被忽略。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
+中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50` 延迟（默认）或 `gpus`（每个部署参与计算的 GPU 数，对数坐标），已停用的 `p90` 按 `p50` 处理；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。`r_engine` 只筛选所选工作负载的数据点，不会改变所选的工作负载。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表和利润估算器已移除；旧的 `r_api`、`r_price_*`、`r_utilization` 参数仍接受但会被忽略。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
 
 `cells` carries the source point, per-clip/frame energy, P95 only with 20 complete
 request samples, deadline metrics and both cost bases.

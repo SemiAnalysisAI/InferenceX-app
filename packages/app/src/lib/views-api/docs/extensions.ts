@@ -501,8 +501,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '已弃用的概览控件参数，仍可传入但会被忽略。始终包含全部 GPU 数量，params.gpuCount 返回 null。',
   ],
   r_engine: [
-    'Recorded engine name, such as sglang or vllm-omni, separate from runtime revision. Limits cells, runs and chip configs to that engine.',
-    '记录的引擎名称（如 sglang 或 vllm-omni），与 runtime revision 分开。将数据点、运行和芯片配置限定为该引擎。',
+    'Recorded engine name, such as sglang or vllm-omni, separate from runtime revision. Limits cells, runs and chip configs to that engine; it never changes which workload is selected.',
+    '记录的引擎名称（如 sglang 或 vllm-omni），与 runtime revision 分开。将数据点、运行和芯片配置限定为该引擎，不会改变所选的工作负载。',
   ],
   r_compare: [
     'Retired engine comparison, accepted but ignored. Each hardware plots the lossless series with the largest Pareto frontier area, or the r_engine series.',
