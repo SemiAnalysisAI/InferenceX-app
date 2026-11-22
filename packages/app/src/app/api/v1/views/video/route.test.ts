@@ -26,12 +26,12 @@ import {
   readVideoDashboardState,
 } from '@/components/video-benchmark/video-url-state';
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { GET } from './route';
 import retainedHistory from '../../../../../../cypress/fixtures/api/video-history.json';
 
-const source = vi.hoisted(() => vi.fn());
-vi.mock('@/app/api/video-runs/route', () => ({ GET: source }));
+const source = (() => vi.fn())();
+mock.module('@/app/api/video-runs/route', () => ({ GET: source }));
 
 const observation: VideoHistoryObservation = {
   id: 'h200:c1',

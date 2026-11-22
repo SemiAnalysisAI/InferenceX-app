@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import ChartLegendItem from './chart-legend-item';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 let container: HTMLDivElement;
 let root: Root;

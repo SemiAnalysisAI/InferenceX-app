@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { GPU_SPECS } from '@/lib/catalog/gpu-specs';
 import { getPostBySlug } from '@/lib/blog/blog';

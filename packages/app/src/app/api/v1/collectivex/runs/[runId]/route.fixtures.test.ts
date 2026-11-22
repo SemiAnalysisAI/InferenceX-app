@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import {
   buildDataset,
@@ -6,26 +6,26 @@ import {
 } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
 
-const { mockLoadFixture } = vi.hoisted(() => ({
+const { mockLoadFixture } = {
   mockLoadFixture: vi.fn(),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: true,
   getCollectiveXWriteDb: vi.fn(),
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/collectivex', () => ({
   collectiveXDatasetFromRow: vi.fn(),
   getCollectiveXRun: vi.fn(),
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   collectiveXCacheTag: () => 'collectivex',
 }));
 
-vi.mock('@/lib/testing/test-fixtures', () => ({
+mock.module('@/lib/testing/test-fixtures', () => ({
   loadFixture: mockLoadFixture,
 }));
 

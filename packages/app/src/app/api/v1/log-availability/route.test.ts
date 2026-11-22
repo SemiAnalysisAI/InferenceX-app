@@ -1,22 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetBenchmarkPresence, mockGetDb } = vi.hoisted(() => ({
+const { mockGetBenchmarkPresence, mockGetDb } = {
   mockGetBenchmarkPresence: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: mockGetDb }));
-vi.mock('@semianalysisai/inferencex-db/queries/benchmark-presence', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ getDb: mockGetDb }));
+// The factory cannot import the module it replaces, so the real exports are captured first.
+const actual = { ...(await import('@semianalysisai/inferencex-db/queries/benchmark-presence')) };
+mock.module('@semianalysisai/inferencex-db/queries/benchmark-presence', () => ({
+  ...actual,
   getBenchmarkPresence: mockGetBenchmarkPresence,
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { NextRequest } from 'next/server';
-import { GET } from './route';
+// Imported after mock.module so the presence reader is built from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 const req = (url: string) => new NextRequest(new URL(url, 'http://localhost'));
 

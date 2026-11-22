@@ -1,21 +1,21 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetReliabilityStats, mockGetDb } = vi.hoisted(() => ({
+const { mockGetReliabilityStats, mockGetDb } = {
   mockGetReliabilityStats: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/reliability', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/reliability', () => ({
   getReliabilityStats: mockGetReliabilityStats,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
@@ -24,7 +24,8 @@ vi.mock('@/lib/cache/api-cache', () => ({
 
 import { aggregateByDateRange } from '@/components/reliability/aggregate';
 
-import { GET } from './route';
+// Imported after mock.module so the route builds its reader from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'http://localhost'));

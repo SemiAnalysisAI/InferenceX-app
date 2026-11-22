@@ -1,6 +1,11 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach, mock, type Mock } from 'bun:test';
+import { stubEnv, unstubAllEnvs } from '@/test/helpers';
 import fs from 'node:fs';
 import path from 'node:path';
+
+// bun:test types spyOn by fs.readFileSync's overloads; these tests only stub the string reads.
+const spyReadFileSync = () =>
+  vi.spyOn(fs, 'readFileSync') as unknown as Mock<(filePath: fs.PathOrFileDescriptor) => string>;
 
 import { OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -110,10 +115,8 @@ tags:
 这是一段中文正文内容。
 `;
 
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof fs>();
-  return { ...actual, default: { ...actual } };
-});
+const actual = { ...(await import('node:fs')) };
+mock.module('node:fs', () => ({ ...actual, default: { ...actual } }));
 
 const isZhPath = (p: string) => p.includes('/zh/');
 
@@ -128,7 +131,7 @@ function mockLocalizedFiles(en: Record<string, string>, zh: Record<string, strin
     return lookup(p) !== undefined;
   });
   vi.spyOn(fs, 'readdirSync').mockReturnValue(Object.keys(en) as any);
-  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => lookup(String(filePath)) ?? '');
+  spyReadFileSync().mockImplementation((filePath) => lookup(String(filePath)) ?? '');
 }
 
 beforeEach(() => {
@@ -255,7 +258,7 @@ describe('getAllPosts', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
 
     vi.spyOn(fs, 'readdirSync').mockReturnValue(['test-post.mdx', 'older-post.mdx'] as any);
-    vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+    spyReadFileSync().mockImplementation((filePath) => {
       if (String(filePath).includes('test-post')) return FAKE_MDX;
       return FAKE_MDX_OLDER;
     });
@@ -298,7 +301,7 @@ describe('getAllPosts', () => {
 function mockPostFiles(files: Record<string, string>) {
   vi.spyOn(fs, 'existsSync').mockReturnValue(true);
   vi.spyOn(fs, 'readdirSync').mockReturnValue(Object.keys(files).map((name) => name) as any);
-  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+  spyReadFileSync().mockImplementation((filePath) => {
     const p = String(filePath);
     for (const [name, content] of Object.entries(files)) {
       if (p.includes(name.replace('.mdx', ''))) return content;
@@ -309,11 +312,11 @@ function mockPostFiles(files: Record<string, string>) {
 
 describe('getAllPosts — publishDate filtering', () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    unstubAllEnvs();
   });
 
   it('filters out future-publishDate and missing-publishDate posts in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
       'future-post.mdx': FAKE_MDX_FUTURE,
@@ -328,7 +331,7 @@ describe('getAllPosts — publishDate filtering', () => {
   });
 
   it('filters out posts without publishDate in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
     });
@@ -338,7 +341,7 @@ describe('getAllPosts — publishDate filtering', () => {
   });
 
   it('keeps posts with past publishDate in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
     });
@@ -349,7 +352,7 @@ describe('getAllPosts — publishDate filtering', () => {
   });
 
   it('shows all posts including future-dated in development', () => {
-    vi.stubEnv('NODE_ENV', 'development');
+    stubEnv('NODE_ENV', 'development');
     mockPostFiles({
       'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
       'future-post.mdx': FAKE_MDX_FUTURE,
@@ -365,7 +368,7 @@ describe('getAllPosts — publishDate filtering', () => {
   });
 
   it('shows all posts including future-dated in test env', () => {
-    vi.stubEnv('NODE_ENV', 'test');
+    stubEnv('NODE_ENV', 'test');
     mockPostFiles({
       'future-post.mdx': FAKE_MDX_FUTURE,
       'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
@@ -379,7 +382,7 @@ describe('getAllPosts — publishDate filtering', () => {
   });
 
   it('returns empty array when all posts are future-dated in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'future-post.mdx': FAKE_MDX_FUTURE,
     });
@@ -389,7 +392,7 @@ describe('getAllPosts — publishDate filtering', () => {
   });
 
   it('still sorts filtered results by date descending in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
       'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
@@ -404,7 +407,7 @@ describe('getAllPosts — publishDate filtering', () => {
 
 describe('getAllPosts — zh locale', () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    unstubAllEnvs();
   });
 
   it('returns only posts with a zh translation, using zh frontmatter', () => {
@@ -421,7 +424,7 @@ describe('getAllPosts — zh locale', () => {
   });
 
   it('inherits publishDate gating from the English post in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockLocalizedFiles(
       { 'no-publish.mdx': FAKE_MDX_NO_PUBLISH },
       { 'no-publish.mdx': FAKE_MDX_ZH },
@@ -504,7 +507,7 @@ describe('getPostBySlug', () => {
   });
 
   it('returns a post with future publishDate regardless of NODE_ENV', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
     vi.spyOn(fs, 'readFileSync').mockReturnValue(FAKE_MDX_FUTURE);
@@ -514,7 +517,7 @@ describe('getPostBySlug', () => {
     expect(result!.meta.title).toBe('Future Post');
     expect(result!.meta.publishDate).toBe('2099-06-01');
 
-    vi.unstubAllEnvs();
+    unstubAllEnvs();
   });
 });
 
@@ -526,7 +529,7 @@ function mockThreePosts() {
     'middle-post.mdx',
     'older-post.mdx',
   ] as any);
-  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+  spyReadFileSync().mockImplementation((filePath) => {
     const p = String(filePath);
     if (p.includes('test-post')) return FAKE_MDX;
     if (p.includes('middle-post')) return FAKE_MDX_MIDDLE;

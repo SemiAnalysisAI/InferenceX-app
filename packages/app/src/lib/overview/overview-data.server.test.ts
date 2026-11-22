@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('next/cache', () => ({
+mock.module('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
@@ -9,6 +9,16 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 import { Model, Precision } from '../catalog/data-mappings';
 import type { OverviewPageData } from './overview-data';
+import type * as OverviewDataServer from './overview-data.server';
+
+// Each test mocks the connection, benchmark and fixture modules, then loads a new copy of the
+// module under test, so the copy binds those mocks and its derived caches start empty. bun caches
+// modules per specifier, so the query string selects the copy.
+let instances = 0;
+function freshOverviewData(): Promise<typeof OverviewDataServer> {
+  instances += 1;
+  return import(`./overview-data.server?instance=${instances}`);
+}
 
 function row(
   hardware: string,
@@ -67,25 +77,21 @@ function selectedFrameworks(page: OverviewPageData) {
 }
 
 afterEach(() => {
-  vi.resetModules();
   vi.clearAllMocks();
-  vi.doUnmock('@semianalysisai/inferencex-db/connection');
-  vi.doUnmock('@/lib/benchmarks/benchmark-data.server');
-  vi.doUnmock('@/lib/testing/test-fixtures');
 });
 
 describe('getOverviewPageData engine scope forwarding', () => {
   it('returns a renderable empty history payload when no current snapshot exists', async () => {
     const getCachedBenchmarks = vi.fn(() => Promise.resolve([]));
     const getCachedBenchmarksAsOf = vi.fn();
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf,
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
 
     await expect(
       getOverviewPageData(75, 'all', '30d', 'b300', 'all', 'changed', 'priced'),
@@ -108,14 +114,14 @@ describe('getOverviewPageData engine scope forwarding', () => {
   it('keeps hardware mode valid when every platform is missing', async () => {
     const getCachedBenchmarks = vi.fn(() => Promise.resolve([]));
     const getCachedBenchmarksAsOf = vi.fn();
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf,
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', 'hardware');
 
     expect(page.comparisonMode).toBe('hardware');
@@ -129,13 +135,13 @@ describe('getOverviewPageData engine scope forwarding', () => {
   });
 
   it('forwards the selected hardware reference through fixture mode', async () => {
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({
       loadFixture: vi.fn(() => ({ [Model.Qwen3_5]: rows })),
     }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', 'hardware', 'b300');
 
     expect(page.referenceHardware).toBe('b300');
@@ -143,13 +149,13 @@ describe('getOverviewPageData engine scope forwarding', () => {
 
   it('forwards community scope through fixture mode', async () => {
     const getCachedBenchmarks = vi.fn();
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({ getCachedBenchmarks }));
+    mock.module('@/lib/testing/test-fixtures', () => ({
       loadFixture: vi.fn(() => ({ [Model.Qwen3_5]: rows })),
     }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community');
 
     expect(page.engineScope).toBe('community');
@@ -163,14 +169,14 @@ describe('getOverviewPageData engine scope forwarding', () => {
   it('forwards community scope through live benchmark queries', async () => {
     const getCachedBenchmarks = vi.fn(() => Promise.resolve(rows));
     const getCachedBenchmarksAsOf = vi.fn();
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf,
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', 'hardware');
 
     expect(page.engineScope).toBe('community');
@@ -193,14 +199,14 @@ describe('getOverviewPageData engine scope forwarding', () => {
     const getCachedBenchmarksAsOf = vi.fn((_keys: string[], _date: string) =>
       Promise.resolve(historicalRows),
     );
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf,
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', '30d');
     const qwen = page.models.find(
       (model) => model.model === Model.Qwen3_5 && model.scenario === 'single_turn_8k1k',
@@ -232,14 +238,14 @@ describe('getOverviewPageData engine scope forwarding', () => {
     );
     const getCachedBenchmarks = vi.fn();
     const getCachedBenchmarksAsOf = vi.fn();
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf,
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', '30d');
 
     expect(page.comparisonMode).toBe('30d');
@@ -253,14 +259,14 @@ describe('getOverviewPageData engine scope forwarding', () => {
 describe('getOverviewPageData model scope forwarding', () => {
   it('queries deprecated and maintenance models only under the all scope', async () => {
     const getCachedBenchmarks = vi.fn(() => Promise.resolve(rows));
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf: vi.fn(),
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const gptOssKeys = DISPLAY_MODEL_TO_DB[Model.GptOss] ?? [];
     expect(gptOssKeys.length).toBeGreaterThan(0);
 
@@ -287,28 +293,28 @@ describe('getOverviewPageData model scope forwarding', () => {
           : rows,
       ),
     );
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks,
       getCachedBenchmarksAsOf: vi.fn(() => Promise.resolve([])),
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', '30d', 'b200', 'all');
 
     expect(page.historicalWindow?.snapshotDate).toBe('2026-07-20');
   });
 
   it('forwards the all scope through history mode', async () => {
-    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmarks/benchmark-data.server', () => ({
+    mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
       getCachedBenchmarks: vi.fn(() => Promise.resolve(rows)),
       getCachedBenchmarksAsOf: vi.fn(() => Promise.resolve([])),
     }));
-    vi.doMock('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
+    mock.module('@/lib/testing/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData } = await import('./overview-data.server');
+    const { getOverviewPageData } = await freshOverviewData();
     const page = await getOverviewPageData(50, 'community', '30d', 'b200', 'all');
 
     expect(page.comparisonMode).toBe('30d');

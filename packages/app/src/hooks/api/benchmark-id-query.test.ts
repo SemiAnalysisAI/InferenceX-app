@@ -1,10 +1,17 @@
 import { QueryClient } from '@tanstack/react-query';
-import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, describe, expect, it, type Mock, vi } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import { bulkIdsFetcher, bulkIdsQueryOptions } from './benchmark-id-query';
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 const chunkOf = (url: string) =>
@@ -13,7 +20,7 @@ const chunkOf = (url: string) =>
 describe('bulkIdsFetcher', () => {
   it('returns an empty map without fetching for an empty id set', async () => {
     const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    stubGlobal('fetch', fetchMock);
 
     const result = await bulkIdsFetcher<true>('trace-availability', 500)([]);
     expect(result).toEqual({});
@@ -22,7 +29,7 @@ describe('bulkIdsFetcher', () => {
 
   it('fetches the endpoint with comma-joined ids and returns the parsed map', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ 1: true, 3: true }));
-    vi.stubGlobal('fetch', fetchMock);
+    stubGlobal('fetch', fetchMock);
 
     const result = await bulkIdsFetcher<true>('trace-availability', 500)([1, 3]);
     expect(result).toEqual({ 1: true, 3: true });
@@ -37,7 +44,7 @@ describe('bulkIdsFetcher', () => {
     const fetchMock = vi.fn((url: string) =>
       Promise.resolve(Response.json({ [chunkOf(url).at(-1)!]: true })),
     );
-    vi.stubGlobal('fetch', fetchMock);
+    stubGlobal('fetch', fetchMock);
 
     const result = await bulkIdsFetcher<true>('log-availability', 500)(ids);
 
@@ -49,7 +56,7 @@ describe('bulkIdsFetcher', () => {
 
   it('sends exactly the limit in one request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({}));
-    vi.stubGlobal('fetch', fetchMock);
+    stubGlobal('fetch', fetchMock);
 
     await bulkIdsFetcher<true>(
       'log-availability',
@@ -60,7 +67,7 @@ describe('bulkIdsFetcher', () => {
   });
 
   it('throws with the endpoint name and status on a non-ok response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })));
+    stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })));
 
     await expect(bulkIdsFetcher<true>('trace-histograms', 200)([1])).rejects.toThrow(
       'trace-histograms 500',
@@ -68,7 +75,11 @@ describe('bulkIdsFetcher', () => {
   });
 });
 
-function lookup(queryClient: QueryClient, ids: number[], fetchByIds: Mock) {
+function lookup(
+  queryClient: QueryClient,
+  ids: number[],
+  fetchByIds: Mock<(ids: number[], signal?: AbortSignal) => Promise<Record<number, true>>>,
+) {
   return queryClient.fetchQuery(
     bulkIdsQueryOptions<true>(queryClient, 'log-availability', ids, true, fetchByIds),
   );
@@ -104,34 +115,34 @@ describe('bulkIdsQueryOptions', () => {
   });
 
   it('refetches ids whose cached lookup is stale', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     try {
       const queryClient = new QueryClient();
       await lookup(queryClient, [1, 2], vi.fn().mockResolvedValue({ 1: true }));
-      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      advanceTimersByTime(5 * 60 * 1000 + 1);
 
       const fetchByIds = vi.fn().mockResolvedValue({ 2: true });
       expect(await lookup(queryClient, [1, 2, 5], fetchByIds)).toEqual({ 2: true });
       expect(fetchByIds).toHaveBeenCalledExactlyOnceWith([1, 2, 5], expect.anything());
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 
   it('ages reused ids from their original fetch, not from the lookup that reused them', async () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     try {
       const queryClient = new QueryClient();
       await lookup(queryClient, [1, 2], vi.fn().mockResolvedValue({ 1: true }));
-      vi.advanceTimersByTime(4 * 60 * 1000);
+      advanceTimersByTime(4 * 60 * 1000);
       await lookup(queryClient, [1, 3], vi.fn().mockResolvedValue({ 3: true }));
-      vi.advanceTimersByTime(2 * 60 * 1000);
+      advanceTimersByTime(2 * 60 * 1000);
 
       const fetchByIds = vi.fn().mockResolvedValue({ 1: true });
       expect(await lookup(queryClient, [1, 3, 4], fetchByIds)).toEqual({ 1: true, 3: true });
       expect(fetchByIds).toHaveBeenCalledExactlyOnceWith([1, 4], expect.anything());
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 

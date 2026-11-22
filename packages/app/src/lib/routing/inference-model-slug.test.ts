@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { COMPARE_MODEL_SLUGS } from '../compare/compare-slug';
 import { getModelCategory, Model, MODEL_OPTIONS } from '../catalog/data-mappings';

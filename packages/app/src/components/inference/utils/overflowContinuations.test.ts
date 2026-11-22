@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { ClippedInferenceData, InferenceData } from '../types';
 import { buildFrontierContinuations, fitContinuationLabelBaseline } from './overflowContinuations';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { BenchmarkRow, WorkflowInfoResponse } from '@/lib/api/api';
 import type { TrendDataPoint, TrendSource } from '../types';
 import {

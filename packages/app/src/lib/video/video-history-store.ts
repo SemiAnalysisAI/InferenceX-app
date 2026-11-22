@@ -7,6 +7,7 @@ import {
   type VideoHistoryEntry,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
+import { latestOlderEntries } from '@/components/video-benchmark/points';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   approvalPath,
@@ -155,7 +156,10 @@ export interface PublishedVideoHistory {
 
 /**
  * Read `pages` History pages from `page` with one index listing and one snapshot read. Indexes the
- * snapshot does not cover are projected from their stored artifact. This path never writes.
+ * snapshot does not cover are projected from their stored artifact. A read from the first page, the
+ * dashboard's, also carries each older entry that holds a deployment's latest cell, after the
+ * window. With `runId` the pages cover only that run's stored artifacts, approved or not, and
+ * `complete` depends on that run's indexes and receipts alone. This path never writes.
  */
 export async function publishedVideoHistory(
   page: number,
@@ -166,22 +170,42 @@ export async function publishedVideoHistory(
     return { page: { schemaVersion: 1, entries: [], nextPage: null }, complete: false };
   const { indexes, receipts, latest } = await historyState(runId);
   const records = await readRecords(latest).catch(() => new Map<string, HistoryRecord>());
+  const project = (slice: StoredIndex[]) =>
+    Promise.all(
+      slice.map((index) => {
+        const record = records.get(index.pathname);
+        return current(record, index, receipts)
+          ? { entry: record.entry, complete: true }
+          : projectIndex(index);
+      }),
+    );
   const end = (page - 1 + pages) * VIDEO_HISTORY_PAGE_SIZE;
-  const projected = await Promise.all(
-    indexes.slice((page - 1) * VIDEO_HISTORY_PAGE_SIZE, end).map((index) => {
-      const record = records.get(index.pathname);
-      return current(record, index, receipts)
-        ? { entry: record.entry, complete: true }
-        : projectIndex(index);
-    }),
-  );
+  // Only an index with an approval receipt can hold a dashboard cell. A named run is read through
+  // its own pages instead, so it takes no older entries.
+  const [projected, older] = await Promise.all([
+    project(indexes.slice((page - 1) * VIDEO_HISTORY_PAGE_SIZE, end)),
+    page === 1 && !runId
+      ? project(
+          indexes
+            .slice(end)
+            .filter((index) => receipts.has(approvalPath(index.runId, index.artifact))),
+        )
+      : [],
+  ]);
+  const entries = projected.map(({ entry }) => entry);
   return {
     page: {
       schemaVersion: 1,
-      entries: projected.map(({ entry }) => entry),
+      entries: [
+        ...entries,
+        ...latestOlderEntries(
+          entries,
+          older.map(({ entry }) => entry),
+        ),
+      ],
       nextPage: end < indexes.length ? page + pages : null,
     },
-    complete: projected.every(({ complete }) => complete),
+    complete: [...projected, ...older].every(({ complete }) => complete),
   };
 }
 

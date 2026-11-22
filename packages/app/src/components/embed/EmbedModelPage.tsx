@@ -29,6 +29,7 @@ export default function EmbedModelPage({
         yAxisMetric={options.yAxisMetric}
         chipBasis={options.chipBasis}
         lockedFrameworks={options.frameworks.length > 0 ? options.frameworks : undefined}
+        initialActiveHwTypes={options.hwTypes.length > 0 ? options.hwTypes : undefined}
         minimalChrome
       />
     </EmbedFrame>

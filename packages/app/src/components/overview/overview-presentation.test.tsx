@@ -1,17 +1,18 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 import type { OverviewPageData } from '@/lib/overview/overview-data';
 
-const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
-const trackStub = vi.hoisted(() => vi.fn());
+const routerStub = { push: vi.fn(), replace: vi.fn() };
+const trackStub = vi.fn();
 
-vi.mock('next/navigation', () => ({ useRouter: () => routerStub }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: trackStub }));
+mock.module('next/navigation', () => ({ useRouter: () => routerStub }));
+mock.module('@/lib/analytics/analytics', () => ({ track: trackStub }));
 
 import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
 import { DesktopOverviewMatrix, overviewFormatters } from './overview-scorecard';
@@ -160,7 +161,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('OverviewPresentationSurface', () => {
@@ -203,7 +204,7 @@ describe('OverviewPresentationSurface', () => {
   });
 
   it('reasserts presentation intent when Back or Forward lands on an older URL', async () => {
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn(() => new Promise(() => {})),
     );
@@ -242,7 +243,7 @@ describe('OverviewPresentationSurface', () => {
   });
 
   it('preserves every other query parameter and the fragment while notifying persistent chrome', () => {
-    vi.stubGlobal('fetch', vi.fn());
+    stubGlobal('fetch', vi.fn());
     window.history.replaceState({}, '', '/overview?tier=75&compare=30d&utm_source=deck#matrix');
     const searchEvents: string[] = [];
     const onSearchChange = (event: Event) => {
@@ -286,7 +287,7 @@ describe('OverviewPresentationSurface', () => {
 
   it('keeps presentation intent and fullscreen active while paging to another view', async () => {
     const requested: string[] = [];
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
         requested.push(String(input));
@@ -310,7 +311,7 @@ describe('OverviewPresentationSurface', () => {
   });
 
   it('does not page when an arrow key belongs to an interactive control', () => {
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn(() => new Promise<Response>(() => {})),
     );
@@ -326,7 +327,7 @@ describe('OverviewPresentationSurface', () => {
   });
 
   it('does not page when a Radix Select option owns the arrow key', () => {
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn(() => new Promise<Response>(() => {})),
     );
@@ -345,7 +346,7 @@ describe('OverviewPresentationSurface', () => {
 
   it('keeps presentation intent when an older server selection fails', async () => {
     let rejectRequest: ((error: Error) => void) | undefined;
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn(
         () =>
@@ -402,7 +403,7 @@ describe('OverviewPresentationSurface', () => {
 
   it('pages between the two views with the arrow keys, but only while presenting', () => {
     const requested: string[] = [];
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
         requested.push(String(input));

@@ -21,6 +21,7 @@ import { Stat } from '@/components/ui/stat';
 
 import { SM_L2_RUNS } from './sm-l2-data';
 import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
+import { MethodologyFold } from './MethodologyFold';
 
 const STRINGS = {
   en: {
@@ -423,8 +424,9 @@ export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
               <div className="mt-3">
                 <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
                 <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
-                  <h3 className="font-medium text-foreground">{t.methodology}</h3>
-                  <p>{t.methodologyText}</p>
+                  <MethodologyFold title={t.methodology} testId="sm-l2">
+                    <p>{t.methodologyText}</p>
+                  </MethodologyFold>
                 </div>
                 <div className="mt-3 overflow-x-auto" data-testid="sm-l2-device-specs">
                   <table className="w-full text-left text-xs text-muted-foreground tabular-nums">

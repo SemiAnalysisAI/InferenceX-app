@@ -1,4 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import {
   CLIENT_PATHNAME_CHANGE_EVENT,
@@ -30,16 +37,16 @@ function makeEvent(overrides: Partial<MouseEvent<HTMLAnchorElement>> = {}) {
 
 describe('navigateInApp', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.stubGlobal('window', {
+    useFakeTimers();
+    stubGlobal('window', {
       location: { pathname: '/', origin: 'https://example.com' },
       setTimeout: setTimeout.bind(globalThis),
     });
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
+    useRealTimers();
+    unstubAllGlobals();
   });
 
   it('pushes the route exactly once — no timer-based re-push', () => {
@@ -51,7 +58,7 @@ describe('navigateInApp', () => {
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledWith('/infx/inference/kimi-k3');
 
-    vi.advanceTimersByTime(5000);
+    advanceTimersByTime(5000);
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
@@ -70,7 +77,7 @@ describe('navigateInApp', () => {
     );
 
     navigateInApp(event, router, '/infx/inference/kimi-k3');
-    vi.advanceTimersByTime(5000);
+    advanceTimersByTime(5000);
 
     expect(preventDefault).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
@@ -93,8 +100,8 @@ describe('pathname change pageview signalling', () => {
       location.pathname = url.pathname;
       location.search = url.search;
     };
-    vi.stubGlobal('History', { prototype: { replaceState } });
-    vi.stubGlobal('window', {
+    stubGlobal('History', { prototype: { replaceState } });
+    stubGlobal('window', {
       location,
       history: { state: null, replaceState },
       dispatchEvent: (event: Event) => {
@@ -105,7 +112,7 @@ describe('pathname change pageview signalling', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('does not mark filter-driven path rewrites as pageviews', () => {

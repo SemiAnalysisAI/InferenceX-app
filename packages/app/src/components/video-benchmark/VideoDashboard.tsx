@@ -415,6 +415,25 @@ export default function VideoDashboard({
     [points, state, namedPoints],
   );
   const { options, roster } = projection;
+  // A link that names a run but no workload opens on the workload that run measured, as the
+  // inference charts open on an unofficial run's model. Decided once per run, so a later pick stays.
+  const openedRun = useRef<string | null>(null);
+  useEffect(() => {
+    const run = state.unofficialRun;
+    if (run === null || openedRun.current === run) return;
+    if (namedSource !== 'history' && namedSource !== 'live') return;
+    openedRun.current = run;
+    if (state.workload !== null || projection.overlayDeploymentCells.length > 0) return;
+    let best: { workload: string; hardware: number } | null = null;
+    for (const { key, slug } of options.workloads) {
+      const workload = slug ?? key;
+      const drawn = resultProjection(points, { ...state, hidden: [], workload }, namedPoints);
+      const hardware = new Set(drawn.overlayDeploymentCells.map((cell) => cell.point.hardwareKey))
+        .size;
+      if (hardware > (best?.hardware ?? 0)) best = { workload, hardware };
+    }
+    if (best) commit({ ...latest.current, workload: best.workload }, 'replace');
+  }, [state, namedSource, projection, options, points, namedPoints, commit]);
   const consent = useEngineComparisonConsent('video-results');
   const plotted = (next: ResultsState) => {
     const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);

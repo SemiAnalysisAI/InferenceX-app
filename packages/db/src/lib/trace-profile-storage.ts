@@ -16,12 +16,13 @@ export async function writeTraceProfileChunks(
   sql: ProfileSql,
   traceReplayId: number,
   profile: Buffer,
+  chunkBytes = PROFILE_CHUNK_BYTES,
 ): Promise<void> {
   const query = sql as DbClient;
   if (profile.length === 0) throw new Error('Cannot store an empty chunked profile');
   let count = 0;
-  for (let offset = 0; offset < profile.length; offset += PROFILE_CHUNK_BYTES) {
-    const data = profile.subarray(offset, offset + PROFILE_CHUNK_BYTES);
+  for (let offset = 0; offset < profile.length; offset += chunkBytes) {
+    const data = profile.subarray(offset, offset + chunkBytes);
     await query`
       insert into agentic_trace_profile_chunks (trace_replay_id, part, data)
       values (${traceReplayId}, ${count}, ${data})
@@ -43,6 +44,7 @@ export async function writeTraceProfileChunks(
 export async function* readTraceProfileChunks(
   sql: ProfileSql,
   traceReplayId: number,
+  chunkBytes = PROFILE_CHUNK_BYTES,
 ): AsyncGenerator<Buffer> {
   const query = sql as DbClient;
   const [meta] = await query`
@@ -56,11 +58,11 @@ export async function* readTraceProfileChunks(
   const count = Number(meta.parts ?? 0);
   const size = Number(count > 0 ? meta.compressed_size : (meta.inline_size ?? 0));
   if (!Number.isSafeInteger(size) || size < 0) throw new Error('Invalid profile size');
-  if (count > 0 && (!meta.sha256 || count !== Math.ceil(size / PROFILE_CHUNK_BYTES))) {
+  if (count > 0 && (!meta.sha256 || count !== Math.ceil(size / chunkBytes))) {
     throw new Error(`Invalid chunk metadata for trace profile ${traceReplayId}`);
   }
   const hash = createHash('sha256');
-  for (let offset = 0, part = 0; offset < size; offset += PROFILE_CHUNK_BYTES, part++) {
+  for (let offset = 0, part = 0; offset < size; offset += chunkBytes, part++) {
     const rows =
       count > 0
         ? await query`
@@ -68,14 +70,11 @@ export async function* readTraceProfileChunks(
           where trace_replay_id = ${traceReplayId} and part = ${part}
         `
         : await query`
-          select substring(profile_export_jsonl_gz from ${offset + 1}::int for ${PROFILE_CHUNK_BYTES}::int) as data
+          select substring(profile_export_jsonl_gz from ${offset + 1}::int for ${chunkBytes}::int) as data
           from agentic_trace_replay where id = ${traceReplayId}
         `;
     const data = rows[0]?.data;
-    if (
-      !(data instanceof Uint8Array) ||
-      data.length !== Math.min(PROFILE_CHUNK_BYTES, size - offset)
-    ) {
+    if (!(data instanceof Uint8Array) || data.length !== Math.min(chunkBytes, size - offset)) {
       throw new Error(`Missing or truncated trace profile ${traceReplayId} chunk ${part}`);
     }
     const buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);

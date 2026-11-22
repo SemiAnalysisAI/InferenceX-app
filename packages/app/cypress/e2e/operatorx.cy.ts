@@ -438,7 +438,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       .should('exist');
   });
 
-  it('toggles a GPU from a lower legend without scrolling the page', () => {
+  it('isolates a GPU from a lower legend without scrolling the page', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
     cy.visit('/opx');
     cy.wait('@comparison');
@@ -451,9 +451,14 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
         .first()
         .then(($label) => {
           cy.wrap($label).click({ scrollBehavior: false });
+          // As on the inference charts, clicking a shown GPU isolates it.
           cy.get(`[id="${$label.attr('for')}"]`)
-            .should('not.be.checked')
+            .should('be.checked')
             .and('have.focus');
+          cy.get('[data-testid="operatorx-viz-metric-vs-size"] li input:checked').should(
+            'have.length',
+            1,
+          );
         });
       cy.window().its('scrollY').should('eq', before);
     });

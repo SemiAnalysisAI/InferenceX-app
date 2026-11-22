@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   mergeTimingObservations,
   timingBalance,
@@ -123,16 +123,19 @@ describe('observed timing refresh', () => {
   });
 
   it.each([
-    undefined,
-    [],
-    [{ title: [], duration: 1, attempts: 1 }],
-    [{ title: ['test'], duration: -1, attempts: 1 }],
-    [{ title: ['test'], duration: 1, attempts: 0 }],
+    ['missing', undefined],
+    ['empty', []],
+    ['untitled', [{ title: [], duration: 1, attempts: 1 }]],
+    ['negative-duration', [{ title: ['test'], duration: -1, attempts: 1 }]],
+    ['zero-attempt', [{ title: ['test'], duration: 1, attempts: 0 }]],
     [
-      { title: ['same'], duration: 1, attempts: 1 },
-      { title: ['same'], duration: 2, attempts: 1 },
+      'duplicate-title',
+      [
+        { title: ['same'], duration: 1, attempts: 1 },
+        { title: ['same'], duration: 2, attempts: 1 },
+      ],
     ],
-  ])('rejects incomplete or ambiguous per-test measurements %#', (tests) => {
+  ])('rejects %s per-test measurements', (_, tests) => {
     const first = observation(1, 'a', 10);
     first.durations[0].tests = tests;
     expect(() =>

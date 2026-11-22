@@ -71,7 +71,7 @@ export function hardwareLegend(
       isActive: model.hardware.includes(hw),
       onClick: model.toggle,
     })),
-    onItemRemove: model.toggle,
+    onItemRemove: model.remove,
     reset: {
       id: 'operatorx-reset-filter',
       disabled: keys.every((hw) => model.hardware.includes(hw)),

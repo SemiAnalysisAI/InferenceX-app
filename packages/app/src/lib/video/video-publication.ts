@@ -97,7 +97,7 @@ export async function publishVideoResults({
   if (!positiveId(runId)) throw new Error('Invalid H3_RUN_ID');
   if (mergeRunId !== null && !positiveId(mergeRunId)) throw new Error('Invalid H3_MERGE_RUN_ID');
   const data = await get(`?run=${runId}`);
-  if (!Array.isArray(at(data, 'artifacts'))) throw new Error('Invalid video artifact catalog');
+  if (!Array.isArray(at(data, 'artifacts'))) throw new TypeError('Invalid video artifact catalog');
   if (selection !== undefined && mergeRunId === null)
     throw new Error('Selected publication requires a merge run');
   const catalog = rows(at(data, 'artifacts'));

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { create_power_model, type PowerEstimate, ValueError } from './power_model';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';
@@ -9,6 +9,7 @@ import {
   LIQUID_COOLED_RACK_PUE,
 } from './facility-pue';
 import {
+  emptySystemPowerBreakdown,
   estimateChassisPower,
   estimateRackPower,
   isRackPowerHardware,
@@ -18,6 +19,7 @@ import {
   SYSTEM_POWER_MODEL_REVISION,
   SYSTEM_POWER_MODEL_SOURCE_URL,
   systemPowerLeafCategory,
+  systemUnitGpuCount,
   type SystemPowerCategory,
   type SystemPowerOperatingState,
 } from './system-power-model';
@@ -278,5 +280,18 @@ describe('formatPueRange', () => {
     expect(formatPueRange([1.3, 1.1, 1.3])).toBe('1.1–1.3');
     expect(formatPueRange([1.1, Number.NaN])).toBe('1.1');
     expect(formatPueRange([])).toBe('—');
+  });
+});
+
+describe('system power units', () => {
+  it('starts a breakdown at zero in every part', () => {
+    expect(Object.values(emptySystemPowerBreakdown())).toEqual(
+      SYSTEM_POWER_CATEGORIES.map(() => 0),
+    );
+  });
+
+  it('models eight GPUs per chassis and a whole NVL72 rack per rack unit', () => {
+    const hardware = ['b200', 'mi355x', 'gb200', 'gb300'] as const;
+    expect(hardware.map((hw) => systemUnitGpuCount(hw))).toEqual([8, 8, 72, 72]);
   });
 });

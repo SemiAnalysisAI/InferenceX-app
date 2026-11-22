@@ -1,5 +1,5 @@
-// @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+// @test-environment jsdom
+import { describe, it, expect } from 'bun:test';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';

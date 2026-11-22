@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { BlobNotFoundError, head, put, list } from '@vercel/blob';
-import type * as BlobSdk from '@vercel/blob';
 import {
   approveVideoPublication,
   readPublishedArtifact,
@@ -15,8 +15,9 @@ import { publishedVideoHistory } from './video-history-store';
 import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
 import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 
-vi.mock('@vercel/blob', async (original) => ({
-  ...(await original<typeof BlobSdk>()),
+const actual = { ...(await import('@vercel/blob')) };
+mock.module('@vercel/blob', () => ({
+  ...actual,
   list: vi.fn(),
   head: vi.fn((path: string) =>
     Promise.resolve({
@@ -61,16 +62,16 @@ function archive(corrupt = false, extra: Record<string, string> = {}) {
   ]);
 }
 beforeEach(() => {
-  vi.mocked(put).mockClear();
-  vi.mocked(head).mockClear();
+  mocked(put).mockClear();
+  mocked(head).mockClear();
 });
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
   vi.restoreAllMocks();
 });
 describe('persistent H3 media', () => {
   it('writes one immutable approval after the index and verifies source seal on replay', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const zip = archive();
     const withDigest = {
       ...artifact,
@@ -79,18 +80,18 @@ describe('persistent H3 media', () => {
         .digest('hex')}`,
     };
     const saved = await storeVideoArtifact('10', withDigest, zip, new AbortController().signal);
-    const writes = vi.mocked(put).mock.calls.length;
+    const writes = mocked(put).mock.calls.length;
     await expect(
       approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal, {
         manifestSha256: '0'.repeat(64),
         sourceHeadSha: 'c'.repeat(40),
       }),
     ).rejects.toThrow('selected manifest');
-    expect(vi.mocked(put).mock.calls).toHaveLength(writes);
-    const before = vi.mocked(put).mock.calls.length;
+    expect(mocked(put).mock.calls).toHaveLength(writes);
+    const before = mocked(put).mock.calls.length;
     let receipt: unknown;
-    vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
-    vi.mocked(put).mockImplementationOnce((path, body) => {
+    mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    mocked(put).mockImplementationOnce((path, body) => {
       receipt = JSON.parse(String(body));
       return Promise.resolve({
         url: `https://test.public.blob.vercel-storage.com/${path}`,
@@ -119,12 +120,12 @@ describe('persistent H3 media', () => {
       sources: [{ id: '10', kind: 'observation', checkoutSha: 'a'.repeat(40) }],
     });
     expect(approved.sources[0].sha256).toBe(storedBundle(saved.sources[0]).manifestSha256);
-    expect(vi.mocked(put).mock.calls[before][0]).toBe(
+    expect(mocked(put).mock.calls[before][0]).toBe(
       'h3-video-media/v1/approvals/10/h3-video-10-1_20.json',
     );
     expect(await readVideoPublication('10', artifact, saved)).toEqual(approved);
     await approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal);
-    expect(vi.mocked(put).mock.calls).toHaveLength(before + 1);
+    expect(mocked(put).mock.calls).toHaveLength(before + 1);
     await expect(
       approveVideoPublication('10', withDigest, saved, '100', new AbortController().signal),
     ).rejects.toThrow('different merge identity');
@@ -132,8 +133,8 @@ describe('persistent H3 media', () => {
     expect(
       await approveVideoPublication('10', withDigest, saved, null, new AbortController().signal),
     ).toEqual(approved);
-    expect(vi.mocked(put).mock.calls).toHaveLength(before + 1);
-    vi.mocked(list).mockResolvedValue({
+    expect(mocked(put).mock.calls).toHaveLength(before + 1);
+    mocked(list).mockResolvedValue({
       blobs: [
         {
           ...blob(10),
@@ -144,7 +145,7 @@ describe('persistent H3 media', () => {
       hasMore: false,
       cursor: undefined,
     });
-    vi.mocked(fetch).mockImplementation((url) =>
+    mocked(fetch).mockImplementation((url) =>
       Promise.resolve(Response.json(String(url).includes('/runs/') ? saved : approved)),
     );
     const { page: history, complete } = await publishedVideoHistory(1);
@@ -153,9 +154,9 @@ describe('persistent H3 media', () => {
   });
 
   it('fails closed for a missing or mismatched approval without changing the stored source', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const saved = await storeVideoArtifact('10', artifact, archive(), new AbortController().signal);
-    vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
     expect(await readVideoPublication('10', artifact, saved)).toBeNull();
     expect(saved.sources).toHaveLength(1);
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -184,31 +185,31 @@ describe('persistent H3 media', () => {
       }),
     );
     await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow('does not match');
-    expect(vi.mocked(put).mock.calls.some(([path]) => path.includes('/approvals/'))).toBe(false);
+    expect(mocked(put).mock.calls.some(([path]) => path.includes('/approvals/'))).toBe(false);
   });
 
   it('leaves the immutable media index intact when approval upload fails', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const saved = await storeVideoArtifact('10', artifact, archive(), new AbortController().signal);
-    const indexWrites = vi.mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'));
+    const indexWrites = mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'));
     expect(indexWrites).toHaveLength(1);
-    vi.mocked(head)
+    mocked(head)
       .mockRejectedValueOnce(new BlobNotFoundError())
       .mockRejectedValueOnce(new BlobNotFoundError())
       .mockRejectedValueOnce(new BlobNotFoundError());
-    vi.mocked(put).mockRejectedValueOnce(new Error('Approval upload failed'));
+    mocked(put).mockRejectedValueOnce(new Error('Approval upload failed'));
     await expect(
       approveVideoPublication('10', artifact, saved, null, new AbortController().signal),
     ).rejects.toThrow('Approval upload failed');
     expect(saved.sources).toHaveLength(1);
-    expect(vi.mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'))).toHaveLength(1);
+    expect(mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'))).toHaveLength(1);
     expect(await readVideoPublication('10', artifact, saved)).toBeNull();
   });
 
   it.each([false, true])(
     'publishes fidelity reusing original videos (native names: %s)',
     async (nativeOriginals) => {
-      vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+      stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
       const fixture = await fidelityFixture({ nativeOriginals });
       vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
         const url = String(input);
@@ -238,7 +239,7 @@ describe('persistent H3 media', () => {
         new AbortController().signal,
       );
       expect(result.sources[0].kind).toBe('fidelity');
-      vi.mocked(fetch).mockResolvedValueOnce(Response.json(result));
+      mocked(fetch).mockResolvedValueOnce(Response.json(result));
       const saved = await readStoredArtifact(fixture.runId, fixture.artifact);
       expect(storedFidelityBundle(saved!.sources[0]).comparisonSha256).toBe(
         fixture.checksums.get('comparison.json'),
@@ -247,10 +248,10 @@ describe('persistent H3 media', () => {
       expect(result.sources[0].assets.find(([path]) => path.endsWith('.mp4'))?.[1].url).toContain(
         '/101/gpu/c1/baseline/artifacts/',
       );
-      expect(vi.mocked(put).mock.calls.some((call) => call[2]?.contentType === 'video/mp4')).toBe(
+      expect(mocked(put).mock.calls.some((call) => call[2]?.contentType === 'video/mp4')).toBe(
         false,
       );
-      expect(vi.mocked(put).mock.calls.at(-1)?.[0]).toBe(
+      expect(mocked(put).mock.calls.at(-1)?.[0]).toBe(
         'h3-video-media/v1/runs/789/h3-fidelity-789-1_987.json',
       );
     },
@@ -259,7 +260,7 @@ describe('persistent H3 media', () => {
   it.each(['missing', 'digest', 'seal', 'media'])(
     'does not publish fidelity with an unaccepted original source: %s',
     async (failure) => {
-      vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+      stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
       const fixture = await fidelityFixture();
       if (failure === 'missing') fixture.originals[0].sources = [];
       if (failure === 'digest') fixture.originals[0].artifact.digest = `sha256:${'0'.repeat(64)}`;
@@ -297,7 +298,7 @@ describe('persistent H3 media', () => {
     },
   );
   it('reads the trusted listed index URL without a redundant HEAD request', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const indexUrl =
       'https://test.public.blob.vercel-storage.com/h3-video-media/v1/runs/10/h3-video-10-1_20.json';
     const saved = { storageVersion: 1, runId: '10', artifact, sources: [] };
@@ -308,7 +309,7 @@ describe('persistent H3 media', () => {
   });
 
   it('serves the stored index when its quality attachment cannot be read', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const indexUrl =
       'https://test.public.blob.vercel-storage.com/h3-video-media/v1/runs/10/h3-video-10-1_20.json';
     const saved = { storageVersion: 1, runId: '10', artifact, sources: [] };
@@ -329,7 +330,7 @@ describe('persistent H3 media', () => {
       archive(),
       new AbortController().signal,
     );
-    const calls = vi.mocked(put).mock.calls;
+    const calls = mocked(put).mock.calls;
     expect(calls.at(-1)?.[0]).toBe('h3-video-media/v1/runs/10/h3-video-10-1_20.json');
     const video = calls.find(([path]) => path.endsWith('/synthetic.mp4'))!;
     expect(video[0]).toContain(digest('Synthetic test bytes, not a playable benchmark clip'));
@@ -360,7 +361,7 @@ describe('persistent H3 media', () => {
     expect(result.sources[0].checksums).toContainEqual([serving, digest('synthetic serving log')]);
   });
   it('removes embedded serving logs from existing indexes while preserving downloads', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const path = 'gpu/c2/supervisor/baseline/telemetry.jsonl';
     const assets = [
       [path, { url: 'https://media.test/raw', downloadUrl: 'https://media.test/raw?download=1' }],
@@ -389,7 +390,7 @@ describe('persistent H3 media', () => {
     expect(result?.sources[0].assets).toEqual(assets);
   });
   it('reuses an immutable object regardless of SDK conflict wording', async () => {
-    vi.mocked(put).mockRejectedValueOnce(new Error('Different SDK conflict wording'));
+    mocked(put).mockRejectedValueOnce(new Error('Different SDK conflict wording'));
     const result = await storeVideoArtifact(
       '10',
       artifact,
@@ -400,12 +401,12 @@ describe('persistent H3 media', () => {
     expect(head).toHaveBeenCalledTimes(1);
   });
   it('preserves upload failures when no immutable object exists', async () => {
-    vi.mocked(put).mockRejectedValueOnce(new Error('Storage upload failed'));
-    vi.mocked(head).mockRejectedValueOnce(new Error('Object missing'));
+    mocked(put).mockRejectedValueOnce(new Error('Storage upload failed'));
+    mocked(head).mockRejectedValueOnce(new Error('Object missing'));
     await expect(
       storeVideoArtifact('10', artifact, archive(), new AbortController().signal),
     ).rejects.toThrow('Storage upload failed');
-    expect(vi.mocked(put).mock.calls.some(([path]) => path.includes('/runs/'))).toBe(false);
+    expect(mocked(put).mock.calls.some(([path]) => path.includes('/runs/'))).toBe(false);
   });
   it('does not publish unverified bytes', async () => {
     await expect(
@@ -435,9 +436,9 @@ describe('rendition receipts', () => {
   const output = 'b'.repeat(64);
 
   it('resolves each original hash to its rendition MP4 from listed receipt paths alone', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const fetcher = vi.spyOn(globalThis, 'fetch');
-    vi.mocked(list)
+    mocked(list)
       .mockResolvedValueOnce({
         blobs: [
           uploadReceipt(`h3-video-media/v1/renditions/${source}/web-h264-crf23/${output}.json`),
@@ -475,10 +476,10 @@ describe('rendition receipts', () => {
   });
 
   it('resolves a poster receipt to its JPEG as posterUrl beside the rendition', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const poster = 'e'.repeat(64);
     const posterOnly = 'c'.repeat(64);
-    vi.mocked(list).mockResolvedValueOnce({
+    mocked(list).mockResolvedValueOnce({
       blobs: [
         uploadReceipt(`h3-video-media/v1/renditions/${source}/poster-f0-w672-q4/${poster}.json`),
         uploadReceipt(`h3-video-media/v1/renditions/${source}/web-h264-crf23/${output}.json`),

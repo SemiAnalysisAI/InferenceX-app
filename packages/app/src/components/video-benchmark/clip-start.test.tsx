@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import VideoResultsClips from './VideoResultsClips';
 import { videoHistoryEntry, type VideoHistoryPage } from './history';
 import { namedRunPoints } from './points';
@@ -10,14 +11,14 @@ import { referenceQualityFixture } from './reference-quality.fixture';
 import { publishedResultsSide } from './results-clips';
 import { videoClipSourceKey } from './initial-data';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 afterEach(() => {
   if (root) act(() => root?.unmount());
   container?.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -30,10 +31,10 @@ const flush = () =>
   );
 
 it('plays a clip without data from the tap, and keeps playing when that play() is rejected as aborted', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
-  vi.stubGlobal('cancelAnimationFrame', () => {});
+  stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  stubGlobal('cancelAnimationFrame', () => {});
   const plays: { reject: (reason: unknown) => void; resolve: () => void }[] = [];
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
     () =>

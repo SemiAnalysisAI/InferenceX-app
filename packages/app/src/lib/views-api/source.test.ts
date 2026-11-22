@@ -1,6 +1,6 @@
 import { cachedJson } from '@/lib/cache/api-cache';
 import { NextRequest } from 'next/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { readResponse, selection, sourceRequest } from './source';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { ViewsUpstreamError } from './upstream-error';

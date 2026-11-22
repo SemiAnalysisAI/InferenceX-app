@@ -14,7 +14,7 @@ import {
 } from '@/components/collectivex/test-fixture';
 import type { CollectiveXDataset } from '@/components/collectivex/types';
 
-import { availabilityBody } from '../support/e2e';
+import { availabilityBody, fastForwardQueryRetry } from '../support/e2e';
 
 const SOURCE_SHA = 'c'.repeat(40);
 const dataset = makeCollectiveXDataset();
@@ -454,7 +454,9 @@ describe('CollectiveX availability states', () => {
       statusCode: 404,
       body: { error: 'Not found' },
     }).as('missing');
-    cy.visit('/colx');
+    fastForwardQueryRetry('[data-testid="collectivex-error"]', () => {
+      cy.visit('/colx');
+    });
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
@@ -480,7 +482,9 @@ describe('CollectiveX availability states', () => {
       statusCode: 503,
       body: { error: 'unavailable' },
     }).as('down');
-    cy.visit('/colx');
+    fastForwardQueryRetry('[data-testid="collectivex-error"]', () => {
+      cy.visit('/colx');
+    });
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
@@ -502,7 +506,9 @@ describe('CollectiveX availability states', () => {
       );
     }).as('zhDown');
     installRun();
-    cy.visit('/zh/colx');
+    fastForwardQueryRetry('[data-testid="collectivex-error"]', () => {
+      cy.visit('/zh/colx');
+    });
     cy.wait('@zhDown');
     cy.wait('@zhDown');
     cy.get('[data-testid="collectivex-error"]')

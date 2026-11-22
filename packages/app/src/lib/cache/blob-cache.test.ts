@@ -1,8 +1,10 @@
 import { brotliCompressSync, brotliDecompressSync } from 'node:zlib';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, mock } from 'bun:test';
+import { advanceTimersByTimeAsync, mocked, useFakeTimers, useRealTimers } from '@/test/helpers';
 
-vi.mock('@vercel/blob', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+const actual = { ...(await import('@vercel/blob')) };
+mock.module('@vercel/blob', () => ({
+  ...actual,
   del: vi.fn(),
   get: vi.fn(),
   list: vi.fn(),
@@ -33,10 +35,10 @@ function listPage(count: number): ListBlobResult {
   } as unknown as ListBlobResult;
 }
 
-const mockDel = vi.mocked(del);
-const mockGet = vi.mocked(get);
-const mockList = vi.mocked(list);
-const mockPut = vi.mocked(put);
+const mockDel = mocked(del);
+const mockGet = mocked(get);
+const mockList = mocked(list);
+const mockPut = mocked(put);
 
 function stored(body: Uint8Array): GetBlobResult {
   return {
@@ -312,7 +314,7 @@ describe('blobPurge', () => {
 
   describe('large and rate-limited purges', () => {
     afterEach(() => {
-      vi.useRealTimers();
+      useRealTimers();
     });
 
     it('deletes a full list page in batches of at most 100 blobs', async () => {
@@ -324,7 +326,7 @@ describe('blobPurge', () => {
     });
 
     it('waits for the retry-after window and resends the rate-limited batch', async () => {
-      vi.useFakeTimers();
+      useFakeTimers();
       mockList.mockResolvedValue(listPage(150));
       mockDel
         .mockResolvedValueOnce(undefined)
@@ -332,24 +334,28 @@ describe('blobPurge', () => {
         .mockResolvedValue(undefined);
 
       const purge = blobPurge();
-      await vi.advanceTimersByTimeAsync(59_000);
+      await advanceTimersByTimeAsync(59_000);
       expect(mockDel).toHaveBeenCalledTimes(2);
 
-      await vi.advanceTimersByTimeAsync(1000);
+      await advanceTimersByTimeAsync(1000);
       expect(await purge).toBe(150);
       expect(mockDel).toHaveBeenCalledTimes(3);
       expect(mockDel.mock.calls[2]![0]).toEqual(mockDel.mock.calls[1]![0]);
     });
 
     it('fails after three rate-limit waits instead of outliving the function', async () => {
-      vi.useFakeTimers();
+      useFakeTimers();
       mockList.mockResolvedValue(listPage(10));
       mockDel.mockRejectedValue(new BlobServiceRateLimited(60));
 
-      const purge = blobPurge();
-      const outcome = expect(purge).rejects.toBeInstanceOf(BlobServiceRateLimited);
-      await vi.advanceTimersByTimeAsync(180_000);
-      await outcome;
+      // bun's expect(promise).rejects waits synchronously for the promise, which would deadlock
+      // before fake time advances; capture the outcome and assert once the waits have run.
+      const outcome = blobPurge().then(
+        () => new Error('blobPurge resolved'),
+        (error: unknown) => error,
+      );
+      await advanceTimersByTimeAsync(180_000);
+      expect(await outcome).toBeInstanceOf(BlobServiceRateLimited);
       expect(mockDel).toHaveBeenCalledTimes(4);
     });
 

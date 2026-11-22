@@ -2733,6 +2733,7 @@ describe('ChartDisplay engine comparison guard', () => {
         scopeReady: true,
         bestSelectionKey: '',
         bestPerSku: false,
+        requestedOfficialKey: '',
       });
       const [, setRenderVersion] = useState(0);
       const model = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;

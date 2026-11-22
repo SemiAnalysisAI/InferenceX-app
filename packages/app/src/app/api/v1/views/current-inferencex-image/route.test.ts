@@ -1,17 +1,17 @@
 import type { LatestImageRow } from '@/lib/api/api';
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { GET } from './route';
 import { imageAgeHistory, imageAgeSummary } from '@/components/latest-image/image-age';
 
-const mocks = vi.hoisted(() => ({ images: vi.fn(), releases: vi.fn(), history: vi.fn() }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
-vi.mock('@semianalysisai/inferencex-db/queries/latest-images', () => ({
+const mocks = { images: vi.fn(), releases: vi.fn(), history: vi.fn() };
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+mock.module('@semianalysisai/inferencex-db/queries/latest-images', () => ({
   getImageAgeObservations: mocks.history,
 }));
-vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
-vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
+mock.module('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));

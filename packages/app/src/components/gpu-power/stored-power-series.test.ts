@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it } from 'bun:test';
 import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 import { storedPowerSeries } from '@semianalysisai/inferencex-db/power-series/stored-power-series';
 

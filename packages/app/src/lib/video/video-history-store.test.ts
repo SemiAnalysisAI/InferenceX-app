@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { BlobNotFoundError, del, head, list, put, type HeadBlobResult } from '@vercel/blob';
-import type * as BlobSdk from '@vercel/blob';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
+import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import { servingArtifact } from '../../../cypress/support/video-artifacts';
 import {
   publishedVideoHistory as publishedVideoHistoryRead,
@@ -19,8 +21,10 @@ const publishedVideoHistory = async (page: number, pages = 1) => {
   return read.page;
 };
 
-vi.mock('@vercel/blob', async (original) => ({
-  ...(await original<typeof BlobSdk>()),
+// The factory cannot import the module it replaces, so the real exports are captured first.
+const actual = { ...(await import('@vercel/blob')) };
+mock.module('@vercel/blob', () => ({
+  ...actual,
   list: vi.fn(),
   head: vi.fn(),
   put: vi.fn(),
@@ -49,14 +53,12 @@ const ref = (saved: StoredArtifact) => ({
 });
 const snapshots = () => [...blobs.keys()].filter((path) => path.includes('/runs/history/'));
 const artifactReads = () =>
-  vi
-    .mocked(fetch)
-    .mock.calls.filter(
-      ([url]) => /\/runs\/\d+\//u.test(String(url)) && !String(url).includes('/approvals/'),
-    ).length;
+  mocked(fetch).mock.calls.filter(
+    ([url]) => /\/runs\/\d+\//u.test(String(url)) && !String(url).includes('/approvals/'),
+  ).length;
 
-async function publish(i: number, approve = true) {
-  const saved = servingArtifact(100 + i, 1000 + i);
+async function publish(i: number, approve = true, hardware?: string, takes?: number) {
+  const saved = servingArtifact(100 + i, 1000 + i, hardware, takes);
   save(indexPath(saved), JSON.stringify(saved));
   if (approve)
     await approveVideoPublication(
@@ -94,9 +96,9 @@ function meta(pathname: string): HeadBlobResult {
 }
 
 beforeEach(() => {
-  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+  stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
   blobs.clear();
-  vi.mocked(list).mockImplementation((options) => {
+  mocked(list).mockImplementation((options) => {
     const all = [...blobs.keys()]
       .filter((path) => path.startsWith(options?.prefix ?? ''))
       .toSorted((a, b) => a.localeCompare(b));
@@ -108,10 +110,10 @@ beforeEach(() => {
       cursor: more ? String(start + LIST_PAGE) : undefined,
     });
   });
-  vi.mocked(head).mockImplementation((pathname) =>
+  mocked(head).mockImplementation((pathname) =>
     blobs.has(pathname) ? Promise.resolve(meta(pathname)) : Promise.reject(new BlobNotFoundError()),
   );
-  vi.mocked(put).mockImplementation((pathname, body, options) => {
+  mocked(put).mockImplementation((pathname, body, options) => {
     const path = options?.addRandomSuffix
       ? pathname.replace(/\.json$/u, `-${String(suffix++).padStart(6, '0')}.json`)
       : pathname;
@@ -128,7 +130,7 @@ beforeEach(() => {
       pathname: path,
     });
   });
-  vi.mocked(del).mockImplementation((urls) => {
+  mocked(del).mockImplementation((urls) => {
     for (const url of [urls].flat()) blobs.delete(String(url).replace('https://blob.test/', ''));
     return Promise.resolve();
   });
@@ -140,7 +142,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -178,10 +180,24 @@ describe('published video history', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it('lists every index page, orders by publication date, and reads only ten indexes', async () => {
+  it('keeps an older deployment on the dashboard when newer sources fill the first window', async () => {
+    await publish(0, true, 'NVIDIA H100', 10);
+    for (let i = 1; i <= 50; i++) await publish(i, true, 'NVIDIA H200', 10);
+    const page = await publishedVideoHistory(1, VIDEO_HISTORY_MAX_PAGES);
+    expect(page.nextPage).toBe(VIDEO_HISTORY_MAX_PAGES + 1);
+    expect(page.entries.at(-1)?.runId).toBe('100');
+    expect(
+      new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
+    ).toEqual(new Set(['h100', 'h200']));
+  });
+
+  it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
+    // An unreadable unapproved index past the window neither costs a read nor blocks retention.
+    save(indexPath(servingArtifact(99, 999)), 'not json');
     for (let i = 0; i < 12; i++) await publish(i, false);
-    vi.mocked(fetch).mockClear();
-    const page = await publishedVideoHistory(1);
+    mocked(fetch).mockClear();
+    const { page, complete } = await publishedVideoHistoryRead(1);
+    expect(complete).toBe(true);
     expect(page.entries.map((entry) => entry.runId)).toEqual([
       '111',
       '110',
@@ -233,8 +249,8 @@ describe('recorded video history', () => {
     for (let i = 0; i < 14; i++) await publish(i, i % 4 !== 1);
     const expected = [await direct(1, 5), await direct(2)];
     expect(await recordVideoHistory(null)).toEqual({ entries: 14, built: 14, skipped: 0 });
-    vi.mocked(fetch).mockClear();
-    vi.mocked(head).mockClear();
+    mocked(fetch).mockClear();
+    mocked(head).mockClear();
     expect(JSON.stringify(await publishedVideoHistory(1, 5))).toBe(expected[0]);
     expect(JSON.stringify(await publishedVideoHistory(2))).toBe(expected[1]);
     expect(artifactReads()).toBe(0);
@@ -256,12 +272,12 @@ describe('recorded video history', () => {
     );
     const added = await publish(5);
     const expected = await direct(1);
-    vi.mocked(fetch).mockClear();
+    mocked(fetch).mockClear();
     expect(JSON.stringify(await publishedVideoHistory(1))).toBe(expected);
     expect(artifactReads()).toBe(4);
     expect(await recordVideoHistory(added)).toEqual({ entries: 3, built: 1, skipped: 0 });
     expect(await recordVideoHistory(null)).toEqual({ entries: 6, built: 3, skipped: 0 });
-    vi.mocked(fetch).mockClear();
+    mocked(fetch).mockClear();
     expect(JSON.stringify(await publishedVideoHistory(1))).toBe(expected);
     expect(artifactReads()).toBe(0);
   });
@@ -272,17 +288,17 @@ describe('recorded video history', () => {
     const added = await publish(1);
     const sibling = servingArtifact(Number(added.runId), added.artifact.id + 1);
     save(indexPath(sibling), JSON.stringify(sibling));
-    vi.mocked(fetch).mockClear();
+    mocked(fetch).mockClear();
     expect(await recordVideoHistory(added)).toEqual({ entries: 2, built: 1, skipped: 0 });
     expect(artifactReads()).toBe(0);
     expect(await recordVideoHistory(null)).toEqual({ entries: 3, built: 1, skipped: 0 });
-    const before = vi.mocked(put).mock.calls.length;
+    const before = mocked(put).mock.calls.length;
     expect(await recordVideoHistory(added)).toEqual({ entries: 3, built: 0, skipped: 0 });
     expect(await recordVideoHistory(null)).toEqual({ entries: 3, built: 0, skipped: 0 });
     expect(put).toHaveBeenCalledTimes(before);
     blobs.delete(indexPath(sibling));
     expect(await recordVideoHistory(null)).toEqual({ entries: 2, built: 0, skipped: 0 });
-    const written = Object.keys(JSON.parse(String(vi.mocked(put).mock.calls.at(-1)![1])));
+    const written = Object.keys(JSON.parse(String(mocked(put).mock.calls.at(-1)![1])));
     expect(written.toSorted()).toEqual([indexPath(added), indexPath(first)].toSorted());
   });
 
@@ -302,7 +318,7 @@ describe('recorded video history', () => {
     const kept = snapshots();
     expect(kept).toHaveLength(2);
     expect(kept.every((path) => path.includes(`/v${VIDEO_HISTORY_PROJECTION}/`))).toBe(true);
-    vi.mocked(fetch).mockClear();
+    mocked(fetch).mockClear();
     const history = await publishedVideoHistory(1);
     expect(history.entries.map((entry) => entry.runId)).toEqual(['102', '101', saved.runId]);
     expect(artifactReads()).toBe(0);
@@ -311,27 +327,27 @@ describe('recorded video history', () => {
   it('never caches a transient receipt failure and never rewrites over an unreadable snapshot', async () => {
     const saved = await publish(0);
     const receiptUrl = blobs.get(approvalPath(saved.runId, ref(saved)))!.url;
-    const read = vi.mocked(fetch).getMockImplementation()!;
-    vi.mocked(fetch).mockImplementation((url, init) =>
+    const read = mocked(fetch).getMockImplementation()!;
+    mocked(fetch).mockImplementation((url, init) =>
       String(url) === receiptUrl
         ? Promise.resolve(new Response('', { status: 503 }))
         : read(url, init),
     );
     expect(await recordVideoHistory(null)).toEqual({ entries: 0, built: 0, skipped: 1 });
-    vi.mocked(fetch).mockImplementation(read);
-    vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    mocked(fetch).mockImplementation(read);
+    mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
     expect(await recordVideoHistory(null)).toEqual({ entries: 0, built: 0, skipped: 1 });
     const healed = await publishedVideoHistory(1);
     expect(healed.entries[0].approved).toBe(true);
     await recordVideoHistory(null);
     const [snapshot] = snapshots();
     const added = await publish(1);
-    vi.mocked(fetch).mockImplementation((url, init) =>
+    mocked(fetch).mockImplementation((url, init) =>
       String(url).includes('/runs/history/')
         ? Promise.resolve(new Response('', { status: 500 }))
         : read(url, init),
     );
-    const writes = vi.mocked(put).mock.calls.length;
+    const writes = mocked(put).mock.calls.length;
     await expect(recordVideoHistory(added)).rejects.toThrow('snapshot unavailable');
     expect(put).toHaveBeenCalledTimes(writes);
     expect(snapshots()).toEqual([snapshot]);
@@ -367,8 +383,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Run-filtered pagination changes index discovery but preserves each projected entry.
-      sources: '189a4601aa147aa4f3ce6b9ad57b14d1488a3be41b954da884f5f0205700d1a0',
+      // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front. It is reached
+      // only through a type import, so recorded entries are unchanged.
+      sources: '515f0ca74d2331a0310e5cbabfed34f22ac2b61dee036db95e2ad77629c19ba4',
     });
   });
 });

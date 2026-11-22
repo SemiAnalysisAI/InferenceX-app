@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import fixture from '../../../cypress/fixtures/api/video-history.json';
 import type { VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';

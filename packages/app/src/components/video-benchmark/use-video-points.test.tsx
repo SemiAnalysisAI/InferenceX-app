@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { liveHistoryEntry, type VideoHistoryPage } from './history';
 import { referenceQualityFixture } from './reference-quality.fixture';
@@ -23,7 +24,7 @@ function Probe({ runId }: { runId: string | null }) {
 let root: Root;
 afterEach(() => {
   act(() => root.unmount());
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('useVideoPoints live overlay', () => {
@@ -32,7 +33,7 @@ describe('useVideoPoints live overlay', () => {
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 502 }))
       .mockResolvedValueOnce(Response.json(live));
-    vi.stubGlobal('fetch', fetch);
+    stubGlobal('fetch', fetch);
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const container = document.createElement('div');
     root = createRoot(container);
@@ -67,7 +68,7 @@ describe('useVideoPoints History read', () => {
       entries: [{ ...live.entries[0], approved: true }],
       nextPage: null,
     };
-    vi.stubGlobal(
+    stubGlobal(
       'fetch',
       vi
         .fn()

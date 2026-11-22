@@ -1,19 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { GET } from '@/app/api/video-runs/route';
 import { VIDEO_HISTORY_MAX_PAGES, videoHistoryEntry } from '@/components/video-benchmark/history';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { loadVideoPageData, videoPageState } from './video-page-data';
 
-vi.mock('@/app/api/video-runs/route', () => ({ GET: vi.fn() }));
-beforeEach(() => vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-token'));
+mock.module('@/app/api/video-runs/route', () => ({ GET: vi.fn() }));
+beforeEach(() => stubEnv('BLOB_READ_WRITE_TOKEN', 'test-token'));
 afterEach(() => {
   vi.resetAllMocks();
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
 });
 
 describe('VideoGenX first document', () => {
   it('leaves History to the client read when video storage is not configured', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', '');
+    stubEnv('BLOB_READ_WRITE_TOKEN', '');
     const initial = await loadVideoPageData({ unofficialrun: '456' });
     expect(initial.state.unofficialRun).toBe('456');
     expect(initial.history).toBeNull();
@@ -26,7 +27,7 @@ describe('VideoGenX first document', () => {
     const named = referenceQualityFixture(20, '456', 8, 'b'.repeat(64), 'NVIDIA H100');
     const path = named.attachment.pairs[0].candidate.media_path;
     named.stored.sources[0].assets = [[path, { url: '/named.mp4', downloadUrl: '/named.mp4' }]];
-    vi.mocked(GET).mockImplementation(async (request) => {
+    mocked(GET).mockImplementation(async (request) => {
       const query = request.nextUrl.searchParams;
       if (query.get('format') === 'history') {
         expect([query.get('page'), query.get('pages')]).toEqual([
@@ -59,7 +60,7 @@ describe('VideoGenX first document', () => {
 
   it('keeps loaded metrics when a selected media read fails and leaves retry available', async () => {
     const { stored } = referenceQualityFixture(20);
-    vi.mocked(GET)
+    mocked(GET)
       .mockResolvedValueOnce(
         Response.json({
           schemaVersion: 1,
@@ -76,7 +77,7 @@ describe('VideoGenX first document', () => {
 
   it('leaves an incomplete History read to the browser instead of seeding it', async () => {
     const { stored } = referenceQualityFixture(20);
-    vi.mocked(GET).mockResolvedValueOnce(
+    mocked(GET).mockResolvedValueOnce(
       Response.json(
         {
           schemaVersion: 1,

@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { OperatorXRawBundle } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
@@ -16,15 +16,15 @@ import { replaceClientSearch } from '@/lib/routing/client-navigation';
 import type { ComparisonModel } from './compare/model';
 import type { VizDefinition } from './viz/types';
 
-const state = vi.hoisted(() => ({
+const state = {
   views: new Map<string | null, ComparisonView>(),
   models: [] as ComparisonModel[],
   detail: null as null | { view: ComparisonView; hardware: string[]; caseIndex: number | null },
   loading: false,
-}));
+};
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/opx' }));
-vi.mock('@/hooks/api/use-operatorx', () => ({
+mock.module('next/navigation', () => ({ usePathname: () => '/opx' }));
+mock.module('@/hooks/api/use-operatorx', () => ({
   useOperatorXComparison: (_op: string, workload: string | null) => ({
     data: state.loading ? undefined : state.views.get(workload),
     error: null,
@@ -34,14 +34,14 @@ vi.mock('@/hooks/api/use-operatorx', () => ({
   }),
   prefetchOperatorXTimelines: () => undefined,
 }));
-vi.mock('./CaseDetail', () => ({
+mock.module('./CaseDetail', () => ({
   CaseDetail: (props: { view: ComparisonView; hardware: string[]; caseIndex: number | null }) => {
     state.detail = props;
     return null;
   },
 }));
 // One eager card that records every model it renders.
-vi.mock('./viz', () => ({
+mock.module('./viz', () => ({
   VISUALIZATIONS: [
     {
       id: 'probe',
@@ -177,7 +177,7 @@ describe('ComparisonDashboard live state', () => {
   });
 
   it('never empties the GPU selection when toggling after a workload switch', () => {
-    act(() => state.models.at(-1)!.toggle(state.models.at(-1)!.available[0]));
+    act(() => state.models.at(-1)!.remove(state.models.at(-1)!.available[0]));
     expect(state.models.at(-1)!.hardware).toHaveLength(1);
 
     act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
@@ -187,24 +187,38 @@ describe('ComparisonDashboard live state', () => {
     // The last selected GPU stays selected, so the chart does not rebuild.
     const rendered = state.models.length;
     act(() => state.models.at(-1)!.toggle(only));
+    act(() => state.models.at(-1)!.remove(only));
     expect(state.models).toHaveLength(rendered);
     expect(state.models.at(-1)!.hardware).toEqual([only]);
   });
 
-  it('toggles legend GPUs within the GPU list the charts show', () => {
+  it('isolates a clicked legend GPU and restores all on a second click, like the inference charts', () => {
     const [first, second] = state.models.at(-1)!.available;
 
     act(() => state.models.at(-1)!.toggle(first));
+    expect(state.models.at(-1)!.hardware).toEqual([first]);
+
+    act(() => state.models.at(-1)!.toggle(second));
+    expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+
+    act(() => state.models.at(-1)!.toggle(second));
     expect(state.models.at(-1)!.hardware).toEqual([second]);
 
-    act(() => state.models.at(-1)!.toggle(first));
-    expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+    act(() => state.models.at(-1)!.toggle(second));
+    expect(state.models.at(-1)!.hardware).toEqual(state.models.at(-1)!.available);
+  });
+
+  it('hides a GPU with the legend remove button', () => {
+    const [first, second] = state.models.at(-1)!.available;
+
+    act(() => state.models.at(-1)!.remove(first));
+    expect(state.models.at(-1)!.hardware).toEqual([second]);
   });
 
   it('resets the legend filter to every GPU the charts show', () => {
     const [first, second] = state.models.at(-1)!.available;
 
-    act(() => state.models.at(-1)!.toggle(first));
+    act(() => state.models.at(-1)!.remove(first));
     expect(state.models.at(-1)!.hardware).toEqual([second]);
 
     act(() => state.models.at(-1)!.reset());

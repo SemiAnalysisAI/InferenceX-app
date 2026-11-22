@@ -1,6 +1,13 @@
 import { timeStamp } from 'node:console';
 import { createRequire } from 'node:module';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import {
+  runOnlyPendingTimers,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 const require = createRequire(import.meta.url);
 interface FlightClient {
@@ -8,9 +15,9 @@ interface FlightClient {
 }
 
 afterEach(() => {
-  vi.useRealTimers();
+  useRealTimers();
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe.each(['turbopack', 'webpack', 'turbopack-experimental', 'webpack-experimental'])(
@@ -27,12 +34,12 @@ describe.each(['turbopack', 'webpack', 'turbopack-experimental', 'webpack-experi
     ])(
       'retains the error and valid timing at offset $offset (aborted=$aborted)',
       async ({ aborted, startTime, offset, span }) => {
-        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         // Vitest's captured console omits this native capability required by React's timing gate.
-        vi.stubGlobal('console', { ...console, timeStamp });
+        stubGlobal('console', { ...console, timeStamp });
         if (bundler.startsWith('webpack')) {
           // The browser decoder wraps this at import; these Flight rows load no client modules.
-          vi.stubGlobal('__webpack_require__', {
+          stubGlobal('__webpack_require__', {
             u() {
               throw new Error('The Flight timing fixture must not load browser chunks');
             },
@@ -65,7 +72,7 @@ describe.each(['turbopack', 'webpack', 'turbopack-experimental', 'webpack-experi
         await expect(Promise.resolve(createFromReadableStream(stream))).rejects.toMatchObject(
           aborted ? { message: 'Connection closed.' } : { message: digest, digest },
         );
-        expect(() => vi.runOnlyPendingTimers()).not.toThrow();
+        expect(() => runOnlyPendingTimers()).not.toThrow();
 
         if (span) {
           expect(measure).toHaveBeenCalledExactlyOnceWith(

@@ -1,13 +1,28 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
 import {
   RESIZE_COALESCE_MS,
   useResponsiveChartDimensions,
   type UseResponsiveChartDimensionsResult,
 } from './useResponsiveChartDimensions';
+
+let frames: (FrameRequestCallback | null)[] = [];
+
+function flushFrames() {
+  act(() => {
+    for (const frame of frames.splice(0)) frame?.(0);
+  });
+}
 
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
@@ -30,13 +45,18 @@ class MockResizeObserver {
 
   unobserve() {}
 
-  trigger(width: number) {
+  report(width: number) {
     act(() => {
       this.callback(
         [{ contentRect: { width } } as unknown as ResizeObserverEntry],
         this as unknown as ResizeObserver,
       );
     });
+  }
+
+  trigger(width: number) {
+    this.report(width);
+    flushFrames();
   }
 }
 
@@ -79,11 +99,16 @@ function makeContainer(width: number): HTMLDivElement {
 
 beforeEach(() => {
   MockResizeObserver.instances = [];
-  vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  frames = [];
+  stubGlobal('ResizeObserver', MockResizeObserver);
+  stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
+  stubGlobal('cancelAnimationFrame', (id: number) => {
+    frames[id - 1] = null;
+  });
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -134,6 +159,25 @@ describe('useResponsiveChartDimensions', () => {
     unmount();
   });
 
+  it('applies an observed width on the next frame, not inside the observer callback', () => {
+    const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
+      useResponsiveChartDimensions({ height: (width) => width / 2 }),
+    );
+
+    act(() => {
+      result.current.setContainerRef(makeContainer(800));
+    });
+    const observer = MockResizeObserver.instances.at(-1)!;
+
+    observer.report(1000);
+    observer.report(1024);
+    expect(result.current.dimensions).toEqual({ width: 800, height: 400 });
+
+    flushFrames();
+    expect(result.current.dimensions).toEqual({ width: 1024, height: 512 });
+    unmount();
+  });
+
   it('disconnects the previous observer when the container changes', () => {
     const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
       useResponsiveChartDimensions({ height: 600 }),
@@ -173,7 +217,7 @@ describe('useResponsiveChartDimensions', () => {
   });
 
   it('applies the first width change at once and coalesces a burst into its final width', () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
         useResponsiveChartDimensions({ height: 600 }),
@@ -190,15 +234,15 @@ describe('useResponsiveChartDimensions', () => {
       observer.trigger(990);
       expect(result.current.dimensions.width).toBe(1024);
 
-      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      act(() => advanceTimersByTime(RESIZE_COALESCE_MS));
       expect(result.current.dimensions).toEqual({ width: 990, height: 600 });
 
-      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      act(() => advanceTimersByTime(RESIZE_COALESCE_MS));
       observer.trigger(700);
       expect(result.current.dimensions.width).toBe(700);
       unmount();
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 });

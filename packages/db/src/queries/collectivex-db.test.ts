@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { PGlite } from '@electric-sql/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { type ChangelogEntry, linkRows } from '../collectivex/changelog';
 import { buildUploadedRun, validateResults } from '../collectivex/results-upload';
@@ -39,10 +39,16 @@ async function applyMigrations(db: PGlite, filter: (name: string) => boolean): P
   }
 }
 
-async function collectiveXDb(): Promise<PgliteSql> {
+let template: Blob;
+beforeAll(async () => {
   const db = await PGlite.create();
   await applyMigrations(db, () => true);
-  return pgliteSql(db);
+  template = await db.dumpDataDir('none');
+  await db.close();
+});
+
+async function collectiveXDb(): Promise<PgliteSql> {
+  return pgliteSql(await PGlite.create({ loadDataDir: template }));
 }
 
 function result(sku: string, vendor: 'amd' | 'nvidia', sourceSha: string): Json {

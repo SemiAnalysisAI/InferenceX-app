@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline, gzipRequestTimeline } from '../etl/request-timeline-codec';
@@ -17,10 +17,8 @@ import {
 } from './request-timeline';
 import { getTraceHistograms } from './trace-histograms';
 
-vi.mock('./agentic-shared', async (importOriginal) => {
-  const actual = await importOriginal<typeof agenticShared>();
-  return { ...actual, writeBackRequestTimeline: vi.fn(actual.writeBackRequestTimeline) };
-});
+const writeBackRequestTimeline = mock(agenticShared.writeBackRequestTimeline);
+mock.module('./agentic-shared', () => ({ ...agenticShared, writeBackRequestTimeline }));
 
 function timelineFor(seed: number): RequestTimeline {
   return {
@@ -164,9 +162,8 @@ describe('request timeline storage on PostgreSQL', () => {
     const result = await getRequestTimeline(sql, 104);
     expect(result?.requests).toHaveLength(1);
 
-    const writeBack = vi.mocked(agenticShared.writeBackRequestTimeline);
-    expect(writeBack).toHaveBeenCalledTimes(1);
-    await writeBack.mock.results[0]!.value;
+    expect(writeBackRequestTimeline).toHaveBeenCalledTimes(1);
+    await writeBackRequestTimeline.mock.results[0]!.value;
 
     const [row] = (await sql`
       select request_timeline_gz, request_timeline_version, request_count,
@@ -184,7 +181,7 @@ describe('request timeline storage on PostgreSQL', () => {
     expect(row!.request_count).toBe(1);
     expect(row!.legacy_version).toBe(REQUEST_TIMELINE_VERSION - 1);
     await expect(getRequestTimeline(sql, 104)).resolves.toEqual(result);
-    expect(writeBack).toHaveBeenCalledTimes(1);
+    expect(writeBackRequestTimeline).toHaveBeenCalledTimes(1);
   });
 });
 

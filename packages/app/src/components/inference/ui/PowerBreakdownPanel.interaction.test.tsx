@@ -1,8 +1,8 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
@@ -11,18 +11,18 @@ import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777/attempts/1';
 
-const track = vi.hoisted(() => vi.fn());
+const track = (() => vi.fn())();
 // The locale and the pointer type are flipped per test: zh copy, touch scrub.
-const env = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', coarsePointer: false }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => env.locale }));
-vi.mock('@/lib/analytics/analytics', () => ({ track }));
-vi.mock('@/hooks/useUrlState', () => ({
+const env = { locale: 'en' as 'en' | 'zh', coarsePointer: false };
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => env.locale }));
+mock.module('@/lib/analytics/analytics', () => ({ track }));
+mock.module('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: () => null, setUrlParams: () => {} }),
 }));
-vi.mock('@/hooks/useThemeColors', () => ({
+mock.module('@/hooks/useThemeColors', () => ({
   useThemeColors: () => ({ resolveColor: (key: string) => `var(--${key})` }),
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({
     runIndexByUrl: { [RUN_URL]: 2 },
     unofficialRunInfos: [
@@ -32,12 +32,12 @@ vi.mock('@/providers/unofficial-run-provider', () => ({
     ],
   }),
 }));
-vi.mock('@/components/ui/chart-buttons', () => ({
+mock.module('@/components/ui/chart-buttons', () => ({
   ChartButtons: () => <div data-testid="chart-buttons" />,
 }));
 // jsdom has no measured layout, so the chart shell is replaced by one that runs the
 // panel's custom D3 layers against fixed scales; the layers' own output is what is tested.
-vi.mock('@/lib/d3-chart/D3Chart', async () => {
+mock.module('@/lib/d3-chart/D3Chart', async () => {
   const ReactModule = await import('react');
   const d3 = await import('d3');
   const PLOT_WIDTH = 600;

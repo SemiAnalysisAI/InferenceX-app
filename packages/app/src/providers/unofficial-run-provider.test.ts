@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'bun:test';
+
 import { parseUnofficialRunIds } from '@/lib/routing/unofficial-runs';
-import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
@@ -548,6 +549,7 @@ const initialSelection = (): OverlaySelectionState => ({
   scopeReady: false,
   bestSelectionKey: '',
   bestPerSku: false,
+  requestedOfficialKey: '',
 });
 
 describe('unofficial URL and overlay selection state', () => {
@@ -606,6 +608,73 @@ describe('unofficial URL and overlay selection state', () => {
     });
     expect(restored.localOfficialOverride).toEqual(new Set(['h100', 'h200']));
     expect(restored.activeOverlayHwTypes).toEqual(new Set(['h100', 'b100', 'b200']));
+  });
+
+  describe('requested official hardware', () => {
+    const scope = {
+      scopeKey: 'model|sequence|1,2',
+      officialHwTypes: new Set(['h100', 'h200', 'b300']),
+      overlayHwTypes: new Set(['b200']),
+      bestOfficialHwTypes: new Set(['b300']),
+      bestOverlayHwTypes: new Set(['b200']),
+      bestPerSku: false,
+      ready: true,
+    };
+
+    it('limits the official selection to the requested hardware and keeps the overlay', () => {
+      const next = overlaySelectionReducer(initialSelection(), {
+        type: 'scope',
+        input: { ...scope, requestedOfficialHwTypes: new Set(['h200', 'mi355x']) },
+      });
+      expect(next.localOfficialOverride).toEqual(new Set(['h200']));
+      expect(next.activeOverlayHwTypes).toEqual(new Set(['b200', 'h100']));
+    });
+
+    it('keeps the full official scope without a request or when nothing requested is in scope', () => {
+      for (const requestedOfficialHwTypes of [undefined, null, new Set(['mi355x'])]) {
+        const next = overlaySelectionReducer(initialSelection(), {
+          type: 'scope',
+          input: { ...scope, requestedOfficialHwTypes },
+        });
+        expect(next.localOfficialOverride).toEqual(new Set(['h100', 'h200', 'b300']));
+      }
+    });
+
+    it('applies a request that resolves after the scope is ready, and drops it when withdrawn', () => {
+      const full = overlaySelectionReducer(initialSelection(), { type: 'scope', input: scope });
+      expect(full.localOfficialOverride).toEqual(new Set(['h100', 'h200', 'b300']));
+
+      const requested = overlaySelectionReducer(full, {
+        type: 'scope',
+        input: { ...scope, requestedOfficialHwTypes: new Set(['h100']) },
+      });
+      expect(requested.localOfficialOverride).toEqual(new Set(['h100']));
+
+      const withdrawn = overlaySelectionReducer(requested, {
+        type: 'scope',
+        input: { ...scope, requestedOfficialHwTypes: null },
+      });
+      expect(withdrawn.localOfficialOverride).toEqual(new Set(['h100', 'h200', 'b300']));
+    });
+
+    it('keeps a legend selection made after the request while the request is unchanged', () => {
+      const input = { ...scope, requestedOfficialHwTypes: new Set(['h100']) };
+      const requested = overlaySelectionReducer(initialSelection(), { type: 'scope', input });
+      const picked = overlaySelectionReducer(requested, {
+        type: 'selection',
+        official: new Set(['h100', 'b300']),
+        overlay: new Set(['b200']),
+      });
+      expect(overlaySelectionReducer(picked, { type: 'scope', input })).toBe(picked);
+    });
+
+    it('lets best-per-SKU replace the request', () => {
+      const next = overlaySelectionReducer(initialSelection(), {
+        type: 'scope',
+        input: { ...scope, bestPerSku: true, requestedOfficialHwTypes: new Set(['h100']) },
+      });
+      expect(next.localOfficialOverride).toEqual(new Set(['b300']));
+    });
   });
 
   it('resets dismissed-run selection exactly once when the canonical query key changes', () => {

@@ -1,10 +1,12 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
+const actual = { ...(await import('@/lib/d3-chart/dynamic-margins')) };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actual,
   measureTextWidth: (label: string, font: string) =>
     label.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
@@ -17,7 +19,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -26,7 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function render(element: React.ReactNode) {

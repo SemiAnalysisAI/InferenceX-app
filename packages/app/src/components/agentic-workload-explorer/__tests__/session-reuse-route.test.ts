@@ -1,22 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import {
   buildSessionReusePayload,
   sessionReuseWindow,
 } from '@semianalysisai/inferencex-db/proxytrace/shared/session-reuse';
-const mocks = vi.hoisted(() => ({ read: vi.fn(), vis: [] as string[] | null }));
-vi.mock('@/lib/agentic-workload-explorer/api', () => ({
+const mocks = { read: vi.fn(), vis: [] as string[] | null };
+mock.module('@/lib/agentic-workload-explorer/api', () => ({
   CDN_CACHE_CONTROL: 'public, max-age=0, s-maxage=86400, stale-while-revalidate=604800',
   withExplorerRoute:
     (handler: (ctx: { req: unknown; vis: string[] | null }) => Promise<Response>) =>
     (req: unknown) =>
       handler({ req, vis: mocks.vis }),
 }));
-vi.mock('@semianalysisai/inferencex-db/proxytrace/stats', () => ({
+mock.module('@semianalysisai/inferencex-db/proxytrace/stats', () => ({
   readStatsCache: mocks.read,
   statsCacheKey: (kind: string, vis: string[] | null, tv: number | null) =>
     `${kind}:${vis === null ? 'all' : 'anon'}:${tv ?? 'all'}`,
 }));
-import { GET } from '@/app/api/v1/agentic-workload-explorer/session-reuse/route';
+// The route wraps its handler with withExplorerRoute when the module loads, and static imports
+// run before mock.module. Importing after the mock is the only way the route sees the mock.
+const { GET } = await import('@/app/api/v1/agentic-workload-explorer/session-reuse/route');
 const request = (query = '') =>
   ({ nextUrl: new URL(`https://test/api/session-reuse${query}`) }) as Parameters<typeof GET>[0];
 const payload = buildSessionReusePayload(

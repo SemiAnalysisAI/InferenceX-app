@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { buildArtifactPlan } from './ci-artifact-preparation.js';
 import type { ArtifactMeta } from './github-artifacts.js';
@@ -97,6 +97,7 @@ describe('buildArtifactPlan', () => {
       artifact(9, 'job_event_cfg_pool_01', at),
       artifact(10, 'job_events', at),
       artifact(11, 'al_gate_dataset', at),
+      artifact(15, 'scheduling-facts.json', at),
       artifact(12, 'agentic_cfg_pool_01', at),
       artifact(13, 'server_logs_expired_h200_1', at),
       artifact(14, 'bmk_expired_h200_1', at, true),

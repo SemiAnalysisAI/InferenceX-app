@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { PGlite } from '@electric-sql/pglite';
-import { expect, it } from 'vitest';
+import { beforeAll, expect, it } from 'bun:test';
 
 import type { DbClient } from '../connection';
 import type { Sql } from '../etl/db-utils';
@@ -110,16 +110,26 @@ async function migrate(db: PGlite, compact = true): Promise<void> {
   }
 }
 
+let template: Blob;
+beforeAll(async () => {
+  const db = new PGlite();
+  await migrate(db);
+  template = await db.dumpDataDir('none');
+  await db.close();
+});
+
+function migratedDb(): Promise<PGlite> {
+  return PGlite.create({ loadDataDir: template });
+}
+
 function expectedComparison(raw: OperatorXRawBundle) {
   const dataset = normalizeBundle(raw);
   return buildComparison('gemm', [{ runner: dataset.run.plan!.runner, dataset }]);
 }
 
-// The first PGlite test also pays the database start-up.
 it('persists raw OperatorX documents and replaces a re-ingested run atomically', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const first = bundle();
     first.run.generated_at = '2026-09-26T08:00:00.123+08:00';
@@ -184,12 +194,11 @@ it('persists raw OperatorX documents and replaces a re-ingested run atomically',
   } finally {
     await db.close();
   }
-}, 20_000);
+});
 
 it('keeps raw documents and compact comparisons intact when a re-ingest fails', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const before = await getOperatorXBundle(sql, '123');
@@ -216,9 +225,8 @@ it('keeps raw documents and compact comparisons intact when a re-ingest fails', 
 });
 
 it('replaces an older Ascend run atomically while preserving other hardware', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const old = bundle();
     old.run.run_id = 'old-ascend';
@@ -253,9 +261,8 @@ it('replaces an older Ascend run atomically while preserving other hardware', as
 });
 
 it('reads large runs in bounded document batches without changing shard order', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const input = bundle();
     input.shards = [
@@ -284,9 +291,8 @@ const row = (m: number, latency: number) => ({
 });
 
 it('projects persisted shard order so duplicate selection and timeline indices match raw reads', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const input = bundle();
     input.shards[0].id = 'z';
@@ -313,9 +319,8 @@ it('projects persisted shard order so duplicate selection and timeline indices m
 });
 
 it('backfills idempotently and refuses a revision replaced after the raw read', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const captured = (await getOperatorXBundle(sql, '123'))!;
@@ -371,9 +376,8 @@ it.each(['42501', '08006', '57014'])(
 );
 
 it('reads requested compact run revisions with one size query and one batch read', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const first = bundle();
     const second = bundle();
@@ -410,9 +414,8 @@ it('reads requested compact run revisions with one size query and one batch read
 });
 
 it('stores comparisons as JSON objects and still reads double-encoded legacy rows', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const stored = await db.query<{ t: string }>(
@@ -432,9 +435,8 @@ it('stores comparisons as JSON objects and still reads double-encoded legacy row
 });
 
 it('reads comparisons for more runs than one batch holds', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const keys = Array.from({ length: 19 }, (_, i) => String(1000 + i));
     for (const key of keys) {
@@ -470,9 +472,8 @@ function profiledBundle(): OperatorXRawBundle {
 }
 
 it('precomputes per-result timelines at ingest and reads them by ref', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     const raw = profiledBundle();
     await saveOperatorXBundle(sql, raw);
@@ -515,9 +516,8 @@ it('precomputes per-result timelines at ingest and reads them by ref', async () 
 });
 
 it('stores a null timeline for unprofiled results and tolerates a missing table', async () => {
-  const db = new PGlite();
+  const db = await migratedDb();
   try {
-    await migrate(db);
     const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const [run] = await listOperatorXRuns(sql);

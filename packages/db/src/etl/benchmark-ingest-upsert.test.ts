@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { getBenchmarkPresence } from '../queries/benchmark-presence';

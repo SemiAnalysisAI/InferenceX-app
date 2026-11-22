@@ -1,0 +1,60 @@
+name: Set up workspace
+description: >-
+  Installs the pinned Bun and Node 24, mounts the Blacksmith sticky disks the CI jobs share, and
+  installs dependencies from the lockfile. Disk keys live here so every job mounts the same disks.
+inputs:
+  nextjs-cache:
+    description: Mount the Next.js build cache at packages/app/.next/cache.
+    default: 'false'
+  cypress-binary:
+    description: Mount the Cypress binary cache and install the binary if it is missing.
+    default: 'false'
+  commit:
+    description: >-
+      Sticky disk commit mode ('false' or 'on-change'). Only the Warm CI caches workflow writes;
+      Blacksmith discards writes from non-default branches regardless.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      id: setup-bun
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version-file: package.json
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '26'
+    # Sticky disks mount in about a second; bun reconciles node_modules to the lockfile.
+    - name: Mount node_modules
+      uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
+      with:
+        key: ${{ github.repository }}-node-modules-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}
+        path: ./node_modules
+        commit: ${{ inputs.commit }}
+    # The Turbopack compiler cache (turbopackFileSystemCacheForBuild in next.config.ts) plus the
+    # incremental fetch cache, per https://nextjs.org/docs/pages/guides/ci-build-caching.
+    - name: Mount Next.js build cache
+      if: ${{ inputs.nextjs-cache == 'true' }}
+      uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
+      with:
+        key: ${{ github.repository }}-nextjs-cache-${{ runner.arch }}
+        path: ./packages/app/.next/cache
+        commit: ${{ inputs.commit }}
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      env:
+        CYPRESS_INSTALL_BINARY: '0'
+    - name: Mount Cypress binary
+      if: ${{ inputs.cypress-binary == 'true' }}
+      uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
+      with:
+        key: ${{ github.repository }}-cypress-binary-${{ runner.arch }}
+        path: /home/runner/.cache/Cypress
+        commit: ${{ inputs.commit }}
+    - name: Install Cypress binary if missing
+      if: ${{ inputs.cypress-binary == 'true' }}
+      shell: bash
+      working-directory: packages/app
+      run: bunx cypress verify || bunx cypress install

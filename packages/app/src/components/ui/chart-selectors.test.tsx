@@ -1,14 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { renderToString } from 'react-dom/server';
-import { expect, it, vi } from 'vitest';
+import { expect, it, mock } from 'bun:test';
 
 import { ModelSelector, ScenarioSelector } from './chart-selectors';
 import { TooltipProvider } from './tooltip';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
-const route = vi.hoisted(() => ({ pathname: '/infx/inference' }));
-vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
+const route = { pathname: '/infx/inference' };
+mock.module('next/navigation', () => ({ usePathname: () => route.pathname }));
 
 it.each(['/infx/inference', '/zh/infx/inference'])(
   'keeps the catalog label for a retained model absent from availability on %s',

@@ -57,13 +57,16 @@ function retained<T, Args extends unknown[]>(
 /**
  * The page with its completeness, so consumers can tell a degraded read from a complete one. The
  * key is versioned because the runtime cache outlives deploys and keys only on this prefix: bump
- * it whenever the cached value's shape changes.
+ * it whenever the cached value's shape changes. The run id is part of the key, so the overview
+ * (no run) and each named run are cached apart.
  */
 export const cachedVideoHistory = retained(
-  'video:history:v3',
+  'video:history:v4',
   async (page: number, pages: number, runId?: string) => {
     const value = await publishedVideoHistory(page, pages, runId);
-    // Missing runs and pages past the end must stay visible to a later publication.
+    // The overview keeps an empty first page; a page past the end is empty for any number, and
+    // keeping it would let requests grow the cache. A named run keeps only pages that hold its
+    // entries, so a run with nothing stored stays visible to a later publication.
     return {
       value,
       retain: value.complete && (value.page.entries.length > 0 || (!runId && page === 1)),

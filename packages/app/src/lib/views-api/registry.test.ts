@@ -2,7 +2,7 @@ import { apiOperations, buildOpenApiDocument } from '@/lib/api/api-documentation
 import { DASHBOARD_ROUTE_KEYS } from '@/lib/routing/dashboard-routes';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { parseDateParam, parseNumberMap, parseNumberParam, validateParams } from './params';
 import { DASHBOARD_API_COVERAGE, VIEW_QUERY_PARAMS } from './registry';
 import { comparisonSelections } from './source';

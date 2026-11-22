@@ -1,15 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 import type { OverviewPageData, OverviewTier } from '@/lib/overview/overview-data';
 
-const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const routerStub = { push: vi.fn(), replace: vi.fn() };
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   useRouter: () => routerStub,
 }));
 
@@ -95,7 +96,7 @@ function deferredFetch() {
         settlers.push({ resolve, reject });
       }),
   );
-  vi.stubGlobal('fetch', stub);
+  stubGlobal('fetch', stub);
   return { stub, settlers };
 }
 
@@ -117,7 +118,7 @@ afterEach(() => {
   selectRowScope = undefined;
   selectHardwareRowScope = undefined;
   prefetchTier = undefined;
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('OverviewNavigationProvider', () => {
@@ -212,7 +213,7 @@ describe('OverviewNavigationProvider', () => {
     const { settlers } = deferredFetch();
     window.history.pushState({}, '', '/overview?tier=75');
     const reload = vi.fn();
-    vi.stubGlobal('location', {
+    stubGlobal('location', {
       ...window.location,
       pathname: '/overview',
       search: '?tier=75',
@@ -323,7 +324,7 @@ describe('OverviewNavigationProvider', () => {
       .fn()
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce(Response.json(pageData(75)));
-    vi.stubGlobal('fetch', stub);
+    stubGlobal('fetch', stub);
 
     renderProvider(pageData(50), '/overview');
     await act(async () => {
@@ -377,7 +378,7 @@ describe('OverviewNavigationProvider', () => {
 
   it('keys the cache by canonical data identity', async () => {
     const stub = vi.fn().mockResolvedValue(Response.json(pageData(50)));
-    vi.stubGlobal('fetch', stub);
+    stubGlobal('fetch', stub);
 
     window.history.replaceState({}, '', '/overview?tier=50&utm_source=x');
     renderProvider(pageData(50), '/overview?tier=50');

@@ -1,38 +1,57 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'bun:test';
+import {
+  setSystemTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
+import type * as Analytics from './analytics';
 
-const names = (capture: Mock) => capture.mock.calls.map(([name]) => name);
+// analytics keeps its queue and dedupe state at module level. bun:test has no resetModules, so
+// each reset loads a fresh copy under a new specifier.
+let moduleGeneration = 0;
+function resetModules() {
+  moduleGeneration += 1;
+}
+function importAnalytics(): Promise<typeof Analytics> {
+  return import(`./analytics?generation=${moduleGeneration}`);
+}
+
+const names = (capture: Mock<(name: string, ...rest: unknown[]) => unknown>) =>
+  capture.mock.calls.map(([name]) => name);
 
 describe('track', () => {
   const captureMock = vi.fn();
 
   beforeEach(() => {
-    vi.resetModules();
+    resetModules();
     vi.clearAllMocks();
-    vi.stubGlobal('window', {});
+    stubGlobal('window', {});
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('sends event to the registered client with properties', async () => {
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture: captureMock });
     analytics.track('test_event', { key: 'value' });
     expect(captureMock).toHaveBeenCalledWith('test_event', { key: 'value' });
   });
 
   it('sends event without properties', async () => {
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture: captureMock });
     analytics.track('test_event');
     expect(captureMock).toHaveBeenCalledWith('test_event', undefined);
   });
 
   it('does not call capture when window is undefined', async () => {
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture: captureMock });
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
     analytics.track('test_event');
     expect(captureMock).not.toHaveBeenCalled();
   });
@@ -40,39 +59,39 @@ describe('track', () => {
 
 describe('registerAnalyticsClient', () => {
   beforeEach(() => {
-    vi.resetModules();
+    resetModules();
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('flushes queued events in order with the time they were tracked', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-    vi.stubGlobal('window', {});
+    useFakeTimers();
+    setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    stubGlobal('window', {});
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
 
     analytics.track('first_event', { order: 1 });
-    vi.setSystemTime(new Date('2026-01-01T00:00:05Z'));
+    setSystemTime(new Date('2026-01-01T00:00:05Z'));
     analytics.track('second_event');
     expect(capture).not.toHaveBeenCalled();
 
-    vi.setSystemTime(new Date('2026-01-01T00:01:00Z'));
+    setSystemTime(new Date('2026-01-01T00:01:00Z'));
     analytics.registerAnalyticsClient({ capture });
 
     expect(capture.mock.calls).toEqual([
       ['first_event', { order: 1 }, { timestamp: new Date('2026-01-01T00:00:00Z') }],
       ['second_event', {}, { timestamp: new Date('2026-01-01T00:00:05Z') }],
     ]);
-    vi.useRealTimers();
+    useRealTimers();
   });
 
   it('caps the queue and keeps the earliest events', async () => {
-    vi.stubGlobal('window', {});
+    stubGlobal('window', {});
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
 
     for (let i = 0; i < analytics.MAX_PENDING_EVENTS + 25; i++) analytics.track('e', { i });
     analytics.registerAnalyticsClient({ capture });
@@ -91,18 +110,18 @@ describe('pageviews', () => {
   }
 
   beforeEach(() => {
-    vi.resetModules();
+    resetModules();
     setUrl('/');
-    vi.stubGlobal('window', { location });
+    stubGlobal('window', { location });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('sends the initial pageview before events queued by page effects, with the URL at track time', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
 
     analytics.track('landing_page_viewed');
     setUrl('/infx/inference');
@@ -120,7 +139,7 @@ describe('pageviews', () => {
 
   it('does not repeat the pageview when the tracker reports the same URL', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
 
     analytics.track('landing_page_viewed');
@@ -131,7 +150,7 @@ describe('pageviews', () => {
 
   it('sends the pageview of a client navigation before events fired ahead of the tracker', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
     analytics.trackPageview();
 
@@ -148,7 +167,7 @@ describe('pageviews', () => {
 
   it('queues the pageview of a client navigation before events fired ahead of the tracker', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.trackPageview();
 
     setUrl('/infx/submissions');
@@ -166,7 +185,7 @@ describe('pageviews', () => {
   it('sends a virtual pageview when a client rewrite changes the pathname', async () => {
     const capture = vi.fn();
     const register = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture, register });
     setUrl('/zh/infx/inference');
     analytics.trackPageview();
@@ -196,7 +215,7 @@ describe('pageviews', () => {
 
   it('does not send a virtual pageview for a query-only change', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
     setUrl('/overview');
     analytics.trackPageview();
@@ -216,18 +235,18 @@ describe('trackOncePerPageview', () => {
   }
 
   beforeEach(() => {
-    vi.resetModules();
+    resetModules();
     setUrl('/');
-    vi.stubGlobal('window', { location });
+    stubGlobal('window', { location });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('drops remounts on the same page view and re-arms on the next page view', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
 
     expect(analytics.trackOncePerPageview('landing_page_viewed')).toBe(true);
@@ -249,7 +268,7 @@ describe('trackOncePerPageview', () => {
 
   it('keeps a key sent before the pageview of its own page is recorded', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
     analytics.trackPageview();
 
@@ -265,7 +284,7 @@ describe('trackOncePerPageview', () => {
 
   it('separates dedupe keys within one page view', async () => {
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
 
     analytics.trackOncePerPageview('data_query_failed', { status: 500 }, '["a"]');
@@ -278,11 +297,11 @@ describe('trackOncePerPageview', () => {
 
 describe('trackOncePerSession', () => {
   beforeEach(() => {
-    vi.resetModules();
+    resetModules();
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it('sends once per key across module reloads that share sessionStorage', async () => {
@@ -291,12 +310,12 @@ describe('trackOncePerSession', () => {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => void storage.set(key, value),
     };
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       location: new URL('https://inferencex.semianalysis.com/blog/a'),
       sessionStorage,
     });
     const capture = vi.fn();
-    let analytics = await import('./analytics');
+    let analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
 
     expect(analytics.trackOncePerSession('blog_read_milestone', { percent: 25 }, 'a:25')).toBe(
@@ -309,8 +328,8 @@ describe('trackOncePerSession', () => {
       true,
     );
 
-    vi.resetModules();
-    analytics = await import('./analytics');
+    resetModules();
+    analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
     expect(analytics.trackOncePerSession('blog_read_milestone', { percent: 25 }, 'a:25')).toBe(
       false,
@@ -326,12 +345,12 @@ describe('trackOncePerSession', () => {
         throw new Error('denied');
       },
     };
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       location: new URL('https://inferencex.semianalysis.com/'),
       sessionStorage,
     });
     const capture = vi.fn();
-    const analytics = await import('./analytics');
+    const analytics = await importAnalytics();
     analytics.registerAnalyticsClient({ capture });
 
     expect(analytics.trackOncePerSession('inference_replay_export_unavailable')).toBe(true);

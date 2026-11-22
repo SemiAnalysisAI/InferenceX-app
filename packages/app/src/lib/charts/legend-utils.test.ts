@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { filterAndSortLegendItems } from '@/lib/charts/legend-utils';
 
 const makeItem = (label: string, isActive: boolean, title?: string) => ({

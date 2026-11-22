@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { verifiedDiagnosticPairs } from './diagnostic-quality';
 import { diagnosticQualityFixture } from './diagnostic-quality.fixture';
 import { publishedResultsSide, resultsClipEvidence, resultsClipGroups } from './results-clips';

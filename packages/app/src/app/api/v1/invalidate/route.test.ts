@@ -1,15 +1,11 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach, mock } from 'bun:test';
 
-const { mockPurgeAll, mockPurgeCollectiveX, mockPurgeOperatorX, mockPurgeVideo } = vi.hoisted(
-  () => ({
-    mockPurgeAll: vi.fn(),
-    mockPurgeCollectiveX: vi.fn(),
-    mockPurgeOperatorX: vi.fn(),
-    mockPurgeVideo: vi.fn(),
-  }),
-);
+const mockPurgeAll = vi.fn();
+const mockPurgeCollectiveX = vi.fn();
+const mockPurgeOperatorX = vi.fn();
+const mockPurgeVideo = vi.fn();
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   OPERATORX_CACHE_SCOPE: 'operatorx',
   VIDEO_CACHE_SCOPE: 'video',

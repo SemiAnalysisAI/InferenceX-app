@@ -61,6 +61,8 @@ export interface OverlayScopeInput {
   bestOfficialHwTypes: Set<string>;
   bestOverlayHwTypes: Set<string>;
   bestPerSku: boolean;
+  /** Official hardware the page asked for. Unless best-per-SKU is on, it replaces the full scope. */
+  requestedOfficialHwTypes?: ReadonlySet<string> | null;
   ready: boolean;
 }
 
@@ -152,6 +154,7 @@ export interface OverlaySelectionState {
   scopeReady: boolean;
   bestSelectionKey: string;
   bestPerSku: boolean;
+  requestedOfficialKey: string;
 }
 
 export type OverlaySelectionAction =
@@ -170,6 +173,7 @@ const EMPTY_SELECTION_STATE: OverlaySelectionState = {
   scopeReady: false,
   bestSelectionKey: '',
   bestPerSku: false,
+  requestedOfficialKey: '',
 };
 
 function sortedSetKey(values: Set<string>): string {
@@ -225,11 +229,16 @@ export function overlaySelectionReducer(
   }
 
   const { input } = action;
+  const requestedOfficial = new Set(
+    [...input.officialHwTypes].filter((key) => input.requestedOfficialHwTypes?.has(key)),
+  );
   const desiredOfficial = input.bestPerSku
     ? input.bestOfficialHwTypes.size > 0
       ? input.bestOfficialHwTypes
       : input.officialHwTypes
-    : input.officialHwTypes;
+    : requestedOfficial.size > 0
+      ? requestedOfficial
+      : input.officialHwTypes;
   const desiredOverlay = input.bestPerSku
     ? input.bestOverlayHwTypes.size > 0
       ? input.bestOverlayHwTypes
@@ -238,12 +247,14 @@ export function overlaySelectionReducer(
   const bestSelectionKey = input.bestPerSku
     ? `${sortedSetKey(desiredOfficial)}|${sortedSetKey(desiredOverlay)}`
     : '';
+  const requestedOfficialKey = sortedSetKey(requestedOfficial);
   const scopeChanged = state.scopeKey !== input.scopeKey;
   const bestSelectionChanged =
     state.bestPerSku !== input.bestPerSku ||
     (input.bestPerSku && state.bestSelectionKey !== bestSelectionKey);
+  const requestChanged = state.requestedOfficialKey !== requestedOfficialKey;
   const becameReady = input.ready && !state.scopeReady;
-  if (!scopeChanged && !bestSelectionChanged && !becameReady) return state;
+  if (!scopeChanged && !bestSelectionChanged && !requestChanged && !becameReady) return state;
 
   let activeOverlayHwTypes = state.activeOverlayHwTypes;
   if (scopeChanged || bestSelectionChanged) {
@@ -256,7 +267,7 @@ export function overlaySelectionReducer(
     ...state,
     activeOverlayHwTypes,
     localOfficialOverride:
-      input.ready && (scopeChanged || bestSelectionChanged || becameReady)
+      input.ready && (scopeChanged || bestSelectionChanged || requestChanged || becameReady)
         ? new Set(desiredOfficial)
         : scopeChanged
           ? null
@@ -266,6 +277,7 @@ export function overlaySelectionReducer(
     scopeReady: input.ready,
     bestSelectionKey,
     bestPerSku: input.bestPerSku,
+    requestedOfficialKey,
   };
 }
 

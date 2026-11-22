@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { CHART_SERIES_SUMMARY_VERSION } from '../etl/chart-series-summary';
 import {

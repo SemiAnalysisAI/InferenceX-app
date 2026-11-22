@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { profitModelDefaults } from './profit-estimator';
 import { parseProfitTargetParam, profitTargetUrlValue, resolveCalculatorUrlSeed } from './url-seed';

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { configCacheKey, type ConfigParams } from './config-cache';
 
 function makeConfig(overrides: Partial<ConfigParams> = {}): ConfigParams {

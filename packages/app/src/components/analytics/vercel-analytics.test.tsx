@@ -1,16 +1,17 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, mock } from 'bun:test';
+import { waitFor } from '@/test/helpers';
 
-const beacons = vi.hoisted(() => new Map<string, unknown>());
-vi.mock('@vercel/analytics/next', () => ({
+const beacons = (() => new Map<string, unknown>())();
+mock.module('@vercel/analytics/next', () => ({
   Analytics: ({ beforeSend }: { beforeSend: unknown }) => {
     beacons.set('analytics', beforeSend);
     return null;
   },
 }));
-vi.mock('@vercel/speed-insights/next', () => ({
+mock.module('@vercel/speed-insights/next', () => ({
   SpeedInsights: ({ beforeSend }: { beforeSend: unknown }) => {
     beacons.set('speed-insights', beforeSend);
     return null;
@@ -23,7 +24,7 @@ import { dropBotBeacon } from './vercel-beacons';
 it('mounts both Vercel beacons with the bot filter once their chunk loads', async () => {
   const root = createRoot(document.createElement('div'));
   act(() => root.render(createElement(VercelAnalytics)));
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(Object.fromEntries(beacons)).toEqual({
       analytics: dropBotBeacon,
       'speed-insights': dropBotBeacon,

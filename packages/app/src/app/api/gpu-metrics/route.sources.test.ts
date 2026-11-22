@@ -1,17 +1,18 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubEnv, stubGlobal, unstubAllEnvs, unstubAllGlobals } from '@/test/helpers';
 
 import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 import { parseCsvData } from '@/components/gpu-power/types';
 
-const { readRun } = vi.hoisted(() => ({ readRun: vi.fn() }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+const { readRun } = { readRun: vi.fn() };
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: () => ({}),
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForRun: readRun,
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
   getPrecomputedPowerSeries: () => Promise.resolve(null),
 }));
 
@@ -85,14 +86,14 @@ function request(body: unknown, prefix = 'dsr1_', raw = false): NextRequest {
 
 beforeEach(() => {
   readRun.mockReset().mockResolvedValue({ workflowRun, series: [stored(NAME_A)] });
-  vi.stubEnv('DATABASE_READONLY_URL', 'postgresql://readonly.example.test/test');
-  vi.stubEnv('GITHUB_TOKEN', 'test-token');
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Unexpected GitHub request')));
+  stubEnv('DATABASE_READONLY_URL', 'postgresql://readonly.example.test/test');
+  stubEnv('GITHUB_TOKEN', 'test-token');
+  stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Unexpected GitHub request')));
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
+  unstubAllEnvs();
+  unstubAllGlobals();
 });
 
 describe('Timeline requested-source coverage', () => {
@@ -106,7 +107,7 @@ describe('Timeline requested-source coverage', () => {
       workflowRun,
       series: [stored(NAME_A), partial],
     });
-    vi.stubEnv('GITHUB_TOKEN', '');
+    stubEnv('GITHUB_TOKEN', '');
     const response = await POST(request({ sources: [SOURCE_A, SOURCE_B] }));
     expect(readRun).toHaveBeenCalledWith({}, Number(RUN_ID), {
       prefix: 'dsr1_',

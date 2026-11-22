@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 
-const mocks = vi.hoisted(() => ({ sessions: vi.fn(), stats: vi.fn() }));
-vi.mock('@/lib/agentic-workload-explorer/api', () => ({
+const mocks = { sessions: vi.fn(), stats: vi.fn() };
+mock.module('@/lib/agentic-workload-explorer/api', () => ({
   withExplorerRoute:
     (handler: (ctx: { req: unknown; vis: string[] }) => Promise<unknown>) => (req: unknown) =>
       handler({ req, vis: [] }),
 }));
-vi.mock('@semianalysisai/inferencex-db/proxytrace/operations', () => ({
+mock.module('@semianalysisai/inferencex-db/proxytrace/operations', () => ({
   getRecentSessions: mocks.sessions,
   getSessionStats: mocks.stats,
   SESSION_SORT_KEYS: ['active'],

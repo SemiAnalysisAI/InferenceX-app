@@ -6,10 +6,10 @@ import { transformTpcSkylineRun } from '@/components/ubenchx/tpc-skyline-transfo
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from '@/components/ubenchx/ubenchx-data';
 import { transformUbenchxRun } from '@/components/ubenchx/ubenchx-transform';
 import { NextRequest } from 'next/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { GET } from './route';
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));

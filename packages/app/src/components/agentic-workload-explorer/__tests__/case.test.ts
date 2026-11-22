@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { camelKeys } from '@/lib/agentic-workload-explorer/case';
 
 describe('camelKeys', () => {

@@ -1,10 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-vi.mock('next/link', () => ({
+mock.module('next/link', () => ({
   default: ({
     prefetch,
     href,
@@ -127,12 +128,12 @@ describe('IntentPrefetchLink', () => {
 
   describe('route data', () => {
     beforeEach(() => {
-      vi.stubGlobal(
+      stubGlobal(
         'fetch',
         vi.fn(() => new Promise(() => {})),
       );
     });
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => unstubAllGlobals());
 
     it('warms the target page queries on intent, not before', () => {
       act(() =>
@@ -164,12 +165,12 @@ describe('IntentPrefetchLink', () => {
 
   describe('pointer trajectory', () => {
     beforeEach(() => {
-      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
         cb(0);
         return 0;
       });
     });
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => unstubAllGlobals());
 
     it('prefetches when the mouse is heading toward the link before reaching it', () => {
       renderAt(300, 0, 80, 24);

@@ -1,15 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, memo, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
-import type * as UrlStateModule from '@/lib/routing/url-state';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   availability: {
     data: undefined as AvailabilityIndex | undefined,
     error: null as Error | null,
@@ -23,23 +22,24 @@ const mocks = vi.hoisted(() => ({
   getUrlParam: vi.fn((key: string): string | undefined => (key === 'i_seq' ? '8k/1k' : undefined)),
   setUrlParams: vi.fn(),
   hasExplicitUrlParam: vi.fn((_key: string) => false),
-}));
+};
 
-vi.mock('@/hooks/api/use-availability', () => ({
+mock.module('@/hooks/api/use-availability', () => ({
   useAvailability: () => mocks.availability,
 }));
-vi.mock('@/hooks/api/use-workflow-info', () => ({
+mock.module('@/hooks/api/use-workflow-info', () => ({
   useWorkflowInfo: () => mocks.workflow,
 }));
-vi.mock('@/hooks/useUrlState', () => ({
+mock.module('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: mocks.getUrlParam, setUrlParams: mocks.setUrlParams }),
 }));
-vi.mock('@/lib/routing/url-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof UrlStateModule>()),
+const actual = { ...(await import('@/lib/routing/url-state')) };
+mock.module('@/lib/routing/url-state', () => ({
+  ...actual,
   hasExplicitUrlParam: (key: string) => mocks.hasExplicitUrlParam(key),
   refreshUrlParams: () => ({}),
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
 }));
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { type ChangelogEntry, linkRows } from './changelog';
 import { makeRawMatrix, makeRawShard } from './test-fixture';

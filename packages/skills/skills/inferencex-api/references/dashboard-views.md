@@ -144,6 +144,16 @@ a `Chip basis:` note naming it. Embedded charts
 (`/embed/model/<slug>`) accept `chips=total` (or `g_chips=total`) and show the
 basis note, without the toggle, below metrics that depend on it.
 
+Embedded charts also accept `hw=<hardware keys>` (or the dashboard's `i_active`), for
+example `hw=gb200_vllm`, to show only those official lines. A bare GPU such as
+`hw=gb200` keeps every engine on it, and unknown SKUs are ignored. A request turns off
+the best-per-SKU default, so a requested engine is not swapped for its SKU's best one.
+With `unofficialrun=`, the overlay keeps all of its own hardware next to the requested
+official lines, and `i_active` limits the official lines on the dashboard the same way.
+This is a visibility selection. The read-only `inference` view's `gpus` parameter
+accepts the same keys but filters overlay series too. To reproduce such an embed, read
+the official series with `gpus=gb200_vllm&best=false` and the overlay without `gpus`.
+
 Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) are marked
 disaggregated but record no workers and the whole deployment in both
 `num_prefill_gpu` and `num_decode_gpu`. Most October 2025 rows store input and
@@ -556,9 +566,11 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
 - Metrics use participating GPUs. API list price is USD/video-second multiplied
   by clip duration, not TCO, revenue or measured power. `metricDefinitions`
   declares units and optimization direction; missing values remain null.
-- The server reads the same first **five published history pages at most** as the
-  UI. `coverage.pagesRead`, `coverage.nextPage` and `coverage.truncated` describe
-  the inspected window; this is not all-history or date-range coverage. It applies
+- The server reads the same first **five published history pages** as the UI,
+  plus the latest source of every deployment older than them, so each deployment's
+  newest cell is present. `coverage.pagesRead`, `coverage.nextPage` and
+  `coverage.truncated` describe the paged window; this is not all-history or
+  date-range coverage. It applies
   the UI's canonical workload selection, sample floor and newest-cell rules.
 - Evidence rows share one known workload and deployment layout. Hardware without
   C1 keeps raw concurrency measurements only within that cohort, with null ratios.
@@ -1024,8 +1036,9 @@ API 在 `params` 中返回实际采用的参数，并在 `historicalWindow` 中�
 ### VideoGenX results overview
 
 `GET /api/v1/views/video?view=overview` returns the same nine-group projection as
-`/vgx` and `/zh/vgx`. It reads at most five stored history pages;
-`coverage.truncated` remains authoritative. It never triggers media publication.
+`/vgx` and `/zh/vgx`. It reads five stored history pages plus each older
+deployment's latest source; `coverage.truncated` describes the paged window. It
+never triggers media publication.
 The earlier dashboard/compare and run/artifact results views remain available.
 
 HTTP responses remain `private, no-store`. The underlying published History and
