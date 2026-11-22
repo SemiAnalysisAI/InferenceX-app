@@ -328,7 +328,8 @@ export function PowerLoadSwings({
           paginated={false}
           rowAttributes={() => ({ 'data-testid': 'powerx-load-swings-row' })}
           scrollClassName="max-h-96"
-          tableClassName="min-w-[64rem] text-xs"
+          // Twelve columns: tighter cells and wrapping headers keep the table inside the card.
+          tableClassName="min-w-[64rem] text-xs [&_td]:px-2 [&_th]:px-2 [&_th]:whitespace-normal"
         />
       )}
       <p className="text-xs text-muted-foreground">
