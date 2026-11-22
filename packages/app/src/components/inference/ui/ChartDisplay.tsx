@@ -1534,17 +1534,20 @@ export default function ChartDisplay({
                             )}
                         </div>
                       );
-                      // PowerX reads its run context under the chart, as AgentX does; the
-                      // compare pages that borrow PowerX's wording keep it above.
+                      // PowerX reads its run context under the chart, as AgentX does; Over time
+                      // keeps the base caption (context under the title, which also clears its
+                      // control row from the Chart/Table buttons), as do the compare pages that
+                      // borrow PowerX's wording.
+                      const contextAbove = powerXSurface && (!powerXLayout || isPowerTimeline);
                       const chartCaption = (
                         <>
                           {chartHeading}
-                          {powerXSurface && !powerXLayout && chartContext}
+                          {contextAbove && chartContext}
                         </>
                       );
-                      const chartFooter = (!powerXSurface || powerXLayout || hasAtomSeries) && (
+                      const chartFooter = (!contextAbove || hasAtomSeries) && (
                         <div className="mt-3">
-                          {(!powerXSurface || powerXLayout) && chartContext}
+                          {!contextAbove && chartContext}
                           {hasAtomSeries && <AtomEngineFootnote className="mt-2" />}
                         </div>
                       );
