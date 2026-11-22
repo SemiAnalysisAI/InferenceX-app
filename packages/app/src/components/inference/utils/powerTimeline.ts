@@ -247,6 +247,64 @@ export function traceConfigLabel(point: InferenceData): string {
   return parts.join(' · ');
 }
 
+/** What a trace label shows to name one Over time trace among the drawn ones. */
+export interface TraceIdentity {
+  key: string;
+  /** GPU name the label shows, e.g. "H200". */
+  gpu: string;
+  /** The rest of the label that already tells traces apart: concurrency, run entry. */
+  group: string;
+  framework: string;
+  parallelism: string;
+  gpus: number | null;
+}
+
+export interface TraceDistinction {
+  framework: boolean;
+  parallelism: string | null;
+  gpus: number | null;
+}
+
+function groupBy<T>(items: readonly T[], keyOf: (item: T) => string): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+  return [...groups.values()];
+}
+
+const distinct = <T>(items: readonly TraceIdentity[], valueOf: (item: TraceIdentity) => T) =>
+  items.length > 1 && new Set(items.map(valueOf)).size > 1;
+
+/**
+ * The parts a trace label adds so no two drawn traces read the same. Labels name the GPU, so
+ * two traces on one GPU at one concurrency add the framework when it differs, then the
+ * parallelism, then the GPU count; a part is only added where it tells traces apart.
+ */
+export function traceDistinctions(traces: readonly TraceIdentity[]): Map<string, TraceDistinction> {
+  const result = new Map<string, TraceDistinction>();
+  for (const sameLabel of groupBy(traces, (trace) => `${trace.gpu}\u0000${trace.group}`)) {
+    const framework = distinct(sameLabel, (trace) => trace.framework);
+    for (const sameFramework of groupBy(sameLabel, (trace) => trace.framework)) {
+      const parallelism = distinct(sameFramework, (trace) => trace.parallelism);
+      for (const sameParallelism of groupBy(sameFramework, (trace) => trace.parallelism)) {
+        const gpus = distinct(sameParallelism, (trace) => trace.gpus);
+        for (const trace of sameParallelism) {
+          result.set(trace.key, {
+            framework,
+            parallelism: parallelism ? trace.parallelism : null,
+            gpus: gpus ? trace.gpus : null,
+          });
+        }
+      }
+    }
+  }
+  return result;
+}
+
 export type PowerPoolRole = GpuPowerRole | 'all';
 
 export interface PowerPool {

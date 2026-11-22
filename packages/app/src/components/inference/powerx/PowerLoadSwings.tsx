@@ -2,7 +2,6 @@
 
 import { Download } from 'lucide-react';
 import { useMemo } from 'react';
-import type { InferenceData } from '@/components/inference/types';
 import type { PowerPoolRole, PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
@@ -119,7 +118,7 @@ export function PowerLoadSwings({
 }: {
   traces: readonly PowerTimelineTrace[];
   colorOf: (trace: PowerTimelineTrace) => string;
-  labelOf: (point: InferenceData) => string;
+  labelOf: (trace: PowerTimelineTrace) => string;
   /** PowerX GPU role: one row per lane (prefill, decode, and all GPUs for split). */
   role?: PowerXRole;
   /** kW per NVL72 rack, set by the chart legend's switch. */
@@ -133,7 +132,7 @@ export function PowerLoadSwings({
       loadSwingRows(traces, role).map((row) => ({
         ...row,
         color: colorOf(row.trace),
-        label: labelOf(row.trace.point),
+        label: labelOf(row.trace),
       })),
     [traces, colorOf, labelOf, role],
   );

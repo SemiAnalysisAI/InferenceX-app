@@ -9,8 +9,10 @@ import {
   prioritizeRuns,
   traceLanes,
   summarizeTraceWindow,
+  traceDistinctions,
   tracePools,
   windowPhase,
+  type TraceIdentity,
   type PowerTimelineTrace,
   mostCoveredConcurrency,
 } from './powerTimeline';
@@ -299,5 +301,68 @@ describe('role lanes on production-shaped telemetry', () => {
       { role: 'all', kind: 'aggregated', rows: Array.from({ length: 16 }, (_, row) => row) },
     ]);
     expect(poolSubsetSeries(AGGREGATED_GB200_C1_SERIES, 'prefill')).toBeNull();
+  });
+});
+
+const identity = (key: string, over: Partial<TraceIdentity> = {}): TraceIdentity => ({
+  key,
+  gpu: 'H200',
+  group: 'c16',
+  framework: 'vLLM',
+  parallelism: 'TP8',
+  gpus: 8,
+  ...over,
+});
+
+describe('traceDistinctions', () => {
+  it('adds nothing when the GPU name already tells the traces apart', () => {
+    const parts = traceDistinctions([
+      identity('a'),
+      identity('b', { gpu: 'B300', parallelism: 'TP4' }),
+    ]);
+    expect(parts.get('a')).toEqual({ framework: false, parallelism: null, gpus: null });
+    expect(parts.get('b')).toEqual({ framework: false, parallelism: null, gpus: null });
+  });
+
+  it('names the framework when two traces share a GPU at one concurrency', () => {
+    const parts = traceDistinctions([identity('a'), identity('b', { framework: 'Dynamo SGLang' })]);
+    expect(parts.get('a')).toEqual({ framework: true, parallelism: null, gpus: null });
+    expect(parts.get('b')).toEqual({ framework: true, parallelism: null, gpus: null });
+  });
+
+  // DeepSeek V4.1 Flash c16 drew two "H200 c16 · aggregated" lines: H200 vLLM at TP8 and TP4.
+  it('names the parallelism when the GPU and framework match', () => {
+    const parts = traceDistinctions([
+      identity('tp8'),
+      identity('tp4', { parallelism: 'TP4', gpus: 4 }),
+    ]);
+    expect(parts.get('tp8')).toEqual({ framework: false, parallelism: 'TP8', gpus: null });
+    expect(parts.get('tp4')).toEqual({ framework: false, parallelism: 'TP4', gpus: null });
+  });
+
+  it('only adds parallelism inside the framework that needs it', () => {
+    const parts = traceDistinctions([
+      identity('vllm-tp8'),
+      identity('vllm-tp4', { parallelism: 'TP4', gpus: 4 }),
+      identity('sglang', { framework: 'SGLang' }),
+    ]);
+    expect(parts.get('vllm-tp8')).toEqual({ framework: true, parallelism: 'TP8', gpus: null });
+    expect(parts.get('vllm-tp4')).toEqual({ framework: true, parallelism: 'TP4', gpus: null });
+    expect(parts.get('sglang')).toEqual({ framework: true, parallelism: null, gpus: null });
+  });
+
+  it('falls back to the GPU count when framework and parallelism match', () => {
+    const parts = traceDistinctions([identity('a', { gpus: 8 }), identity('b', { gpus: 16 })]);
+    expect(parts.get('a')).toEqual({ framework: false, parallelism: null, gpus: 8 });
+    expect(parts.get('b')).toEqual({ framework: false, parallelism: null, gpus: 16 });
+  });
+
+  it('leaves traces at different concurrencies or runs alone', () => {
+    const parts = traceDistinctions([
+      identity('c16', { framework: 'SGLang' }),
+      identity('c32', { group: 'c32' }),
+    ]);
+    expect(parts.get('c16')).toEqual({ framework: false, parallelism: null, gpus: null });
+    expect(parts.get('c32')).toEqual({ framework: false, parallelism: null, gpus: null });
   });
 });

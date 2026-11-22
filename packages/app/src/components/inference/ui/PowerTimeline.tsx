@@ -5,6 +5,7 @@ import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 import { ChartNoAxesCombined, ChevronDown, Loader2, TriangleAlert } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { getParetoLabel } from '@/components/inference/utils/paretoLabels';
 
 import {
   bucketTimeMs,
@@ -70,6 +71,7 @@ import {
   spreadLabelYs,
   runIdFromUrl,
   traceConfigLabel,
+  traceDistinctions,
   traceKeyRunId,
   traceLanes,
   tracePools,
@@ -176,6 +178,7 @@ const STRINGS = {
       string
     >,
     laneAll: (count: number) => `All ${count} GPU${count === 1 ? '' : 's'}`,
+    gpuTotal: (count: number) => `${count} GPU${count === 1 ? '' : 's'}`,
     aggregated: 'aggregated',
     aggregatedNote: 'Aggregated runs stay dimmed: every GPU does both prefill and decode.',
     lane: 'Lane',
@@ -263,6 +266,7 @@ const STRINGS = {
     >,
     laneShort: { prefill: '预填充', decode: '解码' } satisfies Record<'prefill' | 'decode', string>,
     laneAll: (count: number) => `全部 ${count} 个 GPU`,
+    gpuTotal: (count: number) => `${count} 个 GPU`,
     aggregated: '聚合',
     aggregatedNote: '聚合运行以淡色显示：每个 GPU 同时承担预填充和解码。',
     lane: '分组',
@@ -1347,14 +1351,19 @@ export default function PowerTimeline({
       ? visibleTraces.filter((trace) => !hasPowerTimelineWindow(trace)).length
       : 0;
 
+  const configOf = useCallback(
+    (point: InferenceData) =>
+      overlayPointSet.has(point)
+        ? overlayData?.hardwareConfig[point.hwKey]
+        : hardwareConfig[point.hwKey],
+    [overlayPointSet, overlayData, hardwareConfig],
+  );
   const hardwareLabel = useCallback(
     (point: InferenceData): string => {
-      const config = overlayPointSet.has(point)
-        ? overlayData?.hardwareConfig[point.hwKey]
-        : hardwareConfig[point.hwKey];
+      const config = configOf(point);
       return config ? getDisplayLabel(config) : point.hwKey;
     },
-    [overlayPointSet, overlayData, hardwareConfig],
+    [configOf],
   );
   const entryLabel = useCallback(
     (point: InferenceData) => comparisonEntryLabel(String(point.date), runNumbering),
@@ -1366,6 +1375,51 @@ export default function PowerTimeline({
         ? `${hardwareLabel(point)} · ${entryLabel(point)}`
         : hardwareLabel(point),
     [comparisonSeriesOf, hardwareLabel, entryLabel],
+  );
+  // The framework the legend shows after the GPU, e.g. "Dynamo SGLang" from "(Dynamo SGLang)".
+  const frameworkOf = useCallback(
+    (point: InferenceData) => configOf(point)?.suffix.replaceAll(/^\(|\)$/gu, ''),
+    [configOf],
+  );
+  // Two drawn traces can share a GPU and concurrency (H200 vLLM at TP8 and TP4), so their labels
+  // add the framework, then the parallelism, then the GPU count, only where those differ.
+  const distinctions = useMemo(
+    () =>
+      traceDistinctions(
+        visibleTraces.map(({ key, point }) => {
+          const base = baseHardware(point.hwKey);
+          const gpus = point.disagg
+            ? (point.num_prefill_gpu ?? 0) + (point.num_decode_gpu ?? 0) || null
+            : (point.num_decode_gpu ?? point.num_prefill_gpu ?? null);
+          return {
+            key,
+            gpu: HW_REGISTRY[base]?.label ?? base,
+            group: `${point.conc}|${comparisonSeriesOf(point) ? point.date : ''}`,
+            framework: frameworkOf(point) ?? point.hwKey,
+            parallelism: getParetoLabel(point),
+            gpus,
+          };
+        }),
+      ),
+    [visibleTraces, comparisonSeriesOf, frameworkOf],
+  );
+  const distinctionParts = useCallback(
+    (trace: PowerTimelineTrace, framework: boolean): string[] => {
+      const parts = distinctions.get(trace.key);
+      if (!parts) return [];
+      return [
+        framework && parts.framework ? (frameworkOf(trace.point) ?? '') : '',
+        parts.parallelism ?? '',
+        parts.gpus === null ? '' : t.gpuTotal(parts.gpus),
+      ].filter(Boolean);
+    },
+    [distinctions, frameworkOf, t],
+  );
+  // Load swings rows name the GPU with its framework already, so they add the rest.
+  const swingLabel = useCallback(
+    (trace: PowerTimelineTrace): string =>
+      [seriesLabel(trace.point), ...distinctionParts(trace, false)].join(' '),
+    [seriesLabel, distinctionParts],
   );
 
   const model = useMemo<DrawModel>(() => {
@@ -1443,7 +1497,9 @@ export default function PowerTimeline({
           pool: group.pool,
           lane: group.lane?.kind,
           color,
-          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}c${trace.point.conc}${suffix}`,
+          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}${distinctionParts(trace, true)
+            .map((part) => `${part} `)
+            .join('')}c${trace.point.conc}${suffix}`,
           x: last.x,
           y: last.y,
         });
@@ -1455,6 +1511,7 @@ export default function PowerTimeline({
     colorForTrace,
     comparisonSeriesOf,
     entryLabel,
+    distinctionParts,
     xMode,
     drawMode,
     role,
@@ -2079,7 +2136,7 @@ export default function PowerTimeline({
     <PowerLoadSwings
       traces={swingTraces}
       colorOf={(trace) => colorForTrace(trace).color}
-      labelOf={seriesLabel}
+      labelOf={swingLabel}
       role={role}
       rack={rack}
     />
