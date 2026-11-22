@@ -1608,7 +1608,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: 'e552aa8a58fdebdb15dd6d0c98ec2fbe3d693b8bce8c4deafc124d7d7dc5db2f',
+    sourceSha256: 'fcb379eb0b3f97d8d48fb25c7fdf4052a91978be3773c16cba5821ca450d66a5',
     reviewArea: {
       en: 'VideoGenX published History, media with its stored quality, and the derived-media (rendition and poster) listing cache shared across instances under the video tag; the listing key is versioned by its value shape.',
       zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及派生媒体（转码版本与封面）回执列表以 video 标签跨实例共享的缓存；列表缓存键随值结构变化而升级版本。',

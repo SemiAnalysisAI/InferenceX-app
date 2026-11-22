@@ -390,9 +390,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front. It is reached
-      // only through a type import, so recorded entries are unchanged.
-      sources: '515f0ca74d2331a0310e5cbabfed34f22ac2b61dee036db95e2ad77629c19ba4',
+      // Re-pinned after run-filtered pagination and the selection check before approval. They
+      // change which indexes a read lists and which approvals are refused, not a projected entry.
+      sources: 'c1ed2a1ac2d8b3cd86ddd1533be7c149f19eabfdc23ad6c13231e6a2ee1e9b16',
     });
   });
 });
