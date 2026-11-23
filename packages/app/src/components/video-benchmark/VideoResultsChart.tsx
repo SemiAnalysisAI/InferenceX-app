@@ -94,7 +94,7 @@ const STRINGS = {
     latency: 'Latency per clip',
     latencyClip: (seconds: number, fps: number) => `Latency per ${seconds} s clip at ${fps} fps`,
     median: 'Median',
-    throughputCost: 'Throughput and cost',
+    throughputCost: 'Throughput and Cost',
     powerSection: 'Power',
     deployment: 'Deployment',
     replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,

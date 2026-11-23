@@ -45,10 +45,10 @@ describe('uBenchX hub and test routes', () => {
       .should('include', '/zh/ubx/mem-bw');
 
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.contains('[role="option"]', 'Core Memory-Access Profiles').click();
     cy.url().should('include', '/ubx/core-memory-profiles');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core memory-access profiles');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core Memory-Access Profiles');
   });
 
   it('switches to the TPC Skyline table with the test selector', () => {
@@ -56,7 +56,7 @@ describe('uBenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'TPC Skyline').click();
     cy.url().should('include', '/ubx/tpc-skyline');
-    cy.contains('h2', 'NVIDIA measured TPC groupings').should('be.visible');
+    cy.contains('h2', 'NVIDIA Measured TPC Groupings').should('be.visible');
     cy.get('[data-testid="tpc-skyline-table"] th').then(($th) => {
       expect([...$th].map((th) => th.textContent)).to.deep.equal([
         'Product',
@@ -170,7 +170,7 @@ describe('Ascend core memory-access profiles', () => {
   it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
     cy.visit('/ubx/mem-bw', dismiss);
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.contains('[role="option"]', 'Core Memory-Access Profiles').click();
     cy.url().should('include', '/ubx/core-memory-profiles');
     cy.contains('SYS_CNT ticks are not clock64 cycles').should('be.visible');
     cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg')

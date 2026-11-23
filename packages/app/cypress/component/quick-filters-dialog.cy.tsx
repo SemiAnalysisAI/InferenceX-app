@@ -41,7 +41,7 @@ describe('QuickFiltersDialog', () => {
         ['framework', 'Dynamo vLLM'],
         ['deployment', locale === 'zh' ? '不同的 worker' : 'across workers'],
         ['spec', 'EAGLE'],
-        ['power', locale === 'zh' ? '历史测量' : 'Historical measurement'],
+        ['power', locale === 'zh' ? '历史测量' : 'Historical Measurement'],
       ];
       for (const [key, explanation] of explanations) {
         const testId = key === 'power' ? 'measured-power-help' : `option-help-quick-filter-${key}`;

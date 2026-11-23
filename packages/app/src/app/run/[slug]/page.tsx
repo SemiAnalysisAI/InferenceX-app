@@ -168,7 +168,7 @@ export default async function RunPage({ params }: Props) {
 
   const t: RunStrings = {
     backHref: '/run',
-    backLabel: 'All model and GPU pairings',
+    backLabel: 'All Model and GPU Pairings',
     heading,
     quickAnswerLabel: 'Quick answer',
     quickAnswer,
@@ -176,14 +176,14 @@ export default async function RunPage({ params }: Props) {
     statEngines: 'Serving engines',
     statPrecisions: 'Precisions',
     statFreshness: 'Run dates',
-    ladderHeading: 'Throughput at every interactivity target',
+    ladderHeading: 'Throughput at Every Interactivity Target',
     ladderIntro: `Serving is a trade-off: push more concurrent users through a GPU and each user's tokens arrive slower. The ladder below reads the measured frontier at each per-user speed target on ${scenarioLabel(data.scenario, 'en')}, using the best engine and precision at that point.`,
     colTier: 'Per-user target',
     colThroughput: 'Tokens/s per GPU',
     colCost: '$ / 1M tokens',
     colEngine: 'Engine',
     colPrecision: 'Precision',
-    costHeading: 'What serving actually costs',
+    costHeading: 'What Serving Actually Costs',
     costIntro: `Converting the ${data.primaryTier} tokens/s per user operating point to $ per million total tokens across rental pricing tiers from the SemiAnalysis AI Cloud TCO model.`,
     colPriceTier: 'Pricing tier',
     colGpuHour: '$ / GPU / hr',
@@ -193,9 +193,9 @@ export default async function RunPage({ params }: Props) {
       retail: 'Retail',
     },
     emptyState: `The InferenceX fleet has not published benchmark runs for ${entry.model.seoName} on ${entry.chip.label} yet. Benchmarks re-run continuously; this page fills in automatically as soon as results land.`,
-    faqHeading: 'Frequently asked questions',
+    faqHeading: 'Frequently Asked Questions',
     faq,
-    exploreHeading: 'Explore the data',
+    exploreHeading: 'Explore the Data',
     exploreLinks: [
       {
         href: `/rankings/fastest-gpu-for-${entry.model.slug}`,

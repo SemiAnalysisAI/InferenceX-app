@@ -26,8 +26,8 @@ const STRINGS = {
     cachedInput: 'Cached input',
     totalInput: 'Total input',
     totalOutput: 'Total output',
-    requestShape: 'Request shape',
-    tokenVolume: 'Token volume',
+    requestShape: 'Request Shape',
+    tokenVolume: 'Token Volume',
     viewDataset: 'View dataset',
   },
   zh: {

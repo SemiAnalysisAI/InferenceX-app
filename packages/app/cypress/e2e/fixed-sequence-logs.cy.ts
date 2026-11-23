@@ -27,7 +27,7 @@ describe('Fixed-sequence benchmark logs', () => {
     cy.wait('@logFiles');
     cy.wait('@logContent');
 
-    cy.contains('h1', 'Benchmark logs').should('be.visible');
+    cy.contains('h1', 'Benchmark Logs').should('be.visible');
     cy.get('[data-testid="agentic-server-log-viewer"]')
       .should('have.attr', 'data-log-context', 'fixed-sequence')
       .and('contain.text', 'watchtower-teal-cn03_decode_w0.out');

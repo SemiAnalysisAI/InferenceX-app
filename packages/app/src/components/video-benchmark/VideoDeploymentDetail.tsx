@@ -28,7 +28,7 @@ import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    back: 'Back to overview',
+    back: 'Back to Overview',
     unofficial: 'Unofficial run',
     deployments: 'Deployments',
     clips: 'clips',
@@ -49,14 +49,14 @@ const STRINGS = {
     telemetry: 'Telemetry',
     validity: 'Validity',
     sources: 'Sources',
-    latency: 'Per-clip latency',
+    latency: 'Per-Clip Latency',
     latencyBoundary: 'Submit to downloaded media',
     recorded: (p50: string) => `Recorded median ${p50}`,
     deadline: (seconds: string, share: string | null) =>
       share === null
         ? `Deadline ${seconds} s · attainment needs every valid request time`
         : `Deadline ${seconds} s · ${share} of valid clips met it`,
-    trace: 'GPU board power over time',
+    trace: 'GPU Board Power over Time',
     traceLoading: 'Loading power trace…',
     traceFailed: 'Power trace could not be loaded',
     time: 'Time (s)',
@@ -70,12 +70,12 @@ const STRINGS = {
     clipsPerSecond: 'valid clips per s',
     videoSecondsPerSecond: 'video-s per wall s',
     goodput: 'clips per s within deadline',
-    cost: 'Modelled cost',
+    cost: 'Modelled Cost',
     basis: 'GPU basis',
     participating: 'Participating',
     allocated: 'Allocated',
     perHour: '$ / hr',
-    startup: 'Warmup and failures',
+    startup: 'Warmup and Failures',
     warmup: 'Recorded warmup request duration',
     failures: 'Failed measured requests',
     timeout: 'Timeout',
@@ -83,8 +83,8 @@ const STRINGS = {
     engineError: 'Engine error',
     transport: 'Transport error',
     other: 'Unclassified',
-    memory: 'GPU memory',
-    identity: 'Workload identity',
+    memory: 'GPU Memory',
+    identity: 'Workload Identity',
     workloadHash: 'Workload hash',
     manifestHash: 'Manifest hash',
     completion: 'Completion',

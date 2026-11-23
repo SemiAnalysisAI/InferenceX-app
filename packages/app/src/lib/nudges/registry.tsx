@@ -84,7 +84,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: ShieldCheck,
-      title: 'Every result is reproducible',
+      title: 'Every Result Is Reproducible',
       titleZh: '每项结果均可复现',
       description:
         'Each data point is produced by a public GitHub Actions run. Click any point on a chart to jump to the exact run, logs, and artifacts.',
@@ -121,7 +121,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Star,
-      title: 'Finding us useful?',
+      title: 'Finding Us Useful?',
       titleZh: '觉得有用吗？',
       description: 'Help the project grow so we can add more benchmarks. Star us on GitHub.',
       descriptionZh: '帮助项目成长，让我们可以添加更多基准测试。在 GitHub 上为我们加星。',
@@ -157,7 +157,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Download,
-      title: 'Need the data?',
+      title: 'Need the Data?',
       titleZh: '需要数据？',
       description:
         'Use the download button on any chart to export PNG or CSV instead of copying from tooltips.',
@@ -216,7 +216,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: SlidersHorizontal,
-      title: 'Too much on the chart?',
+      title: 'Too Much on the Chart?',
       titleZh: '图表太拥挤？',
       description:
         'Filter the legend below by vendor (NVIDIA or AMD), disaggregated or aggregated serving (disagg/agg), precision (FP8/FP4) and more to compare only what you care about.',
@@ -246,7 +246,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'evaluation',
     content: {
       icon: MessageSquareText,
-      title: "See the model's actual answers",
+      title: "See the Model's Actual Answers",
       titleZh: '查看模型的实际回答',
       description:
         'Click the Prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
@@ -270,7 +270,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'landing',
     content: {
       icon: GoogleIcon,
-      title: 'TPUv7 preliminary results across multiple models',
+      title: 'TPUv7 Preliminary Results Across Multiple Models',
       titleZh: 'TPUv7 多模型初步结果',
       description: 'AgentX Preview Submissions',
       descriptionZh: 'AgentX 预览版提交结果',
@@ -409,7 +409,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'agentic-detail',
     content: {
       icon: BookOpen,
-      title: 'New to these charts?',
+      title: 'New to These Charts?',
       titleZh: '第一次看这些图表？',
       description:
         'The telemetry tutorial explains every chart on this page: the sequence-length distributions, the cache and queue series, the request timeline and the per-conversation flamegraph.',

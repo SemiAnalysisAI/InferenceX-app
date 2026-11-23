@@ -53,7 +53,7 @@ describe('PowerXTutorialCta', () => {
       act(() => root.unmount());
     }
     const { host } = mount('en');
-    expect(host.textContent).toContain('How we measure power');
+    expect(host.textContent).toContain('How We Measure Power');
   });
 
   it('tracks the header entry point on click', () => {

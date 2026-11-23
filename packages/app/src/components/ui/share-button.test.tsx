@@ -51,7 +51,7 @@ describe('ShareButton', () => {
     expect(
       document.querySelector('[data-testid="share-url-input"]')?.getAttribute('aria-label'),
     ).toBe('当前视图的分享链接');
-    expect(document.body.textContent).not.toContain('Share this view');
+    expect(document.body.textContent).not.toContain('Share This View');
   });
 
   it('renders a closed popover trigger by default', () => {

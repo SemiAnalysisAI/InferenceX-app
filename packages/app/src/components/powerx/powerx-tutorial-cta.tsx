@@ -9,7 +9,7 @@ import { powerxTutorialPath } from '@/lib/powerx/tutorial-path';
 import { cn } from '@/lib/shared/utils';
 
 const STRINGS: Record<Locale, { badge: string; eyebrow: string; title: string }> = {
-  en: { badge: 'New', eyebrow: 'Interactive tutorial', title: 'How we measure power' },
+  en: { badge: 'New', eyebrow: 'Interactive Tutorial', title: 'How We Measure Power' },
   zh: { badge: '新', eyebrow: '交互式教程', title: 'PowerX 如何测量功耗' },
 };
 
