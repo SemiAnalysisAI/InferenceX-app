@@ -80,7 +80,7 @@ describe('live telemetry acquisition', () => {
     ]);
     expect(result.bundleSeries).toEqual([]);
     expect(warned).toHaveBeenCalledWith(
-      'Failed to read artifact gpu_metrics_dsr1_conc2:',
+      'Failed to download artifact gpu_metrics_dsr1_conc2:',
       expect.objectContaining({ message: 'archive unavailable' }),
     );
     warned.mockRestore();
