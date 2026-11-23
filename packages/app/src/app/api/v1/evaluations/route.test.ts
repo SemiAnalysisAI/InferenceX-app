@@ -37,11 +37,17 @@ describe('GET /api/v1/evaluations', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllEvalResults.mockRejectedValueOnce(new Error('Query timeout'));
 
     const res = await GET(new Request('https://example.test/api/v1/evaluations'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching evaluations:',
+      expect.objectContaining({ message: 'Query timeout' }),
+    );
+    logged.mockRestore();
   });
 });

@@ -31,8 +31,12 @@ function copyContainers(value: unknown, seen = new Map<object, unknown>()): unkn
   if (proto !== Object.prototype && proto !== null) return value;
   const out: Record<PropertyKey, unknown> = Object.create(proto);
   seen.set(value, out);
-  for (const key of Reflect.ownKeys(value))
+  // Enumerable keys only, the ones toMatchObject compares. Reading every key would also fire
+  // getters such as the one React DEV puts on element props for `key`, which logs a warning.
+  for (const key of Reflect.ownKeys(value)) {
+    if (!Object.prototype.propertyIsEnumerable.call(value, key)) continue;
     out[key] = copyContainers((value as Record<PropertyKey, unknown>)[key], seen);
+  }
   return out;
 }
 

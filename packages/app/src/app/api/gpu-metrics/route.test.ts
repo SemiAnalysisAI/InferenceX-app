@@ -231,6 +231,7 @@ describe('GET /api/gpu-metrics — database first', () => {
   });
 
   it('reports a database failure separately instead of treating it as missing data', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
     mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('relation does not exist'));
     globalThis.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
@@ -239,6 +240,11 @@ describe('GET /api/gpu-metrics — database first', () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' });
     expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(logged).toHaveBeenCalledWith(
+      'gpu-metrics: database lookup failed for run 99:',
+      expect.objectContaining({ message: 'relation does not exist' }),
+    );
+    logged.mockRestore();
   });
 });
 
@@ -380,12 +386,18 @@ describe('GET /api/gpu-metrics', () => {
   });
 
   it('returns 500 when GITHUB_TOKEN is not set', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     delete process.env.GITHUB_TOKEN;
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain('GitHub token not configured');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching GPU power data:',
+      expect.objectContaining({ message: 'GitHub token not configured' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns 404 when the run has no telemetry artifacts', async () => {
@@ -427,6 +439,7 @@ describe('GET /api/gpu-metrics', () => {
   });
 
   it('skips artifacts that fail to download', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -476,9 +489,14 @@ describe('GET /api/gpu-metrics', () => {
     const body = await res.json();
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
+    expect(warned).toHaveBeenCalledWith(
+      'Failed to download artifact gpu_metrics_dsr1_h200: Forbidden',
+    );
+    warned.mockRestore();
   });
 
   it('skips artifacts exceeding 50MB', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -529,6 +547,78 @@ describe('GET /api/gpu-metrics', () => {
     const body = await res.json();
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
+    expect(warned).toHaveBeenCalledWith('Artifact gpu_metrics_dsr1_h200 exceeds 50 MB, skipping');
+    warned.mockRestore();
+  });
+
+  describe('when no artifact yields telemetry', () => {
+    let warned: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      warned.mockRestore();
+    });
+
+    it('asks for a retry when GitHub cannot list the artifacts', async () => {
+      const { status, body } = await read(run, { ok: false, status: 503 });
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('asks for a retry when a download fails for a reason other than expiry', async () => {
+      const { status, body } = await read(
+        run,
+        listing(1, 2),
+        failedDownload(410),
+        failedDownload(502),
+      );
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('reports no telemetry only when every archive expired or held no series', async () => {
+      zipArchives.byKey.set('empty', []);
+      const { status, body } = await read(run, listing(1, 2), failedDownload(410), {
+        ok: true,
+        headers: new Headers({ 'Content-Length': '1' }),
+        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('empty').buffer),
+      });
+      expect(status).toBe(404);
+      expect(body.code).toBe('NO_TELEMETRY');
+    });
+
+    const corruptArchive = {
+      ok: true,
+      headers: new Headers({ 'Content-Length': '7' }),
+      arrayBuffer: () => Promise.resolve(new TextEncoder().encode('corrupt').buffer),
+    };
+
+    it('reports no telemetry for archives that downloaded but cannot be read', async () => {
+      const { status, body } = await read(run, listing(1, 2), corruptArchive, corruptArchive);
+      expect(status).toBe(404);
+      expect(body.code).toBe('NO_TELEMETRY');
+      expect(warned).toHaveBeenCalledWith(
+        'Failed to read artifact gpu_metrics_dsr1_1:',
+        expect.anything(),
+      );
+    });
+
+    it('asks for a retry when a corrupt archive sits beside a failed download', async () => {
+      const { status, body } = await read(run, listing(1, 2), corruptArchive, failedDownload(502));
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('names the size cap instead of reporting missing telemetry', async () => {
+      const { status, body } = await read(run, listing(1), {
+        ok: true,
+        headers: new Headers({ 'Content-Length': String(60 * 1024 * 1024) }),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+      expect(status).toBe(422);
+      expect(body.code).toBe('ARTIFACT_TOO_LARGE');
+    });
   });
 
   describe('when no artifact yields telemetry', () => {

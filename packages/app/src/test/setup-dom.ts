@@ -81,3 +81,43 @@ Object.defineProperty(window.document, 'defaultView', {
   configurable: true,
   get: () => globalThis,
 });
+
+// jsdom lacks these browser APIs. Radix calls the pointer-capture and scrolling methods while
+// handling input, components construct observers on mount, and next/link checks for
+// IntersectionObserver when its module loads, so they are stubbed here before any module loads.
+const elementProto = Element.prototype as unknown as Record<string, unknown>;
+elementProto.hasPointerCapture ??= () => false;
+elementProto.setPointerCapture ??= () => {};
+elementProto.releasePointerCapture ??= () => {};
+elementProto.scrollIntoView ??= () => {};
+class InertObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+const globals = globalThis as unknown as Record<string, unknown>;
+globals.ResizeObserver ??= InertObserver;
+globals.IntersectionObserver ??= InertObserver;
+// jsdom defines the window scroll methods but only reports "Not implemented" when called.
+for (const key of ['scroll', 'scrollBy', 'scrollTo']) globals[key] = () => {};
+
+// Browsers start a media element muted when its markup carries the muted attribute. jsdom always
+// starts it unmuted, so hydrating server-rendered <video muted> reported a mismatch. Until the
+// property is set, read it from the attribute.
+const mediaProto = HTMLMediaElement.prototype;
+const nativeMuted = Object.getOwnPropertyDescriptor(mediaProto, 'muted')!;
+const mutedAssigned = new WeakSet<HTMLMediaElement>();
+Object.defineProperty(mediaProto, 'muted', {
+  configurable: true,
+  enumerable: nativeMuted.enumerable,
+  get(this: HTMLMediaElement) {
+    return mutedAssigned.has(this) ? nativeMuted.get!.call(this) : this.hasAttribute('muted');
+  },
+  set(this: HTMLMediaElement, value: boolean) {
+    mutedAssigned.add(this);
+    nativeMuted.set!.call(this, value);
+  },
+});

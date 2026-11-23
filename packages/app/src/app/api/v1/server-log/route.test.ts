@@ -289,12 +289,18 @@ describe('GET /api/v1/server-log', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetBoundedServerLog.mockRejectedValueOnce(new Error('Connection reset'));
 
     const res = await GET(req('/api/v1/server-log?id=42'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching server log:',
+      expect.objectContaining({ message: 'Connection reset' }),
+    );
+    logged.mockRestore();
   });
 
   it('handles large numeric id', async () => {

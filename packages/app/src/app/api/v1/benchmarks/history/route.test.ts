@@ -111,6 +111,7 @@ describe('GET /api/v1/benchmarks/history', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('DB error'));
 
     const res = await GET(
@@ -119,6 +120,11 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching benchmark history:',
+      expect.objectContaining({ message: 'DB error' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns empty array when no history found', async () => {

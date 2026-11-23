@@ -120,10 +120,16 @@ describe('GET /api/v1/views/reliability', () => {
   });
 
   it('returns 500 when the query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetReliabilityStats.mockRejectedValueOnce(new Error('DB unreachable'));
     const res = await GET(request('/api/v1/views/reliability'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error building reliability view:',
+      expect.objectContaining({ message: 'DB unreachable' }),
+    );
+    logged.mockRestore();
   });
 });

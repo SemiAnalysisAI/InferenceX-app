@@ -91,8 +91,14 @@ describe('GET /api/v1/server-log-search', () => {
   });
 
   it('returns 500 when the database search fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockSearchServerLogs.mockRejectedValueOnce(new Error('Connection reset'));
     const response = await GET(req('/api/v1/server-log-search?id=42&q=ready'));
     expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error searching server logs:',
+      expect.objectContaining({ message: 'Connection reset' }),
+    );
+    logged.mockRestore();
   });
 });

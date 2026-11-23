@@ -113,16 +113,36 @@ describe('POST /api/v1/feedback', () => {
   });
 
   it('returns 500 with code E_CRYPTO when the encryption key is missing', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     stubEnv('FEEDBACK_SECRET', '');
     const res = await POST(buildReq({ doingWell: 'x' }));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'storage error', code: 'E_CRYPTO' });
+    expect(logged).toHaveBeenCalledWith(
+      'feedback: misconfigured',
+      expect.objectContaining({ message: 'FEEDBACK_SECRET is not set' }),
+    );
+    expect(logged).toHaveBeenCalledWith(
+      '[analytics-server] feedback_submission_failed',
+      expect.objectContaining({ error_code: 'E_CRYPTO' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns 500 with code E_INSERT when the insert query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     sqlCalls.throwOnInsert();
     const res = await POST(buildReq({ doingWell: 'x' }));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'storage error', code: 'E_INSERT' });
+    expect(logged).toHaveBeenCalledWith(
+      'feedback: insert failed',
+      expect.objectContaining({ message: 'boom' }),
+    );
+    expect(logged).toHaveBeenCalledWith(
+      '[analytics-server] feedback_submission_failed',
+      expect.objectContaining({ error_code: 'E_INSERT' }),
+    );
+    logged.mockRestore();
   });
 });
