@@ -1,5 +1,5 @@
-import 'cypress-axe';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
+import { checkA11y } from '../support/axe';
 import { mountWithProviders } from '../support/test-utils';
 
 // The selector's behaviour is covered in src/components/inference/ui/CostTierSelector.test.tsx.
@@ -14,8 +14,7 @@ describe('CostTierSelector', () => {
     });
 
     it('has no detectable a11y violations', () => {
-      cy.injectAxe();
-      cy.checkA11y('[data-testid="cost-tier-selector"]');
+      checkA11y('[data-testid="cost-tier-selector"]');
     });
   });
 });
