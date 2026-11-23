@@ -1576,7 +1576,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/named-run.ts',
-    sourceSha256: '795b1c2ee387c5ca0731d5343388616ab834670f7557b7acd2bb354eb3fb1157',
+    sourceSha256: '74e90fd9efb56a20dc28c7869df0a11a86abbad98ae4c7e86479997f05a59f68',
     reviewArea: {
       en: 'Stored and live named run selection, approval and partial-read status across JSON and CSV.',
       zh: '指定运行的存储与实时来源、批准状态以及 JSON 与 CSV 的读取完整性。',
@@ -1608,7 +1608,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: 'fcb379eb0b3f97d8d48fb25c7fdf4052a91978be3773c16cba5821ca450d66a5',
+    sourceSha256: '6b81bfe01198c370ee9190bbb953588a018cc55b2d0f32526717509a86dc8d0f',
     reviewArea: {
       en: 'VideoGenX published History, media with its stored quality, and the derived-media (rendition and poster) listing cache shared across instances under the video tag; the listing key is versioned by its value shape.',
       zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及派生媒体（转码版本与封面）回执列表以 video 标签跨实例共享的缓存；列表缓存键随值结构变化而升级版本。',

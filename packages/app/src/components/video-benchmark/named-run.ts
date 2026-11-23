@@ -22,7 +22,7 @@ export function cachedNamedVideoRun(
   runId: string,
   complete = true,
 ): NamedVideoRun | null {
-  if (complete && (pages.length === 0 || pages.at(-1)?.nextPage !== null)) return null;
+  if (complete && pages.at(-1)?.nextPage !== null) return null;
   const entries = pages.flatMap((p) => p.entries.filter((e) => e.runId === runId));
   if (!complete) return result(runId, entries, 'incomplete');
   return entries.length > 0 ? result(runId, entries, 'history') : null;

@@ -189,7 +189,7 @@ describe('published video history', () => {
     expect(
       new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
     ).toEqual(new Set(['h100', 'h200']));
-    // A named run is a different read: its own stored artifacts with their approval, nothing older.
+    // A named run takes no older entries.
     const named = await publishedVideoHistoryRead(1, VIDEO_HISTORY_MAX_PAGES, '150');
     expect(named.page.entries.map(({ runId, approved }) => [runId, approved])).toEqual([
       ['150', true],
@@ -390,9 +390,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after run-filtered pagination and the selection check before approval. They
-      // change which indexes a read lists and which approvals are refused, not a projected entry.
-      sources: 'c1ed2a1ac2d8b3cd86ddd1533be7c149f19eabfdc23ad6c13231e6a2ee1e9b16',
+      // Run-filtered pagination changes index discovery but preserves each projected entry.
+      sources: '67722e6222ed88400abae8a00b20ead1b01ab7da033de2a126834ff66fde075d',
     });
   });
 });

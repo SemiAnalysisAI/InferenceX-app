@@ -158,8 +158,7 @@ export interface PublishedVideoHistory {
  * Read `pages` History pages from `page` with one index listing and one snapshot read. Indexes the
  * snapshot does not cover are projected from their stored artifact. A read from the first page, the
  * dashboard's, also carries each older entry that holds a deployment's latest cell, after the
- * window. With `runId` the pages cover only that run's stored artifacts, approved or not, and
- * `complete` depends on that run's indexes and receipts alone. This path never writes.
+ * window. With `runId` the pages cover only that run's stored artifacts. This path never writes.
  */
 export async function publishedVideoHistory(
   page: number,
@@ -180,8 +179,8 @@ export async function publishedVideoHistory(
       }),
     );
   const end = (page - 1 + pages) * VIDEO_HISTORY_PAGE_SIZE;
-  // Only an index with an approval receipt can hold a dashboard cell. A named run is read through
-  // its own pages instead, so it takes no older entries.
+  // Only an index with an approval receipt can hold a dashboard cell.
+  // A named run takes no older entries.
   const [projected, older] = await Promise.all([
     project(indexes.slice((page - 1) * VIDEO_HISTORY_PAGE_SIZE, end)),
     page === 1 && !runId
