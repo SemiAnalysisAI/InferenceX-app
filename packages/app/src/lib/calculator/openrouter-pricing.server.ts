@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { unstable_cache } from 'next/cache';
 
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
@@ -6,6 +8,7 @@ import type { TokenRevenuePricing } from '@/components/inference/types';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
 import {
+  OPENROUTER_MODEL_IDS,
   type OpenRouterModelsPayload,
   type OpenRouterPricingResponse,
   openRouterPrices,
@@ -50,10 +53,21 @@ export async function readOpenRouterPricing(): Promise<OpenRouterPricingResponse
   return { fetchedAt: new Date().toISOString(), models };
 }
 
+/**
+ * Cache key parts for the price map. The catalog's OpenRouter IDs are part of the key, so adding or
+ * remapping a model starts a new entry instead of serving a map built for the old catalog.
+ */
+export function openRouterPricingCacheKey(
+  modelIds: readonly string[] = OPENROUTER_MODEL_IDS,
+): string[] {
+  const catalog = createHash('sha256').update(modelIds.join('\n')).digest('hex').slice(0, 12);
+  return ['openrouter-pricing-v1', catalog];
+}
+
 /** The catalog's OpenRouter prices, shared by the pricing route and the views API. Failures are not cached. */
 export const getOpenRouterPricing = unstable_cache(
   readOpenRouterPricing,
-  ['openrouter-pricing-v1'],
+  openRouterPricingCacheKey(),
   {
     revalidate: OPENROUTER_PRICING_REVALIDATE_SECONDS,
   },

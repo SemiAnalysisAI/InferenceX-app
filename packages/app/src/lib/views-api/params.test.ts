@@ -47,6 +47,8 @@ describe('resolveModelParam', () => {
     expect(resolveModelParam('deepseek-v4').displayName).toBe('DeepSeek-V4-Pro');
     expect(resolveModelParam('dsv4').displayName).toBe('DeepSeek-V4-Pro');
     expect(resolveModelParam('Qwen3.5-397B-A17B').displayName).toBe('Qwen-3.5-397B-A17B');
+    // Compare-page family aliases keep resolving here, as they always have on the views API.
+    expect(resolveModelParam('deepseek').displayName).toBe('DeepSeek-R1-0528');
   });
 
   it('rejects unknown models with the allowed list', () => {

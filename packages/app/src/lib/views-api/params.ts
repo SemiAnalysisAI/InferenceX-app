@@ -47,7 +47,8 @@ export function resolveModelParam(value: string | null, param = 'model'): Resolv
   if (!value) {
     throw new ViewsApiParamError(param, `${param} is required`, MODEL_DISPLAY_NAMES);
   }
-  const resolved = resolveModelName(value);
+  // The views API has always resolved compare-page family aliases such as `deepseek`.
+  const resolved = resolveModelName(value, { familyAliases: true });
   if (!resolved)
     throw new ViewsApiParamError(param, `Unknown model: ${value}`, MODEL_DISPLAY_NAMES);
   return resolved;

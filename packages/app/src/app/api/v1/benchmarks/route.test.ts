@@ -62,6 +62,17 @@ describe('GET /api/v1/benchmarks', () => {
     expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
   });
 
+  it.each(['deepseek', 'kimi', 'qwen', 'glm', 'minimax'])(
+    'returns 400 for the ambiguous family name %s instead of picking one model',
+    async (model) => {
+      const res = await GET(req(`/api/v1/benchmarks?model=${model}`));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('Unknown model');
+      expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     ['a DB model key', 'dsv4', ['dsv4']],
     ['a dashboard slug', 'kimi-k31-pro', ['kimik3.1']],

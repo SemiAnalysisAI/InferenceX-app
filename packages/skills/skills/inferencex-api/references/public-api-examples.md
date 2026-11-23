@@ -48,8 +48,10 @@ Pass display names (for example `DeepSeek-V4-Pro`) as `model`. `/api/v1/benchmar
 `/api/v1/benchmarks/history` and the views API also accept, case-insensitively,
 a DB model key (`dsv4`), a dashboard slug (`kimi-k31-pro`) or a retired name
 (`Qwen3.5-397B-A17B`, `DeepSeek-V4-Pro-0813`, `Kimi-K2.6`), and resolve each to the
-display model that contains it. A DB key selects that whole display model, so filter
-rows by their `model` key to keep one release. An unknown model returns 400 with
+display model that contains it. A DB key returns that whole display model, not only its
+own rows (`kimik2.6` also returns `kimik2.5` rows); each row keeps its `model` key, so
+filter on it to keep one release. Family names such as `deepseek` or `qwen` are
+ambiguous and return 400 on the benchmark reads. An unknown model returns 400 with
 `"param": "model"` and `allowed`, the display names; record the resolved display
 name, not the alias, in reports.
 

@@ -1907,7 +1907,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: 'ee54a4f55f281d5d9dbfaf63bb2d77519272ac483e848e8bfe592837bd5772b1',
+    sourceSha256: 'ee14df85ab82d9e917545a1ba4ca297d89353b6f2acae5ef378553d1bdb8a8e3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1988,7 +1988,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/catalog/model-name-resolver.ts',
-    sourceSha256: '108e7dcdc42ed5116cdfd49b393be894336913af4205c2ad50e5db7bbca14958',
+    sourceSha256: 'e1ff58681093cbe5ba4ee18fea43d96cade58c330dc28bbf942dd6e24ff33a88',
     reviewArea: {
       en: 'Accepted model= forms (display names, DB keys, slugs, legacy names) for the benchmark reads and the views API.',
       zh: '基准读取接口与视图 API 接受的 model= 形式（展示名称、DB 键、slug、旧名称）。',

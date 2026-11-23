@@ -155,8 +155,8 @@ export const SUPPORTED_TCO_MODELS = Object.freeze(
 
 /** Accepted `model=` forms on the benchmark reads, plus how DB keys and unknown models behave. */
 const MODEL_ALIAS_NOTE = text(
-  `The enum lists the canonical display names. ${MODEL_PARAM_FORMS.en} A DB key selects its whole display model; filter rows by model to keep one release. An unknown model returns 400 with param and the allowed display names.`,
-  `枚举列出规范的展示名称。${MODEL_PARAM_FORMS.zh}DB 键会选中其所属的整个展示模型；如只需某个版本，请按行的 model 字段筛选。未知模型返回 400，响应体包含 param 和允许的展示名称。`,
+  `The enum lists the canonical display names. ${MODEL_PARAM_FORMS.en} A DB key returns its whole display model, not only that key's rows: model=kimik2.6 also returns kimik2.5 and kimik2.7-code rows. Every row keeps its own model DB key, so filter on it to keep one release. Family names that cover several current models (deepseek, kimi, qwen, glm, minimax) are ambiguous and return 400. An unknown model returns 400 with param and the allowed display names.`,
+  `枚举列出规范的展示名称。${MODEL_PARAM_FORMS.zh}DB 键返回其所属的整个展示模型，而不只是该键的数据行：model=kimik2.6 也会返回 kimik2.5 和 kimik2.7-code 的数据行。每一行都保留自己的 model DB 键，如只需某个版本，请按该字段筛选。涵盖多个现有模型的系列名称（deepseek、kimi、qwen、glm、minimax）存在歧义，返回 400。未知模型返回 400，响应体包含 param 和允许的展示名称。`,
 );
 
 const UNKNOWN_MODEL_EXAMPLE = {

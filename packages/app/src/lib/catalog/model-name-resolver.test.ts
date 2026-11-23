@@ -7,6 +7,8 @@ import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare/compar
 import { LEGACY_MODEL_NAMES, MODEL_DISPLAY_NAMES, resolveModelName } from './model-name-resolver';
 
 const displayOf = (value: string) => resolveModelName(value)?.displayName ?? null;
+const slugDisplay = (slug: string) =>
+  COMPARE_MODEL_SLUGS.find((entry) => entry.slug === slug)!.displayName;
 
 describe('resolveModelName', () => {
   it('resolves every display name, case-insensitively, to its whole DB bucket', () => {
@@ -29,14 +31,16 @@ describe('resolveModelName', () => {
     expect(displayOf('DSV4')).toBe('DeepSeek-V4-Pro');
   });
 
-  it('resolves every dashboard slug and slug alias', () => {
+  it('resolves every dashboard slug, and slug aliases that name one model', () => {
     for (const { slug, displayName } of COMPARE_MODEL_SLUGS) {
       expect(displayOf(slug)).toBe(displayName);
     }
+    for (const alias of ['llama', 'gptoss', 'kimi-k25', 'minimax-m25', 'glm-5-2']) {
+      expect(displayOf(alias)).toBe(slugDisplay(COMPARE_MODEL_ALIASES[alias]!));
+    }
+    // The views API keeps every compare-page alias, family names included.
     for (const [alias, slug] of Object.entries(COMPARE_MODEL_ALIASES)) {
-      expect(displayOf(alias)).toBe(
-        COMPARE_MODEL_SLUGS.find((entry) => entry.slug === slug)!.displayName,
-      );
+      expect(resolveModelName(alias, { familyAliases: true })?.displayName).toBe(slugDisplay(slug));
     }
   });
 
@@ -88,6 +92,12 @@ describe('resolveModelName', () => {
     'DeepSeek-V4-Flash',
     // A precision suffix is not part of a model name.
     'DeepSeek-V4.1-Flash-FP4',
+    // Family aliases name several current models.
+    'deepseek',
+    'kimi',
+    'qwen',
+    'glm',
+    'minimax',
     'not-a-model',
     '',
     '__proto__',
