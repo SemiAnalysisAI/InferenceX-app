@@ -33,6 +33,33 @@ export function budgetFor(size: number, tolerancePercent: number): number {
   return Math.ceil((size * (1 + tolerancePercent / 100)) / 1024) * 1024;
 }
 
+/**
+ * Reads Next.js's route-bundle-stats.json. Throws unless it is a non-empty array whose entries
+ * each name a route and a finite, non-negative byte count, so a changed format cannot pass
+ * every route silently or write empty budgets.
+ */
+export function parseRouteBundleStats(value: unknown): RouteBundleStat[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('route-bundle-stats.json is not a non-empty array of routes.');
+  }
+  return value.map((entry: unknown, index) => {
+    const { route, firstLoadUncompressedJsBytes: size } = (entry ?? {}) as Partial<
+      Record<keyof RouteBundleStat, unknown>
+    >;
+    if (
+      typeof route !== 'string' ||
+      typeof size !== 'number' ||
+      !Number.isFinite(size) ||
+      size < 0
+    ) {
+      throw new Error(
+        `route-bundle-stats.json entry ${index} needs a string route and a finite firstLoadUncompressedJsBytes, got ${JSON.stringify(entry)}.`,
+      );
+    }
+    return { route, firstLoadUncompressedJsBytes: size };
+  });
+}
+
 export function checkRouteBudgets(
   stats: readonly RouteBundleStat[],
   budgets: RouteBudgets,
@@ -60,11 +87,21 @@ export function checkRouteBudgets(
   return report;
 }
 
-/** Budgets rewritten from a build: every route gets its size plus the tolerance. */
+/** The bare page every route builds on. Its budget is the default for routes without an entry. */
+export const FLOOR_ROUTE = '/_not-found';
+
+/**
+ * Budgets rewritten from a build: every route gets its size plus the tolerance, and routes
+ * without an entry get the floor route's budget.
+ */
 export function updatedRouteBudgets(
   stats: readonly RouteBundleStat[],
   budgets: RouteBudgets,
 ): RouteBudgets {
+  const floor = stats.find(({ route }) => route === FLOOR_ROUTE);
+  if (!floor) {
+    throw new Error(`route-bundle-stats.json has no ${FLOOR_ROUTE} entry to set defaultBytes.`);
+  }
   const routes = Object.fromEntries(
     stats
       .map(({ route, firstLoadUncompressedJsBytes: size }): [string, number] => [
@@ -73,5 +110,9 @@ export function updatedRouteBudgets(
       ])
       .toSorted(([a], [b]) => a.localeCompare(b)),
   );
-  return { ...budgets, routes };
+  return {
+    ...budgets,
+    defaultBytes: budgetFor(floor.firstLoadUncompressedJsBytes, budgets.tolerancePercent),
+    routes,
+  };
 }

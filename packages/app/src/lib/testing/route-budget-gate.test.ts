@@ -3,6 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import {
   budgetFor,
   checkRouteBudgets,
+  FLOOR_ROUTE,
+  parseRouteBundleStats,
   updatedRouteBudgets,
   type RouteBudgets,
 } from './route-budget-gate';
@@ -61,22 +63,72 @@ describe('checkRouteBudgets', () => {
 
 describe('updatedRouteBudgets', () => {
   it('sets every built route to its size plus the tolerance, rounded up to KiB, and drops the rest', () => {
-    const updated = updatedRouteBudgets([stat('/b', 1000), stat('/a', 102_400)], budgets);
+    const updated = updatedRouteBudgets(
+      [stat('/b', 1000), stat('/a', 102_400), stat(FLOOR_ROUTE, 600_000)],
+      budgets,
+    );
     expect(updated).toEqual({
       tolerancePercent: 1,
-      defaultBytes: 700_000,
-      routes: { '/a': 103_424, '/b': 1024 },
+      defaultBytes: 606_208,
+      routes: { '/_not-found': 606_208, '/a': 103_424, '/b': 1024 },
     });
-    expect(Object.keys(updated.routes)).toEqual(['/a', '/b']);
+    expect(Object.keys(updated.routes)).toEqual(['/_not-found', '/a', '/b']);
+  });
+
+  it('recomputes the default from the bare page, so it follows the shared shell down and up', () => {
+    expect(updatedRouteBudgets([stat(FLOOR_ROUTE, 650_000)], budgets).defaultBytes).toBe(
+      budgetFor(650_000, 1),
+    );
+    expect(() => updatedRouteBudgets([stat('/', 700_000)], budgets)).toThrow(
+      'route-bundle-stats.json has no /_not-found entry to set defaultBytes.',
+    );
   });
 
   it('leaves no slack in the budgets it writes', () => {
-    const stats = [stat('/infx/inference/[model]', 1_662_755), stat('/', 706_776)];
+    const stats = [
+      stat('/infx/inference/[model]', 1_662_755),
+      stat('/', 706_776),
+      stat(FLOOR_ROUTE, 661_653),
+    ];
     expect(checkRouteBudgets(stats, updatedRouteBudgets(stats, budgets))).toEqual({
       errors: [],
       stale: [],
       slack: [],
     });
     expect(budgetFor(1_662_755, 1)).toBe(1_680_384);
+  });
+});
+
+describe('parseRouteBundleStats', () => {
+  it('keeps the route and size of each entry', () => {
+    expect(
+      parseRouteBundleStats([
+        { route: '/', firstLoadUncompressedJsBytes: 706_776, firstLoadChunkPaths: ['a.js'] },
+      ]),
+    ).toEqual([stat('/', 706_776)]);
+  });
+
+  it('rejects a file that is not a non-empty array', () => {
+    for (const value of [[], {}, null, { routes: [] }]) {
+      expect(() => parseRouteBundleStats(value)).toThrow(
+        'route-bundle-stats.json is not a non-empty array of routes.',
+      );
+    }
+  });
+
+  it('rejects an entry whose size field is missing, renamed or not a finite count', () => {
+    for (const entry of [
+      { route: '/' },
+      { route: '/', firstLoadJsBytes: 1 },
+      { route: '/', firstLoadUncompressedJsBytes: '706776' },
+      { route: '/', firstLoadUncompressedJsBytes: Number.NaN },
+      { route: '/', firstLoadUncompressedJsBytes: -1 },
+      { firstLoadUncompressedJsBytes: 1 },
+      null,
+    ]) {
+      expect(() => parseRouteBundleStats([stat('/a', 1), entry])).toThrow(
+        'route-bundle-stats.json entry 1 needs a string route and a finite firstLoadUncompressedJsBytes',
+      );
+    }
   });
 });

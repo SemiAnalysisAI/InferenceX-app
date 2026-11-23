@@ -7,9 +7,9 @@ import path from 'node:path';
 
 import {
   checkRouteBudgets,
+  parseRouteBundleStats,
   updatedRouteBudgets,
   type RouteBudgets,
-  type RouteBundleStat,
 } from '../src/lib/testing/route-budget-gate';
 
 const STATS_PATH = path.resolve(
@@ -22,11 +22,23 @@ if (!existsSync(STATS_PATH)) {
   console.error(`check-route-budgets: ${STATS_PATH} is missing. Run \`bun run build\` first.`);
   process.exit(1);
 }
-const stats: RouteBundleStat[] = JSON.parse(readFileSync(STATS_PATH, 'utf8'));
+let stats;
+try {
+  stats = parseRouteBundleStats(JSON.parse(readFileSync(STATS_PATH, 'utf8')));
+} catch (error) {
+  console.error(`check-route-budgets: ${(error as Error).message}`);
+  process.exit(1);
+}
 const budgets: RouteBudgets = JSON.parse(readFileSync(BUDGETS_PATH, 'utf8'));
 
 if (process.argv.includes('--update')) {
-  const updated = updatedRouteBudgets(stats, budgets);
+  let updated;
+  try {
+    updated = updatedRouteBudgets(stats, budgets);
+  } catch (error) {
+    console.error(`check-route-budgets: ${(error as Error).message}`);
+    process.exit(1);
+  }
   writeFileSync(BUDGETS_PATH, `${JSON.stringify(updated, null, 2)}\n`);
   console.log(
     `check-route-budgets: ${Object.keys(updated.routes).length} route budgets set to their size + ${updated.tolerancePercent}%.`,
