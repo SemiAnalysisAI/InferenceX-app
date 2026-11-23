@@ -218,12 +218,16 @@ describe('new dashboard projections', () => {
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({ error: 'Source data unavailable' });
   });
-  it('reports a run without telemetry as 404 with its reason', async () => {
-    const missing = { error: 'No Chip metrics data found in artifacts', code: 'NO_TELEMETRY' };
-    mocks.metrics.mockImplementation(() => Response.json(missing, { status: 404 }));
-    const result = await gpu(req('gpu-metrics', 'runId=123'));
-    expect(result.status).toBe(404);
-    expect(await result.json()).toEqual(missing);
+  it('keeps the live reader status and reason for missing or retryable telemetry', async () => {
+    for (const [status, body] of [
+      [404, { error: 'No Chip metrics data found in artifacts', code: 'NO_TELEMETRY' }],
+      [503, { error: 'Telemetry artifacts could not be downloaded', code: 'GITHUB_UNAVAILABLE' }],
+    ] as const) {
+      mocks.metrics.mockImplementation(() => Response.json(body, { status }));
+      const result = await gpu(req('gpu-metrics', 'runId=123'));
+      expect(result.status).toBe(status);
+      expect(await result.json()).toEqual(body);
+    }
   });
   it("returns the reader's all-chip statistics instead of recomputing them from GPU-filtered rows", async () => {
     const stats = [0, 1].map((gpuIndex) => ({
