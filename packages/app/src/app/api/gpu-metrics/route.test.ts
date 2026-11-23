@@ -620,6 +620,64 @@ describe('GET /api/gpu-metrics', () => {
       expect(body.code).toBe('ARTIFACT_TOO_LARGE');
     });
   });
+
+  describe('when no artifact yields telemetry', () => {
+    it('asks for a retry when GitHub cannot list the artifacts', async () => {
+      const { status, body } = await read(run, { ok: false, status: 503 });
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('asks for a retry when a download fails for a reason other than expiry', async () => {
+      const { status, body } = await read(
+        run,
+        listing(1, 2),
+        failedDownload(410),
+        failedDownload(502),
+      );
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('reports no telemetry only when every archive expired or held no series', async () => {
+      zipArchives.byKey.set('empty', []);
+      const { status, body } = await read(run, listing(1, 2), failedDownload(410), {
+        ok: true,
+        headers: new Headers({ 'Content-Length': '1' }),
+        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('empty').buffer),
+      });
+      expect(status).toBe(404);
+      expect(body.code).toBe('NO_TELEMETRY');
+    });
+
+    const corruptArchive = {
+      ok: true,
+      headers: new Headers({ 'Content-Length': '7' }),
+      arrayBuffer: () => Promise.resolve(new TextEncoder().encode('corrupt').buffer),
+    };
+
+    it('reports no telemetry for archives that downloaded but cannot be read', async () => {
+      const { status, body } = await read(run, listing(1, 2), corruptArchive, corruptArchive);
+      expect(status).toBe(404);
+      expect(body.code).toBe('NO_TELEMETRY');
+    });
+
+    it('asks for a retry when a corrupt archive sits beside a failed download', async () => {
+      const { status, body } = await read(run, listing(1, 2), corruptArchive, failedDownload(502));
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('names the size cap instead of reporting missing telemetry', async () => {
+      const { status, body } = await read(run, listing(1), {
+        ok: true,
+        headers: new Headers({ 'Content-Length': String(60 * 1024 * 1024) }),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+      expect(status).toBe(422);
+      expect(body.code).toBe('ARTIFACT_TOO_LARGE');
+    });
+  });
 });
 
 it('shows temperature from native bundles before ingestion without mixing host-local GPU indices', async () => {
