@@ -1,7 +1,12 @@
+import path from 'path';
+
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
+import { pendingMigrations } from './lib/migration-runner';
+
+const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -26,6 +31,16 @@ function sub(title: string) {
 
 async function verify(): Promise<void> {
   console.log('=== db:verify ===');
+
+  // Reported, never fatal. CI runs this after writes have committed, and admin:db:check-migrations
+  // already blocks writes to a database that is behind.
+  const pending = await pendingMigrations(sql, MIGRATIONS_DIR);
+  console.log(
+    pending.length === 0
+      ? '  Migrations: all applied'
+      : `  Migrations: ${pending.length} unrecorded (${pending.join(', ')}). ` +
+          'Run bun run admin:db:check-migrations for what to do.',
+  );
 
   section('Row Counts');
   const tables = [
