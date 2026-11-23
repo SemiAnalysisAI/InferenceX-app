@@ -32,8 +32,40 @@ export async function pgliteDriverSql(db: PGlite): Promise<PgliteSql> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ix-pglite-'));
   const server = new PGLiteSocketServer({ db, path: path.join(dir, '.s.PGSQL.5432') });
   await server.start();
+  // postgres.js falls back to PG* environment variables (PGSSLMODE, PGUSER, PGPREPARE and one per
+  // option), so every option it reads from the environment is set here to keep tests hermetic.
   // PGlite is single-session, so the pool gets the server's one connection.
-  const sql = postgres({ host: dir, port: 5432, max: 1, onnotice: () => {} });
+  const sql = postgres({
+    host: dir,
+    port: 5432,
+    // A falsy user, password or database would fall through to the environment.
+    user: 'postgres',
+    pass: 'postgres',
+    database: 'postgres',
+    ssl: false,
+    sslnegotiation: null,
+    channel_binding: 'prefer',
+    target_session_attrs: 'read-write',
+    max: 1,
+    min: 0,
+    idle_timeout: 0,
+    connect_timeout: 30,
+    queue_timeout: 0,
+    query_timeout: 0,
+    cancel_timeout: 5,
+    max_lifetime: null,
+    max_pipeline: 100,
+    scheduler: false,
+    backoff: false,
+    keep_alive: 60,
+    prepare: true,
+    debug: false,
+    fetch_types: true,
+    infer: false,
+    publications: 'alltables',
+    connection: { application_name: 'inferencex-db-tests' },
+    onnotice: () => {},
+  });
   // bun's `expect(promise).resolves/.rejects` waits for the promise in a loop that only reads the
   // socket when a timer fires, so with no timer each driver query there stalls for up to a second.
   // A 1 ms timer keeps the loop waking while the driver is open.

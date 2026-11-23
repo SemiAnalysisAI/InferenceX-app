@@ -27,6 +27,7 @@ import {
   writeBackTraceReplayJsonb,
 } from './agentic-shared';
 import { getResidentSequenceLengthSketches } from './resident-sequence-lengths';
+import { getTraceServerMetricSource } from './trace-server-metrics';
 
 function mockSql(reject?: Error): {
   sql: DbClient;
@@ -122,6 +123,48 @@ describe('writeBackChartSeries', () => {
 
     await waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
     expect(warn.mock.calls[0]![0]).toContain('could not persist chart_series');
+  });
+
+  describe('through postgres.js', () => {
+    let db: PGlite;
+    let pg: PgliteSql;
+
+    beforeAll(async () => {
+      db = await migratedPglite();
+      pg = await pgliteDriverSql(db);
+      await db.exec(`
+        INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
+        VALUES (1, 1, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
+        INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
+          is_multinode, prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
+        VALUES (1, 'dsv4', 'b200', 'vllm', 'fp4', 'none', false, false, 8, 8, 8, 8);
+        -- Not gzip, so a recompute from this blob would find no series.
+        INSERT INTO agentic_trace_replay (id, server_metrics_json_gz) VALUES (872, 'not gzip'::bytea);
+        INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics, trace_replay_id)
+        VALUES (88, 1, 1, 'agentic_traces', '2026-10-01', 1, '{}', 872);
+      `);
+    }, 30_000);
+
+    afterAll(async () => {
+      await pg?.end();
+      await db?.close();
+    });
+
+    it('stores the series as a jsonb object whose version the source read serves', async () => {
+      const source = { source: { id: 'engine-0' }, kvCacheUsage: [{ t: 0, value: 0.5 }] };
+      writeBackChartSeries(pg, 872, { ...series, metricSources: [source] as never });
+
+      const stored = await waitFor(async () => {
+        const [row] = await pg`
+          select jsonb_typeof(chart_series) as type, (chart_series->>'version')::int as version
+          from agentic_trace_replay where id = 872
+        `;
+        expect(row?.type).toBe('object');
+        return row;
+      });
+      expect(stored?.version).toBe(CHART_SERIES_VERSION);
+      expect(await getTraceServerMetricSource(pg, 88, 'engine-0')).toEqual(source);
+    });
   });
 });
 
