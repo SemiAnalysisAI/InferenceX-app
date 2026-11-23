@@ -225,6 +225,7 @@ const waitForChart = () => {
   chart().should('exist');
   bars().should('have.length.greaterThan', 0);
 };
+const PINNED_RUN_URL = `/infx/profit-estimator-per-gigawatt?i_gpus=gb300_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}&i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`;
 
 describe('Profit Estimator per GW — compare history', () => {
   beforeEach(stubOpenRouter);
@@ -368,10 +369,7 @@ describe('Profit Estimator per GW — compare history', () => {
   });
 
   it('hydrates pinned runs from the URL and locks the range endpoints as "On chart"', () => {
-    cy.visit(
-      `/infx/profit-estimator-per-gigawatt?i_gpus=gb300_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}&i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`,
-      { onBeforeLoad: suppressNudges },
-    );
+    cy.visit(PINNED_RUN_URL, { onBeforeLoad: suppressNudges });
     chart().should('exist');
     chart().find('rect.bar-tco').should('have.length', 3);
     axisLabels()
@@ -385,6 +383,18 @@ describe('Profit Estimator per GW — compare history', () => {
       .parent()
       .contains('button', 'Add to chart')
       .should('exist');
+  });
+
+  it('numbers a pinned run on the axis when the changelog arrives after the bars', () => {
+    const releaseChangelogs = interceptProfitData({ holdChangelogs: true });
+    cy.visit(PINNED_RUN_URL, { onBeforeLoad: suppressNudges });
+    chart().find('rect.bar-tco').should('have.length', 3);
+    axisLabels()
+      .should('contain.text', PROFIT_RUN_DATE)
+      .and('not.contain.text', `${PROFIT_RUN_DATE} #`);
+    cy.then(releaseChangelogs);
+    changelog().should('contain.text', `${PROFIT_RUN_DATE} #2`);
+    axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #2`);
   });
 });
 
