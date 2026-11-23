@@ -40,7 +40,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import {
   SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_REVISION,
-} from '@/lib/power/system-power-model';
+} from '@/lib/power/system-power-categories';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';

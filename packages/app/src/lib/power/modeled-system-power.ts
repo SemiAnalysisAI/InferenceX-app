@@ -1,16 +1,18 @@
 import type { BenchmarkRow } from '@/lib/api/api';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import {
-  estimateChassisPower,
-  estimateRackPower,
-  isRackPowerHardware,
-  isSystemPowerHardware,
   emptySystemPowerBreakdown,
-  rackComputeTrayCount,
   scaleSystemPowerBreakdown,
   SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_REVISION,
   type SystemPowerBreakdown,
+} from '@/lib/power/system-power-categories';
+import {
+  estimateChassisPower,
+  estimateRackPower,
+  isRackPowerHardware,
+  isSystemPowerHardware,
+  rackComputeTrayCount,
   type SystemPowerOperatingState,
   type SystemUnitPower,
 } from '@/lib/power/system-power-model';
