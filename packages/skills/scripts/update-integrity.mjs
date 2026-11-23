@@ -81,7 +81,8 @@ async function main(args) {
       const current = await readFile(integrityPath, 'utf8').catch(() => undefined);
       if (current === next) continue;
       // Concurrent `npm pack` runs read this file, so replace it in one step instead of truncating it.
-      const staging = new URL(`integrity.json.${process.pid}.tmp`, integrityPath);
+      // Staged in the package root, which is neither hashed nor packed.
+      const staging = new URL(`.integrity-${skillName}.${process.pid}.tmp`, packageRoot);
       await writeFile(staging, next);
       await rename(staging, integrityPath);
     }
