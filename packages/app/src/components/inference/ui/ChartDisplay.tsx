@@ -523,6 +523,7 @@ export default function ChartDisplay({
     runIndexByUrl,
     getOverlayData,
     isUnofficialRun,
+    isUnofficialRunRequested,
     activeOverlayHwTypes,
     localOfficialOverride,
   } = useUnofficialRun();
@@ -889,10 +890,11 @@ export default function ChartDisplay({
     }
     return [...ids];
   }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
-  // PowerX drops the ISL/OSL footer line, so it never asks for the sketches either.
+  // PowerX drops the ISL/OSL footer line, so it never asks for the sketches either. The overlay
+  // gate uses the requested flag: official chart data can land before the overlay run's.
   const residentSequenceLengthsQuery = useResidentSequenceLengths(
     residentPointIds,
-    isAgenticSequence && !isUnofficialRun && !powerXSurface,
+    isAgenticSequence && !isUnofficialRunRequested && !powerXSurface,
   );
   const residentSequenceLengths =
     residentSequenceLengthsQuery.data?.coveredPoints ===

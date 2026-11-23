@@ -16,7 +16,10 @@ mock.module('./cypress-source-fingerprint', () => ({
   cypressSourceFingerprint: () => 'current-source',
 }));
 
-import { setupTimingSplit } from '../../../cypress/plugins/timings';
+// Imported after mock.module so the real cypress-split never loads. Its find-cypress-specs
+// dependency installs tsx's require hook, which bun keeps for later files in the same worker; a
+// later file that requires an ESM .js file then blocks forever in esbuild's transformSync.
+const { setupTimingSplit } = await import('../../../cypress/plugins/timings');
 
 const temporary: string[] = [];
 afterEach(() => {

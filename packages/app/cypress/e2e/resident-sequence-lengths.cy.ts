@@ -51,10 +51,19 @@ describe('resident sequence-length footer summary', () => {
       requestCount += 1;
       request.reply({ body: {} });
     });
+    // Hold the overlay run until the official chart has rendered. This is the window in which
+    // the page used to ask for official-only stats. The stub above answers once released.
+    const overlayGate = Promise.withResolvers<void>();
+    cy.intercept('GET', '/api/unofficial-run*', () => overlayGate.promise);
 
     visitAgenticChart(`&unofficialrun=${OVERLAY_RUN_ID}`);
-    cy.wait('@unofficialRun');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+    cy.get('[data-testid="resident-sequence-lengths"]').should('not.exist');
+    cy.then(() => {
+      expect(requestCount).to.equal(0);
+      overlayGate.resolve();
+    });
+    cy.wait('@unofficialRun');
     cy.get('[data-testid="resident-sequence-lengths"]').should('not.exist');
     cy.then(() => expect(requestCount).to.equal(0));
   });

@@ -577,7 +577,10 @@ describe('VideoGenX Results', () => {
       expect(detail).not.toContain(namedRun);
     });
     click(get('[data-testid="results-detail-back"]'));
-    toggleHardware(await eventually(() => (get('label[for="checkbox-b200"]'), 'b200')));
+    // Back is a history traversal whose popstate lands tasks later, restoring the overview's URL;
+    // a legend toggle made before then would be undone, so wait for the detail to close.
+    await eventually(() => expect($('[data-testid="video-results-detail"]')).toBeNull());
+    toggleHardware('b200');
     await eventually(() => expect(hardwarePoints('b200')).toHaveLength(0));
     toggleHardware('b200');
     await eventually(() => expect(hardwarePoints('b200')).toHaveLength(2));

@@ -354,9 +354,11 @@ export function InferenceProvider({
     availabilityError,
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
-  const { isUnofficialRun } = useUnofficialRun();
+  // The requested flag is known on the first render. Waiting for overlay data would start the
+  // page on official-only rules and flip them (resetting the GPU selection) when it lands.
+  const { isUnofficialRunRequested } = useUnofficialRun();
   const featureGateUnlocked = useFeatureGate();
-  const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
+  const engineGuardLifted = isEngineGuardLifted(isUnofficialRunRequested, featureGateUnlocked);
   const engineConsent = useEngineComparisonConsent(
     `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
   );
@@ -769,7 +771,7 @@ export function InferenceProvider({
     tcoBasis,
     activeTab === 'inference' &&
       !autoSelectAllGpus &&
-      !isUnofficialRun &&
+      !isUnofficialRunRequested &&
       !hasExplicitRunSelection &&
       selectedRunDateRev === 0,
     powerCompare,
