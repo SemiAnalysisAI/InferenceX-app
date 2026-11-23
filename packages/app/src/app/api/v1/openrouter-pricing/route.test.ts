@@ -58,22 +58,57 @@ describe('GET /api/v1/openrouter-pricing', () => {
     );
   });
 
+  // A 200 without usable prices must fail before Next's data cache and the CDN keep it for minutes.
   it.each([
     [
       'OpenRouter answers with an error',
       () => mockFetch.mockResolvedValueOnce(openRouterList(503)),
+      'OpenRouter pricing request failed (503)',
     ],
     [
       'OpenRouter is unreachable',
       () => mockFetch.mockRejectedValueOnce(new TypeError('fetch failed')),
+      'fetch failed',
     ],
-  ])('answers an uncached 502 when %s', async (_case, arrange) => {
+    [
+      'OpenRouter returns an empty model list',
+      () => mockFetch.mockResolvedValueOnce(Response.json({ data: [] })),
+      'OpenRouter returned an empty model list',
+    ],
+    [
+      'OpenRouter returns a non-array model list',
+      () => mockFetch.mockResolvedValueOnce(Response.json({ data: { models: [] } })),
+      'OpenRouter returned an empty model list',
+    ],
+    [
+      'OpenRouter returns no model list',
+      () => mockFetch.mockResolvedValueOnce(Response.json({})),
+      'OpenRouter returned an empty model list',
+    ],
+    [
+      'OpenRouter prices none of the catalog models',
+      () =>
+        mockFetch.mockResolvedValueOnce(
+          Response.json({
+            data: [
+              { id: 'unrelated/model', pricing: { prompt: '0.000001', completion: '0.000002' } },
+              { id: V4_PRO, pricing: { prompt: '0.000001' } },
+            ],
+          }),
+        ),
+      'OpenRouter returned no prices for the catalog models',
+    ],
+  ])('answers an uncached 502 when %s', async (_case, arrange, reason) => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     arrange();
     const res = await GET(new Request('http://localhost/api/v1/openrouter-pricing'));
     expect(res.status).toBe(502);
     expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(await res.json()).toEqual({ error: 'OpenRouter pricing is unavailable right now' });
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching OpenRouter pricing:',
+      expect.objectContaining({ message: reason }),
+    );
     logged.mockRestore();
   });
 });

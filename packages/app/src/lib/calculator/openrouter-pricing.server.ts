@@ -22,7 +22,11 @@ const OPENROUTER_TIMEOUT_MS = 15_000;
 /** Fixture builds read this instead of OpenRouter, so they make no outside request. */
 const FIXTURE_FETCHED_AT = '2026-11-23T00:00:00.000Z';
 
-/** Reads the full OpenRouter list (about 1 MB) and keeps only the catalog's prices. */
+/**
+ * Reads the full OpenRouter list (about 1 MB) and keeps only the catalog's prices. A blank list or
+ * one that prices no catalog model throws, so it is never cached; a revalidation that throws keeps
+ * serving the last good prices.
+ */
 export async function readOpenRouterPricing(): Promise<OpenRouterPricingResponse> {
   if (FIXTURES_MODE) {
     return {
@@ -35,10 +39,15 @@ export async function readOpenRouterPricing(): Promise<OpenRouterPricingResponse
     signal: AbortSignal.timeout(OPENROUTER_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`OpenRouter pricing request failed (${response.status})`);
-  return {
-    fetchedAt: new Date().toISOString(),
-    models: openRouterPrices((await response.json()) as OpenRouterModelsPayload),
-  };
+  const payload = (await response.json()) as OpenRouterModelsPayload;
+  if (!Array.isArray(payload.data) || payload.data.length === 0) {
+    throw new Error('OpenRouter returned an empty model list');
+  }
+  const models = openRouterPrices(payload);
+  if (Object.keys(models).length === 0) {
+    throw new Error('OpenRouter returned no prices for the catalog models');
+  }
+  return { fetchedAt: new Date().toISOString(), models };
 }
 
 /** The catalog's OpenRouter prices, shared by the pricing route and the views API. Failures are not cached. */
