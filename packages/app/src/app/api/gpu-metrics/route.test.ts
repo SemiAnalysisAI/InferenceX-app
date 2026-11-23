@@ -51,6 +51,7 @@ mock.module('adm-zip', () => {
       this.buffer = buffer;
     }
     getEntries() {
+      if (this.buffer.toString('utf8') === 'corrupt') throw new Error('Invalid zip format');
       const entries = zipArchives.byKey.get(this.buffer.toString('utf8')) ?? [
         { entryName: 'gpu_metrics_0.csv', data: csvContent },
       ];
@@ -577,6 +578,24 @@ describe('GET /api/gpu-metrics', () => {
       });
       expect(status).toBe(404);
       expect(body.code).toBe('NO_TELEMETRY');
+    });
+
+    const corruptArchive = {
+      ok: true,
+      headers: new Headers({ 'Content-Length': '7' }),
+      arrayBuffer: () => Promise.resolve(new TextEncoder().encode('corrupt').buffer),
+    };
+
+    it('reports no telemetry for archives that downloaded but cannot be read', async () => {
+      const { status, body } = await read(run, listing(1, 2), corruptArchive, corruptArchive);
+      expect(status).toBe(404);
+      expect(body.code).toBe('NO_TELEMETRY');
+    });
+
+    it('asks for a retry when a corrupt archive sits beside a failed download', async () => {
+      const { status, body } = await read(run, listing(1, 2), corruptArchive, failedDownload(502));
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
     });
 
     it('names the size cap instead of reporting missing telemetry', async () => {

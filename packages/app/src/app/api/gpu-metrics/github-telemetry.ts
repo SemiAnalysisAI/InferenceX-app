@@ -85,7 +85,7 @@ export class GpuTelemetryError extends Error {
   }
 }
 
-/** Why one artifact gave no data; an archive without series yields `null` instead. */
+/** Why one artifact gave no data; an archive without readable series yields `null` instead. */
 type DownloadFailure = 'expired' | 'too_large' | 'failed';
 
 /** Fetches one artifact zip, or why it could not (with a warning). */
@@ -95,18 +95,23 @@ async function downloadZip(
   maxBytes: number,
 ): Promise<Buffer | DownloadFailure> {
   if (artifact.expired) return 'expired';
-  const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
-  if (!dlResp.ok) {
-    console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
-    return dlResp.status === 410 ? 'expired' : 'failed';
-  }
+  try {
+    const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
+    if (!dlResp.ok) {
+      console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
+      return dlResp.status === 410 ? 'expired' : 'failed';
+    }
 
-  const contentLength = dlResp.headers.get('Content-Length');
-  if (contentLength && parseInt(contentLength, 10) > maxBytes) {
-    console.warn(`Artifact ${artifact.name} exceeds ${maxBytes / (1024 * 1024)} MB, skipping`);
-    return 'too_large';
+    const contentLength = dlResp.headers.get('Content-Length');
+    if (contentLength && parseInt(contentLength, 10) > maxBytes) {
+      console.warn(`Artifact ${artifact.name} exceeds ${maxBytes / (1024 * 1024)} MB, skipping`);
+      return 'too_large';
+    }
+    return Buffer.from(await dlResp.arrayBuffer());
+  } catch (error) {
+    console.warn(`Failed to download artifact ${artifact.name}:`, error);
+    return 'failed';
   }
-  return Buffer.from(await dlResp.arrayBuffer());
 }
 
 async function downloadArtifact(
@@ -178,10 +183,9 @@ async function downloadBundle(
 }
 
 /**
- * One artifact download and parse. A corrupt or truncated archive is that
- * artifact's failure alone: it is logged and skipped so the other series of
- * the run still reach the chart (the client would otherwise retry the whole
- * multi-hundred-megabyte request).
+ * One artifact download and parse. A corrupt archive is that artifact's failure alone: it is
+ * logged and skipped so the other series of the run still reach the chart. It counts as an
+ * archive without readable series, since downloading it again yields the same bytes.
  */
 async function runJob(
   job: TelemetryJob,
@@ -199,7 +203,7 @@ async function runJob(
     return Array.isArray(series) ? { kind: 'bundle', series } : series;
   } catch (error) {
     console.warn(`Failed to read artifact ${job.artifact.name}:`, error);
-    return 'failed';
+    return null;
   }
 }
 
@@ -224,8 +228,8 @@ async function downloadTelemetry(
 }
 
 /**
- * Why no artifact gave data. Only expired archives and archives without series mean the run has
- * no telemetry; a failed download may succeed on retry.
+ * Why no artifact gave data. Only expired archives and archives without readable series mean the
+ * run has no telemetry; a failed download may succeed on retry.
  */
 function missingTelemetryError(
   outcomes: readonly (TelemetryResult | DownloadFailure | null)[],
