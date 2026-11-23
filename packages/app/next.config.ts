@@ -1,10 +1,12 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
-import { getDashboardRoute } from './src/lib/routing/dashboard-routes';
-import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
 import {
   DEFAULT_INFERENCE_MODEL_SLUG,
+  getDashboardRoute,
+} from './src/lib/routing/dashboard-routes';
+import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
+import {
   DEFAULT_INFERENCE_REDIRECT_MISSING,
   INFERENCE_MODEL_ALIAS_REDIRECTS,
 } from './src/lib/routing/inference-model-redirects';
