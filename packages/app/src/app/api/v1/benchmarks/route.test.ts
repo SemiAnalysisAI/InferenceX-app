@@ -271,12 +271,18 @@ describe('GET /api/v1/benchmarks', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetLatestBenchmarks.mockRejectedValueOnce(new Error('DB down'));
 
     const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching benchmarks:',
+      expect.objectContaining({ message: 'DB down' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns empty array when no benchmarks found', async () => {

@@ -1194,11 +1194,17 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it('returns 500 on unexpected error', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockFetch.mockRejectedValueOnce(new Error('Network failure'));
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain('unofficial run');
+    expect(logged).toHaveBeenCalledWith(
+      'Error processing unofficial run:',
+      expect.objectContaining({ message: 'Network failure' }),
+    );
+    logged.mockRestore();
   });
 
   it('uses today date when created_at is missing', async () => {

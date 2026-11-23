@@ -267,10 +267,16 @@ describe('GET /api/v1/views/fleet', () => {
   });
 
   it('returns 500 when the query fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await GET(
       request('/api/v1/views/fleet?model=DeepSeek-V4-Pro&sequence=1k/1k&mw=100'),
     );
     expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error building fleet view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

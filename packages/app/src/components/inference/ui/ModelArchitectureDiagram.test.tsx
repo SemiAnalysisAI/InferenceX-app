@@ -28,7 +28,12 @@ mock.module('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: mocks.theme.resolved }),
 }));
 mock.module('next/link', () => ({
-  default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
+  default: ({
+    children,
+    prefetch: _prefetch,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean | null }) => (
     <a {...props}>{children}</a>
   ),
 }));

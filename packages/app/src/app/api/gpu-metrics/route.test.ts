@@ -230,6 +230,7 @@ describe('GET /api/gpu-metrics — database first', () => {
   });
 
   it('reports a database failure separately instead of treating it as missing data', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
     mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('relation does not exist'));
     globalThis.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
@@ -238,6 +239,11 @@ describe('GET /api/gpu-metrics — database first', () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' });
     expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(logged).toHaveBeenCalledWith(
+      'gpu-metrics: database lookup failed for run 99:',
+      expect.objectContaining({ message: 'relation does not exist' }),
+    );
+    logged.mockRestore();
   });
 });
 
@@ -358,12 +364,18 @@ describe('GET /api/gpu-metrics', () => {
   });
 
   it('returns 500 when GITHUB_TOKEN is not set', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     delete process.env.GITHUB_TOKEN;
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain('GitHub token not configured');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching GPU power data:',
+      expect.objectContaining({ message: 'GitHub token not configured' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns 404 when the run has no telemetry artifacts', async () => {
@@ -405,6 +417,7 @@ describe('GET /api/gpu-metrics', () => {
   });
 
   it('skips artifacts that fail to download', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -454,9 +467,14 @@ describe('GET /api/gpu-metrics', () => {
     const body = await res.json();
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
+    expect(warned).toHaveBeenCalledWith(
+      'Failed to download artifact gpu_metrics_dsr1_h200: Forbidden',
+    );
+    warned.mockRestore();
   });
 
   it('skips artifacts exceeding 50MB', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -507,6 +525,8 @@ describe('GET /api/gpu-metrics', () => {
     const body = await res.json();
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
+    expect(warned).toHaveBeenCalledWith('Artifact gpu_metrics_dsr1_h200 exceeds 50 MB, skipping');
+    warned.mockRestore();
   });
 });
 

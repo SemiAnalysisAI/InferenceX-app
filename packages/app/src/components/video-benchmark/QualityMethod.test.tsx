@@ -9,7 +9,12 @@ const mocks = { track: vi.fn(), locale: 'en' as 'en' | 'zh' };
 mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
 mock.module('next/link', () => ({
-  default: ({ href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
+  default: ({
+    href,
+    prefetch: _prefetch,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean | null }) => (
     <a href={href} {...props} />
   ),
 }));

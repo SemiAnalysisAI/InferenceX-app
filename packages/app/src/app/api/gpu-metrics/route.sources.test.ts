@@ -98,6 +98,7 @@ afterEach(() => {
 
 describe('Timeline requested-source coverage', () => {
   it('keeps known missing hosts as 503 even when another requested series is healthy', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const partial = stored(NAME_B, 300);
     partial.sidecars.seriesInventory = [
       { fileName: 'gpu_metrics.csv', sampleCount: 2 },
@@ -118,5 +119,10 @@ describe('Timeline requested-source coverage', () => {
       code: 'STORED_TELEMETRY_INCOMPLETE',
       artifact: csvName(NAME_B),
     });
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching GPU power data:',
+      expect.objectContaining({ artifact: csvName(NAME_B) }),
+    );
+    logged.mockRestore();
   });
 });

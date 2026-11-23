@@ -114,10 +114,16 @@ describe('GET /api/v1/benchmarks/history/trends', () => {
   });
 
   it('returns 500 when the query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('db down'));
     const res = await GET(
       req('/api/v1/benchmarks/history/trends?model=DeepSeek-R1-0528&isl=1024&osl=1024'),
     );
     expect(res.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching trend history:',
+      expect.objectContaining({ message: 'db down' }),
+    );
+    logged.mockRestore();
   });
 });

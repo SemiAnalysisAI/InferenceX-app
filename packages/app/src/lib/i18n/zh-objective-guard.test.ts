@@ -36,6 +36,8 @@ function runChineseOnlyGuard(directory: string, base: string, head: string): str
     cwd: directory,
     encoding: 'utf8',
     env: { ...process.env, ZH_GUARD_BASE_SHA: base, ZH_GUARD_HEAD_SHA: head },
+    // Capture stderr instead of echoing it. A failing guard's report stays in the thrown error.
+    stdio: 'pipe',
   });
 }
 

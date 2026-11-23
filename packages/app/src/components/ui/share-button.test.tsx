@@ -2,6 +2,7 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { settle } from '@/test/helpers';
 
 mock.module('@/lib/routing/url-state', () => ({
   buildShareUrl: () => 'https://inferencex.semianalysis.com/?g_model=dsr1#inference',
@@ -36,14 +37,16 @@ afterEach(() => {
 });
 
 describe('ShareButton', () => {
-  it('renders Chinese trigger, dialog chrome, and accessible input name on a Chinese route', () => {
+  it('renders Chinese trigger, dialog chrome, and accessible input name on a Chinese route', async () => {
     localeState.pathname = '/zh/infx/inference';
     renderUi(<ShareButton />);
 
     const trigger = container.querySelector<HTMLButtonElement>('[data-testid="share-button"]');
     expect(trigger?.textContent).toContain('分享');
     expect(trigger?.title).toBe('分享当前视图');
+    // Async: floating-ui positions the popover in a promise after it opens.
     act(() => trigger?.click());
+    await settle();
 
     expect(document.querySelector('[data-testid="share-popover"]')?.textContent).toContain(
       '复制链接',
@@ -63,13 +66,14 @@ describe('ShareButton', () => {
     expect(document.querySelector('[data-testid="share-popover"]')).toBeNull();
   });
 
-  it('opens the popover with the share URL pre-filled when the trigger is clicked', () => {
+  it('opens the popover with the share URL pre-filled when the trigger is clicked', async () => {
     renderUi(<ShareButton />);
 
     const trigger = container.querySelector<HTMLButtonElement>('[data-testid="share-button"]');
     expect(trigger).not.toBeNull();
 
     act(() => trigger?.click());
+    await settle();
 
     const input = document.querySelector<HTMLInputElement>('[data-testid="share-url-input"]');
     expect(input).not.toBeNull();

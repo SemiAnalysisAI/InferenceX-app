@@ -41,6 +41,7 @@ function csvArchive(power: number): Response {
 
 describe('live telemetry acquisition', () => {
   it('bounds downloads to four and preserves listing order after an isolated failure', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
     readRun.mockResolvedValue(
       Response.json({
         id: 12345,
@@ -78,5 +79,10 @@ describe('live telemetry acquisition', () => {
       300, 302, 303, 304, 305,
     ]);
     expect(result.bundleSeries).toEqual([]);
+    expect(warned).toHaveBeenCalledWith(
+      'Failed to read artifact gpu_metrics_dsr1_conc2:',
+      expect.objectContaining({ message: 'archive unavailable' }),
+    );
+    warned.mockRestore();
   });
 });

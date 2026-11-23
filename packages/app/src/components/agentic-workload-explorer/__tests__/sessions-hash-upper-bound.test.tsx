@@ -13,11 +13,13 @@ const mocks = {
 };
 
 mock.module('next/link', () => ({
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
   default: ({
     href,
     children,
+    prefetch: _prefetch,
     ...props
-  }: { href: string; children: ReactNode } & Omit<
+  }: { href: string; children: ReactNode; prefetch?: boolean | null } & Omit<
     AnchorHTMLAttributes<HTMLAnchorElement>,
     'href'
   >) => (

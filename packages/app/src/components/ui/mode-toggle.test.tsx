@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 import { APP_THEMES } from '@/lib/themes/themes';
-import { click, eventually, focus, get, render } from '@/test/dom';
+import { click, eventually, focus, get, hydrate } from '@/test/dom';
 
 import { ModeToggle } from './mode-toggle';
 import { ThemeProvider } from './theme-provider';
@@ -15,7 +15,8 @@ describe('ModeToggle', () => {
     document.documentElement.className = '';
     localStorage.setItem('theme', 'light');
     registerAnalyticsClient({ capture });
-    render(
+    // Hydrated like a page load, so next-themes' boot script is adopted rather than created.
+    hydrate(
       <ThemeProvider
         attribute="class"
         defaultTheme="light"

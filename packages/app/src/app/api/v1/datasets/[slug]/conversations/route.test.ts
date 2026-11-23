@@ -99,6 +99,7 @@ describe('GET /api/v1/datasets/[slug]/conversations — search input validation'
   });
 
   it('returns 500 when the query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockListConversations.mockRejectedValueOnce(new Error('Neon timeout'));
     const res = await GET(req('/api/v1/datasets/test-dataset/conversations'), {
       params: PARAMS,
@@ -106,5 +107,10 @@ describe('GET /api/v1/datasets/[slug]/conversations — search input validation'
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching dataset conversations:',
+      expect.objectContaining({ message: 'Neon timeout' }),
+    );
+    logged.mockRestore();
   });
 });

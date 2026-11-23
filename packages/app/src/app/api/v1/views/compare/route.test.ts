@@ -282,9 +282,15 @@ describe('GET /api/v1/views/compare', () => {
   });
 
   it('returns 500 when compare assembly fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetComparePageDerivedData.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await GET(request('/api/v1/views/compare?slug=deepseek-r1-b200-vs-h200'));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'Internal server error' });
+    expect(logged).toHaveBeenCalledWith(
+      'Error building compare view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

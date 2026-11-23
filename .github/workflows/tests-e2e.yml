@@ -114,6 +114,18 @@ jobs:
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
           SPLIT_SUMMARY: 'false'
           CYPRESS_TIMING_OUTPUT: /tmp/cypress-timings/observation.json
+      # The action leaves its `start` server running, and the runner reaps it only after the post
+      # steps. next-server maps @next/swc from node_modules, so the node_modules sticky disk could
+      # not unmount and its post step retried ten times on every shard. Stop it before then.
+      - name: Stop app server
+        if: ${{ always() }}
+        run: |
+          pkill -TERM -f '^next-server' || exit 0
+          for _ in $(seq 100); do
+            pgrep -f '^next-server' > /dev/null || exit 0
+            sleep 0.1
+          done
+          pkill -KILL -f '^next-server' || true
       - name: Upload integration timing observations
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

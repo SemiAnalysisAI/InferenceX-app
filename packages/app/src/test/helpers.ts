@@ -9,6 +9,7 @@ import {
   type FakeMethod,
 } from '@sinonjs/fake-timers';
 import type { Mock } from 'bun:test';
+import { act } from 'react';
 
 const stubbedGlobals = new Map<PropertyKey, PropertyDescriptor | undefined>();
 
@@ -53,23 +54,36 @@ export function mocked<T>(
   return value as never;
 }
 
-// Captured before any test fakes timers, so waitFor polls in real time like Vitest's.
+// Captured before any test fakes timers, so waiting happens in real time like Vitest's.
 const realSetTimeout = globalThis.setTimeout;
 const realNow = performance.now.bind(performance);
 
+/** Lets pending promises, effects and timers due within `ms` settle inside act. */
+export async function settle(ms = 0): Promise<void> {
+  await act(async () => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    realSetTimeout(resolve, ms);
+    await promise;
+  });
+}
+
+/**
+ * Retries `callback` until it stops throwing. Every attempt, the first included, runs after a
+ * settle inside act. Responses, lazy chunks and timers that land while the test waits then update
+ * React inside act, and a check that passes at once cannot leave them to the next plain await.
+ */
 export async function waitFor<T>(
   callback: () => T | Promise<T>,
   { timeout = 1000, interval = 50 }: { timeout?: number; interval?: number } = {},
 ): Promise<T> {
   const deadline = realNow() + timeout;
   for (;;) {
+    await settle();
     try {
       return await callback();
     } catch (error) {
       if (realNow() >= deadline) throw error;
-      const { promise, resolve } = Promise.withResolvers<void>();
-      realSetTimeout(resolve, interval);
-      await promise;
+      await settle(interval);
     }
   }
 }
@@ -97,6 +111,8 @@ export function useFakeTimers(options: { toFake?: FakeMethod[]; now?: number | D
       (Object.keys(fakeableTimers) as FakeMethod[]).filter(
         (name) => name !== 'nextTick' && name !== 'queueMicrotask',
       ),
+    // As in Vitest: clearing a timer scheduled before the clock was installed clears the real one.
+    shouldClearNativeTimers: true,
   });
   for (const [key, value] of Object.entries(realNodeTimers))
     Object.defineProperty(timers, key, {
