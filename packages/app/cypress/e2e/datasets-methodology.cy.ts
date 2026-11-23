@@ -160,7 +160,7 @@ describe('AgentX quickstart', () => {
         );
         expect(
           lookup.split(
-            'Golden AL curves: https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
+            '#   Golden AL curves:\n#   https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
           ),
         ).to.have.length(3);
         cy.get('#golden-al button').click();
