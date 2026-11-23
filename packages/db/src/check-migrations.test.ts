@@ -26,7 +26,7 @@ beforeAll(async () => {
   await db.exec(
     'create table schema_migrations (filename text primary key, applied_at timestamptz not null default now())',
   );
-  for (const file of [...files.slice(0, -1), '016_measurement_snapshots.sql']) {
+  for (const file of files.slice(0, -1)) {
     await db.query('insert into schema_migrations (filename) values ($1)', [file]);
   }
 
@@ -64,20 +64,20 @@ it('fails the step when the newest migration is unrecorded', () => {
 });
 
 it('prints the guidance and one GitHub error annotation naming the file', () => {
-  expect(stderr).toHaveLength(1);
-  expect(stderr[0]).toStartWith(
-    '1 migration file(s) in packages/db/migrations are not recorded in schema_migrations.\n' +
-      `  ${newest}\n`,
-  );
-  expect(stderr[0]).toEndWith('\n  016_measurement_snapshots.sql');
-
+  expect(stderr).toEqual([
+    [
+      '1 migration file(s) in packages/db/migrations are not recorded in schema_migrations.',
+      `  ${newest}`,
+      "If a file's schema is already in the database, record it with",
+      "  insert into schema_migrations (filename) values ('<file>');",
+      'Then run bun run admin:db:migrate to apply the rest.',
+    ].join('\n'),
+  ]);
   expect(stdout).toEqual([
     `::error title=Pending database migrations::${stderr[0]!.replaceAll('\n', '%0A')}`,
   ]);
 });
 
 it('writes nothing', () => {
-  expect(recordedAfter).toEqual(
-    [...files.slice(0, -1), '016_measurement_snapshots.sql'].toSorted(),
-  );
+  expect(recordedAfter).toEqual(files.slice(0, -1));
 });
