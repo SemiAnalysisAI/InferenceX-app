@@ -8,7 +8,7 @@ import { isZhPathname } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {
-    title: 'Something went wrong',
+    title: 'Something Went Wrong',
     description: 'An unexpected error has occurred',
     retry: 'Try again',
   },

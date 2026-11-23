@@ -4,6 +4,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 import { BarChart3, Table2 } from 'lucide-react';
 
@@ -18,6 +19,10 @@ import chartDefinitions, {
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
+import {
+  noteInferenceChartLeft,
+  noteInferenceChartShown,
+} from '@/lib/routing/agentic-detail-origin';
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import {
@@ -87,6 +92,7 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import {
@@ -197,6 +203,7 @@ const STRINGS = {
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
+    loadError: 'Failed to load benchmark data',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     powerBasisAssumptions: {
@@ -241,6 +248,7 @@ const STRINGS = {
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
     unregisteredModel: '（未注册模型）',
+    loadError: '基准测试数据加载失败',
     unregisteredHardware: (hw: string) => `未注册硬件 ${hw} 以其原始 runner 名称标注。`,
   },
 } as const;
@@ -319,6 +327,12 @@ export default function ChartDisplay({
   const t = STRINGS[locale];
   const chartRootRef = useRef<HTMLDivElement>(null);
   useFirstChartRenderTiming(chartRootRef);
+  // An agentic detail page opened from this chart can then return with history.
+  useEffect(() => {
+    noteInferenceChartShown();
+    return noteInferenceChartLeft;
+  }, []);
+  const queryClient = useQueryClient();
   const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
   const {
     selectedGPUs,
@@ -846,11 +860,6 @@ export default function ChartDisplay({
     }),
     [selectedPrecisions, quickFilters, activeDates, visibleComparisonRows],
   );
-
-  if (!loading && error) {
-    console.error(error);
-    throw new Error('Something went wrong.');
-  }
 
   const isFirstLoad = loading && graphs.length === 0;
   const isRefetching = refreshing && graphs.length > 0;
@@ -1842,7 +1851,18 @@ export default function ChartDisplay({
         data-stale={isRefetching || undefined}
         aria-busy={isRefetching || undefined}
       >
-        {displayGraphs}
+        {!loading && error ? (
+          <RetryableQueryError
+            message={t.loadError}
+            analyticsEvent="inference_data_retry_clicked"
+            onRetry={() =>
+              queryClient.refetchQueries({ predicate: (query) => query.state.status === 'error' })
+            }
+            testId="inference-query-error"
+          />
+        ) : (
+          displayGraphs
+        )}
         {!powerXSurface && !embedded && !minimalChrome && renderableGraphs.length === 0 && (
           <ResultContext
             locale={locale}

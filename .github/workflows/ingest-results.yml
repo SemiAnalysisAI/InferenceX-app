@@ -161,7 +161,7 @@ jobs:
           bun-version-file: package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Cache Bun packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -272,6 +272,13 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
           echo "Cache invalidate URL: $cache_invalidate_url"
+
+      # Abort before any database write when the target has not recorded every
+      # migration, so a schema behind the code never reports a finished ingest
+      # as failed. The step annotation lists the files and what to do.
+      - name: Check pending migrations
+        id: migrations
+        run: bun run admin:db:check-migrations
 
       - name: Prepare artifacts from InferenceX
         id: artifacts
@@ -404,7 +411,7 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n${{ steps.powerx.outcome == 'failure' && 'PowerX publication check failed\n' || '' }}${{ steps.database_writes.outputs.summary_json && format('```{0}```\n', steps.database_writes.outputs.summary_json) || '' }}<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n${{ steps.migrations.outcome == 'failure' && 'Database has unrecorded migrations, nothing was written\n' || '' }}${{ steps.powerx.outcome == 'failure' && 'PowerX publication check failed\n' || '' }}${{ steps.database_writes.outputs.summary_json && format('```{0}```\n', steps.database_writes.outputs.summary_json) || '' }}<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }
 
       # Report the outcome to InferenceX, whose callback comments on the PR that

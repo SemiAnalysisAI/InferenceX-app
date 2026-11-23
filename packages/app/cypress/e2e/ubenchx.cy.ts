@@ -45,10 +45,10 @@ describe('uBenchX hub and test routes', () => {
       .should('include', '/zh/ubx/mem-bw');
 
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.contains('[role="option"]', 'Core Memory-Access Profiles').click();
     cy.url().should('include', '/ubx/core-memory-profiles');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core memory-access profiles');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core Memory-Access Profiles');
   });
 
   it('switches to the TPC Skyline table with the test selector', () => {
@@ -56,7 +56,7 @@ describe('uBenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'TPC Skyline').click();
     cy.url().should('include', '/ubx/tpc-skyline');
-    cy.contains('h2', 'NVIDIA measured TPC groupings').should('be.visible');
+    cy.contains('h2', 'NVIDIA Measured TPC Groupings').should('be.visible');
     cy.get('[data-testid="tpc-skyline-table"] th').then(($th) => {
       expect([...$th].map((th) => th.textContent)).to.deep.equal([
         'Product',
@@ -170,7 +170,7 @@ describe('Ascend core memory-access profiles', () => {
   it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
     cy.visit('/ubx/mem-bw', dismiss);
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.contains('[role="option"]', 'Core Memory-Access Profiles').click();
     cy.url().should('include', '/ubx/core-memory-profiles');
     cy.contains('SYS_CNT ticks are not clock64 cycles').should('be.visible');
     cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg')
@@ -201,11 +201,19 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.visit('/ubx/core-memory-profiles', dismiss);
   const panel = '[data-testid="profile-scalar_128MiB_cube_isolated"]';
   const value = '[data-testid="profile-scalar_128MiB_cube_isolated-value"]';
-  cy.get(`${panel} svg rect`).eq(1).click();
+  // The cells are one image, so click a cell by its spot in the 420-unit viewBox
+  // (matrix from x 54 / y 22, 320 units across 28 cores).
+  const clickCell = (i: number, j: number) =>
+    cy.get(`${panel} svg`).then(($svg) => {
+      const scale = $svg[0].getBoundingClientRect().width / 420;
+      const step = 320 / 28;
+      cy.wrap($svg).click((54 + (j + 0.5) * step) * scale, (22 + (i + 0.5) * step) * scale);
+    });
+  clickCell(0, 1);
   cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 1: 19.03');
-  cy.get(`${panel} svg rect`).eq(2).click();
+  clickCell(0, 2);
   cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 2: 15.30');
-  cy.get(`${panel} svg rect`).eq(2).click();
+  clickCell(0, 2);
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg`)
     .trigger('keydown', { key: 'ArrowRight' })
@@ -213,10 +221,10 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(value).should('contain', 'Pinned core pair:');
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
-  cy.get(`${panel} svg rect`).eq(1).click();
+  clickCell(0, 1);
   cy.contains('h1', 'uBenchX Microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
-  cy.get(`${panel} svg rect`).eq(1).click();
+  clickCell(0, 1);
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
   cy.get(value).should('be.empty').and('not.be.visible');
 });

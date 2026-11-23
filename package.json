@@ -55,6 +55,7 @@
     "admin:db:promote-to-public": "bun run --cwd packages/db db:promote-to-public",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:sync-public": "bun run --cwd packages/db db:sync-public",
+    "admin:db:check-migrations": "bun run --cwd packages/db db:check-migrations",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
     "admin:db:verify-gpu-sample-blobs": "bun run --cwd packages/db db:verify-gpu-sample-blobs",
     "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx",
@@ -63,15 +64,15 @@
     "admin:db:backfill:operatorx-comparisons": "bun run --cwd packages/db db:backfill:operatorx-comparisons"
   },
   "devDependencies": {
-    "@babel/core": "^8.1.0",
+    "@babel/core": "^8.1.2",
     "@types/node": "^26.6.6",
     "is-ci": "^4.1.0",
     "lefthook": "^2.2.2",
-    "oxfmt": "^0.75.0",
-    "oxlint": "^1.90.0",
-    "rimraf": "^6.1.3",
+    "oxfmt": "^0.78.0",
+    "oxlint": "^1.93.0",
+    "rimraf": "^6.1.4",
     "typescript": "^6.0.3",
-    "vite": "^8.3.5"
+    "vite": "^8.3.8"
   },
   "overrides": {
     "brace-expansion@>=4.0.0 <5.0.12": "5.0.12",
@@ -82,7 +83,7 @@
     "katex@>=0.11.0 <0.18.2": "0.18.2",
     "minimatch@>=7.0.0 <11.0.1": "11.0.1",
     "nanoid@>=3.0.0 <3.3.18": "3.3.18",
-    "next": "16.4.4",
+    "next": "16.4.6",
     "path-to-regexp@>=4.0.0 <6.3.0": "6.3.0",
     "postcss-selector-parser@<6.1.5": "6.1.5",
     "source-map-js@>=1.0.0 <1.2.2": "1.2.2",
@@ -91,11 +92,11 @@
   },
   "engines": {
     "bun": ">=1.4.0",
-    "node": ">=24.11.0"
+    "node": "^26.13.1"
   },
   "packageManager": "bun@1.4.4",
   "patchedDependencies": {
-    "next@16.4.4": "patches/next@16.4.4.patch"
+    "next@16.4.6": "patches/next@16.4.6.patch"
   },
   "trustedDependencies": [
     "@posthog/cli",

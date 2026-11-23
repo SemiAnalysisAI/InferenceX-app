@@ -154,7 +154,7 @@ export function telemetryArtifactsForAttempt(
     );
   const start = Date.parse(source.run_started_at ?? '');
   if (!Number.isFinite(start))
-    throw new Error('Cannot isolate telemetry artifacts without attempt start time');
+    throw new TypeError('Cannot isolate telemetry artifacts without attempt start time');
   return artifacts.filter((artifact) => Date.parse(artifact.created_at) >= start);
 }
 

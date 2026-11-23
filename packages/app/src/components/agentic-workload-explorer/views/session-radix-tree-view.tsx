@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import * as d3 from 'd3';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import { useSession, type SessionRequest } from '@/lib/agentic-workload-explorer/session-context';
 import { formatDollars } from '@/lib/agentic-workload-explorer/format';
 import { formatAxisNumber } from '@/components/agentic-workload-explorer/trends-charts';
@@ -399,9 +400,8 @@ function D3Tree({
     d3.select(svg).call(zoom);
     zoomRef.current = zoom;
 
-    const gNode = g.node();
-    if (gNode) {
-      const bounds = gNode.getBBox();
+    const bounds = svgBBox(g.node());
+    if (bounds) {
       const pad = 40;
       const scale = Math.min(
         viewWidth / (bounds.width + pad * 2),
@@ -482,7 +482,11 @@ function D3Tree({
           <span className="text-2xs text-muted-foreground">{t.renderingTree}</span>
         </div>
       )}
-      <svg ref={svgRef} className={`min-w-full ${rendered ? '' : 'h-0 overflow-hidden'}`} />
+      <svg
+        ref={svgRef}
+        translate="no"
+        className={`notranslate min-w-full ${rendered ? '' : 'h-0 overflow-hidden'}`}
+      />
       {tooltip && (
         <FloatingTooltip x={tooltip.x} y={tooltip.y}>
           <ChartHoverCardBody

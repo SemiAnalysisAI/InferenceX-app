@@ -41,7 +41,7 @@ jobs:
           bun-version-file: package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Cache Bun packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -54,6 +54,15 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
+
+      # Abort before any write when the database has not recorded every migration.
+      # Verify database runs after the writes and only reports this condition.
+      - name: Check pending migrations
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: |
+          : "${DATABASE_WRITE_URL:?DATABASE_WRITE_URL secret is not set}"
+          bun run admin:db:check-migrations
 
       - name: Apply run overrides
         env:

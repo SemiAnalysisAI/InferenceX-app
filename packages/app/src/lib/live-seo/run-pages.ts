@@ -1,6 +1,10 @@
 import { getAllChipPages, type ChipPageEntry } from '@/lib/catalog/chip-pages';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
-import { INFERENCE_MODEL_SLUGS, type InferenceModelSlug } from '@/lib/routing/inference-model-slug';
+import {
+  INFERENCE_MODEL_ALIASES,
+  INFERENCE_MODEL_SLUGS,
+  type InferenceModelSlug,
+} from '@/lib/routing/inference-model-slug';
 import { fitMetaTitle } from '@/lib/seo/meta-text';
 
 export interface RunPageEntry {
@@ -43,6 +47,37 @@ export function getAllRunPageEntries(): readonly RunPageEntry[] {
 
 export function getRunPageEntry(slug: string): RunPageEntry | undefined {
   return ENTRY_BY_SLUG.get(slug.toLowerCase());
+}
+
+// Old links and guessed URLs write versions with dots or extra dashes (`deepseek-v4.1-flash`,
+// `kimi-k3-1-pro`) and name chips by key (`gb300`). Letters and digits alone identify them.
+const nameKey = (name: string) => name.toLowerCase().replaceAll(/[^a-z0-9]/gu, '');
+
+const MODEL_SLUG_BY_KEY: ReadonlyMap<string, string> = new Map([
+  ...Object.entries(INFERENCE_MODEL_ALIASES).map(
+    ([alias, slug]) => [nameKey(alias), slug] as const,
+  ),
+  ...INFERENCE_MODEL_SLUGS.flatMap((entry) =>
+    [entry.slug, entry.model, entry.seoName].map((name) => [nameKey(name), entry.slug] as const),
+  ),
+]);
+
+const CHIP_SLUG_BY_KEY: ReadonlyMap<string, string> = new Map(
+  getAllChipPages().flatMap((chip) =>
+    [chip.slug, chip.hwKey, chip.label, chip.specName].map(
+      (name) => [nameKey(name), chip.slug] as const,
+    ),
+  ),
+);
+
+/** The current slug a respelled or renamed run URL refers to, or null when there is none. */
+export function canonicalRunPageSlug(slug: string): string | null {
+  const lower = slug.toLowerCase();
+  const separator = lower.lastIndexOf('-on-');
+  if (separator <= 0) return null;
+  const model = MODEL_SLUG_BY_KEY.get(nameKey(lower.slice(0, separator)));
+  const chip = CHIP_SLUG_BY_KEY.get(nameKey(lower.slice(separator + '-on-'.length)));
+  return (model && chip && ENTRY_BY_SLUG.get(`${model}-on-${chip}`)?.slug) || null;
 }
 
 export function runPagePath(entry: RunPageEntry): string {

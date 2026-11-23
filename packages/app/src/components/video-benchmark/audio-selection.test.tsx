@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { Activity, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi, mock } from 'bun:test';
-import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
+import { settle, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import VideoResultsClips from './VideoResultsClips';
 import { videoHistoryEntry, type VideoHistoryPage } from './history';
 import { namedRunPoints } from './points';
@@ -23,7 +23,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('keeps one clip audible, including after the overview is hidden and revealed', () => {
+it('keeps one clip audible, including after the overview is hidden and revealed', async () => {
   stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
@@ -68,6 +68,8 @@ it('keeps one clip audible, including after the overview is hidden and revealed'
   document.body.append(container);
   root = createRoot(container);
   act(() => root!.render(<Overview hidden={false} />));
+  // The clips read their sides on mount, so let those reads land inside act.
+  await settle();
   const side = (role: 'a' | 'b') => ({
     video: container!.querySelector<HTMLVideoElement>(`[data-side="${role}"] video`)!,
     speaker: container!.querySelector<HTMLButtonElement>(
@@ -83,6 +85,8 @@ it('keeps one clip audible, including after the overview is hidden and revealed'
 
   act(() => root!.render(<Overview hidden />));
   act(() => root!.render(<Overview hidden={false} />));
+  // Revealing the overview re-runs its effects, which read the sides again.
+  await settle();
   expect(side('b').video.muted, 'audible clip after the detail view closes').toBe(false);
   expect(side('b').speaker.getAttribute('aria-pressed')).toBe('true');
 });

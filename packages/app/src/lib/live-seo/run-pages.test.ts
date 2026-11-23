@@ -13,6 +13,7 @@ import {
 import { getAllChipPages } from '@/lib/catalog/chip-pages';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import {
+  canonicalRunPageSlug,
   getAllRunPageEntries,
   getRunPageEntry,
   runPagePath,
@@ -45,6 +46,46 @@ describe('run pages registry', () => {
     expect(getRunPageEntry(first.slug)).toBe(first);
     expect(getRunPageEntry(first.slug.toUpperCase())).toBe(first);
     expect(getRunPageEntry('kimi-k3-on-abacus')).toBeUndefined();
+  });
+});
+
+describe('canonicalRunPageSlug', () => {
+  it.each([
+    ['deepseek-v4.1-flash-on-h200', 'deepseek-v41-flash-on-h200'],
+    ['deepseek-v4-1-flash-on-b300', 'deepseek-v41-flash-on-b300'],
+    ['kimi-k3.1-pro-on-b300', 'kimi-k31-pro-on-b300'],
+    ['llama-3.3-70b-on-h100', 'llama-3-3-70b-on-h100'],
+    ['qwen3.5-on-h200', 'qwen-3-5-on-h200'],
+    ['gpt-oss-120b-on-h200', 'gptoss-120b-on-h200'],
+    ['deepseek-v4-pro-on-b300', 'deepseek-v4-on-b300'],
+    ['glm-5.2-on-h200', 'glm-5-3-on-h200'],
+    ['kimi-k2-5-on-b200', 'kimi-k26-on-b200'],
+    ['deepseek-r1-on-gb300', 'deepseek-r1-on-gb300-nvl72'],
+    ['deepseek-v41-flash-on-h100-sxm', 'deepseek-v41-flash-on-h100'],
+  ])('maps %s to %s', (slug, current) => {
+    expect(canonicalRunPageSlug(slug)).toBe(current);
+  });
+
+  it.each([
+    'deepseek-v3.1-on-h200',
+    'deepseek-v4-flash-on-h200',
+    'qwen-3-8-27b-on-rtx-pro-6000',
+    'deepseek-v41-flash-on-h200.md',
+    'sitemap.xml',
+  ])('finds no page for %s', (slug) => {
+    expect(canonicalRunPageSlug(slug)).toBeNull();
+  });
+
+  it('maps every model and chip name to its own page', () => {
+    for (const entry of getAllRunPageEntries()) {
+      for (const model of [entry.model.slug, entry.model.model, entry.model.seoName]) {
+        for (const chip of [entry.chip.slug, entry.chip.hwKey, entry.chip.label]) {
+          expect(canonicalRunPageSlug(`${model}-on-${chip}`), `${model} on ${chip}`).toBe(
+            entry.slug,
+          );
+        }
+      }
+    }
   });
 });
 

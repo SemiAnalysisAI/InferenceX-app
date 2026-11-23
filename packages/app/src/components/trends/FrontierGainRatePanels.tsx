@@ -40,7 +40,7 @@ type RateAxis = 'date' | 'age';
 
 const STRINGS = {
   en: {
-    title: 'Rate of software gain',
+    title: 'Rate of Software Gain',
     window: 'Window',
     days: (days: number) => `${days}d`,
     axis: 'X axis',
@@ -55,7 +55,7 @@ const STRINGS = {
     hoverHint: 'Hover to read rates',
     pick: 'Pick at least one chip.',
     noRate: 'Not enough history yet: a rate needs at least half the window.',
-    tableTitle: 'Gain rate by chip',
+    tableTitle: 'Gain Rate by Chip',
     chip: 'Chip',
     age: 'Days since first run',
     gain: 'Gain so far',

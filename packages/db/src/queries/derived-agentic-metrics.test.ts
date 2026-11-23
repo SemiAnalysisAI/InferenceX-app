@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 
 import { SEQUENCE_LENGTH_SKETCHES_VERSION, STATS_VERSION } from './agentic-shared';
 import type { DbClient } from '../connection.js';
@@ -247,5 +247,25 @@ describe('getDerivedAgenticMetrics write-back', () => {
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
     expect(result[7]).toEqual({ id: 7, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: null });
+  });
+
+  it('names the point and trace it drops when the stored profile cannot be read', async () => {
+    const corrupt = Buffer.from('not-gzip');
+    const { sql } = mockSql([
+      [statsRow({})],
+      [{ benchmark_result_id: 7, trace_replay_id: 870, has_server_metrics: false }],
+      [{ parts: 0, inline_size: corrupt.length }],
+      [{ data: corrupt }],
+    ]);
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(await getDerivedAgenticMetrics(sql, [7])).toEqual({});
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toMatch(
+        /^\[derived-agentic-metrics\] no E2E normalized interactivity for benchmark_result_id=7, trace_replay_id=870\. Its stored profile could not be read \(.+\)$/u,
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

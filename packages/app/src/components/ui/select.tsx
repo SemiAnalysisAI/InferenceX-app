@@ -20,8 +20,17 @@ function SelectGroup({ ...props }: React.ComponentProps<typeof SelectPrimitive.G
   return <SelectPrimitive.Group data-slot="select-group" {...props} />;
 }
 
-function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
-  return <SelectPrimitive.Value data-slot="select-value" {...props} />;
+// Radix portals the selected item's bare text into this span. A translator that swaps that text
+// node makes React's removeChild throw when the value changes or the select unmounts.
+function SelectValue({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
+  return (
+    <SelectPrimitive.Value
+      data-slot="select-value"
+      translate="no"
+      className={cn('notranslate', className)}
+      {...props}
+    />
+  );
 }
 
 function SelectTrigger({

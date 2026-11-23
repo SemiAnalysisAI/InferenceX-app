@@ -4,7 +4,7 @@ import type {
   ApiResponse,
   ApiSchema,
 } from '@/lib/api/api-documentation';
-import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-base';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
 import { RESULT_CSV_COLUMNS } from '@/components/video-benchmark/results-csv';
 import { text } from '@/lib/api/api-documentation-helpers';
@@ -151,8 +151,8 @@ const imageAgePoint: ApiSchema = {
 
 const PARAMETER_NOTES: Record<string, [string, string]> = {
   model: [
-    'Model display name or comparison slug, case-insensitive. Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.',
-    '模型显示名称或比较页 slug，不区分大小写。基于基准测试的视图需要此参数。镜像视图还接受当前镜像列表中的模型名，去除首尾空白后匹配，默认 all；未知模型返回 400。',
+    `${MODEL_PARAM_FORMS.en} Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.`,
+    `${MODEL_PARAM_FORMS.zh}基于基准测试的视图需要此参数。镜像视图还接受当前镜像列表中的模型名，去除首尾空白后匹配，默认 all；未知模型返回 400。`,
   ],
   sequence: [
     'Workload: 1k/1k, 1k/8k, 8k/1k or agentic-traces. AgentX extension views default to agentic-traces.',
@@ -646,8 +646,8 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
           : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
               name === 'model'
             ? ([
-                'Model display name or comparison slug. The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.',
-                '模型显示名称或比较页 slug。仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。',
+                `${MODEL_PARAM_FORMS.en} The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.`,
+                `${MODEL_PARAM_FORMS.zh}仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。`,
               ] as const)
             : (PARAMETER_NOTES[name] ?? [
                 `${name} selector for ${view}; resolved value is returned in params.`,
@@ -935,16 +935,60 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
               } satisfies ApiResponse,
             ]
           : []),
-        ...(['404', '429', '503'] as const).map((status): ApiResponse => ({
-          status,
-          description: text(
-            'Source status is preserved; internal details are removed and failures are not cached.',
-            '保留上游状态码，移除内部详情，失败响应不缓存。',
-          ),
-          schema: object,
-          example: { error: 'Source data unavailable' },
-          mediaType: 'application/json',
-        })),
+        ...(view === 'gpu-metrics'
+          ? [
+              {
+                status: '422',
+                description: text(
+                  'Every telemetry artifact of the run exceeds the live download size limit (ARTIFACT_TOO_LARGE). Not cached.',
+                  '该运行的所有遥测产物都超过实时下载大小上限（ARTIFACT_TOO_LARGE）。响应不缓存。',
+                ),
+                schema: object,
+                example: {
+                  error: 'Telemetry artifacts exceed the live download size limit',
+                  code: 'ARTIFACT_TOO_LARGE',
+                },
+                mediaType: 'application/json',
+              } satisfies ApiResponse,
+            ]
+          : []),
+        ...(['404', '429', '503'] as const).map((status): ApiResponse =>
+          view === 'gpu-metrics' && status === '404'
+            ? {
+                status,
+                description: text(
+                  'The run does not exist on GitHub (RUN_NOT_FOUND), or it lists no telemetry artifacts or all of them are expired, unreadable or without series (NO_TELEMETRY). Do not retry. Not cached.',
+                  'GitHub 上不存在该运行（RUN_NOT_FOUND），或该运行没有遥测产物、遥测产物均已过期、无法读取或不含任何序列（NO_TELEMETRY）。无需重试。响应不缓存。',
+                ),
+                schema: object,
+                example: { error: 'No Chip metrics data found in artifacts', code: 'NO_TELEMETRY' },
+                mediaType: 'application/json',
+              }
+            : view === 'gpu-metrics' && status === '503'
+              ? {
+                  status,
+                  description: text(
+                    'GitHub could not return the run, its artifact list or an artifact (GITHUB_UNAVAILABLE); retry later. Other source failures keep the status without internal details. Not cached.',
+                    'GitHub 未能返回该运行、产物列表或产物（GITHUB_UNAVAILABLE），请稍后重试。其他上游失败只保留状态码，不含内部详情。响应不缓存。',
+                  ),
+                  schema: object,
+                  example: {
+                    error: 'Telemetry artifacts could not be downloaded from GitHub; retry later',
+                    code: 'GITHUB_UNAVAILABLE',
+                  },
+                  mediaType: 'application/json',
+                }
+              : {
+                  status,
+                  description: text(
+                    'Source status is preserved; internal details are removed and failures are not cached.',
+                    '保留上游状态码，移除内部详情，失败响应不缓存。',
+                  ),
+                  schema: object,
+                  example: { error: 'Source data unavailable' },
+                  mediaType: 'application/json',
+                },
+        ),
         {
           status: '400',
           description: text('Invalid or unsupported query.', '查询无效或不受支持。'),

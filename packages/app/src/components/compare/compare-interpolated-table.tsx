@@ -234,8 +234,10 @@ export function CompareInterpolatedTable({
       e.preventDefault();
       const didCommit = commitColumnTarget(colIndex);
       if (didCommit) {
+        // React clears currentTarget once the handler returns.
+        const input = e.currentTarget;
         queueMicrotask(() => {
-          e.currentTarget.blur();
+          input.blur();
         });
       }
     },

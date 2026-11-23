@@ -1,6 +1,7 @@
 import type { AvailabilityRow } from '@/lib/api/api';
 import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import type { InferenceData } from '@/components/inference/types';
+import { interceptOpenRouterPricing } from '../support/profit-estimator';
 import {
   interceptVrPublicationData,
   VR_FIXTURE_DATE,
@@ -192,20 +193,17 @@ describe('Inference Chart', () => {
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', {
-      statusCode: 200,
-      body: {
-        data: [
-          {
-            id: 'deepseek/deepseek-v4-pro-0813',
-            pricing: {
-              prompt: '0.000001122',
-              input_cache_read: '0.00000008',
-              completion: '0.000003366',
-            },
+    interceptOpenRouterPricing({
+      data: [
+        {
+          id: 'deepseek/deepseek-v4-pro-0813',
+          pricing: {
+            prompt: '0.000001122',
+            input_cache_read: '0.00000008',
+            completion: '0.000003366',
           },
-        ],
-      },
+        },
+      ],
     }).as('openRouterPricing');
     interceptOverlayRun();
     cy.visit(
@@ -323,15 +321,22 @@ describe('Inference Chart', () => {
       .and('contain.text', 'all-in cost per chip-hour');
   });
 
-  it('surfaces the error instead of an endless skeleton when availability fails', () => {
-    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
+  it('shows an inline retryable error instead of the error page when availability fails', () => {
+    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 403, body: {} }).as(
       'availabilityFailure',
     );
-    fastForwardQueryRetry('h2:contains("Something went wrong")', () => {
+    fastForwardQueryRetry('[data-testid="inference-query-error"]', () => {
       cy.visit('/infx/inference');
     });
     cy.wait('@availabilityFailure');
-    cy.contains('h2', 'Something went wrong').should('be.visible');
+    cy.get('[data-testid="inference-query-error"]')
+      .should('be.visible')
+      .and('contain.text', 'Failed to load benchmark data');
+    cy.contains('h2', /something went wrong/i).should('not.exist');
+    cy.intercept('GET', '/api/v1/availability/compact').as('availabilityRetry');
+    cy.get('[data-testid="inference-query-error"]').contains('button', 'Retry').click();
+    cy.wait('@availabilityRetry');
+    cy.get('[data-testid="inference-query-error"]').should('not.exist');
   });
 });
 

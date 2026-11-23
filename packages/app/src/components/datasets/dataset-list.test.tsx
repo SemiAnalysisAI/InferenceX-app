@@ -81,8 +81,8 @@ describe('DatasetList', () => {
     visibleText('cc-traces-weka (256k)');
     visibleText('1,234');
     visibleText('82%');
-    visibleText('Request shape');
-    visibleText('Token volume');
+    visibleText('Request Shape');
+    visibleText('Token Volume');
     expect(
       $(
         'a[href="/infx/agentx/cc-traces-weka-full"] section[aria-labelledby="cc-traces-weka-full-request-shape"]',

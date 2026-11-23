@@ -4,7 +4,7 @@ import {
   chartSvg,
   chipTrigger,
   openFormulaNotes,
-  OPENROUTER_MODELS,
+  interceptOpenRouterPricing,
   pickChip,
   revenueLabels,
   stubOpenRouter,
@@ -204,7 +204,7 @@ describe('Profit Estimator per GW', () => {
 
   it('explains a missing OpenRouter listing instead of drawing an unpriced chart', () => {
     interceptProfitData();
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] }).as('openrouter-empty');
+    interceptOpenRouterPricing({ data: [] }).as('openrouter-empty');
     cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
@@ -407,7 +407,7 @@ describe('VR publication economics', () => {
   for (const basis of ['chip-hour', 'gw-year']) {
     it(`prices cached-input TRTLLM data per ${basis} under /en`, () => {
       interceptVrPublicationData();
-      cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
+      interceptOpenRouterPricing();
       const page = basis === 'chip-hour' ? 'profit-estimator' : 'profit-estimator-per-gigawatt';
       cy.visit(`/infx/${page}/deepseek-v4`, {
         onBeforeLoad: suppressNudges,
@@ -457,7 +457,7 @@ describe('VR publication economics', () => {
 
 it('keeps the latest VR snapshot in the profit estimator, matching the private preference scope', () => {
   interceptVrPublicationData(true);
-  cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
+  interceptOpenRouterPricing();
   cy.visit('/infx/profit-estimator/deepseek-v4/cache-hit-mode/actual', {
     onBeforeLoad: suppressNudges,
   });

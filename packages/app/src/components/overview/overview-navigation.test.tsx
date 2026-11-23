@@ -3,7 +3,7 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
-import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
+import { settle, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 import type { OverviewPageData, OverviewTier } from '@/lib/overview/overview-data';
@@ -136,10 +136,8 @@ describe('OverviewNavigationProvider', () => {
     renderProvider(pageData(100), '/overview?tier=100');
     expect(readProbe('tier')).toBe('100');
 
-    await act(async () => {
-      settlers[0]?.resolve(Response.json(pageData(75)));
-      await Promise.resolve();
-    });
+    act(() => settlers[0]?.resolve(Response.json(pageData(75))));
+    await settle();
 
     expect(readProbe('tier')).toBe('100');
   });
@@ -154,10 +152,8 @@ describe('OverviewNavigationProvider', () => {
 
     act(() => root.unmount());
 
-    await act(async () => {
-      settlers[0]?.reject(new Error('network down'));
-      await Promise.resolve();
-    });
+    act(() => settlers[0]?.reject(new Error('network down')));
+    await settle();
 
     expect(routerStub.push).not.toHaveBeenCalled();
     expect(routerStub.replace).not.toHaveBeenCalled();
@@ -178,10 +174,8 @@ describe('OverviewNavigationProvider', () => {
     renderProvider(pageData(50), '/overview');
     act(() => selectTier?.());
 
-    await act(async () => {
-      settlers[0]?.reject(new Error('network down'));
-      await Promise.resolve();
-    });
+    act(() => settlers[0]?.reject(new Error('network down')));
+    await settle();
 
     window.removeEventListener(CLIENT_SEARCH_CHANGE_EVENT, onSearchChange);
 
@@ -227,12 +221,10 @@ describe('OverviewNavigationProvider', () => {
     pushState.mockClear();
     const historyLength = window.history.length;
 
-    await act(async () => {
-      window.dispatchEvent(new PopStateEvent('popstate'));
-      await Promise.resolve();
-      settlers[0]?.reject(new Error('network down'));
-      await Promise.resolve();
-    });
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    await settle();
+    act(() => settlers[0]?.reject(new Error('network down')));
+    await settle();
 
     expect(reload).not.toHaveBeenCalled();
     expect(routerStub.push).not.toHaveBeenCalled();
@@ -246,18 +238,14 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('error')).toBe('error');
 
     window.history.replaceState({}, '', '/overview?tier=100');
-    await act(async () => {
-      window.dispatchEvent(new PopStateEvent('popstate'));
-      await Promise.resolve();
-    });
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    await settle();
 
     expect(readProbe('pending')).toBe('pending');
     expect(readProbe('error')).toBe('ok');
 
-    await act(async () => {
-      settlers[1]?.resolve(Response.json(pageData(100)));
-      await Promise.resolve();
-    });
+    act(() => settlers[1]?.resolve(Response.json(pageData(100))));
+    await settle();
 
     expect(readProbe('tier')).toBe('100');
     expect(readProbe('error')).toBe('ok');
@@ -270,12 +258,10 @@ describe('OverviewNavigationProvider', () => {
     const { stub, settlers } = deferredFetch();
 
     window.history.replaceState({}, '', '/overview?tier=75');
-    await act(async () => {
-      window.dispatchEvent(new PopStateEvent('popstate'));
-      await Promise.resolve();
-      settlers[0]?.resolve(Response.json(pageData(75)));
-      await Promise.resolve();
-    });
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    await settle();
+    act(() => settlers[0]?.resolve(Response.json(pageData(75))));
+    await settle();
 
     expect(stub).toHaveBeenCalledWith('/api/v1/overview?tier=75', {
       headers: { Accept: 'application/json' },
@@ -295,12 +281,10 @@ describe('OverviewNavigationProvider', () => {
     const { stub, settlers } = deferredFetch();
 
     window.history.replaceState({}, '', '/zh/overview?tier=75');
-    await act(async () => {
-      window.dispatchEvent(new PopStateEvent('popstate'));
-      await Promise.resolve();
-      settlers[0]?.resolve(Response.json(pageData(75)));
-      await Promise.resolve();
-    });
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    await settle();
+    act(() => settlers[0]?.resolve(Response.json(pageData(75))));
+    await settle();
 
     expect(stub).toHaveBeenCalledWith('/api/v1/overview?tier=75', {
       headers: { Accept: 'application/json' },
@@ -327,14 +311,10 @@ describe('OverviewNavigationProvider', () => {
     stubGlobal('fetch', stub);
 
     renderProvider(pageData(50), '/overview');
-    await act(async () => {
-      prefetchTier?.();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      selectTier?.();
-      await Promise.resolve();
-    });
+    act(() => prefetchTier?.());
+    await settle();
+    act(() => selectTier?.());
+    await settle();
 
     expect(stub).toHaveBeenCalledTimes(2);
     expect(readProbe('tier')).toBe('75');
@@ -347,12 +327,10 @@ describe('OverviewNavigationProvider', () => {
     act(() => selectTier?.());
     act(() => selectEngine?.());
 
-    await act(async () => {
-      settlers[1]?.resolve(Response.json({ ...pageData(50), engineScope: 'all' }));
-      await Promise.resolve();
-      settlers[0]?.resolve(Response.json(pageData(75)));
-      await Promise.resolve();
-    });
+    act(() => settlers[1]?.resolve(Response.json({ ...pageData(50), engineScope: 'all' })));
+    await settle();
+    act(() => settlers[0]?.resolve(Response.json(pageData(75))));
+    await settle();
 
     expect(readProbe('tier')).toBe('50');
     expect(window.location.search).toBe('?tier=75&engine=all');
@@ -367,10 +345,8 @@ describe('OverviewNavigationProvider', () => {
     act(() => selectTier?.());
     expect(readProbe('pending')).toBe('pending');
 
-    await act(async () => {
-      settlers[0]?.resolve(Response.json(pageData(75)));
-      await Promise.resolve();
-    });
+    act(() => settlers[0]?.resolve(Response.json(pageData(75))));
+    await settle();
 
     expect(readProbe('pending')).toBe('settled');
     expect(readProbe('tier')).toBe('75');
@@ -383,20 +359,20 @@ describe('OverviewNavigationProvider', () => {
     window.history.replaceState({}, '', '/overview?tier=50&utm_source=x');
     renderProvider(pageData(50), '/overview?tier=50');
 
-    await act(async () => {
-      selectReference?.();
-      await Promise.resolve();
-    });
+    act(() => selectReference?.());
+    await settle();
 
     expect(stub).not.toHaveBeenCalled();
     expect(readProbe('reference')).toBe('b300');
   });
 
-  it('does not report a load for a reference-only change', () => {
+  it('does not report a load for a reference-only change', async () => {
     const { stub } = deferredFetch();
 
     renderProvider(pageData(50), '/overview');
     act(() => selectReference?.());
+    // The reference comes from the cached page, whose promise still resolves asynchronously.
+    await settle();
 
     expect(stub).not.toHaveBeenCalled();
     expect(readProbe('reference')).toBe('b300');
@@ -410,10 +386,8 @@ describe('OverviewNavigationProvider', () => {
     act(() => selectTier?.());
     act(() => selectReference?.());
 
-    await act(async () => {
-      settlers[0]?.reject(new Error('network down'));
-      await Promise.resolve();
-    });
+    act(() => settlers[0]?.reject(new Error('network down')));
+    await settle();
 
     expect(settlers).toHaveLength(1);
     expect(routerStub.replace).not.toHaveBeenCalled();
@@ -472,10 +446,8 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('tier')).toBe('50');
     expect(readProbe('pending')).toBe('pending');
 
-    await act(async () => {
-      settlers[0]?.resolve(Response.json(pageData(75)));
-      await Promise.resolve();
-    });
+    act(() => settlers[0]?.resolve(Response.json(pageData(75))));
+    await settle();
 
     expect(readProbe('tier')).toBe('75');
     expect(readProbe('pending')).toBe('settled');

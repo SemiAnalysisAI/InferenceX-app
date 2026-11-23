@@ -21,6 +21,12 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import type { CompareChipPageLink } from '@/lib/compare/compare-chip-link';
+import {
+  HERO_IMAGE_HEIGHT,
+  HERO_IMAGE_SIZES,
+  HERO_IMAGE_WIDTH,
+  heroImageSrcSet,
+} from '@/lib/compare/hero-image';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
@@ -86,6 +92,8 @@ interface ComparePerDollarPageClientProps {
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
   heroImageSrc: string;
+  /** `perDollarPngVersion()` of the PNG, so the optimized srcSet URLs change with its data. */
+  heroImageVersion: string;
   chipPageLink?: CompareChipPageLink | null;
   locale?: 'en' | 'zh';
 }
@@ -112,6 +120,7 @@ export default function ComparePerDollarPageClient({
   aCostPerGpuHr,
   bCostPerGpuHr,
   heroImageSrc,
+  heroImageVersion,
   chipPageLink = null,
   locale = 'en',
 }: ComparePerDollarPageClientProps) {
@@ -136,6 +145,7 @@ export default function ComparePerDollarPageClient({
     [defaultSequence, initialBenchmarkRows],
   );
   const t = STRINGS[locale];
+  const heroSrcSet = heroImageSrcSet(heroImageSrc, heroImageVersion);
   const isZh = locale === 'zh';
 
   return (
@@ -283,16 +293,21 @@ export default function ComparePerDollarPageClient({
             data-testid="compare-per-dollar-indexed-image"
           >
             <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              {/* Often the page's LCP image, so it loads eagerly. The PNG URL stays the src
+                  so search engines index the image itself, while browsers pick a webp sized
+                  for the 24rem figure from srcSet instead of the 1200px PNG. */}
               <img
                 src={heroImageSrc}
+                srcSet={heroSrcSet}
+                sizes={HERO_IMAGE_SIZES}
                 alt={
                   isZh
                     ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
                     : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
                 }
-                width={1200}
-                height={675}
-                loading="lazy"
+                width={HERO_IMAGE_WIDTH}
+                height={HERO_IMAGE_HEIGHT}
+                decoding="async"
                 className="w-full rounded-lg"
               />
             </a>

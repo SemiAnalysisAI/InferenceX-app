@@ -16,16 +16,16 @@ import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
-    reproTitle: 'Every Result comes from a Public GitHub Actions run',
+    reproTitle: 'Every Result Comes from a Public GitHub Actions Run',
     reproP1:
       'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe lives in the repo, the run executes on the actual target hardware, and the full logs and artifacts are publicly viewable. Click any point on a chart to jump straight to the run that produced it. All reproducible, auditable, and open source.',
     reproStatPrefix: '',
     reproStatSuffix: '+ new benchmark datapoints added per week on average.',
     reproStatTail: 'Browse every new model, chip, framework, and configuration as it lands.',
-    actionsRunsTitle: 'Public Actions runs',
+    actionsRunsTitle: 'Public Actions Runs',
     actionsRunsDesc:
       'Every benchmark executes on GitHub Actions with full logs visible while the run is in progress.',
-    openRecipesTitle: 'Open recipes',
+    openRecipesTitle: 'Open Recipes',
     openRecipesDesc:
       'Every model, framework, precision, and parallelism setting is committed to the public repo as a shell script.',
     browseSubmissions: 'Browse submissions',

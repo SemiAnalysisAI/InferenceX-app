@@ -28,7 +28,7 @@ type ReproduceTab = 'command' | 'config' | 'environment';
 
 const STRINGS = {
   en: {
-    title: 'Reproduce this result',
+    title: 'Reproduce This Result',
     description:
       'How this benchmark point was produced, from its stored configuration, run metadata, and logs.',
     unofficial: 'Unofficial run',
@@ -252,7 +252,7 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
   const runUrl = payload?.run.run_url ?? point.run_url;
   const logHref =
     persistedId !== null && payload?.logs
-      ? pointLogHref(persistedId, point.benchmark_type, locale)
+      ? pointLogHref(persistedId, point.benchmark_type, point.model, locale)
       : null;
   const workload =
     point.benchmark_type === 'agentic_traces'

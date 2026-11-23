@@ -9,6 +9,7 @@ import {
 } from '@/components/calculator/throughput-data';
 import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
+import { isUnofficialRunUnavailableCode } from '@/lib/api/unofficial-run-unavailable';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { NextRequest } from 'next/server';
@@ -183,9 +184,15 @@ export async function unofficialRunPayload(
 ): Promise<UnofficialRunPayload> {
   const ids = parseRunIdListParam(request.nextUrl.searchParams.get(param), param);
   if (ids.length === 0) return EMPTY_UNOFFICIAL;
-  return readResponse<UnofficialRunPayload>(
-    await unofficial(sourceRequest(request, '/api/unofficial-run', { runId: ids.join(',') })),
+  const response = await unofficial(
+    sourceRequest(request, '/api/unofficial-run', { runId: ids.join(',') }),
   );
+  if (response.status === 404 || response.status === 410) {
+    const body = (await response.json()) as { error?: string; code?: unknown };
+    if (isUnofficialRunUnavailableCode(body.code))
+      throw new ViewsUpstreamError(response.status, body.error, body.code);
+  }
+  return readResponse<UnofficialRunPayload>(response);
 }
 
 /** Unofficial-run benchmark rows narrowed to the request's `model=`. */

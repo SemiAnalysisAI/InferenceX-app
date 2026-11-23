@@ -789,10 +789,11 @@ interface PointLinksInput {
 export function pointLogHref(
   pointId: number,
   benchmarkType: string | undefined,
+  model: string | undefined,
   locale: Locale,
 ): string {
   if (benchmarkType === 'agentic_traces') {
-    const agenticHref = agenticDetailHref(pointId, locale);
+    const agenticHref = agenticDetailHref(pointId, model, locale);
     return `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`;
   }
   return `${locale === 'zh' ? '/zh' : ''}${getDashboardRoute('inference').path}/logs/${pointId}`;
@@ -820,14 +821,14 @@ const pointLinks = ({
       links.push({
         action: 'view-charts',
         label: t.charts,
-        href: agenticDetailHref(pointId, locale),
+        href: agenticDetailHref(pointId, point.model, locale),
       });
     }
     if (hasLogData) {
       links.push({
         action: 'view-logs',
         label: t.logs,
-        href: pointLogHref(pointId, point.benchmark_type, locale),
+        href: pointLogHref(pointId, point.benchmark_type, point.model, locale),
       });
     }
   }

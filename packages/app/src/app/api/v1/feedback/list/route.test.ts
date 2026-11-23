@@ -74,10 +74,16 @@ describe('GET /api/v1/feedback/list', () => {
   });
 
   it('returns 500 when the query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     sqlControl.throwOnNext();
     const res = await GET();
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('storage error');
+    expect(logged).toHaveBeenCalledWith(
+      'feedback list: query failed',
+      expect.objectContaining({ message: 'boom' }),
+    );
+    logged.mockRestore();
   });
 });

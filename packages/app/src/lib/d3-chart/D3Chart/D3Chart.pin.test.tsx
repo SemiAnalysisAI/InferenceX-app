@@ -3,7 +3,7 @@ import { select } from 'd3';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
-import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
+import { settle, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { HOVER_POINT_SIZE, POINT_SIZE } from '@/lib/charts/chart-rendering';
 import { stubMatchMedia } from '@/test/match-media-stub';
@@ -47,12 +47,15 @@ let frames: FrameRequestCallback[] = [];
 let container: HTMLDivElement;
 let root: Root;
 
+/** Runs the stubbed animation frames inside act, since they set React state (the zoom hint). */
 function flushFrames() {
-  while (frames.length > 0) {
-    const pending = frames;
-    frames = [];
-    for (const frame of pending) frame(0);
-  }
+  act(() => {
+    while (frames.length > 0) {
+      const pending = frames;
+      frames = [];
+      for (const frame of pending) frame(0);
+    }
+  });
 }
 
 beforeEach(() => {
@@ -116,7 +119,11 @@ function draw(props: D3ChartProps<Datum>) {
   flushFrames();
 }
 
-function zoomIn(clientX: number, clientY: number) {
+/**
+ * Zooms in with a shift+wheel. Async because the zoomed axes make the zoom hint re-measure from a
+ * MutationObserver, whose callback is a microtask that must also run inside act.
+ */
+async function zoomIn(clientX: number, clientY: number) {
   act(() => {
     container
       .querySelector('svg')!
@@ -125,6 +132,7 @@ function zoomIn(clientX: number, clientY: number) {
       );
   });
   flushFrames();
+  await settle();
 }
 
 function windowMouseEvent(type: string, clientX: number, clientY: number) {
@@ -142,9 +150,7 @@ async function pan() {
     svg.dispatchEvent(windowMouseEvent('click', 240, 170));
   });
   flushFrames();
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 0);
-  await promise;
+  await settle();
 }
 
 function pressEscape() {
@@ -214,7 +220,7 @@ describe('D3Chart pinned point', () => {
     });
     expect(drawnRadius(calls, pinned.x, pinned.y)).toBe(HOVER_POINT_SIZE);
 
-    zoomIn(pinned.clientX + 40, pinned.clientY + 20);
+    await zoomIn(pinned.clientX + 40, pinned.clientY + 20);
     await pan();
     const moved = canvasPoint('b');
     expect([moved.x, moved.y]).not.toEqual([pinned.x, pinned.y]);
@@ -238,7 +244,7 @@ describe('D3Chart pinned point', () => {
     expect(drawnRadius(calls, moved.x, moved.y)).toBe(POINT_SIZE);
   });
 
-  it('keeps SVG dots enlarged under the rulers through zoom', () => {
+  it('keeps SVG dots enlarged under the rulers through zoom', async () => {
     draw(chart(false));
     const radius = () => pinnedDot().querySelector('.visible-shape')!.getAttribute('r');
     const before = overlayMarkerPosition(pinnedDot())!;
@@ -249,7 +255,7 @@ describe('D3Chart pinned point', () => {
     expect(pinMarks()).toMatchObject({ shown: true, x: before.x, y: before.y });
     expect(radius()).toBe(String(HOVER_POINT_SIZE));
 
-    zoomIn(before.x, before.y + 30);
+    await zoomIn(before.x, before.y + 30);
     const after = overlayMarkerPosition(pinnedDot())!;
     expect(after).not.toEqual(before);
     expect(pinMarks()).toEqual({
@@ -265,12 +271,12 @@ describe('D3Chart pinned point', () => {
     expect(radius()).toBe(String(POINT_SIZE));
   });
 
-  it('draws the pinned point at hover size with its rulers and ring in the PNG export', () => {
+  it('draws the pinned point at hover size with its rulers and ring in the PNG export', async () => {
     installRecordingContext();
     draw(chart(true));
     const pinned = canvasPoint('b');
     hitArea('click', pinned);
-    zoomIn(pinned.clientX + 40, pinned.clientY + 20);
+    await zoomIn(pinned.clientX + 40, pinned.clientY + 20);
 
     const svg = container.querySelector('svg')!;
     const clone = svg.cloneNode(true) as SVGSVGElement;

@@ -10,7 +10,13 @@ import {
   READING_SECTION_CLASS,
   READING_TEXT_CLASS,
 } from '@/components/ui/reading-layout';
-import { AGENTX_COMMANDS, AGENTX_QUICKSTART, AGENTX_ROUTING } from '@/lib/agentx/quickstart';
+import {
+  AGENTX_COMMANDS,
+  AGENTX_GOLDEN_AL,
+  AGENTX_GOLDEN_AL_URL,
+  AGENTX_QUICKSTART,
+  AGENTX_ROUTING,
+} from '@/lib/agentx/quickstart';
 import { localePath, type Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
@@ -79,6 +85,21 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
           <CopyableCodeBlock locale={locale} label={t.routing}>
             {AGENTX_ROUTING}
           </CopyableCodeBlock>
+        </section>
+        <section id="golden-al" className="scroll-mt-24 space-y-3">
+          <h2 className={ARTICLE_H2_CLASS}>{t.goldenAl}</h2>
+          <p className={READING_TEXT_CLASS}>{t.goldenAlHelp}</p>
+          <CopyableCodeBlock locale={locale} label={t.goldenAl}>
+            {AGENTX_GOLDEN_AL}
+          </CopyableCodeBlock>
+          <p className={READING_TEXT_CLASS}>{t.goldenAlNote}</p>
+          <Link
+            href={AGENTX_GOLDEN_AL_URL}
+            className="inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
+          >
+            {t.goldenAlLink}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
         </section>
         <footer className={cn(READING_SECTION_CLASS, 'space-y-3')}>
           <p className={READING_TEXT_CLASS}>{t.resultsHelp}</p>

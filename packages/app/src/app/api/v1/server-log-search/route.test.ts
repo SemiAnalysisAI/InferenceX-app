@@ -70,6 +70,8 @@ describe('GET /api/v1/server-log-search', () => {
 
   it.each([
     '/api/v1/server-log-search?q=ready',
+    '/api/v1/server-log-search?id=1e21&q=ready',
+    '/api/v1/server-log-search?id=-5&q=ready',
     '/api/v1/server-log-search?id=42&q=',
     `/api/v1/server-log-search?id=42&q=${'x'.repeat(257)}`,
     '/api/v1/server-log-search?id=42&q=ready&limit=0',
@@ -91,8 +93,14 @@ describe('GET /api/v1/server-log-search', () => {
   });
 
   it('returns 500 when the database search fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockSearchServerLogs.mockRejectedValueOnce(new Error('Connection reset'));
     const response = await GET(req('/api/v1/server-log-search?id=42&q=ready'));
     expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error searching server logs:',
+      expect.objectContaining({ message: 'Connection reset' }),
+    );
+    logged.mockRestore();
   });
 });

@@ -24,7 +24,7 @@ runs:
         bun-version-file: package.json
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
-        node-version: '24'
+        node-version: '26'
     # Sticky disks mount in about a second; bun reconciles node_modules to the lockfile.
     - name: Mount node_modules
       uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2

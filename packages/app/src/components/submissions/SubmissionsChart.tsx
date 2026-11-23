@@ -17,6 +17,7 @@ import {
   type ZoomContext,
 } from '@/lib/d3-chart/D3Chart';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
@@ -232,7 +233,8 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
             .attr('font-weight', '400')
             .attr('fill', 'var(--muted-foreground)')
             .text(formatSubmissionDate(NIGHTLY_END_DATE, locale));
-          const bbox = (text.node() as SVGTextElement).getBBox();
+          const bbox = svgBBox(text.node());
+          if (!bbox) return;
           label
             .insert('rect', 'text')
             .attr('x', bbox.x - 5)

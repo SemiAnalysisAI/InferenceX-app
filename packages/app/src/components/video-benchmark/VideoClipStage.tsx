@@ -59,7 +59,7 @@ const STRINGS = {
     buffering: (percent: number) => `Buffering ${percent}%`,
     downloading: (percent: number) => `Loading ${percent}%`,
     seconds: 's',
-    swap: 'Swap sides',
+    swap: 'Swap Sides',
     inspect: 'Inspect',
     previousFrame: 'Previous frame',
     nextFrame: 'Next frame',

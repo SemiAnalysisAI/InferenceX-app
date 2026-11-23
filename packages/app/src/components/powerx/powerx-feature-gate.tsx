@@ -17,8 +17,9 @@ export function powerXLockedRedirectPath(locale: Locale): '/' | '/zh' {
 
 /**
  * Soft feature flag for PowerX pages. The gate lives in localStorage, so it can only be
- * read on the client: nothing renders until it is read, a locked visitor is replaced onto
- * the landing page, and relocking while on the page sends the visitor there too.
+ * read on the client. Until it is read a viewport-tall placeholder holds the footer below
+ * the fold, a locked visitor is replaced onto the landing page, and relocking while on the
+ * page sends the visitor there too.
  */
 export function PowerXFeatureGate({ locale, children }: { locale: Locale; children: ReactNode }) {
   const router = useRouter();
@@ -40,5 +41,5 @@ export function PowerXFeatureGate({ locale, children }: { locale: Locale; childr
     };
   }, [locale, router]);
 
-  return unlocked ? children : null;
+  return unlocked ? children : <div aria-hidden="true" className="min-h-svh" />;
 }

@@ -123,6 +123,7 @@ describe('GET /api/v1/workflow-info', () => {
   );
 
   it('returns 500 when any query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetWorkflowRunsByDate.mockRejectedValueOnce(new Error('Timeout'));
     mockGetChangelogByDate.mockResolvedValueOnce([]);
     mockGetDateConfigs.mockResolvedValueOnce([]);
@@ -132,5 +133,10 @@ describe('GET /api/v1/workflow-info', () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching workflow info:',
+      expect.objectContaining({ message: 'Timeout' }),
+    );
+    logged.mockRestore();
   });
 });

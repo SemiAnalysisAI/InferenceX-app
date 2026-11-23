@@ -11,6 +11,7 @@ import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
+import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -2824,12 +2825,12 @@ const ScatterGraph = React.memo(
             .style('opacity', (d) => (d.visible ? 1 : 0));
 
           plSel.each(function (d) {
-            d3.select(this).select<SVGTextElement>('.pl-text').text(d.label);
+            d3.select(this).select<SVGTextElement>(':scope > text.pl-text').text(d.label);
           });
           const plMeasured: { node: SVGGElement; d: LabelSeg; bbox: DOMRect }[] = [];
           plSel.each(function (d) {
-            const text = this.querySelector<SVGTextElement>('.pl-text');
-            if (text) plMeasured.push({ node: this, d, bbox: text.getBBox() });
+            const bbox = svgBBox(this.querySelector(':scope > text.pl-text'));
+            if (bbox) plMeasured.push({ node: this, d, bbox });
           });
           for (const { node, d, bbox } of plMeasured) {
             const px = 4;
@@ -3040,9 +3041,10 @@ const ScatterGraph = React.memo(
                     whiteSpace: 'pre-wrap',
                   }),
               );
+              // Translators can insert tspans without bound data; those match no key and exit.
               text
-                .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
-                .data(fitted, (segment) => segment.className)
+                .selectAll<SVGTSpanElement, (typeof segments)[number] | undefined>('tspan')
+                .data(fitted, (segment) => segment?.className ?? '')
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
                 .attr('fill', (segment) => segment.fill)

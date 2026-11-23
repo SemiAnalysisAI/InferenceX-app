@@ -374,10 +374,16 @@ describe('GET /api/v1/views/calculator', () => {
   });
 
   it('returns 500 when the query fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetLatestBenchmarks.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await GET(
       request('/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k'),
     );
     expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error building calculator view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

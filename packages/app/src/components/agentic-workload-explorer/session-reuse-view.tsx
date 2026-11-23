@@ -60,7 +60,7 @@ const COHORT_LABELS = {
 
 const STRINGS = {
   en: {
-    heading: 'Session reuse',
+    heading: 'Session Reuse',
     description: 'Observed conversation activity and returns after long gaps',
     exportCsv: 'Export CSV',
     exportJson: 'Export JSON',
@@ -80,17 +80,17 @@ const STRINGS = {
     cutoffsError: 'Enter comma-separated whole days from 1 to 28',
     noEligible:
       'No eligible sessions have enough follow-up in this trace-version scope. Try All versions or return after more history is recorded.',
-    chartCoverageTitle: 'Conversation age versus call volume',
+    chartCoverageTitle: 'Conversation Age versus Call Volume',
     chartCoverageSubtitle: 'Session counts and call counts have different denominators',
     legendSessionSpan: 'Session span within window',
     legendCallsWithin: 'Calls within window',
     noCohortSessions: 'No eligible sessions in this cohort',
-    chartCohortTitle: 'Call-age coverage by cohort',
+    chartCohortTitle: 'Call-Age Coverage by Cohort',
     chartCohortSubtitle:
       'Proxy cohorts overlap; they are not one-shot, multi-shot or deep-research task labels.',
     cohortNote:
       'Initially small: ≤5 calls on the first UTC date. Multi-day: activity on ≥2 UTC dates. Search-assisted: at least one Web Search Agent label.',
-    chartReturnTitle: 'Returns after inactivity',
+    chartReturnTitle: 'Returns After Inactivity',
     chartReturnSubtitle:
       'Sessions with at least one observed inter-call gap longer than each cutoff.',
     returnNote:
@@ -114,8 +114,8 @@ const STRINGS = {
       "Session age is the time from first to last observed successful call. Call age is measured from that session's first observed call. A return gap is measured between consecutive observed calls, without a 30-minute idle cutoff. None of these quantities is a measure of bytes stored.",
     xAxisLabel: 'Days from first observed call',
     svgCoverageTitle: (label: string) => `Session and call-age coverage, ${label}`,
-    svgCohortTitle: 'Call-age coverage by session cohort',
-    svgReturnTitle: 'Sessions returning after a long gap',
+    svgCohortTitle: 'Call-Age Coverage by Session Cohort',
+    svgReturnTitle: 'Sessions Returning After a Long Gap',
     dayGroup: (days: number) => `${days} days from first call`,
     returnGapTitle: (label: string, days: number) => `${label}, gap over ${days} days`,
     ofSessions: (n: string, d: string) => `${n} / ${d} sessions`,

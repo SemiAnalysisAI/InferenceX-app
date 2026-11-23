@@ -2,6 +2,7 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { settle } from '@/test/helpers';
 
 import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 
@@ -53,9 +54,11 @@ function render(props: Partial<React.ComponentProps<typeof SearchableSelect>> = 
   });
 }
 
-function openMenu() {
+/** Opens the menu. Async because floating-ui positions the popover in a promise after it opens. */
+async function openMenu() {
   const trigger = container.querySelector('[data-testid="yaxis"]') as HTMLButtonElement;
   act(() => trigger.click());
+  await settle();
 }
 
 function setSearchValue(value: string) {
@@ -71,11 +74,11 @@ function setSearchValue(value: string) {
 }
 
 describe('SearchableSelect', () => {
-  it('uses Chinese defaults for search, clear, empty and placeholder without overriding caller copy', () => {
+  it('uses Chinese defaults for search, clear, empty and placeholder without overriding caller copy', async () => {
     route.pathname = '/zh/infx/inference';
     render({ value: 'unknown' });
     expect(container.textContent).toContain('请选择...');
-    openMenu();
+    await openMenu();
     const input = document.body.querySelector('input')!;
     expect(input.getAttribute('placeholder')).toBe('搜索...');
     expect(input.getAttribute('aria-label')).toBe('搜索选项');
@@ -116,42 +119,42 @@ describe('SearchableSelect', () => {
     expect(label?.getAttribute('title')).toBe(longLabel);
   });
 
-  it('shows all groups and options when opened', () => {
+  it('shows all groups and options when opened', async () => {
     render();
-    openMenu();
+    await openMenu();
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     expect(items).toHaveLength(3);
   });
 
-  it('reports search length and result count, never the typed text', () => {
+  it('reports search length and result count, never the typed text', async () => {
     trackMock.mockClear();
     render({ trackPrefix: 'yaxis' });
-    openMenu();
+    await openMenu();
     setSearchValue('input token');
-    openMenu();
+    await openMenu();
     expect(trackMock).toHaveBeenCalledWith('yaxis_searched', { query_length: 11, results: 1 });
     expect(JSON.stringify(trackMock.mock.calls)).not.toContain('input token');
   });
 
-  it('filters options across groups by the search query (option label match)', () => {
+  it('filters options across groups by the search query (option label match)', async () => {
     render();
-    openMenu();
+    await openMenu();
     setSearchValue('input');
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     expect(items).toHaveLength(1);
     expect(items[0]?.textContent).toContain('Input Token Throughput per GPU');
   });
 
-  it('matches on group label as well as option label', () => {
+  it('matches on group label as well as option label', async () => {
     render();
-    openMenu();
+    await openMenu();
     setSearchValue('cost');
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     expect(items).toHaveLength(1);
     expect(items[0]?.textContent).toContain('Cost per Million Total Tokens (Hyperscaler)');
   });
 
-  it('keeps the collapsed menu and selected label while full-name search selects an exact metric', () => {
+  it('keeps the collapsed menu and selected label while full-name search selects an exact metric', async () => {
     const handle = vi.fn();
     render({
       value: 'y_measuredAvgPower',
@@ -183,7 +186,7 @@ describe('SearchableSelect', () => {
     const trigger = container.querySelector('[data-testid="yaxis"]')!;
     expect(trigger.textContent).toBe('Measured Power');
     expect(trigger.getAttribute('aria-haspopup')).toBe('grid');
-    openMenu();
+    await openMenu();
     expect(
       [...document.body.querySelectorAll('[data-select-option]')].map((item) => item.textContent),
     ).toEqual(['Measured Power', 'Measured Energy']);
@@ -205,7 +208,7 @@ describe('SearchableSelect', () => {
     expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(0);
   });
 
-  it('keeps family aliases and full-name search without duplicate values or help buttons', () => {
+  it('keeps family aliases and full-name search without duplicate values or help buttons', async () => {
     const power = {
       value: 'y_measuredP75Power',
       label: 'Measured Power',
@@ -229,7 +232,7 @@ describe('SearchableSelect', () => {
         },
       ],
     });
-    openMenu();
+    await openMenu();
     setSearchValue('Measured');
     expect(document.body.querySelectorAll('[data-select-option]')).toHaveLength(2);
     expect(
@@ -250,23 +253,23 @@ describe('SearchableSelect', () => {
     expect(handle).toHaveBeenCalledExactlyOnceWith('y_measuredP75Power');
   });
 
-  it('shows a "No results" message when nothing matches', () => {
+  it('shows a "No results" message when nothing matches', async () => {
     render();
-    openMenu();
+    await openMenu();
     setSearchValue('zzzzz');
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     expect(items).toHaveLength(0);
     expect(document.body.textContent).toContain('No results');
   });
 
-  it('uses localized search controls and empty state labels', () => {
+  it('uses localized search controls and empty state labels', async () => {
     render({
       searchPlaceholder: '搜索队列...',
       searchAriaLabel: '搜索 CollectiveX 队列',
       clearSearchLabel: '清除队列搜索',
       noResultsLabel: '无匹配队列',
     });
-    openMenu();
+    await openMenu();
     const input = document.body.querySelector('input[type="text"]') as HTMLInputElement;
     expect(input.placeholder).toBe('搜索队列...');
     expect(input.getAttribute('aria-label')).toBe('搜索 CollectiveX 队列');
@@ -275,7 +278,7 @@ describe('SearchableSelect', () => {
     expect(document.body.querySelector('button[aria-label="清除队列搜索"]')).not.toBeNull();
   });
 
-  it('filters the canonical 280-cohort publication scale without truncating it', () => {
+  it('filters the canonical 280-cohort publication scale without truncating it', async () => {
     const groups = [
       ['Library', 76],
       ['Platform', 76],
@@ -289,7 +292,7 @@ describe('SearchableSelect', () => {
       })),
     }));
     render({ groups, value: 'Library-cohort-0' });
-    openMenu();
+    await openMenu();
     expect(document.body.querySelectorAll('[data-slot="select-item"]')).toHaveLength(280);
     setSearchValue('Routing comparisons');
     expect(document.body.querySelectorAll('[data-slot="select-item"]')).toHaveLength(116);
@@ -299,10 +302,10 @@ describe('SearchableSelect', () => {
     expect(items[0]?.textContent).toContain('Routing cohort 115');
   });
 
-  it('invokes onValueChange and closes the menu when an option is clicked', () => {
+  it('invokes onValueChange and closes the menu when an option is clicked', async () => {
     const handle = vi.fn();
     render({ onValueChange: handle });
-    openMenu();
+    await openMenu();
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     const target = [...items].find((el) =>
       el.textContent?.includes('Input Token Throughput per GPU'),
@@ -312,10 +315,10 @@ describe('SearchableSelect', () => {
     expect(document.body.querySelectorAll('[data-slot="select-item"]')).toHaveLength(0);
   });
 
-  it('moves through options and selects from the keyboard', () => {
+  it('moves through options and selects from the keyboard', async () => {
     const handle = vi.fn();
     render({ onValueChange: handle });
-    openMenu();
+    await openMenu();
     const input = document.body.querySelector('input[type="text"]') as HTMLInputElement;
     const options = document.body.querySelectorAll<HTMLElement>('[data-slot="select-item"]');
     expect([...options].every((item) => item.tabIndex === -1)).toBe(true);

@@ -17,6 +17,7 @@ import {
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { ChartPointDetails, type ChartPointDetailsRow } from '@/components/ui/chart-point-details';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
+import { svgBBox } from '@/lib/d3-chart/svg-measure';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import type { EvaluationChartData } from '@/components/evaluation/types';
@@ -235,8 +236,8 @@ export function sizeScoreLabelBackgrounds(
 ): void {
   const measurements: { group: SVGGElement; bounds: DOMRect }[] = [];
   labelGroups.each(function () {
-    const text = this.querySelector<SVGTextElement>('.score-label');
-    if (text) measurements.push({ group: this, bounds: text.getBBox() });
+    const bounds = svgBBox(this.querySelector(':scope > text.score-label'));
+    if (bounds) measurements.push({ group: this, bounds });
   });
 
   for (const { group, bounds } of measurements) {
