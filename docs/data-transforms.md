@@ -33,9 +33,11 @@ Why the shares are built the way they are:
 - **Rows without any tier are drawn as gaps, not zeros.** A GB300 sweep scraped only at the Dynamo frontend has a theoretical ceiling but no server counters; those concurrencies get a marker and remain in the API’s `unmeasured` list.
 - **Fixed sequences record no cache tier at all**, so the tab keeps the scenario selector and shows an explanatory empty state rather than an empty chart.
 
-The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency; no series mixes recipes.
+The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers. `c_recipe` selects a serving recipe within that group; its identity includes PP/DCP/PCP widths when the row has no fingerprint. An explicit unavailable key shows an empty state and the recipe selector; it never substitutes another recipe. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency; no series mixes recipes.
 
-The tab is footer-only, so the agentic chart links into it. `cacheReuseHref` (`lib/calculator/cache-reuse-link.ts`) writes the point's own `g_model`, `g_rundate`, `i_seq`, `i_prec`, `c_cfg`, and `c_recipe` (clearing an inherited `g_runid`) because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
+The tab is footer-only, so the agentic chart links into it. `cacheReuseHref` (`lib/calculator/cache-reuse-link.ts`) writes the point's own `g_model`, `g_rundate`, `i_seq`, `i_prec`, `c_cfg`, `c_recipe`, and the source `g_runid` parsed from `run_url` (clearing an inherited run ID only when the point has none) because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
+
+Cache reuse reads the explicitly requested run ID from the global filter owner, even if it is absent from the date picker, and fetches its exact logical snapshot without a date cutoff. With no explicit run, the existing latest/as-of calculator projection applies.
 
 ## Chart Point Construction
 

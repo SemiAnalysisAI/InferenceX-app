@@ -92,6 +92,7 @@ describe('getTraceServerMetrics', () => {
     const { sql, calls } = mockSql([
       [
         metaRow({
+          metrics: { prefill_pp: 2, decode_dcp_size: 8, prefill_pcp_size: 4 },
           kv_offloading: 'dram',
           kv_offload_backend: 'lmcache',
           kv_offload_backend_version: '0.5.1',
@@ -125,11 +126,13 @@ describe('getTraceServerMetrics', () => {
       num_prefill_gpu: 8,
       num_decode_gpu: 64,
       recipe_fingerprint: 'exact-fingerprint',
+      metrics: { prefill_pp: 2, decode_dcp_size: 8, prefill_pcp_size: 4 },
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain("atr.chart_series - 'metricSources'");
     expect(calls[0]).toContain("metric_source->'kvCacheUsageByEngine'");
     expect(calls[0]).toContain("br.metrics ->> 'kv_offload_backend'");
+    expect(calls[0]).toContain("'prefill_dwdp_size', br.metrics -> 'prefill_dwdp_size'");
   });
 
   it('fetches and computes the raw blob only when chart_series is stale', async () => {

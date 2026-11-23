@@ -1851,7 +1851,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '8204200a643c6ed136ccc0f0b63937ccea1ccb9e09cc34198281f170795ff084',
+    sourceSha256: 'b4f69bdb2bf988fc845fecfb4b8e7ea680fded8a956e311df08dcf78cdd812c6',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -2223,7 +2223,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: 'f86ced13ac76b5c8ee92d2dac0ba71103ff55fa2f7bd0f6be2799d3a2a5fb848',
+    sourceSha256: '416477540af0d54dbfd05d092c4860b3ec5f3e5e5fd6a81d906dea9963332a13',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

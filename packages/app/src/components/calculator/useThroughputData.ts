@@ -62,28 +62,31 @@ export function throughputQueryOptions(
     includePower = false,
     initialRows,
     initialCacheScope,
+    runId,
   }: {
     enabled?: boolean;
     includePower?: boolean;
     initialRows?: BenchmarkRow[];
     initialCacheScope?: string;
+    /** A pinned run reads its exact logical snapshot instead of the dated projection. */
+    runId?: string;
   } = {},
 ) {
   return benchmarkQueryOptions(
     model,
-    runDate,
+    runId ? '' : runDate,
     enabled,
     undefined,
-    undefined,
-    undefined,
-    includePower
+    runId,
+    runId ? true : undefined,
+    includePower || runId
       ? undefined
       : {
           type: 'calculator',
           sequence,
           ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
         },
-    includePower ? undefined : initialRows,
+    includePower || runId ? undefined : initialRows,
   );
 }
 
@@ -119,6 +122,7 @@ export function useThroughputData(
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   includePower = false,
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
+  runId?: string,
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -137,6 +141,7 @@ export function useThroughputData(
       includePower,
       initialRows,
       initialCacheScope,
+      runId,
     }),
   );
 
