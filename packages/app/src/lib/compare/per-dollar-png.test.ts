@@ -22,7 +22,8 @@ mock.module('@/lib/analytics/analytics-server', () => ({ trackServer: () => {} }
 
 // Imported after mock.module so the version reads the mocked pair data.
 const { parseCompareSlug } = await import('./compare-slug');
-const { PER_DOLLAR_PNG_RENDER_REVISION, perDollarPngVersion } = await import('./per-dollar-png');
+const { PER_DOLLAR_PNG_RENDER_REVISION, perDollarPngVersion, perDollarVersionedPngResponse } =
+  await import('./per-dollar-png');
 
 const pair = parseCompareSlug('deepseek-r1-b200-vs-h100')!;
 
@@ -54,5 +55,27 @@ describe('perDollarPngVersion', () => {
     const current = await perDollarPngVersion(pair);
     expect(await perDollarPngVersion(pair, PER_DOLLAR_PNG_RENDER_REVISION)).toBe(current);
     expect(await perDollarPngVersion(pair, PER_DOLLAR_PNG_RENDER_REVISION + 1)).not.toBe(current);
+  });
+});
+
+describe('perDollarVersionedPngResponse', () => {
+  it('renders the current PNG for a well-formed version, even one a stale page still names', async () => {
+    const version = await perDollarPngVersion(pair);
+    for (const file of [`${version}.png`, '000000000000.png']) {
+      const response = await perDollarVersionedPngResponse('deepseek-r1-b200-vs-h100', file, 'zh');
+      expect(response.status).toBe(200);
+    }
+  });
+
+  it('returns 404 for a malformed version file or a non-canonical slug', async () => {
+    const responses = await Promise.all(
+      [
+        ['deepseek-r1-b200-vs-h100', 'latest.png'],
+        ['deepseek-r1-b200-vs-h100', '0123456789ab.webp'],
+        ['deepseek-r1-b200-vs-h100', '0123456789AB.png'],
+        ['not-a-slug', '0123456789ab.png'],
+      ].map(([slug, file]) => perDollarVersionedPngResponse(slug!, file!, 'en')),
+    );
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404, 404]);
   });
 });

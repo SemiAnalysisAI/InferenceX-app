@@ -48,10 +48,10 @@ async function perDollarChartRows({ model, a, b }: CompareSlug) {
 }
 
 /**
- * A short hash of the data the hero PNG draws and the renderer revision. The page puts it on the
- * PNG URL inside the `/_next/image` srcSet, whose responses browsers keep for
- * `images.minimumCacheTTL`, so an ingest that changes the chart, or a deploy that changes the
- * drawing, also changes the optimized image URL. The PNG route ignores the query.
+ * A short hash of the data the hero PNG draws and the renderer revision. The page's
+ * `/_next/image` srcSet points at `performance-per-dollar/<version>.png`, whose optimized responses
+ * browsers keep for `images.minimumCacheTTL`, so an ingest that changes the chart, or a deploy that
+ * changes the drawing, also changes the optimized image URL.
  */
 export async function perDollarPngVersion(
   pair: CompareSlug,
@@ -62,6 +62,26 @@ export async function perDollarPngVersion(
     .update(JSON.stringify([renderRevision, workload, plottedRows, curveRows]))
     .digest('hex')
     .slice(0, 12);
+}
+
+const VERSIONED_PNG_FILE = /^[0-9a-f]{12}\.png$/u;
+
+/**
+ * The hero PNG at `performance-per-dollar/<version>.png`. Each version is its own ISR entry,
+ * rendered on its first request as static generation, which refetches stale data in the
+ * foreground, so a version that first appears after an ingest never serves the pre-ingest chart.
+ * The plain PNG route would serve its stale entry once. The version only keys the cache: a stale
+ * page that still names an older version gets the current chart.
+ */
+export function perDollarVersionedPngResponse(
+  slug: string,
+  file: string,
+  lang: 'en' | 'zh',
+): Promise<Response> {
+  if (!VERSIONED_PNG_FILE.test(file)) {
+    return Promise.resolve(new Response('Not found', { status: 404 }));
+  }
+  return perDollarPngResponse(slug, lang);
 }
 
 /**

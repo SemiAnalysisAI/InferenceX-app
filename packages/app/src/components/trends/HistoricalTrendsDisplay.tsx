@@ -17,6 +17,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
+import { shouldRequestTrendHistory } from '@/components/trends/trend-history-gate';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
@@ -290,10 +291,11 @@ export default function HistoricalTrendsDisplay() {
     targetInteractivity,
     availableDates,
     tokenRevenuePricing,
-    // The availability index resolves the sequence, so the trend request starts alongside the
-    // benchmark rows instead of waiting for them. The chart still renders only with an
-    // interactivity chart.
-    enabled: sequenceResolved,
+    enabled: shouldRequestTrendHistory({
+      sequenceResolved,
+      chartDataLoading: loading,
+      hasInteractivityChart,
+    }),
     tcoBasis,
     chipBasis,
   });

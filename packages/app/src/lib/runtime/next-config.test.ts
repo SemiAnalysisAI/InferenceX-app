@@ -204,21 +204,18 @@ it('loads the production config through Next’s transpiler without Vitest alias
   expect(output).toContain('config-loaded');
 });
 
-it('lets the image optimizer take a versioned per-dollar hero PNG and no other local query', () => {
-  const patterns = nextConfig.images?.localPatterns;
-  for (const src of [
-    '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?v=0123456789ab',
-    '/zh/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?v=0123456789ab',
-    '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png',
-    '/brand/logo-color.webp',
-  ]) {
-    expect(hasLocalMatch(patterns, src), src).toBe(true);
+it('keeps Next’s no-query image default, which takes the versioned per-dollar hero path', () => {
+  // Unset, Next applies `[{ pathname: '**', search: '' }]` (see next/dist/server/config.js).
+  expect(nextConfig.images?.localPatterns).toBeUndefined();
+  const nextDefault = [{ pathname: '**', search: '' }];
+  for (const locale of ['', '/zh']) {
+    const src = `${locale}/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar/0123456789ab.png`;
+    expect(hasLocalMatch(nextDefault, src), src).toBe(true);
   }
-  for (const src of [
-    '/brand/logo-color.webp?v=1',
-    '/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?v=1',
-    '/compare-per-dollar/a/b/performance-per-dollar.png?v=1',
-  ]) {
-    expect(hasLocalMatch(patterns, src), src).toBe(false);
-  }
+  expect(
+    hasLocalMatch(
+      nextDefault,
+      '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?v=1',
+    ),
+  ).toBe(false);
 });
