@@ -45,6 +45,6 @@ export function logTicks(domain: number[]): number[] {
   return out;
 }
 
-export function ticksFor(scale: ScaleConfig): { tickValues?: number[] } {
-  return scale.type === 'log' ? { tickValues: logTicks(scale.domain) } : {};
-}
+/** Log-axis ticks for the current, possibly zoomed, domain. */
+export const logAxisTicks = (scale: { domain: () => unknown[] }) =>
+  logTicks(scale.domain().map(Number));

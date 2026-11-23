@@ -250,7 +250,7 @@ it('shows median and best bars across the row above metric vs size at /', () => 
     .should(($summary) => {
       const next = $summary.next()[0];
       expect(next?.dataset.testid).to.equal('operatorx-viz-metric-vs-size');
-      // Alone on its row, the panel spans the same 12 desktop columns as Metric vs size.
+      // Every chart spans the page width, as on the inference page.
       expect($summary[0].getBoundingClientRect().width).to.be.closeTo(
         next.getBoundingClientRect().width,
         1,
@@ -278,18 +278,16 @@ it('shows median and best bars across the row above metric vs size at /', () => 
         });
       cy.get('.summary-median').should('have.length', 2);
       cy.get('.summary-best').should('have.length', 2);
-      // Axis ticks use the page font, and hardware names match the bar value labels.
+      // Axis ticks keep the shared chart axis style, as on the inference charts, at the size
+      // of the bar value labels.
       cy.get('.y-axis .tick text').should(($ticks) => {
         const tick = getComputedStyle($ticks[0]);
         const label = getComputedStyle(
           $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
         );
-        expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
+        expect(tick.fontFamily).to.equal('sans-serif');
         expect(tick.fontSize).to.equal(label.fontSize);
       });
-      cy.get('.x-axis .tick text')
-        .first()
-        .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
     });
   cy.get('#opx-summary-normalized').click();
   cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
@@ -612,4 +610,27 @@ it('reopens the model token selection and sweep mode from a share link', () => {
       cy.visit(url.pathname + url.search);
     });
   cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
+});
+
+const noModelResults = (op: string) => ({ ...moe, op, modelOptions: [] });
+
+it('lists the inference models and opens an OperatorX family link on its listed model', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', noModelResults('gemm')).as('family');
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', noModelResults('moe'));
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', noModelResults('attention'));
+  cy.visit('/opx/model?model=Kimi-K2.x');
+  cy.location('search').should('eq', '?model=Kimi-K2.5');
+  // OperatorX files Kimi K2.5, K2.6 and K2.7-Code under one family.
+  cy.wait('@family').its('request.url').should('contain', 'model=Kimi-K2.x');
+  cy.get('[data-testid="operatorx-model"]').should('contain.text', 'Kimi K2.5/2.6/2.7-Code 1T');
+  // A listed model without OperatorX results stays selected and says so.
+  cy.get('[data-testid="operatorx-model-empty"]').should(
+    'contain.text',
+    'No OperatorX results for Kimi K2.5/2.6/2.7-Code 1T yet',
+  );
+  cy.get('[data-testid="operatorx-model"]').click();
+  cy.get('[data-slot="select-content"]')
+    .should('contain.text', 'Maintenance Mode')
+    .and('contain.text', 'Deprecated')
+    .and('contain.text', 'DeepSeek V4.1 Flash 552B');
 });

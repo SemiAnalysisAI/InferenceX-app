@@ -2,24 +2,26 @@
 
 import { curveLinear } from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
-import ChartLegend from '@/components/ui/chart-legend';
-import { Label } from '@/components/ui/label';
+import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
+import { ChartSection } from '@/components/ui/chart-section';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics/analytics';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { D3Chart, type D3ChartHandle } from '@/lib/d3-chart/D3Chart';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 
-import { EmptyChart } from '../charts/empty';
-import { OpxChart, hardwareLegend } from '../charts/kit';
-import { formatCompact } from '../charts/scales';
+import { SCATTER_MARGIN, VizCaption, VizFooter, hardwareLegend, inspectCase } from '../charts/kit';
+import { formatCompact, logAxisTicks } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
@@ -32,6 +34,12 @@ const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROOF_DASH = '6 4';
 const ROOF_SAMPLES = 64;
 
+export const ROOFLINE_TITLE: Record<Locale, string> = { en: 'Roofline', zh: 'Roofline' };
+export const SUMMARY_TITLE: Record<Locale, string> = {
+  en: 'Median and best throughput',
+  zh: '吞吐量中位数与最佳值',
+};
+
 const STRINGS = {
   en: {
     sharedOnly: 'Shared cases only',
@@ -39,6 +47,9 @@ const STRINGS = {
     precision: 'Compute precision',
     normalized: 'Normalized',
     logScale: 'Log Scale',
+    summaryKey: 'Median (fill) and best (outline)',
+    summaryInfo:
+      'With Shared cases only, every bar uses the cases measured on every selected accelerator and compute-bound on each. Without it, each accelerator uses its own compute-bound cases, so the case sets differ.',
     intensityAxis: 'Arithmetic intensity',
     shareAxis: 'Share of peak compute (%)',
     tflopsAxis: 'Achieved TFLOPS',
@@ -55,7 +66,10 @@ const STRINGS = {
     empty: '没有同时带 FLOP 和字节数的用例',
     precision: '计算精度',
     normalized: '归一化',
-    logScale: '对数刻度',
+    logScale: '对数缩放',
+    summaryKey: '中位数（填充）与最佳值（轮廓）',
+    summaryInfo:
+      '开启“仅共同用例”时，所有柱使用在每个所选加速器上都有实测值、且在各加速器上均为计算受限的用例；关闭后，各加速器使用各自的计算受限用例，用例集合可能不同。',
     intensityAxis: '算术强度',
     shareAxis: '计算峰值占比（%）',
     tflopsAxis: '实测 TFLOPS',
@@ -124,6 +138,7 @@ export function Roofline({
   const logY = shareBoolean(search.get('scatterLog'), false);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
+  const chart = useRef<D3ChartHandle>(null);
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   // Each stage hits its own roof, so a case sits at its effective intensity: where the
   // device's roofline reaches the case's bound, F / t_roof (plain FLOP/byte for one stage).
@@ -153,7 +168,12 @@ export function Roofline({
     () => rooflineSummary(view, { precision, hardware: model.hardware, sharedOnly, normalized }),
     [view, precision, model.hardware, normalized, sharedOnly],
   );
-  if (!precision) return <EmptyChart>{strings.empty}</EmptyChart>;
+  if (!precision)
+    return (
+      <EmptyState title={(summaryOnly ? SUMMARY_TITLE : ROOFLINE_TITLE)[locale]}>
+        {strings.empty}
+      </EmptyState>
+    );
   const composite = view.cases.some(
     (c) => (c.work?.parts.length ?? 0) > 1 || (c.work?.links.length ?? 0) > 0,
   );
@@ -208,189 +228,179 @@ export function Roofline({
       const below = line[cut - 1];
       rooflines[hw] = [{ x: (below.x * yLo) / below.y, y: yLo }, ...line.slice(cut)];
     }
+  const chartId = summaryOnly ? 'operatorx-roofline-summary' : 'operatorx-roofline';
+  const switches: LegendSwitchConfig[] = [
+    {
+      id: summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized',
+      label: strings.normalized,
+      checked: normalized,
+      onCheckedChange: (enabled) => {
+        track('operatorx_roofline_normalized_toggled', { enabled });
+        setSearchParam(`${prefix}Normalized`, String(enabled));
+      },
+    },
+    summaryOnly
+      ? {
+          id: 'opx-summary-shared',
+          label: strings.sharedOnly,
+          checked: sharedOnly,
+          onCheckedChange: (enabled) => {
+            track('operatorx_summary_shared_toggled', { enabled });
+            setSearchParam('summarySharedOnly', String(enabled));
+          },
+        }
+      : {
+          id: 'opx-roofline-log',
+          label: strings.logScale,
+          checked: logY,
+          onCheckedChange: (enabled) => {
+            track('operatorx_roofline_log_toggled', { enabled });
+            setSearchParam('scatterLog', String(enabled));
+          },
+        },
+  ];
+  const legend = (
+    <ChartLegend
+      variant="sidebar"
+      isLegendExpanded={legendExpanded}
+      onExpandedChange={setLegendExpanded}
+      switches={switches}
+      // Scatter points without a connecting line keep dot swatches.
+      {...hardwareLegend(model, legendId, summaryOnly || normalized ? undefined : ROOF_DASH)}
+    />
+  );
+  const caption = (
+    <VizCaption
+      title={(summaryOnly ? SUMMARY_TITLE : ROOFLINE_TITLE)[locale]}
+      qualifier={summaryOnly ? strings.summaryKey : undefined}
+      info={summaryOnly ? strings.summaryInfo : undefined}
+    >
+      <SegmentedToggle
+        value={precision}
+        onValueChange={(value) => {
+          track('operatorx_roofline_precision_selected', { precision: value });
+          setSearchParam(`${prefix}Precision`, value);
+        }}
+        ariaLabel={strings.precision}
+        options={precisions.map((p) => ({ value: p, label: p }))}
+      />
+    </VizCaption>
+  );
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <SegmentedToggle
-          value={precision}
-          onValueChange={(value) => {
-            track('operatorx_roofline_precision_selected', { precision: value });
-            setSearchParam(`${prefix}Precision`, value);
-          }}
-          ariaLabel={strings.precision}
-          options={precisions.map((p) => ({ value: p, label: p }))}
-        />
-        <div className="flex items-center gap-2">
-          <Switch
-            id={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
-            checked={normalized}
-            onCheckedChange={(enabled) => {
-              track('operatorx_roofline_normalized_toggled', { enabled });
-              setSearchParam(`${prefix}Normalized`, String(enabled));
-            }}
-          />
-          <Label
-            htmlFor={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
-            className="text-sm font-normal text-muted-foreground"
-          >
-            {strings.normalized}
-          </Label>
-        </div>
-        {!summaryOnly && (
-          <div className="flex items-center gap-2">
-            <Switch
-              id="opx-roofline-log"
-              checked={logY}
-              onCheckedChange={(enabled) => {
-                track('operatorx_roofline_log_toggled', { enabled });
-                setSearchParam('scatterLog', String(enabled));
-              }}
-            />
-            <Label htmlFor="opx-roofline-log" className="text-sm font-normal text-muted-foreground">
-              {strings.logScale}
-            </Label>
-          </div>
-        )}
-        {summaryOnly && (
-          <div className="flex items-center gap-2">
-            <Switch
-              id="opx-summary-shared"
-              checked={sharedOnly}
-              onCheckedChange={(enabled) => {
-                track('operatorx_summary_shared_toggled', { enabled });
-                setSearchParam('summarySharedOnly', String(enabled));
-              }}
-            />
-            <Label
-              htmlFor="opx-summary-shared"
-              className="text-sm font-normal text-muted-foreground"
-            >
-              {strings.sharedOnly}
-            </Label>
-          </div>
-        )}
-      </div>
+    <ChartSection
+      chartId={chartId}
+      analyticsPrefix="operatorx"
+      exportFileName={`InferenceX_${chartId}`}
+      setIsLegendExpanded={setLegendExpanded}
+      zoomResetEvent={`d3chart_zoom_reset_${chartId}`}
+    >
       {summaryOnly ? (
-        <RooflineBars model={model} summary={summary} />
+        <RooflineBars model={model} summary={summary} caption={caption} legend={legend} />
       ) : (
-        <div className="min-w-0">
-          <OpxChart<Point>
-            inspect={{ model, caseOf: (p) => p.i }}
-            chartId="operatorx-roofline"
-            data={shown}
-            height={400}
-            margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
-            xScale={{ type: 'log', domain: [a0, a1], nice: false }}
-            yScale={
-              logY
-                ? {
-                    type: 'log',
-                    domain: [yLo, yHi],
-                    nice: false,
-                  }
-                : { type: 'sqrt', domain: [0, yHi], nice: false }
-            }
-            xAxis={
-              normalized
-                ? {
-                    label: strings.intensityAxis,
-                    tickFormat: (v) => ratio(Number(v)),
-                  }
-                : {
-                    label: `${strings.intensityAxis}${strings.aside('FLOP/byte')}`,
-                    tickFormat: (v) => formatCompact(Number(v)),
-                  }
-            }
-            yAxis={
-              normalized
-                ? {
-                    label: strings.shareAxis,
-                    tickCount: 6,
-                    tickFormat: (v) => ratio(Number(v) * 100),
-                  }
-                : {
-                    label: strings.tflopsAxis,
-                    tickCount: 6,
-                    tickFormat: (v) => formatCompact(Number(v)),
-                  }
-            }
-            layers={[
-              {
-                type: 'roofline',
-                key: 'roofs',
-                rooflines,
-                config: {
-                  getColor: (hw) =>
-                    hw === SHARED
-                      ? 'var(--muted-foreground)'
-                      : (model.colors[hw] ?? 'var(--muted-foreground)'),
-                  strokeWidth: 2,
-                  strokeDasharray: ROOF_DASH,
-                  curve: curveLinear,
-                },
+        <D3Chart<Point>
+          ref={chart}
+          chartId={chartId}
+          caption={caption}
+          footer={<VizFooter />}
+          watermark={getChartWatermark()}
+          data={shown}
+          margin={SCATTER_MARGIN}
+          zoom={{ enabled: true }}
+          xScale={{ type: 'log', domain: [a0, a1], nice: false }}
+          yScale={
+            logY
+              ? { type: 'log', domain: [yLo, yHi], nice: false }
+              : { type: 'sqrt', domain: [0, yHi], nice: false }
+          }
+          xAxis={
+            normalized
+              ? {
+                  label: strings.intensityAxis,
+                  tickValues: logAxisTicks,
+                  tickFormat: (v) => ratio(Number(v)),
+                }
+              : {
+                  label: `${strings.intensityAxis}${strings.aside('FLOP/byte')}`,
+                  tickValues: logAxisTicks,
+                  tickFormat: (v) => formatCompact(Number(v)),
+                }
+          }
+          yAxis={{
+            label: normalized ? strings.shareAxis : strings.tflopsAxis,
+            tickCount: 6,
+            tickValues: logY ? logAxisTicks : undefined,
+            tickFormat: (v) => (normalized ? ratio(Number(v) * 100) : formatCompact(Number(v))),
+          }}
+          layers={[
+            {
+              type: 'roofline',
+              key: 'roofs',
+              rooflines,
+              config: {
+                getColor: (hw) =>
+                  hw === SHARED
+                    ? 'var(--muted-foreground)'
+                    : (model.colors[hw] ?? 'var(--muted-foreground)'),
+                strokeWidth: 2,
+                strokeDasharray: ROOF_DASH,
+                curve: curveLinear,
               },
-              {
-                type: 'point',
-                key: 'points',
-                data: shown,
-                config: {
-                  getCx: () => 0,
-                  getCy: () => 0,
-                  getX: (p) => p.x,
-                  getY: (p) => p.y,
-                  getColor: (p) => model.colors[p.hw],
-                  getRadius: () => 3,
-                  keyFn: (p) => `${p.hw}-${p.i}`,
-                  maxPoints: Infinity,
-                },
+            },
+            {
+              type: 'point',
+              key: 'points',
+              data: shown,
+              config: {
+                getCx: () => 0,
+                getCy: () => 0,
+                getX: (p) => p.x,
+                getY: (p) => p.y,
+                getColor: (p) => model.colors[p.hw],
+                getRadius: () => 3,
+                keyFn: (p) => `${p.hw}-${p.i}`,
+                maxPoints: Infinity,
               },
-            ]}
-            tooltip={{
-              rulerType: 'none',
-              attachToLayer: 1,
-              content: (p) => {
-                const peak = peakTflops(p.hw, precision);
-                const bw = peakBandwidthTBs(p.hw);
-                const c = view.cases[p.i];
-                const tbs = c.bytes! / (p.us * 1e6);
-                return chartHoverCard({
-                  title: hardwareLabel(p.hw),
-                  subtitle: `${c.shape} · ${c.precision}`,
-                  color: model.colors[p.hw],
-                  metrics: [
-                    {
-                      value: p.tflops.toFixed(1),
-                      label: `TFLOPS${share(p.tflops, peak, 'compute')}`,
-                    },
-                    { value: tbs.toFixed(2), label: `TB/s${share(tbs, bw, 'bandwidth')}` },
-                  ],
-                  summary: [
-                    originText(view, p.i, locale),
-                    `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? strings.effective(p.ai.toFixed(0)) : ''}`,
-                    ...(p.bound ? [boundText(p.bound, p.us, strings)] : []),
-                  ].join(' · '),
-                });
-              },
-            }}
-            legendElement={
-              <ChartLegend
-                variant="sidebar"
-                isLegendExpanded={legendExpanded}
-                onExpandedChange={setLegendExpanded}
-                {...hardwareLegend(model, legendId, normalized ? undefined : ROOF_DASH)}
-              />
-            }
-          />
-        </div>
+            },
+          ]}
+          tooltip={{
+            rulerType: 'none',
+            attachToLayer: 1,
+            ...inspectCase(model, (p: Point) => p.i, chart),
+            content: (p) => {
+              const peak = peakTflops(p.hw, precision);
+              const bw = peakBandwidthTBs(p.hw);
+              const c = view.cases[p.i];
+              const tbs = c.bytes! / (p.us * 1e6);
+              return chartHoverCard({
+                title: hardwareLabel(p.hw),
+                subtitle: `${c.shape} · ${c.precision}`,
+                color: model.colors[p.hw],
+                metrics: [
+                  {
+                    value: p.tflops.toFixed(1),
+                    label: `TFLOPS${share(p.tflops, peak, 'compute')}`,
+                  },
+                  { value: tbs.toFixed(2), label: `TB/s${share(tbs, bw, 'bandwidth')}` },
+                ],
+                summary: [
+                  originText(view, p.i, locale),
+                  `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? strings.effective(p.ai.toFixed(0)) : ''}`,
+                  ...(p.bound ? [boundText(p.bound, p.us, strings)] : []),
+                ].join(' · '),
+              });
+            },
+          }}
+          legendElement={legend}
+        />
       )}
-    </div>
+    </ChartSection>
   );
 }
 
 export const roofline: VizDefinition = {
   id: 'roofline',
-  title: { en: 'Roofline', zh: 'Roofline' },
+  title: ROOFLINE_TITLE,
   ops: ['gemm', 'moe', 'attention'],
-  wide: true,
+  skeletonClassName: 'h-[600px]',
   Component: Roofline,
 };

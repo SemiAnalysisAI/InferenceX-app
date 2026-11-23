@@ -12,7 +12,6 @@ import { ControlPanel } from '@/components/ui/control-panel';
 import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
-import { Label } from '@/components/ui/label';
 import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -25,6 +24,7 @@ import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
+import { ControlGroup, OperatorXHeader } from './OperatorXHeader';
 import {
   hardwareLabel,
   operatorXColors,
@@ -58,6 +58,15 @@ const STRINGS = {
     none: 'None',
     oneDevice: '1 GPU',
     loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
+    tooltips: {
+      workload: 'The model, or shape list, whose operator shapes are compared.',
+      devices:
+        'How many GPUs each case is split across (tensor, data, expert or context parallel).',
+      metric:
+        'The value plotted for each case. Throughput is useful FLOPs over measured latency, per GPU.',
+      baseline:
+        'The GPU the other GPUs are compared to. Picking one adds the Advantage over baseline chart.',
+    },
   },
   zh: {
     loading: '正在加载结果…',
@@ -70,37 +79,14 @@ const STRINGS = {
     none: '无',
     oneDevice: '单 GPU',
     loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
+    tooltips: {
+      workload: '参与对比的算子形状所属的模型或形状列表。',
+      devices: '每个用例切分到的 GPU 数量（张量、数据、专家或上下文并行）。',
+      metric: '每个用例绘制的数值。吞吐量为有效 FLOPs 除以实测延迟，按单 GPU 计算。',
+      baseline: '其他 GPU 与之对比的基准 GPU。选择后会增加“相对基线的优势”图。',
+    },
   },
 };
-
-// Literal class names so Tailwind generates them.
-const SPAN_CLASS = {
-  5: 'lg:col-span-5',
-  6: 'lg:col-span-6',
-  7: 'lg:col-span-7',
-  12: 'lg:col-span-12',
-} as const;
-
-type Span = keyof typeof SPAN_CLASS;
-
-function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] {
-  const out = visible.map((viz) => ({ viz, span: (viz.wide ? 12 : 6) as Span }));
-  let run: typeof out = [];
-  for (const card of [...out, null]) {
-    if (card && card.span !== 12) {
-      run.push(card);
-      continue;
-    }
-    if (run.length % 2 === 1) run.at(-1)!.span = 12;
-    for (let i = 0; i + 1 < run.length; i += 2) {
-      const [first, second] = [run[i], run[i + 1]];
-      first.span = first.viz.span ?? (second.viz.span ? ((12 - second.viz.span) as Span) : 6);
-      second.span = (12 - first.span) as Span;
-    }
-    run = [];
-  }
-  return out;
-}
 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
@@ -127,36 +113,21 @@ function setParallel(value: string) {
   replaceClientSearch(params);
 }
 
-function ControlGroup({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  children: React.ReactNode;
-}) {
+/** A chart's placeholder: its card and title over the plot's height, like the inference charts'. */
+function VizSkeleton({ viz, testId }: { viz: VizDefinition; testId?: string }) {
   return (
-    <div className="min-w-0 space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
+    <Card data-testid={testId}>
+      <Heading as="h2" level="card">
+        {viz.title[useLocale()]}
+      </Heading>
+      <Skeleton aria-hidden="true" className={viz.skeletonClassName} />
+    </Card>
   );
 }
 
+/** Charts below the first mount once they come within 300px of the viewport, or on focus. */
 const VizCard = memo(
-  ({
-    model,
-    viz,
-    span,
-    eager,
-  }: {
-    model: ComparisonModel;
-    viz: VizDefinition;
-    span: Span;
-    eager: boolean;
-  }) => {
-    const locale = useLocale();
+  ({ model, viz, eager }: { model: ComparisonModel; viz: VizDefinition; eager: boolean }) => {
     const [mounted, setMounted] = useState(eager);
     const card = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -177,31 +148,19 @@ const VizCard = memo(
       return () => observer.disconnect();
     }, [eager, mounted]);
     return (
-      <Card
+      <div
         ref={card}
         data-testid={`operatorx-viz-${viz.id}`}
         aria-busy={!mounted}
-        aria-labelledby={`operatorx-title-${viz.id}`}
         tabIndex={mounted ? undefined : 0}
         onFocus={() => setMounted(true)}
-        className={`min-w-0 ${SPAN_CLASS[span]}`}
+        className="min-w-0"
       >
-        <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
-          {viz.title[locale]}
-        </Heading>
-        {mounted ? (
-          <viz.Component model={model} />
-        ) : (
-          <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
-        )}
-      </Card>
+        {mounted ? <viz.Component model={model} /> : <VizSkeleton viz={viz} />}
+      </div>
     );
   },
 );
-
-function vizSkeletonClass(viz: VizDefinition): string {
-  return viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]';
-}
 
 function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDefinition[] {
   return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
@@ -210,13 +169,12 @@ function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDe
 const CONTROL_LABELS = ['workload', 'devices', 'metric', 'baseline'] as const;
 
 /**
- * Loading state laid out like the loaded dashboard (controls card, then the card grid with
- * each chart's placeholder height), so the content that replaces it does not move the cards
- * or the footer under a reader who has already scrolled.
+ * Loading state laid out like the loaded dashboard (header and controls card, then each
+ * chart's placeholder), so the content that replaces it does not move the cards or the
+ * footer under a reader who has already scrolled.
  */
 function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
-  const locale = useLocale();
-  const strings = STRINGS[locale];
+  const strings = STRINGS[useLocale()];
   return (
     <div
       className="flex flex-col gap-4"
@@ -224,36 +182,24 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
       aria-busy="true"
       aria-label={strings.loading}
     >
-      <Card className="relative z-10 py-4 md:py-5">
+      <OperatorXHeader>
         <ControlPanel
           legend={strings.controlsGroup}
           className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
         >
           {CONTROL_LABELS.map((key) => (
-            <div key={key} className="min-w-0 space-y-1.5">
-              <Label>{strings[key]}</Label>
+            <ControlGroup key={key} label={strings[key]} tooltip={strings.tooltips[key]}>
               <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
-            </div>
+            </ControlGroup>
           ))}
         </ControlPanel>
-        <div className="mt-4 border-t border-border/30 pt-3">
+        <div className="border-t border-border/30 pt-3">
           <Skeleton aria-hidden="true" className="h-[106px] lg:h-[62px]" />
         </div>
-      </Card>
-      <div className="grid gap-4 lg:grid-cols-12">
-        {layout(visibleVisualizations(op, null)).map(({ viz, span }) => (
-          <Card
-            key={viz.id}
-            data-testid={`operatorx-viz-skeleton-${viz.id}`}
-            className={`min-w-0 ${SPAN_CLASS[span]}`}
-          >
-            <Heading as="h2" level="card" className="mb-4">
-              {viz.title[locale]}
-            </Heading>
-            <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
-          </Card>
-        ))}
-      </div>
+      </OperatorXHeader>
+      {visibleVisualizations(op, null).map((viz) => (
+        <VizSkeleton key={viz.id} viz={viz} testId={`operatorx-viz-skeleton-${viz.id}`} />
+      ))}
     </div>
   );
 }
@@ -334,27 +280,41 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
 
   if (error)
     return (
-      <RetryableQueryError
-        message={error.message}
-        analyticsEvent="operatorx_comparison_retry"
-        onRetry={refetch}
-        testId="operatorx-comparison-error"
-      />
+      <>
+        <OperatorXHeader />
+        <RetryableQueryError
+          message={error.message}
+          analyticsEvent="operatorx_comparison_retry"
+          onRetry={refetch}
+          testId="operatorx-comparison-error"
+        />
+      </>
     );
   if (isLoading || !view || !model) return <ComparisonSkeleton op={op} />;
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;
-  if (view.workloads.length === 0) return <EmptyState>{strings.empty}</EmptyState>;
+  if (view.workloads.length === 0)
+    return (
+      <>
+        <OperatorXHeader />
+        <EmptyState>{strings.empty}</EmptyState>
+      </>
+    );
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
+      <OperatorXHeader>
         <ControlPanel
           legend={strings.controlsGroup}
           className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+          data-testid="operatorx-controls"
         >
-          <ControlGroup label={strings.workload} htmlFor="operatorx-workload">
+          <ControlGroup
+            label={strings.workload}
+            tooltip={strings.tooltips.workload}
+            htmlFor="operatorx-workload"
+          >
             <SearchableSelect
               triggerId="operatorx-workload"
               value={pending?.id ?? view.workload ?? ''}
@@ -373,7 +333,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label={strings.devices} htmlFor="operatorx-parallel">
+          <ControlGroup
+            label={strings.devices}
+            tooltip={strings.tooltips.devices}
+            htmlFor="operatorx-parallel"
+          >
             <SearchableSelect
               triggerId="operatorx-parallel"
               value={view.parallel || ONE_DEVICE}
@@ -393,7 +357,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label={strings.metric} htmlFor="operatorx-metric">
+          <ControlGroup
+            label={strings.metric}
+            tooltip={strings.tooltips.metric}
+            htmlFor="operatorx-metric"
+          >
             <SearchableSelect
               triggerId="operatorx-metric"
               value={metric.id}
@@ -415,7 +383,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             />
           </ControlGroup>
 
-          <ControlGroup label={strings.baseline} htmlFor="operatorx-baseline">
+          <ControlGroup
+            label={strings.baseline}
+            tooltip={strings.tooltips.baseline}
+            htmlFor="operatorx-baseline"
+          >
             <SearchableSelect
               triggerId="operatorx-baseline"
               value={baseline ?? NO_BASELINE}
@@ -436,14 +408,14 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             />
           </ControlGroup>
         </ControlPanel>
-        <div className="mt-4 border-t border-border/30 pt-3">
+        <div className="border-t border-border/30 pt-3">
           <CoverageStrip model={model} />
         </div>
-      </Card>
+      </OperatorXHeader>
       <Pending active={switching} label={strings.loadingWorkload(pending?.label)}>
-        <div className="grid gap-4 lg:grid-cols-12">
-          {layout(visibleVisualizations(op, baseline)).map(({ viz, span }, index) => (
-            <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />
+        <div className="flex flex-col gap-4">
+          {visibleVisualizations(op, baseline).map((viz, index) => (
+            <VizCard key={viz.id} model={model} viz={viz} eager={index === 0} />
           ))}
         </div>
       </Pending>

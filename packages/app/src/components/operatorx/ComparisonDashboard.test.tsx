@@ -47,6 +47,7 @@ mock.module('./viz', () => ({
       id: 'probe',
       title: { en: 'Probe', zh: 'Probe' },
       ops: ['gemm'],
+      skeletonClassName: 'h-[600px]',
       Component: ({ model }) => {
         state.models.push(model);
         return null;
@@ -237,9 +238,13 @@ describe('ComparisonDashboard live state', () => {
 });
 
 describe('ComparisonDashboard loading state', () => {
-  it('lays out the controls and every chart card the loaded dashboard shows', () => {
-    const loadedCard = container.querySelector('[data-testid="operatorx-viz-probe"]');
-    expect(loadedCard).not.toBeNull();
+  it('lays out the header controls and every chart placeholder the loaded dashboard shows', () => {
+    expect(container.querySelector('[data-testid="operatorx-viz-probe"]')).not.toBeNull();
+    // Controls share the page header card, as on the inference page.
+    const controls = container.querySelector('[data-testid="operatorx-controls"]');
+    expect(controls?.closest('[data-slot="card"]')?.querySelector('h1')?.textContent).toContain(
+      'OperatorX',
+    );
 
     act(() => root.unmount());
     root = createRoot(container);
@@ -248,14 +253,14 @@ describe('ComparisonDashboard loading state', () => {
 
     const loading = container.querySelector('[data-testid="operatorx-loading"]');
     expect(loading?.getAttribute('aria-busy')).toBe('true');
+    expect(loading?.querySelector('h1')?.textContent).toContain('OperatorX');
     expect(loading?.textContent).toContain('Workload');
     expect(loading?.textContent).toContain('Metric');
     expect(loading?.textContent).toContain('Baseline');
     const placeholder = container.querySelector('[data-testid="operatorx-viz-skeleton-probe"]');
     expect(placeholder?.textContent).toBe('Probe');
-    // Same grid span as the loaded card, so the card does not change width or row.
-    expect(placeholder?.className).toBe(loadedCard?.className);
-    expect(placeholder?.querySelector('[aria-hidden="true"]')?.className).toContain('h-[420px]');
+    // The placeholder keeps the chart's height, so the loaded chart does not move the page.
+    expect(placeholder?.querySelector('[aria-hidden="true"]')?.className).toContain('h-[600px]');
     expect(container.querySelector('[data-testid="operatorx-controls"]')).toBeNull();
   });
 });

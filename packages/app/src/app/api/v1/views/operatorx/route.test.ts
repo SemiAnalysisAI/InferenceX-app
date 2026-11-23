@@ -79,3 +79,15 @@ it('rejects an unknown precision or a malformed bin', async () => {
   expect(await get('bin=1.5')).toHaveProperty('status', 400);
   expect(await get('bin=-1')).toHaveProperty('status', 400);
 });
+
+it('resolves an InferenceX model from the page selector to its OperatorX family', async () => {
+  const glm = { ...row(64, 'bf16'), sources: [{ model: 'GLM-5.x', roles: ['attn'] }] };
+  mocked(getComparison).mockResolvedValue({ ...comparison(), rows: [glm] });
+  for (const model of ['GLM-5.2', 'glm-5.x']) {
+    const response = await get(`model=${model}`);
+    const body = await response.json();
+    expect(body.params.model).toBe('GLM-5.x');
+    expect(body.total).toBe(1);
+  }
+  expect(await get('model=Kimi-K2.5')).toHaveProperty('status', 400);
+});

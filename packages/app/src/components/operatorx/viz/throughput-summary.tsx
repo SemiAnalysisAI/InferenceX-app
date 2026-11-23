@@ -1,4 +1,4 @@
-import { Roofline } from './roofline';
+import { Roofline, SUMMARY_TITLE } from './roofline';
 import type { ComparisonModel } from '../compare/model';
 import type { VizDefinition } from './types';
 
@@ -8,7 +8,8 @@ function ThroughputSummary({ model }: { model: ComparisonModel }) {
 
 export const throughputSummary: VizDefinition = {
   id: 'throughput-summary',
-  title: { en: 'Median and best throughput', zh: '吞吐量中位数与最佳值' },
+  title: SUMMARY_TITLE,
   ops: ['gemm', 'moe', 'attention'],
+  skeletonClassName: 'h-80',
   Component: ThroughputSummary,
 };

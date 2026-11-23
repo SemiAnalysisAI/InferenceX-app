@@ -21,6 +21,7 @@ import {
   comparisonView,
   type ComparisonView,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { topLevelModel } from '@semianalysisai/inferencex-db/operatorx/workloads';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -156,10 +157,12 @@ export function GET(request: NextRequest) {
     const workload = s.get('workload');
     if (workload && !workloadIds.includes(workload))
       throw new ViewsApiParamError('workload', `Unknown workload: ${workload}`, workloadIds);
+    // The page's model selector lists InferenceX models, which OperatorX files under a family.
     const modelParam = s.get('model');
-    const model = modelParam
-      ? models.find((m) => m.toLowerCase() === modelParam.toLowerCase())
-      : null;
+    const names = modelParam
+      ? [modelParam, topLevelModel(modelParam)].map((m) => m.toLowerCase())
+      : [];
+    const model = modelParam ? models.find((m) => names.includes(m.toLowerCase())) : null;
     if (modelParam && !model)
       throw new ViewsApiParamError('model', `Unknown model: ${modelParam}`, models);
 

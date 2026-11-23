@@ -1,4 +1,7 @@
+import { topLevelModel } from '@semianalysisai/inferencex-db/operatorx/workloads';
+
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
+import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
 
 /** Address-bar params that keep the GPU picks and baseline, so share links reproduce them. */
 export const HARDWARE_PARAM = 'hardware';
@@ -20,4 +23,17 @@ export function setSearchParam(key: string, value: string | null): void {
 
 export function setPickedHardware(picked: string[] | null): void {
   setSearchParam(HARDWARE_PARAM, picked?.join(',') ?? null);
+}
+
+/**
+ * The listed model a Model View `model` param opens: the model itself; for a link that names an
+ * OperatorX family (`GLM-5.x`, from before the view used the inference model list), the first
+ * listed model of that family; otherwise the default model, or the first listed one.
+ */
+export function listedModel(requested: string, listed: readonly string[]): string | undefined {
+  if (listed.includes(requested)) return requested;
+  return (
+    listed.find((model) => topLevelModel(model) === requested) ??
+    (listed.includes(DEFAULT_OPERATORX_MODEL) ? DEFAULT_OPERATORX_MODEL : listed[0])
+  );
 }

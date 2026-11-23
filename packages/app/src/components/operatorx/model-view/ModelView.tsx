@@ -19,9 +19,13 @@ import type {
   ComputePrecision,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { compareSplits, parallelLabel } from '@semianalysisai/inferencex-db/operatorx/parallel';
+import { topLevelModel } from '@semianalysisai/inferencex-db/operatorx/workloads';
 import { BLOCK_COLORS } from '@/components/inference/ui/model-architecture-diagram-renderer';
+import { ModelArchitectureInfoLink } from '@/components/inference/ui/ModelArchitectureInfoLink';
 import { Card } from '@/components/ui/card';
+import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
 import {
   Dialog,
@@ -31,8 +35,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Heading } from '@/components/ui/heading';
-import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -43,12 +45,18 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { prefetchOperatorXTimelines } from '@/hooks/api/use-operatorx';
+import { useAvailability } from '@/hooks/api/use-availability';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { type Model, getModelLabel, isRegisteredModel } from '@/lib/catalog/data-mappings';
+import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { resolveAvailableModels, selectableInferenceModels } from '@/providers/GlobalFilterContext';
 
 import { CaseDetail } from '../CaseDetail';
+import { ControlGroup, OperatorXHeader } from '../OperatorXHeader';
 import {
   hardwareLabel,
   measuredHardware,
@@ -61,7 +69,12 @@ import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
 import { slices } from '../compare/slices';
 import { shareBin, shareBoolean, sharePrecision } from '@/lib/operatorx/share-state';
-import { HARDWARE_PARAM, parsePickedHardware, setPickedHardware } from '../compare/url-selection';
+import {
+  HARDWARE_PARAM,
+  listedModel,
+  parsePickedHardware,
+  setPickedHardware,
+} from '../compare/url-selection';
 import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
@@ -102,8 +115,14 @@ const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
 const STRINGS = {
   en: {
     empty: 'No results yet',
-    model: 'Model',
+    noModelResults: (model: string) => `No OperatorX results for ${model} yet`,
+    controlsGroup: 'Model config',
     devices: 'Devices',
+    devicesTooltip:
+      'How many GPUs each case is split across (tensor, data, expert or context parallel).',
+    metricTooltip:
+      'The value each row shows: the median over its cases. Throughput is useful FLOPs over measured latency, per GPU.',
+    precisionTooltip: 'The compute precision of the cases the rows show.',
     metric: 'Metric',
     precision: 'Precision',
     computePrecision: 'Compute precision',
@@ -138,8 +157,13 @@ const STRINGS = {
   },
   zh: {
     empty: '暂无结果',
-    model: '模型',
+    noModelResults: (model: string) => `${model} 暂无 OperatorX 结果`,
+    controlsGroup: '模型配置',
     devices: '设备',
+    devicesTooltip: '每个用例切分到的 GPU 数量（张量、数据、专家或上下文并行）。',
+    metricTooltip:
+      '每行显示的数值，取其各用例的中位数。吞吐量为有效 FLOPs 除以实测延迟，按单 GPU 计算。',
+    precisionTooltip: '各行所示用例的计算精度。',
     metric: '指标',
     precision: '精度',
     computePrecision: '计算精度',
@@ -197,23 +221,6 @@ function setParallel(value: string) {
   if (value === ONE_DEVICE) params.delete('parallel');
   else params.set('parallel', value);
   replaceClientSearch(params);
-}
-
-function ControlGroup({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0 space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
 }
 
 /** A slot resolved against the data: its cases, and those at the selected size. */
@@ -821,6 +828,16 @@ const BlockRows = memo(
   },
 );
 
+/** The inference page's model list, from the same availability and feature gate. */
+function useModelOptions(): string[] {
+  const { data: availability } = useAvailability();
+  const unlocked = useFeatureGate();
+  return useMemo(
+    () => selectableInferenceModels(resolveAvailableModels(availability, [], unlocked), unlocked),
+    [availability, unlocked],
+  );
+}
+
 const ModelControls = memo(
   ({
     requested,
@@ -843,74 +860,93 @@ const ModelControls = memo(
     locale: Locale;
     onPrecision: (precision: ComputePrecision) => void;
   }) => (
-    <Card className="relative z-10 py-4 md:py-5">
-      <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ControlGroup label={STRINGS[locale].model} htmlFor="operatorx-model">
-          <SearchableSelect
-            triggerId="operatorx-model"
-            value={requested}
+    <ControlPanel
+      legend={STRINGS[locale].controlsGroup}
+      className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5"
+      data-testid="operatorx-model-controls"
+    >
+      <ModelSelector
+        id="operatorx-model"
+        value={requested}
+        onChange={(v) => {
+          track('operatorx_model_selected', { model: v });
+          setParam('model', v);
+        }}
+        availableModels={modelOptions}
+        data-testid="operatorx-model"
+        trailing={
+          isRegisteredModel(requested) ? (
+            <ModelArchitectureInfoLink model={requested} locale={locale} />
+          ) : undefined
+        }
+        newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
+      />
+      <ControlGroup
+        label={STRINGS[locale].devices}
+        tooltip={STRINGS[locale].devicesTooltip}
+        htmlFor="operatorx-model-parallel"
+      >
+        <SearchableSelect
+          triggerId="operatorx-model-parallel"
+          value={split || ONE_DEVICE}
+          onValueChange={(v) => {
+            track('operatorx_parallel_selected', { op: 'model', parallel: v });
+            setParallel(v);
+          }}
+          searchable={false}
+          groups={[
+            {
+              label: '',
+              options: splits.map((o) => ({
+                value: o.key || ONE_DEVICE,
+                label: o.key ? o.label : STRINGS[locale].oneDevice,
+              })),
+            },
+          ]}
+        />
+      </ControlGroup>
+      <ControlGroup
+        label={STRINGS[locale].metric}
+        tooltip={STRINGS[locale].metricTooltip}
+        htmlFor="operatorx-metric"
+      >
+        <SearchableSelect
+          triggerId="operatorx-metric"
+          value={metric}
+          onValueChange={(v) => {
+            track('operatorx_metric_selected', { op: 'model', metric: v });
+            setParam('metric', v);
+          }}
+          searchable={false}
+          groups={[
+            {
+              label: '',
+              options: METRICS.map((m) => ({
+                value: m.id,
+                label: STRINGS[locale].metricOption(m.label[locale], m.unit),
+              })),
+            },
+          ]}
+        />
+      </ControlGroup>
+      <ControlGroup
+        label={STRINGS[locale].precision}
+        tooltip={STRINGS[locale].precisionTooltip}
+        htmlFor="operatorx-model-precision"
+      >
+        {precision && (
+          <SegmentedToggle
+            value={precision}
             onValueChange={(v) => {
-              track('operatorx_model_selected', { model: v });
-              setParam('model', v);
+              track('operatorx_model_precision_selected', { precision: v });
+              onPrecision(v);
             }}
-            groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
+            ariaLabel={STRINGS[locale].computePrecision}
+            options={precisions.map((p) => ({ value: p, label: p }))}
           />
-        </ControlGroup>
-        <ControlGroup label={STRINGS[locale].devices} htmlFor="operatorx-model-parallel">
-          <SearchableSelect
-            triggerId="operatorx-model-parallel"
-            value={split || ONE_DEVICE}
-            onValueChange={(v) => {
-              track('operatorx_parallel_selected', { op: 'model', parallel: v });
-              setParallel(v);
-            }}
-            searchable={false}
-            groups={[
-              {
-                label: '',
-                options: splits.map((o) => ({
-                  value: o.key || ONE_DEVICE,
-                  label: o.key ? o.label : STRINGS[locale].oneDevice,
-                })),
-              },
-            ]}
-          />
-        </ControlGroup>
-        <ControlGroup label={STRINGS[locale].metric} htmlFor="operatorx-metric">
-          <SearchableSelect
-            triggerId="operatorx-metric"
-            value={metric}
-            onValueChange={(v) => {
-              track('operatorx_metric_selected', { op: 'model', metric: v });
-              setParam('metric', v);
-            }}
-            searchable={false}
-            groups={[
-              {
-                label: '',
-                options: METRICS.map((m) => ({
-                  value: m.id,
-                  label: STRINGS[locale].metricOption(m.label[locale], m.unit),
-                })),
-              },
-            ]}
-          />
-        </ControlGroup>
-        <ControlGroup label={STRINGS[locale].precision} htmlFor="operatorx-model-precision">
-          {precision && (
-            <SegmentedToggle
-              value={precision}
-              onValueChange={(v) => {
-                track('operatorx_model_precision_selected', { precision: v });
-                onPrecision(v);
-              }}
-              ariaLabel={STRINGS[locale].computePrecision}
-              options={precisions.map((p) => ({ value: p, label: p }))}
-            />
-          )}
-        </ControlGroup>
-      </div>
-    </Card>
+        )}
+      </ControlGroup>
+    </ControlPanel>
   ),
 );
 
@@ -1049,20 +1085,8 @@ const SlotDetail = memo(
                   </p>
                 )}
               </div>
-              <div className="space-y-6">
-                <section className="space-y-2">
-                  <Heading as="h3" level="card">
-                    {roofline.title[locale]}
-                  </Heading>
-                  <roofline.Component model={sub.model} />
-                </section>
-                <section className="space-y-2">
-                  <Heading as="h3" level="card">
-                    {metricVsSize.title[locale]}
-                  </Heading>
-                  <metricVsSize.Component model={sub.model} />
-                </section>
-              </div>
+              <roofline.Component model={sub.model} />
+              <metricVsSize.Component model={sub.model} />
               <CaseDetail
                 op={sub.op}
                 view={sub.model.view}
@@ -1090,6 +1114,8 @@ export function ModelView({
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const requested = search.get('model') ?? DEFAULT_OPERATORX_MODEL;
+  // OperatorX files a model's cases under its checkpoint family (`GLM-5.x` for GLM-5 and 5.2).
+  const family = topLevelModel(requested);
   const requestedSplit = search.get('parallel');
   const isDark = isDarkTheme(useTheme().resolvedTheme);
   // GPU picks live in the address bar so share links reproduce them.
@@ -1100,11 +1126,13 @@ export function ModelView({
   const pickedBin = shareBin(search.get('modelBin'));
   const sweep = shareBoolean(search.get('modelSweep'), false);
 
-  // Device splits any of the model's ops has cases at; one device by default.
+  // Device splits any of the model's ops has cases at; one device by default, and for a
+  // model without results.
   const splits = useMemo(() => {
     const keys = new Set<string>();
     for (const v of [gemm.data, moe.data, attention.data])
       for (const o of v?.parallelOptions ?? []) keys.add(o.key);
+    if (keys.size === 0) keys.add('');
     return [...keys]
       .map((key) => ({ key, label: parallelLabel(key) }))
       .sort((a, b) => compareSplits(a.key, b.key));
@@ -1123,16 +1151,11 @@ export function ModelView({
   );
   // GPUs with results at the selected device split
   const atSplitViews = useMemo(() => views.filter((v) => v.parallel === split), [views, split]);
-  const modelOptions = useMemo(() => [...new Set(views.flatMap((v) => v.modelOptions))], [views]);
-  // a link to a model without results opens on one with results
-  const loaded = !gemm.isLoading && !moe.isLoading && !attention.isLoading;
+  const modelOptions = useModelOptions();
   useEffect(() => {
-    if (loaded && modelOptions.length > 0 && !modelOptions.includes(requested))
-      setParam(
-        'model',
-        modelOptions.includes(DEFAULT_OPERATORX_MODEL) ? DEFAULT_OPERATORX_MODEL : modelOptions[0],
-      );
-  }, [loaded, modelOptions, requested]);
+    const listed = listedModel(requested, modelOptions);
+    if (listed && listed !== requested) setParam('model', listed);
+  }, [modelOptions, requested]);
   // GPUs with measured results at the selected device split
   const available = useMemo(() => measuredHardware(atSplitViews), [atSplitViews]);
   const colors = useMemo(
@@ -1167,7 +1190,7 @@ export function ModelView({
   const arch = architecture(requested);
   // Fused ops the reader unfolded.
   const [openFolds, setOpenFolds] = useState<ReadonlySet<string>>(new Set());
-  const present = useMemo(() => measuredRoles(gemmView, requested), [gemmView, requested]);
+  const present = useMemo(() => measuredRoles(gemmView, family), [gemmView, family]);
   const hasMoe = (moe.data?.cases.length ?? 0) > 0;
   const blocks = useMemo(
     () => modelLayers(arch, present, attentionView, requested, hasMoe, openFolds),
@@ -1215,9 +1238,9 @@ export function ModelView({
   const slotIndices = useMemo(() => {
     const opViews = { gemm: gemmView, moe: moeView, attention: attentionView };
     return blocks.map((block) =>
-      block.spans.map(({ slot }) => slotCases(opViews[slot.op], slot, requested, precision)),
+      block.spans.map(({ slot }) => slotCases(opViews[slot.op], slot, family, precision)),
     );
-  }, [blocks, gemmView, moeView, attentionView, requested, precision]);
+  }, [blocks, gemmView, moeView, attentionView, family, precision]);
   const resolved = useMemo(
     () =>
       blocks.map((block, b) => ({
@@ -1301,100 +1324,110 @@ export function ModelView({
   const error = gemm.error ?? moe.error ?? attention.error;
   if (error)
     return (
-      <RetryableQueryError
-        message={error.message}
-        analyticsEvent="operatorx_model_view_retry"
-        onRetry={() => {
-          void gemm.refetch();
-          void moe.refetch();
-          void attention.refetch();
-        }}
-        testId="operatorx-model-view-error"
-      />
+      <>
+        <OperatorXHeader />
+        <RetryableQueryError
+          message={error.message}
+          analyticsEvent="operatorx_model_view_retry"
+          onRetry={() => {
+            void gemm.refetch();
+            void moe.refetch();
+            void attention.refetch();
+          }}
+          testId="operatorx-model-view-error"
+        />
+      </>
     );
   if (gemm.isLoading || moe.isLoading || attention.isLoading) return <ModelViewLoading />;
-  if (modelOptions.length === 0) return <EmptyState>{strings.empty}</EmptyState>;
 
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-4" data-testid="operatorx-model-view">
-        <ModelControls
-          requested={requested}
-          modelOptions={modelOptions}
-          split={split}
-          splits={splits}
-          metric={metric.id}
-          precision={precision}
-          precisions={precisions}
-          locale={locale}
-          onPrecision={setPrecision}
-        />
-        {/* Too narrow for the diagram beside its bars: the card scrolls sideways, not the page */}
-        <Card className="gap-3 max-md:overflow-x-auto" data-testid="operatorx-model-diagram">
-          <div className="flex flex-col gap-3 max-md:min-w-[36rem]">
-            <div
-              className={`max-md:static sticky top-14 z-20 -mx-2 grid ${ROW_GRID} items-end gap-x-4 rounded-md bg-card px-2 py-2`}
-            >
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                {available.map((hw) => (
-                  <button
-                    type="button"
-                    key={hw}
-                    aria-pressed={hardware.includes(hw)}
-                    onClick={() => toggle(hw, 'diagram')}
-                    className={`flex items-center gap-1.5 ${hardware.includes(hw) ? '' : 'opacity-40'}`}
-                    data-testid={`operatorx-model-gpu-${hw}`}
-                  >
-                    <span
-                      className="inline-block size-2 rounded-full"
-                      style={{ background: colors[hw] }}
+        <OperatorXHeader>
+          <ModelControls
+            requested={requested}
+            modelOptions={modelOptions}
+            split={split}
+            splits={splits}
+            metric={metric.id}
+            precision={precision}
+            precisions={precisions}
+            locale={locale}
+            onPrecision={setPrecision}
+          />
+        </OperatorXHeader>
+        {views.every((v) => v.cases.length === 0) ? (
+          <EmptyState className="min-h-80" data-testid="operatorx-model-empty">
+            {strings.noModelResults(getModelLabel(requested as Model))}
+          </EmptyState>
+        ) : (
+          /* Too narrow for the diagram beside its bars: the card scrolls sideways, not the page */
+          <Card className="gap-3 max-md:overflow-x-auto" data-testid="operatorx-model-diagram">
+            <div className="flex flex-col gap-3 max-md:min-w-[36rem]">
+              <div
+                className={`max-md:static sticky top-14 z-20 -mx-2 grid ${ROW_GRID} items-end gap-x-4 rounded-md bg-card px-2 py-2`}
+              >
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  {available.map((hw) => (
+                    <button
+                      type="button"
+                      key={hw}
+                      aria-pressed={hardware.includes(hw)}
+                      onClick={() => toggle(hw, 'diagram')}
+                      className={`flex items-center gap-1.5 ${hardware.includes(hw) ? '' : 'opacity-40'}`}
+                      data-testid={`operatorx-model-gpu-${hw}`}
+                    >
+                      <span
+                        className="inline-block size-2 rounded-full"
+                        style={{ background: colors[hw] }}
+                      />
+                      {hardwareLabel(hw)}
+                    </button>
+                  ))}
+                </div>
+                {bin === null ? (
+                  <div />
+                ) : (
+                  <SizeControls
+                    bins={bins}
+                    bin={bin}
+                    onChange={setBin}
+                    sweep={sweep}
+                    onSweep={toggleSweep}
+                  />
+                )}
+              </div>
+              <div className="flex flex-col">
+                {blocks.map((block, b) => (
+                  <div key={block.id}>
+                    {b > 0 && (
+                      <div className={`grid ${ROW_GRID} gap-x-4`}>
+                        {block.alternative ? (
+                          <span className="my-0.5 text-center text-xs text-muted-foreground">
+                            {strings.or}
+                          </span>
+                        ) : (
+                          <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
+                        )}
+                      </div>
+                    )}
+                    <BlockRows
+                      block={block}
+                      slots={slots.get(block.id) ?? []}
+                      tokens={tokens}
+                      range={range}
+                      lanes={hardware.length}
+                      isDark={isDark}
+                      onOpen={openSlot}
+                      onFold={toggleFold}
                     />
-                    {hardwareLabel(hw)}
-                  </button>
+                  </div>
                 ))}
               </div>
-              {bin === null ? (
-                <div />
-              ) : (
-                <SizeControls
-                  bins={bins}
-                  bin={bin}
-                  onChange={setBin}
-                  sweep={sweep}
-                  onSweep={toggleSweep}
-                />
-              )}
             </div>
-            <div className="flex flex-col">
-              {blocks.map((block, b) => (
-                <div key={block.id}>
-                  {b > 0 && (
-                    <div className={`grid ${ROW_GRID} gap-x-4`}>
-                      {block.alternative ? (
-                        <span className="my-0.5 text-center text-xs text-muted-foreground">
-                          {strings.or}
-                        </span>
-                      ) : (
-                        <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
-                      )}
-                    </div>
-                  )}
-                  <BlockRows
-                    block={block}
-                    slots={slots.get(block.id) ?? []}
-                    tokens={tokens}
-                    range={range}
-                    lanes={hardware.length}
-                    isDark={isDark}
-                    onOpen={openSlot}
-                    onFold={toggleFold}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-        <SlotDetail data={open} modelName={requested} onClose={closeSlot} />
+          </Card>
+        )}
+        <SlotDetail data={open} modelName={getModelLabel(requested as Model)} onClose={closeSlot} />
       </div>
     </TooltipProvider>
   );

@@ -54,8 +54,8 @@ const parameters: readonly ApiParameter[] = [
   ),
   query(
     'model',
-    'Model name from options.models, case-insensitive: every case the model contributes, across workloads. Mutually exclusive with workload.',
-    'options.models 中的模型名称，不区分大小写：返回该模型贡献的所有用例，跨工作负载。不能与 workload 同时使用。',
+    'Model name from options.models, case-insensitive, or an InferenceX model from the page selector, resolved to its OperatorX family: every case the model contributes, across workloads. Mutually exclusive with workload.',
+    'options.models 中的模型名称（不区分大小写），或页面模型选择器中的 InferenceX 模型（解析为对应的 OperatorX 模型系列）：返回该模型贡献的所有用例，跨工作负载。不能与 workload 同时使用。',
     stringSchema,
     'DeepSeek-V4-Pro',
   ),

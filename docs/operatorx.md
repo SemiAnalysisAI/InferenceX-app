@@ -340,6 +340,13 @@ dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并�
 
 ## Model View
 
+The Model selector is the inference page's: the same component, models, order and
+sections, including Maintenance Mode and Deprecated. `model` is that InferenceX model;
+OperatorX reads its checkpoint family (`topLevelModel`: GLM-5.2 and GLM-5.3 both read
+`GLM-5.x`). A family link such as `?model=GLM-5.x` opens on the family's first listed
+model, and an unknown name on DeepSeek-R1-0528. A listed model without OperatorX results
+shows an empty state.
+
 Beside each measured op, Model View shows one row per selected GPU at the token count
 the slider picks (half-octave size bins; each value is the GPU's median over the op's
 cases in that bin). The slider has one more step past the largest size, **All**: there
@@ -354,7 +361,12 @@ Clicking an op opens its detail for one shape swept over the token count (`m` fo
 configs, one per tensor-parallel degree (DeepSeek-R1 `o_proj` has `k` 16384, 4096, 2048
 and 1024), so the detail picks one, largest first, and lists the others to switch to.
 
-中文：Model View 在每个已测量算子旁，按滑块选择的 token 数为每个所选 GPU 显示一行
+中文：模型选择器与推理页面相同：组件、模型、顺序和分组（包括维护模式和已弃用）一致。
+`model` 取 InferenceX 模型名，OperatorX 读取其所属的 checkpoint 系列（`topLevelModel`：
+GLM-5.2 和 GLM-5.3 都读取 `GLM-5.x`）。`?model=GLM-5.x` 这类系列链接会打开该系列中
+第一个列出的模型，未知名称则打开 DeepSeek-R1-0528。列出但尚无 OperatorX 结果的模型显示空状态。
+
+Model View 在每个已测量算子旁，按滑块选择的 token 数为每个所选 GPU 显示一行
 （按半个倍频程分组；数值为该 GPU 在该组内各用例的中位数）。滑块在最大规模之后还有一档
 **全部**（英文页面为 All）：拖到这一档时，滑块下方出现共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU
 一条线，覆盖全部规模分组，横轴为对数 token 数，纵轴为对数指标并按行缩放，旁边标出该行的
@@ -376,7 +388,8 @@ TFLOPS, TB/s, roofline time and share (see Roofline), kernel, and the stored run
 and result index.
 
 - `op`: `gemm` (default), `moe` or `attention`.
-- `workload` (from `options.workloads`) or `model` (from `options.models`).
+- `workload` (from `options.workloads`) or `model` (from `options.models`, or an
+  InferenceX model from the page selector, resolved to its family).
 - `parallel`: `1` for one device (tp=dp=ep=dcp=1), or a split such as `tp8`.
 - `hardware`, `status` (`ok` by default, or `all`), `page` (100 rows), `format=csv`.
 
@@ -543,8 +556,10 @@ OperatorX 自身的写入才会使其缓存失效。Vercel 的 CDN 缓存键包�
 
 ### Progressive rendering and intent prefetch
 
-The first chart mounts eagerly; others mount within 300px of the viewport or on
-focus, then retain their controls. Without IntersectionObserver all charts render.
+Charts use the inference page's chart sections: PNG export, zoom on the scatter charts,
+the sidebar legend with each chart's switches, and the source footer. The first chart
+mounts eagerly; others mount within 300px of the viewport or on focus, then retain their
+controls. Without IntersectionObserver all charts render.
 Links to `/opx` and its categories, including the category switcher, prefetch the
 route and warm its comparison or model-view queries on intent (`prefetchRouteData`).
 API selectors, results, and click analytics are unaffected.

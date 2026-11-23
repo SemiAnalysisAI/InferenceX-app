@@ -1,20 +1,21 @@
 'use client';
 
-import { color, type ScaleBand, type ScaleContinuousNumeric } from 'd3';
+import type { ScaleBand, ScaleContinuousNumeric } from 'd3';
+import { type ReactNode, useRef } from 'react';
 
-import type { CustomLayerConfig } from '@/lib/d3-chart/D3Chart';
+import { EmptyState } from '@/components/ui/empty-state';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
+import { type CustomLayerConfig, D3Chart, type D3ChartHandle } from '@/lib/d3-chart/D3Chart';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { RooflineSummary, RooflineSummaryBar } from '@/lib/operatorx/roofline-summary';
-import { OpxChart } from '../charts/kit';
-import { EmptyChart } from '../charts/empty';
+import { VizFooter, inspectCase } from '../charts/kit';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
 
 const STRINGS = {
   en: {
-    title: 'Median (fill) and best (outline)',
-    individual: 'Each accelerator uses its own compute-bound cases',
     noData: 'No compute-bound measurements for this precision',
     empty: 'No shared compute-bound cases. Try selecting fewer accelerators or another precision.',
     missing: 'A compute or bandwidth reference is unavailable for',
@@ -24,8 +25,6 @@ const STRINGS = {
     normalized: 'Share of peak compute (%)',
   },
   zh: {
-    title: '中位数（填充）与最佳值（轮廓）',
-    individual: '各加速器使用各自的计算受限用例',
     noData: '此精度没有计算受限的实测用例',
     empty: '没有共同的计算受限用例。请减少所选加速器，或切换精度。',
     missing: '以下硬件缺少计算峰值或带宽参考值',
@@ -36,38 +35,19 @@ const STRINGS = {
   },
 };
 
-const linear = (v: number) =>
-  v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4;
-
-function foreground(fill: string): string {
-  const rgb = color(fill)?.rgb();
-  let channels: number[];
-  if (rgb) channels = [rgb.r, rgb.g, rgb.b];
-  else {
-    // The shared palette uses OKLCH, which d3-color cannot parse.
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const context = canvas.getContext('2d');
-    if (!context) return '#ffffff';
-    context.fillStyle = fill;
-    context.fillRect(0, 0, 1, 1);
-    channels = [...context.getImageData(0, 0, 1, 1).data];
-  }
-  const luminance =
-    0.2126 * linear(channels[0]) + 0.7152 * linear(channels[1]) + 0.0722 * linear(channels[2]);
-  return luminance > 0.179 ? '#111827' : '#ffffff';
-}
-
 export function RooflineBars({
   model,
   summary,
+  caption,
+  legend,
 }: {
   model: ComparisonModel;
   summary: RooflineSummary;
+  caption: ReactNode;
+  legend: ReactNode;
 }) {
-  const locale = useLocale();
-  const strings = STRINGS[locale];
+  const strings = STRINGS[useLocale()];
+  const chart = useRef<D3ChartHandle>(null);
   const format = (value: number) =>
     summary.normalized
       ? `${(value * 100).toFixed(1)}%`
@@ -137,7 +117,7 @@ export function RooflineBars({
         .style('fill', function (d) {
           const bar = this.parentElement?.querySelector('.summary-median');
           return fits(d)
-            ? foreground(bar ? getComputedStyle(bar).fill : model.colors[d.hardware])
+            ? readableTextColor(bar ? getComputedStyle(bar).fill : model.colors[d.hardware])
             : 'var(--foreground)';
         })
         .text((d) => format(d.median));
@@ -155,70 +135,68 @@ export function RooflineBars({
     },
   };
   return (
-    <section
-      // Hardware names share a row with the 12px median and best labels.
-      className="min-w-0 space-y-2 [&_.y-axis_.tick_text]:text-xs!"
-      data-testid="operatorx-roofline-summary"
-    >
-      <p className="text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{strings.title}</span>
-        {!summary.sharedOnly && ` · ${strings.individual}`}
-      </p>
-      {summary.bars.length === 0 ? (
-        <EmptyChart>
-          {summary.missingReferences.length > 0
-            ? `${strings.missing}: ${summary.missingReferences.map(hardwareLabel).join(', ')}`
-            : summary.sharedOnly
-              ? strings.empty
-              : strings.noData}
-        </EmptyChart>
-      ) : (
-        <OpxChart<RooflineSummaryBar>
-          chartId="operatorx-roofline-summary"
-          data={summary.bars}
-          inspect={{ model, caseOf: (d) => d.bestCaseIndex }}
-          height={Math.max(120, summary.bars.length * 30 + 52)}
-          clipContent={false}
-          margin={{ top: 4, right: 64, bottom: 48, left: 140 }}
-          xScale={{
-            type: 'linear',
-            domain: [0, Math.max(...summary.bars.map((b) => b.best)) * 1.04],
-            nice: true,
-          }}
-          yScale={{
-            type: 'band',
-            domain: summary.bars.map((b) => b.hardware).toReversed(),
-            padding: 0.35,
-          }}
-          xAxis={{
-            label: summary.normalized ? strings.normalized : strings.absolute,
-            tickCount: 4,
-            tickFormat: (v) =>
-              summary.normalized
-                ? `${Math.round(Number(v) * 100)}%`
-                : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }),
-          }}
-          yAxis={{
-            tickFormat: (v) =>
-              `${hardwareLabel(String(v))} (n=${summary.bars.find((b) => b.hardware === v)?.n ?? 0})`,
-            grid: false,
-          }}
-          layers={[layer]}
-          tooltip={{
-            attachToLayer: 0,
-            rulerType: 'none',
-            content: (d) =>
-              chartHoverCard({
-                title: hardwareLabel(d.hardware),
-                color: model.colors[d.hardware],
-                metrics: [
-                  { value: format(d.median), label: strings.median },
-                  { value: format(d.best), label: strings.best },
-                ],
-              }),
-          }}
-        />
-      )}
-    </section>
+    <D3Chart<RooflineSummaryBar>
+      ref={chart}
+      chartId="operatorx-roofline-summary"
+      testId="operatorx-roofline-summary"
+      caption={caption}
+      footer={<VizFooter />}
+      watermark={getChartWatermark()}
+      grabCursor={false}
+      data={summary.bars}
+      height={Math.max(120, summary.bars.length * 32 + 52)}
+      clipContent={false}
+      margin={{ top: 4, right: 64, bottom: 48, left: 140 }}
+      xScale={{
+        type: 'linear',
+        domain: [0, Math.max(0, ...summary.bars.map((b) => b.best)) * 1.04 || 1],
+        nice: true,
+      }}
+      yScale={{
+        type: 'band',
+        domain: summary.bars.map((b) => b.hardware).toReversed(),
+        padding: 0.35,
+      }}
+      xAxis={{
+        label: summary.normalized ? strings.normalized : strings.absolute,
+        tickCount: 4,
+        tickFormat: (v) =>
+          summary.normalized
+            ? `${Math.round(Number(v) * 100)}%`
+            : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }),
+      }}
+      yAxis={{
+        tickFormat: (v) =>
+          `${hardwareLabel(String(v))} (n=${summary.bars.find((b) => b.hardware === v)?.n ?? 0})`,
+        grid: false,
+      }}
+      layers={[layer]}
+      tooltip={{
+        attachToLayer: 0,
+        rulerType: 'none',
+        ...inspectCase(model, (d: RooflineSummaryBar) => d.bestCaseIndex, chart),
+        content: (d) =>
+          chartHoverCard({
+            title: hardwareLabel(d.hardware),
+            color: model.colors[d.hardware],
+            metrics: [
+              { value: format(d.median), label: strings.median },
+              { value: format(d.best), label: strings.best },
+            ],
+          }),
+      }}
+      noDataOverlay={
+        summary.bars.length === 0 ? (
+          <EmptyState bare className="absolute inset-0 pointer-events-none">
+            {summary.missingReferences.length > 0
+              ? `${strings.missing}: ${summary.missingReferences.map(hardwareLabel).join(', ')}`
+              : summary.sharedOnly
+                ? strings.empty
+                : strings.noData}
+          </EmptyState>
+        ) : undefined
+      }
+      legendElement={legend}
+    />
   );
 }

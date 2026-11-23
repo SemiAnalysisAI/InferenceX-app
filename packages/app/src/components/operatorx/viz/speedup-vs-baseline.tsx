@@ -1,17 +1,21 @@
 'use client';
 
+import type { ScaleBand, ScaleContinuousNumeric } from 'd3';
 import { useId, useState } from 'react';
 
 import ChartLegend from '@/components/ui/chart-legend';
+import { ChartSection } from '@/components/ui/chart-section';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { type CustomLayerConfig, D3Chart } from '@/lib/d3-chart/D3Chart';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { EmptyChart } from '../charts/empty';
-import { hardwareLegend, OpxChart } from '../charts/kit';
-import { originBarsLayer } from '../charts/layers';
-import { formatRatio, ratioScale } from '../charts/scales';
+import { VizCaption, VizFooter, hardwareLegend } from '../charts/kit';
+import { formatRatio, logAxisTicks, ratioScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import { type ComparisonModel, geomeanAdvantage } from '../compare/model';
 import { SIZE_BUCKETS, sizeBucket } from '../compare/slices';
@@ -20,6 +24,8 @@ import type { VizDefinition } from './types';
 type Grouping = 'none' | 'precision' | 'size';
 
 const PRECISIONS = ['fp4', 'fp8', 'bf16', 'other'];
+const TITLE: Record<Locale, string> = { en: 'Advantage over baseline', zh: '相对基线的优势' };
+const CHART_ID = 'operatorx-speedup-vs-baseline';
 
 const STRINGS = {
   en: {
@@ -66,13 +72,62 @@ function groupCases(model: ComparisonModel, grouping: Grouping): [string, number
     .filter(([, idx]) => idx.length > 0);
 }
 
+/** Bars from 1× (the baseline) to each GPU's advantage, one sub-band per GPU when grouped. */
+function advantageBars(
+  bars: Bar[],
+  grouping: Grouping,
+  series: string[],
+  colors: Record<string, string>,
+): CustomLayerConfig {
+  const grouped = grouping !== 'none';
+  return {
+    type: 'custom',
+    key: `bars-${grouping}`,
+    render: (group, ctx) => {
+      const x = ctx.xScale as ScaleContinuousNumeric<number, number>;
+      const y = ctx.yScale as ScaleBand<string>;
+      const x0 = x(1);
+      const n = grouped ? series.length : 1;
+      const h = y.bandwidth() / n;
+      const top = (b: Bar) =>
+        (y(grouped ? b.group : b.hw) ?? 0) + (grouped ? series.indexOf(b.hw) * h : 0);
+      group
+        .selectAll<SVGTextElement, Bar>('.bar-note')
+        .data(bars)
+        .join('text')
+        .attr('class', 'bar-note')
+        .attr('x', (b) => (b.value >= 1 ? x(b.value) + 6 : x(b.value) - 6))
+        .attr('y', (b) => top(b) + h / 2)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', (b) => (b.value >= 1 ? 'start' : 'end'))
+        .attr('font-size', '11px')
+        .style('fill', 'var(--muted-foreground)')
+        .style('pointer-events', 'none')
+        .text((b) => formatRatio(b.value));
+      return group
+        .selectAll<SVGRectElement, Bar>('.bar')
+        .data(bars)
+        .join('rect')
+        .attr('class', 'bar')
+        .attr('x', (b) => Math.min(x0, x(b.value)))
+        .attr('y', (b) => top(b) + (n > 1 ? 1 : 0))
+        .attr('width', (b) => Math.max(1, Math.abs(x(b.value) - x0)))
+        .attr('height', n > 1 ? Math.max(1, h - 2) : h)
+        .attr('rx', 2)
+        .attr('fill', (b) => colors[b.hw])
+        .attr('cursor', 'pointer');
+    },
+  };
+}
+
 function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
-  const strings = STRINGS[useLocale()];
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const { baseline, view } = model;
   const [grouping, setGrouping] = useState<Grouping>('none');
   const [legendExpanded, setLegendExpanded] = useState(true);
   const legendId = useId();
-  if (!baseline) return <EmptyChart>{strings.pick}</EmptyChart>;
+  if (!baseline) return <EmptyState title={TITLE[locale]}>{strings.pick}</EmptyState>;
   const grouped = grouping !== 'none';
   const series = grouped ? model.hardware.filter((hw) => hw !== baseline) : model.hardware;
   const bars: Bar[] = groupCases(model, grouping).flatMap(([group, idx]) =>
@@ -84,97 +139,96 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
   const groups = [...new Set(bars.map((b) => b.group))];
   const sizeLabel = view.op === 'gemm' ? 'M' : strings.tokens;
   const xScale = ratioScale(bars.map((b) => b.value));
+  if (bars.length === 0) return <EmptyState title={TITLE[locale]}>{strings.none}</EmptyState>;
   return (
-    <div className="space-y-3">
-      <SegmentedToggle
-        value={grouping}
-        onValueChange={(value) => {
-          track('operatorx_speedup_grouping_selected', { grouping: value });
-          setGrouping(value);
+    <ChartSection
+      chartId={CHART_ID}
+      analyticsPrefix="operatorx"
+      exportFileName={`InferenceX_${CHART_ID}`}
+      setIsLegendExpanded={setLegendExpanded}
+    >
+      <D3Chart<Bar>
+        chartId={CHART_ID}
+        caption={
+          <VizCaption title={TITLE[locale]}>
+            <SegmentedToggle
+              value={grouping}
+              onValueChange={(value) => {
+                track('operatorx_speedup_grouping_selected', { grouping: value });
+                setGrouping(value);
+              }}
+              ariaLabel={strings.groupBy}
+              options={[
+                { value: 'none', label: strings.overall },
+                { value: 'precision', label: strings.byPrecision },
+                { value: 'size', label: strings.bySize(sizeLabel) },
+              ]}
+            />
+          </VizCaption>
+        }
+        footer={<VizFooter />}
+        watermark={getChartWatermark()}
+        grabCursor={false}
+        data={bars}
+        height={
+          (grouped ? groups.length * Math.max(36, series.length * 12 + 12) : bars.length * 36) + 60
+        }
+        margin={{ top: 8, right: 56, bottom: 44, left: 84 }}
+        xScale={xScale}
+        yScale={{
+          type: 'band',
+          domain: grouped ? groups : bars.map((b) => b.hw),
+          padding: grouped ? 0.2 : 0.3,
         }}
-        ariaLabel={strings.groupBy}
-        options={[
-          { value: 'none', label: strings.overall },
-          { value: 'precision', label: strings.byPrecision },
-          { value: 'size', label: strings.bySize(sizeLabel) },
-        ]}
-      />
-      {bars.length === 0 ? (
-        <EmptyChart>{strings.none}</EmptyChart>
-      ) : (
-        <OpxChart<Bar>
-          chartId="operatorx-speedup-vs-baseline"
-          data={bars}
-          height={
-            (grouped ? groups.length * Math.max(36, series.length * 12 + 12) : bars.length * 36) +
-            60
-          }
-          margin={{ top: 8, right: 56, bottom: 44, left: 84 }}
-          xScale={xScale}
-          yScale={{
-            type: 'band',
-            domain: grouped ? groups : bars.map((b) => b.hw),
-            padding: grouped ? 0.2 : 0.3,
-          }}
-          xAxis={{
-            label: strings.axis(hardwareLabel(baseline)),
-            tickFormat: (v) => formatRatio(Number(v)),
-          }}
-          yAxis={{
-            tickFormat: (v) => (grouped ? String(v) : hardwareLabel(String(v))),
-            grid: false,
-          }}
-          layers={[
-            originBarsLayer({
-              key: `bars-${grouping}`,
-              data: bars,
-              band: (b) => (grouped ? b.group : b.hw),
-              sub: grouped ? { of: (b) => b.hw, domain: series } : undefined,
-              value: (b) => b.value,
-              color: (b) => model.colors[b.hw],
-              label: (b) => formatRatio(b.value),
-              origin: 1,
+        xAxis={{
+          label: strings.axis(hardwareLabel(baseline)),
+          tickValues: logAxisTicks,
+          tickFormat: (v) => formatRatio(Number(v)),
+        }}
+        yAxis={{
+          tickFormat: (v) => (grouped ? String(v) : hardwareLabel(String(v))),
+          grid: false,
+        }}
+        layers={[advantageBars(bars, grouping, series, model.colors)]}
+        tooltip={{
+          rulerType: 'none',
+          content: (b) =>
+            chartHoverCard({
+              title: hardwareLabel(b.hw),
+              subtitle: grouped
+                ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group}`
+                : undefined,
+              color: model.colors[b.hw],
+              metrics: [
+                { value: formatRatio(b.value), label: strings.axis(hardwareLabel(baseline)) },
+              ],
+              summary: strings.shared(b.cases),
             }),
-          ]}
-          tooltip={{
-            rulerType: 'none',
-            content: (b) =>
-              chartHoverCard({
-                title: hardwareLabel(b.hw),
-                subtitle: grouped
-                  ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group}`
-                  : undefined,
-                color: model.colors[b.hw],
-                metrics: [
-                  { value: formatRatio(b.value), label: strings.axis(hardwareLabel(baseline)) },
-                ],
-                summary: strings.shared(b.cases),
-              }),
-          }}
-          legendElement={
-            grouped ? (
-              <ChartLegend
-                variant="sidebar"
-                isLegendExpanded={legendExpanded}
-                onExpandedChange={setLegendExpanded}
-                {...hardwareLegend(
-                  model,
-                  legendId,
-                  undefined,
-                  model.available.filter((hw) => hw !== baseline),
-                )}
-              />
-            ) : undefined
-          }
-        />
-      )}
-    </div>
+        }}
+        legendElement={
+          grouped ? (
+            <ChartLegend
+              variant="sidebar"
+              isLegendExpanded={legendExpanded}
+              onExpandedChange={setLegendExpanded}
+              {...hardwareLegend(
+                model,
+                legendId,
+                undefined,
+                model.available.filter((hw) => hw !== baseline),
+              )}
+            />
+          ) : undefined
+        }
+      />
+    </ChartSection>
   );
 }
 
 export const speedupVsBaseline: VizDefinition = {
   id: 'speedup-vs-baseline',
-  title: { en: 'Advantage over baseline', zh: '相对基线的优势' },
+  title: TITLE,
+  skeletonClassName: 'h-80',
   needsBaseline: true,
   ops: ['gemm', 'moe', 'attention'],
   Component: SpeedupVsBaseline,

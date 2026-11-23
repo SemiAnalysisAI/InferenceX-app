@@ -8,9 +8,8 @@ export interface VizDefinition {
   id: string;
   title: Record<Locale, string>;
   ops: ComparisonOp[];
-  wide?: boolean;
-  /** Desktop columns out of 12 when paired with another card; the partner takes the rest. */
-  span?: 5 | 6 | 7;
+  /** Height of the placeholder shown until the chart mounts. */
+  skeletonClassName: string;
   needsBaseline?: boolean;
   Component: (props: { model: ComparisonModel }) => React.ReactNode;
 }
