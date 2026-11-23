@@ -94,9 +94,10 @@ jobs:
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           # Consume each full response: a streamed body that is cut off is not cached.
-          for path in / /zh /inference /zh/inference /historical /evaluation /operatorx /zh/operatorx; do
-            curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
-              -o /dev/null -w "%{http_code} %{time_total}s $path\n" \
+          # The bare Inference route redirects to the featured model, so follow redirects.
+          for path in / /zh /infx/inference /zh/infx/inference /infx/historical /infx/evaluation /opx /zh/opx; do
+            curl -sSfL --retry 2 --retry-delay 2 --max-time 300 --compressed \
+              -o /dev/null -w "%{http_code} %{time_total}s $path -> %{url_effective}\n" \
               "${APP_URL%/}$path" "${headers[@]}"
           done
           status=$(curl -sS --retry 2 --retry-delay 2 --max-time 300 --compressed \
