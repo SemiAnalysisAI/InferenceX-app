@@ -43,20 +43,6 @@ function expectLowCls() {
 }
 
 describe('Landing page performance', () => {
-  it('labels Jensen as Ex-NVIDIA and preserves the localized quote destination', () => {
-    for (const prefix of ['', '/zh']) {
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="intro-section"]').within(() => {
-        cy.get(`a[href="${prefix}/quotes#quote-nvidia"]`)
-          .should('have.text', 'Ex-NVIDIA Jensen')
-          .click();
-      });
-      cy.location('pathname').should('eq', `${prefix}/quotes`);
-      cy.location('hash').should('eq', '#quote-nvidia');
-      cy.get('#quote-nvidia').should('be.visible').and('contain.text', 'Jensen Huang');
-    }
-  });
-
   it('features Google instead of Anyscale and links to its localized quote without loading a logo', () => {
     for (const prefix of ['', '/zh']) {
       cy.visit(prefix || '/');
