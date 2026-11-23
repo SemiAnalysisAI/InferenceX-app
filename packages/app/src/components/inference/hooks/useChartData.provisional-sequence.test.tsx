@@ -16,6 +16,10 @@ mock.module('@/lib/api/api', () => ({
 }));
 
 import { useChartData } from './useChartData';
+import { loadSystemPowerModeler } from '@/lib/power/system-power-modeler';
+
+// The chart waits for the lazily loaded power model, so load it before rendering the hook.
+await loadSystemPowerModeler();
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;

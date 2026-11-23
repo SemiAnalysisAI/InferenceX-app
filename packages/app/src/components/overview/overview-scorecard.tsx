@@ -1101,10 +1101,15 @@ type OverviewScopeToggleVariant = 'section' | 'toolbar';
 const SCOPE_CHIP_CLASS = buttonVariants({ variant: 'outline', size: 'xs' });
 
 function ScopeChipCount({ count }: { count: number }) {
+  // The leading space keeps the chip's text "label N" rather than "labelN", so the accessible
+  // name ("label N. sentence") contains the visible text (WCAG 2.5.3). The flex gap hides it.
   return (
-    <span aria-hidden="true" className="tabular-nums text-muted-foreground">
-      {count}
-    </span>
+    <>
+      {' '}
+      <span aria-hidden="true" className="tabular-nums text-muted-foreground">
+        {count}
+      </span>
+    </>
   );
 }
 
@@ -1136,6 +1141,7 @@ export function OverviewModelScopeToggle({
   const targetHardwareRowScope: OverviewHardwareRowScope =
     target === 'all' ? 'all' : hardwareRowScope;
   const sentence = modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow;
+  const chip = modelScope === 'all' ? strings.modelScopeChipHide : strings.modelScopeChipShow;
   const link = (
     <OverviewNavLink
       data-overview-model-scope={target}
@@ -1151,11 +1157,11 @@ export function OverviewModelScopeToggle({
       )}
       analytics={{ control: 'models', value: target }}
       searchKeys={['models', 'rows', 'hwrows']}
-      aria-label={sentence}
+      aria-label={strings.withDetail(chip, sentence)}
       title={sentence}
       className={SCOPE_CHIP_CLASS}
     >
-      {modelScope === 'all' ? strings.modelScopeChipHide : strings.modelScopeChipShow}
+      {chip}
     </OverviewNavLink>
   );
   if (variant === 'toolbar') return link;
@@ -1199,6 +1205,7 @@ export function OverviewRowScopeToggle({
     rowScope === 'all'
       ? strings.rowScopeHide(unchangedRowCount, windowDays)
       : strings.rowScopeShow(unchangedRowCount, windowDays);
+  const chip = rowScope === 'all' ? strings.rowScopeChipHide : strings.rowScopeChipShow;
   const link = (
     <OverviewNavLink
       data-overview-row-scope={target}
@@ -1213,11 +1220,14 @@ export function OverviewRowScopeToggle({
       )}
       analytics={{ control: 'rows', value: target }}
       searchKeys={['rows']}
-      aria-label={sentence}
+      aria-label={strings.withDetail(
+        variant === 'section' ? `${chip} ${unchangedRowCount}` : chip,
+        sentence,
+      )}
       title={sentence}
       className={SCOPE_CHIP_CLASS}
     >
-      {rowScope === 'all' ? strings.rowScopeChipHide : strings.rowScopeChipShow}
+      {chip}
       {variant === 'section' ? <ScopeChipCount count={unchangedRowCount} /> : null}
     </OverviewNavLink>
   );
@@ -1260,6 +1270,10 @@ export function OverviewHardwareRowScopeToggle({
     hardwareRowScope === 'all'
       ? strings.hardwareRowScopeHide(emptyRowCount)
       : strings.hardwareRowScopeShow(emptyRowCount);
+  const chip =
+    hardwareRowScope === 'all'
+      ? strings.hardwareRowScopeChipHide
+      : strings.hardwareRowScopeChipShow;
   const link = (
     <OverviewNavLink
       data-overview-hardware-row-scope={target}
@@ -1275,13 +1289,14 @@ export function OverviewHardwareRowScopeToggle({
       )}
       analytics={{ control: 'hwrows', value: target }}
       searchKeys={['hwrows']}
-      aria-label={sentence}
+      aria-label={strings.withDetail(
+        variant === 'section' ? `${chip} ${emptyRowCount}` : chip,
+        sentence,
+      )}
       title={sentence}
       className={SCOPE_CHIP_CLASS}
     >
-      {hardwareRowScope === 'all'
-        ? strings.hardwareRowScopeChipHide
-        : strings.hardwareRowScopeChipShow}
+      {chip}
       {variant === 'section' ? <ScopeChipCount count={emptyRowCount} /> : null}
     </OverviewNavLink>
   );

@@ -21,7 +21,7 @@ import {
   OPERATORX_URL,
   TPUV7_QWEN_3_5_AGENTX_URL,
 } from '@/lib/nudges/landing-banner';
-import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { GRADIENT_NUDGE_EVENT, NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { GoogleIcon } from '@/components/ui/google-icon';
@@ -36,8 +36,6 @@ import {
 } from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
-
-export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
 
 function isOnInferenceTab(): boolean {
   if (typeof window === 'undefined') return false;
@@ -87,9 +85,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Every Result Is Reproducible',
       titleZh: '每项结果均可复现',
       description:
-        'Each data point is produced by a public GitHub Actions run. Click any point on a chart to jump to the exact run, logs, and artifacts.',
+        'Each data point is produced by a public GitHub Actions run. Click any point on a chart to open its details, then follow the link to the exact run, logs, and artifacts.',
       descriptionZh:
-        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点即可跳转到对应的运行记录、日志和产物。',
+        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点可打开详情，再通过其中的链接查看对应的运行记录、日志和产物。',
       action: {
         label: 'See how',
         labelZh: '了解详情',
@@ -172,7 +170,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'gradient-label',
     type: 'inline',
-    trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
+    trigger: { type: 'event', event: GRADIENT_NUDGE_EVENT },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
     priority: 25,

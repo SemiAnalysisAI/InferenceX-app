@@ -6,6 +6,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
 import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
 export type UnofficialChartData = Record<
   string,
@@ -43,6 +44,7 @@ export function buildChartData(
       'external',
       tokenBasis,
       chipBasis,
+      modelSystemPower,
     );
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(

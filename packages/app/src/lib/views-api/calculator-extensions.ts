@@ -17,7 +17,7 @@ import {
   interpolateProfitForGPU,
 } from '@/components/calculator/profit-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
+import { fetchOpenRouterPricing } from '@/lib/calculator/openrouter-pricing.server';
 import { cachedJson } from '@/lib/cache/api-cache';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 import { getOpenRouterModelId, Sequence, type Model } from '@/lib/catalog/data-mappings';
@@ -178,7 +178,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
           'This model has no OpenRouter price; supply custom prices',
           ['custom'],
         );
-      pricing = await fetchOpenRouterPricing(id, AbortSignal.timeout(15_000));
+      pricing = await fetchOpenRouterPricing(id);
     } else {
       pricing = {
         source: 'normalized',

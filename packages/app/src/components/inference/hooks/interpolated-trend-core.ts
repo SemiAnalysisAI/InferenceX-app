@@ -37,6 +37,7 @@ import {
   dedupeAgenticHistoryRuns,
 } from '@/lib/benchmarks/benchmark-run-selection';
 import { benchmarkRowPhysicalChips, rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import {
   chartMetric,
@@ -172,7 +173,7 @@ function createTrendRowPreparer(): (row: ChipBasisRow) => TrendRow | null {
     if (!knownGpu) return null;
 
     const isAgentic = row.benchmark_type === 'agentic_traces';
-    const agenticEntry = isAgentic ? rowToAggDataEntry(row) : undefined;
+    const agenticEntry = isAgentic ? rowToAggDataEntry(row, { modelSystemPower }) : undefined;
     const interactivity = agenticEntry ? agenticEntry.p90_intvty : (row.metrics.median_intvty ?? 0);
     if (isAgentic && (!Number.isFinite(interactivity) || interactivity <= 0)) return null;
 
@@ -314,7 +315,7 @@ function trendPoint(
   if (derivesFromEntry) {
     trendRow.derivedEntry ??= withLegacyOutputThroughput(
       trendRow.row,
-      rowToAggDataEntry(trendRow.row),
+      rowToAggDataEntry(trendRow.row, { modelSystemPower }),
     );
     writeDerivedChartFields(point, trendRow.derivedEntry, request, specs);
   } else {

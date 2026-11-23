@@ -90,6 +90,9 @@ jobs:
       - name: Check client bundle
         if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
         run: bun run check:bundle
+      - name: Check route bundle budgets
+        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
+        run: bun run check:route-budgets
       - name: Run integration tests
         uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060 # v7.4.6
         with:

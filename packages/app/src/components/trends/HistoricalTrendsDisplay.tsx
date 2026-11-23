@@ -17,6 +17,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
+import { shouldRequestTrendHistory } from '@/components/trends/trend-history-gate';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
@@ -196,7 +197,7 @@ export default function HistoricalTrendsDisplay() {
   // A vendor narrows every chip view to that company's chips; null shows all vendors.
   const [frontierVendorFilter, setFrontierVendorFilter] = useState<string | null>(null);
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
-  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis, sequenceResolved } = useGlobalFilterSelection();
   const modelDetails = useModelHistoryDetails();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
@@ -290,7 +291,11 @@ export default function HistoricalTrendsDisplay() {
     targetInteractivity,
     availableDates,
     tokenRevenuePricing,
-    enabled: hasInteractivityChart,
+    enabled: shouldRequestTrendHistory({
+      sequenceResolved,
+      chartDataLoading: loading,
+      hasInteractivityChart,
+    }),
     tcoBasis,
     chipBasis,
   });

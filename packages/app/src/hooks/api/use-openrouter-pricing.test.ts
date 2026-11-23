@@ -1,60 +1,55 @@
-import { describe, expect, it } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import { openRouterPricingForModel } from './use-openrouter-pricing';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
+import { ExpectedQueryFailureError } from '@/lib/analytics/query-error-analytics';
+import { ApiRequestError } from '@/lib/api/api-request-error';
+import type { OpenRouterPricingResponse } from '@/lib/calculator/openrouter-pricing';
 
-describe('openRouterPricingForModel', () => {
-  it('converts OpenRouter per-token strings to $/M token prices', () => {
-    const pricing = openRouterPricingForModel(
-      {
-        data: [
-          {
-            id: 'deepseek/deepseek-v4-pro-0813',
-            pricing: {
-              prompt: '0.000001122',
-              completion: '0.000003366',
-            },
-          },
-        ],
-      },
-      'deepseek/deepseek-v4-pro-0813',
-    );
+import { fetchOpenRouterPricing } from './use-openrouter-pricing';
 
-    expect(pricing).toMatchObject({
+const mockFetch = vi.fn();
+stubGlobal('fetch', mockFetch);
+afterAll(unstubAllGlobals);
+beforeEach(() => mockFetch.mockReset());
+
+const V4_PRO = 'deepseek/deepseek-v4-pro-0813';
+const PRICES: OpenRouterPricingResponse = {
+  fetchedAt: '2026-11-23T00:00:00.000Z',
+  models: {
+    [V4_PRO]: { inputPerMillion: 1.2, outputPerMillion: 3.6, cachedInputPerMillion: null },
+  },
+};
+
+describe('fetchOpenRouterPricing (browser)', () => {
+  it('reads the same-origin pricing route, not openrouter.ai', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json(PRICES));
+    const signal = new AbortController().signal;
+    await expect(fetchOpenRouterPricing(V4_PRO, signal)).resolves.toMatchObject({
       source: 'openrouter',
-      inputPerMillion: 1.122,
-      outputPerMillion: 3.366,
-      openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
+      inputPerMillion: 1.2,
+      outputPerMillion: 3.6,
+      openRouterModelId: V4_PRO,
     });
-    expect(pricing?.cachedInputPerMillion).toBeCloseTo(0.1122, 10);
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/openrouter-pricing', { signal });
   });
 
-  it('uses a published cache-read price when OpenRouter provides one', () => {
-    const pricing = openRouterPricingForModel(
-      {
-        data: [
-          {
-            id: 'deepseek/deepseek-v4-pro-0813',
-            pricing: {
-              prompt: '0.000001122',
-              input_cache_read: '0.00000008',
-              completion: '0.000003366',
-            },
-          },
-        ],
-      },
-      'deepseek/deepseek-v4-pro-0813',
+  it('treats a model OpenRouter does not price as an expected, unreported outcome', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json(PRICES));
+    const failure = fetchOpenRouterPricing('moonshotai/kimi-k3');
+    await expect(failure).rejects.toBeInstanceOf(ExpectedQueryFailureError);
+    await expect(failure).rejects.toThrow(
+      'OpenRouter pricing is unavailable for moonshotai/kimi-k3',
     );
-
-    expect(pricing?.cachedInputPerMillion).toBe(0.08);
   });
 
-  it('returns null for a missing model or incomplete prices', () => {
-    expect(openRouterPricingForModel({ data: [] }, 'missing/model')).toBeNull();
-    expect(
-      openRouterPricingForModel(
-        { data: [{ id: 'incomplete/model', pricing: { prompt: '0.1' } }] },
-        'incomplete/model',
-      ),
-    ).toBeNull();
+  it('reports a failed pricing route with its status', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json({ error: 'x' }, { status: 502 }));
+    const failure = fetchOpenRouterPricing(V4_PRO);
+    await expect(failure).rejects.toBeInstanceOf(ApiRequestError);
+    await expect(failure).rejects.toMatchObject({
+      status: 502,
+      endpoint: '/api/v1/openrouter-pricing',
+      message: 'OpenRouter pricing request failed (502)',
+    });
   });
 });

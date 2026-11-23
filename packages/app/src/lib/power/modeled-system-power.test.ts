@@ -2,18 +2,23 @@ import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS } from '@/lib/benchmarks/chip-basis';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import { isNvl72Hardware, modelSystemPower } from '@/lib/power/modeled-system-power';
 import {
   gb300AggregateRow,
   gb300DisaggRow,
   upstreamRackWattsPerGpu,
 } from '@/lib/power/nvl72-power.fixture';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-categories';
 import {
   estimateChassisPower,
   estimateRackPower,
-  SYSTEM_POWER_CATEGORIES,
   type SystemPowerHardware,
 } from '@/lib/power/system-power-model';
+
+const transformWithPower = (rows: BenchmarkRow[], tcoBasis: TcoBasis = DEFAULT_TCO_BASIS) =>
+  transformBenchmarkRows(rows, 'median', tcoBasis, 'total', DEFAULT_CHIP_BASIS, modelSystemPower);
 
 const chassis = (hardware: SystemPowerHardware, gpuWatts: number, scaleOut = false) =>
   estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut })!;
@@ -557,22 +562,21 @@ describe('modeled system power admission and accounting', () => {
 
   it('shares official/overlay transforms without changing measured metrics or inventing modeled zeros', () => {
     const source = row();
-    const entry = rowToAggDataEntry(source);
+    const entry = rowToAggDataEntry(source, { modelSystemPower });
     expect(entry.avg_power_w).toBe(source.metrics.avg_power_w);
     expect(entry.joules_per_output_token).toBe(source.metrics.joules_per_output_token);
-    const { chartData } = transformBenchmarkRows([source]);
+    const { chartData } = transformWithPower([source]);
     for (const points of chartData) {
       expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
     }
-    const overlay = transformBenchmarkRows(
+    const overlay = transformWithPower(
       [row({ benchmark_type: 'agentic_traces', isl: null, osl: null })],
-      'median',
       'external',
     );
     for (const points of overlay.chartData) {
       expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
     }
-    const unsupported = transformBenchmarkRows([row({ hardware: 'gb200' })]);
+    const unsupported = transformWithPower([row({ hardware: 'gb200' })]);
     for (const points of unsupported.chartData) {
       expect(points[0].utilityModeledWatts).toBeUndefined();
       expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);

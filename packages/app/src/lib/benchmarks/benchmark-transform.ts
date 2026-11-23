@@ -26,7 +26,7 @@ import { Percentile } from '@/lib/catalog/data-mappings';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { resolvePowerTier } from '@/lib/power/power-tier';
-import { modelSystemPower } from '@/lib/power/modeled-system-power';
+import type { SystemPowerModeler } from '@/lib/power/system-power-modeler';
 import type { BenchmarkRow } from '@/lib/api/api';
 import {
   DEFAULT_CHIP_BASIS,
@@ -155,7 +155,11 @@ export function rowLatencyMetric(
 }
 
 export interface AggDataEntryOptions {
-  modelPower?: boolean;
+  /**
+   * Estimates the row's modeled system power. Without it `modeledSystemPower` stays undefined.
+   * Browser callers on the inference chart pass the lazily loaded model (`useSystemPowerModeler`).
+   */
+  modelSystemPower?: SystemPowerModeler;
 }
 
 function aggregateUsesPrefill(row: BenchmarkRow): boolean {
@@ -199,7 +203,7 @@ export function benchmarkRowPhysicalChips(row: BenchmarkRow): number {
 
 export function rowToAggDataEntry(
   row: ChipBasisRow,
-  { modelPower = true }: AggDataEntryOptions = {},
+  { modelSystemPower }: AggDataEntryOptions = {},
 ): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
@@ -335,7 +339,7 @@ export function rowToAggDataEntry(
         ? row.power_invalid_reasons
         : undefined,
     power_metric_schema_version: m.power_metric_schema_version,
-    modeledSystemPower: modelPower ? modelSystemPower(row) : undefined,
+    modeledSystemPower: modelSystemPower?.(row),
     power_tier: resolvePowerTier({
       powerValid: m.power_valid,
       wholeDeploymentSemantics: hasWholeDeploymentEnergySemantics,
@@ -561,6 +565,8 @@ export function mergeRunScopedRows(
  *   tokens; see {@link TokenBasis}.
  * @param chipBasis Which chips divide disaggregated input/output throughput;
  *   see {@link ChipBasis}.
+ * @param modelSystemPower Estimates each row's modeled system power, as
+ *   {@link AggDataEntryOptions} describes.
  */
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
@@ -568,6 +574,7 @@ export function transformBenchmarkRows(
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   tokenBasis: TokenBasis = 'total',
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
+  modelSystemPower?: SystemPowerModeler,
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
@@ -579,7 +586,7 @@ export function transformBenchmarkRows(
   const specsByHw = new Map<string, GpuSpecs>();
   const pointsByHw: Record<string, InferenceData[][]> = {};
   for (const row of rowsWithChipBasis(rows, chipBasis)) {
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelSystemPower });
     if (tokenBasis === 'uncached' && !applyUncachedTokenBasis(entry)) continue;
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
@@ -627,6 +634,7 @@ export function transformChartRowsForPrecisions(
   percentile = 'median',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
+  modelSystemPower?: SystemPowerModeler,
 ): InferenceData[] {
   const chartDef = (chartDefinitions as ChartDefinition[])[chartIndex];
   const xKey = withPercentile(chartDef.x, percentile) as keyof AggDataEntry;
@@ -652,7 +660,7 @@ export function transformChartRowsForPrecisions(
       specs = getGpuSpecs(hwKey, tcoBasis);
       specsByHw.set(hwKey, specs);
     }
-    const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
+    const entry = rowToAggDataEntry(withChipBasis(row, chipBasis), { modelSystemPower });
     entry.hwKey = hwKey;
     points.push(createChartDataPoint(entry.date, entry, xKey, yKey, hwKey, specs));
   }

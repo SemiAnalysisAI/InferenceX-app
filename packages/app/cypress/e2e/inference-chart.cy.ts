@@ -1,6 +1,7 @@
 import type { AvailabilityRow } from '@/lib/api/api';
 import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import type { InferenceData } from '@/components/inference/types';
+import { interceptOpenRouterPricing } from '../support/profit-estimator';
 import {
   interceptVrPublicationData,
   VR_FIXTURE_DATE,
@@ -192,20 +193,17 @@ describe('Inference Chart', () => {
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', {
-      statusCode: 200,
-      body: {
-        data: [
-          {
-            id: 'deepseek/deepseek-v4-pro-0813',
-            pricing: {
-              prompt: '0.000001122',
-              input_cache_read: '0.00000008',
-              completion: '0.000003366',
-            },
+    interceptOpenRouterPricing({
+      data: [
+        {
+          id: 'deepseek/deepseek-v4-pro-0813',
+          pricing: {
+            prompt: '0.000001122',
+            input_cache_read: '0.00000008',
+            completion: '0.000003366',
           },
-        ],
-      },
+        },
+      ],
     }).as('openRouterPricing');
     interceptOverlayRun();
     cy.visit(

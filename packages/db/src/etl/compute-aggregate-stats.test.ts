@@ -7,6 +7,7 @@ import {
   computeAggregateStats,
   computeProfileAggregateStatsFromCompressedChunks,
   mergeProfileStatsUpgrade,
+  withServerMetricAggregateStats,
 } from './compute-aggregate-stats.js';
 
 function makeProfileBlob(
@@ -141,13 +142,88 @@ describe('computeAggregateStats', () => {
     expect(stats.e2elPerOsl).toBeNull();
   });
 
-  it('tolerates a malformed profile blob by leaving its metrics null', async () => {
+  it('tolerates a malformed profile blob by leaving its metrics null and warning', async () => {
     const garbage = Buffer.from('not-gzip-data');
-    const stats = await computeAggregateStats({ profileBlob: garbage, serverBlob: null });
+    const warnings: string[] = [];
+    const stats = await computeAggregateStats({ profileBlob: garbage, serverBlob: null }, warnings);
     expect(stats.isl).toBeNull();
     expect(stats.osl).toBeNull();
     expect(stats.e2elPerOsl).toBeNull();
     expect(stats.version).toBe(STATS_VERSION);
+    expect(warnings).toEqual([
+      expect.stringMatching(
+        /^profile export unreadable \(.+\), so ISL, OSL and E2EL\/OSL stats are empty$/u,
+      ),
+    ]);
+  });
+
+  it('warns about a truncated profile even after some chunks arrived', async () => {
+    const blob = makeProfileBlob([{ isl: 100, osl: 50 }]);
+    const warnings: string[] = [];
+    const stats = await computeProfileAggregateStatsFromCompressedChunks(
+      [blob.subarray(0, -4)],
+      warnings,
+    );
+    expect(stats.isl).toBeNull();
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('does not warn when there is no profile at all', async () => {
+    const warnings: string[] = [];
+    await computeAggregateStats({ profileBlob: null, serverBlob: makeServerBlob() }, warnings);
+    await computeProfileAggregateStatsFromCompressedChunks([], warnings);
+    await computeProfileAggregateStatsFromCompressedChunks([Buffer.alloc(0)], warnings);
+    expect(warnings).toEqual([]);
+  });
+
+  it('warns when the profile source itself fails before yielding bytes', async () => {
+    const failing: AsyncIterable<Uint8Array> = {
+      [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new Error('read failed')) }),
+    };
+    const warnings: string[] = [];
+    await computeProfileAggregateStatsFromCompressedChunks(failing, warnings);
+    expect(warnings).toEqual([
+      'profile export unreadable (read failed), so ISL, OSL and E2EL/OSL stats are empty',
+    ]);
+  });
+
+  it('leaves server stats null and warns on a corrupt server blob', async () => {
+    const warnings: string[] = [];
+    const stats = await computeAggregateStats(
+      { profileBlob: null, serverBlob: gzipSync(Buffer.from('{"metrics": {')) },
+      warnings,
+    );
+    expect(stats.kvCacheUtil).toBeNull();
+    expect(stats.prefixCacheHitRate).toBeNull();
+    expect(warnings).toEqual([
+      expect.stringMatching(
+        /^server metrics unreadable \(.+\), so KV cache utilization and prefix cache hit rate stats are empty$/u,
+      ),
+    ]);
+  });
+
+  it('adds no warnings on the successful path', async () => {
+    const warnings: string[] = [];
+    await computeAggregateStats(
+      { profileBlob: makeProfileBlob([{ isl: 100, osl: 50 }]), serverBlob: makeServerBlob() },
+      warnings,
+    );
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('withServerMetricAggregateStats', () => {
+  it('keeps the profile stats and warns when the metrics cannot be read', async () => {
+    const profile = await computeAggregateStats({
+      profileBlob: makeProfileBlob([{ isl: 100, osl: 50 }]),
+      serverBlob: null,
+    });
+    const warnings: string[] = [];
+    // JSON.stringify throws on a cycle, standing in for any unreadable metric.
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    expect(withServerMetricAggregateStats(profile, cyclic, warnings)).toBe(profile);
+    expect(warnings).toEqual([expect.stringMatching(/^server metrics unreadable \(/u)]);
   });
 });
 

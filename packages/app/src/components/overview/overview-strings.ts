@@ -53,7 +53,7 @@ export const OVERVIEW_STRINGS = {
       `View details: ${modelLabel} · ${scenarioLabel}`,
     compareCurvesLink: 'Compare curves',
     compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
-      `Compare current and historical ${hardwareLabel} cost curves for ${modelLabel}`,
+      `Compare curves: current and historical ${hardwareLabel} cost for ${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `Open raw source dashboard for ${evidenceDate}: ${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -106,6 +106,7 @@ export const OVERVIEW_STRINGS = {
     presentExit: 'Exit',
     presentEnterAria: 'Show the matrix full screen',
     presentExitAria: 'Leave full screen',
+    withDetail: (label: string, detail: string) => `${label}. ${detail}`,
     presentShortcutHint: 'Arrow keys switch views · Esc exits',
     categoryBadges: {
       maintenance: 'Maintenance',
@@ -219,7 +220,7 @@ export const OVERVIEW_STRINGS = {
       `查看详情：${modelLabel} · ${scenarioLabel}`,
     compareCurvesLink: '对比曲线',
     compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
-      `对比 ${modelLabel} 在 ${hardwareLabel} 上当前与历史成本曲线`,
+      `对比曲线：${modelLabel} 在 ${hardwareLabel} 上的当前与历史成本`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -265,6 +266,7 @@ export const OVERVIEW_STRINGS = {
     presentExit: '退出',
     presentEnterAria: '全屏展示矩阵',
     presentExitAria: '退出全屏',
+    withDetail: (label: string, detail: string) => `${label}。${detail}`,
     presentShortcutHint: '方向键切换视图 · Esc 退出',
     categoryBadges: {
       maintenance: '维护模式',

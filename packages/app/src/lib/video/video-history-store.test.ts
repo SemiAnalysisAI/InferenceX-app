@@ -372,9 +372,13 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after inference topology labels moved to one pass. The graph reaches that file only
-      // for pointTopologyKey, which is unchanged, so recorded entries are unchanged.
-      sources: 'd15e35c58c3862ebf9d3ba040c4fd82b8bd6ce93d29df8e54349a798fcd5cf98',
+      // Re-pinned after the lazy power model loader gained failure and retry states (reached only
+      // through type imports), fetchJson learned to take an early document-load response,
+      // data_query_failed stopped reporting failed background refetches that keep their data,
+      // dashboard-routes gained the default Inference model slug, and inference topology labels
+      // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey).
+      // None of these feed recorded entries, so they are unchanged.
+      sources: '00123b3aab9fb95535e4d00c15fb11429764d9eb912e1d9e5c1473105ad3f8e6',
     });
   });
 });
