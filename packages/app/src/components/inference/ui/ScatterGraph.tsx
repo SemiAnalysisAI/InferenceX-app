@@ -15,8 +15,7 @@ import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
-import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { GRADIENT_NUDGE_EVENT, NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
 import {
   useInferenceActions,

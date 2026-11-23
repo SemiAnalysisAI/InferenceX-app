@@ -443,6 +443,11 @@ describe('Model Architecture Diagram', () => {
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
       cy.window().its('scrollY').should('equal', 0);
+      // Focus on server-rendered markup opens nothing until React attaches the tooltip's handlers.
+      cy.get('[data-testid="model-architecture-link"]').should(([link]) => {
+        const hydrated = Object.keys(link).some((key) => key.startsWith('__reactProps'));
+        expect(hydrated, 'architecture link is hydrated').to.equal(true);
+      });
       cy.get('[data-testid="model-architecture-link"]').scrollIntoView().focus();
       cy.get('[data-testid="model-architecture-tooltip"]')
         .should('be.visible')

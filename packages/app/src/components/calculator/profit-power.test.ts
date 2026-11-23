@@ -7,7 +7,7 @@ import {
   gb300DisaggRow,
   upstreamRackWattsPerGpu,
 } from '@/lib/power/nvl72-power.fixture';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';

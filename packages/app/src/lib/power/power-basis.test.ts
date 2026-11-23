@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
-import { withChipBasis } from '@/lib/benchmarks/chip-basis';
+import { DEFAULT_CHIP_BASIS, withChipBasis } from '@/lib/benchmarks/chip-basis';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
 import {
   gpusPerMegawatt,
@@ -14,7 +14,8 @@ import {
   writePowerBasisChartFields,
   type PowerBasisChartFields,
 } from '@/lib/power/power-basis';
-import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-categories';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { rowToLightweightPoint } from '@/components/inference/hooks/interpolated-trend-core';
@@ -66,8 +67,18 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
+const overlayTransform = () =>
+  transformBenchmarkRows(
+    [row()],
+    'median',
+    'external',
+    'total',
+    DEFAULT_CHIP_BASIS,
+    modelSystemPower,
+  );
+
 function derive(source: BenchmarkRow) {
-  const entry = rowToAggDataEntry(source);
+  const entry = rowToAggDataEntry(source, { modelSystemPower });
   const hwKey = getHardwareKey(entry);
   return { entry, hwKey, fields: buildDerivedChartFields(entry, hwKey) };
 }
@@ -121,7 +132,14 @@ describe('power boundaries through the derived-field builder', () => {
       expect(historical?.utilityModeledJPerOutputToken).toEqual(
         fields.utilityModeledJPerOutputToken,
       );
-      const { chartData } = transformBenchmarkRows([source], 'p90', 'external');
+      const { chartData } = transformBenchmarkRows(
+        [source],
+        'p90',
+        'external',
+        'total',
+        DEFAULT_CHIP_BASIS,
+        modelSystemPower,
+      );
       expect(chartData[0][0].utilityModeledWatts).toEqual(fields.utilityModeledWatts);
       const result = buildInferenceSeries([source], {
         sequence: Sequence.AgenticTraces,
@@ -231,7 +249,7 @@ describe('power boundaries through the derived-field builder', () => {
   );
 
   it('serves the same fields to ?unofficialrun= overlays through transformBenchmarkRows', () => {
-    const { chartData } = transformBenchmarkRows([row()], 'median', 'external');
+    const { chartData } = overlayTransform();
     const point = chartData[0][0];
     const official = derive(row()).fields;
     for (const fields of Object.values(POWER_BASIS_FIELDS)) {
@@ -327,7 +345,7 @@ describe('J per total token at every power boundary', () => {
   );
 
   it('draws J per total token boundary siblings for ?unofficialrun= overlay points', () => {
-    const { chartData } = transformBenchmarkRows([row()], 'median', 'external');
+    const { chartData } = overlayTransform();
     const official = derive(row()).fields;
     const { data } = processOverlayChartDataWithClipping(
       chartData[0],
@@ -396,7 +414,7 @@ describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => 
 });
 
 const supported = () => {
-  const entry = rowToAggDataEntry(row());
+  const entry = rowToAggDataEntry(row(), { modelSystemPower });
   const model = entry.modeledSystemPower;
   if (model?.status !== 'supported') throw new Error('expected a supported power model');
   return { entry, model };
