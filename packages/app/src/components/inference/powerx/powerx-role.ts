@@ -1,4 +1,3 @@
-import type { PowerCompare } from '../types';
 import {
   energyPerFor,
   POWER_PERCENT_TDP_METRIC,
@@ -65,13 +64,6 @@ export function rewriteLegacyPowerRoleParams(params: PowerXRoleParams): PowerXRo
   return { metric, compare, role };
 }
 
-/** True when a URL still carries one of the old role encodings. */
-export function hasLegacyPowerRoleParams(params: PowerXRoleParams): boolean {
-  return Boolean(
-    (params.metric && params.metric in LEGACY_ROLE_METRICS) || params.compare === 'roles',
-  );
-}
-
 /**
  * The metric + compare pair the chart draws under a role. The user's stored choice stays
  * untouched so it comes back with All GPUs:
@@ -119,11 +111,6 @@ export function powerXPinnedControls(
 /** Per units a role allows on the Energy view: prefill adds its role-local Input. */
 export function powerXRoleEnergyPers(role: PowerXRole): readonly ('output' | 'input')[] {
   return role === 'prefill' ? ['output', 'input'] : ['output'];
-}
-
-/** The compare a role resolves to never leaves `roles` for Energy and Power draw. */
-export function powerXRoleCompare(selection: PowerXSelection, role: PowerXRole): PowerCompare {
-  return resolvePowerXRole(selection, role).compare;
 }
 
 export interface PowerXRolePoint {
