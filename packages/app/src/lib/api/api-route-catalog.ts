@@ -221,7 +221,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: 'd5e0f5148ce88fba223a019188305647a235256e0deae4781e8e8860a71fef76',
+    sourceSha256: '2caa04eed605700774b9183f8de9a961127db38775d7671995524e47dd481666',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -1365,7 +1365,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: 'ac495d055a72e392c4ac15e6bd2b7d3291c08ded0fac2162ff6d4a112ba674dc',
+    sourceSha256: 'fa3993772c8960c3b356a02dab02d86849468b115a4d1cea7216e250203b546f',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',

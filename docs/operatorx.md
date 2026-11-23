@@ -6,15 +6,17 @@ same reader, chart, filters, and coverage.
 
 Each category has its own page at `/opx/<category>` and `/zh/opx/<category>`,
 where the category is `gemm`, `moe`, `attention` or `model`. Bare `/opx` shows GEMM.
-The category tabs swap the path in place without a reload. They drop `workload` and
-`parallel`, which belong to one category, and keep every other query parameter. Older links
+The category tabs swap the path in place without a reload. They drop `parallel` (and a legacy
+`workload`), which belong to one category, and keep every other query parameter, `model`
+included. Older links
 with `?op=<category>` redirect permanently (308) to the category path with their other
 parameters intact. The proxy handles this in `operatorXCategoryRedirectUrl`
 (`packages/app/src/lib/routing/operatorx-category.ts`). Unknown categories return 404.
 
 中文：每个类别都有独立页面 `/opx/<category>` 与 `/zh/opx/<category>`，类别为
 `gemm`、`moe`、`attention` 或 `model`。直接访问 `/opx` 显示 GEMM。切换类别标签会就地替换
-路径而不重新加载页面，并去掉只属于单个类别的 `workload` 与 `parallel`，其他查询参数保持不变。
+路径而不重新加载页面，并去掉只属于单个类别的 `parallel`（以及旧的 `workload`），其他查询参数
+（包括 `model`）保持不变。
 旧的 `?op=<category>` 链接会永久重定向（308）到对应类别路径，
 并保留其他参数。未知类别返回 404。
 
@@ -235,10 +237,24 @@ view opens on `moe:DeepSeek-V4.1-Flash` (`DEFAULT_WORKLOADS` in
 listed workload (most hardware, then label). GEMM keeps the first listed workload. An explicit
 valid `workload` always wins.
 
+The GEMM, MoE and Attention tabs pick the workload with the inference page's model selector,
+the same one Model View uses. `model` names an InferenceX model, and the comparison shows its
+family's workload (`findWorkload` in `packages/db/src/operatorx/workloads.ts`); workloads no
+listed model maps to, such as Synthetic Shapes, sit in a trailing Other section under their
+label. A listed model without a workload for that op shows an empty state. A `workload=<id>`
+link opens on the listed model of that workload and keeps its other parameters; an unknown
+model opens on the default workload's model.
+
 中文：未传 `workload` 或其值不对应任何可用工作负载（例如 `workload=moe`）时，MoE 视图默认打开
 `moe:DeepSeek-V4.1-Flash`（见 `packages/db/src/operatorx/compare.ts` 中的 `DEFAULT_WORKLOADS`）。
 该工作负载没有数据时，回退到列表中的第一项（按硬件数量、再按名称排序）。GEMM 仍使用列表第一项。
 显式传入的有效 `workload` 始终优先。
+
+GEMM、MoE 和注意力标签使用与推理页面相同的模型选择器（与 Model View 一致）来选择工作负载。
+`model` 取 InferenceX 模型名，对比视图显示其所属系列的工作负载（见
+`packages/db/src/operatorx/workloads.ts` 中的 `findWorkload`）；没有对应已列出模型的工作负载
+（如 Synthetic Shapes）以其名称放在末尾的“其他”分组中。已列出但该算子没有工作负载的模型显示空状态。
+`workload=<id>` 链接会打开该工作负载对应的已列出模型，并保留其他参数；未知模型打开默认工作负载的模型。
 
 中文：带 `parallel` 的用例在单节点的 `tp × dp` 个设备上运行。按照 InferenceX
 `operatorx/core/parallel.py` 的约定，参数保留未切分的完整形状和每个 dp 组的 batch，因此 MoE
@@ -388,8 +404,9 @@ TFLOPS, TB/s, roofline time and share (see Roofline), kernel, and the stored run
 and result index.
 
 - `op`: `gemm` (default), `moe` or `attention`.
-- `workload` (from `options.workloads`) or `model` (from `options.models`, or an
-  InferenceX model from the page selector, resolved to its family).
+- `workload` (from `options.workloads`, or the page selector's InferenceX model or Other label,
+  resolved to its workload) or `model` (from `options.models`, or an InferenceX model,
+  resolved to its family).
 - `parallel`: `1` for one device (tp=dp=ep=dcp=1), or a split such as `tp8`.
 - `hardware`, `status` (`ok` by default, or `all`), `page` (100 rows), `format=csv`.
 
@@ -566,9 +583,9 @@ API selectors, results, and click analytics are unaffected.
 
 ### Share-link control coverage
 
-OperatorX share links keep the category path (including `/zh`) and `workload`,
-`parallel`, `metric`, `model`, `hardware`, and `baseline`. Changing the workload drops
-`hardware` and `baseline`. Chart controls use separate URL keys, so the summary and
+OperatorX share links keep the category path (including `/zh`) and `model`, `parallel`,
+`metric`, `hardware`, and `baseline`. Changing the model on a comparison tab drops `hardware`
+and `baseline`; a legacy `workload` id is replaced by its model. Chart controls use separate URL keys, so the summary and
 scatter charts never overwrite each other. Scatter keys use the `scatter` prefix so they
 never collide with the compare API's `roofline*` summary selectors.
 
@@ -586,8 +603,9 @@ Unknown or malformed URL values fall back to the existing defaults in the UI; th
 reject them with 400. Legend expansion, open dialogs and diagram folds are
 presentation-only and are not persisted.
 
-中文：OperatorX 分享链接保留类别路径（包括 `/zh`）以及 `workload`、`parallel`、`metric`、
-`model`、`hardware` 和 `baseline`；切换工作负载时会清除 `hardware` 和 `baseline`。
+中文：OperatorX 分享链接保留类别路径（包括 `/zh`）以及 `model`、`parallel`、`metric`、
+`hardware` 和 `baseline`；在对比标签切换模型时会清除 `hardware` 和 `baseline`，旧的 `workload`
+ID 会替换为对应模型。
 图表控件使用各自独立的 URL 参数，汇总柱状图与散点图互不覆盖；散点图参数统一以
 `scatter` 为前缀，避免与对比 API 的 `roofline*` 汇总参数重名。模型视图的
 `modelPrecision` 和 `modelBin` 分别对应只读 API `/api/v1/views/operatorx` 的 `precision`

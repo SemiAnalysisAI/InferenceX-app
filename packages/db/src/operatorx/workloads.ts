@@ -64,3 +64,16 @@ export function workloadSources(
   }
   return [...sources.values()];
 }
+
+/**
+ * The workload a request names: its id, or a model (`GLM-5.2`) or label (`Synthetic Shapes`)
+ * whose family's workload it is.
+ */
+export function findWorkload(
+  workloads: readonly WorkloadSource[],
+  name: string | null | undefined,
+): WorkloadSource | undefined {
+  if (!name) return undefined;
+  const family = topLevelModel(name);
+  return workloads.find((w) => w.id === name) ?? workloads.find((w) => w.label === family);
+}

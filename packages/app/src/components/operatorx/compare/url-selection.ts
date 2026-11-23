@@ -1,4 +1,8 @@
-import { topLevelModel } from '@semianalysisai/inferencex-db/operatorx/workloads';
+import {
+  findWorkload,
+  topLevelModel,
+  type WorkloadSource,
+} from '@semianalysisai/inferencex-db/operatorx/workloads';
 
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
@@ -36,4 +40,27 @@ export function listedModel(requested: string, listed: readonly string[]): strin
     listed.find((model) => topLevelModel(model) === requested) ??
     (listed.includes(DEFAULT_OPERATORX_MODEL) ? DEFAULT_OPERATORX_MODEL : listed[0])
   );
+}
+
+/**
+ * The model selector of a comparison: the requested model when it is listed or names a shape
+ * list (`other`, workloads no listed model maps to); otherwise the listed model of the workload
+ * the comparison shows. `measured` is false for a listed model with no workload for this op.
+ */
+export function workloadSelection(
+  workloads: readonly WorkloadSource[],
+  current: string | null,
+  listed: readonly string[],
+  requested: string | null,
+): { model: string; other: string[]; measured: boolean } {
+  const modelOf = (label: string) => listed.find((m) => topLevelModel(m) === label);
+  const other = workloads.filter((w) => !modelOf(w.label)).map((w) => w.label);
+  const shown = workloads.find((w) => w.id === current);
+  const model =
+    requested && (listed.includes(requested) || other.includes(requested))
+      ? requested
+      : shown
+        ? (modelOf(shown.label) ?? shown.label)
+        : (requested ?? '');
+  return { model, other, measured: Boolean(findWorkload(workloads, model)) };
 }

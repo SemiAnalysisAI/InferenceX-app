@@ -21,7 +21,7 @@ import {
 } from './normalize';
 import { compareSplits, parallelKey, parallelLabel } from './parallel';
 import { comparisonDefaults, type ComparisonDefaults } from './visualization';
-import { topLevelModel, type WorkloadSource, workloadSources } from './workloads';
+import { findWorkload, topLevelModel, type WorkloadSource, workloadSources } from './workloads';
 
 /** An op family: GEMM, MoE, or the attention modules (several op types). */
 export type ComparisonOp = 'gemm' | 'moe' | 'attention';
@@ -474,8 +474,7 @@ export function comparisonView(
   model: string | null = null,
   parallel: string | null = null,
 ): ComparisonView {
-  const find = (id: string | null | undefined) =>
-    id ? comparison.workloads.find((w) => w.id === id)?.id : undefined;
+  const find = (name: string | null | undefined) => findWorkload(comparison.workloads, name)?.id;
   const workload = model
     ? null
     : (find(workloadId) ??

@@ -19,12 +19,18 @@ import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
+import { type Model, getModelLabel } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { ControlGroup, OperatorXHeader } from './OperatorXHeader';
+import {
+  ControlGroup,
+  OperatorXHeader,
+  OperatorXModelSelector,
+  useOperatorXModels,
+} from './OperatorXHeader';
 import {
   hardwareLabel,
   operatorXColors,
@@ -40,6 +46,7 @@ import {
   parsePickedHardware,
   setPickedHardware,
   setSearchParam,
+  workloadSelection,
 } from './compare/url-selection';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
@@ -51,15 +58,16 @@ const STRINGS = {
     loading: 'Loading results…',
     controlsGroup: 'Comparison config',
     empty: 'No results yet',
-    workload: 'Workload',
+    noModelResults: (model: string) => `No OperatorX results for ${model} yet`,
+    model: 'Model',
     devices: 'Devices',
     metric: 'Metric',
     baseline: 'Baseline',
     none: 'None',
     oneDevice: '1 GPU',
-    loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
+    loadingModel: (label?: string) => `Loading ${label ?? 'results'}…`,
     tooltips: {
-      workload: 'The model, or shape list, whose operator shapes are compared.',
+      model: 'The model, or shape list, whose operator shapes are compared.',
       devices:
         'How many GPUs each case is split across (tensor, data, expert or context parallel).',
       metric:
@@ -72,15 +80,16 @@ const STRINGS = {
     loading: '正在加载结果…',
     controlsGroup: '对比配置',
     empty: '暂无结果',
-    workload: '工作负载',
+    noModelResults: (model: string) => `${model} 暂无 OperatorX 结果`,
+    model: '模型',
     devices: '设备',
     metric: '指标',
     baseline: '基线',
     none: '无',
     oneDevice: '单 GPU',
-    loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
+    loadingModel: (label?: string) => `正在加载${label ? ` ${label}` : '结果'}…`,
     tooltips: {
-      workload: '参与对比的算子形状所属的模型或形状列表。',
+      model: '参与对比的算子形状所属的模型或形状列表。',
       devices: '每个用例切分到的 GPU 数量（张量、数据、专家或上下文并行）。',
       metric: '每个用例绘制的数值。吞吐量为有效 FLOPs 除以实测延迟，按单 GPU 计算。',
       baseline: '其他 GPU 与之对比的基准 GPU。选择后会增加“相对基线的优势”图。',
@@ -94,12 +103,18 @@ function setParam(key: string, value: string) {
   replaceClientSearch(params);
 }
 
-/** A new workload drops the GPU picks and baseline, which belong to the old one. */
-function setWorkload(value: string) {
+/**
+ * Opens a model's workload; a legacy `workload` id gives way to it. Picking a model drops the
+ * GPU picks and baseline, which belong to the old one.
+ */
+function setModel(value: string, keepSelection = false) {
   const params = new URLSearchParams(window.location.search);
-  params.set('workload', value);
-  params.delete(HARDWARE_PARAM);
-  params.delete(BASELINE_PARAM);
+  params.set('model', value);
+  params.delete('workload');
+  if (!keepSelection) {
+    params.delete(HARDWARE_PARAM);
+    params.delete(BASELINE_PARAM);
+  }
   replaceClientSearch(params);
 }
 
@@ -166,7 +181,7 @@ function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDe
   return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
 }
 
-const CONTROL_LABELS = ['workload', 'devices', 'metric', 'baseline'] as const;
+const CONTROL_LABELS = ['model', 'devices', 'metric', 'baseline'] as const;
 
 /**
  * Loading state laid out like the loaded dashboard (header and controls card, then each
@@ -185,10 +200,15 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
       <OperatorXHeader>
         <ControlPanel
           legend={strings.controlsGroup}
-          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5"
         >
           {CONTROL_LABELS.map((key) => (
-            <ControlGroup key={key} label={strings[key]} tooltip={strings.tooltips[key]}>
+            <ControlGroup
+              key={key}
+              label={strings[key]}
+              tooltip={strings.tooltips[key]}
+              className={key === 'model' ? 'lg:col-span-2' : undefined}
+            >
               <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
             </ControlGroup>
           ))}
@@ -215,7 +235,12 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     isLoading,
     isPlaceholderData: switching,
     refetch,
-  } = useOperatorXComparison(op, search.get('workload'), search.get('parallel'));
+  } = useOperatorXComparison(
+    op,
+    search.get('workload') ?? search.get('model'),
+    search.get('parallel'),
+  );
+  const models = useOperatorXModels();
   const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
   // GPU picks and the baseline live in the address bar so share links reproduce them.
   const pickedParam = search.get(HARDWARE_PARAM);
@@ -278,6 +303,20 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     );
   }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
 
+  // The selector lists InferenceX models; a legacy `workload` id or an unknown model gives way
+  // to the model of the workload shown, keeping the link's GPU picks.
+  const legacyWorkload = search.has('workload');
+  const requested = legacyWorkload ? null : search.get('model');
+  const selection = useMemo(
+    () => view && workloadSelection(view.workloads, view.workload, models, requested),
+    [view, models, requested],
+  );
+  useEffect(() => {
+    if (!selection || switching || models.length === 0) return;
+    if (legacyWorkload || (requested && requested !== selection.model))
+      setModel(selection.model, true);
+  }, [selection, switching, models, legacyWorkload, requested]);
+
   if (error)
     return (
       <>
@@ -290,10 +329,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         />
       </>
     );
-  if (isLoading || !view || !model) return <ComparisonSkeleton op={op} />;
-  const pending = switching
-    ? view.workloads.find((w) => w.id === search.get('workload'))
-    : undefined;
+  if (isLoading || !view || !model || !selection) return <ComparisonSkeleton op={op} />;
   if (view.workloads.length === 0)
     return (
       <>
@@ -307,32 +343,19 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
       <OperatorXHeader>
         <ControlPanel
           legend={strings.controlsGroup}
-          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5"
           data-testid="operatorx-controls"
         >
-          <ControlGroup
-            label={strings.workload}
-            tooltip={strings.tooltips.workload}
-            htmlFor="operatorx-workload"
-          >
-            <SearchableSelect
-              triggerId="operatorx-workload"
-              value={pending?.id ?? view.workload ?? ''}
-              onValueChange={(v) => {
-                track('operatorx_workload_selected', { op, workload: v });
-                setWorkload(v);
-              }}
-              groups={[
-                {
-                  label: '',
-                  options: view.workloads.map((w) => ({
-                    value: w.id,
-                    label: w.label,
-                  })),
-                },
-              ]}
-            />
-          </ControlGroup>
+          <OperatorXModelSelector
+            id="operatorx-workload"
+            value={selection.model}
+            models={models}
+            other={selection.other}
+            onChange={(v) => {
+              track('operatorx_model_selected', { op, model: v });
+              setModel(v);
+            }}
+          />
           <ControlGroup
             label={strings.devices}
             tooltip={strings.tooltips.devices}
@@ -408,17 +431,28 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             />
           </ControlGroup>
         </ControlPanel>
-        <div className="border-t border-border/30 pt-3">
-          <CoverageStrip model={model} />
-        </div>
+        {selection.measured && (
+          <div className="border-t border-border/30 pt-3">
+            <CoverageStrip model={model} />
+          </div>
+        )}
       </OperatorXHeader>
-      <Pending active={switching} label={strings.loadingWorkload(pending?.label)}>
-        <div className="flex flex-col gap-4">
-          {visibleVisualizations(op, baseline).map((viz, index) => (
-            <VizCard key={viz.id} model={model} viz={viz} eager={index === 0} />
-          ))}
-        </div>
-      </Pending>
+      {selection.measured ? (
+        <Pending
+          active={switching}
+          label={strings.loadingModel(getModelLabel(selection.model as Model))}
+        >
+          <div className="flex flex-col gap-4">
+            {visibleVisualizations(op, baseline).map((viz, index) => (
+              <VizCard key={viz.id} model={model} viz={viz} eager={index === 0} />
+            ))}
+          </div>
+        </Pending>
+      ) : (
+        <EmptyState className="min-h-80" data-testid="operatorx-model-empty">
+          {strings.noModelResults(getModelLabel(selection.model as Model))}
+        </EmptyState>
+      )}
       <CaseDetail
         op={op}
         view={view}

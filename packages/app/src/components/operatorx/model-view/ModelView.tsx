@@ -21,9 +21,7 @@ import type {
 import { compareSplits, parallelLabel } from '@semianalysisai/inferencex-db/operatorx/parallel';
 import { topLevelModel } from '@semianalysisai/inferencex-db/operatorx/workloads';
 import { BLOCK_COLORS } from '@/components/inference/ui/model-architecture-diagram-renderer';
-import { ModelArchitectureInfoLink } from '@/components/inference/ui/ModelArchitectureInfoLink';
 import { Card } from '@/components/ui/card';
-import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
@@ -45,18 +43,19 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { prefetchOperatorXTimelines } from '@/hooks/api/use-operatorx';
-import { useAvailability } from '@/hooks/api/use-availability';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { type Model, getModelLabel, isRegisteredModel } from '@/lib/catalog/data-mappings';
-import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
+import { type Model, getModelLabel } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
-import { resolveAvailableModels, selectableInferenceModels } from '@/providers/GlobalFilterContext';
 
 import { CaseDetail } from '../CaseDetail';
-import { ControlGroup, OperatorXHeader } from '../OperatorXHeader';
+import {
+  ControlGroup,
+  OperatorXHeader,
+  OperatorXModelSelector,
+  useOperatorXModels,
+} from '../OperatorXHeader';
 import {
   hardwareLabel,
   measuredHardware,
@@ -829,15 +828,6 @@ const BlockRows = memo(
 );
 
 /** The inference page's model list, from the same availability and feature gate. */
-function useModelOptions(): string[] {
-  const { data: availability } = useAvailability();
-  const unlocked = useFeatureGate();
-  return useMemo(
-    () => selectableInferenceModels(resolveAvailableModels(availability, [], unlocked), unlocked),
-    [availability, unlocked],
-  );
-}
-
 const ModelControls = memo(
   ({
     requested,
@@ -865,21 +855,14 @@ const ModelControls = memo(
       className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5"
       data-testid="operatorx-model-controls"
     >
-      <ModelSelector
+      <OperatorXModelSelector
         id="operatorx-model"
         value={requested}
+        models={modelOptions}
         onChange={(v) => {
           track('operatorx_model_selected', { model: v });
           setParam('model', v);
         }}
-        availableModels={modelOptions}
-        data-testid="operatorx-model"
-        trailing={
-          isRegisteredModel(requested) ? (
-            <ModelArchitectureInfoLink model={requested} locale={locale} />
-          ) : undefined
-        }
-        newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
       />
       <ControlGroup
         label={STRINGS[locale].devices}
@@ -1151,7 +1134,7 @@ export function ModelView({
   );
   // GPUs with results at the selected device split
   const atSplitViews = useMemo(() => views.filter((v) => v.parallel === split), [views, split]);
-  const modelOptions = useModelOptions();
+  const modelOptions = useOperatorXModels();
   useEffect(() => {
     const listed = listedModel(requested, modelOptions);
     if (listed && listed !== requested) setParam('model', listed);

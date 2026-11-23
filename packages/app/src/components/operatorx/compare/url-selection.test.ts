@@ -11,6 +11,7 @@ import {
   parsePickedHardware,
   setPickedHardware,
   setSearchParam,
+  workloadSelection,
 } from './url-selection';
 
 function stubSearch(search: string) {
@@ -67,5 +68,35 @@ describe('listedModel', () => {
     expect(listedModel('GLM-5.x', ['Kimi-K3', 'DeepSeek-R1-0528'])).toBe('DeepSeek-R1-0528');
     expect(listedModel('nope', ['Kimi-K3'])).toBe('Kimi-K3');
     expect(listedModel('nope', [])).toBeUndefined();
+  });
+});
+
+describe('workloadSelection', () => {
+  const workloads = [
+    { id: 'gemm:GLM-5', label: 'GLM-5.x' },
+    { id: 'gemm:Synthetic-Shapes', label: 'Synthetic Shapes' },
+  ];
+  const listed = ['GLM-5.2', 'Kimi-K3.1-Pro'];
+
+  it('shows the listed model of the workload a legacy id or no model opens', () => {
+    expect(workloadSelection(workloads, 'gemm:GLM-5', listed, null)).toEqual({
+      model: 'GLM-5.2',
+      other: ['Synthetic Shapes'],
+      measured: true,
+    });
+  });
+
+  it('keeps a listed model or shape list, and marks a model without a workload', () => {
+    expect(
+      workloadSelection(workloads, 'gemm:Synthetic-Shapes', listed, 'Synthetic Shapes'),
+    ).toMatchObject({ model: 'Synthetic Shapes', measured: true });
+    expect(workloadSelection(workloads, 'gemm:GLM-5', listed, 'Kimi-K3.1-Pro')).toMatchObject({
+      model: 'Kimi-K3.1-Pro',
+      measured: false,
+    });
+  });
+
+  it('replaces an unknown model with the model of the workload shown', () => {
+    expect(workloadSelection(workloads, 'gemm:GLM-5', listed, 'nope').model).toBe('GLM-5.2');
   });
 });

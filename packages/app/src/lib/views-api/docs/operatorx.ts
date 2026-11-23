@@ -47,8 +47,8 @@ const parameters: readonly ApiParameter[] = [
   ),
   query(
     'workload',
-    'Workload source id from options.workloads, such as attention:Kimi-K3. Defaults to the best-covered workload. Mutually exclusive with model.',
-    'options.workloads 中的工作负载 ID，例如 attention:Kimi-K3。默认选择覆盖最广的工作负载。不能与 model 同时使用。',
+    'Workload source id from options.workloads, such as attention:Kimi-K3, or an InferenceX model or workload label from the page selector, resolved to that workload. Defaults to the best-covered workload. Mutually exclusive with model.',
+    'options.workloads 中的工作负载 ID，例如 attention:Kimi-K3；也可以是页面选择器中的 InferenceX 模型或工作负载名称，会解析为对应的工作负载。默认选择覆盖最广的工作负载。不能与 model 同时使用。',
     stringSchema,
     'attention:DeepSeek-V4-Pro',
   ),

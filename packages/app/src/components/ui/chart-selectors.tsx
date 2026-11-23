@@ -148,6 +148,8 @@ interface ModelSelectorProps {
   modelDetails?: ReadonlyMap<string, ReactNode>;
   /** Called with a model once the user shows intent toward its option. */
   onOptionIntent?: (value: Model) => void;
+  /** A trailing section of choices that are not models, with its `?` help. */
+  extraSection?: { label: string; reason: string; options: readonly string[] };
 }
 
 export function ModelSelector({
@@ -162,6 +164,7 @@ export function ModelSelector({
   newModels,
   modelDetails,
   onOptionIntent,
+  extraSection,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels.filter(isRegisteredModel), (m) =>
@@ -234,6 +237,21 @@ export function ModelSelector({
               />
             ),
             options: unregistered.map(optionFor),
+          },
+        ]
+      : []),
+    ...(extraSection && extraSection.options.length > 0
+      ? [
+          {
+            id: 'extra',
+            header: (
+              <CategorySectionTitle
+                id="extra"
+                label={extraSection.label}
+                reason={extraSection.reason}
+              />
+            ),
+            options: extraSection.options.map((option) => toOption(option)),
           },
         ]
       : []),

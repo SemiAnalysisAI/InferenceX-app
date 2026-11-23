@@ -11,6 +11,7 @@ import {
   comparisonView,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
+import { findWorkload } from '@semianalysisai/inferencex-db/operatorx/workloads';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import type { ComparisonModel } from './compare/model';
@@ -25,8 +26,11 @@ const state = {
 
 mock.module('next/navigation', () => ({ usePathname: () => '/opx' }));
 mock.module('@/hooks/api/use-operatorx', () => ({
+  // The compare API resolves a workload id or a model name to its workload.
   useOperatorXComparison: (_op: string, workload: string | null) => ({
-    data: state.loading ? undefined : state.views.get(workload),
+    data: state.loading
+      ? undefined
+      : state.views.get(findWorkload(comparison.workloads, workload)?.id ?? null),
     error: null,
     isLoading: state.loading,
     isPlaceholderData: false,
@@ -160,12 +164,12 @@ afterEach(() => {
 });
 
 describe('ComparisonDashboard live state', () => {
-  it('rebuilds the chart model from the new workload and its own GPU list', () => {
+  it('rebuilds the chart model from the new model and its own GPU list', () => {
     expect(shared.hardware).toHaveLength(2);
     expect(single.hardware).toHaveLength(1);
     expect(state.models.at(-1)!.view).toBe(sharedView);
 
-    act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
+    act(() => replaceClientSearch(new URLSearchParams({ model: single.label })));
 
     // Every model the charts rendered pairs a view with that view's GPU list.
     for (const model of state.models) {
@@ -177,11 +181,11 @@ describe('ComparisonDashboard live state', () => {
     expect(latest.hardware).toEqual(single.hardware);
   });
 
-  it('never empties the GPU selection when toggling after a workload switch', () => {
+  it('never empties the GPU selection when toggling after a model switch', () => {
     act(() => state.models.at(-1)!.remove(state.models.at(-1)!.available[0]));
     expect(state.models.at(-1)!.hardware).toHaveLength(1);
 
-    act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
+    act(() => replaceClientSearch(new URLSearchParams({ model: single.label })));
     const [only] = state.models.at(-1)!.available;
     expect(state.models.at(-1)!.hardware).toEqual([only]);
 
@@ -227,7 +231,7 @@ describe('ComparisonDashboard live state', () => {
   });
 
   it('opens case detail with the view and GPUs of the clicked chart', () => {
-    act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
+    act(() => replaceClientSearch(new URLSearchParams({ model: single.label })));
     const clicked = state.models.at(-1)!;
 
     act(() => clicked.inspect(0));
@@ -254,7 +258,7 @@ describe('ComparisonDashboard loading state', () => {
     const loading = container.querySelector('[data-testid="operatorx-loading"]');
     expect(loading?.getAttribute('aria-busy')).toBe('true');
     expect(loading?.querySelector('h1')?.textContent).toContain('OperatorX');
-    expect(loading?.textContent).toContain('Workload');
+    expect(loading?.textContent).toContain('Model');
     expect(loading?.textContent).toContain('Metric');
     expect(loading?.textContent).toContain('Baseline');
     const placeholder = container.querySelector('[data-testid="operatorx-viz-skeleton-probe"]');

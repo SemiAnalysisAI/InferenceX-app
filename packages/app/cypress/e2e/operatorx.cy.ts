@@ -62,7 +62,7 @@ it('shows measured and missing GPU coverage, then links to MoE and back', () => 
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
-  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro');
+  cy.visit('/opx/gemm?model=gpt-oss-120b');
   cy.wait('@gemm');
   cy.get('[data-testid="operatorx-page"] h1')
     .should('contain.text', 'OperatorX')
@@ -76,11 +76,11 @@ it('shows measured and missing GPU coverage, then links to MoE and back', () => 
 
   cy.get('[data-testid="operatorx-page"] nav')
     .contains('a', 'MoE')
-    .should('have.attr', 'href', '/opx/moe?model=DeepSeek-V4-Pro')
+    .should('have.attr', 'href', '/opx/moe?model=gpt-oss-120b')
     .click();
   cy.wait('@moe');
   cy.location('pathname').should('eq', '/opx/moe');
-  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
+  cy.location('search').should('eq', '?model=gpt-oss-120b');
   cy.contains('No results yet').should('be.visible');
   cy.contains('[data-testid="operatorx-page"] nav a', 'MoE').should(
     'have.attr',
@@ -106,10 +106,10 @@ it('shows measured and missing GPU coverage, then links to MoE and back', () => 
 
 it('keeps the view filters when the current category is clicked again', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm);
-  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro&parallel=tp8');
+  cy.visit('/opx/gemm?model=gpt-oss-120b&parallel=tp8');
   cy.contains('[data-testid="operatorx-page"] nav a', 'GEMM').click();
   cy.location('pathname').should('eq', '/opx/gemm');
-  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro&parallel=tp8');
+  cy.location('search').should('eq', '?model=gpt-oss-120b&parallel=tp8');
 });
 
 it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
@@ -123,9 +123,9 @@ it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () =
 });
 
 it('redirects a legacy ?op= link to the category path', () => {
-  cy.request({ url: '/opx?op=model&model=DeepSeek-V4-Pro', followRedirect: false })
+  cy.request({ url: '/opx?op=model&model=gpt-oss-120b', followRedirect: false })
     .its('headers.location')
-    .should('match', /\/opx\/model\?model=DeepSeek-V4-Pro$/u);
+    .should('match', /\/opx\/model\?model=gpt-oss-120b$/u);
   cy.visit('/opx?op=model');
   cy.location('pathname').should('eq', '/opx/model');
   cy.location('search').should('eq', '');
@@ -633,4 +633,22 @@ it('lists the inference models and opens an OperatorX family link on its listed 
     .should('contain.text', 'Maintenance Mode')
     .and('contain.text', 'Deprecated')
     .and('contain.text', 'DeepSeek V4.1 Flash 552B');
+});
+
+it('picks comparison workloads with the inference model selector and redirects workload links', () => {
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
+  cy.visit('/opx/gemm?workload=gemm:gpt-oss-120b&hardware=h200');
+  // A workload id opens on the listed model of its family and keeps the link's GPU picks.
+  cy.location('search').should('eq', '?hardware=h200&model=gpt-oss-120b');
+  cy.get('[data-testid="operatorx-workload"]').should('contain.text', 'gpt-oss 120B').click();
+  cy.get('[data-slot="select-content"]')
+    .should('contain.text', 'Maintenance Mode')
+    .and('contain.text', 'Deprecated');
+  cy.get('body').type('{esc}');
+  // A listed model without a workload for this op keeps its selection and says so.
+  cy.visit('/opx/gemm?model=Kimi-K3.1-Pro');
+  cy.get('[data-testid="operatorx-model-empty"]').should(
+    'contain.text',
+    'No OperatorX results for Kimi K3.1 Pro 2.8T yet',
+  );
 });

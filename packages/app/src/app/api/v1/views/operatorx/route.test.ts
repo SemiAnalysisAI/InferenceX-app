@@ -91,3 +91,12 @@ it('resolves an InferenceX model from the page selector to its OperatorX family'
   }
   expect(await get('model=Kimi-K2.5')).toHaveProperty('status', 400);
 });
+
+it('resolves an InferenceX model or workload label to its workload', async () => {
+  for (const workload of ['gemm:test', 'Test']) {
+    const response = await get(`workload=${workload}`);
+    const body = await response.json();
+    expect(body.params.workload).toBe('gemm:test');
+  }
+  expect(await get('workload=nope')).toHaveProperty('status', 400);
+});

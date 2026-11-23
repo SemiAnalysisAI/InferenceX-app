@@ -686,9 +686,11 @@ Page share links keep the selection in plain query params: `workload` or `model`
 `parallel`, `metric`, `hardware` (comma-separated GPU keys, same as the view API's
 `hardware`), and `baseline` (presentation-only; it picks the speedup reference and
 does not change returned rows). The view response's `url` carries `hardware` when narrowed.
-The Model View's `model` is an InferenceX model from the same selector as `/infx`; the view
-API resolves it to its OperatorX family (`GLM-5.2` reads `GLM-5.x`). A family link such as
-`model=GLM-5.x` opens on that family's first listed model, and a listed model with no
+Every OperatorX tab's `model` is an InferenceX model from the same selector as `/infx`. On
+GEMM, MoE and Attention it opens that model's family workload: pass it to the view API as
+`workload` (`workload=GLM-5.2` reads `gemm:GLM-5`); shape lists such as `Synthetic Shapes`
+are passed by label. In Model View pass it as `model` (`GLM-5.2` reads `GLM-5.x`). Legacy
+`workload=<id>` and family links redirect to the listed model; a listed model with no
 OperatorX results shows an empty state.
 Its other `/api/v1/operatorx/*` routes belong to the page and are not part of this
 skill's read-only view API. The page-owned
