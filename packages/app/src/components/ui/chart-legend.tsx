@@ -53,8 +53,6 @@ const STRETCHED_LEGEND_QUERY = '(min-width: 64rem)';
 export interface LegendSwitchConfig {
   id: string;
   label: string;
-  /** Short muted note after the label, such as how much the switch changes. */
-  detail?: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   infoTooltip?: React.ReactNode;
@@ -356,10 +354,9 @@ export default function ChartLegend({
             <LegendSwitch config={sw} />
             <Label
               htmlFor={sw.id}
-              className="gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
             >
               {sw.label}
-              {sw.detail && <span className="tabular-nums">{sw.detail}</span>}
             </Label>
             {sw.infoTooltip && (
               <InfoHelp
