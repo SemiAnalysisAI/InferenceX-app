@@ -374,7 +374,7 @@ describe('history projection version', () => {
       projection: 6,
       // Re-pinned after the unofficial-run provider and banner gained unavailable-run states. They are
       // reached only through a type import and React context, so recorded entries are unchanged.
-      sources: 'a5da5be8db577909ed2993499ecc69291226461a2527a72ce5e3d1794d0691c7',
+      sources: '79700f5f33940e35a9593b8bf79d3bdbd01f5ca468f66981dfa00ea88fe128b8',
     });
   });
 });

@@ -472,8 +472,7 @@ export function UnofficialRunProvider({
 
   const dismissRun = useCallback(
     (runId: string) => {
-      const target = unofficialRunInfos.find((run) => String(run.id) === runId);
-      if (!target) return;
+      if (!runIds.includes(runId)) return;
       const remainingIds = runIds.filter((id) => id !== runId);
       if (remainingIds.length > 0 && query.data) {
         queryClient.setQueryData<UnofficialRunResponse>(
@@ -488,7 +487,7 @@ export function UnofficialRunProvider({
       window.history.pushState({}, '', url);
       notifyClientSearchChange(url.href);
     },
-    [runIds, unofficialRunInfos, query.data, queryClient],
+    [runIds, query.data, queryClient],
   );
 
   const runIndexByUrl = useMemo(() => {

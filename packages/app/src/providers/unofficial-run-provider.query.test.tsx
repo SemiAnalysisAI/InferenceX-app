@@ -225,6 +225,8 @@ describe('UnofficialRunProvider query lifecycle', () => {
         '/infx/evaluation',
       ),
     ).toBeNull();
+    act(() => dismissLatest?.('27968834654'));
+    expect(window.location.search).toBe('');
     act(() => root.unmount());
   });
 });
