@@ -74,7 +74,6 @@ function fakeTransactionSql(
     }
     return Promise.resolve([]);
   }) as any;
-  tag.array = (value: unknown) => value;
   tag.begin = (fn: (tx: typeof tag) => Promise<void>) => fn(tag);
   return { sql: tag as Sql, calls };
 }
@@ -85,7 +84,6 @@ function captureInsertSql() {
     calls.push({ text: strings.join('?').replaceAll(/\s+/gu, ' ').trim(), values });
     return Promise.resolve([]);
   }) as any;
-  tag.array = (value: unknown) => value;
   return { sql: tag as Sql, calls };
 }
 
@@ -130,7 +128,7 @@ describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
 
     const { text } = calls[0];
     expect(text).toContain('metrics, workers, power_invalid_reasons, power_audit )');
-    expect(text.match(/::jsonb\[\]/gu)).toHaveLength(4);
+    expect(text.match(/::text\[\]\)::jsonb/gu)).toHaveLength(4);
     expect(text).toContain('power_invalid_reasons = excluded.power_invalid_reasons');
     expect(text).toContain('coalesce(excluded.power_audit, benchmark_results.power_audit)');
   });

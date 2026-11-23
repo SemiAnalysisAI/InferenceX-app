@@ -192,7 +192,9 @@ export async function getTraceServerMetrics(
       (atr.server_metrics_json_gz is not null) as has_blob,
       case when summary.is_current then encode(atr.chart_series_summary_gz, 'base64') end as summary_gz,
       case
-        when summary.is_current or atr.chart_series is null then null
+        -- Rows written before the write-back cast fix can hold the series as a jsonb string, which
+        -- the key-delete operator rejects. Treat them as stale so the blob recompute rewrites them.
+        when summary.is_current or jsonb_typeof(atr.chart_series) is distinct from 'object' then null
         else atr.chart_series - 'metricSources'
       end as chart_series,
       case when summary.is_current then '[]'::jsonb else coalesce((

@@ -1,17 +1,15 @@
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { DbClient } from '../connection';
+
+import { pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getImageAgeObservations, getLatestImages } from './latest-images';
 
 let db: PGlite;
-const sql: DbClient = async (strings, ...values) => {
-  const text = strings.reduce((query, part, i) => query + (i ? `$${i}` : '') + part, '');
-  const result = await db.query<Record<string, unknown>>(text, values);
-  return result.rows;
-};
+let sql: PgliteSql;
 
 beforeAll(async () => {
   db = await PGlite.create();
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     CREATE TABLE configs (id int, model text, hardware text, framework text, precision text, spec_method text, disagg boolean);
     CREATE TABLE benchmark_results (config_id int, benchmark_type text, isl int, osl int, date date, image text, error text);
@@ -37,6 +35,7 @@ beforeAll(async () => {
   `);
 }, 20_000);
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

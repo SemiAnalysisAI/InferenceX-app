@@ -24,7 +24,7 @@ export function ingestEvalRow(
 
   return sql.begin(async (tx) => {
     await tx`select id from workflow_runs where id = ${workflowRunId} for update`;
-    const [existing] = await tx<{ id: number }[]>`
+    const [existing] = await tx<{ id: string }[]>`
       update eval_results set metrics = ${tx.json(p.metrics)}
       where id = (
         select id from eval_results
@@ -37,7 +37,7 @@ export function ingestEvalRow(
       )
       returning id
     `;
-    if (existing) return { outcome: 'dup' as const, id: existing.id };
+    if (existing) return { outcome: 'dup' as const, id: Number(existing.id) };
     return insertEvalRow(tx, configId, p, workflowRunId, date);
   });
 }
@@ -49,7 +49,8 @@ async function insertEvalRow(
   workflowRunId: number,
   date: string,
 ): Promise<{ outcome: 'new' | 'dup'; id: number }> {
-  const [row] = await sql<{ inserted: boolean; id: number }[]>`
+  // postgres.js returns bigint columns as strings.
+  const [row] = await sql<{ inserted: boolean; id: string }[]>`
     insert into eval_results (
       workflow_run_id, config_id, task, date,
       isl, osl, conc, lm_eval_version, metrics
@@ -62,5 +63,5 @@ async function insertEvalRow(
     do update set metrics = excluded.metrics
     returning id, (xmax = 0) as inserted
   `;
-  return { outcome: row.inserted ? 'new' : 'dup', id: row.id };
+  return { outcome: row.inserted ? 'new' : 'dup', id: Number(row.id) };
 }

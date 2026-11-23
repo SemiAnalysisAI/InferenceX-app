@@ -22,7 +22,7 @@ import {
   purgeBenchmarkPoints,
   purgeWorkflowRuns,
 } from './run-override-actions';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 import {
   type Row,
   type Snapshot,
@@ -37,11 +37,12 @@ let before: Snapshot;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   spyOn(console, 'log').mockImplementation(() => {});
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

@@ -1,33 +1,15 @@
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
-import type postgres from 'postgres';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'bun:test';
+
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { ingestEvalRow, type EvalPersistenceInput } from './eval-ingest';
 
-type Sql = postgres.Sql;
 let db: PGlite;
-let sql: Sql;
-
-function queryClient(database: Pick<PGlite, 'query'>) {
-  return Object.assign(
-    async (strings: TemplateStringsArray, ...values: unknown[]) => {
-      const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-      const result = await database.query(query, values);
-      return result.rows;
-    },
-    { json: JSON.stringify },
-  );
-}
+let sql: PgliteSql;
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '002_eval_samples.sql']) {
-    await db.exec(readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
-  }
-  sql = Object.assign(queryClient(db), {
-    begin: (fn: (tx: Sql) => Promise<unknown>) =>
-      db.transaction((tx) => fn(queryClient(tx) as unknown as Sql)),
-  }) as unknown as Sql;
+  db = await migratedPglite();
+  sql = await pgliteDriverSql(db);
 }, 20_000);
 
 beforeEach(async () => {
@@ -40,6 +22,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

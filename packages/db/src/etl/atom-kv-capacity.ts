@@ -97,7 +97,7 @@ export async function updateAtomKvCachePoolTokens(
     select br.id, br.server_log_id
     from benchmark_results br
     join configs c on c.id = br.config_id
-    where br.id = any(${sql.array([...benchmarkIds])}::bigint[])
+    where br.id = any(${[...benchmarkIds]}::bigint[])
       and c.framework = 'atom' and not c.disagg
       and br.server_log_id is not null
     order by br.id

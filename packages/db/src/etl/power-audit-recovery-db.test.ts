@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { applyAgentxAudits } from './power-audit-recovery';
 
 let db: PGlite;
@@ -12,10 +12,11 @@ const START = 1789194365;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 20_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

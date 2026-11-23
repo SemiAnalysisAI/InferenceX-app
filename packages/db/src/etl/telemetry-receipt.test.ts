@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { stablePowerPointIdentity } from './power-publication';
 
 import {
@@ -196,9 +196,10 @@ describe('persisted telemetry receipts', () => {
   let sql: PgliteSql;
   beforeAll(async () => {
     db = await migratedPglite();
-    sql = pgliteSql(db);
+    sql = await pgliteDriverSql(db);
   }, 20_000);
   afterAll(async () => {
+    await sql?.end();
     await db?.close();
   });
   beforeEach(async () => {

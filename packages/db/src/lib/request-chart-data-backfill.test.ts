@@ -16,7 +16,7 @@ import {
   writeRequestChartColumns,
 } from './request-chart-data-backfill';
 import { writeRequestTimelineGz } from './request-timeline-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 function timelineFor(seed: number): RequestTimeline {
   return {
@@ -62,7 +62,7 @@ async function storedColumns(id: number): Promise<ColumnsRow> {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
     VALUES (1, 34557177019, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -73,6 +73,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

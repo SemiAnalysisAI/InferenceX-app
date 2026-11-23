@@ -7,7 +7,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, expect, it, mock, spyOn } from 'bun:test';
 
 import { stubEnv, unstubAllEnvs } from './lib/test-helpers';
-import { migratedPglite, pgliteSql } from './lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './lib/test-pglite';
 
 const files = fs
   .readdirSync(path.join(import.meta.dirname, '..', 'migrations'))
@@ -16,6 +16,7 @@ const files = fs
 const [newest] = files.slice(-1);
 
 let db: PGlite;
+let endDriver: PgliteSql['end'] | undefined;
 let exitCode: typeof process.exitCode;
 let stdout: string[];
 let stderr: string[];
@@ -30,7 +31,8 @@ beforeAll(async () => {
     await db.query('insert into schema_migrations (filename) values ($1)', [file]);
   }
 
-  const sql = pgliteSql(db);
+  const sql = await pgliteDriverSql(db);
+  endDriver = sql.end.bind(sql);
   const { promise: ended, resolve: end } = Promise.withResolvers<void>();
   mock.module('./etl/db-utils', () => ({
     createAdminSql: () => Object.assign(sql, { end: () => Promise.resolve(end()) }),
@@ -56,6 +58,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await endDriver?.();
   await db?.close();
 });
 

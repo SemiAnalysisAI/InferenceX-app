@@ -183,7 +183,7 @@ async function expectRecoveredAudits(
     select c.*, br.id, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,
       br.recipe_fingerprint
     from benchmark_results br join configs c on c.id = br.config_id
-    where br.id = any(${sql.array(audits.map((audit) => audit.benchmarkResultId))}::bigint[])
+    where br.id = any(${audits.map((audit) => audit.benchmarkResultId)}::bigint[])
   `;
   for (const row of rows) {
     const identity = stablePowerPointIdentity(row);

@@ -53,8 +53,11 @@ runs:
         key: ${{ github.repository }}-cypress-binary-${{ runner.arch }}
         path: /home/runner/.cache/Cypress
         commit: ${{ inputs.commit }}
+    # The disk holds one folder per Cypress version and its key does not change with the version.
+    # After a version bump, verify fails until install adds the new folder. Prune then drops the
+    # old ones, so the disk the Warm CI caches workflow commits keeps only the current binary.
     - name: Install Cypress binary if missing
       if: ${{ inputs.cypress-binary == 'true' }}
       shell: bash
       working-directory: packages/app
-      run: bunx cypress verify || bunx cypress install
+      run: bunx cypress verify || { bunx cypress install && bunx cypress cache prune; }

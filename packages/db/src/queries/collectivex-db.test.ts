@@ -9,7 +9,7 @@ import { type ChangelogEntry, linkRows } from '../collectivex/changelog';
 import { buildUploadedRun, validateResults } from '../collectivex/results-upload';
 import { makeRawMatrix, makeRawShard } from '../collectivex/test-fixture';
 import { planUpload } from '../ingest-collectivex';
-import { pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import {
   collectiveXDatasetFromRow,
   deleteCollectiveXRun,
@@ -46,10 +46,6 @@ beforeAll(async () => {
   template = await db.dumpDataDir('none');
   await db.close();
 });
-
-async function collectiveXDb(): Promise<PgliteSql> {
-  return pgliteSql(await PGlite.create({ loadDataDir: template }));
-}
 
 function result(sku: string, vendor: 'amd' | 'nvidia', sourceSha: string): Json {
   return {
@@ -110,13 +106,17 @@ function runOf(docs: Json[], now: Date, maxStoredRunId: string | null = null) {
   return buildUploadedRun(validateResults({ files }), null, { maxStoredRunId, now });
 }
 
+let db: PGlite;
 let sql: PgliteSql;
 
 beforeEach(async () => {
-  sql = await collectiveXDb();
+  db = await PGlite.create({ loadDataDir: template });
+  sql = await pgliteDriverSql(db);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await sql?.end();
+  await db?.close();
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -331,30 +331,35 @@ describe('CollectiveX changelog links in PostgreSQL', () => {
 
 describe('migration 005', () => {
   it('drops lazy-ingest runs that would outrank uploaded runs, and forbids new ones', async () => {
-    const db = await PGlite.create();
-    await applyMigrations(db, (name) => name < '005');
-    const legacy = pgliteSql(db);
-    const first = runOf([mi300x], FIRST_AT);
-    await upsertCollectiveXRun(legacy, first.run, first.docs);
-    await upsertCollectiveXRun(
-      legacy,
-      { ...first.run, run_id: '37459990486', source_sha: NVIDIA_SHA },
-      first.docs,
-    );
-    const before = await getLatestCollectiveXRun(legacy, 1);
-    expect(before?.run_id).toBe('37459990486');
-
-    await applyMigrations(db, (name) => name >= '005');
-    const after = await getLatestCollectiveXRun(legacy, 1);
-    expect(after?.run_id).toBe(first.run.run_id);
-    const [{ count }] = await legacy`SELECT count(*)::int AS count FROM cx_run_docs`;
-    expect(count).toBe(1);
-    await expect(
-      upsertCollectiveXRun(
+    const legacyDb = await PGlite.create();
+    await applyMigrations(legacyDb, (name) => name < '005');
+    const legacy = await pgliteDriverSql(legacyDb);
+    try {
+      const first = runOf([mi300x], FIRST_AT);
+      await upsertCollectiveXRun(legacy, first.run, first.docs);
+      await upsertCollectiveXRun(
         legacy,
-        { ...first.run, run_id: '37459990487', source_sha: NVIDIA_SHA },
+        { ...first.run, run_id: '37459990486', source_sha: NVIDIA_SHA },
         first.docs,
-      ),
-    ).rejects.toThrow(/cx_runs_committed_run_id/u);
+      );
+      const before = await getLatestCollectiveXRun(legacy, 1);
+      expect(before?.run_id).toBe('37459990486');
+
+      await applyMigrations(legacyDb, (name) => name >= '005');
+      const after = await getLatestCollectiveXRun(legacy, 1);
+      expect(after?.run_id).toBe(first.run.run_id);
+      const [{ count }] = await legacy`SELECT count(*)::int AS count FROM cx_run_docs`;
+      expect(count).toBe(1);
+      await expect(
+        upsertCollectiveXRun(
+          legacy,
+          { ...first.run, run_id: '37459990487', source_sha: NVIDIA_SHA },
+          first.docs,
+        ),
+      ).rejects.toThrow(/cx_runs_committed_run_id/u);
+    } finally {
+      await legacy.end();
+      await legacyDb.close();
+    }
   });
 });

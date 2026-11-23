@@ -341,7 +341,7 @@ export async function saveOperatorXBundle(
         const chunk = shard.docs.slice(i, i + DOCS_INSERT_CHUNK).map((d) => JSON.stringify(d));
         await tx`
           INSERT INTO opx_run_docs (run_id, run_attempt, shard, doc)
-          SELECT ${id}, ${shard.attempt}, ${shard.id}, unnest(${tx.array(chunk)}::jsonb[])
+          SELECT ${id}, ${shard.attempt}, ${shard.id}, unnest(${chunk}::text[])::jsonb
         `;
         docs += chunk.length;
       }

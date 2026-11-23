@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,13 +35,16 @@ function harness() {
   stubEnv('GITHUB_SHA', 'revision');
   stubEnv('GITHUB_RUN_ID', 'run');
   stubEnv('GITHUB_RUN_ATTEMPT', '2');
-  const events = new Map<string, (...args: unknown[]) => unknown>();
+  // Cypress 16.3+ keeps every handler for an event and runs them in registration order.
+  const events = new Map<string, ((...args: unknown[]) => unknown)[]>();
   const on = ((event: string, callback: (...args: unknown[]) => unknown) => {
-    if (events.has(event)) throw new Error(`Overwritten Cypress handler: ${event}`);
-    events.set(event, callback);
+    events.set(event, [...(events.get(event) ?? []), callback]);
   }) as Cypress.PluginEvents;
+  const emit = async (event: string, ...args: unknown[]) => {
+    for (const handler of events.get(event) ?? []) await handler(...args);
+  };
   setupTimingSplit(on, { testingType: 'e2e' } as Cypress.PluginConfigOptions);
-  return { output, events };
+  return { output, events, emit };
 }
 
 const runResult = () => ({
@@ -68,10 +71,13 @@ const runResult = () => ({
 });
 
 describe('Cypress timing event integration', () => {
-  it('composes plugin handlers and records Cypress 15 spec and test durations', async () => {
-    const { output, events } = harness();
+  it('runs the plugin handlers first and records spec and test durations', async () => {
+    const { output, events, emit } = harness();
     const results = runResult();
-    await events.get('after:run')!(results);
+    splitAfterRun.mockImplementationOnce(() => {
+      expect(existsSync(output)).toBe(false);
+    });
+    await emit('after:run', results);
     expect(events.has('before:run')).toBe(true);
     expect(splitAfterRun).toHaveBeenCalledWith(results);
     expect(JSON.parse(readFileSync(output, 'utf8'))).toEqual({
@@ -98,15 +104,15 @@ describe('Cypress timing event integration', () => {
   it.each(['totalFailed', 'totalPending', 'totalSkipped'])(
     'does not qualify a run with %s',
     async (counter) => {
-      const { output, events } = harness();
-      await events.get('after:run')!({ ...runResult(), [counter]: 1 });
+      const { output, emit } = harness();
+      await emit('after:run', { ...runResult(), [counter]: 1 });
       expect(JSON.parse(readFileSync(output, 'utf8')).passed).toBe(false);
     },
   );
 
   it('rejects a runner failure instead of inventing timings', async () => {
-    const { events } = harness();
-    await expect(events.get('after:run')!({ status: 'failed', failures: 1 })).rejects.toThrow(
+    const { emit } = harness();
+    await expect(emit('after:run', { status: 'failed', failures: 1 })).rejects.toThrow(
       'did not return test results',
     );
   });

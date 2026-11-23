@@ -163,7 +163,7 @@ export async function findUnlinkedTraceReplayIds(
   if (benchmarkResultIds.length === 0) return [];
   const rows = await sql<{ id: number }[]>`
     select id from benchmark_results
-    where id = any(${sql.array(benchmarkResultIds)}::bigint[])
+    where id = any(${benchmarkResultIds}::bigint[])
       and trace_replay_id is null
   `;
   return rows.map((row) => row.id);
@@ -247,7 +247,7 @@ export async function writeCacheHitMetrics(
       '{server_gpu_cache_hit_rate}',
       to_jsonb(${rates.gpu}::numeric)
     )
-    where id = any(${sql.array([...benchmarkIds])}::bigint[])
+    where id = any(${[...benchmarkIds]}::bigint[])
   `;
 }
 
@@ -288,7 +288,7 @@ export async function persistPreparedTraceReplay(
   await sql.begin(async (tx) => {
     const unlinked = await tx<{ id: number }[]>`
       select id from benchmark_results
-      where id = any(${tx.array(benchmarkResultIds)}::bigint[])
+      where id = any(${benchmarkResultIds}::bigint[])
         and trace_replay_id is null
       for update
     `;
@@ -411,7 +411,7 @@ export async function persistPreparedTraceReplay(
     await tx`
       update benchmark_results
       set trace_replay_id = ${traceReplayId}
-      where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+      where id = any(${unlinked.map((row) => row.id)}::bigint[])
     `;
     log(`linked benchmark rows (${elapsed(updateStart)})`);
 
@@ -427,7 +427,7 @@ export async function persistPreparedTraceReplay(
       await tx`
         update benchmark_results
         set metrics = metrics || ${tx.json(fullResponseMetrics)}
-        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+        where id = any(${unlinked.map((row) => row.id)}::bigint[])
           and not (metrics ? 'median_full_response_itl')
       `;
       log('filled full-response ITL and interactivity from the AIPerf profile');
