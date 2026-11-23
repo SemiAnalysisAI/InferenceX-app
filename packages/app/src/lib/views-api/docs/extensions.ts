@@ -935,28 +935,59 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
               } satisfies ApiResponse,
             ]
           : []),
+        ...(view === 'gpu-metrics'
+          ? [
+              {
+                status: '422',
+                description: text(
+                  'Every telemetry artifact of the run exceeds the live download size limit (ARTIFACT_TOO_LARGE). Not cached.',
+                  '该运行的所有遥测产物都超过实时下载大小上限（ARTIFACT_TOO_LARGE）。响应不缓存。',
+                ),
+                schema: object,
+                example: {
+                  error: 'Telemetry artifacts exceed the live download size limit',
+                  code: 'ARTIFACT_TOO_LARGE',
+                },
+                mediaType: 'application/json',
+              } satisfies ApiResponse,
+            ]
+          : []),
         ...(['404', '429', '503'] as const).map((status): ApiResponse =>
           view === 'gpu-metrics' && status === '404'
             ? {
                 status,
                 description: text(
-                  'The run does not exist on GitHub (RUN_NOT_FOUND) or has no readable telemetry artifacts (NO_TELEMETRY). Not cached.',
-                  'GitHub 上不存在该运行（RUN_NOT_FOUND），或该运行没有可读的遥测产物（NO_TELEMETRY）。响应不缓存。',
+                  'The run does not exist on GitHub (RUN_NOT_FOUND), or it lists no telemetry artifacts or all of them expired or hold no series (NO_TELEMETRY). Not cached.',
+                  'GitHub 上不存在该运行（RUN_NOT_FOUND），或该运行没有遥测产物、遥测产物均已过期或不含任何序列（NO_TELEMETRY）。响应不缓存。',
                 ),
                 schema: object,
                 example: { error: 'No Chip metrics data found in artifacts', code: 'NO_TELEMETRY' },
                 mediaType: 'application/json',
               }
-            : {
-                status,
-                description: text(
-                  'Source status is preserved; internal details are removed and failures are not cached.',
-                  '保留上游状态码，移除内部详情，失败响应不缓存。',
-                ),
-                schema: object,
-                example: { error: 'Source data unavailable' },
-                mediaType: 'application/json',
-              },
+            : view === 'gpu-metrics' && status === '503'
+              ? {
+                  status,
+                  description: text(
+                    'GitHub could not return the run, its artifact list or an artifact (GITHUB_UNAVAILABLE); retry later. Other source failures keep the status without internal details. Not cached.',
+                    'GitHub 未能返回该运行、产物列表或产物（GITHUB_UNAVAILABLE），请稍后重试。其他上游失败只保留状态码，不含内部详情。响应不缓存。',
+                  ),
+                  schema: object,
+                  example: {
+                    error: 'Telemetry artifacts could not be downloaded from GitHub; retry later',
+                    code: 'GITHUB_UNAVAILABLE',
+                  },
+                  mediaType: 'application/json',
+                }
+              : {
+                  status,
+                  description: text(
+                    'Source status is preserved; internal details are removed and failures are not cached.',
+                    '保留上游状态码，移除内部详情，失败响应不缓存。',
+                  ),
+                  schema: object,
+                  example: { error: 'Source data unavailable' },
+                  mediaType: 'application/json',
+                },
         ),
         {
           status: '400',

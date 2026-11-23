@@ -12,7 +12,7 @@ import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
 import {
   downloadGithubArtifact,
   extractZipEntries,
-  fetchGithubRunArtifacts,
+  listGithubRunArtifacts,
   fetchGithubWorkflowRun,
   getGithubToken,
   normalizeGithubRunInfo,
@@ -55,33 +55,56 @@ type TelemetryResult =
   | { kind: 'csv'; parsed: GithubArtifactPayload }
   | { kind: 'bundle'; series: GpuPowerSeries[] };
 
-/** The run, or its telemetry, does not exist on GitHub; the route answers 404. */
-export class GpuTelemetryNotFoundError extends Error {
-  override name = 'GpuTelemetryNotFoundError';
-  readonly code: 'RUN_NOT_FOUND' | 'NO_TELEMETRY';
+const GPU_TELEMETRY_ERROR_STATUS = {
+  RUN_NOT_FOUND: 404,
+  NO_TELEMETRY: 404,
+  ARTIFACT_TOO_LARGE: 422,
+  GITHUB_UNAVAILABLE: 503,
+} as const;
 
-  constructor(code: GpuTelemetryNotFoundError['code'], message: string) {
+export type GpuTelemetryErrorCode = keyof typeof GPU_TELEMETRY_ERROR_STATUS;
+
+export function isGpuTelemetryErrorCode(value: unknown): value is GpuTelemetryErrorCode {
+  return typeof value === 'string' && Object.hasOwn(GPU_TELEMETRY_ERROR_STATUS, value);
+}
+
+/**
+ * A live telemetry read the route answers with its code's status: 404 when GitHub has no run or
+ * no telemetry for it, 422 when every artifact is over the download cap, 503 (retry) when GitHub
+ * failed.
+ */
+export class GpuTelemetryError extends Error {
+  override name = 'GpuTelemetryError';
+  readonly code: GpuTelemetryErrorCode;
+  readonly status: number;
+
+  constructor(code: GpuTelemetryErrorCode, message: string) {
     super(message);
     this.code = code;
+    this.status = GPU_TELEMETRY_ERROR_STATUS[code];
   }
 }
 
-/** Fetches one artifact zip, or `null` (with a warning) when it fails or exceeds `maxBytes`. */
+/** Why one artifact gave no data; an archive without series yields `null` instead. */
+type DownloadFailure = 'expired' | 'too_large' | 'failed';
+
+/** Fetches one artifact zip, or why it could not (with a warning). */
 async function downloadZip(
   artifact: GithubArtifact,
   githubToken: string,
   maxBytes: number,
-): Promise<Buffer | null> {
+): Promise<Buffer | DownloadFailure> {
+  if (artifact.expired) return 'expired';
   const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
   if (!dlResp.ok) {
     console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
-    return null;
+    return dlResp.status === 410 ? 'expired' : 'failed';
   }
 
   const contentLength = dlResp.headers.get('Content-Length');
   if (contentLength && parseInt(contentLength, 10) > maxBytes) {
     console.warn(`Artifact ${artifact.name} exceeds ${maxBytes / (1024 * 1024)} MB, skipping`);
-    return null;
+    return 'too_large';
   }
   return Buffer.from(await dlResp.arrayBuffer());
 }
@@ -89,9 +112,9 @@ async function downloadZip(
 async function downloadArtifact(
   artifact: GithubArtifact,
   githubToken: string,
-): Promise<GithubArtifactPayload | null> {
+): Promise<GithubArtifactPayload | DownloadFailure | null> {
   const buffer = await downloadZip(artifact, githubToken, MAX_ARTIFACT_BYTES);
-  if (!buffer) return null;
+  if (typeof buffer === 'string') return buffer;
   const contexts = new Map<string, Record<string, unknown>>();
   const contextFiles = extractZipEntries(buffer, '.json', (name, contents) => {
     const base = name.slice(name.lastIndexOf('/') + 1);
@@ -123,9 +146,9 @@ async function downloadArtifact(
 async function downloadNativeSamples(
   artifact: GithubArtifact,
   githubToken: string,
-): Promise<GithubArtifactPayload | null> {
+): Promise<GithubArtifactPayload | DownloadFailure | null> {
   const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
-  if (!buffer) return null;
+  if (typeof buffer === 'string') return buffer;
   const files = extractZipEntries(buffer, '.csv', (name, contents) => {
     if (!isMultinodePowerSamplesPath(name)) return [];
     return (parseMultinodePowerSamples(contents) ?? []).map((host) => ({
@@ -144,9 +167,9 @@ async function downloadNativeSamples(
 async function downloadBundle(
   artifact: GithubArtifact,
   githubToken: string,
-): Promise<GpuPowerSeries[] | null> {
+): Promise<GpuPowerSeries[] | DownloadFailure | null> {
   const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
-  if (!buffer) return null;
+  if (typeof buffer === 'string') return buffer;
   const series = cutPowerAuditBundle(
     artifact.name,
     readZipEntries(buffer, isPowerAuditBundleEntry),
@@ -160,20 +183,23 @@ async function downloadBundle(
  * the run still reach the chart (the client would otherwise retry the whole
  * multi-hundred-megabyte request).
  */
-async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
+async function runJob(
+  job: TelemetryJob,
+  githubToken: string,
+): Promise<TelemetryResult | DownloadFailure | null> {
   try {
     if (job.kind === 'csv' || job.kind === 'native') {
       const parsed = await (job.kind === 'native' ? downloadNativeSamples : downloadArtifact)(
         job.artifact,
         githubToken,
       );
-      return parsed ? { kind: 'csv', parsed } : null;
+      return parsed && typeof parsed === 'object' ? { kind: 'csv', parsed } : parsed;
     }
     const series = await downloadBundle(job.artifact, githubToken);
-    return series ? { kind: 'bundle', series } : null;
+    return Array.isArray(series) ? { kind: 'bundle', series } : series;
   } catch (error) {
     console.warn(`Failed to read artifact ${job.artifact.name}:`, error);
-    return null;
+    return 'failed';
   }
 }
 
@@ -181,17 +207,42 @@ async function runJob(job: TelemetryJob, githubToken: string): Promise<Telemetry
 async function downloadTelemetry(
   jobs: TelemetryJob[],
   githubToken: string,
-): Promise<TelemetryResult[]> {
-  const results: (TelemetryResult | null)[] = Array.from({ length: jobs.length }, () => null);
+): Promise<(TelemetryResult | DownloadFailure | null)[]> {
+  const outcomes: (TelemetryResult | DownloadFailure | null)[] = Array.from(
+    { length: jobs.length },
+    () => null,
+  );
   let next = 0;
   const worker = async () => {
     while (next < jobs.length) {
       const index = next++;
-      results[index] = await runJob(jobs[index], githubToken);
+      outcomes[index] = await runJob(jobs[index], githubToken);
     }
   };
   await Promise.all(Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, jobs.length) }, worker));
-  return results.filter((result): result is TelemetryResult => result !== null);
+  return outcomes;
+}
+
+/**
+ * Why no artifact gave data. Only expired archives and archives without series mean the run has
+ * no telemetry; a failed download may succeed on retry.
+ */
+function missingTelemetryError(
+  outcomes: readonly (TelemetryResult | DownloadFailure | null)[],
+): GpuTelemetryError {
+  if (outcomes.includes('failed')) {
+    return new GpuTelemetryError(
+      'GITHUB_UNAVAILABLE',
+      'Telemetry artifacts could not be downloaded from GitHub; retry later',
+    );
+  }
+  if (outcomes.includes('too_large')) {
+    return new GpuTelemetryError(
+      'ARTIFACT_TOO_LARGE',
+      'Telemetry artifacts exceed the live download size limit',
+    );
+  }
+  return new GpuTelemetryError('NO_TELEMETRY', 'No Chip metrics data found in artifacts');
 }
 
 export async function fetchGpuMetricsFromGithub(
@@ -205,12 +256,23 @@ export async function fetchGpuMetricsFromGithub(
 
   const runResp = await fetchGithubWorkflowRun(runId, githubToken);
   if (runResp.status === 404) {
-    throw new GpuTelemetryNotFoundError('RUN_NOT_FOUND', `Workflow run ${runId} was not found`);
+    throw new GpuTelemetryError('RUN_NOT_FOUND', `Workflow run ${runId} was not found`);
   }
-  if (!runResp.ok) throw new Error(`Failed to fetch workflow run: ${runResp.status}`);
+  if (!runResp.ok) {
+    throw new GpuTelemetryError(
+      'GITHUB_UNAVAILABLE',
+      `Failed to fetch workflow run from GitHub (${runResp.status}); retry later`,
+    );
+  }
   const run = (await runResp.json()) as GithubWorkflowRun;
 
-  const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
+  const artifacts = await listGithubRunArtifacts(runId, githubToken);
+  if (!artifacts) {
+    throw new GpuTelemetryError(
+      'GITHUB_UNAVAILABLE',
+      'The artifact list could not be read from GitHub; retry later',
+    );
+  }
 
   // `eval_gpu_metrics_*` artifacts are excluded by the bare `gpu_metrics` test.
   const wanted = prefix ? `${ARTIFACT_PREFIX}${prefix}` : 'gpu_metrics';
@@ -225,16 +287,17 @@ export async function fetchGpuMetricsFromGithub(
     jobs.push({ kind: includeBundles ? 'bundle' : 'native', artifact });
   }
   if (jobs.length === 0) {
-    throw new GpuTelemetryNotFoundError(
+    throw new GpuTelemetryError(
       'NO_TELEMETRY',
       'No telemetry artifacts (gpu_metrics or power_audit) found for this run',
     );
   }
 
-  const results = await downloadTelemetry(jobs, githubToken);
-  if (results.length === 0) {
-    throw new GpuTelemetryNotFoundError('NO_TELEMETRY', 'No Chip metrics data found in artifacts');
-  }
+  const outcomes = await downloadTelemetry(jobs, githubToken);
+  const results = outcomes.filter(
+    (outcome): outcome is TelemetryResult => outcome !== null && typeof outcome === 'object',
+  );
+  if (results.length === 0) throw missingTelemetryError(outcomes);
 
   const parsedArtifacts: GithubArtifactPayload[] = [];
   const bundleSeries: GpuPowerSeries[] = [];
