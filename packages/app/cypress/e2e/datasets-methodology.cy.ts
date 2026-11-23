@@ -146,10 +146,33 @@ describe('AgentX quickstart', () => {
         cy.get('#routing button').click();
         cy.get('@writeText').should('have.been.calledWithExactly', flags);
       });
+    cy.get('#golden-al code')
+      .invoke('text')
+      .then((lookup) => {
+        expect(lookup).to.include('python -m infx.golden_al_distribution lookup qwen3.5 mtp 3');
+        expect(lookup).to.include('synthetic_acceptance_length');
+        expect(lookup).to.include('SGLANG_SIMULATE_ACC_LEN');
+        expect(lookup).to.include(
+          'TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS=<placeholder_value - 1>',
+        );
+        expect(lookup).to.include(
+          '# Golden AL curves:\n# https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
+        );
+        expect(
+          lookup.split(
+            '#   Golden AL curves:\n#   https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
+          ),
+        ).to.have.length(3);
+        cy.get('#golden-al button').click();
+        cy.get('@writeText').should('have.been.calledWithExactly', lookup);
+      });
+    cy.get(
+      '#golden-al a[href="https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution"]',
+    ).should('be.visible');
     cy.get('[data-testid="agentx-quickstart-article"] details').should('not.exist');
     cy.get('[data-testid="agentx-quickstart-article"] [data-testid="copyable-code-block"]').should(
       'have.length',
-      2,
+      3,
     );
     cy.get('link[rel="canonical"]').should(
       'have.attr',
