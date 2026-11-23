@@ -10,50 +10,85 @@ import type { modelSystemPower } from './modeled-system-power';
 
 export type SystemPowerModeler = typeof modelSystemPower;
 
-let modeler: SystemPowerModeler | undefined;
-let loadError: unknown;
-let loading: Promise<SystemPowerModeler> | undefined;
-const listeners = new Set<() => void>();
+type ModelerState =
+  | { status: 'idle' | 'loading' }
+  | { status: 'loaded'; modeler: SystemPowerModeler }
+  | { status: 'failed'; error: unknown };
 
-function notify() {
-  for (const listener of listeners) listener();
+const IDLE: ModelerState = { status: 'idle' };
+const LOADING: ModelerState = { status: 'loading' };
+
+export interface SystemPowerModelerStore {
+  /** Starts a load unless one is running or done, and resolves with the model. */
+  load: () => Promise<SystemPowerModeler>;
+  /**
+   * The loaded model, or `undefined` while it loads and during server rendering. A failed load
+   * throws to the nearest error boundary, as a failed `next/dynamic` chunk does, and starts a
+   * fresh load, so the boundary's retry or a later mount gets the model once it arrives.
+   */
+  useModeler: () => SystemPowerModeler | undefined;
 }
 
-/** Starts loading the model once and resolves with it. A failed load is retried on the next call. */
-export function loadSystemPowerModeler(): Promise<SystemPowerModeler> {
-  loading ??= import('./modeled-system-power').then(
-    (module) => {
-      modeler = module.modelSystemPower;
-      loadError = undefined;
-      notify();
-      return modeler;
-    },
-    (error: unknown) => {
-      loading = undefined;
-      loadError = error;
-      notify();
-      throw error;
-    },
-  );
-  return loading;
+/** A store around one chunk loader. Tests pass a loader they control. */
+export function createSystemPowerModelerStore(
+  importModeler: () => Promise<SystemPowerModeler>,
+): SystemPowerModelerStore {
+  let state = IDLE;
+  let pending: Promise<SystemPowerModeler> | undefined;
+  const listeners = new Set<() => void>();
+  const setState = (next: ModelerState) => {
+    state = next;
+    for (const listener of listeners) listener();
+  };
+
+  const load = (): Promise<SystemPowerModeler> => {
+    if (state.status === 'loaded') return Promise.resolve(state.modeler);
+    if (pending) return pending;
+    setState(LOADING);
+    pending = importModeler().then(
+      (modeler) => {
+        pending = undefined;
+        setState({ status: 'loaded', modeler });
+        return modeler;
+      },
+      (error: unknown) => {
+        pending = undefined;
+        // A new state object, so every subscribed chart re-renders and throws it.
+        setState({ status: 'failed', error });
+        throw error;
+      },
+    );
+    return pending;
+  };
+
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+  const getSnapshot = () => state;
+  const getServerSnapshot = () => IDLE;
+
+  const useModeler = () => {
+    const current = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+    if (current.status === 'failed') {
+      // Retry once React has committed the error boundary. A load started during render would
+      // replace the snapshot React is still checking.
+      queueMicrotask(() => {
+        if (state === current) load().catch(() => {});
+      });
+      throw current.error;
+    }
+    return current.status === 'loaded' ? current.modeler : undefined;
+  };
+
+  return { load, useModeler };
 }
+
+const store = createSystemPowerModelerStore(() =>
+  import('./modeled-system-power').then((module) => module.modelSystemPower),
+);
+
+export const loadSystemPowerModeler = store.load;
+export const useSystemPowerModeler = store.useModeler;
 
 if (typeof window !== 'undefined') loadSystemPowerModeler().catch(() => {});
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-const getSnapshot = () => modeler;
-const getServerSnapshot = () => undefined;
-
-/**
- * The loaded model, or `undefined` while it loads and during server rendering. A chunk that
- * failed to load throws to the nearest error boundary, as a failed `next/dynamic` chunk does.
- */
-export function useSystemPowerModeler(): SystemPowerModeler | undefined {
-  const loaded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  if (!loaded && loadError !== undefined) throw loadError;
-  return loaded;
-}

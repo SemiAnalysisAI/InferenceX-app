@@ -372,10 +372,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the power model's revision and categories moved to
-      // system-power-categories.ts. They are reached only through type imports, so recorded
-      // entries are unchanged.
-      sources: '422044e7dd6352c44e592aa70f8732b2f599c46f70884ad7faaaa8a1619236b8',
+      // Re-pinned after the lazy power model loader gained failure and retry states. It is
+      // reached only through type imports, so recorded entries are unchanged.
+      sources: 'a233b356db175ecf383eba67bd23118cea400458b8cca434a766ffb9c50e0c0c',
     });
   });
 });
