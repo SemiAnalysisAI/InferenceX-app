@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join, posix, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -76,10 +76,14 @@ export async function checkIntegrity(root = packageRoot) {
 async function main(args) {
   if (args.length === 0) {
     for (const skillName of SKILLS) {
-      await writeFile(
-        new URL(`skills/${skillName}/integrity.json`, packageRoot),
-        await generatedIntegrity(packageRoot, skillName),
-      );
+      const integrityPath = new URL(`skills/${skillName}/integrity.json`, packageRoot);
+      const next = await generatedIntegrity(packageRoot, skillName);
+      const current = await readFile(integrityPath, 'utf8').catch(() => undefined);
+      if (current === next) continue;
+      // Concurrent `npm pack` runs read this file, so replace it in one step instead of truncating it.
+      const staging = new URL(`integrity.json.${process.pid}.tmp`, integrityPath);
+      await writeFile(staging, next);
+      await rename(staging, integrityPath);
     }
     return;
   }

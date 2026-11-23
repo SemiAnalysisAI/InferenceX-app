@@ -41,7 +41,7 @@ function requestNumber(n: number): string {
 
 const STRINGS = {
   en: {
-    eyebrow: 'Session replay',
+    eyebrow: 'Session Replay',
     replay: 'Replay',
     request: (range: string, total: number) => `Request ${range} / ${total}`,
     main: 'main',

@@ -68,7 +68,7 @@ const STRINGS = {
     unavailableValue: 'unavailable',
     measured: ' (measured)',
     roundTrip: 'Round trip',
-    rangeHeading: 'Range across libraries',
+    rangeHeading: 'Range Across Libraries',
     rangeMedian: 'Median',
     rangeCount: (n: number) => `${n} librar${n === 1 ? 'y' : 'ies'} at this point`,
     best: 'Best',

@@ -63,7 +63,7 @@ const STRINGS = {
     nonStreaming: 'Non-Streaming',
     hiddenCells: 'Under 5 requests, hidden',
     hourOfDay: 'Hour of day',
-    scaleTitle: 'Requests per hour',
+    scaleTitle: 'Requests per Hour',
     requestsLabel: 'Requests',
     dailyRequests: 'Daily Requests',
   },

@@ -390,7 +390,7 @@ const STRINGS = {
     agenticLoopDepth: 'Agentic Loop Depth',
     toolCallsPerSession: 'Tool Calls per Session',
     uniqueToolsPerSession: 'Unique Tools per Session',
-    toolDiversityRatio: 'Tool Diversity Ratio (unique / total)',
+    toolDiversityRatio: 'Tool Diversity Ratio (Unique / Total)',
     axisToolCalls: 'Tool Calls',
     axisUniqueTools: 'Unique Tools',
     axisRatio: 'Ratio',

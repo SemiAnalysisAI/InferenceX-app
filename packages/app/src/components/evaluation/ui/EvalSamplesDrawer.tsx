@@ -18,7 +18,7 @@ const PAGE_SIZE = 50;
 
 const STRINGS = {
   en: {
-    title: 'Evaluation samples',
+    title: 'Evaluation Samples',
     searchScope: 'Search this page only',
     score: 'score',
     filterAll: 'All',

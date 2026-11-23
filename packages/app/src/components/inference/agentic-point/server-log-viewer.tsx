@@ -40,7 +40,7 @@ import {
 
 const STRINGS = {
   en: {
-    title: 'Log files',
+    title: 'Log Files',
     description: 'Raw .log and .out files captured for this benchmark point',
     fileLabel: 'Log file',
     fileOne: 'file',

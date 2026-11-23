@@ -23,32 +23,32 @@ type RolePanelId = 'power' | 'local-energy' | 'output-energy' | 'share';
 
 const STRINGS = {
   en: {
-    title: 'Prefill and decode roles',
+    title: 'Prefill and Decode Roles',
     empty: 'No validated prefill/decode telemetry is available for these filters.',
     panelEmpty: 'These observations do not report this role figure',
     roles: { prefill: 'Prefill', decode: 'Decode', total: 'Prefill + decode' },
     conc: (n: number) => `conc ${n}`,
     panels: {
       power: {
-        title: 'Mean GPU power by role',
+        title: 'Mean GPU Power by Role',
         axis: 'Mean GPU power (W/GPU)',
         note: 'Mean board power per GPU inside each pool over the validated window.',
         units: { prefill: 'W/GPU', decode: 'W/GPU', total: 'W/GPU' },
       },
       'local-energy': {
-        title: 'Role-local GPU energy',
+        title: 'Role-Local GPU Energy',
         axis: 'GPU energy (J/token, log)',
         note: 'Prefill: prefill-pool joules ÷ input tokens. Decode: decode-pool joules ÷ output tokens. The denominators differ, so these two are not added.',
         units: { prefill: 'J/input token', decode: 'J/output token', total: 'J/output token' },
       },
       'output-energy': {
-        title: 'GPU energy per output token by role',
+        title: 'GPU Energy per Output Token by Role',
         axis: 'GPU energy (J/output token, log)',
         note: 'Prefill energy restated per output token with the same window’s input:output token ratio, so prefill + decode is the request total.',
         units: { prefill: 'J/output token', decode: 'J/output token', total: 'J/output token' },
       },
       share: {
-        title: 'Prefill energy share',
+        title: 'Prefill Energy Share',
         axis: 'Prefill energy share (%)',
         note: 'Share = prefill ÷ (prefill + decode), both per output token. The dashed line marks 50%.',
         units: { prefill: '%', decode: '%', total: '%' },

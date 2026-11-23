@@ -193,7 +193,7 @@ const STRINGS = {
     colAvailability: 'Availability',
     never: 'Never',
     monthsSuffix: 'mo',
-    unmeasuredTitle: 'Not measured at this interactivity',
+    unmeasuredTitle: 'Not Measured at This Interactivity',
     unmeasuredIntro:
       'These chips have run history for this scenario but no single run date was measured across the target interactivity, so no honest number exists for them. The nearest interactivity each one actually reached:',
     unmeasuredRange: (below: number | null, above: number | null, dates: number) => {

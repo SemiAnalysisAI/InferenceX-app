@@ -21,7 +21,7 @@ export async function GET() {
     '',
     `- [Dashboard](${SITE_URL})`,
     `- [AgentX](${SITE_URL}${AGENTX_ROUTE.path})`,
-    `- [Benchmark your own chips with AgentX](${SITE_URL}${AGENTX_ROUTE.path}/quickstart): agentx-harness 1.0.14 installation, public trace replay, and optional session-routing headers`,
+    `- [Benchmark Your Own Chips with AgentX](${SITE_URL}${AGENTX_ROUTE.path}/quickstart): agentx-harness 1.0.14 installation, public trace replay, optional session-routing headers, and golden speculative-decoding acceptance lengths`,
     `- [AgentX Methodology](${SITE_URL}${AGENTX_ROUTE.path}/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
     `- [Hardware Results](${SITE_URL}/hardware)`,
