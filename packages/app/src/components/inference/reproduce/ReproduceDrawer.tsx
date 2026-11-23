@@ -28,7 +28,7 @@ type ReproduceTab = 'command' | 'config' | 'environment';
 
 const STRINGS = {
   en: {
-    title: 'Reproduce this result',
+    title: 'Reproduce This Result',
     description:
       'How this benchmark point was produced, from its stored configuration, run metadata, and logs.',
     unofficial: 'Unofficial run',

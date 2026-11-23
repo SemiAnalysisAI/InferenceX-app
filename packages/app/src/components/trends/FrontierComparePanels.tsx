@@ -34,7 +34,7 @@ import {
 
 const STRINGS = {
   en: {
-    barsTitle: 'Lead at each interactivity',
+    barsTitle: 'Lead at Each Interactivity',
     barsTwo: (a: string, b: string) => `Bars above the line: ${a} ahead. Below: ${b} ahead.`,
     barsMany: 'Bar height is how far the leader is ahead of the next best.',
     na: 'NA',
@@ -45,7 +45,7 @@ const STRINGS = {
     noneReach: 'None of the compared series reach this interactivity',
     even: 'even',
     needTwo: 'Pick at least two to compare.',
-    areaTitle: 'Ground covered over time',
+    areaTitle: 'Ground Covered over Time',
     leads: (leader: string, ratio: string, runnerUp: string) =>
       `${leader} covers ${ratio} the ground of ${runnerUp}`,
     was: (ratio: string, date: string) => `, from ${ratio} on ${date}`,

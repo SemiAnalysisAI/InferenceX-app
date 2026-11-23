@@ -36,6 +36,7 @@ const REQUEST_CARD_STRINGS = {
     distribution: 'Distribution',
     inflight: 'In-flight avg',
     e2eLatency: 'E2E latency',
+    e2eLatencyTitle: 'E2E Latency',
     interactivity: 'Interactivity',
     latencyMetric: 'Latency metric',
     points: (count?: number) =>
@@ -43,14 +44,14 @@ const REQUEST_CARD_STRINGS = {
         ? '— points'
         : `${count.toLocaleString()} ${count === 1 ? 'point' : 'points'}`,
     percentile: (metric: string) => `${metric} percentile`,
-    overTime: (metric: string) => `${metric} over time`,
+    overTime: (metric: string) => `${metric} over Time`,
     rolling: (pct: string) => `${pct} (rolling 50 req)`,
     cumulative: (pct: string, metric: string) => `Cumulative ${pct} ${metric}`,
     inverseTpot: (pct: string) => `1 / cumulative ${pct} TPOT`,
-    inputLength: 'Input sequence length',
-    outputLength: 'Output sequence length',
-    distributionTitle: (name: string) => `${name} distribution`,
-    avgInflight: (name: string) => `Average ${name} in flight`,
+    inputLength: 'Input Sequence Length',
+    outputLength: 'Output Sequence Length',
+    distributionTitle: (name: string) => `${name} Distribution`,
+    avgInflight: (name: string) => `Average ${name} in Flight`,
     chartView: (name: string) => `${name} chart view`,
     retrospective: "Retrospective: final observed OSL is assigned across each request's lifetime.",
     avgSeries: (name: string) => `Average ${name} in flight (30s avg)`,
@@ -60,6 +61,7 @@ const REQUEST_CARD_STRINGS = {
     distribution: '分布',
     inflight: '在途请求平均值',
     e2eLatency: 'E2E 延迟',
+    e2eLatencyTitle: 'E2E 延迟',
     interactivity: '交互性',
     latencyMetric: '延迟指标',
     points: (count?: number) =>
@@ -150,7 +152,11 @@ export function RequestMetricOverTime({
 
   return (
     <ExpandableChart
-      title={latencySelector ? t.overTime(metricLabel) : title}
+      title={
+        latencySelector
+          ? t.overTime(selectedMetric === 'e2e' ? t.e2eLatencyTitle : metricLabel)
+          : title
+      }
       controls={controls}
       testId={`${metric}-over-time-chart`}
       render={(size) => {

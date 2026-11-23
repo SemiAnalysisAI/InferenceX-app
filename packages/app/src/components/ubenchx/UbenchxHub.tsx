@@ -29,8 +29,8 @@ const STRINGS = {
     test: 'Microbenchmark',
     testTooltip: 'The uBenchX microbenchmark to display.',
     memBwTitle: 'HBM Bandwidth',
-    tpcSkylineTitle: 'TPC Skyline & SKU configurations',
-    coreProfilesTitle: 'Core memory-access profiles',
+    tpcSkylineTitle: 'TPC Skyline & SKU Configurations',
+    coreProfilesTitle: 'Core Memory-Access Profiles',
   },
   zh: {
     title: 'uBenchX 微基准测试',
