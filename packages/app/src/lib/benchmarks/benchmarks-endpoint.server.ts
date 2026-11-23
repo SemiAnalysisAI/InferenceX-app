@@ -18,7 +18,7 @@ import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export function parseBenchmarksQuery(params: URLSearchParams): BenchmarkRequestParams | Response {
   const parsed = parseBenchmarkRequest(params);
-  return parsed.ok ? parsed.params : publicApiError(parsed.error, 400);
+  return parsed.ok ? parsed.params : publicApiError(parsed.error, 400, parsed.detail);
 }
 
 export async function loadBenchmarks(query: BenchmarkRequestParams): Promise<BenchmarkRow[]> {

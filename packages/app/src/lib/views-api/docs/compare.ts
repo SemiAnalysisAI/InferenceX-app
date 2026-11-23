@@ -4,7 +4,7 @@ import type {
   ApiResponse,
   ApiSchema,
 } from '@/lib/api/api-documentation';
-import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -39,8 +39,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Display model name (case-insensitive) or compare-page model slug. Use together with gpus as an alternative to slug. Muse Spark 1.3/Open retains the API identifier Muse-Spark-Open and slug muse-spark-open; model.label is Muse Spark 1.3/Open 816B. Its measurements use Open checkpoints, not Meta’s hosted 1.3 service.',
-      '模型显示名称（不区分大小写）或对比页模型 slug。与 gpus 搭配使用，可替代 slug。Muse Spark 1.3/Open 保留 API 标识符 Muse-Spark-Open 和 slug muse-spark-open；model.label 为 Muse Spark 1.3/Open 816B。实测结果使用 Open checkpoint，不代表 Meta 托管的 1.3 服务。',
+      `${MODEL_PARAM_FORMS.en} Use together with gpus as an alternative to slug. Muse Spark 1.3/Open retains the API identifier Muse-Spark-Open and slug muse-spark-open; model.label is Muse Spark 1.3/Open 816B. Its measurements use Open checkpoints, not Meta’s hosted 1.3 service.`,
+      `${MODEL_PARAM_FORMS.zh}与 gpus 搭配使用，可替代 slug。Muse Spark 1.3/Open 保留 API 标识符 Muse-Spark-Open 和 slug muse-spark-open；model.label 为 Muse Spark 1.3/Open 816B。实测结果使用 Open checkpoint，不代表 Meta 托管的 1.3 服务。`,
     ),
     schema: stringSchema,
     example: 'DeepSeek-V4-Pro',

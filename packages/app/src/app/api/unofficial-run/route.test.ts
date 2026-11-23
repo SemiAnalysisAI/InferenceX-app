@@ -1181,16 +1181,19 @@ describe('GET /api/unofficial-run', () => {
     expect(body.error).toContain('rate limit');
   });
 
-  it('passes a non-rate-limit GitHub 403 through uncached', async () => {
+  it('passes a non-rate-limit GitHub 403 through uncached, naming the status', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 403,
-      statusText: 'Forbidden',
+      // GitHub answers over HTTP/2, which has no status text.
+      statusText: '',
       headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(403);
     expect(res.headers.get('Cache-Control')).toBe('no-store');
+    const body = await res.json();
+    expect(body.error).toBe('GitHub API returned 403 for workflow run 123');
   });
 
   it('returns 500 on unexpected error', async () => {

@@ -1,33 +1,28 @@
+import {
+  OPENROUTER_PRICING_PATH,
+  type OpenRouterModelsPayload,
+  type OpenRouterPricingResponse,
+  openRouterPrices,
+} from '@/lib/calculator/openrouter-pricing';
+
+import openRouterModels from '../fixtures/api/openrouter-models.json';
 import { interceptProfitData } from './profit-fixtures';
 
-export const OPENROUTER_MODELS = {
-  data: [
-    {
-      id: 'moonshotai/kimi-k3',
-      pricing: { prompt: '0.0000006', completion: '0.0000025', input_cache_read: '0.0000001' },
-    },
-    {
-      id: 'z-ai/glm-5.3',
-      pricing: { prompt: '0.00000115', completion: '0.0000035', input_cache_read: '0.0000002' },
-    },
-    {
-      id: 'minimax/minimax-m3',
-      pricing: { prompt: '0.00000023', completion: '0.00000096', input_cache_read: '0.00000005' },
-    },
-    {
-      id: 'deepseek/deepseek-v4-pro-0813',
-      pricing: { prompt: '0.00000066', completion: '0.00000198', input_cache_read: '0.000000022' },
-    },
-    {
-      id: 'deepseek/deepseek-v4.1-flash',
-      pricing: { prompt: '0.00000015', completion: '0.0000006', input_cache_read: '0.000000003' },
-    },
-  ],
-};
+/** OpenRouter's own model-list shape; fixture builds serve the same file from the pricing route. */
+export const OPENROUTER_MODELS: OpenRouterModelsPayload = openRouterModels;
+
+/** Serves `/api/v1/openrouter-pricing` as the server would build it from `models`. */
+export function interceptOpenRouterPricing(models: OpenRouterModelsPayload = OPENROUTER_MODELS) {
+  const body: OpenRouterPricingResponse = {
+    fetchedAt: '2026-11-23T00:00:00.000Z',
+    models: openRouterPrices(models),
+  };
+  return cy.intercept('GET', OPENROUTER_PRICING_PATH, body);
+}
 
 export function stubOpenRouter(): void {
   interceptProfitData();
-  cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS).as('openrouter');
+  interceptOpenRouterPricing().as('openrouter');
 }
 
 export function suppressNudges(win: Cypress.AUTWindow): void {

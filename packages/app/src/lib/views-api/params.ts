@@ -1,4 +1,4 @@
-import { DISPLAY_MODEL_TO_DB, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
+import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import type { CalculatorMode, CostProvider, CostType } from '@/components/calculator/types';
 import {
@@ -13,7 +13,6 @@ import {
   type DeploymentMode,
   type SpecMode,
 } from '@/components/inference/utils/quickFilters';
-import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
@@ -22,6 +21,11 @@ import {
   Sequence,
   type Precision,
 } from '@/lib/catalog/data-mappings';
+import {
+  MODEL_DISPLAY_NAMES,
+  resolveModelName,
+  type ResolvedModel,
+} from '@/lib/catalog/model-name-resolver';
 
 import { ViewsApiParamError } from './errors';
 
@@ -33,42 +37,20 @@ import { ViewsApiParamError } from './errors';
  *   never a silent fallback — API consumers must find typos immediately.
  * - List parameters are comma-separated, trimmed, deduplicated, and returned in
  *   a canonical (sorted) order so logically identical requests share cache keys.
- * - Model accepts the dashboard display name (case-insensitive) plus the
- *   public compare-page slugs and their aliases (e.g. `deepseek-v4`).
+ * - Model accepts what `resolveModelName` does: the display name, legacy names,
+ *   DB model keys, and dashboard slugs and their aliases (e.g. `deepseek-v4`).
  */
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
-export interface ResolvedModel {
-  /** Canonical display name, e.g. `DeepSeek-V4-Pro`. */
-  readonly displayName: string;
-  /** DB model keys behind the display name. */
-  readonly dbModelKeys: readonly string[];
-}
-
-const DISPLAY_NAMES = Object.keys(DISPLAY_MODEL_TO_DB);
-const LOWERCASE_DISPLAY_TO_CANONICAL = new Map(
-  DISPLAY_NAMES.map((name) => [name.toLowerCase(), name]),
-);
-const SLUG_TO_DISPLAY = new Map(
-  COMPARE_MODEL_SLUGS.map((entry) => [entry.slug, entry.displayName]),
-);
-
-/** Canonical model-name vocabulary accepted by `model=` (display names). */
-export const VIEWS_MODEL_NAMES: readonly string[] = DISPLAY_NAMES.toSorted();
-
 export function resolveModelParam(value: string | null, param = 'model'): ResolvedModel {
   if (!value) {
-    throw new ViewsApiParamError(param, `${param} is required`, VIEWS_MODEL_NAMES);
+    throw new ViewsApiParamError(param, `${param} is required`, MODEL_DISPLAY_NAMES);
   }
-  const displayFromName = LOWERCASE_DISPLAY_TO_CANONICAL.get(value.toLowerCase());
-  const slug = COMPARE_MODEL_ALIASES[value.toLowerCase()] ?? value.toLowerCase();
-  const displayName = displayFromName ?? SLUG_TO_DISPLAY.get(slug);
-  const dbModelKeys = displayName ? DISPLAY_MODEL_TO_DB[displayName] : undefined;
-  if (!displayName || !dbModelKeys || dbModelKeys.length === 0) {
-    throw new ViewsApiParamError(param, `Unknown model: ${value}`, VIEWS_MODEL_NAMES);
-  }
-  return { displayName, dbModelKeys };
+  const resolved = resolveModelName(value);
+  if (!resolved)
+    throw new ViewsApiParamError(param, `Unknown model: ${value}`, MODEL_DISPLAY_NAMES);
+  return resolved;
 }
 
 const SEQUENCE_ALIASES: Readonly<Record<string, Sequence>> = {

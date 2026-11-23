@@ -44,6 +44,15 @@ use the recipes below and derive the answer from the saved complete responses.
 Reuse an existing bundle's retained response when it already contains the needed
 population; a later capture is a separate observation.
 
+Pass display names (for example `DeepSeek-V4-Pro`) as `model`. `/api/v1/benchmarks`,
+`/api/v1/benchmarks/history` and the views API also accept, case-insensitively,
+a DB model key (`dsv4`), a dashboard slug (`kimi-k31-pro`) or a retired name
+(`Qwen3.5-397B-A17B`, `DeepSeek-V4-Pro-0813`, `Kimi-K2.6`), and resolve each to the
+display model that contains it. A DB key selects that whole display model, so filter
+rows by their `model` key to keep one release. An unknown model returns 400 with
+`"param": "model"` and `allowed`, the display names; record the resolved display
+name, not the alias, in reports.
+
 ## Basic benchmark lookup
 
 This Node 24 example prints up to five latest available single-turn observations

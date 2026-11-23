@@ -84,6 +84,18 @@ describe('GET /api/v1/server-log', () => {
     expect(body.error).toBe('id is required (benchmark_result_id)');
   });
 
+  // `Number('1e21')` is finite, so these used to reach Postgres as an invalid bigint and answer 500.
+  it.each(['1e21', '9007199254740993', '-5', '1.5'])(
+    'returns 400 for id=%s, which is not a positive safe integer',
+    async (id) => {
+      const res = await GET(req(`/api/v1/server-log?id=${id}`));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('id is required (benchmark_result_id)');
+      expect(mockGetBoundedServerLog).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns 404 when server log not found', async () => {
     mockGetBoundedServerLog.mockResolvedValueOnce(null);
 

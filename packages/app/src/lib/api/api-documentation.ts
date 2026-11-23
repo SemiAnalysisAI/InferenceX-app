@@ -20,6 +20,7 @@ import {
 
 import { POWER_VALIDITY_FILTERS } from '../benchmarks/benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
+import { MODEL_PARAM_FORMS } from './api-documentation-base';
 import { PARETO_DIRECTIONS, PARETO_SEQUENCES } from './pareto-api';
 import { operations as calculatorViews } from '../views-api/docs/calculator';
 import { operations as compareViews } from '../views-api/docs/compare';
@@ -152,6 +153,17 @@ export const SUPPORTED_TCO_MODELS = Object.freeze(
   [...new Set([...Object.keys(DB_MODEL_TO_DISPLAY), ...SUPPORTED_BENCHMARK_MODELS])].toSorted(),
 );
 
+/** Accepted `model=` forms on the benchmark reads, plus how DB keys and unknown models behave. */
+const MODEL_ALIAS_NOTE = text(
+  `The enum lists the canonical display names. ${MODEL_PARAM_FORMS.en} A DB key selects its whole display model; filter rows by model to keep one release. An unknown model returns 400 with param and the allowed display names.`,
+  `枚举列出规范的展示名称。${MODEL_PARAM_FORMS.zh}DB 键会选中其所属的整个展示模型；如只需某个版本，请按行的 model 字段筛选。未知模型返回 400，响应体包含 param 和允许的展示名称。`,
+);
+
+const UNKNOWN_MODEL_EXAMPLE = {
+  param: 'model',
+  allowed: SUPPORTED_BENCHMARK_MODELS,
+} as const;
+
 const metricMapSchema: ApiSchema = { type: 'object', additionalProperties: numberSchema };
 const anyObjectSchema: ApiSchema = { type: 'object', additionalProperties: true };
 
@@ -199,11 +211,12 @@ const errorResponse = (
   en: string,
   zh: string,
   error: string,
+  detail?: Readonly<Record<string, unknown>>,
 ): ApiResponse => ({
   status,
   description: text(en, zh),
   schema: errorSchema,
-  example: { error },
+  example: { error, ...detail },
   mediaType: 'application/json',
 });
 
@@ -1068,8 +1081,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'string',
-        'Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3, and supports 8k/1k and agentic-traces. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected.',
-        '展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开，支持 8k/1k 和 agentic-traces。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。',
+        `Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3, and supports 8k/1k and agentic-traces. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected. ${MODEL_ALIAS_NOTE.en}`,
+        `展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开，支持 8k/1k 和 agentic-traces。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。${MODEL_ALIAS_NOTE.zh}`,
         { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
         'DeepSeek-R1-0528',
       ),
@@ -1153,9 +1166,10 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'A query parameter is malformed, so nothing is read from the database: the model is missing or unsupported, date is not a YYYY-MM-DD calendar date, exact or exactRun is not true or false, runId is not a positive integer, exactRun=true has no runId, view is not calculator, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator. Unknown parameters are ignored.',
-        '查询参数格式错误，请求不会读取数据库：模型缺失或不受支持、date 不是 YYYY-MM-DD 格式的有效日期、exact 或 exactRun 不是 true 或 false、runId 不是正整数、exactRun=true 但未提供 runId、view 不是 calculator、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。未知参数会被忽略。',
+        'A query parameter is malformed, so nothing is read from the database: the model is missing or unsupported, date is not a YYYY-MM-DD calendar date, exact or exactRun is not true or false, runId is not a positive integer, exactRun=true has no runId, view is not calculator, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator. For an unknown model the body also has param: "model" and allowed, the display names. Unknown parameters are ignored.',
+        '查询参数格式错误，请求不会读取数据库：模型缺失或不受支持、date 不是 YYYY-MM-DD 格式的有效日期、exact 或 exactRun 不是 true 或 false、runId 不是正整数、exactRun=true 但未提供 runId、view 不是 calculator、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。模型未知时，响应体还包含 param: "model" 和列出展示名称的 allowed。未知参数会被忽略。',
         PUBLIC_API_ERRORS.unknownModel,
+        UNKNOWN_MODEL_EXAMPLE,
       ),
       errorResponse(
         '500',
@@ -1185,8 +1199,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'string',
-        'Display model name.',
-        '展示模型名称。',
+        `Display model name. ${MODEL_ALIAS_NOTE.en}`,
+        `展示模型名称。${MODEL_ALIAS_NOTE.zh}`,
         { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
         'DeepSeek-R1-0528',
       ),
@@ -1235,8 +1249,8 @@ export const apiOperations: readonly ApiOperation[] = [
       success('Historical benchmark rows.', '历史基准行。', benchmarkRowsSchema, benchmarkExample),
       errorResponse(
         '400',
-        'Required parameters are missing or the model is unsupported.',
-        '必填参数缺失或模型不受支持。',
+        'Required parameters are missing or the model is unsupported. An unknown model also returns param: "model" and allowed, the display names.',
+        '必填参数缺失或模型不受支持。模型未知时，响应体还包含 param: "model" 和列出展示名称的 allowed。',
         PUBLIC_API_ERRORS.benchmarkHistoryParameters,
       ),
       errorResponse(

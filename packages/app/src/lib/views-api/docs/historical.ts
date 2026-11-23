@@ -1,5 +1,5 @@
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
-import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -52,8 +52,8 @@ const parameters: readonly ApiParameter[] = [
     required: true,
     type: 'string',
     description: text(
-      'Frontend model display name (see /api/v1/views/options → models).',
-      '前端模型显示名（见 /api/v1/views/options → models）。',
+      `Frontend model (see /api/v1/views/options → models). ${MODEL_PARAM_FORMS.en}`,
+      `前端模型（见 /api/v1/views/options → models）。${MODEL_PARAM_FORMS.zh}`,
     ),
     schema: stringSchema,
     example: 'DeepSeek-V4-Pro',

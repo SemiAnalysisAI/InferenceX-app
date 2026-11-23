@@ -12,8 +12,18 @@ export const PUBLIC_API_ERRORS = {
   noValidIds: 'no valid ids provided',
 } as const;
 
-export function publicApiError(error: string, status: number): NextResponse {
-  return NextResponse.json({ error }, { status });
+/** Names the rejected query parameter and the values it accepts, as the views API does. */
+export interface PublicApiErrorDetail {
+  param: string;
+  allowed: readonly string[];
+}
+
+export function publicApiError(
+  error: string,
+  status: number,
+  detail?: PublicApiErrorDetail,
+): NextResponse {
+  return NextResponse.json({ error, ...detail }, { status });
 }
 
 export function tooManyIdsError(maxIds: number): string {
