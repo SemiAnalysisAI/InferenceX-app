@@ -70,14 +70,8 @@ import {
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { TokenBasisToggle } from './TokenBasisToggle';
-import {
-  Sequence,
-  type Model,
-  MODEL_OPTIONS,
-  isModelVisible,
-  isRegisteredModel,
-  modelRequiresObservations,
-} from '@/lib/catalog/data-mappings';
+import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { selectableInferenceModels } from '@/providers/GlobalFilterContext';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
@@ -256,19 +250,10 @@ export default function ChartControls({
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
   const featureGateUnlocked = useFeatureGate();
-  // Pending registrations are discoverable on inference without making them
-  // measured choices in shared calculator/TCO, PowerX, or historical selectors.
   const selectableModels = useMemo(
     () =>
       tcoSource === 'inference' && !powerXSurface
-        ? [
-            ...MODEL_OPTIONS.filter(
-              (model) =>
-                isModelVisible(model, featureGateUnlocked) &&
-                (availableModels.includes(model) || modelRequiresObservations(model)),
-            ),
-            ...availableModels.filter((model) => !isRegisteredModel(model)),
-          ]
+        ? selectableInferenceModels(availableModels, featureGateUnlocked)
         : availableModels,
     [availableModels, powerXSurface, tcoSource, featureGateUnlocked],
   );

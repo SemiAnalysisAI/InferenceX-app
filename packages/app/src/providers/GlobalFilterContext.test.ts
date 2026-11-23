@@ -6,7 +6,9 @@ import {
   latestRunId,
   resolveEffectiveRunDate,
   resolveEffectiveRunId,
+  selectableInferenceModels,
 } from '@/providers/GlobalFilterContext';
+import { Model } from '@/lib/catalog/data-mappings';
 import workflowFixture from '../../cypress/fixtures/api/workflow-info.json';
 import type { WorkflowInfoResponse } from '@/lib/api/api';
 import type { RunInfo } from '@/components/inference/types';
@@ -188,5 +190,23 @@ describe('global filter requested and effective selectors', () => {
       g_rundate: requestedDate,
       g_runid: requestedRunId,
     });
+  });
+});
+
+describe('selectableInferenceModels', () => {
+  it('lists available models in selector order, then pending ones, then unregistered ones', () => {
+    const available = [Model.DeepSeek_R1, Model.Kimi_K3_1_Pro, 'dsr2'];
+    expect(selectableInferenceModels(available, false)).toEqual([
+      Model.Kimi_K3_1_Pro,
+      Model.DeepSeek_R1,
+      'dsr2',
+    ]);
+    // A pending registration is listed before its first observation once it is visible.
+    expect(selectableInferenceModels(available, true)).toEqual([
+      Model.Kimi_K3_1_Pro,
+      Model.GLM_5_3_Flash,
+      Model.DeepSeek_R1,
+      'dsr2',
+    ]);
   });
 });

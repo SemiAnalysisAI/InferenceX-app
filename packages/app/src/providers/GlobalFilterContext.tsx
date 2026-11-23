@@ -420,6 +420,25 @@ export function resolveAvailableModels(
   return [...registered, ...unregistered];
 }
 
+/**
+ * The inference model selector's list. Pending registrations stay discoverable before their
+ * first observation, without becoming measured choices in the calculator, TCO, PowerX or
+ * historical selectors, which list `availableModels` as is.
+ */
+export function selectableInferenceModels(
+  availableModels: readonly string[],
+  featureGateUnlocked: boolean,
+): string[] {
+  return [
+    ...MODEL_OPTIONS.filter(
+      (model) =>
+        isModelVisible(model, featureGateUnlocked) &&
+        (availableModels.includes(model) || modelRequiresObservations(model)),
+    ),
+    ...availableModels.filter((model) => !isRegisteredModel(model)),
+  ];
+}
+
 export function resolveAvailableSequences(
   modelLines: readonly AvailabilityLine[],
   unofficialAvailable: readonly AvailableModelSequence[],
