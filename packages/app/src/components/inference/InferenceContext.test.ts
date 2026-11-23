@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 import {
   InferenceContextsProvider,
   matchRequestedHw,
+  openedUrlNamesParam,
   requestedHwConflict,
   resolveE2eXAxisMetric,
   resolveEffectiveXAxisMode,
@@ -15,6 +16,7 @@ import {
 import { comparisonExclusion } from '@/components/inference/utils/comparison-exclusion';
 import { resolveExclusionGroups } from '@/lib/benchmarks/exclusion';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { refreshUrlParams } from '@/lib/routing/url-state';
 import type {
   InferenceActionsContextType,
   InferenceDataContextType,
@@ -177,5 +179,16 @@ describe('requested hardware engine conflicts', () => {
       dropped: ['sglang'],
       partial: [],
     });
+  });
+});
+
+describe('openedUrlNamesParam', () => {
+  it('ignores the previous page URL while a client navigation renders the next page', () => {
+    window.history.replaceState(null, '', '/infx/inference?i_active=b200_sglang,b200_vllm');
+    refreshUrlParams();
+    expect(openedUrlNamesParam('i_active', '/infx/inference')).toBe(true);
+    expect(openedUrlNamesParam('i_active', '/compare/b200-vs-b300')).toBe(false);
+    window.history.replaceState(null, '', '/');
+    refreshUrlParams();
   });
 });
