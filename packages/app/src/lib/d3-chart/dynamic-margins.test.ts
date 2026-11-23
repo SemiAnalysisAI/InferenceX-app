@@ -5,6 +5,14 @@ import { computeLeftMargin, measureTextWidth } from './dynamic-margins';
 // A canvas whose glyphs are 10 px wide at 10px and 20 px wide at 20px, recording what it measured.
 const measured: { font: string; text: string }[] = [];
 class FakeOffscreenCanvas {
+  readonly width: number;
+  readonly height: number;
+
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+  }
+
   getContext() {
     return {
       font: '',
