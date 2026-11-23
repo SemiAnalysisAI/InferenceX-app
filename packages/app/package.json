@@ -36,7 +36,6 @@
     "guard:zh-copy:chinese-only": "bun scripts/check-zh-chinese-only.ts --chinese-only"
   },
   "dependencies": {
-    "@chenglou/pretext": "^1.0.0",
     "@jpinsonneau/html-to-image": "^1.11.13",
     "@noble/ciphers": "^2.4.0",
     "@posthog/nextjs-config": "^1.12.2",
