@@ -375,9 +375,12 @@ describe('history projection version', () => {
       // Re-pinned after the lazy power model loader gained failure and retry states (reached only
       // through type imports), fetchJson learned to take an early document-load response,
       // data_query_failed stopped reporting failed background refetches that keep their data,
-      // dashboard-routes gained the default Inference model slug, and the unofficial run provider
-      // gained a requested-overlay flag. None of these feed recorded entries, so they are unchanged.
-      sources: 'e79ff1da9b66ba43ef05e118382fc9ce448928b83b8d49c1a409d32af44216e5',
+      // dashboard-routes gained the default Inference model slug, inference topology labels
+      // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
+      // the inference setSelectedGPUs action type now returns whether picks applied, and the
+      // unofficial run provider gained a requested-overlay flag. None of these feed recorded
+      // entries, so they are unchanged.
+      sources: '9ed1467c433c994d3a2d8a58b1387e15afc78dadeaec8ad2320f233caf884011',
     });
   });
 });

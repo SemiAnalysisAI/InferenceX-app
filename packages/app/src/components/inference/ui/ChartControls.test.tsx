@@ -1,6 +1,6 @@
 // @test-environment jsdom
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
-import type { ReactElement } from 'react';
+import { Suspense, use, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { ResultContext } from '@/components/ui/result-context';
@@ -280,6 +280,45 @@ describe('Inference ChartControls with GPUs selected', () => {
       },
     });
     expect(contains('button', 'Select date range').classList.contains('animate-pulse')).toBe(false);
+  });
+});
+
+const consentPending = Promise.withResolvers<void>().promise;
+let openConsent: () => void = () => {};
+
+/** Stands in for the engine-comparison consent dialog, still loading while the test looks. */
+function ConsentDialog() {
+  const [open, setOpen] = useState(false);
+  openConsent = () => setOpen(true);
+  if (open) use(consentPending);
+  return null;
+}
+
+describe('Inference ChartControls GPU picks the provider does not apply', () => {
+  it('keeps the GPU trigger on the committed selection while consent opens', () => {
+    mount(
+      <>
+        <InferenceChartControls showXAxisMode />
+        <Suspense fallback={null}>
+          <ConsentDialog />
+        </Suspense>
+      </>,
+      {
+        unofficial: {},
+        inference: {
+          selectedGPUs: [],
+          setSelectedGPUs: () => {
+            openConsent();
+            return false;
+          },
+        },
+      },
+    );
+    const trigger = get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]');
+    click(trigger);
+    click(contains('[role="option"]', /^H100$/u));
+    expect(trigger.textContent).not.toContain('H100');
+    expect(trigger.textContent).toContain('Select Chip Config');
   });
 });
 

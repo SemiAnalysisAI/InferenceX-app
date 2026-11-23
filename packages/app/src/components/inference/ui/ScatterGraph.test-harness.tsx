@@ -1,4 +1,4 @@
-import { act, createElement, useReducer } from 'react';
+import { act, createElement, useLayoutEffect, useReducer } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, vi, mock } from 'bun:test';
 import { mocked, stubGlobal, unstubAllGlobals } from '@/test/helpers';
@@ -47,9 +47,12 @@ declare global {
   globalThis.__scatterPresenceState = { current: undefined, enabled: undefined };
 })();
 
+// Captures the committed props, like the handlers a real click reaches.
 mock.module('@/components/ui/chart-legend', () => ({
   default: (props: Record<string, any>) => {
-    globalThis.__scatterLegendState.current = props;
+    useLayoutEffect(() => {
+      globalThis.__scatterLegendState.current = props;
+    });
     return props.keyIndicators ?? null;
   },
 }));

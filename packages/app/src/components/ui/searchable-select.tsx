@@ -54,7 +54,8 @@ interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
   searchGroups?: SearchableSelectGroup[];
   value: string;
-  onValueChange: (value: string) => void;
+  /** Return `false` to reject the pick, e.g. a locked tier, so the trigger never shows it. */
+  onValueChange: (value: string) => void | boolean;
   placeholder?: string;
   initialLabel?: string;
   className?: string;
@@ -107,6 +108,8 @@ export function SearchableSelect({
   const clearSearchLabel = clearSearchLabelProp ?? t.clearSearchLabel;
   const noResultsLabel = noResultsLabelProp ?? t.noResultsLabel;
   const [internalOpen, setInternalOpen] = React.useState(false);
+  // The pick shows at once; whatever it re-renders (often whole charts) runs as a transition.
+  const [shownValue, setShownValue] = React.useOptimistic(value);
   const isOpen = !disabled && (open ?? internalOpen);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
@@ -161,16 +164,18 @@ export function SearchableSelect({
 
   const selectedLabel = React.useMemo(() => {
     for (const group of groups) {
-      const match = group.options.find((opt) => opt.value === value);
+      const match = group.options.find((opt) => opt.value === shownValue);
       if (match) return match.label;
     }
     return undefined;
-  }, [groups, value]);
+  }, [groups, shownValue]);
   const triggerLabel = mounted ? (selectedLabel ?? placeholder) : (initialLabel ?? placeholder);
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
-    onValueChange(optionValue);
+    React.startTransition(() => {
+      if (onValueChange(optionValue) !== false) setShownValue(optionValue);
+    });
     handleOpenChange(false);
   };
   const focusOption = (index: number) => {
@@ -222,7 +227,7 @@ export function SearchableSelect({
             data-testid={triggerTestId}
             data-slot="select-trigger"
             data-size={size}
-            data-value={mounted ? value : undefined}
+            data-value={mounted ? shownValue : undefined}
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup={hasOptionHelp ? 'grid' : 'listbox'}
@@ -314,7 +319,7 @@ export function SearchableSelect({
                   []),
               ];
               optionIntent.focusQuietly(
-                options.find((option) => option.dataset.value === value) ?? options[0],
+                options.find((option) => option.dataset.value === shownValue) ?? options[0],
               );
             }
           }}
@@ -393,7 +398,7 @@ export function SearchableSelect({
                   </div>
                 )}
                 {group.options.map((option) => {
-                  const isSelected = option.value === value;
+                  const isSelected = option.value === shownValue;
                   if (hasOptionHelp) {
                     return (
                       <div

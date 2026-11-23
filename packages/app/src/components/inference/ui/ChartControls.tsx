@@ -455,12 +455,13 @@ export default function ChartControls({
   };
 
   const handleGPUChange = (value: string[]) => {
-    setSelectedGPUs(value);
+    const applied = setSelectedGPUs(value);
     track('inference_gpu_selected', {
       ...analyticsContext,
       gpus: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
+    return applied;
   };
 
   const handleXAxisMetricChange = (value: string) => {

@@ -944,7 +944,7 @@ export function InferenceProvider({
     [setSelectedYAxisMetric, clearPresetOnChange],
   );
   const setSelectedGPUsAndClear = useCallback(
-    (next: string[]) => {
+    (next: string[]): boolean => {
       gpuSelectionChosenRef.current = true;
       if (
         requestEngineComparison(next, () => {
@@ -952,11 +952,11 @@ export function InferenceProvider({
           clearScopedSelectionOnChange();
         })
       )
-        return;
+        return false;
       if (!exclusion) {
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
-        return;
+        return true;
       }
 
       const previous = new Set(selectedGPUs);
@@ -978,16 +978,16 @@ export function InferenceProvider({
             existing: decision.existing,
           });
           clearPresetOnChange();
-          return;
+          return false;
         }
         if (decision.kind === 'silent-resolve') {
           setSelectedGpuState([...decision.result]);
           clearScopedSelectionOnChange();
-          return;
+          return false;
         }
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
-        return;
+        return true;
       }
 
       const { result, droppedGroups } = resolveExclusionGroups(
@@ -1004,6 +1004,7 @@ export function InferenceProvider({
         });
       }
       clearScopedSelectionOnChange();
+      return result.size === proposed.size;
     },
     [
       selectedGPUs,

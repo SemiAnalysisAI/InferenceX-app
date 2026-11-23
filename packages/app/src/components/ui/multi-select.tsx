@@ -62,7 +62,8 @@ interface MultiSelectProps {
   options?: MultiSelectOption[];
   sections?: MultiSelectSection[];
   value?: string[];
-  onChange?: (value: string[]) => void;
+  /** Return `false` to reject the pick, e.g. a locked tier, so the trigger never shows it. */
+  onChange?: (value: string[]) => void | boolean;
   triggerId?: string;
   triggerTestId?: string;
   ariaLabel?: string;
@@ -96,7 +97,7 @@ interface MultiSelectProps {
 function MultiSelect({
   options,
   sections,
-  value = [],
+  value: committedValue = [],
   onChange,
   triggerId,
   triggerTestId,
@@ -133,6 +134,12 @@ function MultiSelect({
   const resolvedSelectedSuffix = selectedSuffix ?? t.selectedSuffix;
   const resolvedMinimumPrefix = minimumPrefix ?? t.minimumPrefix;
   const [internalIsOpen, setInternalIsOpen] = React.useState(false);
+  // Picks show at once; whatever they re-render (often whole charts) runs as a transition.
+  const [value, setShownValue] = React.useOptimistic(committedValue);
+  const choose = (next: string[]) =>
+    React.startTransition(() => {
+      if (onChange?.(next) !== false) setShownValue(next);
+    });
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
   const resolvedTriggerId = triggerId ?? `${listboxId}-trigger`;
@@ -275,7 +282,7 @@ function MultiSelect({
     track(value.includes(optionValue) ? 'multi_select_deselected' : 'multi_select_selected', {
       value: optionValue,
     });
-    onChange?.(newValue);
+    choose(newValue);
     setIsOpen(false);
     triggerRef.current?.focus();
   };
@@ -292,7 +299,7 @@ function MultiSelect({
 
     track('multi_select_removed', { value: optionValue });
     const newValue = value.filter((v) => v !== optionValue);
-    onChange?.(newValue);
+    choose(newValue);
   };
 
   const handleClearAll = (e: React.SyntheticEvent) => {
@@ -304,7 +311,7 @@ function MultiSelect({
       return;
     }
     track('multi_select_cleared');
-    onChange?.([]);
+    choose([]);
   };
 
   const selectedOptions = value.map(

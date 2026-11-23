@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -126,6 +128,20 @@ export function MeasuredMetricControls({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // Picks commit in transitions, one at a time, so each builds on the last one requested. Only a
+  // metric outside the picks still in flight is an outside change that starts over.
+  const latest = useRef({ committed: metric, pending: [] as string[], requested: metric });
+  if (latest.current.committed !== metric) {
+    const caughtUp = latest.current.pending.indexOf(metric);
+    latest.current =
+      caughtUp === -1
+        ? { committed: metric, pending: [], requested: metric }
+        : {
+            ...latest.current,
+            committed: metric,
+            pending: latest.current.pending.slice(caughtUp + 1),
+          };
+  }
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
   const show = (field: MeasuredMetricField) => fields === undefined || fields.includes(field);
@@ -135,8 +151,11 @@ export function MeasuredMetricControls({
     all: t.compareAll,
     roles: t.compareRoles,
   };
-  const change = (next: MeasuredMetricConfigChange) =>
-    onChange(changeMeasuredMetricConfig(metric, next));
+  const change = (next: MeasuredMetricConfigChange) => {
+    latest.current.requested = changeMeasuredMetricConfig(latest.current.requested, next);
+    latest.current.pending.push(latest.current.requested);
+    onChange(latest.current.requested);
+  };
   const basisId = `measured-${config.family}-basis`;
   const scopeId = `measured-${config.family}-scope`;
   const roleScope =
