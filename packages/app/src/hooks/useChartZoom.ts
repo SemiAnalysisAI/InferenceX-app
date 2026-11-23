@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
+
+import { setChartZoomed } from '@/lib/d3-chart/zoom-state';
 
 export interface UseChartZoomOptions {
   resetEventName: string;
@@ -56,6 +58,9 @@ export function zoomEventFilter(event: {
   return !event.ctrlKey && !event.button;
 }
 
+/** How far (px) the pointer may move between press and release and still count as a click. */
+export const ZOOM_CLICK_DISTANCE_PX = 4;
+
 export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
   const { resetEventName, defaultZoomK = 1, scaleExtent = [1, 100], onReset, svgRef } = options;
 
@@ -64,6 +69,22 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
   const zoomTransformRef = useRef<d3.ZoomTransform>(defaultZoomTransform);
   const scaleExtentRef = useRef(scaleExtent);
   scaleExtentRef.current = scaleExtent;
+  // Lets the chart's reset button stay disabled while the chart is at its default view.
+  const [zoomStateToken] = useState(() => Symbol(resetEventName));
+  const publishZoomRef = useRef<(transform: d3.ZoomTransform) => void>(() => {});
+  publishZoomRef.current = (transform) =>
+    setChartZoomed(
+      resetEventName,
+      zoomStateToken,
+      transform.k !== defaultZoomTransform.k ||
+        transform.x !== defaultZoomTransform.x ||
+        transform.y !== defaultZoomTransform.y,
+    );
+
+  useEffect(
+    () => () => setChartZoomed(resetEventName, zoomStateToken, false),
+    [resetEventName, zoomStateToken],
+  );
 
   useEffect(() => {
     const handleResetZoom = () => {
@@ -112,6 +133,9 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
       const zoom = d3
         .zoom<SVGSVGElement, unknown>()
         .filter(zoomEventFilter)
+        // A pointer that drifts a few pixels between press and release is still a click; d3's
+        // default of 0 would treat it as a pan and swallow the click on a point.
+        .clickDistance(ZOOM_CLICK_DISTANCE_PX)
         .wheelDelta((event: WheelEvent) => {
           const delta = event.deltaY || event.deltaX;
           return -delta * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
@@ -132,6 +156,7 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
         zoomTransformRef.current = customTransformStorage
           ? customTransformStorage(event.transform)
           : event.transform;
+        publishZoomRef.current(zoomTransformRef.current);
       });
 
       svg.call(zoom as any);

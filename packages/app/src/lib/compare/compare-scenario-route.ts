@@ -20,6 +20,24 @@ export const SCENARIO_SEGMENTS = Object.keys(
   SCENARIO_SEGMENT_TO_SEQUENCE,
 ) as readonly ScenarioSegment[];
 
+/**
+ * The scenario children built at deploy time under each prerendered `/compare` and
+ * `/compare-per-dollar` slug. These two take about 98% of scenario traffic.
+ */
+export const PRERENDERED_SCENARIO_SEGMENTS = [
+  'agentic',
+  '8k-1k',
+] as const satisfies readonly ScenarioSegment[];
+
+/** Static params for a `[slug]/[scenario]` page: every prerendered scenario of each slug. */
+export function prerenderedScenarioParams(
+  slugs: readonly { slug: string }[],
+): { slug: string; scenario: ScenarioSegment }[] {
+  return slugs.flatMap(({ slug }) =>
+    PRERENDERED_SCENARIO_SEGMENTS.map((scenario) => ({ slug, scenario })),
+  );
+}
+
 export function sequenceForScenarioSegment(segment: string): Sequence | null {
   return (
     SCENARIO_SEGMENT_TO_SEQUENCE[segment as ScenarioSegment] ??
