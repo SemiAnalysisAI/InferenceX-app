@@ -60,7 +60,7 @@ export async function ingestChangelogEntries(
         workflow_run_id, date, base_ref, head_ref, config_keys, description, pr_link, append_only
       ) values (
         ${workflowRunId}, ${date}, ${baseRef}, ${headRef},
-        ${sql.array(e.configKeys)}, ${e.description}, ${e.prLink}, ${e.appendOnly}
+        ${e.configKeys}, ${e.description}, ${e.prLink}, ${e.appendOnly}
       )
       on conflict (workflow_run_id, base_ref, head_ref)
       do update set

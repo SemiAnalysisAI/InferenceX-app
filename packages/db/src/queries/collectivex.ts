@@ -241,7 +241,7 @@ export async function upsertCollectiveXChangelogLinks(
         (run_id, entry_index, pr_number, pr_link, date, pools, selectors, description, changes)
       VALUES
         (${row.run_id}, ${row.entry_index}, ${row.pr_number}, ${row.pr_link}, ${row.date},
-         ${sql.array(row.pools)}, ${row.selectors as never}::jsonb, ${row.description},
+         ${row.pools}, ${row.selectors as never}::jsonb, ${row.description},
          ${{ changes: row.changes } as never}::jsonb->'changes')
       ON CONFLICT (run_id, entry_index) DO UPDATE SET
         pr_number = EXCLUDED.pr_number, pr_link = EXCLUDED.pr_link, date = EXCLUDED.date,

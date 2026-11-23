@@ -35,14 +35,14 @@ export async function bulkIngestEvalSamples(
       )
       select
         ${evalResultId},
-        unnest(${sql.array(docIds)}::int[]),
-        unnest(${sql.array(prompts)}::text[]),
-        unnest(${sql.array(targets)}::text[]),
-        unnest(${sql.array(responses)}::text[]),
-        unnest(${sql.array(passes)}::bool[]),
-        unnest(${sql.array(scores)}::numeric[]),
-        unnest(${sql.array(metricsJsons)}::jsonb[]),
-        unnest(${sql.array(dataJsons)}::jsonb[])
+        unnest(${docIds}::int[]),
+        unnest(${prompts}::text[]),
+        unnest(${targets}::text[]),
+        unnest(${responses}::text[]),
+        unnest(${passes}::bool[]),
+        unnest(${scores}::numeric[]),
+        unnest(${metricsJsons}::text[])::jsonb,
+        unnest(${dataJsons}::text[])::jsonb
       on conflict (eval_result_id, doc_id) do nothing
       returning (xmax = 0) as inserted
     `;

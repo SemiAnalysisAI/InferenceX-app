@@ -5,6 +5,7 @@ import { beforeAll, expect, it } from 'bun:test';
 
 import type { DbClient } from '../connection';
 import type { Sql } from '../etl/db-utils';
+import { pgliteDriverSql } from '../lib/test-pglite';
 import type { OperatorXRawBundle } from '../operatorx/bundle';
 import { OPERATORX_COMPARISON_OPS } from '../operatorx/comparison-cache';
 import { buildComparison } from '../operatorx/compare';
@@ -90,7 +91,6 @@ function sqlFor(db: PGlite): Sql & DbClient {
       return result.rows;
     };
     return Object.assign(tag, {
-      array: (items: unknown[]) => items,
       begin: <T>(fn: (tx: Sql) => Promise<T>) => db.transaction((tx) => fn(makeTag(tx))),
     }) as unknown as Sql & DbClient;
   };
@@ -192,6 +192,23 @@ it('persists raw OperatorX documents and replaces a re-ingested run atomically',
     expect(await getOperatorXRunComparison(sql, '999', 'gemm')).toBeNull();
     expect(await getOperatorXBundle(sql, '999')).toBeNull();
   } finally {
+    await db.close();
+  }
+});
+
+it('stores raw documents as jsonb objects through the postgres driver', async () => {
+  const db = await migratedDb();
+  const driver = await pgliteDriverSql(db);
+  try {
+    const raw = bundle();
+    expect(await saveOperatorXBundle(driver.sql, raw)).toEqual({ docs: 1, results: 1 });
+    const types = await db.query<{ type: string }>(
+      'SELECT jsonb_typeof(doc) AS type FROM opx_run_docs',
+    );
+    expect(types.rows).toEqual([{ type: 'object' }]);
+    expect(await getOperatorXBundle(sqlFor(db), '123')).toMatchObject({ shards: raw.shards });
+  } finally {
+    await driver.close();
     await db.close();
   }
 });
