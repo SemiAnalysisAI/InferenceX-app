@@ -27,7 +27,7 @@ import { cachedJson } from '@/lib/cache/api-cache';
 import {
   downloadGithubArtifact,
   extractZipEntries,
-  fetchGithubRunArtifacts,
+  listGithubRunArtifacts,
   fetchGithubWorkflowRun,
   getGithubToken,
   getRunDate,
@@ -100,10 +100,13 @@ function unavailableJson(
   );
 }
 
-/** GitHub keeps run artifacts this long; an older run with none listed has lost them. */
+/**
+ * GitHub keeps run artifacts this long, then drops them from the listing (it answers an empty
+ * list, not entries marked expired), so a successful empty listing of an older run means expiry.
+ */
 const ARTIFACT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
-/** Why a run lists no result artifacts. `listed` includes expired artifacts. */
+/** Why a successfully listed run has no result artifacts. `listed` includes expired artifacts. */
 export function missingResultsCode(
   run: Pick<GithubWorkflowRun, 'created_at' | 'status'>,
   listed: readonly GithubArtifact[],
@@ -460,7 +463,19 @@ async function processSingleRun(
   }
   const run = (await runResp.json()) as GithubWorkflowRun;
 
-  const listed = await fetchGithubRunArtifacts(runId, githubToken);
+  const listed = await listGithubRunArtifacts(runId, githubToken);
+  if (!listed) {
+    return {
+      errorResponse: NextResponse.json(
+        {
+          error: `The artifact list of run ${runId} could not be read from GitHub; retry later`,
+          code: 'GITHUB_UNAVAILABLE',
+          runId,
+        },
+        { status: 503, headers: { 'Cache-Control': UNCACHED } },
+      ),
+    };
+  }
   const artifacts = listed.filter((artifact) => !artifact.expired);
   const bmkArtifact = artifacts
     .filter((a) => a.name === 'results_bmk')
@@ -495,15 +510,11 @@ async function processSingleRun(
 
   if (!bmkArtifact && perConfigBmkArtifacts.length === 0 && !evalArtifact) {
     const code = missingResultsCode(run, listed);
-    // A failed artifact listing also lands here, so an empty listing for a recent
-    // run stays short-lived instead of taking the missing-run TTL.
     return {
       errorResponse: unavailableJson(
         code,
         runId,
-        code === 'ARTIFACTS_EXPIRED' || (code === 'NO_RESULTS' && listed.length > 0)
-          ? MISSING_RUN_CACHE_CONTROL
-          : ACTIVE_RUN_CACHE_CONTROL,
+        code === 'RUN_IN_PROGRESS' ? ACTIVE_RUN_CACHE_CONTROL : MISSING_RUN_CACHE_CONTROL,
       ),
     };
   }
