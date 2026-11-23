@@ -356,10 +356,10 @@ export default function ChartLegend({
             <LegendSwitch config={sw} />
             <Label
               htmlFor={sw.id}
-              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              className="gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
             >
               {sw.label}
-              {sw.detail && <span className="ml-1 tabular-nums">{sw.detail}</span>}
+              {sw.detail && <span className="tabular-nums">{sw.detail}</span>}
             </Label>
             {sw.infoTooltip && (
               <InfoHelp
