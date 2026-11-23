@@ -372,9 +372,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the unofficial-run provider and banner gained unavailable-run states. They are
-      // reached only through a type import and React context, so recorded entries are unchanged.
-      sources: '79700f5f33940e35a9593b8bf79d3bdbd01f5ca468f66981dfa00ea88fe128b8',
+      // Re-pinned after dashboard-routes gained the default Inference model slug (moved from the
+      // redirect config so the header can link to it). Route constants do not feed recorded entries.
+      sources: '3469bf243568d542d62305c78170fa6ce5baa9aef3b35dbdb69360f07f17dda5',
     });
   });
 });

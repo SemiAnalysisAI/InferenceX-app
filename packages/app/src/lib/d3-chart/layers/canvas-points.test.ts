@@ -86,7 +86,7 @@ describe('joinedDrawOrder', () => {
 });
 
 describe('PointHitGrid', () => {
-  it('returns the last drawn interactive point within the hit radius, like stacked SVG circles', () => {
+  it('returns the nearest interactive point within the hit radius, the topmost on a tie', () => {
     const random = seeded(11);
     const count = 400;
     const xs = Float64Array.from({ length: count }, () => random() * 220 - 10);
@@ -98,10 +98,15 @@ describe('PointHitGrid', () => {
       for (let x = -3; x <= 203; x += 1.5) {
         let expected = -1;
         if (x >= 0 && x <= 200 && y >= 0 && y <= 100) {
+          let bestDistance = 144;
           for (let index = 0; index < count; index++) {
             const dx = xs[index] - x;
             const dy = ys[index] - y;
-            if (interactive[index] && dx * dx + dy * dy <= 144) expected = index;
+            const distance = dx * dx + dy * dy;
+            if (interactive[index] && distance <= bestDistance) {
+              expected = index;
+              bestDistance = distance;
+            }
           }
         }
         expect(grid.hit(x, y)).toBe(expected);
@@ -186,7 +191,7 @@ describe('CanvasPointLayer', () => {
     svg.remove();
   });
 
-  it('dispatches enter, leave and click for the topmost point under the pointer', () => {
+  it('dispatches enter, leave and click for the nearest point under the pointer', () => {
     const { svg, layer } = mountLayer();
     layer.join(
       [
@@ -220,9 +225,10 @@ describe('CanvasPointLayer', () => {
       hitArea.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y }));
 
     fire('mousemove', 1, 10);
-    fire('mousemove', 12, 10);
+    fire('mousemove', 14, 10);
     fire('mousemove', 26, 10);
     fire('mousemove', 60, 60);
+    fire('click', 14, 10);
     fire('click', 12, 10);
     fire('mouseleave', 60, 60);
     expect(events).toEqual([
@@ -234,6 +240,7 @@ describe('CanvasPointLayer', () => {
       'move',
       'leave:b1',
       'click:b1',
+      'click:a1',
     ]);
     expect(layer.snapshot().some((entry) => entry.hovered)).toBe(false);
 

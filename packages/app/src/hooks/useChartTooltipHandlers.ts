@@ -239,12 +239,11 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         event.stopPropagation();
 
         if (config.panel) {
+          // The details panel closes from its own button, Escape or an empty-plot click. A second
+          // click on the pinned point keeps it open rather than closing it with no visible cue.
+          if (pinnedPointRef.current === d) return;
           tooltipElement.style('opacity', 0).style('display', 'none');
           rulerGroup.style('display', 'none');
-          if (pinnedPointRef.current === d) {
-            dismissTooltip();
-            return;
-          }
           const { xScale: curX, yScale: curY } = zoomedScales();
           const x = markerPosition?.x ?? config.getRulerX?.(d, curX);
           const y = markerPosition?.y ?? (curY ? config.getRulerY?.(d, curY) : undefined);

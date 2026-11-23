@@ -22,7 +22,7 @@ import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
-import { DEFAULT_INFERENCE_MODEL_SLUG } from '@/lib/routing/inference-model-redirects';
+import { DEFAULT_INFERENCE_MODEL_SLUG } from '@/lib/routing/dashboard-routes';
 import {
   getInferenceModelBySlug,
   inferenceModelSlugForModel,
