@@ -123,7 +123,10 @@ jobs:
       - name: Stop app server
         if: ${{ always() }}
         run: |
-          pkill -TERM -f '^next-server' || exit 0
+          if ! pkill -TERM -f '^next-server'; then
+            echo '::warning::No next-server process found; the node_modules sticky disk may retry its unmount'
+            exit 0
+          fi
           for _ in $(seq 100); do
             pgrep -f '^next-server' > /dev/null || exit 0
             sleep 0.1
