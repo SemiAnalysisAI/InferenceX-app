@@ -14,6 +14,9 @@ import { computeCompareImageRows } from '@/lib/compare/compare-ssr';
 import { getLogoSrc } from '@/lib/seo/og-assets';
 import { renderComparePngChart } from '@/lib/compare/png-chart';
 
+// Bump when the per-dollar PNG drawing changes, so the hero srcSet URLs change on that deploy.
+export const PER_DOLLAR_PNG_RENDER_REVISION = 1;
+
 /** What the hero PNG draws for a pair, from the page's own cached pair data. */
 async function perDollarChartRows({ model, a, b }: CompareSlug) {
   const { sequence, precision, ssrRows, interactivityRange, initialPairBenchmarkRows } =
@@ -45,14 +48,18 @@ async function perDollarChartRows({ model, a, b }: CompareSlug) {
 }
 
 /**
- * A short hash of the data the hero PNG draws. The page puts it on the PNG URL inside the
- * `/_next/image` srcSet, whose responses browsers keep for `images.minimumCacheTTL`, so an ingest
- * that changes the chart also changes the optimized image URL. The PNG route ignores the query.
+ * A short hash of the data the hero PNG draws and the renderer revision. The page puts it on the
+ * PNG URL inside the `/_next/image` srcSet, whose responses browsers keep for
+ * `images.minimumCacheTTL`, so an ingest that changes the chart, or a deploy that changes the
+ * drawing, also changes the optimized image URL. The PNG route ignores the query.
  */
-export async function perDollarPngVersion(pair: CompareSlug): Promise<string> {
+export async function perDollarPngVersion(
+  pair: CompareSlug,
+  renderRevision = PER_DOLLAR_PNG_RENDER_REVISION,
+): Promise<string> {
   const { workload, plottedRows, curveRows } = await perDollarChartRows(pair);
   return createHash('sha256')
-    .update(JSON.stringify([workload, plottedRows, curveRows]))
+    .update(JSON.stringify([renderRevision, workload, plottedRows, curveRows]))
     .digest('hex')
     .slice(0, 12);
 }

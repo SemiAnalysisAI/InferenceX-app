@@ -22,7 +22,7 @@ mock.module('@/lib/analytics/analytics-server', () => ({ trackServer: () => {} }
 
 // Imported after mock.module so the version reads the mocked pair data.
 const { parseCompareSlug } = await import('./compare-slug');
-const { perDollarPngVersion } = await import('./per-dollar-png');
+const { PER_DOLLAR_PNG_RENDER_REVISION, perDollarPngVersion } = await import('./per-dollar-png');
 
 const pair = parseCompareSlug('deepseek-r1-b200-vs-h100')!;
 
@@ -48,5 +48,11 @@ describe('perDollarPngVersion', () => {
     } finally {
       derived.precision = 'fp4';
     }
+  });
+
+  it('changes when the renderer revision is bumped for a new drawing', async () => {
+    const current = await perDollarPngVersion(pair);
+    expect(await perDollarPngVersion(pair, PER_DOLLAR_PNG_RENDER_REVISION)).toBe(current);
+    expect(await perDollarPngVersion(pair, PER_DOLLAR_PNG_RENDER_REVISION + 1)).not.toBe(current);
   });
 });
