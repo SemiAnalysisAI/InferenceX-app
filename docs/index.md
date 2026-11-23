@@ -25,7 +25,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [GPU Specs](./gpu-specs.md) covers unit conventions, topology invariants, and hardware gotchas.
 - [TCO Calculator](./tco-calculator.md) covers the calculator's interpolation, cost metrics, unofficial-run overlays, and estimator design.
 - [Adding Entities](./adding-entities.md) has the checklists for adding models, GPUs, precisions, sequences, and frameworks.
-- [Testing](./testing.md) covers test requirements, quality standards, and the pre-commit checklist.
+- [Testing](./testing.md) covers test requirements, quality standards, the pre-commit checklist, and the post-deploy smoke check.
 - [Site Search](./site-search.md) covers how header search indexes and ranks pages, plus its performance and SEO guarantees.
 - [Typography](./typography.md) covers type tokens, heading components, chart font sizes, and the `check:typography` gate.
 - [Data Transforms](./data-transforms.md) covers power boundaries, prefix-cache tier shares, and hardware-key gotchas in the chart data pipeline.

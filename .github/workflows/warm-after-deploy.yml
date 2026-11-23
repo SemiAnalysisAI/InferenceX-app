@@ -8,10 +8,19 @@ name: Warm After Deploy
 # domain serves the new deployment, for automatic deploys, manual promotions,
 # and rollbacks. The cache is also per region: this fills the region nearest the
 # runner and leaves warm functions and server caches for the others.
+#
+# Afterwards the smoke job checks what visitors now get from the CDN: key APIs in
+# every content coding, top pages, and share images (docs/testing.md). It runs
+# even when warming failed, and a manual run can skip warming with `smoke-only`.
 on:
   repository_dispatch:
     types: [vercel.deployment.promoted]
   workflow_dispatch:
+    inputs:
+      smoke-only:
+        description: Skip warming and only run the smoke check
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -22,7 +31,7 @@ concurrency:
 jobs:
   warm:
     name: Warm dashboards, OperatorX and top pages
-    if: github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production'
+    if: (github.event_name == 'workflow_dispatch' && !inputs.smoke-only) || github.event.client_payload.environment == 'production'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
@@ -117,3 +126,44 @@ jobs:
               -o /dev/null -w "%{http_code} %{time_total}s $path\n" \
               "${APP_URL%/}$path" "${headers[@]}"
           done
+
+  smoke:
+    name: Smoke-check production
+    needs: warm
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production') }}
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
+            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      # Fails with an ::error annotation per broken check: a non-200, a body that does not
+      # match its Content-Encoding, JSON of the wrong shape, a page showing a render error,
+      # a share image that is not a PNG, or uncacheable headers.
+      - name: Smoke-check APIs, pages and share images
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          bun run smoke "$APP_URL"

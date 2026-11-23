@@ -173,6 +173,8 @@ from the public database into a downstream deployment's `DATABASE_WRITE_URL`, an
 `promote-to-public` moves runs the other way, so both run everywhere except
 `SemiAnalysisAI/InferenceX-app`. `Warm After Deploy` skips the video History snapshot on a
 deployment without video storage and the OperatorX APIs on one without an OperatorX database.
+Its `smoke` job then runs the [post-deploy smoke check](./testing.md#post-deploy-smoke-check)
+against `APP_URL` and fails the workflow when an API, page or share image is broken.
 
 ### Staging prerequisites
 

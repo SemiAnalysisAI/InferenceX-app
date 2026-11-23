@@ -33,6 +33,7 @@
     "cache:warmup": "bun --env-file=../../.env scripts/warmup-cache.ts",
     "capture:fixtures": "bun scripts/capture-cypress-fixtures.ts",
     "fixtures:video-history": "bun scripts/build-video-history-fixture.ts",
+    "smoke": "bun --env-file=../../.env scripts/smoke-check.ts",
     "guard:zh-copy:chinese-only": "bun scripts/check-zh-chinese-only.ts --chinese-only"
   },
   "dependencies": {

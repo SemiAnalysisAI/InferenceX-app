@@ -78,6 +78,28 @@ time are not included.
 
 Server-cache performance regressions must assert source-reader call counts for repeated identical inputs. Do not use elapsed-time thresholds: CI scheduling and cold-start variance make wall-clock assertions nondeterministic.
 
+## Post-deploy smoke check
+
+`bun run smoke -- <base-url>` checks a running deployment in about 35 read-only GET requests, normally in a few seconds. It exits 1 when any check fails, and in GitHub Actions each failure is also an `::error` annotation. The base URL defaults to `http://localhost:3000`. When `VERCEL_PROTECTION_BYPASS_SECRET` is set, every request sends it as `x-vercel-protection-bypass`.
+
+```sh
+bun run smoke -- https://inferencex.semianalysis.com
+bun run preview   # production build on port 3001
+bun run smoke -- http://localhost:3001
+```
+
+Point it at a production build or a deployment. `bun run dev` serves pages with `no-store`, and `E2E_FIXTURES=1` builds serve APIs with `no-store`, so the cache header checks fail against either.
+
+The `smoke` job of the Warm After Deploy workflow runs it against `APP_URL` after every production promotion, once warming has finished (or failed). Run that workflow by hand with `smoke-only` to check production without warming it.
+
+What it checks (`packages/app/src/lib/testing/smoke-check.ts`):
+
+- **APIs.** `/api/v1/availability`, `availability/compact`, `overview`, `reliability`, `benchmarks?model=<featured model>`, `workflow-info?date=<its newest run date>`, `datasets` and `benchmark-presence`, each requested three times with `Accept-Encoding` set to `br`, `gzip` and `identity`. Every response must be HTTP 200 JSON with publicly cacheable `Cache-Control`. Its Content-Encoding must be one the request accepted and must match the bytes, and the decoded body must have the expected top-level shape and keys. The client is `node:http`, which never decompresses on its own, so a compressed body served without `Content-Encoding` fails here as it fails in a browser. Next.js 16.4.5 introduced that bug for Route Handlers.
+- **Pages.** `/`, `/zh`, `/infx/inference` (which must redirect to the featured model), its `/zh` page, a prerendered `/compare/<slug>`, `/run/<slug>`, `/rankings/<slug>` and `/blog`. Each must answer 200 after same-origin redirects, with HTML that has the header, footer, an `h1` and a page-specific element, and without `private` or `no-store` caching. The HTML must not contain a render failure. That means the Next.js error document (`<html id="__next_error__">`), a Suspense boundary that failed on the server (`<template data-dgst="<digest>">`, after which the browser shows `src/app/error.tsx`), or the titles `error.tsx` renders. Empty digests and `BAILOUT_TO_CLIENT_SIDE_RENDERING` are normal client-rendering bailouts.
+- **Share images.** The per-dollar, precision and spec-decode comparison PNGs. Each must be HTTP 200 `image/png` whose decoded body starts with the PNG signature.
+
+The featured model is `DEFAULT_INFERENCE_MODEL_SLUG`. Compare, run and ranking slugs come from the deployment's own availability rows, chosen the way the build picks its prerendered pages (`prerenderedCompareSlugs`), so nothing goes stale when models change. A deployment with no comparable chips skips those checks with a notice. Requests run six at a time with a 20 s deadline each. A network error (refused or reset connection, timeout) is retried once, and a wrong answer is never retried.
+
 ## Quality Standards
 
 1. **No tautological tests** — every test must verify a real transformation
