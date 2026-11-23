@@ -412,7 +412,9 @@ All text keys (model, hardware, framework, precision) have `CHECK (field = lower
 
 Never rewrite an applied migration; add a new numbered file. `runMigrations` (`packages/db/src/lib/migration-runner.ts`) keys `schema_migrations` on the filename only, so an edited file is skipped on every database that already ran it.
 
-Migrations are applied by hand, so a database can fall behind the repository. `bun run admin:db:verify` first calls `pendingMigrations` from the same module, which lists every file in `packages/db/migrations` that `schema_migrations` does not record (all of them when the table is missing). If any are pending, it exits nonzero and names the files before printing anything else. CI runs it after every ingest and after applying run overrides, so the job fails until someone applies them with `bun run admin:db:migrate`. Filenames recorded in `schema_migrations` but absent from the repository, such as CollectiveX or OperatorX migrations, are ignored.
+Migrations are applied by hand, so a database can fall behind the repository. `bun run admin:db:check-migrations` lists every file in `packages/db/migrations` that `schema_migrations` does not record (all of them when the table is missing) and exits nonzero. The ingest workflow and Apply Run Overrides run it before any database write, so a database that is behind aborts the job with nothing written and a `Pending database migrations` annotation. The post-write `admin:db:verify` reports the same list without failing, so it never turns a committed ingest red or skips cache invalidation.
+
+An unrecorded file is not necessarily unapplied. `008_agentic.sql`, `009_latest_benchmarks_single_run_per_line.sql` and `010_dataset_request_stats.sql` were first committed as 007-009 on the PR #348 branch with identical contents, so `EARLIER_MIGRATION_NAMES` in `migration-runner.ts` counts those earlier names as applied, both in the check and in `admin:db:migrate`. For any other listed file, do not run `admin:db:migrate` straight away, because it applies every unrecorded file and some are not safe to rerun (for example the ones that drop and recreate `latest_benchmarks`). Check whether each file's schema is already in the database. If it is, record it with `insert into schema_migrations (filename) values ('<file>')`. Then migrate the files that are truly missing. The check also lists recorded names that no migrations directory holds, which may be earlier names of listed files. CollectiveX and OperatorX migrations share `schema_migrations` and are not listed.
 
 ## ETL Design
 
@@ -967,7 +969,7 @@ semantics change so cached point payloads are refreshed.
 No workflow or Vercel deploy applies main-database migrations. Apply them by hand before deploying code
 that needs them, or readers fail until the migration runs. From the
 repository root, with credentials for the reviewed target database, run
-`bun run admin:db:verify` to list pending migrations, then `bun run admin:db:migrate --yes`. The app and ingest
+`bun run admin:db:check-migrations` to list unrecorded migrations, record any whose schema is already present (see Append-Only Migrations), then run `bun run admin:db:migrate --yes`. The app and ingest
 process must use the same database.
 
 For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
