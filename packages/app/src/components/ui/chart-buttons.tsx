@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { useChartZoomed } from '@/lib/d3-chart/zoom-state';
 
 const MENU_ITEM_STYLE =
   'flex min-h-11 w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8';
@@ -134,6 +135,7 @@ export function ChartButtons({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [pngAspectRatio, setPngAspectRatio] = useState<PngAspectRatio>('auto');
   const resetEventName = zoomResetEvent || `${analyticsPrefix ?? 'chart'}_zoom_reset_${chartId}`;
+  const zoomed = useChartZoomed(resetEventName);
   const eventProperties = { chart: analyticsChart, ...analyticsContext };
   const trackEvent = (suffix: string, properties: Record<string, unknown> = eventProperties) => {
     if (analyticsPrefix) track(`${analyticsPrefix}_${suffix}`, properties);
@@ -259,7 +261,8 @@ export function ChartButtons({
             data-testid="zoom-reset-button"
             variant="outline"
             size="icon-xs"
-            disabled={hideImageExport}
+            // At the default view there is nothing to reset.
+            disabled={hideImageExport || !zoomed}
             aria-label={t.reset}
             onClick={() => {
               trackEvent('zoom_reset_button');

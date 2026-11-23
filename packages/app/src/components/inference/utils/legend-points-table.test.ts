@@ -49,6 +49,14 @@ describe('pointDetailHref', () => {
     });
   });
 
+  it("names the point's own model so the detail page knows its chart", () => {
+    const d = pt({ benchmark_type: 'agentic_traces', id: 206863, model: 'DeepSeek-V4-Pro' });
+    expect(pointDetailHref(d, false)).toEqual({
+      href: '/infx/inference/agentic/206863?g_model=DeepSeek-V4-Pro',
+      isExternal: false,
+    });
+  });
+
   it('fixed-seq point links to its GitHub Actions run (repo URL rewritten)', () => {
     const d = pt({
       benchmark_type: 'single_turn',

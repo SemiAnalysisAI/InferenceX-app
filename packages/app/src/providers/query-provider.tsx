@@ -19,6 +19,7 @@ export function createAppQueryClient(): QueryClient {
               ? options.throwOnError(error, query)
               : Boolean(options.throwOnError),
           ),
+          keepsData: query.state.data !== undefined,
         }),
     }),
     mutationCache: new MutationCache({

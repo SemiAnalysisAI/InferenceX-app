@@ -1,3 +1,5 @@
+import { errorMessage } from '../lib/error-message';
+
 export interface Skips {
   badZip: number;
   unmappedModel: number;
@@ -82,7 +84,9 @@ export interface SkipTracker {
   dbWriteErrors: DbWriteFailure[];
   dbWriteWarnings: DbWriteFailure[];
   recordDbError: (kind: DbWriteKind, subject: string, err: unknown) => void;
-  recordTelemetryError: (context: string, err: Error) => void;
+  /** A write that succeeded with part of its data missing. Listed in the receipt, never fatal. */
+  recordDbWarning: (kind: DbWriteKind, subject: string, message: string) => void;
+  recordTelemetryError: (context: string, err: unknown) => void;
   snapshot: () => SkipSnapshot;
   diff: (before: SkipSnapshot) => {
     droppedModel: number;
@@ -159,9 +163,14 @@ export function createSkipTracker(): SkipTracker {
       dbWriteErrors.push(failure);
       printDbError(detail);
     },
-    recordTelemetryError(context: string, err: Error): void {
+    recordDbWarning(kind: DbWriteKind, subject: string, message: string): void {
+      const failure = dbWriteFailure(kind, subject, message);
+      dbWriteWarnings.push(failure);
+      printDbWarning(`${kind} for ${subject}: ${failure.message}`);
+    },
+    recordTelemetryError(context: string, err: unknown): void {
       skips.telemetryError++;
-      printTelemetryError(`${context}: ${err.message}`);
+      printTelemetryError(`${context}: ${errorMessage(err)}`);
     },
 
     snapshot(): SkipSnapshot {

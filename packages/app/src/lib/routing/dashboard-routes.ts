@@ -317,6 +317,12 @@ export const DASHBOARD_ROUTES = [
 export const AGENTX_ROUTE = { path: '/infx/agentx', legacyPath: '/agentx' } as const;
 export const UBENCHX_ROUTE = { path: '/ubx', legacyPath: '/ubenchx' } as const;
 
+/**
+ * The featured model the bare Inference URL redirects to, and the model the header's Dashboard
+ * link opens directly. It can change, so the redirect is temporary.
+ */
+export const DEFAULT_INFERENCE_MODEL_SLUG = 'kimi-k31-pro';
+
 export type DashboardRoute = (typeof DASHBOARD_ROUTES)[number];
 export type DashboardRouteKey = DashboardRoute['key'];
 

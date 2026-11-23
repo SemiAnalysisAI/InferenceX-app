@@ -76,11 +76,21 @@ describe('GET /api/v1/benchmarks/history/trends', () => {
     expect(mockGetAllBenchmarksForHistory).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for an unknown model', async () => {
+  it('returns 400 for an unknown model with the accepted display names', async () => {
     const res = await GET(req('/api/v1/benchmarks/history/trends?model=Bad&isl=1024&osl=1024'));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Unknown model');
+    expect(body.allowed).toContain('DeepSeek-R1-0528');
+  });
+
+  it('accepts a dashboard slug for the model', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce([]);
+    const res = await GET(
+      req('/api/v1/benchmarks/history/trends?model=deepseek-r1&isl=1024&osl=8192'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 8192);
   });
 
   it('serves the published fixed-sequence rows for the same query', async () => {

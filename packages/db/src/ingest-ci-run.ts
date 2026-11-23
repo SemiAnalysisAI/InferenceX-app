@@ -20,6 +20,7 @@ import {
   fetchRunAttempt,
   listRunArtifacts,
 } from './lib/github-artifacts';
+import { errorMessage } from './lib/error-message';
 import { pairServerLogArtifacts } from './lib/server-log-backfill';
 import { createAdminSql } from './etl/db-utils';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
@@ -270,8 +271,8 @@ const stripBmkAndAgenticPrefix = (s: string): string =>
 function readJson(filePath: string): unknown {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (error: any) {
-    console.warn(`  [WARN] Failed to parse ${path.basename(filePath)}: ${error.message}`);
+  } catch (error) {
+    console.warn(`  [WARN] Failed to parse ${path.basename(filePath)}: ${errorMessage(error)}`);
     return null;
   }
 }
@@ -615,10 +616,7 @@ async function main(): Promise<void> {
             ),
           );
         } catch (error) {
-          tracker.recordTelemetryError(
-            `power audit for ${configKey}`,
-            error instanceof Error ? error : new Error(String(error)),
-          );
+          tracker.recordTelemetryError(`power audit for ${configKey}`, error);
         }
       }
       const resolved: (BenchmarkParams & { configId: number })[] = [];
@@ -626,7 +624,7 @@ async function main(): Promise<void> {
         let configId: number;
         try {
           configId = await getOrCreateConfig(row.config);
-        } catch (error: any) {
+        } catch (error) {
           telemetryExpectationsUnknown = true;
           tracker.recordDbError('config', path.posix.basename(file.path), error);
           report.counts.benchmark.failed++;
@@ -778,14 +776,14 @@ async function main(): Promise<void> {
                     `+${ingested.samplesInserted} sample(s), ` +
                     `${ingested.seriesSkipped} unchanged (${elapsed(gpuMetricsStart)})`,
                 );
-              } catch (error: any) {
+              } catch (error) {
                 tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
                 report.counts.power.failed++;
                 for (const row of toInsert) {
                   const point = telemetryObservations.get(
                     stablePowerPointIdentity(benchmarkPublicationIdentity(row)),
                   );
-                  if (point) point.error = error instanceof Error ? error.message : String(error);
+                  if (point) point.error = errorMessage(error);
                 }
               }
             }
@@ -871,6 +869,9 @@ async function main(): Promise<void> {
                       },
                       // oxlint-disable-next-line no-loop-func -- each callback closes over this iteration's block-scoped trace metadata
                       async (prepared) => {
+                        for (const warning of prepared.warnings) {
+                          tracker.recordDbWarning('trace_replay', traceSubject, warning);
+                        }
                         console.log(
                           `    trace_replay ${suffix}: compressed ` +
                             `profile=${formatBytes(prepared.profileSize)} -> ${formatBytes(prepared.profileGz?.length)}, ` +
@@ -899,13 +900,13 @@ async function main(): Promise<void> {
                         console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
                       },
                     )
-                    .catch((error: any) => {
+                    .catch((error: unknown) => {
                       tracker.recordDbError('trace_replay', traceSubject, error);
                       report.counts.trace.failed += unlinkedIds.length;
                     });
                   traceTasks.push(task);
                 }
-              } catch (error: any) {
+              } catch (error) {
                 tracker.recordDbError('trace_replay', traceSubject, error);
                 report.counts.trace.failed += insertedIds.length;
               }
@@ -915,7 +916,7 @@ async function main(): Promise<void> {
               report.counts.trace.skipped += insertedIds.length;
             }
           }
-        } catch (error: any) {
+        } catch (error) {
           tracker.recordDbError('benchmark', path.posix.basename(file.path), error);
           report.counts.benchmark.failed += toInsert.length;
         }
@@ -964,7 +965,7 @@ async function main(): Promise<void> {
       try {
         await bulkUpsertAvailability(sql, availRows, date);
         console.log(`  Availability: ${availRows.length} row(s) upserted`);
-      } catch (error: any) {
+      } catch (error) {
         tracker.recordDbError('availability', `${availRows.length} row(s)`, error);
       }
     }
@@ -1028,7 +1029,7 @@ async function main(): Promise<void> {
         totalDupStats = dupCount;
         report.detail.runStatsNew = newCount;
         report.detail.runStatsDuplicate = dupCount;
-      } catch (error: any) {
+      } catch (error) {
         tracker.recordDbError('run_stats', `${statsRows.length} row(s)`, error);
       }
     }
@@ -1056,7 +1057,7 @@ async function main(): Promise<void> {
         const { outcome } = await ingestEvalRow(sql, configId, mapped, workflowRunId, date);
         if (outcome === 'new') totalEvals++;
         report.counts.eval[outcome === 'new' ? 'new' : 'duplicate']++;
-      } catch (error: any) {
+      } catch (error) {
         tracker.recordDbError('eval', `${path.basename(file)} ${mapped.task}`, error);
         report.counts.eval.failed++;
       }
@@ -1110,8 +1111,8 @@ async function main(): Promise<void> {
       if (!task) continue;
       try {
         samplesByTask.set(task, fs.readFileSync(path.join(dir, f), 'utf8'));
-      } catch (error: any) {
-        console.warn(`  [WARN] failed to read ${f}: ${error.message}`);
+      } catch (error) {
+        console.warn(`  [WARN] failed to read ${f}: ${errorMessage(error)}`);
       }
     }
 
@@ -1136,7 +1137,7 @@ async function main(): Promise<void> {
         const { newCount } = await bulkIngestEvalSamples(sql, evalResultId, samples);
         totalSamples += newCount;
         totalSampleFiles++;
-      } catch (error: any) {
+      } catch (error) {
         tracker.recordDbError('eval', `${path.basename(dir)} ${params.task}`, error);
         report.counts.eval.failed++;
       }
@@ -1158,7 +1159,7 @@ async function main(): Promise<void> {
         entries,
       );
       totalChangelogs += written;
-    } catch (error: any) {
+    } catch (error) {
       tracker.recordDbError('changelog', `${baseRef}..${headRef}`, error);
     }
   }
@@ -1230,11 +1231,11 @@ function writeIngestRunReport(): void {
 
 main()
   .catch((error) => {
-    powerPublicationErrors.push(error instanceof Error ? error.message : String(error));
+    powerPublicationErrors.push(errorMessage(error));
     console.error('ingest-ci-run failed:', error);
     process.exitCode = 1;
     report.status = 'failed';
-    report.error = (error instanceof Error ? error.message : String(error)).slice(0, 500);
+    report.error = errorMessage(error).slice(0, 500);
   })
   .finally(async () => {
     report.detail.powerPublicationPoints = powerPublicationPoints.size;

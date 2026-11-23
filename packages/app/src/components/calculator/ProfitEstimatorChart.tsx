@@ -17,6 +17,7 @@ import { widthTickCount } from '@/lib/d3-chart/chart-update';
 import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
+  CustomLayerConfig,
   D3ChartHandle,
   LayerConfig,
   RenderContext,
@@ -690,10 +691,21 @@ export default function ProfitEstimatorChart({
   const tooltipStateRef = useRef({ hardwareConfig, assumptions, locale });
   tooltipStateRef.current = { hardwareConfig, assumptions, locale };
 
+  // The chart redraws only when its data or metrics change, so a palette change (High Contrast,
+  // theme) reaches the bars through this identity.
+  const paletteIdentity = useMemo(
+    () => rows.map((row) => `${row.resultKey}:${colorResolver(row)}`).join('|'),
+    [rows, colorResolver],
+  );
+
   const layers = useMemo<LayerConfig<ProfitSegment>[]>(() => {
-    const stackLayer: LayerConfig<ProfitSegment> = {
+    const stackLayer: CustomLayerConfig = {
       type: 'custom',
       key: 'profit-stack',
+      displayIdentity: paletteIdentity,
+      onDisplayUpdate: (group, ctx) => {
+        stackLayer.render?.(group, ctx);
+      },
       render: (group, ctx) => {
         const band = (horizontal ? ctx.yScale : ctx.xScale) as d3.ScaleBand<string>;
         const value = (horizontal ? ctx.xScale : ctx.yScale) as d3.ScaleLinear<number, number>;
@@ -936,6 +948,7 @@ export default function ProfitEstimatorChart({
     outlineFor,
     labelColorFor,
     colorResolver,
+    paletteIdentity,
     strings,
     basis,
     horizontal,

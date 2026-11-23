@@ -70,6 +70,8 @@ export interface PreparedTraceReplay {
   cacheHitRates: { gpu: number; cpu: number | null } | null;
   fullResponseMetrics: Record<string, number>;
   atomKvCacheBlocks?: number | null;
+  /** Unreadable inputs whose derived payloads were left empty (see TraceDerivedPayloads). */
+  warnings: string[];
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -182,8 +184,14 @@ export async function prepareTraceReplay(
   const compressionMs = Date.now() - compressionStart;
 
   const computeStart = Date.now();
-  const { aggregateStats, chartSeries, promptTokenTotals, requestTimeline, atomKvCacheBlocks } =
-    await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
+  const {
+    aggregateStats,
+    chartSeries,
+    promptTokenTotals,
+    requestTimeline,
+    atomKvCacheBlocks,
+    warnings,
+  } = await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
   const requestTimelineGz = requestTimeline ? await gzipRequestTimeline(requestTimeline) : null;
   const requestChartDataGz = requestTimelineGz
     ? encodeRequestChartColumns(await requestChartDataFromTimelineGz(requestTimelineGz))
@@ -215,6 +223,7 @@ export async function prepareTraceReplay(
     cacheHitRates: cacheHitRatesFromPromptTokenTotals(promptTokenTotals),
     fullResponseMetrics,
     atomKvCacheBlocks,
+    warnings,
   };
 }
 

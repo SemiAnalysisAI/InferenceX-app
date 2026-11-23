@@ -73,6 +73,7 @@ async function main(): Promise<void> {
     framework: 'sglang',
     disagg: false,
   });
+  for (const warning of prepared.warnings) console.warn(`  [WARN] ${warning}`);
   if (!prepared.timelineRequests || !prepared.chartWindows)
     throw new Error('Recovered trace is empty');
   prepared.cacheHitRates = null;

@@ -1,10 +1,15 @@
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-
 import {
   parsePowerValidityFilter,
   type PowerValidityFilter,
 } from '@/lib/benchmarks/benchmark-power-validity';
-import { PUBLIC_API_ERRORS } from '@/lib/api/public-api-errors';
+import { PUBLIC_API_ERRORS, type PublicApiErrorDetail } from '@/lib/api/public-api-errors';
+import { MODEL_DISPLAY_NAMES, resolveModelName } from '@/lib/catalog/model-name-resolver';
+
+/** The 400 body for an unknown `model=` names the parameter and the canonical display names. */
+export const UNKNOWN_MODEL_DETAIL: PublicApiErrorDetail = {
+  param: 'model',
+  allowed: MODEL_DISPLAY_NAMES,
+};
 
 export const CALCULATOR_SEQUENCES = ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'] as const;
 
@@ -37,7 +42,7 @@ export interface BenchmarkRequestParams {
 
 export type BenchmarkRequestParseResult =
   | { ok: true; params: BenchmarkRequestParams }
-  | { ok: false; error: string };
+  | { ok: false; error: string; detail?: PublicApiErrorDetail };
 
 const ISO_DATE = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/u;
 
@@ -72,10 +77,18 @@ function parseFlag(value: string | null): boolean | undefined {
  * Validate `/api/v1/benchmarks` query parameters before any database call, so
  * a malformed value is a 400 instead of a Postgres cast error and a 500.
  * Unknown parameters are ignored. An empty `date=` means the latest snapshot.
+ * `model` accepts every form `resolveModelName` does.
  */
 export function parseBenchmarkRequest(search: URLSearchParams): BenchmarkRequestParseResult {
-  const dbModelKeys = DISPLAY_MODEL_TO_DB[search.get('model') ?? ''];
-  if (!dbModelKeys || dbModelKeys.length === 0) return fail(BENCHMARK_REQUEST_ERRORS.unknownModel);
+  const model = resolveModelName(search.get('model') ?? '');
+  if (!model) {
+    return {
+      ok: false,
+      error: BENCHMARK_REQUEST_ERRORS.unknownModel,
+      detail: UNKNOWN_MODEL_DETAIL,
+    };
+  }
+  const dbModelKeys = [...model.dbModelKeys];
 
   const date = search.get('date') || undefined;
   if (date !== undefined && !isCalendarDate(date))
