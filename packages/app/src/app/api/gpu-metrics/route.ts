@@ -59,7 +59,7 @@ import {
 import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
 import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
 import { ARTIFACT_PREFIX } from './artifact-selection';
-import { fetchGpuMetricsFromGithub, GpuTelemetryNotFoundError } from './github-telemetry';
+import { fetchGpuMetricsFromGithub, GpuTelemetryError } from './github-telemetry';
 
 /** Bundle downloads are latency-bound; match the other artifact routes' budget. */
 export const maxDuration = 300;
@@ -344,10 +344,10 @@ async function readGpuMetrics(
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
-    if (error instanceof GpuTelemetryNotFoundError) {
+    if (error instanceof GpuTelemetryError) {
       return NextResponse.json(
         { error: error.message, code: error.code },
-        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+        { status: error.status, headers: { 'Cache-Control': 'no-store' } },
       );
     }
     console.error('Error fetching GPU power data:', error);

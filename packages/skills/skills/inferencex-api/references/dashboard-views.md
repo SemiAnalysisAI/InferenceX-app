@@ -631,9 +631,11 @@ execution/publication times and coverage alongside exported values.
 `artifact` from `artifacts[]`: a plain artifact name, or `<artifact>/<file>` when
 one artifact contains several files. `downsample` only sets the renderer hint
 `maxInteractivePoints` to 2000 (default) or `null`; rows and statistics stay unsampled.
-A run GitHub does not have returns 404 with `code: "RUN_NOT_FOUND"`; a run without
-readable telemetry artifacts (none uploaded, or expired) returns 404 with
-`code: "NO_TELEMETRY"`. Both bodies carry `error`.
+Live reads explain a missing answer with `error` and `code`: 404 `RUN_NOT_FOUND` (GitHub
+has no such run), 404 `NO_TELEMETRY` (no telemetry artifacts, or all expired or hold no
+series), 422 `ARTIFACT_TOO_LARGE` (every archive exceeds the live download limit) and
+503 `GITHUB_UNAVAILABLE` (GitHub failed to return the run, its artifact list or an
+artifact; retry). Do not retry the 404 or 422 answers.
 
 Stored telemetry includes run-wide `coverage`, even when one host is selected:
 `complete` means the recorded artifact/file inventory is present, `partial` means

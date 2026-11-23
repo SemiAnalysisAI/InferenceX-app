@@ -55,6 +55,7 @@
     "admin:db:promote-to-public": "bun run --cwd packages/db db:promote-to-public",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:sync-public": "bun run --cwd packages/db db:sync-public",
+    "admin:db:check-migrations": "bun run --cwd packages/db db:check-migrations",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
     "admin:db:verify-gpu-sample-blobs": "bun run --cwd packages/db db:verify-gpu-sample-blobs",
     "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx",

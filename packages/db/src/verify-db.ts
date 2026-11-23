@@ -32,14 +32,15 @@ function sub(title: string) {
 async function verify(): Promise<void> {
   console.log('=== db:verify ===');
 
+  // Reported, never fatal. CI runs this after writes have committed, and admin:db:check-migrations
+  // already blocks writes to a database that is behind.
   const pending = await pendingMigrations(sql, MIGRATIONS_DIR);
-  if (pending.length > 0) {
-    throw new Error(
-      `${pending.length} migration(s) in packages/db/migrations are not applied to this database ` +
-        `(${pending.join(', ')}). Apply them with bun run admin:db:migrate.`,
-    );
-  }
-  console.log('  Migrations: all applied');
+  console.log(
+    pending.length === 0
+      ? '  Migrations: all applied'
+      : `  Migrations: ${pending.length} unrecorded (${pending.join(', ')}). ` +
+          'Run bun run admin:db:check-migrations for what to do.',
+  );
 
   section('Row Counts');
   const tables = [
