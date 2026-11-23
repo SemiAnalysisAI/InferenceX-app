@@ -35,13 +35,14 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
+import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
 
 import ComparePerDollarPageClient from './page-client';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedCompareParams();
 }
 
 export interface ScenarioOptions {
@@ -132,7 +133,7 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
 
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const imageUrl = `${url}/performance-per-dollar.png`;
+  const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png`;
   const jsonLd = buildJsonLd(
     'per-dollar',
     parsed.model,

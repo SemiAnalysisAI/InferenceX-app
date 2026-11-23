@@ -29,6 +29,11 @@ const INFERENCE_PATH = getDashboardRoute('inference').path;
 const SEO_REDIRECTS = [
   { source: '/datasets', destination: '/infx/agentx' },
   { source: '/zh/datasets', destination: '/zh/infx/agentx' },
+  {
+    source: '/compare-per-dollar/:slug/performance-per-dollar.png',
+    has: [{ type: 'query' as const, key: 'lang', value: 'zh' }],
+    destination: '/zh/compare-per-dollar/:slug/performance-per-dollar.png',
+  },
   ...LOCALE_PREFIXES.flatMap((prefix) => [
     { source: `${prefix}/xvideo`, destination: `${prefix}/vgx` },
     { source: `${prefix}/xxvideo`, destination: `${prefix}/vgx` },

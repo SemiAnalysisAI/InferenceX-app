@@ -84,6 +84,10 @@ describe('next.config custom routes', () => {
     ],
     ['/media', '/quotes'],
     ['/zh/media', '/zh/quotes'],
+    [
+      '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?lang=zh',
+      '/zh/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?lang=zh',
+    ],
   ])('permanently redirects %s to %s in one hop', async (from, to) => {
     const response = await respond(from);
     expect(response.status).toBe(308);
