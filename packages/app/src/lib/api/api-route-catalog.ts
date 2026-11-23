@@ -877,6 +877,17 @@ export const apiRouteCatalog = [
     sourceSha256: '5b585e7dabfa6000f5613bcdbdd55b62f164eddeefd4744f898b54d448f168cb',
   },
   {
+    source: 'src/app/api/v1/github-stars/route.ts',
+    path: '/api/v1/github-stars',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Backend for the header and footer star buttons: a CDN-cached copy of the InferenceX repository star count, read with the server token so browsers do not hit the unauthenticated GitHub API rate limit. Not benchmark data.',
+      zh: '页头和页脚 Star 按钮的后端：通过 CDN 缓存 InferenceX 仓库的 star 数，使用服务端 token 读取，避免浏览器触发 GitHub API 未认证请求的速率限制。不属于基准测试数据。',
+    },
+    sourceSha256: '39fd1fdf574d4bcf2c59f6a21663d0dcd5625bbc022ae8ac3134509b21d23ca6',
+  },
+  {
     source: 'src/app/api/v1/invalidate/route.ts',
     path: '/api/v1/invalidate',
     method: 'POST',
