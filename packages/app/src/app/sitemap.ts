@@ -80,6 +80,18 @@ function localizedPair(
   ];
 }
 
+/** A compare page pair whose hero PNG is served under each locale's own path. */
+function localizedHeroImagePair(
+  enPath: string,
+  heroImage: string,
+  entry: Omit<SitemapEntry, 'url' | 'alternates' | 'images'>,
+): SitemapEntry[] {
+  return localizedPair(enPath, entry).map((localized) => ({
+    ...localized,
+    images: [`${localized.url}/${heroImage}`],
+  }));
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const availabilityRead = getCachedAvailability();
   const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets, runEntries, availability] =
@@ -308,33 +320,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }),
     ),
-    ...compareSlugs.flatMap(({ modelSlug, a, b }) => {
-      const enPath = `/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
-      return localizedPair(enPath, {
-        images: [`${BASE_URL}${enPath}/performance-per-dollar.png`],
-        lastModified: dataDates.forModelChips(modelSlug, [a, b]) ?? latestData,
-        changeFrequency: 'daily' as const,
-        priority: 0.7,
-      });
-    }),
-    ...precisionSlugs.flatMap(({ modelSlug, gpu, precA, precB }) => {
-      const enPath = `/compare-precision/${canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB)}`;
-      return localizedPair(enPath, {
-        images: [`${BASE_URL}${enPath}/precision-comparison.png`],
-        lastModified: dataDates.forModelChips(modelSlug, [gpu]) ?? latestData,
-        changeFrequency: 'daily' as const,
-        priority: 0.7,
-      });
-    }),
-    ...specDecodeSlugs.flatMap(({ modelSlug, gpu, precision, method }) => {
-      const enPath = `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, precision, method)}`;
-      return localizedPair(enPath, {
-        images: [`${BASE_URL}${enPath}/spec-decode-comparison.png`],
-        lastModified: dataDates.forModelChips(modelSlug, [gpu]) ?? latestData,
-        changeFrequency: 'daily' as const,
-        priority: 0.7,
-      });
-    }),
+    ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
+      localizedHeroImagePair(
+        `/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`,
+        'performance-per-dollar.png',
+        {
+          lastModified: dataDates.forModelChips(modelSlug, [a, b]) ?? latestData,
+          changeFrequency: 'daily' as const,
+          priority: 0.7,
+        },
+      ),
+    ),
+    ...precisionSlugs.flatMap(({ modelSlug, gpu, precA, precB }) =>
+      localizedHeroImagePair(
+        `/compare-precision/${canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB)}`,
+        'precision-comparison.png',
+        {
+          lastModified: dataDates.forModelChips(modelSlug, [gpu]) ?? latestData,
+          changeFrequency: 'daily' as const,
+          priority: 0.7,
+        },
+      ),
+    ),
+    ...specDecodeSlugs.flatMap(({ modelSlug, gpu, precision, method }) =>
+      localizedHeroImagePair(
+        `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, precision, method)}`,
+        'spec-decode-comparison.png',
+        {
+          lastModified: dataDates.forModelChips(modelSlug, [gpu]) ?? latestData,
+          changeFrequency: 'daily' as const,
+          priority: 0.7,
+        },
+      ),
+    ),
   ];
   return entries.filter((entry) => !isFeatureGatedModelPath(new URL(entry.url).pathname));
 }

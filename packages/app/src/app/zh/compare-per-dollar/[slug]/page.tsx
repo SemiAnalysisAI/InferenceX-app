@@ -18,6 +18,7 @@ import {
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
 import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
+import { perDollarPngVersion } from '@/lib/compare/per-dollar-png';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
@@ -129,6 +130,8 @@ export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: S
     null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
+  // Reuses the cached pair read above (the scenario pages read the default scenario once more).
+  const heroImageVersion = await perDollarPngVersion(parsed);
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   const imageUrl = `${SITE_URL}/zh/compare-per-dollar/${canonical}/performance-per-dollar.png`;
@@ -193,6 +196,7 @@ export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: S
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
         heroImageSrc={`/zh/compare-per-dollar/${canonical}/performance-per-dollar.png`}
+        heroImageVersion={heroImageVersion}
         locale="zh"
       />
     </>

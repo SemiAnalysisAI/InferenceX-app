@@ -1,12 +1,88 @@
+import { createHash } from 'node:crypto';
+
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { trackServer } from '@/lib/analytics/analytics-server';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import { getComparePageDerivedData } from '@/lib/compare/compare-page-data.server';
-import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare/compare-slug';
+import {
+  canonicalCompareSlug,
+  type CompareSlug,
+  parseCompareSlug,
+} from '@/lib/compare/compare-slug';
 import { computeCompareImageRows } from '@/lib/compare/compare-ssr';
 import { getLogoSrc } from '@/lib/seo/og-assets';
 import { renderComparePngChart } from '@/lib/compare/png-chart';
+
+// Bump when the per-dollar PNG drawing changes, so the hero srcSet URLs change on that deploy.
+export const PER_DOLLAR_PNG_RENDER_REVISION = 1;
+
+/** What the hero PNG draws for a pair, from the page's own cached pair data. */
+async function perDollarChartRows({ model, a, b }: CompareSlug) {
+  const { sequence, precision, ssrRows, interactivityRange, initialPairBenchmarkRows } =
+    await getComparePageDerivedData(
+      model.dbKeys,
+      a,
+      b,
+      null,
+      null,
+      comparisonScenarioForModel(model).sequence,
+    );
+  const plottedRows = ssrRows.filter((row) => row.a || row.b);
+  const imageRows = computeCompareImageRows(
+    initialPairBenchmarkRows,
+    a,
+    b,
+    sequence,
+    precision,
+    interactivityRange,
+    plottedRows.map((row) => row.target),
+  ).filter((row) => row.a || row.b);
+  return {
+    sequence,
+    precision,
+    plottedRows,
+    curveRows: imageRows.length > 0 ? imageRows : plottedRows,
+    workload: [sequence, precision?.toUpperCase()].filter(Boolean).join(' / '),
+  };
+}
+
+/**
+ * A short hash of the data the hero PNG draws and the renderer revision. The page's
+ * `/_next/image` srcSet points at `performance-per-dollar/<version>.png`, whose optimized responses
+ * browsers keep for `images.minimumCacheTTL`, so an ingest that changes the chart, or a deploy that
+ * changes the drawing, also changes the optimized image URL.
+ */
+export async function perDollarPngVersion(
+  pair: CompareSlug,
+  renderRevision = PER_DOLLAR_PNG_RENDER_REVISION,
+): Promise<string> {
+  const { workload, plottedRows, curveRows } = await perDollarChartRows(pair);
+  return createHash('sha256')
+    .update(JSON.stringify([renderRevision, workload, plottedRows, curveRows]))
+    .digest('hex')
+    .slice(0, 12);
+}
+
+const VERSIONED_PNG_FILE = /^[0-9a-f]{12}\.png$/u;
+
+/**
+ * The hero PNG at `performance-per-dollar/<version>.png`. Each version is its own ISR entry,
+ * rendered on its first request as static generation, which refetches stale data in the
+ * foreground, so a version that first appears after an ingest never serves the pre-ingest chart.
+ * The plain PNG route would serve its stale entry once. The version only keys the cache: a stale
+ * page that still names an older version gets the current chart.
+ */
+export function perDollarVersionedPngResponse(
+  slug: string,
+  file: string,
+  lang: 'en' | 'zh',
+): Promise<Response> {
+  if (!VERSIONED_PNG_FILE.test(file)) {
+    return Promise.resolve(new Response('Not found', { status: 404 }));
+  }
+  return perDollarPngResponse(slug, lang);
+}
 
 /**
  * The compare-per-dollar hero PNG. It reads the page's own cached pair data, so the ingest purge
@@ -21,33 +97,12 @@ export async function perDollarPngResponse(slug: string, lang: 'en' | 'zh'): Pro
     return new Response('Not found', { status: 404 });
   }
 
-  const [{ sequence, precision, ssrRows, interactivityRange, initialPairBenchmarkRows }, logoSrc] =
-    await Promise.all([
-      getComparePageDerivedData(
-        parsed.model.dbKeys,
-        parsed.a,
-        parsed.b,
-        null,
-        null,
-        comparisonScenarioForModel(parsed.model).sequence,
-      ),
-      getLogoSrc(),
-    ]);
-  const plottedRows = ssrRows.filter((row) => row.a || row.b);
-  const imageRows = computeCompareImageRows(
-    initialPairBenchmarkRows,
-    parsed.a,
-    parsed.b,
-    sequence,
-    precision,
-    interactivityRange,
-    plottedRows.map((row) => row.target),
-  ).filter((row) => row.a || row.b);
-  const curveRows = imageRows.length > 0 ? imageRows : plottedRows;
-
+  const [{ sequence, precision, plottedRows, curveRows, workload }, logoSrc] = await Promise.all([
+    perDollarChartRows(parsed),
+    getLogoSrc(),
+  ]);
   const aLabel = HW_REGISTRY[parsed.a]?.label ?? parsed.a.toUpperCase();
   const bLabel = HW_REGISTRY[parsed.b]?.label ?? parsed.b.toUpperCase();
-  const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
 
   try {
     return await renderComparePngChart({

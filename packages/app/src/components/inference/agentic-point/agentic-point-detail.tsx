@@ -3,13 +3,15 @@
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
-import { useRequestChartData } from '@/hooks/api/use-request-chart-data';
+import { type RequestChartData, useRequestChartData } from '@/hooks/api/use-request-chart-data';
 import { useRequestTimeline } from '@/hooks/api/use-request-timeline';
 import {
+  type MetricSourceDescriptor,
   useTraceServerMetrics,
   useTraceServerMetricSource,
 } from '@/hooks/api/use-trace-server-metrics';
@@ -21,7 +23,10 @@ import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
-import { withChartState } from '@/lib/routing/url-state';
+import type { Model } from '@/lib/catalog/data-mappings';
+import { inferenceModelPath, inferenceModelSlugForModel } from '@/lib/routing/inference-model-slug';
+import { currentChartSearch } from '@/lib/routing/url-state';
+import { resolveAgenticDetailOrigin } from '@/lib/routing/agentic-detail-origin';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import { AggregatesGrid } from './aggregates-grid';
@@ -31,6 +36,7 @@ import {
   sliceRequestChartDataByPhase,
   sliceServerSeriesByPhase,
   timelineHasWarmup,
+  type PhaseSlicedSeries,
   type ServerSeriesLike,
   type StagePhase,
 } from './phase-slice';
@@ -48,7 +54,6 @@ import {
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
 import { useDetailView, type DetailView } from './use-detail-view';
-import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const AGENTIC_POINT_DETAIL_STRINGS = {
   en: {
@@ -187,15 +192,12 @@ export function AgenticPointDetail({ id }: Props) {
   const t = AGENTIC_POINT_DETAIL_STRINGS[locale];
   const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
-  const inferenceBaseHref = isZh
-    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}`
-    : getDashboardRoute('inference').path;
-  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
-  useEffect(() => {
-    setInferenceHref(withChartState(inferenceBaseHref));
-  }, [inferenceBaseHref]);
   const featureGateUnlocked = useFeatureGate();
   const [view, setView] = useDetailView();
+  // `view` comes from the URL through useSyncExternalStore, which always renders synchronously,
+  // so the toggle follows `view` while the view body renders from the deferred copy. Opening
+  // Per-point mounts a dozen charts, and the press would otherwise wait for all of them.
+  const renderedView = useDeferredValue(view);
   const viewOptions = useMemo(
     () => agenticDetailViewOptions(t, { featureGateUnlocked, currentView: view }),
     [t, featureGateUnlocked, view],
@@ -205,6 +207,36 @@ export function AgenticPointDetail({ id }: Props) {
 
   const metrics = metricsQuery.data;
   const siblingsData = siblingsQuery.data;
+  // Back and the chart link open the chart of this point's own model, named in the path: the bare
+  // Inference path redirects to the featured model whenever chart state leaves `g_model` out (it
+  // does for the default model). The point's data names the model; until it loads (or if it
+  // fails), the `g_model` the chart wrote into this page's URL does. With neither, both controls
+  // wait rather than send the reader to the wrong chart.
+  const [urlModel, setUrlModel] = useState<string | null>(null);
+  useEffect(() => {
+    setUrlModel(new URLSearchParams(window.location.search).get('g_model'));
+  }, [pathname]);
+  const dataModel = siblingsData?.sku.model ?? metrics?.meta.model;
+  const pointModel = dataModel ? (DB_MODEL_TO_DISPLAY[dataModel] ?? dataModel) : urlModel;
+  const pointModelSlug = pointModel ? inferenceModelSlugForModel(pointModel as Model) : null;
+  const [inferenceHref, setInferenceHref] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pointModelSlug) {
+      setInferenceHref(null);
+      return;
+    }
+    const chartPath = `${isZh ? ZH_PREFIX : ''}${inferenceModelPath(pointModelSlug)}`;
+    const state = new URLSearchParams(currentChartSearch());
+    state.delete('g_model');
+    const search = state.toString();
+    setInferenceHref(search ? `${chartPath}?${search}` : chartPath);
+  }, [isZh, pointModelSlug]);
+  // Opened from a chart in this tab: Back returns to that entry, so browser Back afterwards does
+  // not reopen this page. Otherwise (deep link, new tab) Back replaces this entry with the chart.
+  const [openedFromChart, setOpenedFromChart] = useState(false);
+  useEffect(() => {
+    setOpenedFromChart(resolveAgenticDetailOrigin(id));
+  }, [id]);
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
@@ -279,22 +311,28 @@ export function AgenticPointDetail({ id }: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={!openedFromChart && !inferenceHref}
           onClick={() => {
             track('inference_agentic_detail_back_clicked', { id });
-            router.back();
+            if (openedFromChart) router.back();
+            else if (inferenceHref) router.replace(inferenceHref);
           }}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ArrowLeft className="size-4" /> {t.back}
         </button>
-        <span className="text-sm text-muted-foreground">·</span>
-        <IntentPrefetchLink
-          href={inferenceHref}
-          onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          {t.inferenceChart}
-        </IntentPrefetchLink>
+        {inferenceHref && (
+          <>
+            <span className="text-sm text-muted-foreground">·</span>
+            <IntentPrefetchLink
+              href={inferenceHref}
+              onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t.inferenceChart}
+            </IntentPrefetchLink>
+          </>
+        )}
       </div>
 
       {siblingsQuery.isError ? (
@@ -320,7 +358,7 @@ export function AgenticPointDetail({ id }: Props) {
         </div>
       ) : null}
 
-      {view !== 'logs' && metricsQuery.isError && (
+      {renderedView !== 'logs' && metricsQuery.isError && (
         <RetryableQueryError
           message={withId(t.traceFailure)}
           analyticsEvent="inference_agentic_trace_retry_clicked"
@@ -328,7 +366,7 @@ export function AgenticPointDetail({ id }: Props) {
           testId="agentic-trace-query-error"
         />
       )}
-      {view !== 'logs' &&
+      {renderedView !== 'logs' &&
         metricsQuery.data === null &&
         !metricsQuery.isLoading &&
         !metricsQuery.isError && <EmptyState>{withId(t.missingTrace)}</EmptyState>}
@@ -343,20 +381,20 @@ export function AgenticPointDetail({ id }: Props) {
           className="max-w-full overflow-x-auto"
           buttonClassName="px-3 py-1.5 text-sm"
         />
-        {view === 'aggregates' && (
+        {renderedView === 'aggregates' && (
           <span className="text-xs text-muted-foreground">
             {siblingIds.length} {t.configsInSku}
             {aggregatesQuery.isLoading ? ` · ${t.loadingAggregates}` : ''}
           </span>
         )}
-        {view === 'timeline' && timelineQuery.data && (
+        {renderedView === 'timeline' && timelineQuery.data && (
           <span className="text-xs text-muted-foreground">
             {timelineQuery.data.requests.length} {t.requests}
           </span>
         )}
       </div>
 
-      {view === 'point' &&
+      {renderedView === 'point' &&
         (showMetricSourceToolbar({ sourceCount: metricSources.length, hasWarmup }) ? (
           <MetricSourceToolbar
             hasWarmup={hasWarmup}
@@ -371,12 +409,12 @@ export function AgenticPointDetail({ id }: Props) {
           <div aria-hidden="true" className="h-[50px]" />
         ))}
 
-      <div className={view === 'point' ? 'contents' : 'min-h-svh'}>
-        {view === 'logs' ? (
+      <div className={renderedView === 'point' ? 'contents' : 'min-h-svh'}>
+        {renderedView === 'logs' ? (
           <ServerLogViewer id={id} enabled />
-        ) : view === 'power' ? (
+        ) : renderedView === 'power' ? (
           <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
-        ) : view === 'aggregates' ? (
+        ) : renderedView === 'aggregates' ? (
           aggregatesQuery.isError ? (
             <RetryableQueryError
               message={t.aggregatesError}
@@ -391,7 +429,7 @@ export function AgenticPointDetail({ id }: Props) {
               isLoading={aggregatesQuery.isLoading}
             />
           )
-        ) : view === 'timeline' ? (
+        ) : renderedView === 'timeline' ? (
           timelineQuery.isLoading ? (
             <EmptyState>{t.loadingTimeline}</EmptyState>
           ) : timelineQuery.isError ? (
@@ -439,70 +477,106 @@ export function AgenticPointDetail({ id }: Props) {
                 testId="agentic-metric-source-query-error"
               />
             )}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
-              {!requestChartQuery.isError && (
-                <>
-                  <SequenceMetricCard
-                    metric="isl"
-                    timeline={phaseRequestData}
-                    timelineLoading={requestChartQuery.isLoading}
-                  />
-                  <SequenceMetricCard
-                    metric="osl"
-                    timeline={phaseRequestData}
-                    timelineLoading={requestChartQuery.isLoading}
-                  />
-
-                  <RequestMetricOverTime
-                    title={t.interactivityOverTime}
-                    metric="interactivity"
-                    timeline={phaseRequestData}
-                    isLoading={requestChartQuery.isLoading}
-                  />
-
-                  <RequestMetricOverTime
-                    title={t.ttftOverTime}
-                    metric="ttft"
-                    timeline={phaseRequestData}
-                    isLoading={requestChartQuery.isLoading}
-                    latencySelector
-                  />
-                </>
-              )}
-
-              <KvCacheUtilizationCard sliced={sliced} />
-
-              <RequestActivityCard
-                sliced={sliced}
-                phaseTimeline={phaseRequestData}
-                timelineLoading={requestChartQuery.isLoading}
-                timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
-                view={requestActivityView}
-                onViewChange={setRequestActivityView}
-              />
-
-              <PrefixCacheHitRateCard sliced={sliced} />
-
-              <ThroughputCard
-                sliced={sliced}
-                selectedSource={selectedMetricSource}
-                selected={throughputSeries}
-                onSelectedChange={setThroughputSeries}
-              />
-
-              <PromptTokenSourceCard sliced={sliced} />
-
-              {!requestChartQuery.isError && (
-                <InflightUniqueTokensCard
-                  phaseTimeline={phaseRequestData}
-                  timelineLoading={requestChartQuery.isLoading}
-                  kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
-                />
-              )}
-            </div>
+            <PointCharts
+              strings={t}
+              timeline={phaseRequestData}
+              timelineLoading={requestChartQuery.isLoading}
+              timelineFailed={requestChartQuery.isError}
+              sliced={sliced}
+              requestActivityView={requestActivityView}
+              onRequestActivityViewChange={setRequestActivityView}
+              selectedMetricSource={selectedMetricSource}
+              throughputSeries={throughputSeries}
+              onThroughputSeriesChange={setThroughputSeries}
+              kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+            />
           </>
         )}
       </div>
     </div>
   );
 }
+
+// Memoized so the urgent render of a view switch, which still shows the previous view while the
+// deferred one renders, skips re-rendering a dozen charts whose inputs did not change.
+const PointCharts = memo(
+  ({
+    strings: t,
+    timeline,
+    timelineLoading,
+    timelineFailed,
+    sliced,
+    requestActivityView,
+    onRequestActivityViewChange,
+    selectedMetricSource,
+    throughputSeries,
+    onThroughputSeriesChange,
+    kvCachePoolTokens,
+  }: {
+    strings: (typeof AGENTIC_POINT_DETAIL_STRINGS)[keyof typeof AGENTIC_POINT_DETAIL_STRINGS];
+    timeline: RequestChartData | null;
+    timelineLoading: boolean;
+    timelineFailed: boolean;
+    sliced: PhaseSlicedSeries<ServerSeriesLike> | null;
+    requestActivityView: RequestActivityView;
+    onRequestActivityViewChange: (view: RequestActivityView) => void;
+    selectedMetricSource: MetricSourceDescriptor | undefined;
+    throughputSeries: ReadonlySet<ThroughputSeriesKey>;
+    onThroughputSeriesChange: (next: ReadonlySet<ThroughputSeriesKey>) => void;
+    kvCachePoolTokens: number | null;
+  }) => (
+    <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
+      {!timelineFailed && (
+        <>
+          <SequenceMetricCard metric="isl" timeline={timeline} timelineLoading={timelineLoading} />
+          <SequenceMetricCard metric="osl" timeline={timeline} timelineLoading={timelineLoading} />
+
+          <RequestMetricOverTime
+            title={t.interactivityOverTime}
+            metric="interactivity"
+            timeline={timeline}
+            isLoading={timelineLoading}
+          />
+
+          <RequestMetricOverTime
+            title={t.ttftOverTime}
+            metric="ttft"
+            timeline={timeline}
+            isLoading={timelineLoading}
+            latencySelector
+          />
+        </>
+      )}
+
+      <KvCacheUtilizationCard sliced={sliced} />
+
+      <RequestActivityCard
+        sliced={sliced}
+        phaseTimeline={timeline}
+        timelineLoading={timelineLoading}
+        timelineError={timelineFailed ? t.requestChartsError : undefined}
+        view={requestActivityView}
+        onViewChange={onRequestActivityViewChange}
+      />
+
+      <PrefixCacheHitRateCard sliced={sliced} />
+
+      <ThroughputCard
+        sliced={sliced}
+        selectedSource={selectedMetricSource}
+        selected={throughputSeries}
+        onSelectedChange={onThroughputSeriesChange}
+      />
+
+      <PromptTokenSourceCard sliced={sliced} />
+
+      {!timelineFailed && (
+        <InflightUniqueTokensCard
+          phaseTimeline={timeline}
+          timelineLoading={timelineLoading}
+          kvCachePoolTokens={kvCachePoolTokens}
+        />
+      )}
+    </div>
+  ),
+);

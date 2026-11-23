@@ -16,6 +16,7 @@ import { computeRequestTimeline, type RequestTimeline } from './compute-request-
 import { collectMetricPhases } from './gzip-json-stream.js';
 import { ATOM_KV_BLOCKS_METRIC, atomKvCacheBlocksFromMetricPhases } from './atom-kv-capacity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters.js';
+import { errorMessage } from '../lib/error-message.js';
 
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
@@ -23,6 +24,8 @@ export interface TraceDerivedPayloads {
   promptTokenTotals: PromptTokenTotals | null;
   requestTimeline: RequestTimeline | null;
   atomKvCacheBlocks: number | null;
+  /** Inputs that could not be read, each leaving its derived payload empty. Ingest reports them. */
+  warnings: string[];
 }
 
 export interface TraceDerivedComputeOptions {
@@ -49,7 +52,8 @@ export async function computeTraceDerivedPayloads(
   metricsContext: ServerMetricsContext = {},
   options: TraceDerivedComputeOptions = {},
 ): Promise<TraceDerivedPayloads> {
-  const profileStatsPromise = computeAggregateStats({ profileBlob, serverBlob: null });
+  const warnings: string[] = [];
+  const profileStatsPromise = computeAggregateStats({ profileBlob, serverBlob: null }, warnings);
   const requestTimelinePromise = computeRequestTimeline(profileBlob);
 
   const phases = serverBlob
@@ -57,7 +61,13 @@ export async function computeTraceDerivedPayloads(
         serverBlob,
         DERIVED_SERVER_METRIC_KEYS,
         options.maxInMemoryBytes,
-      ).catch(() => null)
+      ).catch((error: unknown) => {
+        warnings.push(
+          `server metrics unreadable (${errorMessage(error)}), so the chart series and ` +
+            'KV cache and prefix cache stats are empty',
+        );
+        return null;
+      })
     : null;
   const [initialAggregateStats, requestTimeline] = await Promise.all([
     profileStatsPromise,
@@ -71,7 +81,7 @@ export async function computeTraceDerivedPayloads(
     const aggregateMetrics = phases.complete
       ? phases.metrics
       : selectMetrics(phases.metrics, AGGREGATE_SERVER_METRIC_KEYS);
-    aggregateStats = withServerMetricAggregateStats(aggregateStats, aggregateMetrics);
+    aggregateStats = withServerMetricAggregateStats(aggregateStats, aggregateMetrics, warnings);
 
     const profiling = phases.complete
       ? phases.metrics
@@ -83,8 +93,8 @@ export async function computeTraceDerivedPayloads(
       const data = computeChartDataFromMetricPhases(profiling, warmup, metricsContext);
       chartSeries = data.series;
       promptTokenTotals = data.promptTokenTotals;
-    } catch {
-      chartSeries = null;
+    } catch (error) {
+      warnings.push(`chart series failed (${errorMessage(error)}), so it is empty`);
     }
   }
 
@@ -96,5 +106,6 @@ export async function computeTraceDerivedPayloads(
     atomKvCacheBlocks: phases
       ? atomKvCacheBlocksFromMetricPhases(phases.metrics, phases.warmupMetrics)
       : null,
+    warnings,
   };
 }

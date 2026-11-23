@@ -252,7 +252,7 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
   const runUrl = payload?.run.run_url ?? point.run_url;
   const logHref =
     persistedId !== null && payload?.logs
-      ? pointLogHref(persistedId, point.benchmark_type, locale)
+      ? pointLogHref(persistedId, point.benchmark_type, point.model, locale)
       : null;
   const workload =
     point.benchmark_type === 'agentic_traces'
