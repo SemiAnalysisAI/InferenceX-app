@@ -756,7 +756,7 @@ function buildAgenticTierReads(
   tiers: readonly number[],
 ): TcoTierRead[] {
   const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
-    const entry = rowToAggDataEntry(row, { modelPower: false });
+    const entry = rowToAggDataEntry(row);
     const interactivity = entry.p90_intvty;
     const e2eLatency = entry.p90_e2el;
     const totalThroughput = entry.tput_per_gpu;

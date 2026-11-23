@@ -215,7 +215,7 @@ export function GET(request: NextRequest) {
             if (!family || !familySet.has(family)) return false;
           }
           if (gpus.length > 0 || vendorSet.size > 0) {
-            const hwKey = getHardwareKey(rowToAggDataEntry(row, { modelPower: false }));
+            const hwKey = getHardwareKey(rowToAggDataEntry(row));
             if (!matchesHardware(hwKey, gpus)) return false;
             if (vendorSet.size > 0) {
               const vendor = pointVendor(hwKey);

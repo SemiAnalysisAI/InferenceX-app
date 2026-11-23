@@ -20,7 +20,7 @@ import { metricRowLabel } from '@/components/inference/axis-metric-explanations'
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
 import {
   ALL_IN_MEASURED_AGENTIC_NOTE,
   ALL_IN_MEASURED_EMPTY,

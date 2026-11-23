@@ -22,13 +22,15 @@ import {
   type ReliabilityRow,
 } from '@/lib/api/api';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS } from '@/lib/benchmarks/chip-basis';
 import {
   dedupeAgenticHistoryRuns,
   dedupeRowsToLatestPerConfig,
 } from '@/lib/benchmarks/benchmark-run-selection';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { DEFAULT_TCO_BASIS, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import {
@@ -344,7 +346,14 @@ async function resolveSpec(spec: AiChartSpec, locale: Locale): Promise<AiSingleC
         ? dedupeRowsToLatestPerConfig(fetchedRows)
         : fetchedRows;
 
-  const { chartData } = transformBenchmarkRows(rows);
+  const { chartData } = transformBenchmarkRows(
+    rows,
+    'median',
+    DEFAULT_TCO_BASIS,
+    'total',
+    DEFAULT_CHIP_BASIS,
+    modelSystemPower,
+  );
   let points = chartData[0] ?? [];
 
   if (spec.hardwareKeys.length > 0) {

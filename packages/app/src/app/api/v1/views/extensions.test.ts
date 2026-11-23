@@ -5,7 +5,7 @@ import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import type { BenchmarkRow } from '@/lib/api/api';
 import type { BenchmarkRequestParams } from '@/lib/benchmarks/benchmark-request-params';
 import { Model } from '@/lib/catalog/data-mappings';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { GET as cache } from './cache-reuse/route';

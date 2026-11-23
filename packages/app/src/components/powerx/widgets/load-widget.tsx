@@ -14,7 +14,7 @@ import {
   trackMoves,
 } from '@/lib/powerx/ladder';
 import { cn } from '@/lib/shared/utils';
-import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-categories';
 
 import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';

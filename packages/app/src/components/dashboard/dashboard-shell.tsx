@@ -1,12 +1,19 @@
 'use client';
 
 import { GlobalFilterProvider } from '@/providers/GlobalFilterContext';
-import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { TabNav } from '@/components/dashboard/tab-nav';
 import { UnofficialRunBanner, UnofficialRunProvider } from '@/providers/unofficial-run-provider';
 import { dashboardShellCapabilitiesForPathname } from '@/lib/routing/dashboard-routes';
 import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
+
+// No dashboard nudge renders on first load. Each waits for a timer, a scroll or an app event, so
+// the engine and its registry load after hydration.
+const NudgeEngine = dynamic(
+  () => import('@/components/nudges/nudge-engine').then((module) => module.NudgeEngine),
+  { ssr: false },
+);
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

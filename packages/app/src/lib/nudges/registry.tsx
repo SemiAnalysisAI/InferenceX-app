@@ -21,7 +21,7 @@ import {
   OPERATORX_URL,
   TPUV7_QWEN_3_5_AGENTX_URL,
 } from '@/lib/nudges/landing-banner';
-import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { GRADIENT_NUDGE_EVENT, NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { GoogleIcon } from '@/components/ui/google-icon';
@@ -36,8 +36,6 @@ import {
 } from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
-
-export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
 
 function isOnInferenceTab(): boolean {
   if (typeof window === 'undefined') return false;
@@ -172,7 +170,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'gradient-label',
     type: 'inline',
-    trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
+    trigger: { type: 'event', event: GRADIENT_NUDGE_EVENT },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
     priority: 25,

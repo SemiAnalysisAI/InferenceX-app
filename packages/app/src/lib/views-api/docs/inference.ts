@@ -1,6 +1,6 @@
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
-import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-categories';
 import {
   text,
   stringSchema,

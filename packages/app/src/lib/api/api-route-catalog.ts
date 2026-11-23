@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '98c52e79b23dae047bf265ff400dd9770700776a09e9d3d131b9653c819bcdab',
+    sourceSha256: '65a89e846f5db40b25bc9dd57468ddbfcac7c6200af444c618ad3bcdd6f42aad',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '1e6d87de9fb74785a458a904c5df378e5ff21d94e8ea71ed09b7e1757b4d9a56',
+    sourceSha256: 'b7f85bb9d6dce3533dbc0cc2e0256aafa51e1d287d216115c87c7dd4e01e8aab',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -1496,7 +1496,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: 'a360d5044e821e0a8e630fda7d0e0721920727a2c89224e6dc5bdef38ebbbac6',
+    sourceSha256: '56f74b5fd6d1bd4dc301834eb8dcd70c76f9973ea10d4d45977018f1da4d928c',
     reviewArea: {
       en: 'Per-point system power breakdown: measured GPU and Grace parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
       zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
@@ -1512,7 +1512,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '22322bba9d59237a3f97af0e30ab30bdb23dd2b1793362e32103db698fae6cbe',
+    sourceSha256: '057dd9471a1ecac565f58c9583e4661973d1e6bc8af4a75ac73ce3958d0c89da',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1806,7 +1806,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '91b05094830ebe261810c935159c145c4ac95c1f8f3b9431242a167de1ebc187',
+    sourceSha256: 'd9835333057fa42c3b89ce3b789d98ea9eeb3dd5ec2c439e8dcab3db12961d66',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1878,7 +1878,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '2ebcea69a14260ef63b76617fb2fd1d3c6a24c9f6c0c56d7bd68376370982c00',
+    sourceSha256: '6435027256cd93a5a22f2d579b3e184c234b9014a0d3fe23c47e049e8e815b0e',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -2041,7 +2041,7 @@ export const apiContractSourceDigests = [
     // Disaggregated rows now read the stored per-deployed-GPU tput_per_gpu without
     // a second decode ÷ total rescale. costPerMtok values change; parameters,
     // response shape and the documented cost formula are unchanged.
-    sourceSha256: 'd9e952b4fe64b4d797f1a23d28951091bf82b0460370dc1a4531b60cb8c61dd0',
+    sourceSha256: '15d10533b96590ffc21208fbf7b4d7806757afff5bd467dd5d05598dd93fbdc7',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

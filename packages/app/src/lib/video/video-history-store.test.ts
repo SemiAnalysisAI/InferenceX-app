@@ -372,9 +372,10 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the unofficial-run provider and banner gained unavailable-run states. They are
-      // reached only through a type import and React context, so recorded entries are unchanged.
-      sources: '79700f5f33940e35a9593b8bf79d3bdbd01f5ca468f66981dfa00ea88fe128b8',
+      // Re-pinned after the power model's revision and categories moved to
+      // system-power-categories.ts. They are reached only through type imports, so recorded
+      // entries are unchanged.
+      sources: '422044e7dd6352c44e592aa70f8732b2f599c46f70884ad7faaaa8a1619236b8',
     });
   });
 });

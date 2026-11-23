@@ -45,7 +45,7 @@ import {
   Sequence,
 } from '@/lib/catalog/data-mappings';
 import { buildHeadroomRows, HEADROOM_INTERACTIVITIES } from '@/lib/power/headroom';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,

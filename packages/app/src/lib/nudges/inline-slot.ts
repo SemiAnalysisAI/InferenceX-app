@@ -11,6 +11,9 @@ export type NudgeSlot = (typeof NUDGE_SLOTS)[keyof typeof NUDGE_SLOTS];
 
 export const NUDGE_SLOT_MOUNTED_EVENT = 'inferencex:nudge-slot-mounted';
 
+/** The inference legend fires this when a reader turns on parallelism labels. */
+export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
+
 export interface InlineNudgeEntry {
   def: NudgeDefinition;
   onDismiss: () => void;

@@ -17,10 +17,8 @@ import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
 } from '@/lib/power/modeled-system-power';
-import {
-  SYSTEM_POWER_MODEL_SOURCE_URL,
-  type SystemPowerWorkload,
-} from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_SOURCE_URL } from '@/lib/power/system-power-categories';
+import type { SystemPowerWorkload } from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
