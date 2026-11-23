@@ -184,9 +184,11 @@ export function writeBackChartSeries(
   const json = JSON.stringify(series);
   const write = async () => {
     const summary = encodeChartSeriesSummary(json);
+    // `::text` first so the server types the parameter as text on every driver. Bound straight to
+    // jsonb, postgres.js would JSON-encode the string again and store a jsonb string.
     await sql`
       update agentic_trace_replay
-      set chart_series = ${json}::jsonb,
+      set chart_series = ${json}::text::jsonb,
           chart_series_summary_gz = ${summary},
           chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
       where id = ${traceReplayId}

@@ -8,6 +8,7 @@ import path from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import type { DbClient } from '../connection';
 import { updateAtomKvCachePoolTokens } from '../etl/atom-kv-capacity';
 import {
   bulkIngestBenchmarkRows,
@@ -17,15 +18,24 @@ import {
   type BenchmarkPersistenceInput,
 } from '../etl/benchmark-ingest';
 import { ingestChangelogEntries } from '../etl/changelog-ingest';
+import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
 import type { Sql } from '../etl/db-utils';
+import { ingestEvalRow } from '../etl/eval-ingest';
 import { bulkIngestEvalSamples } from '../etl/eval-samples-ingest';
-import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
+import { ingestGpuMetricsArtifact, upsertGpuMetricSeries } from '../etl/gpu-metrics-ingest';
 import { applyAgentxAudits } from '../etl/power-audit-recovery';
 import {
   findUnlinkedTraceReplayIds,
   persistPreparedTraceReplay,
   type PreparedTraceReplay,
 } from '../etl/trace-replay-ingest';
+import type { OperatorXRawBundle } from '../operatorx/bundle';
+import { writeBackChartSeries, writeBackTraceReplayJsonb } from '../queries/agentic-shared';
+import { upsertCollectiveXChangelogLinks, upsertCollectiveXRun } from '../queries/collectivex';
+import { saveOperatorXBundle } from '../queries/operatorx';
+import { getTraceServerMetricSource, getTraceServerMetrics } from '../queries/trace-server-metrics';
+import { writeChartSeriesBackfill } from './backfill-chart-series-row';
+import { jsonbParam } from './backfill-runner';
 import { migratedPglite, pgliteDriverSql } from './test-pglite';
 
 let db: PGlite;
@@ -366,5 +376,261 @@ describe('postgres.js v4 parameter typing', () => {
         (select array_agg(jsonb_typeof(x::jsonb)) from unnest(${['{"a":1}']}::text[]) x) as as_text
     `;
     expect(row).toEqual({ as_jsonb: ['string'], as_text: ['object'] });
+  });
+});
+
+async function jsonbTypes(query: string): Promise<Record<string, unknown>[]> {
+  const result = await db.query<Record<string, unknown>>(query);
+  return result.rows;
+}
+
+/**
+ * The stored jsonb type once any fire-and-forget write-back has landed. The driver has one
+ * connection and runs queries in order, so a query issued after the write-back finishes after it.
+ */
+async function writtenType(column: string): Promise<unknown> {
+  await sql`select 1`;
+  const [row] = await jsonbTypes(
+    `SELECT jsonb_typeof(${column}) AS type FROM agentic_trace_replay WHERE id = 500`,
+  );
+  return row?.type;
+}
+
+// Every jsonb writer, read back with jsonb_typeof. A writer that binds pre-serialized JSON
+// straight to a jsonb slot stores a jsonb string under postgres.js (v3 and v4), so these pin
+// the stored shape, not just the round-tripped value.
+describe('jsonb writes through postgres.js', () => {
+  const SERIES = {
+    version: CHART_SERIES_VERSION,
+    startNs: 0,
+    endNs: 2_000_000_000,
+    durationS: 2,
+    timeslicesCount: 2,
+    kvCacheUsage: [{ t: 0, value: 0.25 }],
+    prefixCacheHitRate: [],
+    queueDepth: [],
+    promptTokensBySource: {},
+    prefillTps: [],
+    decodeTps: [],
+    prefixCacheHitsTps: [],
+    hostKvCacheUsage: [],
+    kvCacheUsageByEngine: [],
+    metricSources: [{ source: { id: 'engine-0' }, kvCacheUsage: [{ t: 0, value: 0.5 }] }],
+  } as unknown as ChartSeries;
+
+  // The app's read and write-back paths take a DbClient; the postgres.js tag is one at runtime.
+  let app: DbClient;
+
+  beforeAll(async () => {
+    app = sql as unknown as DbClient;
+    // The CollectiveX and OperatorX tables are prefixed, so they share the main schema here.
+    for (const dir of ['migrations-collectivex', 'migrations-operatorx']) {
+      const url = new URL(`../../${dir}/`, import.meta.url);
+      for (const name of fs.readdirSync(url).toSorted()) {
+        if (name.endsWith('.sql')) await db.exec(fs.readFileSync(new URL(name, url), 'utf8'));
+      }
+    }
+  });
+
+  beforeEach(async () => {
+    // Not gzip, so a chart-series recompute from this blob finds no series.
+    await db.exec(`TRUNCATE agentic_trace_replay, datasets, cx_runs, opx_runs CASCADE;
+      INSERT INTO agentic_trace_replay (id, server_metrics_json_gz) VALUES (500, 'not gzip'::bytea);
+      INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc,
+        metrics, trace_replay_id)
+      VALUES (50, 1, 1, 'agentic_traces', '2026-09-11', 8, '{"a":0}', 500);`);
+  });
+
+  it('stores a write-back chart series as a jsonb object the source read serves', async () => {
+    writeBackChartSeries(app, 500, SERIES);
+    expect(await writtenType('chart_series')).toBe('object');
+    expect(await getTraceServerMetricSource(app, 50, 'engine-0')).toEqual(SERIES.metricSources[0]!);
+  });
+
+  it('stores write-back aggregate stats as a jsonb object', async () => {
+    writeBackTraceReplayJsonb(app, 'aggregate_stats', 500, { version: 1, isl: [1, 2] });
+    expect(await writtenType('aggregate_stats')).toBe('object');
+  });
+
+  it('stores a backfilled chart series as a jsonb object', async () => {
+    expect(await writeChartSeriesBackfill(sql, 500, SERIES, null)).toBe(true);
+    expect(await writtenType('chart_series')).toBe('object');
+  });
+
+  it('treats a legacy jsonb-string chart series as stale instead of failing the read', async () => {
+    await db.query(
+      'UPDATE agentic_trace_replay SET chart_series = to_jsonb($1::text) WHERE id = 500',
+      [JSON.stringify(SERIES)],
+    );
+    expect(await getTraceServerMetrics(app, 50)).toBeNull();
+    expect(await getTraceServerMetricSource(app, 50, 'engine-0')).toBeNull();
+  });
+
+  it('stores eval result metrics as a jsonb object on insert and on re-ingest', async () => {
+    const row = { task: 'gsm8k', isl: null, osl: null, conc: null, lmEvalVersion: null };
+    const first = await ingestEvalRow(sql, 1, { ...row, metrics: { em: 0.5 } }, 1, '2026-09-11');
+    const again = await ingestEvalRow(sql, 1, { ...row, metrics: { em: 0.75 } }, 1, '2026-09-11');
+    expect(again).toEqual({ outcome: 'dup', id: first.id });
+    expect(
+      await jsonbTypes('SELECT jsonb_typeof(metrics) AS type, metrics FROM eval_results'),
+    ).toEqual([{ type: 'object', metrics: { em: 0.75 } }]);
+  });
+
+  it('stores gpu series sidecars as a jsonb object', async () => {
+    const sidecars = { context: { timestamp_timezone: 'UTC' }, identity: null };
+    await upsertGpuMetricSeries(sql, {
+      workflowRunId: 1,
+      artifactName: 'gpu_metrics_x',
+      series: {
+        fileName: 'gpu_metrics.csv',
+        vendor: 'nvidia',
+        csvSha256: 'sha',
+        samples: [],
+        sampleIntervalS: null,
+        gpuCount: 0,
+        startedAtMs: 0,
+        endedAtMs: 0,
+        sidecars: sidecars as never,
+      },
+      benchmarkResultIds: [],
+    });
+    expect(
+      await jsonbTypes('SELECT jsonb_typeof(sidecars) AS type, sidecars FROM gpu_metric_series'),
+    ).toEqual([{ type: 'object', sidecars }]);
+  });
+
+  it('stores the backfill and dataset scripts’ sql.json and jsonbParam binds as jsonb values', async () => {
+    // backfill-agentic-disagg-throughput, backfill-full-response-interactivity
+    await sql`update benchmark_results set metrics = metrics || ${jsonbParam(sql, { b: 1 })} where id = 50`;
+    // spec-algorithm-backfill, backfill-runtime-metadata, trace-replay full-response ITL
+    await sql`update benchmark_results set metrics = metrics || ${sql.json({ c: 'x' })} where id = 50`;
+    // run-override-actions point backfill; a jsonb array through the same bind
+    await sql`update benchmark_results set workers = ${jsonbParam(sql, [{ role: 'decode' }])} where id = 50`;
+    // backfill-aggregate-stats
+    await sql`update agentic_trace_replay set aggregate_stats = ${jsonbParam(sql, { version: 1 })} where id = 500`;
+    // ingest-weka-dataset and backfill-dataset-stats
+    await sql`insert into datasets (id, slug, label) values ('d', 'd', 'd')`;
+    await sql`insert into dataset_conversations ${sql([
+      { dataset_id: 'd', conv_id: 'c', models: ['m'], structure: sql.json({ nodes: [] }) },
+    ])}`;
+    await sql`update datasets set summary = ${sql.json({ n: 1 })}, chart_data = ${jsonbParam(sql, { v: 1 })}`;
+
+    expect(
+      await jsonbTypes(`SELECT
+        (SELECT metrics FROM benchmark_results WHERE id = 50) AS metrics,
+        (SELECT jsonb_typeof(workers) || '/' || jsonb_typeof(workers->0) FROM benchmark_results WHERE id = 50) AS workers,
+        (SELECT jsonb_typeof(aggregate_stats) FROM agentic_trace_replay WHERE id = 500) AS aggregate_stats,
+        (SELECT jsonb_typeof(structure) FROM dataset_conversations) AS structure,
+        (SELECT jsonb_typeof(summary) || '/' || jsonb_typeof(chart_data) FROM datasets) AS dataset`),
+    ).toEqual([
+      {
+        metrics: { a: 0, b: 1, c: 'x' },
+        workers: 'array/object',
+        aggregate_stats: 'object',
+        structure: 'object',
+        dataset: 'object/object',
+      },
+    ]);
+  });
+
+  it('stores CollectiveX runs, documents and changelog links as jsonb objects and arrays', async () => {
+    const run = {
+      run_id: '1761696000',
+      run_attempt: 1,
+      version: 1,
+      generated_at: '2026-10-29T00:00:00Z',
+      source_sha: 'a'.repeat(40),
+      source_branch: 'main',
+      conclusion: 'success',
+      matrix: { cases: [{ id: 'c1' }] },
+      summary: { source_repository: null } as never,
+    };
+    expect(await upsertCollectiveXRun(sql, run, [{ sku: 'b200' }, { sku: 'mi355x' }])).toBe(
+      'inserted',
+    );
+    await upsertCollectiveXChangelogLinks(sql, [
+      {
+        run_id: run.run_id,
+        entry_index: 0,
+        pr_number: 1,
+        pr_link: 'https://github.com/x/y/pull/1',
+        date: '2026-10-29',
+        pools: ['b200'],
+        selectors: { sku: ['b200'] },
+        description: 'd',
+        changes: [{ case_id: 'c1' }] as never,
+      },
+    ]);
+    expect(
+      await jsonbTypes(`SELECT
+        (SELECT jsonb_typeof(matrix) || '/' || jsonb_typeof(summary) FROM cx_runs) AS run,
+        (SELECT array_agg(jsonb_typeof(doc) ORDER BY id) FROM cx_run_docs) AS docs,
+        (SELECT jsonb_typeof(selectors) || '/' || jsonb_typeof(changes) || '/' || jsonb_typeof(changes->0)
+          FROM cx_changelog_entries) AS changelog`),
+    ).toEqual([
+      { run: 'object/object', docs: ['object', 'object'], changelog: 'object/array/object' },
+    ]);
+  });
+
+  it('stores OperatorX runs, documents, comparisons and timelines as jsonb objects', async () => {
+    const shape = {
+      type: 'gemm',
+      args: { m: 1, n: 64, k: 128, a: { dtype: 'bf16' }, b: { dtype: 'bf16' } },
+      sources: ['openai/gpt-oss-120b/k_proj'],
+    };
+    const bundle = {
+      run: {
+        run_id: '123',
+        run_attempt: 1,
+        source_sha: 'a'.repeat(40),
+        source_branch: 'main',
+        generated_at: '2026-09-26T00:00:00Z',
+        conclusion: 'success',
+      },
+      manifest: {
+        include: [
+          {
+            id: 's1',
+            runner: 'cluster:h200-dgxc',
+            mode: 'timing',
+            backends: ['vllm'],
+            cases: [{ testlist: 'gemm', shape }],
+          },
+        ],
+      },
+      shards: [
+        {
+          id: 's1',
+          attempt: 1,
+          docs: [
+            {
+              run: { cluster: 'h200' },
+              rows: [
+                {
+                  testlist: 'gemm',
+                  op: { ...shape, backend: 'vllm' },
+                  status: 'ok',
+                  metrics: {
+                    latency_us: 10,
+                    profile: { timeline: [{ name: 'gemm', stream: 7, start_us: 0, dur_us: 6 }] },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as OperatorXRawBundle;
+    expect(await saveOperatorXBundle(sql, bundle)).toEqual({ docs: 1, results: 1 });
+    expect(
+      await jsonbTypes(`SELECT
+        (SELECT jsonb_typeof(manifest) || '/' || jsonb_typeof(summary) FROM opx_runs) AS run,
+        (SELECT array_agg(DISTINCT jsonb_typeof(doc)) FROM opx_run_docs) AS docs,
+        (SELECT array_agg(DISTINCT jsonb_typeof(comparison)) FROM opx_run_comparisons) AS comparisons,
+        (SELECT array_agg(DISTINCT coalesce(jsonb_typeof(timeline), 'sql null'))
+          FROM opx_run_timelines) AS timelines`),
+    ).toEqual([
+      { run: 'object/object', docs: ['object'], comparisons: ['object'], timelines: ['object'] },
+    ]);
   });
 });
