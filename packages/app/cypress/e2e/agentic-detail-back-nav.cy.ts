@@ -131,7 +131,15 @@ function interceptChart(): void {
   cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
     'availability',
   );
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
+  // Each model's chart gets only its own rows, so a clicked point belongs to the chart's model.
+  const dbKeyFor: Record<string, string> = {
+    'DeepSeek-V4-Pro': DEFAULT_MODEL_DB_KEY,
+    'Kimi-K3': TARGET_MODEL_DB_KEY,
+  };
+  cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+    const model = dbKeyFor[new URL(request.url).searchParams.get('model') ?? ''];
+    request.reply({ body: benchmarks.filter((b) => b.model === model) });
+  }).as('benchmarks');
   interceptBenchmarkPresence({ trace: tracedIds });
   interceptDerivedAgenticMetrics();
   interceptDetailPage();

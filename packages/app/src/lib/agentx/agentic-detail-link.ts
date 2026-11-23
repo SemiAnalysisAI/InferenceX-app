@@ -1,17 +1,23 @@
 import { ZH_PREFIX, type Locale } from '@/lib/i18n/i18n';
 import { withChartState } from '@/lib/routing/url-state';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
-import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
 
-export function agenticDetailHref(pointId: number, locale: Locale = 'en'): string {
+/**
+ * The agentic detail page of a stored point. It names the point's own model in `g_model`, so the
+ * detail page knows which chart Back returns to before any point data loads. The model comes from
+ * the point, not the current URL, so server and client render the same model.
+ */
+export function agenticDetailHref(
+  pointId: number,
+  model: string | undefined,
+  locale: Locale = 'en',
+): string {
   const href = withChartState(
     `${locale === 'zh' ? ZH_PREFIX : ''}${getDashboardRoute('inference').path}/agentic/${pointId}`,
   );
-  // On a model route the chart state leaves the model to the path. The detail page needs it in
-  // its own URL so Back can return to this chart before (or without) loading the point's data.
-  const routeModel =
-    typeof window === 'undefined' ? null : inferenceModelForPathname(window.location.pathname);
-  if (!routeModel || /[?&]g_model=/u.test(href)) return href;
-  const param = `g_model=${encodeURIComponent(routeModel)}`;
-  return `${href}${href.includes('?') ? '&' : '?'}${param}`;
+  if (!model) return href;
+  const [path, search = ''] = href.split('?');
+  const params = new URLSearchParams(search);
+  params.set('g_model', model);
+  return `${path}?${params}`;
 }
