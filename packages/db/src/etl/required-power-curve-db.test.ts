@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'bun:test';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import { preflightRequiredPowerCurves } from './required-power-curve';
 import { verifyRequiredPowerArtifacts } from './required-power-publication';
@@ -24,9 +24,10 @@ function preflight(root: string, runSource = source) {
 }
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 20000);
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 beforeEach(async () => {

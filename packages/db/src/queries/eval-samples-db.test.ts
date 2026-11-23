@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 
 import { getEvalSampleOffset, getEvalSamples } from './eval-samples';
 
@@ -29,7 +29,7 @@ function dataOf(docId: number): unknown {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
     VALUES (1, 1, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -43,17 +43,18 @@ beforeAll(async () => {
     await sql`
       insert into eval_samples (eval_result_id, doc_id, prompt, target, response, passed, score, metrics, data)
       values (1, ${docId}, ${`prompt ${docId}`}, ${`target ${docId}`}, ${`resp ${docId}`},
-        ${passedOf(docId)}, ${docId / 10}, ${JSON.stringify({ exact_match: docId % 3 === 0 ? 0 : 1 })},
-        ${JSON.stringify(dataOf(docId))})
+        ${passedOf(docId)}, ${docId / 10}, ${{ exact_match: docId % 3 === 0 ? 0 : 1 }},
+        ${dataOf(docId)})
     `;
   }
   await sql`
     insert into eval_samples (eval_result_id, doc_id, passed, data)
-    values (2, 0, true, ${JSON.stringify(dataOf(0))})
+    values (2, 0, true, ${dataOf(0)})
   `;
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

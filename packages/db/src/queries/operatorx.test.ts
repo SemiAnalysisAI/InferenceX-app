@@ -4,7 +4,6 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeAll, expect, it } from 'bun:test';
 
 import type { DbClient } from '../connection';
-import type { Sql } from '../etl/db-utils';
 import { pgliteDriverSql } from '../lib/test-pglite';
 import type { OperatorXRawBundle } from '../operatorx/bundle';
 import { OPERATORX_COMPARISON_OPS } from '../operatorx/comparison-cache';
@@ -70,33 +69,6 @@ function bundle(): OperatorXRawBundle {
   };
 }
 
-function bind(value: unknown): string | number | boolean | null {
-  if (Array.isArray(value))
-    return `{${value.map((item) => JSON.stringify(String(item))).join(',')}}`;
-  return value !== null && typeof value === 'object'
-    ? JSON.stringify(value)
-    : (value as string | number | boolean | null);
-}
-
-function sqlFor(db: PGlite): Sql & DbClient {
-  const makeTag = (client: Pick<PGlite, 'query'>): Sql => {
-    const tag = async (strings: TemplateStringsArray, ...values: unknown[]) => {
-      const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-      // postgres.js serializes any parameter bound to a scalar jsonb slot with JSON.stringify,
-      // strings included, so a pre-serialized string is stored as a jsonb string.
-      const params = values.map((value, i) =>
-        /^::jsonb(?!\[)/u.test(strings[i + 1] ?? '') ? JSON.stringify(value) : bind(value),
-      );
-      const result = await client.query<Record<string, unknown>>(query, params);
-      return result.rows;
-    };
-    return Object.assign(tag, {
-      begin: <T>(fn: (tx: Sql) => Promise<T>) => db.transaction((tx) => fn(makeTag(tx))),
-    }) as unknown as Sql & DbClient;
-  };
-  return makeTag(db) as Sql & DbClient;
-}
-
 async function migrate(db: PGlite, compact = true): Promise<void> {
   for (const name of [
     '001_initial_schema.sql',
@@ -129,8 +101,8 @@ function expectedComparison(raw: OperatorXRawBundle) {
 
 it('persists raw OperatorX documents and replaces a re-ingested run atomically', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const first = bundle();
     first.run.generated_at = '2026-09-26T08:00:00.123+08:00';
 
@@ -192,31 +164,32 @@ it('persists raw OperatorX documents and replaces a re-ingested run atomically',
     expect(await getOperatorXRunComparison(sql, '999', 'gemm')).toBeNull();
     expect(await getOperatorXBundle(sql, '999')).toBeNull();
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('stores raw documents as jsonb objects through the postgres driver', async () => {
   const db = await migratedDb();
-  const driver = await pgliteDriverSql(db);
+  const sql = await pgliteDriverSql(db);
   try {
     const raw = bundle();
-    expect(await saveOperatorXBundle(driver.sql, raw)).toEqual({ docs: 1, results: 1 });
+    expect(await saveOperatorXBundle(sql, raw)).toEqual({ docs: 1, results: 1 });
     const types = await db.query<{ type: string }>(
       'SELECT jsonb_typeof(doc) AS type FROM opx_run_docs',
     );
     expect(types.rows).toEqual([{ type: 'object' }]);
-    expect(await getOperatorXBundle(sqlFor(db), '123')).toMatchObject({ shards: raw.shards });
+    expect(await getOperatorXBundle(sql, '123')).toMatchObject({ shards: raw.shards });
   } finally {
-    await driver.close();
+    await sql.end();
     await db.close();
   }
 });
 
 it('keeps raw documents and compact comparisons intact when a re-ingest fails', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const before = await getOperatorXBundle(sql, '123');
     const comparison = await getOperatorXRunComparison(sql, '123', 'gemm');
@@ -237,14 +210,15 @@ it('keeps raw documents and compact comparisons intact when a re-ingest fails', 
     expect(await getOperatorXBundle(sql, '123')).toEqual(before);
     expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(comparison);
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('replaces an older Ascend run atomically while preserving other hardware', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const old = bundle();
     old.run.run_id = 'old-ascend';
     (old.manifest as { include: { runner: string }[] }).include[0].runner = 'ascend950pr-external';
@@ -273,14 +247,15 @@ it('replaces an older Ascend run atomically while preserving other hardware', as
       runId: 'new-ascend',
     });
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('reads large runs in bounded document batches without changing shard order', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const input = bundle();
     input.shards = [
       { id: 'a', attempt: 1, docs: Array.from({ length: 11 }, (_, n) => ({ n })) },
@@ -291,6 +266,7 @@ it('reads large runs in bounded document batches without changing shard order', 
     expect(stored?.shards).toEqual(input.shards);
     expect(stored?.run.revision).toMatch(/^\d+$/u);
   } finally {
+    await sql.end();
     await db.close();
   }
 });
@@ -309,8 +285,8 @@ const row = (m: number, latency: number) => ({
 
 it('projects persisted shard order so duplicate selection and timeline indices match raw reads', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const input = bundle();
     input.shards[0].id = 'z';
     input.shards.push({
@@ -331,14 +307,15 @@ it('projects persisted shard order so duplicate selection and timeline indices m
       profile: { kernels: [{ name: 'kernel_20' }] },
     });
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('backfills idempotently and refuses a revision replaced after the raw read', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const captured = (await getOperatorXBundle(sql, '123'))!;
     await db.exec('DELETE FROM opx_run_comparisons');
@@ -367,17 +344,20 @@ it('backfills idempotently and refuses a revision replaced after the raw read', 
     expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(replacement);
     await expect(backfillOperatorXRunComparisons(sql, bundle())).rejects.toThrow('stored revision');
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('falls back before the projection migration is applied', async () => {
   const db = new PGlite();
+  await migrate(db, false);
+  const sql = await pgliteDriverSql(db);
   try {
-    await migrate(db, false);
-    expect(await getOperatorXRunComparison(sqlFor(db), '123', 'gemm')).toBeNull();
-    expect(await getOperatorXRunComparisons(sqlFor(db), [bundle().run], 'gemm')).toEqual(new Map());
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toBeNull();
+    expect(await getOperatorXRunComparisons(sql, [bundle().run], 'gemm')).toEqual(new Map());
   } finally {
+    await sql.end();
     await db.close();
   }
 });
@@ -394,8 +374,8 @@ it.each(['42501', '08006', '57014'])(
 
 it('reads requested compact run revisions with one size query and one batch read', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const first = bundle();
     const second = bundle();
     second.run.run_id = '124';
@@ -426,14 +406,15 @@ it('reads requested compact run revisions with one size query and one batch read
     const missing = { ...captured, run_id: 'not-stored' };
     expect(await getOperatorXRunComparisons(sql, [missing], 'gemm')).toEqual(new Map());
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('stores comparisons as JSON objects and still reads double-encoded legacy rows', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const stored = await db.query<{ t: string }>(
       'SELECT DISTINCT jsonb_typeof(comparison) AS t FROM opx_run_comparisons',
@@ -447,14 +428,15 @@ it('stores comparisons as JSON objects and still reads double-encoded legacy row
     );
     expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(expected);
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('reads comparisons for more runs than one batch holds', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const keys = Array.from({ length: 19 }, (_, i) => String(1000 + i));
     for (const key of keys) {
       const run = bundle();
@@ -469,6 +451,7 @@ it('reads comparisons for more runs than one batch holds', async () => {
     expect([...comparisons.keys()].toSorted()).toEqual(keys);
     expect([...comparisons.values()].every((c) => c.op === 'gemm')).toBe(true);
   } finally {
+    await sql.end();
     await db.close();
   }
 });
@@ -490,8 +473,8 @@ function profiledBundle(): OperatorXRawBundle {
 
 it('precomputes per-result timelines at ingest and reads them by ref', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     const raw = profiledBundle();
     await saveOperatorXBundle(sql, raw);
     const [run] = await listOperatorXRuns(sql);
@@ -528,14 +511,15 @@ it('precomputes per-result timelines at ingest and reads them by ref', async () 
     const current = await read([ref(0, next.revision!)]);
     expect(current.get(key(0, next.revision!))).toEqual({ timeline: expected, known: true });
   } finally {
+    await sql.end();
     await db.close();
   }
 });
 
 it('stores a null timeline for unprofiled results and tolerates a missing table', async () => {
   const db = await migratedDb();
+  const sql = await pgliteDriverSql(db);
   try {
-    const sql = sqlFor(db);
     await saveOperatorXBundle(sql, bundle());
     const [run] = await listOperatorXRuns(sql);
     const hit = await getOperatorXTimelines(
@@ -546,19 +530,18 @@ it('stores a null timeline for unprofiled results and tolerates a missing table'
     expect(hit.get(`123:0:${run.revision}`)).toEqual({ timeline: null, known: true });
     expect(await getOperatorXTimelines(sql, [], 'gemm')).toEqual(new Map());
   } finally {
+    await sql.end();
     await db.close();
   }
   const bare = new PGlite();
+  await migrate(bare, false);
+  const bareSql = await pgliteDriverSql(bare);
   try {
-    await migrate(bare, false);
     expect(
-      await getOperatorXTimelines(
-        sqlFor(bare),
-        [{ runId: '123', index: 0, revision: '1' }],
-        'gemm',
-      ),
+      await getOperatorXTimelines(bareSql, [{ runId: '123', index: 0, revision: '1' }], 'gemm'),
     ).toEqual(new Map());
   } finally {
+    await bareSql.end();
     await bare.close();
   }
 });

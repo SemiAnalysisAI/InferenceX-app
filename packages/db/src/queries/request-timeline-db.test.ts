@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline, gzipRequestTimeline } from '../etl/request-timeline-codec';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 
 import * as agenticShared from './agentic-shared';
 import { encodeRequestChartData, getRequestChartData } from './request-chart-data';
@@ -64,7 +64,7 @@ let sql: PgliteSql;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
     VALUES (1, 34557177019, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -74,7 +74,7 @@ beforeAll(async () => {
   `);
   await sql`
     insert into agentic_trace_replay (id, request_timeline)
-    values (11, ${JSON.stringify(legacyOnly)}::jsonb)
+    values (11, ${legacyOnly}::jsonb)
   `;
   await sql`
     insert into agentic_trace_replay (id, request_timeline_gz, request_timeline_version, request_count)
@@ -85,7 +85,7 @@ beforeAll(async () => {
       id, request_timeline, request_timeline_gz, request_timeline_version, request_count
     )
     values (
-      13, ${JSON.stringify(supersededLegacy)}::jsonb, ${await gzipRequestTimeline(gzipCopy)},
+      13, ${supersededLegacy}::jsonb, ${await gzipRequestTimeline(gzipCopy)},
       ${REQUEST_TIMELINE_VERSION}, 4
     )
   `;
@@ -107,7 +107,7 @@ beforeAll(async () => {
     insert into agentic_trace_replay (id, request_timeline, profile_export_jsonl_gz)
     values (
       14,
-      ${JSON.stringify({ ...legacyOnly, version: REQUEST_TIMELINE_VERSION - 1 })}::jsonb,
+      ${{ ...legacyOnly, version: REQUEST_TIMELINE_VERSION - 1 }}::jsonb,
       ${profile}
     )
   `;
@@ -122,6 +122,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 
