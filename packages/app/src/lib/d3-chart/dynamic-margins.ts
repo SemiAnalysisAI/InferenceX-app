@@ -13,11 +13,10 @@ let measureContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
 function textContext(): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
   if (measureContext) return measureContext;
-  const canvas =
+  const context =
     typeof OffscreenCanvas === 'undefined'
-      ? document.createElement('canvas')
-      : new OffscreenCanvas(1, 1);
-  const context = canvas.getContext('2d');
+      ? document.createElement('canvas').getContext('2d')
+      : new OffscreenCanvas(1, 1).getContext('2d');
   if (!context) throw new Error('Text measurement needs a 2D canvas context.');
   measureContext = context;
   return context;
