@@ -63,7 +63,7 @@ export const AGENTX_QUICKSTART = {
       'Export these before running AgentX if your router needs session headers. Only the Dynamo option sends the parent-session ID for subagents.',
     goldenAl: 'Speculative decoding: golden acceptance length',
     goldenAlHelp:
-      'AgentX anonymizes trace tokens to protect user privacy, so draft-token acceptance on the replayed text does not reflect real workloads. If your server runs MTP, EAGLE3, DSpark, or DFlash, force the committed golden acceptance length (AL) for your model, method, thinking mode, and draft length. Each value is the mean AL measured with real verification on the SPEED-Bench coding category, and every submission for the same model and mode uses the same curve, so results compare serving systems rather than draft heads.',
+      'AgentX anonymizes trace tokens to protect user privacy, so we simulate acceptance lengths (ALs), a feature supported by all popular inference engines, including vLLM, SGLang, TensorRT-LLM, and ATOM. The AL distribution used for simulation is collected from the SPEED-Bench coding category to reflect real-world acceptance lengths. If your server runs MTP, EAGLE3, DSpark, or DFlash, force the committed golden AL for your model, method, thinking mode, and draft length. Every submission for the same model and mode uses the same curve, so results compare serving systems rather than draft heads.',
     goldenAlNote:
       'lookup defaults to thinking_on; pass --thinking thinking_off for non-thinking runs. You may pick any measured draft length, but not a different AL. A missing curve or draft length fails the lookup; add a measured curve instead of guessing. Accuracy evals use real verification.',
     goldenAlLink: 'Golden AL curves and collection method',
@@ -92,7 +92,7 @@ export const AGENTX_QUICKSTART = {
       '如果路由器需要会话 header，请在运行 AgentX 前导出这些变量。只有 Dynamo 选项会为子智能体发送父会话 ID。',
     goldenAl: '投机解码：golden acceptance length',
     goldenAlHelp:
-      '为保护用户隐私，AgentX 对 trace 中的 token 做了匿名化处理，因此在回放文本上测得的 draft token 接受率不能反映真实负载。如果服务器启用了 MTP、EAGLE3、DSpark 或 DFlash，请按模型、方法、thinking mode 和 draft length 固定使用仓库中提交的 golden acceptance length（AL，接受长度）。每个值都是在 SPEED-Bench coding 类别上用真实验证测得的平均 AL。同一模型和模式的所有提交都使用同一条曲线，因此结果比较的是推理服务系统，而不是 draft head。',
+      '为保护用户隐私，AgentX 对 trace 中的 token 做了匿名化处理，因此需要模拟 acceptance length（AL，接受长度）。vLLM、SGLang、TensorRT-LLM 和 ATOM 等主流推理引擎都支持这一功能。模拟所用的 AL 分布采集自 SPEED-Bench 的 coding 类别，用于反映真实场景中的接受长度。如果服务器启用了 MTP、EAGLE3、DSpark 或 DFlash，请按模型、方法、thinking mode 和 draft length 固定使用仓库中提交的 golden AL。同一模型和模式的所有提交都使用同一条曲线，因此结果比较的是推理服务系统，而不是 draft head。',
     goldenAlNote:
       'lookup 默认使用 thinking_on；非 thinking 运行请传入 --thinking thinking_off。可以选择任意已测量的 draft length，但不能改用其他 AL。缺少对应曲线或 draft length 时查询会失败；请补充实测曲线，不要自行估算。精度评测使用真实验证。',
     goldenAlLink: 'Golden AL 曲线与采集方法',
