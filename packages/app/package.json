@@ -36,7 +36,6 @@
     "guard:zh-copy:chinese-only": "bun scripts/check-zh-chinese-only.ts --chinese-only"
   },
   "dependencies": {
-    "@chenglou/pretext": "^1.0.0",
     "@jpinsonneau/html-to-image": "^1.11.13",
     "@noble/ciphers": "^2.4.0",
     "@posthog/nextjs-config": "^1.12.2",
@@ -100,10 +99,9 @@
     "@types/react-dom": "19.3.0",
     "@types/three": "^0.187.0",
     "@vercel/routing-utils": "^6.6.1",
-    "axe-core": "~4.13.0",
+    "axe-core": "~4.14.0",
     "bun-types": "^1.4.4",
-    "cypress": "15.21.1",
-    "cypress-axe": "^1.7.0",
+    "cypress": "16.3.0",
     "cypress-split": "^1.25.0",
     "esbuild": "^0.28.2",
     "jsdom": "^31.0.1",

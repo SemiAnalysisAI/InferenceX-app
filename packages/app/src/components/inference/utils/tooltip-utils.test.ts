@@ -8,7 +8,7 @@ import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import {
   SYSTEM_POWER_MODEL_REVISION,
   SYSTEM_POWER_MODEL_SOURCE_URL,
-} from '@/lib/power/system-power-model';
+} from '@/lib/power/system-power-categories';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   buildPointDetails,

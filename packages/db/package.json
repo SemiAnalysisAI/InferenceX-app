@@ -62,12 +62,13 @@
     "kysely": "^0.29.9",
     "kysely-neon": "^3.0.0",
     "pg": "^8.23.1",
-    "postgres": "^3.4.9",
+    "postgres": "^4.1.1",
     "stream-chain": "^4.4.2",
     "stream-json": "^3.9.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",
+    "@electric-sql/pglite-socket": "^0.2.19",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",

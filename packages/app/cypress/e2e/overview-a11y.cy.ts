@@ -1,5 +1,7 @@
 import type { Result } from 'axe-core';
 
+import { checkA11y } from '../support/axe';
+
 const OVERVIEW_SURFACE = '[data-testid="overview-page"]';
 
 const OVERVIEW_ROUTES = [
@@ -68,8 +70,7 @@ describe('Overview accessibility', () => {
           expect(style.getPropertyValue('--range-progress').trim()).to.match(/%$/);
         });
 
-        cy.injectAxe();
-        cy.checkA11y(OVERVIEW_SURFACE, WCAG_AA_RULES, reportViolations);
+        checkA11y(OVERVIEW_SURFACE, WCAG_AA_RULES, reportViolations);
       });
     }
   }

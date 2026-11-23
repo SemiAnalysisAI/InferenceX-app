@@ -42,7 +42,7 @@ export async function previewConclusions(
     const expected = overrides.get(Number(r.github_run_id));
     if (expected && r.conclusion !== expected) {
       stale.push({
-        githubRunId: r.github_run_id as number,
+        githubRunId: Number(r.github_run_id),
         current: r.conclusion as string | null,
         expected,
       });
@@ -115,8 +115,8 @@ export async function previewChangelogBackfill(
   console.log(`      set ${JSON.stringify(backfill.set)}`);
   return {
     backfill,
-    changelogId: row.id as number,
-    workflowRunId: row.workflow_run_id as number,
+    changelogId: Number(row.id),
+    workflowRunId: Number(row.workflow_run_id),
   };
 }
 
@@ -258,7 +258,7 @@ export async function previewBenchmarkPointBackfill(
   console.log(`      set ${JSON.stringify(backfill.set)}`);
   return {
     backfill,
-    resultId: row.id as number,
+    resultId: Number(row.id),
     metrics,
     sourceSpecMethod: row.spec_method as string,
     date: row.date as string,
@@ -339,7 +339,7 @@ export async function previewRunFrameworkOverride(
     console.log('      run not in DB, skipping.');
     return null;
   }
-  const wrIds = runs.map((r) => r.id as number);
+  const wrIds = runs.map((r) => Number(r.id));
 
   const configRows = await sql`
     SELECT c.id,
@@ -373,7 +373,7 @@ export async function previewRunFrameworkOverride(
       rewriteConfigKeyFramework(key, override.from, override.to),
     );
     if (!isDeepStrictEqual(current, rewritten)) {
-      changelogs.push({ changelogId: row.id as number, configKeys: rewritten });
+      changelogs.push({ changelogId: Number(row.id), configKeys: rewritten });
     }
   }
 
@@ -534,7 +534,7 @@ export async function previewPurge(
     return null;
   }
 
-  const wrIds = runs.map((r) => r.id as number);
+  const wrIds = runs.map((r) => Number(r.id));
   const header = attempts
     ? `${githubRunId} (attempts ${runs.map((r) => r.run_attempt).join(',')})`
     : `${githubRunId}`;
@@ -623,7 +623,7 @@ export async function previewBenchmarkPointPurge(
   const links = rows.reduce((sum, row) => sum + (row.telemetry_links as number), 0);
   if (links > 0)
     console.log(`    removes ${links} gpu_metric_series link(s); the series stay with the run.`);
-  return { resultIds: rows.map((row) => row.id as number) };
+  return { resultIds: rows.map((row) => Number(row.id)) };
 }
 
 export async function purgeBenchmarkPoints(sql: Sql, resultIds: number[]): Promise<void> {

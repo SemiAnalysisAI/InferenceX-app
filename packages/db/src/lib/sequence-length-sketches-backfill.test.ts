@@ -13,7 +13,7 @@ import {
   computeSequenceLengthSketches,
   writeSequenceLengthSketches,
 } from './sequence-length-sketches-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 const CURRENT = {
   isl: buildTokenLengthSketch([0, 12, 4_096, 4_100, 120_000]),
@@ -39,7 +39,7 @@ async function storedColumns(id: number): Promise<SketchColumns> {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
     VALUES (1, 34557177019, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -50,6 +50,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 
@@ -61,7 +62,7 @@ beforeEach(async () => {
   ] as const) {
     await sql`
       insert into agentic_trace_replay (id, aggregate_stats)
-      values (${id}, ${JSON.stringify({ version, sequenceLengths })}::jsonb)
+      values (${id}, ${{ version, sequenceLengths }}::jsonb)
     `;
   }
   await db.exec(`

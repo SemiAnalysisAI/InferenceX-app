@@ -7,7 +7,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import type postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { PROFILE_INLINE_BYTES, readTraceProfileGz } from '../lib/trace-profile-storage';
 import {
   SEQUENCE_LENGTH_SKETCHES_VERSION,
@@ -103,11 +103,9 @@ function mockSqlWithTransaction(
     return Promise.resolve([]);
   };
   const tx = Object.assign(execute, {
-    array: (values: unknown[]) => values,
     json: (value: unknown) => value,
   });
   const sql = Object.assign(execute, {
-    array: (values: unknown[]) => values,
     begin: (operation: (transaction: typeof tx) => Promise<void>) => operation(tx),
   }) as unknown as Parameters<typeof persistPreparedTraceReplay>[0];
   return { sql, calls };
@@ -435,7 +433,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
 
   beforeAll(async () => {
     db = await migratedPglite();
-    pg = pgliteSql(db);
+    pg = await pgliteDriverSql(db);
     await db.exec(`
       INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
       VALUES (1, 29181694248, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -450,6 +448,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
   }, 30_000);
 
   afterAll(async () => {
+    await pg?.end();
     await db?.close();
   });
 

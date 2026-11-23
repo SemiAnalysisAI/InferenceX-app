@@ -24,7 +24,7 @@ import {
   noteInferenceChartShown,
 } from '@/lib/routing/agentic-detail-origin';
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
 import {
   ALL_IN_MEASURED_AGENTIC_NOTE,
   ALL_IN_MEASURED_EMPTY,

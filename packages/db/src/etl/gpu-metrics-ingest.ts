@@ -179,22 +179,22 @@ async function insertSampleBatch(
     )
     select
       ${seriesId},
-      unnest(${tx.array(batch.map((s) => s.gpuIndex))}::smallint[]),
-      to_timestamp(unnest(${tx.array(batch.map((s) => s.timestampMs / 1000))}::double precision[])),
-      unnest(${tx.array(batch.map((s) => s.powerW))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.temperatureC))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.smClockMhz))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.memClockMhz))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.gpuUtilPct))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.memUtilPct))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.edgeTempC))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.memTempC))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.gfxVoltageMv))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.socVoltageMv))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.memVoltageMv))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.fclkMhz))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.socclkMhz))}::real[]),
-      unnest(${tx.array(batch.map((s) => s.mmActivityPct))}::real[])
+      unnest(${batch.map((s) => s.gpuIndex)}::smallint[]),
+      to_timestamp(unnest(${batch.map((s) => s.timestampMs / 1000)}::double precision[])),
+      unnest(${batch.map((s) => s.powerW)}::real[]),
+      unnest(${batch.map((s) => s.temperatureC)}::real[]),
+      unnest(${batch.map((s) => s.smClockMhz)}::real[]),
+      unnest(${batch.map((s) => s.memClockMhz)}::real[]),
+      unnest(${batch.map((s) => s.gpuUtilPct)}::real[]),
+      unnest(${batch.map((s) => s.memUtilPct)}::real[]),
+      unnest(${batch.map((s) => s.edgeTempC)}::real[]),
+      unnest(${batch.map((s) => s.memTempC)}::real[]),
+      unnest(${batch.map((s) => s.gfxVoltageMv)}::real[]),
+      unnest(${batch.map((s) => s.socVoltageMv)}::real[]),
+      unnest(${batch.map((s) => s.memVoltageMv)}::real[]),
+      unnest(${batch.map((s) => s.fclkMhz)}::real[]),
+      unnest(${batch.map((s) => s.socclkMhz)}::real[]),
+      unnest(${batch.map((s) => s.mmActivityPct)}::real[])
   `;
 }
 
@@ -299,7 +299,7 @@ export function upsertGpuMetricSeries(
     if (benchmarkResultIds.length > 0) {
       await tx`
         insert into benchmark_result_gpu_metrics (benchmark_result_id, series_id)
-        select unnest(${tx.array([...new Set(benchmarkResultIds)])}::bigint[]), ${seriesId}
+        select unnest(${[...new Set(benchmarkResultIds)]}::bigint[]), ${seriesId}
         on conflict do nothing
       `;
     }
@@ -363,13 +363,13 @@ export async function ingestGpuMetricsArtifact(
       delete from gpu_metric_series
       where workflow_run_id = ${input.workflowRunId}
         and artifact_name = ${input.artifact.artifactName}
-        and not (id = any(${sql.array(result.seriesIds)}::bigint[]))
+        and not (id = any(${result.seriesIds}::bigint[]))
     `;
     if (input.replacePointLinks && input.benchmarkResultIds.length > 0) {
       await sql`
         delete from benchmark_result_gpu_metrics
-        where benchmark_result_id = any(${sql.array([...input.benchmarkResultIds])}::bigint[])
-          and not (series_id = any(${sql.array(result.seriesIds)}::bigint[]))
+        where benchmark_result_id = any(${[...input.benchmarkResultIds]}::bigint[])
+          and not (series_id = any(${result.seriesIds}::bigint[]))
       `;
     }
   }

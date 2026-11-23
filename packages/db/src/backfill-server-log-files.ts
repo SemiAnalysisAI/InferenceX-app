@@ -84,7 +84,7 @@ async function resultLogsAreComplete(resultIds: readonly number[]): Promise<bool
     select count(*) = ${resultIds.length} as complete
     from benchmark_results br
     join server_logs sl on sl.id = br.server_log_id
-    where br.id = any(${sql.array([...resultIds])}::bigint[])
+    where br.id = any(${[...resultIds]}::bigint[])
       and sl.files_complete
   `;
   return row?.complete ?? false;

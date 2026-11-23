@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import {
   getAgenticCatalog,
   mergeAgenticCatalogGroups,
@@ -74,19 +74,22 @@ function seed(id: number, conc: number, tput: string): string {
 
 describe('getAgenticCatalog', () => {
   const databases: PGlite[] = [];
+  const drivers: PgliteSql[] = [];
 
   beforeAll(async () => {
     databases.push(await migratedPglite(), await migratedPglite());
     await databases[0]!.exec(seed(1, 8, '{}'));
     await databases[1]!.exec(seed(1_000_000_000_000, 64, '{"tput_per_gpu": 0}'));
+    for (const db of databases) drivers.push(await pgliteDriverSql(db));
   }, 60_000);
 
   afterAll(async () => {
+    await Promise.all(drivers.map((sql) => sql.end()));
     await Promise.all(databases.map((db) => db.close()));
   });
 
   it('lists a group held by both databases once, ranking a missing throughput last', async () => {
-    await expect(getAgenticCatalog(databases.map(pgliteSql))).resolves.toEqual([
+    await expect(getAgenticCatalog(drivers)).resolves.toEqual([
       {
         id: 1_000_000_000_000,
         model: 'dsr1',

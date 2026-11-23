@@ -239,13 +239,17 @@ export function OverviewPresentationSurface({ children }: { children: ReactNode 
 export function OverviewPresentToggle({ strings }: { strings: OverviewStrings }) {
   const { presenting, supported, toggle } = useOverviewPresentation();
   if (!supported) return null;
+  const label = presenting ? strings.presentExit : strings.presentEnter;
   return (
     <button
       type="button"
       data-testid="overview-present-toggle"
       onClick={toggle}
       aria-pressed={presenting}
-      aria-label={presenting ? strings.presentExitAria : strings.presentEnterAria}
+      aria-label={strings.withDetail(
+        label,
+        presenting ? strings.presentExitAria : strings.presentEnterAria,
+      )}
       title={strings.presentShortcutHint}
       className={buttonVariants({ variant: 'outline', size: 'xs' })}
     >
@@ -265,7 +269,7 @@ export function OverviewPresentToggle({ strings }: { strings: OverviewStrings })
           <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
         )}
       </svg>
-      {presenting ? strings.presentExit : strings.presentEnter}
+      {label}
     </button>
   );
 }

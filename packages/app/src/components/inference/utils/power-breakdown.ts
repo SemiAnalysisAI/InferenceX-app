@@ -10,7 +10,7 @@ import {
   SYSTEM_POWER_CATEGORIES,
   type SystemPowerBreakdown,
   type SystemPowerCategory,
-} from '@/lib/power/system-power-model';
+} from '@/lib/power/system-power-categories';
 import {
   equalServiceSourceKey,
   getEqualServiceSources,

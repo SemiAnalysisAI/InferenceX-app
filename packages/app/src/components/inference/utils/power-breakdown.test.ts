@@ -22,7 +22,8 @@ import {
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
 } from './power-breakdown';
-import { estimateChassisPower, SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-categories';
+import { estimateChassisPower } from '@/lib/power/system-power-model';
 
 const metric = (y: number) => ({ y, roof: false });
 

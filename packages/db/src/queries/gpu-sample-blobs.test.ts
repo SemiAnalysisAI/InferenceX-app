@@ -9,7 +9,7 @@ import { stubEnv, unstubAllEnvs } from '../lib/test-helpers';
 import type { DbClient } from '../connection';
 import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
 import { GPU_SAMPLE_BLOB_FORMAT_VERSION } from '../lib/gpu-sample-blob';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getGpuMetricsForPoint, getGpuMetricsForRun, readSqlSampleRows } from './gpu-metrics';
 import { storeGpuSampleBlob, storedSample } from './gpu-sample-blobs';
 
@@ -21,10 +21,11 @@ const SERIES = [100, 101];
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 20_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

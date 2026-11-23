@@ -384,25 +384,42 @@ describe('Overview page', () => {
   });
 
   it('sends one RSC request when a slow language switch preserves overview state', () => {
-    let zhOverviewRscRequests = 0;
+    let zhOverviewRscFetches = 0;
 
     cy.intercept('GET', '/zh/overview*', (request) => {
       if (request.query._rsc === undefined && request.headers.rsc !== '1') return;
-
-      zhOverviewRscRequests += 1;
       request.continue((response) => {
         response.setDelay(600);
       });
     });
 
-    cy.visit('/overview?ref=b300&compare=hardware');
+    // Count the app's fetch calls. In Chrome, cy.intercept runs on the browser's network layer and
+    // can see one fetch twice when the browser sends it again, which the old proxy never saw.
+    cy.visit('/overview?ref=b300&compare=hardware', {
+      onBeforeLoad(win) {
+        const fetch = win.fetch.bind(win);
+        win.fetch = (input, init) => {
+          const url = new URL(
+            input instanceof win.Request ? input.url : String(input),
+            win.location.href,
+          );
+          if (
+            url.pathname === '/zh/overview' &&
+            (url.searchParams.has('_rsc') || new win.Headers(init?.headers).get('rsc') === '1')
+          ) {
+            zhOverviewRscFetches += 1;
+          }
+          return fetch(input, init);
+        };
+      },
+    });
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?ref=b300&compare=hardware')
       .click();
 
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?ref=b300&compare=hardware');
-    cy.then(() => expect(zhOverviewRscRequests).to.equal(1));
+    cy.then(() => expect(zhOverviewRscFetches).to.equal(1));
   });
 
   it('switches between B200 and 30-day comparison without losing page state', () => {
@@ -657,13 +674,20 @@ describe('Overview page', () => {
   it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
     cy.viewport(1280, 900);
 
-    for (const [href, attribute, key, sentence] of [
-      ['/overview?tier=50', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+    for (const [href, attribute, key, sentence, hideChip] of [
+      [
+        '/overview?tier=50',
+        'data-overview-row-scope',
+        'rows=changed',
+        'no 30-day change',
+        'Hide unchanged',
+      ],
       [
         '/overview?tier=50&compare=hardware',
         'data-overview-hardware-row-scope',
         'hwrows=priced',
         'no result on any platform',
+        'Hide blanks',
       ],
     ] as const) {
       cy.visit(href);
@@ -685,7 +709,11 @@ describe('Overview page', () => {
           cy.get(`a[${attribute}]`)
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
-            .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+            .and(
+              'have.attr',
+              'aria-label',
+              `Show all rows ${hidden}. Show ${hidden} rows with ${sentence}`,
+            );
           cy.window().then((win) => {
             win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
             win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
@@ -693,7 +721,7 @@ describe('Overview page', () => {
           cy.get(`a[${attribute}]`).should(
             'have.attr',
             'aria-label',
-            `Show ${hidden + 1} rows with ${sentence}`,
+            `Show all rows ${hidden + 1}. Show ${hidden + 1} rows with ${sentence}`,
           );
           cy.get('[data-testid="overview-desktop-model"]').should(
             'have.length',
@@ -704,13 +732,17 @@ describe('Overview page', () => {
             win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
           });
           cy.get(`a[${attribute}]`)
-            .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
+            .should(
+              'have.attr',
+              'aria-label',
+              `Show all rows ${hidden}. Show ${hidden} rows with ${sentence}`,
+            )
             .click();
           cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
           cy.get(`a[${attribute}]`).should(
             'have.attr',
             'aria-label',
-            `Hide ${hidden} rows with ${sentence}`,
+            `${hideChip} ${hidden}. Hide ${hidden} rows with ${sentence}`,
           );
         });
     }

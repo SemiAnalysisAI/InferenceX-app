@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'e380aaf9adbdbc76df05c1a3cbdf091bc2f175697c9ba1fab25df65c47f3bc06',
+    sourceSha256: '5480da2448014598971d33579d30d3ec21b9a0fb02098da2e2a7c6a6951b9169',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '00dcc51a38e1cfa8d3326724f8368e279b45d00016d4aa6bc9ac088e4f513c65',
+    sourceSha256: 'b2c8119694ae3e98b349b22016ffa0b02149f90e4b6280ec8329080934bd6993',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -877,6 +877,17 @@ export const apiRouteCatalog = [
     sourceSha256: '5b585e7dabfa6000f5613bcdbdd55b62f164eddeefd4744f898b54d448f168cb',
   },
   {
+    source: 'src/app/api/v1/github-stars/route.ts',
+    path: '/api/v1/github-stars',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Backend for the header and footer star buttons: a CDN-cached copy of the InferenceX repository star count, read with the server token so browsers do not hit the unauthenticated GitHub API rate limit. Not benchmark data.',
+      zh: '页头和页脚 Star 按钮的后端：通过 CDN 缓存 InferenceX 仓库的 star 数，使用服务端 token 读取，避免浏览器触发 GitHub API 未认证请求的速率限制。不属于基准测试数据。',
+    },
+    sourceSha256: '39fd1fdf574d4bcf2c59f6a21663d0dcd5625bbc022ae8ac3134509b21d23ca6',
+  },
+  {
     source: 'src/app/api/v1/invalidate/route.ts',
     path: '/api/v1/invalidate',
     method: 'POST',
@@ -1394,7 +1405,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: 'cbacce994faad1de48a48d4d1cb4c452f0467e5dfa7d3fd57fef25e94a751274',
+    sourceSha256: '5b4d7391d005d9da3ff5bfbf629e909ac1df09b4de2cee88d3a5656777298aa0',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -1507,7 +1518,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: 'a360d5044e821e0a8e630fda7d0e0721920727a2c89224e6dc5bdef38ebbbac6',
+    sourceSha256: '56f74b5fd6d1bd4dc301834eb8dcd70c76f9973ea10d4d45977018f1da4d928c',
     reviewArea: {
       en: 'Per-point system power breakdown: measured GPU and Grace parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
       zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
@@ -1523,7 +1534,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '22322bba9d59237a3f97af0e30ab30bdb23dd2b1793362e32103db698fae6cbe',
+    sourceSha256: '057dd9471a1ecac565f58c9583e4661973d1e6bc8af4a75ac73ce3958d0c89da',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1817,7 +1828,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '91b05094830ebe261810c935159c145c4ac95c1f8f3b9431242a167de1ebc187',
+    sourceSha256: 'd9835333057fa42c3b89ce3b789d98ea9eeb3dd5ec2c439e8dcab3db12961d66',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1889,7 +1900,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '2ebcea69a14260ef63b76617fb2fd1d3c6a24c9f6c0c56d7bd68376370982c00',
+    sourceSha256: '6435027256cd93a5a22f2d579b3e184c234b9014a0d3fe23c47e049e8e815b0e',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -2071,7 +2082,7 @@ export const apiContractSourceDigests = [
     // Disaggregated rows now read the stored per-deployed-GPU tput_per_gpu without
     // a second decode ÷ total rescale. costPerMtok values change; parameters,
     // response shape and the documented cost formula are unchanged.
-    sourceSha256: 'd9e952b4fe64b4d797f1a23d28951091bf82b0460370dc1a4531b60cb8c61dd0',
+    sourceSha256: '15d10533b96590ffc21208fbf7b4d7806757afff5bd467dd5d05598dd93fbdc7',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -2172,7 +2183,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '0d53ab244496628373742f1575e415d58974905dc0254a33afa284ba59da4e26',
+    sourceSha256: '4274534dcd9da63f88f8b41e49206c759161b7f92f691f2018b090c7d3bfafe6',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',
@@ -2253,7 +2264,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: 'f86ced13ac76b5c8ee92d2dac0ba71103ff55fa2f7bd0f6be2799d3a2a5fb848',
+    sourceSha256: 'a3ac1f7c532956abb2d3beda136edf1adf9aa7b92a0d5e46a57dd75a5e2f9873',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',
