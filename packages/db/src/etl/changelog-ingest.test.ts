@@ -35,13 +35,10 @@ describe('append-only changelog metadata', () => {
 describe('ingestChangelogEntries', () => {
   it('updates existing metadata for the same workflow and git refs', async () => {
     const queries: string[] = [];
-    const sqlMock = Object.assign(
-      mock((strings: TemplateStringsArray) => {
-        queries.push(strings.join('?'));
-        return Promise.resolve([{ id: 123 }]);
-      }),
-      { array: mock((values: string[]) => values) },
-    );
+    const sqlMock = mock((strings: TemplateStringsArray) => {
+      queries.push(strings.join('?'));
+      return Promise.resolve([{ id: 123 }]);
+    });
 
     const written = await ingestChangelogEntries(
       sqlMock as unknown as Parameters<typeof ingestChangelogEntries>[0],

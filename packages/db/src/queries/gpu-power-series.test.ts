@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { storedPowerSeries } from '../power-series/stored-power-series';
 import { getGpuMetricsForRun } from './gpu-metrics';
 import {
@@ -20,10 +20,11 @@ const C = 'gpu_metrics_gptoss_8k1k_fp4_vllm_conc32_b200';
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 20_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

@@ -1,4 +1,3 @@
-import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
@@ -6,6 +5,7 @@ import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import { ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { checkA11y } from '../support/axe';
 import { mountWithProviders } from '../support/test-utils';
 
 function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
@@ -302,8 +302,7 @@ describe('Axis option help', () => {
   it('exposes separate accessible selection and help actions', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-testid="option-help-y_tokensPerDollarH"]').click();
-    cy.injectAxe();
-    cy.checkA11y(
+    checkA11y(
       '[data-slot="select-content"], [data-testid="option-help-content-y_tokensPerDollarH"]',
       {
         runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },

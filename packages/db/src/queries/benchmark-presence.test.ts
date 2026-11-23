@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import {
   getBenchmarkPresence,
   mergeBenchmarkPresence,
@@ -60,7 +60,7 @@ async function expectMaintained(step: string) {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
     VALUES (1, 29181694248, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -75,6 +75,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

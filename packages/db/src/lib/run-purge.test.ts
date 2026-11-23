@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 
 import type { Sql } from '../etl/db-utils';
 import { deleteStaleAvailability, purgeBenchmarkResults, purgeRuns } from './run-purge';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 import {
   type Row,
   type Snapshot,
@@ -18,10 +18,11 @@ let before: Snapshot;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

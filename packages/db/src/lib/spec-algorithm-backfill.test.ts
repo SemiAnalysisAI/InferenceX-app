@@ -2,7 +2,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { backfillSpecAlgorithm, loadSpecAlgorithmCandidates } from './spec-algorithm-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -35,14 +35,14 @@ async function point(
   await sql`
     insert into benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics,
       server_log_id, offload_mode)
-    values (${id}, 1, ${config!.id}, 'agentic_traces', '2026-08-16', ${id}, ${JSON.stringify(metrics)}::jsonb,
+    values (${id}, 1, ${config!.id}, 'agentic_traces', '2026-08-16', ${id}, ${metrics}::jsonb,
       ${id}, 'on')
   `;
 }
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await sql`
     insert into workflow_runs (id, github_run_id, run_attempt, name, head_sha, head_branch, created_at, date)
     values (1, 31893747354, 2, 'run', 'sha', 'main', '2026-08-16T00:00:00Z', '2026-08-16')
@@ -55,7 +55,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.close();
+  await sql?.end();
+  await db?.close();
 });
 
 describe('spec algorithm backfill', () => {

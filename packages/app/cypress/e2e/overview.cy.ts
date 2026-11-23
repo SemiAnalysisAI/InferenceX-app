@@ -384,25 +384,42 @@ describe('Overview page', () => {
   });
 
   it('sends one RSC request when a slow language switch preserves overview state', () => {
-    let zhOverviewRscRequests = 0;
+    let zhOverviewRscFetches = 0;
 
     cy.intercept('GET', '/zh/overview*', (request) => {
       if (request.query._rsc === undefined && request.headers.rsc !== '1') return;
-
-      zhOverviewRscRequests += 1;
       request.continue((response) => {
         response.setDelay(600);
       });
     });
 
-    cy.visit('/overview?ref=b300&compare=hardware');
+    // Count the app's fetch calls. In Chrome, cy.intercept runs on the browser's network layer and
+    // can see one fetch twice when the browser sends it again, which the old proxy never saw.
+    cy.visit('/overview?ref=b300&compare=hardware', {
+      onBeforeLoad(win) {
+        const fetch = win.fetch.bind(win);
+        win.fetch = (input, init) => {
+          const url = new URL(
+            input instanceof win.Request ? input.url : String(input),
+            win.location.href,
+          );
+          if (
+            url.pathname === '/zh/overview' &&
+            (url.searchParams.has('_rsc') || new win.Headers(init?.headers).get('rsc') === '1')
+          ) {
+            zhOverviewRscFetches += 1;
+          }
+          return fetch(input, init);
+        };
+      },
+    });
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?ref=b300&compare=hardware')
       .click();
 
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?ref=b300&compare=hardware');
-    cy.then(() => expect(zhOverviewRscRequests).to.equal(1));
+    cy.then(() => expect(zhOverviewRscFetches).to.equal(1));
   });
 
   it('switches between B200 and 30-day comparison without losing page state', () => {

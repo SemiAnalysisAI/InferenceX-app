@@ -512,6 +512,32 @@
       ]
     },
     {
+      "spec": "cypress/component/check-a11y.cy.tsx",
+      "duration": 208,
+      "tests": [
+        {
+          "title": ["checkA11y", "fails with the violation count and logs each violation"],
+          "duration": 85,
+          "attempts": 1
+        },
+        {
+          "title": ["checkA11y", "lets a violation callback report instead"],
+          "duration": 35,
+          "attempts": 1
+        },
+        {
+          "title": ["checkA11y", "audits only the rules runOnly selects"],
+          "duration": 30,
+          "attempts": 1
+        },
+        {
+          "title": ["checkA11y", "passes accessible content"],
+          "duration": 52,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/component-css.cy.tsx",
       "duration": 2997,
       "tests": [

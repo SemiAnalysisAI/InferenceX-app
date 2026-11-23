@@ -8,7 +8,7 @@ import path from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { migratedPglite, pgliteSql } from './lib/test-pglite';
+import { migratedPglite, pgliteDriverSql } from './lib/test-pglite';
 
 const RUN_ID = 99999999001;
 const RUN_ATTEMPT = 2;
@@ -16,6 +16,7 @@ const TRACE_SUFFIX = 'dsr1_fp8_vllm_tp8_h200';
 
 let db: PGlite;
 let dir: string;
+let endDriver: (() => Promise<void>) | undefined;
 let receipt: unknown;
 let report: Record<string, any>;
 let exitCode: typeof process.exitCode;
@@ -110,7 +111,9 @@ beforeAll(async () => {
     ],
   });
 
-  const sql = pgliteSql(db);
+  const sql = await pgliteDriverSql(db);
+  // The script ends its client when done. Keep the real end, which also stops the socket server.
+  endDriver = sql.end;
   const { promise: ended, resolve: end } = Promise.withResolvers<void>();
   mock.module('./etl/db-utils', () => ({
     createAdminSql: () => Object.assign(sql, { end: () => Promise.resolve(end()) }),
@@ -163,6 +166,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  await endDriver?.();
   await db?.close();
   if (dir) fs.rmSync(dir, { recursive: true, force: true });
 });

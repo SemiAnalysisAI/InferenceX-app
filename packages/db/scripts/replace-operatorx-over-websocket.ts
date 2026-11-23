@@ -37,7 +37,6 @@ const begin = async <T>(work: (tx: Sql) => Promise<T>): Promise<T> => {
   }
 };
 const sql = Object.assign(queryTag, {
-  array: (values: unknown[]) => values,
   begin,
 }) as unknown as Sql & DbClient;
 

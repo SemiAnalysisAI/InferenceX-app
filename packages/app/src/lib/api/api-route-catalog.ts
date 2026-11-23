@@ -877,6 +877,17 @@ export const apiRouteCatalog = [
     sourceSha256: '5b585e7dabfa6000f5613bcdbdd55b62f164eddeefd4744f898b54d448f168cb',
   },
   {
+    source: 'src/app/api/v1/github-stars/route.ts',
+    path: '/api/v1/github-stars',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Backend for the header and footer star buttons: a CDN-cached copy of the InferenceX repository star count, read with the server token so browsers do not hit the unauthenticated GitHub API rate limit. Not benchmark data.',
+      zh: '页头和页脚 Star 按钮的后端：通过 CDN 缓存 InferenceX 仓库的 star 数，使用服务端 token 读取，避免浏览器触发 GitHub API 未认证请求的速率限制。不属于基准测试数据。',
+    },
+    sourceSha256: '39fd1fdf574d4bcf2c59f6a21663d0dcd5625bbc022ae8ac3134509b21d23ca6',
+  },
+  {
     source: 'src/app/api/v1/invalidate/route.ts',
     path: '/api/v1/invalidate',
     method: 'POST',
@@ -1394,7 +1405,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: 'cbacce994faad1de48a48d4d1cb4c452f0467e5dfa7d3fd57fef25e94a751274',
+    sourceSha256: '5b4d7391d005d9da3ff5bfbf629e909ac1df09b4de2cee88d3a5656777298aa0',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -2172,7 +2183,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '0d53ab244496628373742f1575e415d58974905dc0254a33afa284ba59da4e26',
+    sourceSha256: '4274534dcd9da63f88f8b41e49206c759161b7f92f691f2018b090c7d3bfafe6',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',
@@ -2253,7 +2264,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: 'f86ced13ac76b5c8ee92d2dac0ba71103ff55fa2f7bd0f6be2799d3a2a5fb848',
+    sourceSha256: 'a3ac1f7c532956abb2d3beda136edf1adf9aa7b92a0d5e46a57dd75a5e2f9873',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

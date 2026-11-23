@@ -854,6 +854,18 @@ current summary, or with one over 32 MiB, are derived from `chart_series` as
 before. A change to the overlay or the payload's series fields bumps
 `SUMMARY_FORMAT`.
 
+`chart_series` must be a jsonb object. Through postgres.js (v3 and v4), JSON text
+bound straight to a jsonb parameter is encoded again and stored as a jsonb
+string, so writers either pass the object (`sql.json`, `jsonbParam`) or cast the
+text first (`${json}::text::jsonb`). Neon's HTTP driver sends the text as-is, so
+the bug only shows on the postgres.js path. Rows written that way before the fix
+(the route's self-heal under postgres.js, and `db:backfill-chart-series` from
+#1649 until #1763) read as stale. The metadata read still serves their summary
+when it is current. Otherwise it recomputes from the blob, as the source read
+always does for them, and the self-heal rewrites the row as an object.
+`db:backfill-chart-series` also selects them, since their `version` reads as
+null.
+
 ### Schema Version Detection
 
 `mapBenchmarkRow()`, `mapEvalRow()`, and `mapAggEvalRow()` all use
