@@ -13,6 +13,7 @@ import { enAlternates } from '@/lib/i18n/i18n';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import {
+  getAllRankingPageEntries,
   getRankingPageEntry,
   rankingPageDescription,
   rankingPageHeading,
@@ -27,8 +28,10 @@ import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
 
+// Built with the deployment so the first visitor after a deploy gets a cached page instead of
+// waiting for the benchmark read. Revalidation still refreshes them daily.
 export function generateStaticParams(): { slug: string }[] {
-  return [];
+  return getAllRankingPageEntries().map((entry) => ({ slug: entry.slug }));
 }
 
 interface Props {

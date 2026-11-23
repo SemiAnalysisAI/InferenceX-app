@@ -196,7 +196,7 @@ export default function HistoricalTrendsDisplay() {
   // A vendor narrows every chip view to that company's chips; null shows all vendors.
   const [frontierVendorFilter, setFrontierVendorFilter] = useState<string | null>(null);
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
-  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis, sequenceResolved } = useGlobalFilterSelection();
   const modelDetails = useModelHistoryDetails();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
@@ -290,7 +290,10 @@ export default function HistoricalTrendsDisplay() {
     targetInteractivity,
     availableDates,
     tokenRevenuePricing,
-    enabled: hasInteractivityChart,
+    // The availability index resolves the sequence, so the trend request starts alongside the
+    // benchmark rows instead of waiting for them. The chart still renders only with an
+    // interactivity chart.
+    enabled: sequenceResolved,
     tcoBasis,
     chipBasis,
   });

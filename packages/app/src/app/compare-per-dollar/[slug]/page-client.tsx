@@ -1,6 +1,7 @@
 'use client';
 
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
+import { getImageProps } from 'next/image';
 import { useEffect, useMemo } from 'react';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
@@ -90,6 +91,11 @@ interface ComparePerDollarPageClientProps {
   locale?: 'en' | 'zh';
 }
 
+const HERO_IMAGE_WIDTH = 1200;
+const HERO_IMAGE_HEIGHT = 675;
+// The figure is `max-w-sm` (24rem) and full width below that.
+const HERO_IMAGE_SIZES = '(min-width: 24rem) 24rem, 100vw';
+
 export default function ComparePerDollarPageClient({
   a,
   b,
@@ -136,6 +142,13 @@ export default function ComparePerDollarPageClient({
     [defaultSequence, initialBenchmarkRows],
   );
   const t = STRINGS[locale];
+  const heroSrcSet = getImageProps({
+    src: heroImageSrc,
+    alt: '',
+    width: HERO_IMAGE_WIDTH,
+    height: HERO_IMAGE_HEIGHT,
+    sizes: HERO_IMAGE_SIZES,
+  }).props.srcSet;
   const isZh = locale === 'zh';
 
   return (
@@ -284,16 +297,19 @@ export default function ComparePerDollarPageClient({
           >
             <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
               {/* Often the page's LCP image, so it loads eagerly. The PNG URL stays the src
-                  so search engines index the image itself. */}
+                  so search engines index the image itself, while browsers pick a webp sized
+                  for the 24rem figure from srcSet instead of the 1200px PNG. */}
               <img
                 src={heroImageSrc}
+                srcSet={heroSrcSet}
+                sizes={HERO_IMAGE_SIZES}
                 alt={
                   isZh
                     ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
                     : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
                 }
-                width={1200}
-                height={675}
+                width={HERO_IMAGE_WIDTH}
+                height={HERO_IMAGE_HEIGHT}
                 decoding="async"
                 className="w-full rounded-lg"
               />

@@ -88,6 +88,14 @@ describe('next.config custom routes', () => {
       '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?lang=zh',
       '/zh/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?lang=zh',
     ],
+    [
+      '/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?lang=zh',
+      '/zh/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?lang=zh',
+    ],
+    [
+      '/compare-spec-decode/glm-5-1-h200-fp8-mtp-vs-none/spec-decode-comparison.png?lang=zh',
+      '/zh/compare-spec-decode/glm-5-1-h200-fp8-mtp-vs-none/spec-decode-comparison.png?lang=zh',
+    ],
   ])('permanently redirects %s to %s in one hop', async (from, to) => {
     const response = await respond(from);
     expect(response.status).toBe(308);

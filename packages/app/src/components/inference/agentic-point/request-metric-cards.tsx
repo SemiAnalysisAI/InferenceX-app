@@ -13,7 +13,7 @@ import { ExpandableChart } from './expandable-chart';
 import { TimeSeriesChart } from './time-series-chart';
 import {
   averageSequenceLengthInFlight,
-  rollingRequestMetric,
+  cachedRollingRequestMetric,
   timeRollingAverage,
   type RequestMetric,
   type RequestPercentile,
@@ -100,7 +100,9 @@ export function RequestMetricOverTime({
   const selectedMetric = latencySelector ? latencyMetric : metric;
   const result = useMemo(
     () =>
-      timeline ? rollingRequestMetric(timeline.requests, selectedMetric, percentile, 50) : null,
+      timeline
+        ? cachedRollingRequestMetric(timeline.requests, selectedMetric, percentile, 50)
+        : null,
     [timeline, selectedMetric, percentile],
   );
   const metricLabel =

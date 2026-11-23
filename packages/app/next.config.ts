@@ -29,11 +29,18 @@ const INFERENCE_PATH = getDashboardRoute('inference').path;
 const SEO_REDIRECTS = [
   { source: '/datasets', destination: '/infx/agentx' },
   { source: '/zh/datasets', destination: '/zh/infx/agentx' },
-  {
-    source: '/compare-per-dollar/:slug/performance-per-dollar.png',
+  // Hero PNGs used to pick the language from `?lang=zh`; the /zh routes replace that.
+  ...(
+    [
+      ['compare-per-dollar', 'performance-per-dollar.png'],
+      ['compare-precision', 'precision-comparison.png'],
+      ['compare-spec-decode', 'spec-decode-comparison.png'],
+    ] as const
+  ).map(([family, file]) => ({
+    source: `/${family}/:slug/${file}`,
     has: [{ type: 'query' as const, key: 'lang', value: 'zh' }],
-    destination: '/zh/compare-per-dollar/:slug/performance-per-dollar.png',
-  },
+    destination: `/zh/${family}/:slug/${file}`,
+  })),
   ...LOCALE_PREFIXES.flatMap((prefix) => [
     { source: `${prefix}/xvideo`, destination: `${prefix}/vgx` },
     { source: `${prefix}/xxvideo`, destination: `${prefix}/vgx` },

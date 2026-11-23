@@ -3,13 +3,14 @@
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
-import { useRequestChartData } from '@/hooks/api/use-request-chart-data';
+import { type RequestChartData, useRequestChartData } from '@/hooks/api/use-request-chart-data';
 import { useRequestTimeline } from '@/hooks/api/use-request-timeline';
 import {
+  type MetricSourceDescriptor,
   useTraceServerMetrics,
   useTraceServerMetricSource,
 } from '@/hooks/api/use-trace-server-metrics';
@@ -31,6 +32,7 @@ import {
   sliceRequestChartDataByPhase,
   sliceServerSeriesByPhase,
   timelineHasWarmup,
+  type PhaseSlicedSeries,
   type ServerSeriesLike,
   type StagePhase,
 } from './phase-slice';
@@ -196,6 +198,10 @@ export function AgenticPointDetail({ id }: Props) {
   }, [inferenceBaseHref]);
   const featureGateUnlocked = useFeatureGate();
   const [view, setView] = useDetailView();
+  // `view` comes from the URL through useSyncExternalStore, which always renders synchronously,
+  // so the toggle follows `view` while the view body renders from the deferred copy. Opening
+  // Per-point mounts a dozen charts, and the press would otherwise wait for all of them.
+  const renderedView = useDeferredValue(view);
   const viewOptions = useMemo(
     () => agenticDetailViewOptions(t, { featureGateUnlocked, currentView: view }),
     [t, featureGateUnlocked, view],
@@ -320,7 +326,7 @@ export function AgenticPointDetail({ id }: Props) {
         </div>
       ) : null}
 
-      {view !== 'logs' && metricsQuery.isError && (
+      {renderedView !== 'logs' && metricsQuery.isError && (
         <RetryableQueryError
           message={withId(t.traceFailure)}
           analyticsEvent="inference_agentic_trace_retry_clicked"
@@ -328,7 +334,7 @@ export function AgenticPointDetail({ id }: Props) {
           testId="agentic-trace-query-error"
         />
       )}
-      {view !== 'logs' &&
+      {renderedView !== 'logs' &&
         metricsQuery.data === null &&
         !metricsQuery.isLoading &&
         !metricsQuery.isError && <EmptyState>{withId(t.missingTrace)}</EmptyState>}
@@ -343,20 +349,20 @@ export function AgenticPointDetail({ id }: Props) {
           className="max-w-full overflow-x-auto"
           buttonClassName="px-3 py-1.5 text-sm"
         />
-        {view === 'aggregates' && (
+        {renderedView === 'aggregates' && (
           <span className="text-xs text-muted-foreground">
             {siblingIds.length} {t.configsInSku}
             {aggregatesQuery.isLoading ? ` · ${t.loadingAggregates}` : ''}
           </span>
         )}
-        {view === 'timeline' && timelineQuery.data && (
+        {renderedView === 'timeline' && timelineQuery.data && (
           <span className="text-xs text-muted-foreground">
             {timelineQuery.data.requests.length} {t.requests}
           </span>
         )}
       </div>
 
-      {view === 'point' &&
+      {renderedView === 'point' &&
         (showMetricSourceToolbar({ sourceCount: metricSources.length, hasWarmup }) ? (
           <MetricSourceToolbar
             hasWarmup={hasWarmup}
@@ -371,12 +377,12 @@ export function AgenticPointDetail({ id }: Props) {
           <div aria-hidden="true" className="h-[50px]" />
         ))}
 
-      <div className={view === 'point' ? 'contents' : 'min-h-svh'}>
-        {view === 'logs' ? (
+      <div className={renderedView === 'point' ? 'contents' : 'min-h-svh'}>
+        {renderedView === 'logs' ? (
           <ServerLogViewer id={id} enabled />
-        ) : view === 'power' ? (
+        ) : renderedView === 'power' ? (
           <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
-        ) : view === 'aggregates' ? (
+        ) : renderedView === 'aggregates' ? (
           aggregatesQuery.isError ? (
             <RetryableQueryError
               message={t.aggregatesError}
@@ -391,7 +397,7 @@ export function AgenticPointDetail({ id }: Props) {
               isLoading={aggregatesQuery.isLoading}
             />
           )
-        ) : view === 'timeline' ? (
+        ) : renderedView === 'timeline' ? (
           timelineQuery.isLoading ? (
             <EmptyState>{t.loadingTimeline}</EmptyState>
           ) : timelineQuery.isError ? (
@@ -439,70 +445,106 @@ export function AgenticPointDetail({ id }: Props) {
                 testId="agentic-metric-source-query-error"
               />
             )}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
-              {!requestChartQuery.isError && (
-                <>
-                  <SequenceMetricCard
-                    metric="isl"
-                    timeline={phaseRequestData}
-                    timelineLoading={requestChartQuery.isLoading}
-                  />
-                  <SequenceMetricCard
-                    metric="osl"
-                    timeline={phaseRequestData}
-                    timelineLoading={requestChartQuery.isLoading}
-                  />
-
-                  <RequestMetricOverTime
-                    title={t.interactivityOverTime}
-                    metric="interactivity"
-                    timeline={phaseRequestData}
-                    isLoading={requestChartQuery.isLoading}
-                  />
-
-                  <RequestMetricOverTime
-                    title={t.ttftOverTime}
-                    metric="ttft"
-                    timeline={phaseRequestData}
-                    isLoading={requestChartQuery.isLoading}
-                    latencySelector
-                  />
-                </>
-              )}
-
-              <KvCacheUtilizationCard sliced={sliced} />
-
-              <RequestActivityCard
-                sliced={sliced}
-                phaseTimeline={phaseRequestData}
-                timelineLoading={requestChartQuery.isLoading}
-                timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
-                view={requestActivityView}
-                onViewChange={setRequestActivityView}
-              />
-
-              <PrefixCacheHitRateCard sliced={sliced} />
-
-              <ThroughputCard
-                sliced={sliced}
-                selectedSource={selectedMetricSource}
-                selected={throughputSeries}
-                onSelectedChange={setThroughputSeries}
-              />
-
-              <PromptTokenSourceCard sliced={sliced} />
-
-              {!requestChartQuery.isError && (
-                <InflightUniqueTokensCard
-                  phaseTimeline={phaseRequestData}
-                  timelineLoading={requestChartQuery.isLoading}
-                  kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
-                />
-              )}
-            </div>
+            <PointCharts
+              strings={t}
+              timeline={phaseRequestData}
+              timelineLoading={requestChartQuery.isLoading}
+              timelineFailed={requestChartQuery.isError}
+              sliced={sliced}
+              requestActivityView={requestActivityView}
+              onRequestActivityViewChange={setRequestActivityView}
+              selectedMetricSource={selectedMetricSource}
+              throughputSeries={throughputSeries}
+              onThroughputSeriesChange={setThroughputSeries}
+              kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+            />
           </>
         )}
       </div>
     </div>
   );
 }
+
+// Memoized so the urgent render of a view switch, which still shows the previous view while the
+// deferred one renders, skips re-rendering a dozen charts whose inputs did not change.
+const PointCharts = memo(
+  ({
+    strings: t,
+    timeline,
+    timelineLoading,
+    timelineFailed,
+    sliced,
+    requestActivityView,
+    onRequestActivityViewChange,
+    selectedMetricSource,
+    throughputSeries,
+    onThroughputSeriesChange,
+    kvCachePoolTokens,
+  }: {
+    strings: (typeof AGENTIC_POINT_DETAIL_STRINGS)[keyof typeof AGENTIC_POINT_DETAIL_STRINGS];
+    timeline: RequestChartData | null;
+    timelineLoading: boolean;
+    timelineFailed: boolean;
+    sliced: PhaseSlicedSeries<ServerSeriesLike> | null;
+    requestActivityView: RequestActivityView;
+    onRequestActivityViewChange: (view: RequestActivityView) => void;
+    selectedMetricSource: MetricSourceDescriptor | undefined;
+    throughputSeries: ReadonlySet<ThroughputSeriesKey>;
+    onThroughputSeriesChange: (next: ReadonlySet<ThroughputSeriesKey>) => void;
+    kvCachePoolTokens: number | null;
+  }) => (
+    <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
+      {!timelineFailed && (
+        <>
+          <SequenceMetricCard metric="isl" timeline={timeline} timelineLoading={timelineLoading} />
+          <SequenceMetricCard metric="osl" timeline={timeline} timelineLoading={timelineLoading} />
+
+          <RequestMetricOverTime
+            title={t.interactivityOverTime}
+            metric="interactivity"
+            timeline={timeline}
+            isLoading={timelineLoading}
+          />
+
+          <RequestMetricOverTime
+            title={t.ttftOverTime}
+            metric="ttft"
+            timeline={timeline}
+            isLoading={timelineLoading}
+            latencySelector
+          />
+        </>
+      )}
+
+      <KvCacheUtilizationCard sliced={sliced} />
+
+      <RequestActivityCard
+        sliced={sliced}
+        phaseTimeline={timeline}
+        timelineLoading={timelineLoading}
+        timelineError={timelineFailed ? t.requestChartsError : undefined}
+        view={requestActivityView}
+        onViewChange={onRequestActivityViewChange}
+      />
+
+      <PrefixCacheHitRateCard sliced={sliced} />
+
+      <ThroughputCard
+        sliced={sliced}
+        selectedSource={selectedMetricSource}
+        selected={throughputSeries}
+        onSelectedChange={onThroughputSeriesChange}
+      />
+
+      <PromptTokenSourceCard sliced={sliced} />
+
+      {!timelineFailed && (
+        <InflightUniqueTokensCard
+          phaseTimeline={timeline}
+          timelineLoading={timelineLoading}
+          kvCachePoolTokens={kvCachePoolTokens}
+        />
+      )}
+    </div>
+  ),
+);
