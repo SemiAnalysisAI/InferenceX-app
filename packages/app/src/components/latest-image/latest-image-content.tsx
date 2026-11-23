@@ -53,7 +53,7 @@ const STRINGS = {
       'Docker image tags for each actively benchmarked model, scenario, and chip configuration. Retired models and scenarios are not listed.',
     benchmarkGroup: 'Configuration',
     runtimeGroup: 'Hardware & runtime',
-    imageVersions: 'Images & versions',
+    imageVersions: 'Images & Versions',
     configuration: 'Configuration',
     resultsCount: (count: number) => `${count} configuration${count === 1 ? '' : 's'}`,
     sortHint: 'Oldest submission first',

@@ -114,7 +114,7 @@ async function CompareCatalog() {
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
           <Heading level="section" className="text-2xl">
-            AgentX and 8K/1K results
+            AgentX and 8K/1K Results
           </Heading>
           <p className="mt-3 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}

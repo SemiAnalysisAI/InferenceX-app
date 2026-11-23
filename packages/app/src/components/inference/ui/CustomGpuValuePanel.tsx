@@ -31,7 +31,7 @@ type GpuValuePanelKind = 'powers';
 const STRINGS = {
   en: {
     reset: 'Reset',
-    resetToDefaults: 'Reset to defaults',
+    resetToDefaults: 'Reset to Defaults',
     calculate: 'Calculate',
     invalidNumber: 'Must be a valid number',
     nonNegative: 'Must be a non-negative number',

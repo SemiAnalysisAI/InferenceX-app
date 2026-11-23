@@ -125,7 +125,7 @@ const STRINGS = {
     engineHelp:
       'Best shows the lossless engine with the largest Pareto frontier area on each GPU. Lossy optimizations are never ranked.',
     engineComparison: {
-      title: 'Show two engines on the same GPU?',
+      title: 'Show Two Engines on the Same GPU?',
       description:
         'By continuing to display two serving engines on the same GPU, I agree not to use this comparison to start engine drama on Twitter, XHS or other forums.',
       cancel: 'Cancel',
@@ -145,7 +145,7 @@ const STRINGS = {
       'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. A fixture replay reads retained evidence and is not a new measurement.',
     replay: 'Local replay · unpublished',
     vs: 'vs.',
-    howToRead: 'How to read these results',
+    howToRead: 'How to Read These Results',
     howToReadItems: [
       'One cohort is 20 scheduled clips at concurrency 1 (C1) per hardware. A hardware appears only with at least 10 valid clips of the same workload.',
       'Latency runs from request submit to downloaded media.',

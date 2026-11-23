@@ -40,7 +40,7 @@ import {
 export const CACHE_REUSE_STRINGS = {
   en: {
     xTitle: 'Concurrency',
-    yTitle: 'Share of prompt tokens',
+    yTitle: 'Share of Prompt Tokens',
     hbm: 'HBM cache',
     host: 'Host cache',
     combined: 'HBM + host cache (reported together)',

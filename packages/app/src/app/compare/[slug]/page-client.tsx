@@ -24,7 +24,7 @@ import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
-    eyebrowSuffix: 'Chip comparison',
+    eyebrowSuffix: 'Chip Comparison',
     mainChartLinkText: 'the main inference chart',
     perDollarLinkText: 'View performance per dollar →',
     caveatSeqFallback: 'sequence',

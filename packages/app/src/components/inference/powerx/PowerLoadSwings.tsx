@@ -21,7 +21,7 @@ import { PowerBasisPill } from './PowerBasisPill';
 
 const STRINGS = {
   en: {
-    title: 'Load swings',
+    title: 'Load Swings',
     rack: `× ${NVL72_GPUS_PER_RACK} per NVL72 rack`,
     rackHelp: `Multiplies the per-GPU trace by ${NVL72_GPUS_PER_RACK} and shows kW per rack. Assumes all ${NVL72_GPUS_PER_RACK} GPUs swing together, so it is an upper bound on rack-level swings.`,
     trace: 'Trace',

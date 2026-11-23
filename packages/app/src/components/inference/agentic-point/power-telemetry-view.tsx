@@ -56,7 +56,7 @@ const STRINGS = {
     window: 'Recorded window',
     sharedNote:
       'This series covers the whole benchmark job, including server start-up and warm-up, so summary rows below span more than the measured serving window.',
-    perGpuStats: 'Per-chip statistics',
+    perGpuStats: 'Per-Chip Statistics',
     chip: 'Chip',
     secondsUnit: 's',
     allInLine: 'All-in provisioned line',
