@@ -373,8 +373,9 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
       // Re-pinned after data_query_failed stopped reporting failed background refetches that keep
-      // their data. Analytics reporting does not feed recorded entries, so they are unchanged.
-      sources: 'bafd1b65da3904d30107985b7c90f8edd4fca7c6eb1cceeb0a8709f1396502f7',
+      // their data, and dashboard-routes gained the default Inference model slug. Neither analytics
+      // reporting nor route constants feed recorded entries, so they are unchanged.
+      sources: '6cfa497132aee188679814ae3b81a902cc80e9ba1b9f81d815da547821adcd86',
     });
   });
 });

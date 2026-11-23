@@ -68,6 +68,9 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
                 'input.peer.sr-only',
                 'input.peer.sr-only ~ label',
               ],
+              // Steppers and pagination (Next page, Previous available date, ‹ ›) are clicked
+              // repeatedly on purpose; the built-in keyword list drops them from rageclicks.
+              content_ignorelist: true,
             },
             capture_performance: {
               network_timing: true,

@@ -1,11 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 import type { Model } from '@/lib/catalog/data-mappings';
-import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
-import {
-  DEFAULT_INFERENCE_MODEL_SLUG,
-  DEFAULT_INFERENCE_REDIRECT_MISSING,
-} from '@/lib/routing/inference-model-redirects';
+import { DEFAULT_INFERENCE_MODEL_SLUG, getDashboardRoute } from '@/lib/routing/dashboard-routes';
+import { DEFAULT_INFERENCE_REDIRECT_MISSING } from '@/lib/routing/inference-model-redirects';
 import { inferenceModelForPathname, inferenceModelPath } from '@/lib/routing/inference-model-slug';
 import { modelRouteRedirectUrl } from '@/lib/routing/model-route-redirect';
 import {
