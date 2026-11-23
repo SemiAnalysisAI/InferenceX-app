@@ -44,6 +44,31 @@ function Page() {
   );
 }
 
+const requested: string[] = [];
+let commitMetric: (metric: string) => void = () => {};
+
+/** Commits picks only when the test says so, the way separate transitions land one by one. */
+function QueuedPage() {
+  const [metric, setMetric] = React.useState('y_measuredJPerTotalToken');
+  commitMetric = setMetric;
+  return (
+    <>
+      <MeasuredMetricControls metric={metric} onChange={(next) => requested.push(next)} />
+      <p data-testid="metric">{metric}</p>
+    </>
+  );
+}
+
+async function pickBasis(container: HTMLElement, basis: string) {
+  act(() => container.querySelector<HTMLButtonElement>('#measured-energy-basis')!.click());
+  await settle();
+  act(() =>
+    document.body
+      .querySelector<HTMLElement>(`[data-select-option][data-value="${basis}"]`)!
+      .click(),
+  );
+}
+
 describe('MeasuredMetricControls', () => {
   it('keeps a basis pick when another control changes before that pick renders', async () => {
     const container = document.createElement('div');
@@ -66,6 +91,35 @@ describe('MeasuredMetricControls', () => {
     });
     expect(container.querySelector('[data-testid="metric"]')?.textContent).toBe(
       'y_itModeledJPerOutputToken',
+    );
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('keeps every pick when an earlier one commits while later ones are in flight', async () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    act(() => root.render(<QueuedPage />));
+    await pickBasis(container, 'it-modeled');
+    const denominator = [...container.querySelectorAll('select')].find((select) =>
+      select.querySelector('option[value="query"]'),
+    )!;
+    act(() => {
+      denominator.value = 'output';
+      denominator.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    act(() => commitMetric(requested[0]));
+    await pickBasis(container, 'utility-modeled');
+    act(() => commitMetric(requested[1]));
+    act(() => commitMetric(requested[2]));
+    expect(requested).toEqual([
+      'y_itModeledJPerTotalToken',
+      'y_itModeledJPerOutputToken',
+      'y_utilityModeledJPerOutputToken',
+    ]);
+    expect(container.querySelector('[data-testid="metric"]')?.textContent).toBe(
+      'y_utilityModeledJPerOutputToken',
     );
     act(() => root.unmount());
     container.remove();

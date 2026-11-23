@@ -128,10 +128,20 @@ export function MeasuredMetricControls({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  // Picks commit in transitions, so one can land before the last renders. Each builds on the last.
-  const latest = useRef({ committed: metric, requested: metric });
-  if (latest.current.committed !== metric)
-    latest.current = { committed: metric, requested: metric };
+  // Picks commit in transitions, one at a time, so each builds on the last one requested. Only a
+  // metric outside the picks still in flight is an outside change that starts over.
+  const latest = useRef({ committed: metric, pending: [] as string[], requested: metric });
+  if (latest.current.committed !== metric) {
+    const caughtUp = latest.current.pending.indexOf(metric);
+    latest.current =
+      caughtUp === -1
+        ? { committed: metric, pending: [], requested: metric }
+        : {
+            ...latest.current,
+            committed: metric,
+            pending: latest.current.pending.slice(caughtUp + 1),
+          };
+  }
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
   const show = (field: MeasuredMetricField) => fields === undefined || fields.includes(field);
@@ -143,6 +153,7 @@ export function MeasuredMetricControls({
   };
   const change = (next: MeasuredMetricConfigChange) => {
     latest.current.requested = changeMeasuredMetricConfig(latest.current.requested, next);
+    latest.current.pending.push(latest.current.requested);
     onChange(latest.current.requested);
   };
   const basisId = `measured-${config.family}-basis`;
