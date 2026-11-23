@@ -418,8 +418,6 @@ export function InferenceProvider({
 
   const [selectedGpuState, setSelectedGpuState] = useState<string[]>([]);
   const [gpuUrlHydrated, setGpuUrlHydrated] = useState(false);
-  // GPUs remembered from an earlier page resolve silently; only a shared URL explains its drop.
-  const [gpuRequestExplicit] = useState(() => hasExplicitUrlParam('i_gpus'));
   useEffect(() => {
     const urlGpus = getUrlParam('i_gpus');
     if (urlGpus) setSelectedGpuState(urlGpus.split(',').filter(Boolean));
@@ -456,8 +454,10 @@ export function InferenceProvider({
     const resolutionKey = `${selectedGpuResolution.selection.join(',')}|${selectedGpuResolution.dropped.join(',')}|${selectedGpuResolution.partial.join(',')}`;
     if (resolutionKey === notifiedGpuResolutionRef.current) return;
     notifiedGpuResolutionRef.current = resolutionKey;
+    // Effects run on the client, so this reads the live URL, never the empty server snapshot.
+    // GPUs remembered from an earlier page resolve silently; only a shared URL explains its drop.
     if (
-      gpuRequestExplicit &&
+      hasExplicitUrlParam('i_gpus') &&
       (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0)
     ) {
       setEngineConflict({
@@ -467,7 +467,7 @@ export function InferenceProvider({
         partial: selectedGpuResolution.partial,
       });
     }
-  }, [selectedGpuResolution, gpuRequestExplicit]);
+  }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
@@ -663,10 +663,9 @@ export function InferenceProvider({
   const presetHwFilterRef = useRef<string[] | null>(null);
 
   // A page's own hardware outranks a value remembered from an earlier page, not a shared URL.
-  const [activeHwRequestExplicit] = useState(() => hasExplicitUrlParam('i_active'));
   const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
     const v =
-      activeHwRequestExplicit || !initialActiveHwTypes?.length
+      hasExplicitUrlParam('i_active') || !initialActiveHwTypes?.length
         ? getUrlParam('i_active')
         : undefined;
     if (v) {
@@ -1384,7 +1383,7 @@ export function InferenceProvider({
       const resolved = resolveHwSelection(restored, new Set());
       restored = resolved.result;
       const conflict =
-        activeHwRequestExplicit && matchedRequest
+        matchedRequest && hasExplicitUrlParam('i_active')
           ? requestedHwConflict(pendingActiveHwTypes, proposed, resolved.result, exclusion)
           : null;
       if (conflict) setEngineConflict({ kind: 'resolved', ...conflict });
@@ -1396,7 +1395,6 @@ export function InferenceProvider({
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
-    activeHwRequestExplicit,
     selectableHwTypes,
     chartDataLoading,
     exclusion,

@@ -21,13 +21,24 @@ const parsePositive = (raw: string) => {
 
 function Field({ onCommit }: { onCommit: (next: number, source: DraftNumberCommit) => void }) {
   const [value, setValue] = useState(60);
-  const input = useDraftNumberInput(value, parsePositive, (next, source) => {
+  const target = useDraftNumberInput(value, parsePositive, (next, source) => {
     setValue(next);
     onCommit(next, source);
   });
   return (
     <>
-      <input type="number" data-testid="field" {...input} />
+      <input
+        type="range"
+        min={0}
+        max={200}
+        data-testid="slider"
+        value={target.sliderValue}
+        onChange={(event) => {
+          target.discardDraft();
+          setValue(Number(event.target.value));
+        }}
+      />
+      <input type="number" data-testid="field" {...target.input} />
       <output data-testid="committed">{value}</output>
     </>
   );
@@ -39,6 +50,7 @@ function setup() {
   return {
     onCommit,
     field: get<HTMLInputElement>('[data-testid="field"]'),
+    slider: get<HTMLInputElement>('[data-testid="slider"]'),
     committed: () => get('[data-testid="committed"]').textContent,
   };
 }
@@ -93,5 +105,22 @@ describe('useDraftNumberInput', () => {
     blur(field);
     expect(onCommit).toHaveBeenLastCalledWith(28, 'blur');
     expect(committed()).toBe('28');
+  });
+
+  it('moves the slider thumb to a valid typed draft', () => {
+    const { field, slider, committed } = setup();
+    type(field, '{selectall}90');
+    expect(slider.value).toBe('90');
+    expect(committed()).toBe('60');
+  });
+
+  it('keeps a slider move made before the input blurs instead of the typed draft', () => {
+    const { field, slider, committed } = setup();
+    type(field, '{selectall}90');
+    inputWithoutType(slider, '30');
+    blur(field);
+    expect(committed()).toBe('30');
+    expect(field.value).toBe('30');
+    expect(slider.value).toBe('30');
   });
 });
