@@ -79,12 +79,18 @@ export function interpAt(data: TimeSeriesPoint[], t: number): number | null {
   return a.value + (b.value - a.value) * frac;
 }
 
+export interface RollingRequestMetric {
+  raw: TimeSeriesPoint[];
+  trend: TimeSeriesPoint[];
+  cumulative: TimeSeriesPoint[];
+}
+
 export function rollingRequestMetric(
   requests: readonly RequestChartRecord[],
   metric: RequestMetric,
   percentile: RequestPercentile,
   windowSize = 50,
-): { raw: TimeSeriesPoint[]; trend: TimeSeriesPoint[]; cumulative: TimeSeriesPoint[] } {
+): RollingRequestMetric {
   const q = percentile === 'p75' ? 0.75 : 0.9;
   const samples = requests
     .filter((request) => !request.cancelled)
@@ -104,13 +110,43 @@ export function rollingRequestMetric(
     t,
     value: metric === 'interactivity' ? 1000 / latencyMs : latencyMs / 1000,
   }));
-  const trend = samples.map(({ t }, i) => {
-    const start = Math.max(0, i - Math.max(1, windowSize) + 1);
-    const sorted = samples
-      .slice(start, i + 1)
-      .map((sample) => sample.latencyMs)
-      .toSorted((a, b) => a - b);
-    const latencyMs = quantile(sorted, q);
+  // A sorted copy of the trailing window, kept sorted by binary-search insert and remove, so
+  // each step costs one O(window) shift instead of a slice, map and sort. A point with 55k
+  // requests used to spend ~250 ms per card here.
+  const windowLength = Math.max(1, windowSize);
+  const sortedWindow = new Float64Array(Math.min(windowLength, samples.length));
+  let windowCount = 0;
+  const trend = samples.map(({ t, latencyMs: incoming }, i) => {
+    if (i >= windowLength) {
+      const outgoing = samples[i - windowLength]!.latencyMs;
+      let lo = 0;
+      let hi = windowCount;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (sortedWindow[mid]! < outgoing) lo = mid + 1;
+        else hi = mid;
+      }
+      sortedWindow.copyWithin(lo, lo + 1, windowCount);
+      windowCount -= 1;
+    }
+    let lo = 0;
+    let hi = windowCount;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sortedWindow[mid]! <= incoming) lo = mid + 1;
+      else hi = mid;
+    }
+    sortedWindow.copyWithin(lo + 1, lo, windowCount);
+    sortedWindow[lo] = incoming;
+    windowCount += 1;
+    // Same interpolation as `quantile`, read from the typed window.
+    const position = (windowCount - 1) * q;
+    const low = Math.floor(position);
+    const high = Math.ceil(position);
+    const latencyMs =
+      low === high
+        ? sortedWindow[low]!
+        : sortedWindow[low]! + (sortedWindow[high]! - sortedWindow[low]!) * (position - low);
     return { t, value: metric === 'interactivity' ? 1000 / latencyMs : latencyMs / 1000 };
   });
 
@@ -154,6 +190,36 @@ export function rollingRequestMetric(
   });
 
   return { raw, trend, cumulative };
+}
+
+const rollingRequestMetricCache = new WeakMap<
+  readonly RequestChartRecord[],
+  Map<string, RollingRequestMetric>
+>();
+
+/**
+ * `rollingRequestMetric` memoized per requests array, outside React state, so switching back to
+ * the Per-point view or between percentiles reuses series computed for the same phase slice.
+ * Callers must treat the result as read-only.
+ */
+export function cachedRollingRequestMetric(
+  requests: readonly RequestChartRecord[],
+  metric: RequestMetric,
+  percentile: RequestPercentile,
+  windowSize = 50,
+): RollingRequestMetric {
+  let byKey = rollingRequestMetricCache.get(requests);
+  if (!byKey) {
+    byKey = new Map();
+    rollingRequestMetricCache.set(requests, byKey);
+  }
+  const key = `${metric}:${percentile}:${windowSize}`;
+  let result = byKey.get(key);
+  if (!result) {
+    result = rollingRequestMetric(requests, metric, percentile, windowSize);
+    byKey.set(key, result);
+  }
+  return result;
 }
 
 export function timeRollingAverage(data: TimeSeriesPoint[], windowS: number): TimeSeriesPoint[] {

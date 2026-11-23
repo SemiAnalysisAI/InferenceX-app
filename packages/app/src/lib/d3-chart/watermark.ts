@@ -1,5 +1,6 @@
 import type * as d3 from 'd3';
 
+import { LOGO_WATERMARK_HREF } from './logo-watermark';
 import type { ChartMargin } from './types';
 import { CHART_TYPE, px } from './typography';
 
@@ -55,7 +56,7 @@ export function createLogoWatermark(
     .attr('width', containerWidth)
     .attr('height', containerHeight)
     .append('image')
-    .attr('href', '/brand/logo-color.webp')
+    .attr('href', LOGO_WATERMARK_HREF)
     .attr('width', logoSize)
     .attr('height', logoSize)
     .attr('x', margin.left + (innerWidth - logoSize) / 2)

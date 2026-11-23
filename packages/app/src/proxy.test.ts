@@ -378,6 +378,8 @@ describe('proxy matcher', () => {
     '/infx/inference?g_model=GLM-5x3-Flash',
     '/infx/inference?g_model=not-a-model',
     '/compare-per-dollar/deepseek-r1-b200-vs-mi355x/performance-per-dollar.png?lang=zh',
+    '/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?lang=zh',
+    '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp-vs-none/spec-decode-comparison.png',
     '/compare/deepseek-r1-b200-vs-mi355x/opengraph-image',
     '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp/opengraph-image?v=2',
     '/infx/calculator',

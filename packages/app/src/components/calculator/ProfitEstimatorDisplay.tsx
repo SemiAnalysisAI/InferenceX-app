@@ -16,7 +16,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import { profitTargetUrlValue } from '@/components/calculator/url-seed';
+import { profitTargetUrlValue, type ProfitUrlSeed } from '@/components/calculator/url-seed';
 import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
@@ -510,7 +510,11 @@ export default function ProfitEstimatorDisplay({
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
         >
-          <ProfitEstimatorInner initialTarget={urlSeed.profitTarget} basis={basis} />
+          <ProfitEstimatorInner
+            initialTarget={urlSeed.profitTarget}
+            profitSeed={urlSeed.profit}
+            basis={basis}
+          />
         </GlobalFilterProvider>
       )}
     </CalculatorUrlSeedBoundary>
@@ -544,15 +548,17 @@ function usePercentField(defaultValue: number, eventName: string) {
 
 function ProfitEstimatorInner({
   initialTarget,
+  profitSeed,
   basis,
 }: {
   initialTarget?: number;
+  profitSeed?: ProfitUrlSeed;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
-  const { setUrlParam, getUrlParam } = useUrlState();
+  const { setUrlParam } = useUrlState();
   const router = useRouter();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
@@ -569,7 +575,7 @@ function ProfitEstimatorInner({
   const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availableModels, availability } = useGlobalFilterAvailability();
+  const { availableModels, availability, availabilitySettled } = useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(
     () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
@@ -605,17 +611,13 @@ function ProfitEstimatorInner({
   }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
-  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
+  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>(
+    profitSeed?.powerBasis ?? 'provisioned',
+  );
   const powerBasis = powerControlsEnabled ? requestedPowerBasis : 'provisioned';
-  useEffect(() => {
-    const value = getUrlParam('c_power');
-    setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
-  }, [getUrlParam]);
-  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
-  useEffect(() => {
-    const value = getUrlParam('c_chmode');
-    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
-  }, [getUrlParam]);
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(
+    profitSeed?.cacheHitMode ?? DEFAULT_CACHE_HIT_MODE,
+  );
   const isMobile = useIsMobileViewport();
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -665,26 +667,19 @@ function ProfitEstimatorInner({
     includePower,
   );
 
-  const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
-  const [selectedDateRange, setSelectedDateRange] = useState({
-    startDate: '',
-    endDate: '',
-  });
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [historyHydrated, setHistoryHydrated] = useState(false);
+  // Seeded from the route so a shared link renders its history controls on the server.
+  const [selectedGPUs, setSelectedGPUs] = useState<string[]>(
+    () => profitSeed?.historyGpus.slice(0, PROFIT_HISTORY_MAX_GPUS) ?? [],
+  );
+  const [selectedDateRange, setSelectedDateRange] = useState(
+    () => profitSeed?.historyDateRange ?? { startDate: '', endDate: '' },
+  );
+  const [selectedDates, setSelectedDates] = useState<string[]>(
+    () => profitSeed?.historyDates ?? [],
+  );
   useEffect(() => {
-    const gpus = getUrlParam('i_gpus');
-    if (gpus) setSelectedGPUs(gpus.split(',').filter(Boolean).slice(0, PROFIT_HISTORY_MAX_GPUS));
-    const startDate = getUrlParam('i_dstart') || '';
-    const endDate = getUrlParam('i_dend') || '';
-    if (startDate && endDate) setSelectedDateRange({ startDate, endDate });
-    const dates = getUrlParam('i_dates');
-    if (dates) setSelectedDates(dates.split(',').filter(Boolean));
-    setHistoryHydrated(true);
-  }, [getUrlParam]);
-  useEffect(() => {
-    if (historyHydrated) setUrlParam('i_dates', selectedDates.join(','));
-  }, [historyHydrated, selectedDates, setUrlParam]);
+    setUrlParam('i_dates', selectedDates.join(','));
+  }, [selectedDates, setUrlParam]);
 
   const dbModelKeys = useMemo<string[]>(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -713,7 +708,7 @@ function ProfitEstimatorInner({
     [availability, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
   useEffect(() => {
-    if (!historyHydrated || !availability || selectedGPUs.length === 0) return;
+    if (!availability || selectedGPUs.length === 0) return;
     const { startDate, endDate } = selectedDateRange;
     if (!startDate || !endDate) return;
     const available = new Set(historyAvailableDates);
@@ -722,14 +717,7 @@ function ProfitEstimatorInner({
     setSelectedDates([]);
     setUrlParam('i_dstart', '');
     setUrlParam('i_dend', '');
-  }, [
-    historyHydrated,
-    availability,
-    selectedGPUs.length,
-    selectedDateRange,
-    historyAvailableDates,
-    setUrlParam,
-  ]);
+  }, [availability, selectedGPUs.length, selectedDateRange, historyAvailableDates, setUrlParam]);
 
   const handleHistoryGpuChange = useCallback(
     (next: string[]) => {
@@ -1898,7 +1886,9 @@ function ProfitEstimatorInner({
                   selectedPrecisions={selectedPrecisions}
                   modelDbKeys={dbModelKeys}
                   selectedSequence={selectedSequence}
-                  loading={historyChangelogs.loading}
+                  // Reserve the loading height until availability says which dates to query, so
+                  // the list doesn't grow under the chart after hydration.
+                  loading={historyChangelogs.loading || !availabilitySettled}
                   totalDatesQueried={historyChangelogs.totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}

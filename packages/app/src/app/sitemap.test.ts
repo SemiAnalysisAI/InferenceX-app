@@ -33,6 +33,9 @@ const mocks = {
     ],
     zh: [{ slug: 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results', date: '2026-10-19' }],
   },
+  compareSlugs: [] as { modelSlug: string; a: string; b: string }[],
+  precisionSlugs: [] as { modelSlug: string; gpu: string; precA: string; precB: string }[],
+  specDecodeSlugs: [] as { modelSlug: string; gpu: string; precision: string; method: string }[],
 };
 
 // bun:test snapshots a mock factory's getters, so fixture mode flips by mocking the module again,
@@ -57,12 +60,12 @@ mock.module('@/lib/hardware/hardware', () => ({
   getAllHardwarePages: (locale: 'en' | 'zh' = 'en') => mocks.hardwarePages[locale],
 }));
 mock.module('@/lib/compare/compare-availability', () => ({
-  getAllComparableCompareSlugs: () => Promise.resolve([]),
+  getAllComparableCompareSlugs: () => Promise.resolve(mocks.compareSlugs),
   getCachedAvailability: () => Promise.resolve(mocks.availability),
 }));
 mock.module('@/lib/compare/compare-variant-availability', () => ({
-  getAllComparablePrecisionSlugs: () => Promise.resolve([]),
-  getAllComparableSpecDecodeSlugs: () => Promise.resolve([]),
+  getAllComparablePrecisionSlugs: () => Promise.resolve(mocks.precisionSlugs),
+  getAllComparableSpecDecodeSlugs: () => Promise.resolve(mocks.specDecodeSlugs),
 }));
 mock.module('@/lib/content/glossary', () => ({ getAllGlossaryEntries: () => [] }));
 mock.module('@/lib/live-seo/run-rankings-data.server', () => ({
@@ -228,6 +231,41 @@ describe('sitemap locale parity', () => {
       const visible = !isFeatureGatedModelPath(`/rankings/${entry.slug}`);
       expect(urls.has(`${SITE_URL}/rankings/${entry.slug}`)).toBe(visible);
       expect(urls.has(`${SITE_URL}${zhPath(`/rankings/${entry.slug}`)}`)).toBe(visible);
+    }
+  });
+
+  it("points each compare page's image at the hero PNG route of its own locale", async () => {
+    mocks.compareSlugs.push({ modelSlug: 'deepseek-r1', a: 'b200', b: 'h100' });
+    mocks.precisionSlugs.push({
+      modelSlug: 'deepseek-r1',
+      gpu: 'b200',
+      precA: 'fp4',
+      precB: 'fp8',
+    });
+    mocks.specDecodeSlugs.push({
+      modelSlug: 'deepseek-r1',
+      gpu: 'b200',
+      precision: 'fp8',
+      method: 'mtp',
+    });
+    try {
+      const entries = await sitemap();
+      const pages = entries.filter(
+        (entry) =>
+          /\/compare-(?:per-dollar|precision|spec-decode)\//u.test(entry.url) && entry.images,
+      );
+      expect(pages).toHaveLength(6);
+      for (const page of pages) {
+        expect(page.images).toHaveLength(1);
+        expect(page.images![0]).toMatch(new RegExp(`^${page.url}/[a-z-]+\\.png$`, 'u'));
+      }
+      expect(pages.map((page) => page.images![0])).toContain(
+        `${SITE_URL}/zh/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png`,
+      );
+    } finally {
+      mocks.compareSlugs.length = 0;
+      mocks.precisionSlugs.length = 0;
+      mocks.specDecodeSlugs.length = 0;
     }
   });
 

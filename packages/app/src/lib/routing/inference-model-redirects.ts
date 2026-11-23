@@ -9,9 +9,6 @@ interface InferenceModelAliasRedirect {
 
 const { path, legacyPath } = getDashboardRoute('inference');
 
-/** The featured model bare inference URLs redirect to. It can change, so the redirect is temporary. */
-export const DEFAULT_INFERENCE_MODEL_SLUG = 'kimi-k31-pro';
-
 /**
  * The bare-URL redirect skips queries that name a model or open a measured-power view. Next
  * matches each `value` against the whole query value.
