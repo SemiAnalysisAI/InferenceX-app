@@ -152,7 +152,12 @@ describe('AgentX quickstart', () => {
         expect(lookup).to.include('python -m infx.golden_al_distribution lookup qwen3.5 mtp 3');
         expect(lookup).to.include('synthetic_acceptance_length');
         expect(lookup).to.include('SGLANG_SIMULATE_ACC_LEN');
-        expect(lookup).to.include('TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS=2.39');
+        expect(lookup).to.include(
+          'TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS=<placeholder_value - 1>',
+        );
+        expect(lookup).to.include(
+          '# Golden AL curves: https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
+        );
         cy.get('#golden-al button').click();
         cy.get('@writeText').should('have.been.calledWithExactly', lookup);
       });

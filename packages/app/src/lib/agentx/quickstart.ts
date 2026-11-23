@@ -24,25 +24,26 @@ export AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=true`;
 export const AGENTX_GOLDEN_AL_URL =
   'https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution';
 
-export const AGENTX_GOLDEN_AL = `git clone --depth 1 https://github.com/SemiAnalysisAI/InferenceX
+export const AGENTX_GOLDEN_AL = `# Golden AL curves: ${AGENTX_GOLDEN_AL_URL}
+git clone --depth 1 https://github.com/SemiAnalysisAI/InferenceX
 cd InferenceX/inferencex-e2e
 
 # Every golden curve and its measured draft lengths
 python -m infx.golden_al_distribution list
 # Golden AL for <model prefix> <method> <num_speculative_tokens>
-python -m infx.golden_al_distribution lookup qwen3.5 mtp 3   # 3.39
+python -m infx.golden_al_distribution lookup qwen3.5 mtp 3   # <placeholder_value>
 
 # Force that AL in your engine:
 # vLLM, inside --speculative-config:
-#   "rejection_sample_method": "synthetic", "synthetic_acceptance_length": 3.39
+#   "rejection_sample_method": "synthetic", "synthetic_acceptance_length": <placeholder_value>
 # SGLang, server environment:
-#   SGLANG_SIMULATE_ACC_LEN=3.39
+#   SGLANG_SIMULATE_ACC_LEN=<placeholder_value>
 #   SGLANG_SIMULATE_ACC_METHOD=match-expected
 #   SGLANG_SIMULATE_ACC_TOKEN_MODE=real-draft-token
 # ATOM:
-#   --spec-decode-acceptance-length 3.39
+#   --spec-decode-acceptance-length <placeholder_value>
 # TensorRT-LLM counts draft tokens only, so use AL - 1:
-#   TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS=2.39`;
+#   TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS=<placeholder_value - 1>`;
 
 export const AGENTX_QUICKSTART = {
   en: {
