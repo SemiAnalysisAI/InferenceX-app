@@ -46,7 +46,8 @@ AL measured on the SPEED-Bench coding category, and every comparable submission
 uses the same curve. Look it up from an InferenceX checkout:
 
 ```bash
-# Golden AL curves: https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution
+# Golden AL curves:
+# https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution
 cd InferenceX/inferencex-e2e
 python -m infx.golden_al_distribution list
 python -m infx.golden_al_distribution lookup qwen3.5 mtp 3   # <placeholder_value>

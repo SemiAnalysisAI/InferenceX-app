@@ -156,7 +156,7 @@ describe('AgentX quickstart', () => {
           'TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS=<placeholder_value - 1>',
         );
         expect(lookup).to.include(
-          '# Golden AL curves: https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
+          '# Golden AL curves:\n# https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution',
         );
         cy.get('#golden-al button').click();
         cy.get('@writeText').should('have.been.calledWithExactly', lookup);

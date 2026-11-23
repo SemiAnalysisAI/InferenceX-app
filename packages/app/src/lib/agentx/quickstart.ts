@@ -24,7 +24,8 @@ export AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=true`;
 export const AGENTX_GOLDEN_AL_URL =
   'https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution';
 
-export const AGENTX_GOLDEN_AL = `# Golden AL curves: ${AGENTX_GOLDEN_AL_URL}
+export const AGENTX_GOLDEN_AL = `# Golden AL curves:
+# ${AGENTX_GOLDEN_AL_URL}
 git clone --depth 1 https://github.com/SemiAnalysisAI/InferenceX
 cd InferenceX/inferencex-e2e
 
