@@ -12,7 +12,12 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
-import { getRankingPageEntry, scenarioLabel, type RankingPageEntry } from '@/lib/live-seo/rankings';
+import {
+  getAllRankingPageEntries,
+  getRankingPageEntry,
+  scenarioLabel,
+  type RankingPageEntry,
+} from '@/lib/live-seo/rankings';
 import {
   rankingPageDescriptionZh,
   rankingPageHeadingZh,
@@ -25,8 +30,9 @@ import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
 
+// Built with the deployment, like the English page.
 export function generateStaticParams(): { slug: string }[] {
-  return [];
+  return getAllRankingPageEntries().map((entry) => ({ slug: entry.slug }));
 }
 
 interface Props {

@@ -379,7 +379,10 @@ async function downloadArtifactRows(archiveUrl: string, githubToken: string, run
       errorResponse:
         response.status === 410
           ? unavailableJson('ARTIFACTS_EXPIRED', runId, MISSING_RUN_CACHE_CONTROL)
-          : githubFailure(response, `Artifact download failed: ${response.statusText}`),
+          : githubFailure(
+              response,
+              `Artifact download failed with GitHub status ${response.status}`,
+            ),
     };
   }
 
@@ -455,9 +458,10 @@ async function processSingleRun(
   }
   if (!runResp.ok) {
     return {
+      // HTTP/2 responses carry no statusText, so name the status code.
       errorResponse: githubFailure(
         runResp,
-        `GitHub API error for runId ${runId}: ${runResp.statusText}`,
+        `GitHub API returned ${runResp.status} for workflow run ${runId}`,
       ),
     };
   }

@@ -139,7 +139,8 @@ function parseIntegerParam(
 export async function GET(request: NextRequest) {
   const id = Number(request.nextUrl.searchParams.get('id'));
 
-  if (!id || !Number.isFinite(id)) {
+  // `1e21` is finite but not a bigint Postgres accepts; reject it here instead of answering 500.
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
   }
 

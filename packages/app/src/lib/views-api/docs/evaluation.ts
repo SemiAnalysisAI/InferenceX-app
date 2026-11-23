@@ -1,5 +1,9 @@
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
-import { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from '@/lib/api/api-documentation-base';
+import {
+  API_BASE_URL,
+  MODEL_PARAM_FORMS,
+  SUPPORTED_BENCHMARK_MODELS,
+} from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -18,10 +22,7 @@ const parameters: readonly ApiParameter[] = [
     location: 'query',
     required: true,
     type: 'string',
-    description: text(
-      'Display model name (case-insensitive) or compare-page slug.',
-      '模型显示名称（不区分大小写）或对比页 slug。',
-    ),
+    description: text(MODEL_PARAM_FORMS.en, MODEL_PARAM_FORMS.zh),
     schema: { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
     example: 'DeepSeek-V4-Pro',
   },
