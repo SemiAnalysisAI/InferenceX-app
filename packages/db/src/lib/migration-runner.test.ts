@@ -5,7 +5,13 @@ import path from 'path';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { pendingMigrations, runMigrations } from './migration-runner';
+import {
+  EARLIER_MIGRATION_NAMES,
+  describePendingMigrations,
+  pendingMigrations,
+  runMigrations,
+  unknownRecordedMigrations,
+} from './migration-runner';
 import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
 
 interface Executed {
@@ -83,6 +89,14 @@ describe('runMigrations', () => {
     expect(ran).toBe(0);
     expect(executed.some((e) => e.text.startsWith('create table'))).toBe(false);
   });
+
+  it('skips a file recorded under its earlier name', async () => {
+    fs.writeFileSync(path.join(dir, '008_agentic.sql'), 'create table agentic ();');
+    const { sql, executed } = fakeSql(['007_agentic.sql']);
+
+    expect(await runMigrations(sql, dir)).toBe(0);
+    expect(executed.some((e) => e.text.startsWith('create table'))).toBe(false);
+  });
 });
 
 describe('pendingMigrations', () => {
@@ -136,5 +150,64 @@ describe('pendingMigrations', () => {
     expect(await pendingMigrations(sql, MIGRATIONS_DIR)).toEqual([files.at(-1)]);
     await record(files.at(-1)!);
     expect(await pendingMigrations(sql, MIGRATIONS_DIR)).toEqual([]);
+  });
+
+  it('counts a file recorded under its earlier, identical name as applied', async () => {
+    const files = fs
+      .readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .toSorted();
+    await record(...files.map((file) => EARLIER_MIGRATION_NAMES[file] ?? file));
+    expect(await pendingMigrations(sql, MIGRATIONS_DIR)).toEqual([]);
+  });
+});
+
+describe('EARLIER_MIGRATION_NAMES', () => {
+  it('maps current migration files to names no current file uses', () => {
+    const files = new Set(fs.readdirSync(path.join(import.meta.dirname, '..', '..', 'migrations')));
+    for (const [current, earlier] of Object.entries(EARLIER_MIGRATION_NAMES)) {
+      expect(files.has(current)).toBe(true);
+      expect(files.has(earlier)).toBe(false);
+    }
+  });
+});
+
+describe('unknownRecordedMigrations', () => {
+  it('lists recorded names that match no directory file or earlier name', () => {
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-runner-other-'));
+    try {
+      fs.writeFileSync(path.join(dir, '001_main.sql'), '');
+      fs.writeFileSync(path.join(other, '001_collectivex.sql'), '');
+      expect(
+        unknownRecordedMigrations(
+          ['001_main.sql', '001_collectivex.sql', '007_agentic.sql', 'z_gone.sql', 'a_gone.sql'],
+          [dir, other],
+        ),
+      ).toEqual(['a_gone.sql', 'z_gone.sql']);
+    } finally {
+      fs.rmSync(other, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('describePendingMigrations', () => {
+  it('lists the files and says to record present schema before migrating', () => {
+    const text = describePendingMigrations(['028_a.sql', '029_b.sql'], []);
+    expect(text).toStartWith(
+      '2 migration file(s) in packages/db/migrations are not recorded in schema_migrations.\n' +
+        '  028_a.sql\n  029_b.sql\n',
+    );
+    expect(text).toContain('Do not run bun run admin:db:migrate yet');
+    expect(text).toContain("insert into schema_migrations (filename) values ('<file>');");
+    expect(text).toEndWith(
+      'Once only missing files remain unrecorded, run bun run admin:db:migrate.',
+    );
+  });
+
+  it('names recorded files the repository does not hold', () => {
+    expect(describePendingMigrations(['029_b.sql'], ['016_old.sql'])).toEndWith(
+      'name of a listed file. Compare it with git history before recording the new name.\n' +
+        '  016_old.sql',
+    );
   });
 });

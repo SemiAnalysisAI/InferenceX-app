@@ -55,6 +55,15 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
 
+      # Abort before any write when the database has not recorded every migration.
+      # Verify database runs after the writes and only reports this condition.
+      - name: Check pending migrations
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: |
+          : "${DATABASE_WRITE_URL:?DATABASE_WRITE_URL secret is not set}"
+          bun run admin:db:check-migrations
+
       - name: Apply run overrides
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
