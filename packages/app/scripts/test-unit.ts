@@ -7,6 +7,8 @@ import { globSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { availableParallelism, tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { passFailed, stallWatchdogEnabled } from '../src/lib/testing/unit-test-runner';
+
 const root = path.join(import.meta.dirname, '..');
 const args = process.argv.slice(2);
 const filters = args.filter((arg) => !arg.startsWith('-'));
@@ -32,6 +34,7 @@ const coverage = flags.includes('--coverage');
 // worker until CI cancels the job. A pass in which no file starts or finishes for this long is
 // stopped instead. The slowest file takes about 6 s under load.
 const stallMs = 60_000;
+const watched = stallWatchdogEnabled(flags, process.env);
 
 /** Runs one bun test pass. `stalled` means the watchdog stopped it. */
 async function runPass(name: string, preloads: readonly string[], group: readonly string[]) {
@@ -59,7 +62,7 @@ async function runPass(name: string, preloads: readonly string[], group: readonl
   );
   let stalled = false;
   const watchdog = setInterval(() => {
-    if (Date.now() - statSync(heartbeat).mtimeMs < stallMs) return;
+    if (!watched || Date.now() - statSync(heartbeat).mtimeMs < stallMs) return;
     stalled = true;
     clearInterval(watchdog);
     console.error(
@@ -73,7 +76,7 @@ async function runPass(name: string, preloads: readonly string[], group: readonl
   const [code] = (await once(child, 'exit')) as [number | null];
   clearInterval(watchdog);
   rmSync(directory, { recursive: true, force: true });
-  return { passed: code === 0, stalled };
+  return { passed: !passFailed(code, stalled), stalled };
 }
 
 let failed = false;
