@@ -2044,7 +2044,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '42e8361265365e715285d59b8a3db2964531c247fd9dd47b355b05c2ff0de128',
+    // Reviewed for the document early fetch: `benchmarksUrl` and `DASHBOARD_AVAILABILITY_URL`
+    // build the same URLs as before, and `fetchJson` can read an early response for one. No
+    // parameter, response, or caching contract changed, so the docs stand.
+    sourceSha256: '70d2b4a3e83e253c674d70fe845ae8ed5261256d3ba14f0a9b42c697f01de1b2',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
