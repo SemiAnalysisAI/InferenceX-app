@@ -1641,8 +1641,11 @@ function ProfitEstimatorInner({
                       label={t.targetAgenticLabel(percentileLabel)}
                       min={ranges.interactivity.min}
                       max={ranges.interactivity.max}
-                      value={targetValue}
-                      onSliderChange={setTargetValue}
+                      value={targetInput.sliderValue}
+                      onSliderChange={(next) => {
+                        targetInput.discardDraft();
+                        setTargetValue(next);
+                      }}
                       onSliderCommit={() =>
                         track('profit_target_set', { mode, value: targetValue })
                       }
@@ -1653,7 +1656,7 @@ function ProfitEstimatorInner({
                         onWheel: blurOnWheel,
                         inputMode: 'decimal',
                         min: 1,
-                        ...targetInput,
+                        ...targetInput.input,
                       }}
                     />
                   </div>
