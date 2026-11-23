@@ -496,7 +496,8 @@ export interface InferenceActionsContextType {
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
   setShowParetoFrontier: (show: boolean) => void;
-  setSelectedGPUs: (gpus: string[]) => void;
+  /** False when the picks are not applied as given: consent is pending, blocked or rewritten. */
+  setSelectedGPUs: (gpus: string[]) => boolean;
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;

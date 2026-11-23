@@ -55,7 +55,7 @@ interface SearchableSelectProps {
   searchGroups?: SearchableSelectGroup[];
   value: string;
   /** Return `false` to reject the pick, e.g. a locked tier, so the trigger never shows it. */
-  onValueChange: (value: string) => void | false;
+  onValueChange: (value: string) => void | boolean;
   placeholder?: string;
   initialLabel?: string;
   className?: string;

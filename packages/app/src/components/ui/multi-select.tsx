@@ -63,7 +63,7 @@ interface MultiSelectProps {
   sections?: MultiSelectSection[];
   value?: string[];
   /** Return `false` to reject the pick, e.g. a locked tier, so the trigger never shows it. */
-  onChange?: (value: string[]) => void | false;
+  onChange?: (value: string[]) => void | boolean;
   triggerId?: string;
   triggerTestId?: string;
   ariaLabel?: string;
