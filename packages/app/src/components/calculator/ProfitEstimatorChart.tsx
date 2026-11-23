@@ -1244,9 +1244,17 @@ export default function ProfitEstimatorChart({
   );
 
   const dataIdentity = useMemo(() => rows.map((row) => row.resultKey).join('|'), [rows]);
+  // The axes redraw only when the data or metrics change. A label can change alone, as when a
+  // pinned run gets its "#2" from a changelog that loads after the bars, so it is part of this key.
   const metricIdentity = useMemo(
-    () => rows.map((row) => `${row.revenue}:${row.tco}:${row.labCut}:${row.profit}`).join('|'),
-    [rows],
+    () =>
+      rows
+        .map(
+          (row) =>
+            `${row.revenue}:${row.tco}:${row.labCut}:${row.profit}:${labelMap.get(row.resultKey)}`,
+        )
+        .join('|'),
+    [rows, labelMap],
   );
 
   if (rows.length === 0) {
