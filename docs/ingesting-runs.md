@@ -40,7 +40,7 @@ The host alone does not identify the database. The public database already holds
 
 Writing to the public database requires explicit publication approval for the run and its artifacts, including server logs and trace payloads. Do not ingest confidential or NDA-covered data into it. A successful ingest is not publication clearance.
 
-Check that the schema is current. `bun run admin:db:check-migrations` exits nonzero and names any file in `packages/db/migrations` that `schema_migrations` does not record. A listed file may already be applied under an earlier name, so do not run `bun run admin:db:migrate` on the whole list. For each file, check whether its schema is already in the database and, if so, record it with `insert into schema_migrations (filename) values ('<file>')`. Then run `bun run admin:db:migrate` from the repo root for the files that are truly missing, after confirming the target. [Append-Only Migrations](./data-pipeline.md#append-only-migrations) has the details.
+Check that the schema is current. `bun run admin:db:check-migrations` exits nonzero and names any file in `packages/db/migrations` that `schema_migrations` does not record. If a listed file's schema is already in the database, record it with `insert into schema_migrations (filename) values ('<file>')`. Otherwise review the files and run `bun run admin:db:migrate` from the repo root after confirming the target.
 
 ## Inspect the run
 

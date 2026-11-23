@@ -4,32 +4,19 @@ import path from 'path';
 
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
-import {
-  describePendingMigrations,
-  recordedMigrations,
-  unknownRecordedMigrations,
-  unrecordedMigrations,
-} from './lib/migration-runner';
+import { describePendingMigrations, pendingMigrations } from './lib/migration-runner';
 
-const [MIGRATIONS_DIR, ...OTHER_MIGRATION_DIRS] = [
-  'migrations',
-  'migrations-collectivex',
-  'migrations-operatorx',
-].map((dir) => path.join(import.meta.dirname, '..', dir));
+const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} });
 
 async function check(): Promise<void> {
-  const recorded = await recordedMigrations(sql);
-  const pending = unrecordedMigrations(recorded, MIGRATIONS_DIR);
+  const pending = await pendingMigrations(sql, MIGRATIONS_DIR);
   if (pending.length === 0) {
     console.log('Migrations: all applied');
     return;
   }
-  const message = describePendingMigrations(
-    pending,
-    unknownRecordedMigrations(recorded, [MIGRATIONS_DIR, ...OTHER_MIGRATION_DIRS]),
-  );
+  const message = describePendingMigrations(pending);
   console.error(message);
   if (process.env.GITHUB_ACTIONS === 'true') {
     const data = message.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
