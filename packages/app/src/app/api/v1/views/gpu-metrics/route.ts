@@ -2,6 +2,7 @@ import {
   readGpuMetricsForView as metrics,
   type GpuMetricsRouteResponse,
 } from '@/app/api/gpu-metrics/route';
+import { isGpuTelemetryErrorCode } from '@/app/api/gpu-metrics/github-telemetry';
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
 import { storedGpuStatsForMetric } from '@/components/gpu-power/stored-gpu-stats';
 import {
@@ -35,10 +36,10 @@ export function GET(request: NextRequest) {
       sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) }),
       s.get('artifact'),
     );
-    // The reader answers 404 only for a run without telemetry; say why instead of masking it.
-    if (source.status === 404) {
-      const { error, code } = (await source.json()) as { error: string; code: string };
-      throw new ViewsUpstreamError(404, error, code);
+    // Say why a live read has no data (missing run or telemetry, size cap, GitHub retry).
+    if (!source.ok) {
+      const { error, code } = (await source.json()) as { error?: string; code?: unknown };
+      if (isGpuTelemetryErrorCode(code)) throw new ViewsUpstreamError(source.status, error, code);
     }
     const data = await readResponse<GpuMetricsRouteResponse>(source);
     const artifactNames = data.artifactNames ?? data.artifacts.map((a) => a.name);

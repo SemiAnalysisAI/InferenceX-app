@@ -241,6 +241,27 @@ describe('GET /api/gpu-metrics — database first', () => {
   });
 });
 
+const run = { ok: true, json: () => Promise.resolve({ id: 12345, name: 'Run' }) };
+const listing = (...ids: number[]) => ({
+  ok: true,
+  json: () =>
+    Promise.resolve({
+      artifacts: ids.map((id) => ({
+        id,
+        name: `gpu_metrics_dsr1_${id}`,
+        archive_download_url: `https://example.com/dl/${id}`,
+      })),
+    }),
+});
+const failedDownload = (status: number) => ({ ok: false, status, statusText: String(status) });
+const read = async (...responses: unknown[]) => {
+  const fetch = vi.fn();
+  for (const response of responses) fetch.mockResolvedValueOnce(response);
+  globalThis.fetch = fetch;
+  const res = await GET(req('/api/gpu-metrics?runId=12345'));
+  return { status: res.status, body: await res.json() };
+};
+
 describe('GET /api/gpu-metrics', () => {
   it('returns 400 when runId is missing', async () => {
     const res = await GET(req('/api/gpu-metrics'));
@@ -507,6 +528,46 @@ describe('GET /api/gpu-metrics', () => {
     const body = await res.json();
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
+  });
+
+  describe('when no artifact yields telemetry', () => {
+    it('asks for a retry when GitHub cannot list the artifacts', async () => {
+      const { status, body } = await read(run, { ok: false, status: 503 });
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('asks for a retry when a download fails for a reason other than expiry', async () => {
+      const { status, body } = await read(
+        run,
+        listing(1, 2),
+        failedDownload(410),
+        failedDownload(502),
+      );
+      expect(status).toBe(503);
+      expect(body.code).toBe('GITHUB_UNAVAILABLE');
+    });
+
+    it('reports no telemetry only when every archive expired or held no series', async () => {
+      zipArchives.byKey.set('empty', []);
+      const { status, body } = await read(run, listing(1, 2), failedDownload(410), {
+        ok: true,
+        headers: new Headers({ 'Content-Length': '1' }),
+        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('empty').buffer),
+      });
+      expect(status).toBe(404);
+      expect(body.code).toBe('NO_TELEMETRY');
+    });
+
+    it('names the size cap instead of reporting missing telemetry', async () => {
+      const { status, body } = await read(run, listing(1), {
+        ok: true,
+        headers: new Headers({ 'Content-Length': String(60 * 1024 * 1024) }),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+      expect(status).toBe(422);
+      expect(body.code).toBe('ARTIFACT_TOO_LARGE');
+    });
   });
 });
 
