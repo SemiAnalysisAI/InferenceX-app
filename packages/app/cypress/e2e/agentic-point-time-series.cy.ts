@@ -401,12 +401,12 @@ describe('Agentic point request metric time series', () => {
   it('switches ISL and OSL cards from distributions to in-flight averages', () => {
     cy.get('[data-testid="isl-metric-chart"]').within(() => {
       cy.get('[data-testid="isl-metric-inflight"]').click();
-      cy.contains('h2', 'Average ISL in flight').should('be.visible');
+      cy.contains('h2', 'Average ISL in Flight').should('be.visible');
       cy.get('svg').should('contain.text', 'Average ISL in flight (30s avg)');
     });
     cy.get('[data-testid="osl-metric-chart"]').within(() => {
       cy.get('[data-testid="osl-metric-inflight"]').click();
-      cy.contains('h2', 'Average OSL in flight').should('be.visible');
+      cy.contains('h2', 'Average OSL in Flight').should('be.visible');
       cy.contains('Retrospective: final observed OSL').should('be.visible');
       cy.get('svg').should('contain.text', 'Average OSL in flight (30s avg)');
     });
@@ -415,7 +415,7 @@ describe('Agentic point request metric time series', () => {
   it('switches the TTFT chart to E2E request latency over time', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();
-      cy.contains('h2', 'E2E latency over time').should('be.visible');
+      cy.contains('h2', 'E2E Latency over Time').should('be.visible');
       cy.get('[data-testid="e2e-point-count"]').should('have.text', '8 points');
       cy.get('svg circle').should('have.length', 8);
       cy.get('svg').should('contain.text', 'E2E latency (s)');
