@@ -39,6 +39,24 @@ export AIPERF_HTTP_X_DYNAMO_SESSION_ID_FROM_CORRELATION_ID=true
 export AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=true
 ```
 
+If the server uses speculative decoding (MTP, EAGLE3, DSpark, DFlash), force the
+committed [golden acceptance length](https://github.com/SemiAnalysisAI/InferenceX/tree/main/inferencex-e2e/infx/golden_al_distribution)
+for the model, method, thinking mode, and draft length. Each value is the mean
+AL measured on the SPEED-Bench coding category, and every comparable submission
+uses the same curve. Look it up from an InferenceX checkout:
+
+```bash
+cd InferenceX/inferencex-e2e
+python -m infx.golden_al_distribution list
+python -m infx.golden_al_distribution lookup qwen3.5 mtp 3   # 3.39
+```
+
+Pass the value as vLLM `synthetic_acceptance_length` (with
+`rejection_sample_method: synthetic`), SGLang `SGLANG_SIMULATE_ACC_LEN`, or ATOM
+`--spec-decode-acceptance-length`. TensorRT-LLM's
+`TLLM_SPEC_DECODE_FORCE_NUM_ACCEPTED_TOKENS` excludes the verification token, so
+set it to AL minus 1. A missing curve or draft length fails; do not guess a value.
+
 `X-Session-ID` alone does not send the parent ID. Inspect errors and
 `submission_valid` in the output artifacts, retain the server configuration,
 and follow the methodology before comparing hardware. This CLI runs against
