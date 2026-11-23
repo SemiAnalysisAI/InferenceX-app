@@ -131,7 +131,7 @@ jobs:
     name: Smoke-check production
     needs: warm
     if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production') }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
