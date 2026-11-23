@@ -1,3 +1,4 @@
+import { POINT_HIT_AREA_CLASS } from '@/lib/d3-chart/layers/canvas-point-registry';
 import { interceptDerivedAgenticMetrics, unlockAgenticGate, selectXAxisMode } from '../support/e2e';
 import {
   countVisible,
@@ -39,6 +40,12 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
       'have.length',
       OVERLAY_CONFIGS.length,
     );
+    // The canvas point layer paints a frame after the chart renders, setting the hit area and
+    // hiding the grid it draws. Snapshots and exports must start from that painted chart.
+    cy.get('[data-testid="d3-chart-svg"]')
+      .first()
+      .find(`.${POINT_HIT_AREA_CLASS}`)
+      .should('have.attr', 'd');
   });
 
   beforeEach(() => {
