@@ -1152,7 +1152,7 @@ describe('GET /api/unofficial-run', () => {
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
   });
 
-  it('keeps a no-artifact 404 short-lived because the listing may have failed', async () => {
+  it('reports a finished run whose listing succeeded empty as having no results', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 123, status: 'completed' }),
@@ -1163,7 +1163,41 @@ describe('GET /api/unofficial-run', () => {
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(404);
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=30');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
+    expect(await res.json()).toMatchObject({ code: 'NO_RESULTS' });
+  });
+
+  it.each([
+    ['an old run', '2026-06-22T16:44:01Z'],
+    ['a recent run', new Date().toISOString()],
+  ])('asks for a retry when the artifact list of %s cannot be read', async (_, createdAt) => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 123, status: 'completed', created_at: createdAt }),
+    });
+    mockFetch.mockResolvedValue({ ok: false, status: 502, statusText: 'Bad Gateway' });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.json()).toMatchObject({ code: 'GITHUB_UNAVAILABLE', runId: '123' });
+  });
+
+  it('reports an old run whose listing marks the results expired as expired', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({ id: 123, status: 'completed', created_at: '2026-06-22T16:44:01Z' }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: '', expired: true }],
+        }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ code: 'ARTIFACTS_EXPIRED' });
   });
 
   it('turns a GitHub rate limit into an uncached 503 with Retry-After', async () => {
