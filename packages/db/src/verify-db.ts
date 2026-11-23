@@ -1,7 +1,12 @@
+import path from 'path';
+
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
+import { pendingMigrations } from './lib/migration-runner';
+
+const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -26,6 +31,15 @@ function sub(title: string) {
 
 async function verify(): Promise<void> {
   console.log('=== db:verify ===');
+
+  const pending = await pendingMigrations(sql, MIGRATIONS_DIR);
+  if (pending.length > 0) {
+    throw new Error(
+      `${pending.length} migration(s) in packages/db/migrations are not applied to this database ` +
+        `(${pending.join(', ')}). Apply them with bun run admin:db:migrate.`,
+    );
+  }
+  console.log('  Migrations: all applied');
 
   section('Row Counts');
   const tables = [

@@ -412,6 +412,8 @@ All text keys (model, hardware, framework, precision) have `CHECK (field = lower
 
 Never rewrite an applied migration; add a new numbered file. `runMigrations` (`packages/db/src/lib/migration-runner.ts`) keys `schema_migrations` on the filename only, so an edited file is skipped on every database that already ran it.
 
+Migrations are applied by hand, so a database can fall behind the repository. `bun run admin:db:verify` first calls `pendingMigrations` from the same module, which lists every file in `packages/db/migrations` that `schema_migrations` does not record (all of them when the table is missing). If any are pending, it exits nonzero and names the files before printing anything else. CI runs it after every ingest and after applying run overrides, so the job fails until someone applies them with `bun run admin:db:migrate`. Filenames recorded in `schema_migrations` but absent from the repository, such as CollectiveX or OperatorX migrations, are ignored.
+
 ## ETL Design
 
 ### Config Cache
@@ -962,10 +964,10 @@ semantics change so cached point payloads are refreshed.
 
 #### Migration and targeted recovery
 
-No workflow or Vercel deploy applies main-database migrations; apply them by hand before deploying code
+No workflow or Vercel deploy applies main-database migrations. Apply them by hand before deploying code
 that needs them, or readers fail until the migration runs. From the
 repository root, with credentials for the reviewed target database, run
-`bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
+`bun run admin:db:verify` to list pending migrations, then `bun run admin:db:migrate --yes`. The app and ingest
 process must use the same database.
 
 For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
@@ -1073,7 +1075,10 @@ postgres.js client code. The workflow step "Check database writes" runs even aft
 an earlier step fails, annotates each entry on the run page, fails on errors, and
 adds a short summary to the Slack failure message. Known failures listed in
 `DB_WRITE_WARNING_RULES` (`etl/skip-tracker.ts`) are warnings instead: they are
-annotated but not counted or fatal.
+annotated but not counted or fatal. A trace replay whose profile or server metrics
+export cannot be read is still written, with the stats or chart series derived from
+that input left empty. Each such input adds a `trace_replay` warning naming the
+agentic config (and concurrency) and the parse error.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database

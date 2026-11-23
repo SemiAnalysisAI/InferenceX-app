@@ -40,7 +40,7 @@ The host alone does not identify the database. The public database already holds
 
 Writing to the public database requires explicit publication approval for the run and its artifacts, including server logs and trace payloads. Do not ingest confidential or NDA-covered data into it. A successful ingest is not publication clearance.
 
-Check that the schema is current. Compare `packages/db/migrations` with the applied entries in `schema_migrations`; if migrations are pending, review them and run `bun run admin:db:migrate` from the repo root after confirming the target.
+Check that the schema is current. `bun run admin:db:verify` exits nonzero and names any file in `packages/db/migrations` that `schema_migrations` does not record. If it lists pending migrations, review them and run `bun run admin:db:migrate` from the repo root after confirming the target.
 
 ## Inspect the run
 
