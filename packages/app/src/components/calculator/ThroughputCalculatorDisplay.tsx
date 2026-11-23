@@ -1159,14 +1159,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           }
                           min={currentRange.min}
                           max={currentRange.max}
-                          value={targetValue}
-                          onSliderChange={setRequestedTargetValue}
+                          value={targetInput.sliderValue}
+                          onSliderChange={(next) => {
+                            targetInput.discardDraft();
+                            setRequestedTargetValue(next);
+                          }}
                           onSliderCommit={() =>
                             track('calculator_target_slider_set', { mode, value: targetValue })
                           }
                           input={{
                             id: 'calc-target',
-                            ...targetInput,
+                            ...targetInput.input,
                           }}
                         />
                       </div>
