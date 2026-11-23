@@ -1,3 +1,4 @@
+import { interceptOpenRouterPricing } from '../support/profit-estimator';
 import { interceptProfitData } from '../support/profit-fixtures';
 
 function suppressNudges(win: Cypress.AUTWindow): void {
@@ -8,7 +9,7 @@ function suppressNudges(win: Cypress.AUTWindow): void {
 describe('Profit estimator route parameters', { testIsolation: true }, () => {
   beforeEach(() => {
     interceptProfitData();
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] });
+    interceptOpenRouterPricing({ data: [] });
   });
 
   for (const [prefix, tab] of [

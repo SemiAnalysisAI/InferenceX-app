@@ -1,3 +1,4 @@
+import { interceptOpenRouterPricing } from '../support/profit-estimator';
 import {
   interceptProfitData,
   profitBenchmarkRows,
@@ -33,7 +34,7 @@ function rowsFor(date = PROFIT_DATE) {
 
 function setup() {
   interceptProfitData();
-  cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] });
+  interceptOpenRouterPricing({ data: [] });
   cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
     req.reply({
       body: rowsFor(req.query['date'] === PROFIT_HISTORY_DATE ? PROFIT_HISTORY_DATE : PROFIT_DATE),

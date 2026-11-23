@@ -65,6 +65,13 @@
       "source": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/38825822770",
       "topLevel": "object"
     },
+    "openrouter-models": {
+      "bytes": 945,
+      "capturedAt": null,
+      "sha256": "af3607a9697215e13e194513045dad7073b4f9083fd372f0ff1de5d930ecbffa",
+      "source": "Synthetic OpenRouter model-list prices for fixture builds and Cypress; not live OpenRouter prices.",
+      "topLevel": "object"
+    },
     "overview-history-rows": {
       "bytes": 5002,
       "capturedAt": null,
