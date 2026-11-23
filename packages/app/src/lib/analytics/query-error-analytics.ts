@@ -6,6 +6,12 @@ import { trackOncePerPageview } from './analytics';
 import { routeTemplateForPathname } from './route-template';
 
 export const DATA_QUERY_FAILED_EVENT = 'data_query_failed';
+const MAX_ERROR_MESSAGE_LENGTH = 200;
+
+/** Thrown by a query for an expected outcome (for example an expired run) so it is not reported. */
+export class ExpectedQueryFailureError extends Error {
+  override name = 'ExpectedQueryFailureError';
+}
 
 /** The parts of a React Query `Query` or `Mutation` the reporter reads. */
 export interface FailedRequest {
@@ -22,6 +28,9 @@ export interface DataQueryFailure {
   query_key: string;
   endpoint?: string;
   status?: number;
+  /** Set for non-HTTP failures (network, parse, thrown by query code). */
+  error_name?: string;
+  error_message?: string;
   route_template: string;
 }
 
@@ -39,12 +48,20 @@ export function describeDataQueryFailure(
   kind: DataQueryFailure['kind'],
   pathname: string,
 ): DataQueryFailure | null {
-  if (request.throwsToErrorBoundary || isAbort(error)) return null;
+  if (request.throwsToErrorBoundary || isAbort(error) || error instanceof ExpectedQueryFailureError)
+    return null;
   const first = request.key?.[0];
   return {
     kind,
     query_key: typeof first === 'string' ? first : 'unknown',
-    ...(error instanceof ApiRequestError ? { endpoint: error.endpoint, status: error.status } : {}),
+    ...(error instanceof ApiRequestError
+      ? { endpoint: error.endpoint, status: error.status }
+      : error instanceof Error
+        ? {
+            error_name: error.name,
+            error_message: error.message.slice(0, MAX_ERROR_MESSAGE_LENGTH),
+          }
+        : { error_name: typeof error }),
     route_template: routeTemplateForPathname(pathname),
   };
 }

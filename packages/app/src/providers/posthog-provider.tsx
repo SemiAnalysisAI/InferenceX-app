@@ -9,6 +9,7 @@ import {
   trackVirtualPageview,
 } from '@/lib/analytics/analytics';
 import { isBotBrowser } from '@/lib/analytics/bot-user-agent';
+import { dropNoiseExceptions } from '@/lib/analytics/exception-noise';
 import { markNavigationStart } from '@/lib/analytics/navigation-timing';
 import { maskCapturedNetworkRequest } from '@/lib/analytics/network-request-mask';
 import { installOutboundLinkTracking } from '@/lib/analytics/outbound-links';
@@ -58,7 +59,22 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
             capture_pageleave: true,
             autocapture: true,
             capture_dead_clicks: false,
-            capture_performance: { network_timing: true, web_vitals: true },
+            rageclick: {
+              ignore_text_selection: true,
+              // Defaults, plus chart legend items: a label click also clicks its hidden checkbox, so one toggle counts twice.
+              css_selector_ignorelist: [
+                '.ph-no-rageclick',
+                '.ph-no-capture',
+                'input.peer.sr-only',
+                'input.peer.sr-only ~ label',
+              ],
+            },
+            capture_performance: {
+              network_timing: true,
+              web_vitals: true,
+              web_vitals_attribution: ['CLS', 'INP', 'LCP'],
+            },
+            before_send: dropNoiseExceptions,
             disable_surveys: true,
             session_recording: { maskCapturedNetworkRequestFn: maskCapturedNetworkRequest },
           });

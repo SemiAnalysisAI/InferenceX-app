@@ -6,7 +6,11 @@ import { ApiRequestError, requestEndpoint } from '../api/api-request-error';
 import { createAppQueryClient } from '@/providers/query-provider';
 
 import { trackOncePerPageview } from './analytics';
-import { describeDataQueryFailure, reportDataQueryFailure } from './query-error-analytics';
+import {
+  describeDataQueryFailure,
+  ExpectedQueryFailureError,
+  reportDataQueryFailure,
+} from './query-error-analytics';
 
 mock.module('./analytics', () => ({ trackOncePerPageview: vi.fn(() => true) }));
 
@@ -38,7 +42,7 @@ describe('describeDataQueryFailure', () => {
     });
   });
 
-  it('reports network and parse errors without endpoint or status', () => {
+  it('reports the error name and a truncated message for non-HTTP failures', () => {
     expect(
       describeDataQueryFailure(
         new TypeError('Failed to fetch'),
@@ -46,7 +50,17 @@ describe('describeDataQueryFailure', () => {
         'query',
         '/',
       ),
-    ).toEqual({ kind: 'query', query_key: 'unknown', route_template: '/' });
+    ).toEqual({
+      kind: 'query',
+      query_key: 'unknown',
+      error_name: 'TypeError',
+      error_message: 'Failed to fetch',
+      route_template: '/',
+    });
+    expect(
+      describeDataQueryFailure(new SyntaxError('x'.repeat(500)), request, 'query', '/')
+        ?.error_message,
+    ).toHaveLength(200);
   });
 
   it('skips cancellations, aborts, and errors that reach an error boundary', () => {
@@ -60,6 +74,9 @@ describe('describeDataQueryFailure', () => {
         'query',
         '/',
       ),
+    ).toBeNull();
+    expect(
+      describeDataQueryFailure(new ExpectedQueryFailureError('expired'), request, 'query', '/'),
     ).toBeNull();
   });
 });
