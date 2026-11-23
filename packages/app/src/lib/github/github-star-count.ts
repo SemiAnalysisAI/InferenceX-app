@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
-
-const STAR_COUNT_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
+export const STAR_COUNT_URL = '/api/v1/github-stars';
 export const STAR_COUNT_STORAGE_KEY = 'inferencex-github-stars';
 export const STAR_COUNT_TTL_MS = 60 * 60 * 1000;
 
@@ -42,7 +40,8 @@ function writeStored(value: StoredStarCount): void {
 }
 
 /**
- * Browser-side star count, so no server render waits on (or revalidates for) the GitHub API.
+ * Star count read from the app's CDN-cached route, so no server render waits on the GitHub API and
+ * browsers never spend GitHub's unauthenticated per-IP rate limit.
  * Each browser asks GitHub at most once per TTL, and after a failure (e.g. rate limiting) waits
  * out a backoff before retrying. Failures fall back to the last known count, or null when there is none.
  */
@@ -53,18 +52,20 @@ export async function loadGitHubStarCount(now = Date.now()): Promise<number | nu
   if (stored.failedAt !== undefined && now - stored.failedAt < STAR_COUNT_FAILURE_BACKOFF_MS)
     return fallback;
   const fail = () => {
-    writeStored({ count: stored.count, fetchedAt: stored.fetchedAt, failedAt: now });
+    writeStored({
+      count: stored.count,
+      fetchedAt: stored.fetchedAt,
+      failedAt: now,
+    });
     return fallback;
   };
   try {
-    const res = await fetch(STAR_COUNT_URL, {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-    });
+    const res = await fetch(STAR_COUNT_URL);
     if (!res.ok) return fail();
-    const data: { stargazers_count?: unknown } = await res.json();
-    if (typeof data.stargazers_count !== 'number') return fail();
-    writeStored({ count: data.stargazers_count, fetchedAt: now });
-    return data.stargazers_count;
+    const data: { stars?: unknown } = await res.json();
+    if (typeof data.stars !== 'number' || !Number.isFinite(data.stars)) return fail();
+    writeStored({ count: data.stars, fetchedAt: now });
+    return data.stars;
   } catch {
     return fail();
   }
