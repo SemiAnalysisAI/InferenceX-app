@@ -472,7 +472,11 @@ const GPUGraph = React.memo(
     useDialogCloseTracking(fixedLogPointId !== null, 'gpu_timeseries_logs_closed');
     useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
 
-    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
+    const {
+      dismissed: dismissedNotices,
+      dismiss: dismissNotice,
+      visibleNotices,
+    } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
         modelLabel,
@@ -513,9 +517,9 @@ const GPUGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
+      return visibleNotices(annotations);
     }, [
-      dismissedNotices,
+      visibleNotices,
       modelLabel,
       filteredData,
       officialPoints,

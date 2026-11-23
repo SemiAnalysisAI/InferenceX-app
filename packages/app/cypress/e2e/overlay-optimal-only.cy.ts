@@ -19,6 +19,17 @@ function chartSnapshot(svg: Element) {
   return clone.outerHTML;
 }
 
+/** Official and overlay points the chart currently shows. */
+function shownPoints() {
+  return cy
+    .scatterPoints('[data-testid="inference-chart-display"]')
+    .then((points) =>
+      cy
+        .get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt')
+        .then(($overlay) => visiblePoints(points).length + countVisible($overlay)),
+    );
+}
+
 describe('Overlay points follow Optimal Only on the selected axes', () => {
   before(() => {
     interceptOverlayRun({ overlayConfigs: OVERLAY_CONFIGS });
@@ -152,11 +163,25 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
   });
 
   it('shows all overlay points when Optimal Only is turned off', () => {
-    cy.get('#scatter-hide-non-optimal').click();
-    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
-      expect(countVisible($pts), 'visible overlay X markers').to.eq(OVERLAY_CONFIGS.length);
-    });
+    // The switch label says how many points it hides; turning it off must reveal exactly those.
+    cy.get('label[for="scatter-hide-non-optimal"]')
+      .invoke('text')
+      .then((label) => {
+        const hidden = Number(
+          /^Optimal Only\s*\(hides (?<count>\d+) points?\)$/u.exec(label.trim())?.groups?.count,
+        );
+        expect(hidden, `hidden count in "${label}"`).to.be.at.least(1);
+        shownPoints().then((withOptimalOnly) => {
+          cy.get('#scatter-hide-non-optimal').click();
+          cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+          cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+            ($pts) => {
+              expect(countVisible($pts), 'visible overlay X markers').to.eq(OVERLAY_CONFIGS.length);
+            },
+          );
+          shownPoints().should('eq', withOptimalOnly + hidden);
+        });
+      });
   });
 
   it('re-drops the dominated overlay point when Optimal Only is re-enabled', () => {

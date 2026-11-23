@@ -492,6 +492,8 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    optimalOnlyHides: (count: number) =>
+      count === 0 ? '(hides none)' : `(hides ${pointCountEn(count)})`,
     paretoFrontier: 'Pareto Frontier',
     paretoFrontierInfo:
       'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
@@ -528,6 +530,8 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    optimalOnlyHides: (count: number) =>
+      count === 0 ? '（无点可隐藏）' : `（隐藏 ${count} 个点）`,
     paretoFrontier: 'Pareto 前沿',
     paretoFrontierInfo:
       '用点线连接所有可见系列的最优边界点，并在更优一侧填充绿色。关闭后再次开启，切换为阳光、蝴蝶和城堡背景；再重复一次恢复绿色。',
@@ -1117,7 +1121,7 @@ const ScatterGraph = React.memo(
       showPowerEnvelope,
     ]);
 
-    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
+    const { dismiss: dismissNotice, visibleNotices } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const visibleOverlayPoints = processedOverlayData.filter((p) =>
         activeOverlayHwTypes.has(p.hwKey as string),
@@ -1153,9 +1157,9 @@ const ScatterGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
+      return visibleNotices(annotations);
     }, [
-      dismissedNotices,
+      visibleNotices,
       modelLabel,
       filteredData,
       processedOverlayData,
@@ -1394,6 +1398,28 @@ const ScatterGraph = React.memo(
       optimalPointKeys,
       overlayOptimalPoints,
       showPowerEnvelope,
+    ]);
+
+    // Shown next to the Optimal Only switch: on frontier-heavy views it may hide only a point or
+    // two, and the reader otherwise cannot tell that the switch did anything.
+    const nonOptimalPointCount = useMemo(() => {
+      const official = filteredData.filter(
+        (point) =>
+          !hiddenPowerVariants.has(powerVariantId(point.powerVariant)) &&
+          !optimalPointKeys.has(optimalPointKey(point)),
+      ).length;
+      const overlay = processedOverlayData.filter(
+        (point) =>
+          !hiddenPowerVariants.has(powerVariantId(point.powerVariant)) &&
+          !overlayOptimalPoints.has(point),
+      ).length;
+      return official + overlay;
+    }, [
+      filteredData,
+      processedOverlayData,
+      hiddenPowerVariants,
+      optimalPointKeys,
+      overlayOptimalPoints,
     ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -4530,6 +4556,7 @@ const ScatterGraph = React.memo(
                         {
                           id: 'scatter-hide-non-optimal',
                           label: legendT.optimalOnly,
+                          detail: legendT.optimalOnlyHides(nonOptimalPointCount),
                           checked: hideNonOptimal,
                           onCheckedChange: (checked: boolean) => {
                             setHideNonOptimal(checked);

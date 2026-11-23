@@ -10,6 +10,11 @@ interface AnnotationBase {
   label: string;
   color: string;
   points: { x: number; y: number }[];
+  /**
+   * Closed while this chart is on screen. It still holds its slot in the stack, so the notice
+   * below does not slide up under the pointer that just clicked ×.
+   */
+  dismissed?: boolean;
 }
 
 export type KnownIssueAnnotation = AnnotationBase &
@@ -168,7 +173,12 @@ export function renderKnownIssueAnnotations(
     .attr('class', 'known-issue-arrows');
 
   let yCursor = BOX_TOP;
+  const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
   annotations.forEach((annotation, index) => {
+    if (annotation.dismissed) {
+      yCursor += boxH + BOX_GAP;
+      return;
+    }
     const { issue, preview, label, color, points } = annotation;
     const markerId = `known-issue-arrowhead-${chartId}-${index}`;
     const outlineMarkerId = `${markerId}-outline`;
@@ -257,7 +267,6 @@ export function renderKnownIssueAnnotations(
       if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, line2Font);
     }
     const boxW = Math.max(w1, w2) + PAD_X * 2 + dismissSpace;
-    const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
     const bx = Math.max(2, boxRight - boxW);
     const by = yCursor;
 

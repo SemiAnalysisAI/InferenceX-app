@@ -281,7 +281,9 @@ export function AgenticPointDetail({ id }: Props) {
           type="button"
           onClick={() => {
             track('inference_agentic_detail_back_clicked', { id });
-            router.back();
+            // History may hold sibling points or another site (a shared link), so Back always
+            // returns to the chart this point belongs to.
+            router.push(inferenceHref);
           }}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >

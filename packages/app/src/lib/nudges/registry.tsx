@@ -87,9 +87,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Every result is reproducible',
       titleZh: '每项结果均可复现',
       description:
-        'Each data point is produced by a public GitHub Actions run. Click any point on a chart to jump to the exact run, logs, and artifacts.',
+        'Each data point is produced by a public GitHub Actions run. Click any point on a chart to open its details, then follow the link to the exact run, logs, and artifacts.',
       descriptionZh:
-        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点即可跳转到对应的运行记录、日志和产物。',
+        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点可打开详情，再通过其中的链接查看对应的运行记录、日志和产物。',
       action: {
         label: 'See how',
         labelZh: '了解详情',

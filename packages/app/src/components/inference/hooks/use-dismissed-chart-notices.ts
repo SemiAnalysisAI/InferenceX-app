@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 
 import type { KnownIssueAnnotation } from '@/components/inference/utils/knownIssueAnnotations';
 
@@ -59,8 +59,24 @@ function subscribe(onChange: () => void): () => void {
 /** Chart notices (official-preview and known-issue boxes) the reader has dismissed, shared across charts and tabs. */
 export function useDismissedChartNotices() {
   const dismissed = useSyncExternalStore(subscribe, readDismissed, () => EMPTY);
+  const [closedHere, setClosedHere] = useState<ReadonlySet<string>>(EMPTY);
   const dismiss = useCallback((annotation: KnownIssueAnnotation) => {
-    dismissChartNotice(chartNoticeKey(annotation));
+    const key = chartNoticeKey(annotation);
+    setClosedHere((current) => new Set([...current, key]));
+    dismissChartNotice(key);
   }, []);
-  return { dismissed, dismiss };
+  /**
+   * The notices to draw. Ones dismissed earlier are dropped; ones closed on this chart stay as
+   * empty slots, so closing a notice never moves the next one under the reader's pointer.
+   */
+  const visibleNotices = useCallback(
+    (annotations: KnownIssueAnnotation[]): KnownIssueAnnotation[] =>
+      annotations.flatMap((annotation) => {
+        const key = chartNoticeKey(annotation);
+        if (!dismissed.has(key)) return [annotation];
+        return closedHere.has(key) ? [{ ...annotation, dismissed: true }] : [];
+      }),
+    [dismissed, closedHere],
+  );
+  return { dismissed, dismiss, visibleNotices };
 }

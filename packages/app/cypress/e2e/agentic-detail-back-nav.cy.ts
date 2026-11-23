@@ -206,8 +206,72 @@ function assertRestoredChart(): void {
     .should('contain.text', SOLO_HW_LABEL);
 }
 
+/** Answers the sibling navigator with every traced point of the soloed SKU on the target model. */
+function interceptSiblings(): void {
+  const [hardware, framework] = SOLO_HW_KEY.split('_');
+  const skuPoints = benchmarks.filter(
+    (b) => b.model === TARGET_MODEL_DB_KEY && b.hardware === hardware && b.framework === framework,
+  );
+  cy.intercept('GET', '/api/v1/benchmark-siblings*', (request) => {
+    const currentId = Number(new URL(request.url).searchParams.get('id'));
+    request.reply({
+      sku: {
+        hardware,
+        framework,
+        model: TARGET_MODEL_DB_KEY,
+        precision: 'fp4',
+        spec_method: 'none',
+        benchmark_type: 'agentic_traces',
+        github_run_id: 31893747354,
+        date: AGENTIC_DATE,
+        dataset_slug: 'fixture-dataset',
+      },
+      siblings: skuPoints.map((b) => ({
+        id: b.id,
+        conc: b.conc,
+        offload_mode: 'off',
+        decode_tp: 8,
+        decode_ep: 1,
+        decode_pp: 1,
+        decode_dcp_size: 1,
+        decode_pcp_size: 1,
+        decode_dp_attention: false,
+        decode_num_workers: 0,
+        prefill_tp: 8,
+        prefill_ep: 1,
+        prefill_pp: 1,
+        prefill_dcp_size: 1,
+        prefill_pcp_size: 1,
+        prefill_dp_attention: false,
+        prefill_num_workers: 0,
+        num_prefill_gpu: 8,
+        num_decode_gpu: 8,
+        disagg: false,
+        is_multinode: false,
+        tput_per_gpu: b.metrics.tput_per_gpu,
+        total_requests: 100,
+        is_current: b.id === currentId,
+        has_trace: true,
+      })),
+    });
+  });
+}
+
+/** Steps to a neighbouring point of the same SKU with the Previous/Next buttons. */
+function stepToSibling(): void {
+  cy.location('pathname').then((detailPath) => {
+    cy.get('button[aria-label="Next point"], button[aria-label="Previous point"]')
+      .filter(':enabled')
+      .first()
+      .click();
+    cy.location('pathname')
+      .should('match', /^\/infx\/inference\/agentic\/\d+$/u)
+      .and('not.eq', detailPath);
+  });
+}
+
 describe('Agentic point detail — returning to the chart', () => {
-  it('restores the model and legend when the reader clicks Back', () => {
+  it('returns to the chart and restores the model and legend when the reader clicks Back', () => {
     visitChart('/infx/inference');
     selectTargetModel();
     soloLegendSeries();
@@ -215,6 +279,35 @@ describe('Agentic point detail — returning to the chart', () => {
 
     cy.location('pathname').should('match', /^\/infx\/inference\/agentic\/\d+$/u);
     backControl('en').click();
+
+    cy.location('pathname').should('eq', '/infx/inference');
+    assertRestoredChart();
+  });
+
+  it('returns to the chart in one Back click after stepping through sibling points', () => {
+    visitChart('/infx/inference');
+    interceptSiblings();
+    selectTargetModel();
+    soloLegendSeries();
+    openPointDetail();
+
+    stepToSibling();
+    stepToSibling();
+    backControl('en').click();
+
+    cy.location('pathname').should('eq', '/infx/inference');
+    assertRestoredChart();
+  });
+
+  it('replaces the history entry when stepping between siblings', () => {
+    visitChart('/infx/inference');
+    interceptSiblings();
+    selectTargetModel();
+    soloLegendSeries();
+    openPointDetail();
+
+    stepToSibling();
+    cy.go('back');
 
     cy.location('pathname').should('eq', '/infx/inference/kimi-k3');
     assertRestoredChart();
