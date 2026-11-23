@@ -11,6 +11,7 @@ import {
   type MetricPercentiles,
   type SequenceLengthSketches,
 } from '../queries/agentic-aggregates';
+import { errorMessage } from '../lib/error-message';
 
 export { STATS_VERSION };
 
@@ -100,21 +101,43 @@ async function extractProfileSamples(
   return { isl, osl, e2elPerOsl };
 }
 
+/**
+ * A corrupt profile leaves the stats empty and appends a warning instead of throwing, so one
+ * unreadable blob cannot fail a whole ingest. Callers report the warnings. No bytes at all means
+ * there is no profile, which is not a warning.
+ */
 export async function computeProfileAggregateStatsFromCompressedChunks(
   compressedChunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
+  warnings: string[] = [],
 ): Promise<AggregateStats> {
   let islPct: MetricPercentiles | null = null;
   let oslPct: MetricPercentiles | null = null;
   let e2elPerOsl: MetricPercentiles | null = null;
   let sequenceLengths: SequenceLengthSketches = { isl: null, osl: null };
 
+  let emptySource = true;
+  let sourceEnded = false;
+  async function* tracked() {
+    for await (const chunk of compressedChunks) {
+      if (chunk.length > 0) emptySource = false;
+      yield chunk;
+    }
+    sourceEnded = true;
+  }
+
   try {
-    const { isl, osl, e2elPerOsl: ratios } = await extractProfileSamples(compressedChunks);
+    const { isl, osl, e2elPerOsl: ratios } = await extractProfileSamples(tracked());
     islPct = percentilesOf(isl);
     oslPct = percentilesOf(osl);
     sequenceLengths = sequenceLengthSketches(isl, osl);
     e2elPerOsl = percentilesOf(ratios);
-  } catch {}
+  } catch (error) {
+    if (!(emptySource && sourceEnded)) {
+      warnings.push(
+        `profile export unreadable (${errorMessage(error)}), so ISL, OSL and E2EL/OSL stats are empty`,
+      );
+    }
+  }
 
   return {
     version: STATS_VERSION,
@@ -181,6 +204,7 @@ async function streamExtractServer(
 export function withServerMetricAggregateStats(
   profileStats: AggregateStats,
   metrics: Record<string, unknown>,
+  warnings: string[] = [],
 ): AggregateStats {
   try {
     const server = extractServerMetricSamples(JSON.stringify({ metrics }));
@@ -189,18 +213,31 @@ export function withServerMetricAggregateStats(
       kvCacheUtil: percentilesOf(server.kvCacheUtil),
       prefixCacheHitRate: percentilesOf(server.prefixCacheHitRate),
     };
-  } catch {
+  } catch (error) {
+    warnings.push(serverStatsWarning(error));
     return profileStats;
   }
 }
 
-export async function computeAggregateStats(args: {
-  profileBlob: Buffer | null;
-  serverBlob: Buffer | null;
-}): Promise<AggregateStats> {
-  const profile = args.profileBlob
-    ? await computeProfileAggregateStatsFromCompressedChunks([args.profileBlob])
-    : await computeProfileAggregateStatsFromCompressedChunks([]);
+function serverStatsWarning(error: unknown): string {
+  return (
+    `server metrics unreadable (${errorMessage(error)}), ` +
+    'so KV cache utilization and prefix cache hit rate stats are empty'
+  );
+}
+
+/** Appends to `warnings` like computeProfileAggregateStatsFromCompressedChunks. */
+export async function computeAggregateStats(
+  args: {
+    profileBlob: Buffer | null;
+    serverBlob: Buffer | null;
+  },
+  warnings: string[] = [],
+): Promise<AggregateStats> {
+  const profile = await computeProfileAggregateStatsFromCompressedChunks(
+    args.profileBlob ? [args.profileBlob] : [],
+    warnings,
+  );
 
   let kvPct: MetricPercentiles | null = null;
   let prefixPct: MetricPercentiles | null = null;
@@ -212,7 +249,9 @@ export async function computeAggregateStats(args: {
         json === null
           ? await streamExtractServer(args.serverBlob)
           : extractServerMetricSamples(json);
-    } catch {}
+    } catch (error) {
+      warnings.push(serverStatsWarning(error));
+    }
     if (server) {
       kvPct = percentilesOf(server.kvCacheUtil);
       prefixPct = percentilesOf(server.prefixCacheHitRate);

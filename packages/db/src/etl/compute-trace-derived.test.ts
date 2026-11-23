@@ -167,5 +167,24 @@ describe('computeTraceDerivedPayloads', () => {
     );
     expect(optimized.chartSeries).toBeNull();
     expect(optimized.requestTimeline).toEqual(await computeRequestTimeline(profileBlob));
+    expect(optimized.warnings).toEqual([
+      expect.stringMatching(
+        /^server metrics unreadable \(.+\), so the chart series and KV cache and prefix cache stats are empty$/u,
+      ),
+    ]);
+  });
+
+  it('reports an unreadable profile alongside readable server metrics', async () => {
+    const derived = await computeTraceDerivedPayloads(Buffer.from('not-gzip'), makeServerBlob());
+    expect(derived.aggregateStats.isl).toBeNull();
+    expect(derived.chartSeries).not.toBeNull();
+    expect(derived.warnings).toEqual([expect.stringMatching(/^profile export unreadable \(/u)]);
+  });
+
+  it('has no warnings when every input is readable or absent', async () => {
+    const readable = await computeTraceDerivedPayloads(makeProfileBlob(), makeServerBlob());
+    const absent = await computeTraceDerivedPayloads(null, null);
+    expect(readable.warnings).toEqual([]);
+    expect(absent.warnings).toEqual([]);
   });
 });

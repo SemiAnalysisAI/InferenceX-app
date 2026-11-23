@@ -77,6 +77,7 @@ function preparedFixture(): PreparedTraceReplay {
       median_itl: 0.005,
       median_intvty: 200,
     },
+    warnings: [],
   };
 }
 

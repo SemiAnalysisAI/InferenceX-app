@@ -372,9 +372,11 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the lazy power model loader gained failure and retry states. It is
-      // reached only through type imports, so recorded entries are unchanged.
-      sources: 'a233b356db175ecf383eba67bd23118cea400458b8cca434a766ffb9c50e0c0c',
+      // Re-pinned after the lazy power model loader gained failure and retry states (reached only
+      // through type imports), data_query_failed stopped reporting failed background refetches that
+      // keep their data, and dashboard-routes gained the default Inference model slug. None of these
+      // feed recorded entries, so they are unchanged.
+      sources: 'd1aec72ee247ba9549eec7ea88d078fdaafe5d033e47477ebe34b73e0e65cfbb',
     });
   });
 });

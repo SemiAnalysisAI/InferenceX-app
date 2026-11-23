@@ -1,5 +1,5 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
-import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
+import { fetchOpenRouterPricing } from '@/lib/calculator/openrouter-pricing.server';
 import { getOpenRouterModelId, type Model, Sequence } from '@/lib/catalog/data-mappings';
 import {
   validateParams as validateViewParams,
@@ -167,7 +167,7 @@ export function GET(request: NextRequest) {
       throw new ViewsApiParamError('priceSource', 'No OpenRouter price configured');
     const pricing =
       priceSource === 'openrouter'
-        ? await fetchOpenRouterPricing(pricingId!, AbortSignal.timeout(15000))
+        ? await fetchOpenRouterPricing(pricingId!)
         : NORMALIZED_TOKEN_REVENUE_PRICING;
 
     const isAgentic = sequence === Sequence.AgenticTraces;

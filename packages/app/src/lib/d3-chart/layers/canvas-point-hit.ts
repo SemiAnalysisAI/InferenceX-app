@@ -60,24 +60,28 @@ export class PointHitGrid {
     return row * this.columns + column;
   }
 
+  /** The point nearest to (x, y) within the radius; the later (topmost) point wins a tie. */
   hit(x: number, y: number): number {
     if (!(x >= 0 && x <= this.width && y >= 0 && y <= this.height)) return -1;
     const radius = this.radius;
-    const limit = radius * radius;
     const firstColumn = Math.max(0, Math.floor(x / radius));
     const lastColumn = Math.min(this.columns - 1, Math.floor((x + 2 * radius) / radius));
     const firstRow = Math.max(0, Math.floor(y / radius));
     const lastRow = Math.min(this.rows - 1, Math.floor((y + 2 * radius) / radius));
     let best = -1;
+    let bestDistance = radius * radius;
     for (let row = firstRow; row <= lastRow; row++) {
       for (let column = firstColumn; column <= lastColumn; column++) {
         const cell = row * this.columns + column;
         for (let item = this.cellStart[cell]; item < this.cellStart[cell + 1]; item++) {
           const index = this.items[item];
-          if (index <= best) continue;
           const dx = this.xs[index] - x;
           const dy = this.ys[index] - y;
-          if (dx * dx + dy * dy <= limit) best = index;
+          const distance = dx * dx + dy * dy;
+          if (distance < bestDistance || (distance === bestDistance && index > best)) {
+            best = index;
+            bestDistance = distance;
+          }
         }
       }
     }

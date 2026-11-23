@@ -1,5 +1,5 @@
 import type { ApiOperation, ApiResponse, ApiSchema } from '@/lib/api/api-documentation';
-import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-base';
 import {
   text,
   queryParameter as parameter,
@@ -212,8 +212,8 @@ export const operations: ApiOperation[] = [
         'model',
         true,
         'string',
-        'Display model name or compare slug.',
-        '模型显示名称或对比页 slug。',
+        MODEL_PARAM_FORMS.en,
+        MODEL_PARAM_FORMS.zh,
         { type: 'string' },
         'DeepSeek-V4-Pro',
       ),

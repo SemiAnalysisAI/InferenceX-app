@@ -1,6 +1,6 @@
-import { CancelledError } from '@tanstack/react-query';
+import { CancelledError, onlineManager, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
-import { mocked, stubGlobal, unstubAllGlobals } from '@/test/helpers';
+import { mocked, stubGlobal, unstubAllGlobals, waitFor } from '@/test/helpers';
 
 import { ApiRequestError, requestEndpoint } from '../api/api-request-error';
 import { createAppQueryClient } from '@/providers/query-provider';
@@ -78,8 +78,46 @@ describe('describeDataQueryFailure', () => {
     expect(
       describeDataQueryFailure(new ExpectedQueryFailureError('expired'), request, 'query', '/'),
     ).toBeNull();
+    expect(
+      describeDataQueryFailure(
+        new TypeError('Failed to fetch'),
+        { ...request, keepsData: true },
+        'query',
+        '/',
+      ),
+    ).toBeNull();
   });
 });
+
+// The reconnect refetch of a stale query: the browser reports `online` before requests work.
+async function reconnectWhileRequestsFail(initial: 'loaded' | 'failed'): Promise<void> {
+  const client = createAppQueryClient();
+  client.setDefaultOptions({ queries: { retry: false } });
+  // QueryClientProvider mounts the client, which subscribes it to the online manager.
+  client.mount();
+  let calls = 0;
+  const observer = new QueryObserver(client, {
+    queryKey: ['benchmark-presence'],
+    queryFn: () => {
+      calls += 1;
+      return initial === 'loaded' && calls === 1
+        ? Promise.resolve({ trace: [], log: [] })
+        : Promise.reject(new TypeError('Failed to fetch'));
+    },
+    staleTime: 0,
+  });
+  const unsubscribe = observer.subscribe(() => {});
+  await waitFor(() => expect(calls).toBe(1));
+  await waitFor(() => expect(observer.getCurrentResult().isFetching).toBe(false));
+  mocked(trackOncePerPageview).mockClear();
+
+  onlineManager.setOnline(false);
+  onlineManager.setOnline(true);
+  await waitFor(() => expect(calls).toBe(2));
+  await waitFor(() => expect(observer.getCurrentResult().isFetching).toBe(false));
+  unsubscribe();
+  client.unmount();
+}
 
 describe('reportDataQueryFailure', () => {
   beforeEach(() => {
@@ -122,5 +160,27 @@ describe('reportDataQueryFailure', () => {
       },
       'query:["evaluations"]',
     );
+  });
+
+  describe('after the network comes back (wake from sleep)', () => {
+    afterEach(() => onlineManager.setOnline(true));
+
+    it('does not report a failed refetch that keeps the earlier data on screen', async () => {
+      await reconnectWhileRequestsFail('loaded');
+      expect(trackOncePerPageview).not.toHaveBeenCalled();
+    });
+
+    it('still reports a query that has no data to show', async () => {
+      await reconnectWhileRequestsFail('failed');
+      expect(trackOncePerPageview).toHaveBeenCalledWith(
+        'data_query_failed',
+        expect.objectContaining({
+          query_key: 'benchmark-presence',
+          error_name: 'TypeError',
+          error_message: 'Failed to fetch',
+        }),
+        'query:["benchmark-presence"]',
+      );
+    });
   });
 });

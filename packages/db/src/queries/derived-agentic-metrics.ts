@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/error-message';
 import { readTraceProfileLines } from '../lib/trace-profile-storage';
 
 import type { DbClient } from '../connection.js';
@@ -211,7 +212,12 @@ export async function getDerivedAgenticMetrics(
         };
         writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
       }
-    } catch {}
+    } catch (error) {
+      console.warn(
+        `[derived-agentic-metrics] no E2E normalized interactivity for benchmark_result_id=${id}, ` +
+          `trace_replay_id=${row.trace_replay_id}. Its stored profile could not be read (${errorMessage(error)})`,
+      );
+    }
   }
   return result;
 }

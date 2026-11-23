@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { convertRedirects } from '@vercel/routing-utils/dist/superstatic';
 import { describe, expect, it } from 'bun:test';
+import { hasLocalMatch } from 'next/dist/shared/lib/match-local-pattern';
 
 import nextConfig from '../../../next.config';
 
@@ -87,6 +88,14 @@ describe('next.config custom routes', () => {
     [
       '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?lang=zh',
       '/zh/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?lang=zh',
+    ],
+    [
+      '/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?lang=zh',
+      '/zh/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?lang=zh',
+    ],
+    [
+      '/compare-spec-decode/glm-5-1-h200-fp8-mtp-vs-none/spec-decode-comparison.png?lang=zh',
+      '/zh/compare-spec-decode/glm-5-1-h200-fp8-mtp-vs-none/spec-decode-comparison.png?lang=zh',
     ],
   ])('permanently redirects %s to %s in one hop', async (from, to) => {
     const response = await respond(from);
@@ -193,4 +202,20 @@ it('loads the production config through Next’s transpiler without Vitest alias
     },
   );
   expect(output).toContain('config-loaded');
+});
+
+it('keeps Next’s no-query image default, which takes the versioned per-dollar hero path', () => {
+  // Unset, Next applies `[{ pathname: '**', search: '' }]` (see next/dist/server/config.js).
+  expect(nextConfig.images?.localPatterns).toBeUndefined();
+  const nextDefault = [{ pathname: '**', search: '' }];
+  for (const locale of ['', '/zh']) {
+    const src = `${locale}/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar/0123456789ab.png`;
+    expect(hasLocalMatch(nextDefault, src), src).toBe(true);
+  }
+  expect(
+    hasLocalMatch(
+      nextDefault,
+      '/compare-per-dollar/deepseek-r1-b200-vs-h100/performance-per-dollar.png?v=1',
+    ),
+  ).toBe(false);
 });

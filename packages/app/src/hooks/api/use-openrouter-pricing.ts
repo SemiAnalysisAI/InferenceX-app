@@ -1,67 +1,35 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import { ExpectedQueryFailureError } from '@/lib/analytics/query-error-analytics';
 import { ApiRequestError } from '@/lib/api/api-request-error';
-import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/calculator/cache-pricing';
+import {
+  OPENROUTER_PRICING_PATH,
+  type OpenRouterPricingResponse,
+  openRouterPricingForModel,
+} from '@/lib/calculator/openrouter-pricing';
 
-export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
-
-interface OpenRouterModel {
-  id?: unknown;
-  pricing?: {
-    prompt?: unknown;
-    completion?: unknown;
-    input_cache_read?: unknown;
-  };
-}
-
-interface OpenRouterModelsResponse {
-  data?: OpenRouterModel[];
-}
-
-function dollarsPerMillion(value: unknown): number | null {
-  if (typeof value !== 'string' && typeof value !== 'number') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed * 1_000_000 : null;
-}
-
-export function openRouterPricingForModel(
-  payload: OpenRouterModelsResponse,
-  modelId: string,
-): TokenRevenuePricing | null {
-  const model = payload.data?.find((candidate) => candidate.id === modelId);
-  const inputPerMillion = dollarsPerMillion(model?.pricing?.prompt);
-  const outputPerMillion = dollarsPerMillion(model?.pricing?.completion);
-  if (inputPerMillion === null || outputPerMillion === null) return null;
-  const publishedCachedInput = dollarsPerMillion(model?.pricing?.input_cache_read);
-
-  return {
-    source: 'openrouter',
-    inputPerMillion,
-    cachedInputPerMillion:
-      publishedCachedInput ?? inputPerMillion * DEFAULT_CACHED_INPUT_PRICE_RATIO,
-    outputPerMillion,
-    openRouterModelId: modelId,
-  };
-}
-
+/**
+ * Reads one model's OpenRouter price from the same-origin pricing route. A model OpenRouter does
+ * not price is an expected outcome the page explains, so it is not reported as a failed query.
+ */
 export async function fetchOpenRouterPricing(
   modelId: string,
   signal?: AbortSignal,
 ): Promise<TokenRevenuePricing> {
-  const response = await fetch(OPENROUTER_MODELS_URL, { signal });
+  const response = await fetch(OPENROUTER_PRICING_PATH, { signal });
   if (!response.ok) {
     throw new ApiRequestError(
       `OpenRouter pricing request failed (${response.status})`,
       response.status,
-      OPENROUTER_MODELS_URL,
+      OPENROUTER_PRICING_PATH,
     );
   }
-  const pricing = openRouterPricingForModel(
-    (await response.json()) as OpenRouterModelsResponse,
-    modelId,
-  );
-  if (!pricing) throw new Error(`OpenRouter pricing is unavailable for ${modelId}`);
+  const { models } = (await response.json()) as OpenRouterPricingResponse;
+  const pricing = openRouterPricingForModel(models, modelId);
+  if (!pricing) {
+    throw new ExpectedQueryFailureError(`OpenRouter pricing is unavailable for ${modelId}`);
+  }
   return pricing;
 }
 
@@ -72,6 +40,7 @@ export function useOpenRouterPricing(modelId: string | null, enabled: boolean) {
     enabled: enabled && Boolean(modelId),
     staleTime: 5 * 60 * 1_000,
     gcTime: 60 * 60 * 1_000,
-    retry: 1,
+    retry: (failureCount, error) =>
+      !(error instanceof ExpectedQueryFailureError) && failureCount < 1,
   });
 }

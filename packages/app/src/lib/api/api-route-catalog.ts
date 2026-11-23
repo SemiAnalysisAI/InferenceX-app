@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '65a89e846f5db40b25bc9dd57468ddbfcac7c6200af444c618ad3bcdd6f42aad',
+    sourceSha256: '5480da2448014598971d33579d30d3ec21b9a0fb02098da2e2a7c6a6951b9169',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'b7f85bb9d6dce3533dbc0cc2e0256aafa51e1d287d216115c87c7dd4e01e8aab',
+    sourceSha256: 'b2c8119694ae3e98b349b22016ffa0b02149f90e4b6280ec8329080934bd6993',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -658,7 +658,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Rows whose model or hardware has no registry entry are kept, with the raw model prefix and the raw runner base as their model and hardware identities; official ingest still skips them. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After. A run GitHub does not have returns 404 RUN_NOT_FOUND. Once the artifact list is read, result artifacts listed as expired, a 410 download, or an empty list for a run older than GitHub’s 90-day artifact retention return 410 ARTIFACTS_EXPIRED; a completed run without results returns 404 NO_RESULTS and an unfinished one 404 RUN_IN_PROGRESS. An artifact list GitHub fails to return is an uncached, retryable 503 GITHUB_UNAVAILABLE, never an expiry. These bodies carry error, code and runId.',
       zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。模型或硬件尚未注册的行也会保留，分别以原始模型前缀和原始 runner 名称作为模型和硬件标识；正式入库仍会跳过这些行。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。GitHub 上不存在的运行返回 404 RUN_NOT_FOUND。成功读取产物列表后，若结果产物标记为已过期、下载返回 410，或运行早于 GitHub 的 90 天产物保留期且列表为空，则返回 410 ARTIFACTS_EXPIRED；已完成但没有结果的运行返回 404 NO_RESULTS，尚未结束的运行返回 404 RUN_IN_PROGRESS。GitHub 未能返回产物列表时，返回不缓存、可重试的 503 GITHUB_UNAVAILABLE，不会报为已过期。这些响应体包含 error、code 和 runId。',
     },
-    sourceSha256: 'ff2a78e033164c6d8a47b011218819a994089380623f337c7edad95a548528f6',
+    sourceSha256: 'e4a5e19fcb610e5b0118611205860196261cc2a45c634e8e90c84cbef571f66f',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -720,7 +720,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'dcdda2fb8d266449de4f7a5e1b63dde13a628aa3ee52e44e7cc5a8ee5b28aa82',
+    sourceSha256: 'ec0725c55db090c1987f43f889dc01c8092c52c9bf4da25d9e3424aac050203a',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/trends/route.ts',
@@ -731,7 +731,7 @@ export const apiRouteCatalog = [
       en: 'Historical Trends BFF: the published benchmark history rows dictionary-encoded by config and run, with only the metric keys and power fields a trend reads.',
       zh: '历史趋势页面专用 BFF：按配置和运行字典编码的已发布基准历史行，只保留趋势读取的指标键和功耗字段。',
     },
-    sourceSha256: '1f9c3e9daec93de23deb917cdc9e8b86885ae75ed5b1a690690e75936d358551',
+    sourceSha256: '7b7dac6ee403971f1373d473c32d55064ae10f9ef3c3bf2b73fb0cae4e0384ea',
   },
   {
     source: 'src/app/api/v1/collectivex/changelog/route.ts',
@@ -904,6 +904,17 @@ export const apiRouteCatalog = [
     sourceSha256: '6aed139b34cef1ff8390de220c9bd12f6fcee2263c8e337946491cb7a4842570',
   },
   {
+    source: 'src/app/api/v1/openrouter-pricing/route.ts',
+    path: '/api/v1/openrouter-pricing',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Dashboard backend for the OpenRouter price source: a cached copy of third-party list prices for catalog models. The read-only views API already returns the prices it applies (priceSource=openrouter, in pricing).',
+      zh: 'OpenRouter 价格来源的仪表板后端：为目录中的模型缓存第三方公开价格。只读视图 API 已在 pricing 中返回其实际使用的价格（priceSource=openrouter）。',
+    },
+    sourceSha256: '3d6745d60110f72dc62ed3c2e50399fb05973a6840eed325b50eb903543c783a',
+  },
+  {
     source: 'src/app/api/v1/overview/route.ts',
     path: '/api/v1/overview',
     method: 'GET',
@@ -1004,7 +1015,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'search-server-logs',
-    sourceSha256: 'e4dd4f02ca57e261ce3549b81108f790f838009fb39883d0f428f6cd2b6f2855',
+    sourceSha256: 'e62c0dd3c357d1ef732764a7664eb3a477907c5b5af8a04483fa7c1aa2a567b0',
   },
   {
     source: 'src/app/api/v1/server-log/route.ts',
@@ -1012,7 +1023,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '965da04be9c3f9843f89bf181f0c0212e52a0a71c4b00b907027db6fb3edc580',
+    sourceSha256: '7ad66d056dad2b57d9280b78e69e591a2b5b69d2151378a55046384adac4b528',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -1055,7 +1066,7 @@ export const apiRouteCatalog = [
       en: 'Agentic point-detail BFF that lazily returns the full time-series arrays for one UI-selected metric source.',
       zh: '智能体数据点详情页专用 BFF；按界面选择按需返回单个指标来源的完整时间序列。',
     },
-    sourceSha256: 'a4348f8eb15ca6cfc7173132b45f91f0225e5d7af33f59408e5622cc1d7156a8',
+    sourceSha256: '90bdff4069eb95efc28697a5d162e10fcbf1e6fe47bee3a5e21b09bf7799a136',
   },
   {
     source: 'src/app/api/v1/trace-server-metrics/route.ts',
@@ -1851,7 +1862,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '8204200a643c6ed136ccc0f0b63937ccea1ccb9e09cc34198281f170795ff084',
+    sourceSha256: 'c3082fab095dbf821fd0c4ca9132770e7073e5e65d4517193fa856ca01759a06',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1896,7 +1907,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '21f92834ef015f770573923da19085fdb92a4cff9115c5e106b8c7e632cfed46',
+    sourceSha256: 'ee14df85ab82d9e917545a1ba4ca297d89353b6f2acae5ef378553d1bdb8a8e3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1929,7 +1940,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-request-params.ts',
-    sourceSha256: '76ebf0e9a7827db72580944926b42fd6b0f933a1db642260b895b0eae07257b6',
+    sourceSha256: '876c31f250ec60274675f7adc05155b1e0e52771a6a0aea54ae1daa17ce1b3c2',
     reviewArea: {
       en: '/api/v1/benchmarks query validation and 400 messages.',
       zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
@@ -1945,7 +1956,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmarks-endpoint.server.ts',
-    sourceSha256: '4153e258a16e27e99f9ec596bd548c0df44cd0e324ba14d3d9a56c8ee58ba010',
+    sourceSha256: 'd967b586fff50b080c079409a99eacb25d2b8e8f39b93d6b4102ce4224d9957b',
     reviewArea: {
       en: 'Benchmarks endpoint parameter validation, date/run/view selection, calculator trimming, power validity filtering and cache keys shared by the route, views and pareto.',
       zh: '基准端点的参数校验、日期/运行/视图选择、计算器裁剪、功耗有效性过滤，以及路由、视图和 pareto 共用的缓存键。',
@@ -1969,10 +1980,26 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/public-api-errors.ts',
-    sourceSha256: '48301bb3567870921f5cae0e0a35240c9a687767b89f96141b36be41afbaa16a',
+    sourceSha256: '104141572445304cbe7d6d6532ae4e098d208e6ce90c7f155ddb2d68fdbbe59a',
     reviewArea: {
       en: 'Canonical public JSON error strings shared by handlers and OpenAPI examples.',
       zh: '处理程序与 OpenAPI 示例共享的规范公开 JSON 错误字符串。',
+    },
+  },
+  {
+    source: 'src/lib/catalog/model-name-resolver.ts',
+    sourceSha256: 'e1ff58681093cbe5ba4ee18fea43d96cade58c330dc28bbf942dd6e24ff33a88',
+    reviewArea: {
+      en: 'Accepted model= forms (display names, DB keys, slugs, legacy names) for the benchmark reads and the views API.',
+      zh: '基准读取接口与视图 API 接受的 model= 形式（展示名称、DB 键、slug、旧名称）。',
+    },
+  },
+  {
+    source: 'src/lib/calculator/openrouter-pricing.ts',
+    sourceSha256: '709bca15c5a89b1566a2a22db0e7bac6928baf106eb07e1f9e1d4ea7a2a3cec1',
+    reviewArea: {
+      en: 'OpenRouter price conversion shared by the dashboard and priceSource=openrouter in the views API.',
+      zh: '仪表板与视图 API 中 priceSource=openrouter 共用的 OpenRouter 价格换算。',
     },
   },
   {
