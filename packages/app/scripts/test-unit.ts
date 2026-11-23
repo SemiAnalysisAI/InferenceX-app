@@ -1,9 +1,10 @@
 // Runs the app unit tests on bun:test. Files marked `// @test-environment jsdom` run in a second
 // pass with a jsdom window preloaded; the rest run without DOM globals, as server code does.
 // Arguments that are not flags filter files by path substring; flags (e.g. --coverage) pass through.
-import { spawnSync } from 'node:child_process';
-import { globSync, readFileSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { globSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { availableParallelism, tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = path.join(import.meta.dirname, '..');
@@ -23,22 +24,27 @@ const isDom = (file: string) =>
 const dom = files.filter(isDom);
 const node = files.filter((file) => !dom.includes(file));
 
-// Half the CPUs: on an 18-core machine 9 to 16 workers all finish in about 8 s, while 17 or more
-// (bun 1.4.5) hang loading src/lib/video/video-history-store.test.ts.
+// Half the CPUs: on an 18-core machine, more workers do not finish any sooner.
 const workers = Math.max(1, Math.floor(availableParallelism() / 2));
-let failed = false;
 const coverage = flags.includes('--coverage');
-for (const [name, preloads, group] of [
-  ['node', ['./src/test/setup.ts'], node],
-  ['jsdom', ['./src/test/setup-dom.ts', './src/test/setup.ts'], dom],
-] as const) {
-  if (group.length === 0) continue;
-  const { status } = spawnSync(
+
+// bun applies no timeout while a test file loads, so an import that never settles would hold its
+// worker until CI cancels the job. A pass in which no file starts or finishes for this long is
+// stopped instead. The slowest file takes about 6 s under load.
+const stallMs = 60_000;
+
+/** Runs one bun test pass. `stalled` means the watchdog stopped it. */
+async function runPass(name: string, preloads: readonly string[], group: readonly string[]) {
+  // src/test/heartbeat.ts appends to this file whenever a test file starts or ends.
+  const directory = mkdtempSync(path.join(tmpdir(), 'app-unit-'));
+  const heartbeat = path.join(directory, 'heartbeat');
+  writeFileSync(heartbeat, '');
+  const child = spawn(
     process.execPath,
     [
       'test',
       `--parallel=${workers}`,
-      ...preloads.flatMap((preload) => ['--preload', preload]),
+      ...['./src/test/heartbeat.ts', ...preloads].flatMap((preload) => ['--preload', preload]),
       ...flags,
       // Each pass writes its own report; one shared directory would keep only the last pass.
       ...(coverage ? [`--coverage-dir=coverage/${name}`] : []),
@@ -48,9 +54,36 @@ for (const [name, preloads, group] of [
       cwd: root,
       stdio: 'inherit',
       // Unit tests must not depend on a developer's .env; this keeps source lookups at their defaults.
-      env: { ...process.env, INFERENCEX_SOURCE_REPOS: '' },
+      env: { ...process.env, INFERENCEX_SOURCE_REPOS: '', UNIT_TEST_HEARTBEAT: heartbeat },
     },
   );
-  if (status !== 0) failed = true;
+  let stalled = false;
+  const watchdog = setInterval(() => {
+    if (Date.now() - statSync(heartbeat).mtimeMs < stallMs) return;
+    stalled = true;
+    clearInterval(watchdog);
+    console.error(
+      `\nThe ${name} pass stopped: no test file started or finished for ${stallMs / 1000} s.`,
+    );
+    // On SIGTERM bun test lists the files still running and stops its workers, including one
+    // blocked in native code.
+    child.kill('SIGTERM');
+    setTimeout(() => child.kill('SIGKILL'), 5_000).unref();
+  }, 1_000);
+  const [code] = (await once(child, 'exit')) as [number | null];
+  clearInterval(watchdog);
+  rmSync(directory, { recursive: true, force: true });
+  return { passed: code === 0, stalled };
+}
+
+let failed = false;
+for (const [name, preloads, group] of [
+  ['node', ['./src/test/setup.ts'], node],
+  ['jsdom', ['./src/test/setup-dom.ts', './src/test/setup.ts'], dom],
+] as const) {
+  if (group.length === 0) continue;
+  const { passed, stalled } = await runPass(name, preloads, group);
+  if (!passed) failed = true;
+  if (stalled) break;
 }
 process.exitCode = failed ? 1 : 0;
