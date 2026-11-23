@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -126,6 +128,10 @@ export function MeasuredMetricControls({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // Picks commit in transitions, so one can land before the last renders. Each builds on the last.
+  const latest = useRef({ committed: metric, requested: metric });
+  if (latest.current.committed !== metric)
+    latest.current = { committed: metric, requested: metric };
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
   const show = (field: MeasuredMetricField) => fields === undefined || fields.includes(field);
@@ -135,8 +141,10 @@ export function MeasuredMetricControls({
     all: t.compareAll,
     roles: t.compareRoles,
   };
-  const change = (next: MeasuredMetricConfigChange) =>
-    onChange(changeMeasuredMetricConfig(metric, next));
+  const change = (next: MeasuredMetricConfigChange) => {
+    latest.current.requested = changeMeasuredMetricConfig(latest.current.requested, next);
+    onChange(latest.current.requested);
+  };
   const basisId = `measured-${config.family}-basis`;
   const scopeId = `measured-${config.family}-scope`;
   const roleScope =

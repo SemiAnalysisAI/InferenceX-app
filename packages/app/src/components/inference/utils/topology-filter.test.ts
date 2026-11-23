@@ -34,6 +34,21 @@ describe('topologyLabels', () => {
       'Disaggregated · GPU8 · TP8 · EP1 · P-GPU8 · D-GPU8 · P-TP8 · P-EP?',
     ]);
   });
+
+  it('labels each key exactly as topologyLabel does against the same keys', () => {
+    const keys = [
+      { physicalChips: 8, decode_tp: 8, decode_ep: 1, decode_pp: 1, offload_mode: 'off' },
+      { physicalChips: 8, decode_tp: 8, decode_ep: 8, decode_pp: 1, offload_mode: 'off' },
+      { physicalChips: 16, is_multinode: true, decode_tp: 8, decode_pp: 2, offload_mode: 'on' },
+      { disagg: true, physicalChips: 12, num_prefill_gpu: 4, num_decode_gpu: 8, prefill_tp: 4 },
+      { disagg: true, physicalChips: 12, num_prefill_gpu: 4, num_decode_gpu: 8, prefill_tp: 2 },
+    ].map((point) => pointTopologyKey(point as InferenceData));
+    for (const locale of ['en', 'zh'] as const) {
+      expect(topologyLabels(keys, locale)).toEqual(
+        keys.map((key) => topologyLabel(key, locale, keys)),
+      );
+    }
+  });
 });
 
 describe('pointTopologyKey', () => {

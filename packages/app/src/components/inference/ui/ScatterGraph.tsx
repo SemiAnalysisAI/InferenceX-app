@@ -13,16 +13,7 @@ import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dyn
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import dynamic from 'next/dynamic';
-import React, {
-  startTransition,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useOptimistic,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
@@ -758,8 +749,6 @@ const ScatterGraph = React.memo(
       return { official, overlay };
     }, [resolvedUnifiedSelection]);
     const effectiveOfficialHwTypes = resolvedHwTypes.official;
-    // Legend picks show at once; the chart redraw they start runs as a transition behind that paint.
-    const [shownOfficialHwTypes, showOfficialHwTypes] = useOptimistic(effectiveOfficialHwTypes);
     const activeOverlayHwTypesRef = useRef(resolvedHwTypes.overlay);
     if (!setsEqual(activeOverlayHwTypesRef.current, resolvedHwTypes.overlay)) {
       activeOverlayHwTypesRef.current = resolvedHwTypes.overlay;
@@ -4474,7 +4463,9 @@ const ScatterGraph = React.memo(
                         getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                     )
                     .map(([key, hwConfig]: [string, any]) => {
-                      const isActive = showAllHardwareTypes ? true : shownOfficialHwTypes.has(key);
+                      const isActive = showAllHardwareTypes
+                        ? true
+                        : effectiveOfficialHwTypes.has(key);
                       const blocked = isActive ? undefined : blockedHwToggles.get(key);
                       return {
                         name: hwConfig.name,
@@ -4494,16 +4485,10 @@ const ScatterGraph = React.memo(
                           : undefined,
                         onClick: showAllHardwareTypes
                           ? () => {}
-                          : () =>
-                              startTransition(() => {
-                                if (!blocked) {
-                                  showOfficialHwTypes(
-                                    computeToggle(effectiveOfficialHwTypes, key, hwTypesWithData),
-                                  );
-                                }
-                                handleToggleHwType(key);
-                                track('latency_hw_type_toggled', { gpu: key });
-                              }),
+                          : () => {
+                              handleToggleHwType(key);
+                              track('latency_hw_type_toggled', { gpu: key });
+                            },
                         onShowPoints: () => {
                           setPointsTableTarget({ kind: 'official', hwKey: key });
                           track('inference_legend_points_table_opened', {
