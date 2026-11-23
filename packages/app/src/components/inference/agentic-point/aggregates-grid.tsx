@@ -49,10 +49,10 @@ export function AggregatesGrid({
           missing: 'SKU sibling list not loaded yet — open a point to populate.',
           loading: (count: number) =>
             `Computing aggregates across ${count} configs… (parsing trace blobs)`,
-          isl: 'ISL distribution (across configs)',
-          osl: 'OSL distribution (across configs)',
-          kv: 'KV cache utilization (across configs)',
-          prefix: 'Prefix cache hit rate (across configs)',
+          isl: 'ISL Distribution (Across Configs)',
+          osl: 'OSL Distribution (Across Configs)',
+          kv: 'KV Cache Utilization (Across Configs)',
+          prefix: 'Prefix Cache Hit Rate (Across Configs)',
         };
   if (siblings.length === 0) {
     return <EmptyState>{t.missing}</EmptyState>;

@@ -1271,7 +1271,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    sourceSha256: '2ef19d035a474778efaa90f74edafdd287b6aef39a2cdad3bed41bb9423be196',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',

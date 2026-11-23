@@ -23,7 +23,7 @@ export function ShareButton({ className }: { className?: string } = {}) {
   const t = {
     en: {
       trigger: 'Share',
-      title: 'Share this view',
+      title: 'Share This View',
       description: 'Anyone with this link will see your current selections and filters.',
       inputLabel: 'Share link for the current view',
       copied: 'Copied',

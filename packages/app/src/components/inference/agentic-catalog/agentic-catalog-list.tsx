@@ -6,7 +6,7 @@ import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
-    heading: 'AgentX runs with stored telemetry',
+    heading: 'AgentX Runs with Stored Telemetry',
     summary: (configs: number, points: number, models: number) =>
       `${configs.toLocaleString()} serving configurations across ${models} models, covering ${points.toLocaleString()} benchmark points with per-request telemetry. Each card opens that configuration's headline point; the detail page's navigator moves between its concurrencies.`,
     empty: 'No AgentX runs currently have stored telemetry',

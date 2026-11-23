@@ -62,10 +62,10 @@ const STRINGS = {
       'Keep one GPU allocation and parallelism configuration across its observed concurrency sweep. This does not match software versions or fill missing measurements.',
     certified: 'Validated',
     legacyTier: 'Historical',
-    validatedTitle: 'Validated measurement',
+    validatedTitle: 'Validated Measurement',
     validatedDescription:
       'GPU power was recorded from runner telemetry using the current PowerX method and passed checks for benchmark-window coverage, expected GPU count, sample quality, and the energy definition.',
-    historicalTitle: 'Historical measurement',
+    historicalTitle: 'Historical Measurement',
     historicalDescription:
       "Real GPU telemetry from an older run, but the record lacks information needed to confirm it meets today's method. This does not mean the measurement is wrong.",
     powerDefault:

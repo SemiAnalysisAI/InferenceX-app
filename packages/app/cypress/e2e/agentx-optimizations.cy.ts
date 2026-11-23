@@ -70,7 +70,7 @@ describe('AgentX optimizations', () => {
       );
       cy.get('[data-testid="agentx-optimizations-section-ecosystem"]').should(
         'contain.text',
-        'A brief introduction to the distributed inference ecosystem',
+        'A Brief Introduction to the Distributed Inference Ecosystem',
       );
       cy.get('[data-testid="agentx-optimizations-figure-servingStack"] img').should('be.visible');
       cy.get('[data-testid="agentx-optimizations-section-other"]')
@@ -166,7 +166,7 @@ describe('AgentX optimizations', () => {
     cy.visit('/zh/infx/agentx/optimizations/sglang', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentx-optimizations-article"]').within(() => {
       cy.get('h1').should('have.text', 'SGLang');
-      cy.contains('HiCache offload').should('be.visible');
+      cy.contains('HiCache Offload').should('be.visible');
       cy.contains('并发 384 下输出吞吐量提升 26.75%').should('be.visible');
       cy.get('[data-testid="agentx-optimizations-pr"]')
         .first()

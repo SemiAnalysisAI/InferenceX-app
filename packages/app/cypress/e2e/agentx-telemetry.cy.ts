@@ -54,7 +54,7 @@ describe('AgentX telemetry tutorial — English page', () => {
       .should('be.visible')
       .and('have.attr', 'href', '/infx/inference?i_seq=agentic-traces');
 
-    cy.contains('a', 'AgentX datasets').click();
+    cy.contains('a', 'AgentX Datasets').click();
     cy.location('pathname').should('eq', '/infx/agentx');
   });
 });

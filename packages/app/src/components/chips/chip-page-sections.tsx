@@ -44,26 +44,26 @@ import {
 const STRINGS = {
   en: {
     breadcrumbRoot: 'AI Chips',
-    backToIndex: 'All AI inference chips',
+    backToIndex: 'All AI Inference Chips',
     indexTitle: 'AI Chips for LLM Inference',
     indexIntro:
       'Specs, cloud pricing and continuously measured inference benchmarks for every chip InferenceX covers. Each page joins the hardware data used by the live dashboard with the SemiAnalysis AI Cloud TCO rates.',
-    chipPages: 'Chip pages',
-    vsPages: 'Head-to-head comparisons',
+    chipPages: 'Chip Pages',
+    vsPages: 'Head-to-Head Comparisons',
     specsHeading: 'Specifications',
-    pricingHeading: 'Power & cloud pricing',
-    faqHeading: 'Frequently asked questions',
-    relatedArticles: 'Benchmark analyses',
+    pricingHeading: 'Power & Cloud Pricing',
+    faqHeading: 'Frequently Asked Questions',
+    relatedArticles: 'Benchmark Analyses',
     relatedTerms: 'Glossary',
-    relatedChips: 'Related chips',
-    liveCta: 'See live benchmark results',
+    relatedChips: 'Related Chips',
+    liveCta: 'See Live Benchmark Results',
     liveCtaBody:
       'Every number above is static hardware data. Delivered tokens per second, cost per million tokens and energy per token are measured continuously on the dashboard:',
     liveLinkInference: 'Live inference dashboard',
     liveLinkCompare: 'Chip-vs-chip model comparisons',
     liveLinkPerDollar: 'Performance per dollar',
     liveLinkOverview: 'Benchmark methodology & overview',
-    modelsHeading: 'Go deeper with the SemiAnalysis models',
+    modelsHeading: 'Go Deeper with the SemiAnalysis Models',
     modelsBody:
       'InferenceX measures delivered inference performance. The SemiAnalysis institutional models cover the market behind these chips: who ships them, who buys them, and what they cost to own.',
     modelsAccDesc:
@@ -94,10 +94,10 @@ const STRINGS = {
     none: 'N/A (NVLink domain only)',
     vsRatioNote: 'Ratios are spec-sheet values; see the live compare pages for measured deltas.',
     vsRatioNa: 'n/a',
-    vsSpecTableCaption: 'Spec-sheet comparison',
+    vsSpecTableCaption: 'Spec-Sheet Comparison',
     specScrollHint: 'Swipe horizontally to view all specification values',
     overviewHeading: 'Overview',
-    benchmarkHeading: 'How InferenceX benchmarks it',
+    benchmarkHeading: 'How InferenceX Benchmarks It',
     vsIntroPrefix: 'Spec-sheet and pricing comparison of',
     vsIntroAnd: 'and',
     vsIntroSuffix:

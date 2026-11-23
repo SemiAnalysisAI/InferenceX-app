@@ -332,7 +332,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="inference-query-error"]')
       .should('be.visible')
       .and('contain.text', 'Failed to load benchmark data');
-    cy.contains('h2', 'Something went wrong').should('not.exist');
+    cy.contains('h2', /something went wrong/i).should('not.exist');
     cy.intercept('GET', '/api/v1/availability/compact').as('availabilityRetry');
     cy.get('[data-testid="inference-query-error"]').contains('button', 'Retry').click();
     cy.wait('@availabilityRetry');
