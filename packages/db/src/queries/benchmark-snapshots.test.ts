@@ -3,20 +3,16 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 import { getStagedChartScopes } from './staged-chart-links';
-import type { DbClient } from '../connection';
+import { pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { stablePowerPointIdentity } from '../etl/power-publication';
 import { loadStoredCurvePoints, publishedCurve } from '../etl/required-power-curve';
 import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
 let db: PGlite;
+let sql: PgliteSql;
 let legacyCount: number;
 let retainedCount: number;
-const sql: DbClient = async (strings, ...values) => {
-  const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-  const result = await db.query<Record<string, unknown>>(query, values);
-  return result.rows;
-};
 const ids = (rows: { id: number }[]) => rows.map((r) => Number(r.id)).toSorted((a, b) => a - b);
 const currentIds = [2, 3, 4, 5, 6, 7];
 async function addRun(
@@ -116,6 +112,7 @@ async function expectSameCurve(state: string) {
 }
 beforeAll(async () => {
   db = await PGlite.create();
+  sql = await pgliteDriverSql(db);
   const dir = new URL('../../migrations/', import.meta.url);
   const migrations = readdirSync(dir)
     .filter((name) => name.endsWith('.sql'))
@@ -136,6 +133,7 @@ beforeAll(async () => {
 }, 20_000);
 beforeEach(seed);
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 
@@ -170,8 +168,8 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       });
     }
     const historicalRows = await getBenchmarksForRun(sql, 'glm5.2', 33219706372);
+    expect(ids(historicalRows.slice(0, 1))).toEqual([1]);
     expect(historicalRows[0]).toMatchObject({
-      id: 1,
       power_invalid_reasons: ['sampling_gap_exceeded'],
       power_audit: { expected_gpu_count: 16 },
     });

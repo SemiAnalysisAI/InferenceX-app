@@ -6,7 +6,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { pendingMigrations, runMigrations } from './migration-runner';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 interface Executed {
   text: string;
@@ -92,10 +92,11 @@ describe('pendingMigrations', () => {
 
   beforeAll(async () => {
     db = await migratedPglite();
-    sql = pgliteSql(db);
+    sql = await pgliteDriverSql(db);
   }, 30_000);
 
   afterAll(async () => {
+    await sql?.end();
     await db?.close();
   });
 

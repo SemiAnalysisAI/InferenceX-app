@@ -13,7 +13,7 @@ import {
   readMappedBenchmarkRows,
 } from './benchmark-result-lookup';
 import { collectMissingTelemetryExpectations } from './gpu-metrics-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -47,7 +47,7 @@ function mapped(raw: Record<string, unknown>): BenchmarkParams {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 30_000);
 
 afterEach(() => {
@@ -55,6 +55,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

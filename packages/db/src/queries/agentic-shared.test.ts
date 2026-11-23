@@ -15,7 +15,7 @@ import {
 import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline } from '../etl/request-timeline-codec';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 
 import {
   _resetWriteBackWarned,
@@ -143,7 +143,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
 
   beforeAll(async () => {
     db = await migratedPglite();
-    pg = pgliteSql(db);
+    pg = await pgliteDriverSql(db);
     const stale = sequenceLengthSketchColumns({
       version: STATS_VERSION,
       sequenceLengths: { isl: buildTokenLengthSketch([5]) },
@@ -162,6 +162,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
   }, 30_000);
 
   afterAll(async () => {
+    await pg?.end();
     await db?.close();
   });
 
@@ -233,10 +234,11 @@ describe('writeBackRequestTimeline', () => {
 
   beforeAll(async () => {
     db = await migratedPglite();
-    pg = pgliteSql(db);
+    pg = await pgliteDriverSql(db);
   }, 30_000);
 
   afterAll(async () => {
+    await pg?.end();
     await db?.close();
   });
 
@@ -253,7 +255,7 @@ describe('writeBackRequestTimeline', () => {
     const legacy = { version: REQUEST_TIMELINE_VERSION - 1, requests: [] };
     await pg`
       insert into agentic_trace_replay (id, request_timeline, request_timeline_version)
-      values (870, ${JSON.stringify(legacy)}::jsonb, ${REQUEST_TIMELINE_VERSION - 1})
+      values (870, ${legacy}::jsonb, ${REQUEST_TIMELINE_VERSION - 1})
     `;
 
     await writeBackRequestTimeline(pg, 870, timeline);

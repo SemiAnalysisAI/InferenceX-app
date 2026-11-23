@@ -1,6 +1,6 @@
-// The ETL writers through the real postgres.js driver (over a PGlite socket), not the template
-// shim: these pin how the driver serializes arrays, JSON text, booleans, Buffers and Dates, which
-// postgres.js v4 changed (the server now decides every parameter's type).
+// The ETL writers through the real postgres.js driver (over a PGlite socket). These pin how the
+// driver serializes arrays, JSON text, booleans, Buffers and Dates, which postgres.js v4 changed
+// (the server now decides every parameter's type).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,16 +30,15 @@ import { migratedPglite, pgliteDriverSql } from './test-pglite';
 
 let db: PGlite;
 let sql: Sql;
-let close: () => Promise<void>;
 const roots: string[] = [];
 
 beforeAll(async () => {
   db = await migratedPglite();
-  ({ sql, close } = await pgliteDriverSql(db));
+  sql = await pgliteDriverSql(db);
 }, 30_000);
 
 afterAll(async () => {
-  await close?.();
+  await sql?.end();
   await db?.close();
 });
 

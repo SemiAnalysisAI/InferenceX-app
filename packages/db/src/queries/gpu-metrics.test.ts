@@ -5,7 +5,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
 import type { DbClient } from '../connection';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getGpuMetricsForPoint, getGpuMetricsForRun, SAMPLE_PAGE_SIZE } from './gpu-metrics';
 import { getGpuMetricsPointRevision } from './gpu-metrics-revision';
 import { GPU_STATS_VERSION } from '../lib/gpu-metric-stats';
@@ -21,10 +21,11 @@ const NO_SERIES = 34557177023;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 20_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

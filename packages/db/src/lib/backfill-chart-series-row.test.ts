@@ -9,7 +9,7 @@ import {
   computeChartDataFromMetricPhases,
 } from '../etl/compute-chart-series';
 import { writeChartSeriesBackfill } from './backfill-chart-series-row';
-import { pgliteSql, type PgliteSql } from './test-pglite';
+import { pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -17,7 +17,7 @@ const series = computeChartDataFromMetricPhases({}, {}).series;
 
 beforeAll(async () => {
   db = await PGlite.create();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec(`
     create table agentic_trace_replay (
       id integer primary key,
@@ -37,7 +37,7 @@ beforeEach(async () => {
   await db.exec('truncate benchmark_results, agentic_trace_replay');
   await sql`
     insert into agentic_trace_replay (id, chart_series)
-    values (1, ${JSON.stringify({ version: CHART_SERIES_VERSION - 1 })}::jsonb)
+    values (1, ${{ version: CHART_SERIES_VERSION - 1 }}::jsonb)
   `;
   await db.exec(`
     insert into benchmark_results (id, trace_replay_id, metrics)
@@ -48,7 +48,8 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await db.close();
+  await sql?.end();
+  await db?.close();
 });
 
 describe('writeChartSeriesBackfill', () => {
@@ -94,7 +95,7 @@ describe('writeChartSeriesBackfill', () => {
 
   it('leaves both chart and row rates untouched when a newer parser has written the trace', async () => {
     const newer = { version: CHART_SERIES_VERSION + 1, prefixCacheHitRate: [{ t: 0, value: 0.8 }] };
-    await sql`update agentic_trace_replay set chart_series = ${JSON.stringify(newer)}::jsonb where id = 1`;
+    await sql`update agentic_trace_replay set chart_series = ${newer}::jsonb where id = 1`;
     expect(await writeChartSeriesBackfill(sql, 1, series, { gpu: 0.97, cpu: null })).toBe(false);
     const [row] = await sql`select chart_series from agentic_trace_replay where id = 1`;
     expect(row.chart_series).toEqual(newer);
