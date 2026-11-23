@@ -1383,7 +1383,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: 'cbacce994faad1de48a48d4d1cb4c452f0467e5dfa7d3fd57fef25e94a751274',
+    sourceSha256: '5b4d7391d005d9da3ff5bfbf629e909ac1df09b4de2cee88d3a5656777298aa0',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -2142,7 +2142,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '0d53ab244496628373742f1575e415d58974905dc0254a33afa284ba59da4e26',
+    sourceSha256: '4274534dcd9da63f88f8b41e49206c759161b7f92f691f2018b090c7d3bfafe6',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',

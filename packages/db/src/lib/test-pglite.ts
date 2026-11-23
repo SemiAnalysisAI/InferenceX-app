@@ -1,6 +1,10 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { PGlite } from '@electric-sql/pglite';
+import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
+import postgres from 'postgres';
 
 import type { DbClient } from '../connection';
 import type { Sql } from '../etl/db-utils';
@@ -63,7 +67,7 @@ function client(database: Pick<PGlite, 'query'>) {
   return Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) =>
       new PgliteQuery(database, strings, values),
-    { json: JSON.stringify, array: (value: unknown) => value },
+    { json: JSON.stringify },
   );
 }
 
@@ -72,4 +76,29 @@ export function pgliteSql(db: PGlite): PgliteSql {
     begin: (fn: (tx: Sql) => Promise<unknown>) =>
       db.transaction((tx) => fn(client(tx) as unknown as Sql)),
   }) as unknown as PgliteSql;
+}
+
+/**
+ * The real postgres.js driver against `db`, over a PGlite socket server on a Unix socket. Unlike
+ * `pgliteSql`, this exercises the driver's parameter typing, array and JSON serialization and
+ * transaction handling, so a driver upgrade that changes them fails here. Call `close` before
+ * `db.close()`.
+ */
+export async function pgliteDriverSql(
+  db: PGlite,
+): Promise<{ sql: Sql; close: () => Promise<void> }> {
+  // postgres.js reads a host that starts with `/` as a socket directory, as libpq does.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ix-pglite-'));
+  const server = new PGLiteSocketServer({ db, path: path.join(dir, '.s.PGSQL.5432') });
+  await server.start();
+  // PGlite is single-session, so the pool gets the server's one connection.
+  const sql = postgres({ host: dir, port: 5432, max: 1, onnotice: () => {} });
+  return {
+    sql,
+    close: async () => {
+      await sql.end();
+      await server.stop();
+      fs.rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }

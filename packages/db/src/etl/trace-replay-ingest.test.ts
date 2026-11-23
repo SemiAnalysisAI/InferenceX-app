@@ -103,11 +103,9 @@ function mockSqlWithTransaction(
     return Promise.resolve([]);
   };
   const tx = Object.assign(execute, {
-    array: (values: unknown[]) => values,
     json: (value: unknown) => value,
   });
   const sql = Object.assign(execute, {
-    array: (values: unknown[]) => values,
     begin: (operation: (transaction: typeof tx) => Promise<void>) => operation(tx),
   }) as unknown as Parameters<typeof persistPreparedTraceReplay>[0];
   return { sql, calls };
