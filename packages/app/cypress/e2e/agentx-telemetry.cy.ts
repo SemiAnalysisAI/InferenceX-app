@@ -141,7 +141,7 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
   it('is the only card in the corner — dashboard nudges stay off this route', () => {
     // The card waits for the first scroll so it cannot become the page's LCP element.
     cy.get('[data-testid="detail-view-logs"]').should('exist');
-    cy.document().trigger('scroll');
+    cy.scrollTo(0, 200);
     cy.get('[data-testid="telemetry-tutorial-modal"]').should('be.visible');
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
