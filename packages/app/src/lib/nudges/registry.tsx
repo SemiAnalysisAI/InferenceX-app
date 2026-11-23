@@ -402,7 +402,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'agentx-telemetry-tutorial',
     type: 'modal',
-    trigger: { type: 'timer', delayMs: 2500 },
+    // After the first scroll, when the browser has stopped picking LCP candidates, so the
+    // card's paragraph never becomes this page's largest (and latest) contentful paint.
+    trigger: { type: 'dom-event', event: 'scroll', delayMs: 2500 },
     dismissal: { type: 'permanent' },
     storageKey: TELEMETRY_TUTORIAL_STORAGE_KEY,
     priority: 40,

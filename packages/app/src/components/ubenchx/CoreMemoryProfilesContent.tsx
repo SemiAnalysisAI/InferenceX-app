@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -10,6 +10,7 @@ import {
   CORE_PROFILE_GPU_KEYS,
   type CoreProfilePanel,
 } from './core-memory-profiles';
+import { heatmapDataUrl } from './heatmap-image';
 import { SmL2Content } from './SmL2Heatmap';
 import { UbenchxHub } from './UbenchxHub';
 import {
@@ -99,6 +100,9 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
     top = 22,
     step = extent / n;
   const colors = useMemo(() => d3.scaleSequential(d3.interpolateReds).domain([0, max]), [max]);
+  // Needs a canvas, so it is drawn after mount rather than during the server render.
+  const [cellsHref, setCellsHref] = useState<string | null>(null);
+  useEffect(() => setCellsHref(heatmapDataUrl(panel.matrix, colors)), [panel.matrix, colors]);
   const ticks = [
     ...new Set([0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1]),
   ];
@@ -207,18 +211,27 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
         }}
       >
         <title>{`${panel.coreType} ${text[panel.launchMode]}`}</title>
-        {panel.matrix.flatMap((row, i) =>
-          row.map((value, j) => (
-            <rect
-              key={`${i}-${j}`}
-              x={start + j * step}
-              y={top + i * step}
-              width={step + 0.1}
-              height={step + 0.1}
-              fill={i === j ? 'var(--background)' : colors(value)}
-            />
-          )),
+        {cellsHref && (
+          <image
+            href={cellsHref}
+            x={start}
+            y={top}
+            width={extent}
+            height={extent}
+            preserveAspectRatio="none"
+            style={{ imageRendering: 'pixelated' }}
+          />
         )}
+        {panel.coreIds.map((_, i) => (
+          <rect
+            key={i}
+            x={start + i * step}
+            y={top + i * step}
+            width={step + 0.1}
+            height={step + 0.1}
+            fill="var(--background)"
+          />
+        ))}
         <line
           x1={start + extent / 2}
           x2={start + extent / 2}
@@ -386,6 +399,8 @@ export function CoreMemoryProfilesContent() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [gpu, setGpu] = useState('all');
+  // The picker updates at once; the heatmaps below re-render in the background.
+  const shownGpu = useDeferredValue(gpu);
   return (
     <div className="flex flex-col gap-4">
       <UbenchxHub
@@ -423,12 +438,12 @@ export function CoreMemoryProfilesContent() {
           </div>
         }
       />
-      {(gpu === 'all' || gpu === CORE_PROFILE_GPU) && (
+      {(shownGpu === 'all' || shownGpu === CORE_PROFILE_GPU) && (
         <section data-testid="ascend-core-profiles">
-          <AscendCoreProfiles note={gpu === 'all' ? t.comparison : undefined} />
+          <AscendCoreProfiles note={shownGpu === 'all' ? t.comparison : undefined} />
         </section>
       )}
-      {gpu !== CORE_PROFILE_GPU && <SmL2Content gpu={gpu} />}
+      {shownGpu !== CORE_PROFILE_GPU && <SmL2Content gpu={shownGpu} />}
     </div>
   );
 }

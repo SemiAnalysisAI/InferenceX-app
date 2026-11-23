@@ -58,6 +58,15 @@ describe('ComparisonChangelog', () => {
     expect(container.textContent).toContain('No config changelog data');
   });
 
+  it('holds the bounded list height while loading so the chart below does not jump', () => {
+    const container = render({ loading: true });
+    const list = container.querySelector('[data-testid="comparison-changelog-list"]')!;
+    expect(list.classList.contains('h-72')).toBe(true);
+    act(() => root!.render(createElement(ComparisonChangelog, { ...BASE, totalDatesQueried: 3 })));
+    expect(list.classList.contains('h-72')).toBe(false);
+    expect(list.classList.contains('max-h-72')).toBe(true);
+  });
+
   it('reports each toggle so the parent can start the deferred fetch', () => {
     const onExpandedChange = vi.fn();
     const container = render({ defaultExpanded: false, deferred: true, onExpandedChange });
