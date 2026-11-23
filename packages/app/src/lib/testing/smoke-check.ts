@@ -123,11 +123,12 @@ function getOnce(url: URL, headers: Record<string, string>, timeoutMs: number) {
       }),
     );
   });
-  // A deadline for the whole exchange, body included.
-  const deadline = setTimeout(
-    () => request.destroy(new NetworkError(`no complete response within ${timeoutMs} ms`)),
-    timeoutMs,
-  );
+  // A deadline for the whole exchange, body included. Settle here: destroy need not emit 'error'.
+  const deadline = setTimeout(() => {
+    const error = new NetworkError(`no complete response within ${timeoutMs} ms`);
+    reject(error);
+    request.destroy(error);
+  }, timeoutMs);
   request.on('error', (error) =>
     reject(error instanceof NetworkError ? error : new NetworkError(error.message)),
   );

@@ -299,6 +299,10 @@ describe('runCheck against a local server', () => {
       routes['/api/ok']!(req, res);
     },
     '/api/slow': () => {},
+    '/api/stalled-body': (_req, res) => {
+      res.writeHead(200, JSON_HEADERS);
+      res.write('{"rows":');
+    },
     '/start': (_req, res) => {
       res.writeHead(307, { location: '/page' });
       res.end();
@@ -368,6 +372,15 @@ describe('runCheck against a local server', () => {
 
   it('gives up on a request that never answers', async () => {
     const result = await runCheck(origin, jsonCheck('identity', '/api/slow'), {
+      ...fast,
+      timeoutMs: 50,
+      retries: 0,
+    });
+    expect(result.problems).toEqual(['no complete response within 50 ms']);
+  });
+
+  it('gives up on a body that stops after the headers', async () => {
+    const result = await runCheck(origin, jsonCheck('identity', '/api/stalled-body'), {
       ...fast,
       timeoutMs: 50,
       retries: 0,
