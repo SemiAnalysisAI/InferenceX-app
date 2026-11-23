@@ -22,7 +22,7 @@ export interface ReproducePayload {
 export function buildReproducePayload(id: number, source: ReproduceSource): ReproducePayload {
   return {
     id,
-    config: buildReproduceConfig(rowToAggDataEntry(source.row, { modelPower: false })),
+    config: buildReproduceConfig(rowToAggDataEntry(source.row)),
     run: source.run,
     logs: source.logs,
   };

@@ -7,7 +7,7 @@ import { useId, useMemo, useState } from 'react';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-categories';
 import { cn } from '@/lib/shared/utils';
 import {
   isHatchedBand,

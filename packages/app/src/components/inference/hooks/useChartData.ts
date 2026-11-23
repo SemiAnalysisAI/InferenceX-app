@@ -70,6 +70,7 @@ import {
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
+import { useSystemPowerModeler } from '@/lib/power/system-power-modeler';
 import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
 
 export {
@@ -272,7 +273,13 @@ export function useChartData(
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
 
-  const loading = queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
+  // Points carry modeled system power, so the chart waits for the lazily loaded model too.
+  const modelSystemPower = useSystemPowerModeler();
+  const loading =
+    queryLoading ||
+    !allRows ||
+    !modelSystemPower ||
+    (comparisonDates.length > 0 && comparisonLoading);
   const refreshing = !loading && (basePlaceholder || baseFetching);
   const error = queryError ? queryError.message : null;
 
@@ -320,13 +327,20 @@ export function useChartData(
   ]);
 
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
-    if (rows.length === 0)
+    if (rows.length === 0 || !modelSystemPower)
       return {
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis);
-  }, [rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis]);
+    return transformBenchmarkRows(
+      rows,
+      selectedPercentile,
+      tcoBasis,
+      tokenBasis,
+      chipBasis,
+      modelSystemPower,
+    );
+  }, [rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis, modelSystemPower]);
 
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
     key: '',

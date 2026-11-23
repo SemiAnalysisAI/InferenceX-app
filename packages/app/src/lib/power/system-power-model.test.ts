@@ -10,17 +10,19 @@ import {
 } from './facility-pue';
 import {
   emptySystemPowerBreakdown,
+  SYSTEM_POWER_CATEGORIES,
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+  type SystemPowerCategory,
+} from './system-power-categories';
+import {
   estimateChassisPower,
   estimateRackPower,
   isRackPowerHardware,
   isSystemPowerHardware,
   rackComputeTrayCount,
-  SYSTEM_POWER_CATEGORIES,
-  SYSTEM_POWER_MODEL_REVISION,
-  SYSTEM_POWER_MODEL_SOURCE_URL,
   systemPowerLeafCategory,
   systemUnitGpuCount,
-  type SystemPowerCategory,
   type SystemPowerOperatingState,
 } from './system-power-model';
 import type { PowerComponentBreakdown } from './power_model/base';

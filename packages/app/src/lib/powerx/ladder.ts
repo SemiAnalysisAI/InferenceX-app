@@ -1,12 +1,12 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { gpusPerMegawatt } from '@/lib/power/power-basis';
+import type { SystemPowerCategory } from '@/lib/power/system-power-categories';
 import {
   estimateChassisPower,
   estimateRackPower,
   isRackPowerHardware,
   type RackPowerHardware,
-  type SystemPowerCategory,
   type SystemPowerHardware,
   type SystemPowerOperatingState,
   systemUnitGpuCount,
