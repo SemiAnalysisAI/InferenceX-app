@@ -229,7 +229,7 @@ export function AgenticPointDetail({ id }: Props) {
   // not reopen this page. Otherwise (deep link, new tab) Back replaces this entry with the chart.
   const [openedFromChart, setOpenedFromChart] = useState(false);
   useEffect(() => {
-    setOpenedFromChart(resolveAgenticDetailOrigin());
+    setOpenedFromChart(resolveAgenticDetailOrigin(id));
   }, [id]);
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');

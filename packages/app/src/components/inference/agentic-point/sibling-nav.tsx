@@ -299,7 +299,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
                 track('agentic_siblings_navigated', { direction: 'prev', target_id: prev.id });
                 // Stepping through siblings swaps the point in place so browser Back still
                 // returns to the page that opened the detail.
-                noteAgenticSiblingStep();
+                noteAgenticSiblingStep(prev.id);
                 router.replace(hrefFor(prev.id));
               }
             }}
@@ -316,7 +316,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             onClick={() => {
               if (next) {
                 track('agentic_siblings_navigated', { direction: 'next', target_id: next.id });
-                noteAgenticSiblingStep();
+                noteAgenticSiblingStep(next.id);
                 router.replace(hrefFor(next.id));
               }
             }}
@@ -340,7 +340,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               onClick={() => {
                 if (!active) {
                   track('agentic_siblings_navigated', { direction: 'chip', target_id: s.id });
-                  noteAgenticSiblingStep();
+                  noteAgenticSiblingStep(s.id);
                   router.replace(hrefFor(s.id));
                 }
               }}
