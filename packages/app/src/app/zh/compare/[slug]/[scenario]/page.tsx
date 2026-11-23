@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
 import {
+  prerenderedScenarioParams,
   type ScenarioSegment,
   sequenceForScenarioSegment,
 } from '@/lib/compare/compare-scenario-route';
@@ -10,8 +12,9 @@ import { buildCompareMetadataZh, renderComparePageZh } from '../page';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { scenario: string }[] {
-  return [];
+// The slugs the parent page builds, each with its most visited scenarios.
+export function generateStaticParams(): Promise<{ slug: string; scenario: string }[]> {
+  return getPrerenderedCompareParams().then(prerenderedScenarioParams);
 }
 
 interface Props {
