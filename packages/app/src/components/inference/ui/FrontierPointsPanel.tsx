@@ -17,7 +17,7 @@ import { pointTopologyKey, topologyLabel } from '../utils/topology-filter';
 
 const STRINGS = {
   en: {
-    title: 'Frontier points',
+    title: 'Frontier Points',
     hardware: 'Hardware',
     config: 'Configuration',
     concurrency: 'Conc.',

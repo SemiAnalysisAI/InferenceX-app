@@ -14,8 +14,8 @@ const STRINGS = {
   en: {
     back: 'Back',
     inferenceChart: 'Inference chart',
-    eyebrow: 'Fixed-sequence benchmark',
-    title: 'Benchmark logs',
+    eyebrow: 'Fixed-Sequence Benchmark',
+    title: 'Benchmark Logs',
   },
   zh: {
     back: '返回',

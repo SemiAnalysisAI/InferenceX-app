@@ -166,7 +166,7 @@ export default async function GlossaryTermPage({ params }: Props) {
 
               <section aria-labelledby="technical-definition-heading" className="mt-12">
                 <h2 id="technical-definition-heading" className={ARTICLE_H2_CLASS}>
-                  Technical definition
+                  Technical Definition
                 </h2>
                 <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.definition}</p>
               </section>
@@ -187,19 +187,19 @@ export default async function GlossaryTermPage({ params }: Props) {
               <div className={cn(READING_SECTION_CLASS, 'mt-12 space-y-12')}>
                 <section aria-labelledby="engineering-details">
                   <h2 id="engineering-details" className={ARTICLE_H2_CLASS}>
-                    Engineering details
+                    Engineering Details
                   </h2>
                   <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.explanation}</p>
                 </section>
                 <section aria-labelledby="why-it-matters">
                   <h2 id="why-it-matters" className={ARTICLE_H2_CLASS}>
-                    Why it matters
+                    Why It Matters
                   </h2>
                   <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.significance}</p>
                 </section>
                 <section aria-labelledby="reading-inferencex">
                   <h2 id="reading-inferencex" className={ARTICLE_H2_CLASS}>
-                    How to read it in InferenceX
+                    How to Read It in InferenceX
                   </h2>
                   <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.benchmarkContext}</p>
                 </section>
@@ -230,7 +230,7 @@ export default async function GlossaryTermPage({ params }: Props) {
             <section aria-labelledby="further-reading" className={READING_SECTION_CLASS}>
               <div className="flex max-w-measure flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
                 <h2 id="further-reading" className={ARTICLE_H2_CLASS}>
-                  See the concept in real benchmarks
+                  See the Concept in Real Benchmarks
                 </h2>
                 <IntentPrefetchLink
                   href="/blog"

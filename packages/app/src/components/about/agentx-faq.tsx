@@ -49,21 +49,21 @@ const CONTENT: Record<
     ],
     sections: [
       {
-        title: 'What does AgentX measure?',
+        title: 'What Does AgentX Measure?',
         paragraphs: [
           'Traditional load tests often send unrelated single-turn prompts at a fixed request rate. AgentX instead keeps a configurable number of complete session trees alive. A root coding conversation may spawn child conversations, wait for them, and resume after they finish. Each turn carries the accumulated message history, creating the long shared prefixes and bursty fan-out seen in real agent systems.',
           'The prompt text is synthesized, but the workload shape comes from recorded sessions: input and output lengths, prefix-sharing relationships, subagent topology, and inter-turn timing. This preserves the parts that matter to schedulers, routers, and prefix caches without replaying private user content.',
         ],
       },
       {
-        title: 'Where does the workload come from?',
+        title: 'Where Does the Workload Come From?',
         paragraphs: [
           'The scenario uses SemiAnalysis public Weka-format agentic-coding trace corpora. For reproducible comparisons, choose a date-pinned corpus rather than the rolling alias. A _256k variant removes individual requests above the 256K-token range and is the better match for servers with a context window around that size.',
           'The short semianalysis_cc_traces_weka name is the legacy corpus without subagents. Use a dated corpus or a with_subagents alias when you want AgentX fan-out behavior.',
         ],
       },
       {
-        title: 'What does the scenario lock?',
+        title: 'What Does the Scenario Lock?',
         paragraphs: [
           'Passing --scenario inferencex-agentx-mvp selects agentic replay and enforces the settings that define a comparable run:',
         ],
@@ -79,21 +79,21 @@ const CONTENT: Record<
         code: undefined,
       },
       {
-        title: 'Why does AgentX use streaming chat completions?',
+        title: 'Why Does AgentX Use Streaming Chat Completions?',
         paragraphs: [
           'The recorded workload is represented as multi-turn message arrays, which map naturally to an OpenAI-compatible chat-completions endpoint. Streaming exposes first-token and token-to-token timing; a non-streaming response cannot provide those core latency measurements.',
           "--use-server-token-count changes only metric accounting. It trusts the server's usage fields when local tokenization differs because of a tokenizer revision or invisible chat-template overhead. It does not change prompt construction.",
         ],
       },
       {
-        title: 'What does concurrency mean?',
+        title: 'What Does Concurrency Mean?',
         paragraphs: [
           'Concurrency is the number of live session trees, not the number of in-flight HTTP requests. A session can fan out into several child conversations, so instantaneous request concurrency may exceed the configured value.',
           'There is intentionally no request-rate control in this scenario. Offered load is produced by the number of active sessions together with their recorded think times and fan-out patterns. This makes --concurrency the primary load dial.',
         ],
       },
       {
-        title: 'Why can the first run take so long?',
+        title: 'Why Can the First Run Take So Long?',
         paragraphs: [
           'Before traffic starts, AIPerf downloads the corpus and reconstructs it into tokenized, cache-aware conversation trees. The result is stored in a memory-mapped disk cache. With the same corpus, tokenizer, reconstruction settings, entry count, and random seed, later runs can restore that prepared dataset in seconds.',
           'For a cold run, raise both configuration timeouts together. The visible run then proceeds through dataset configuration, warmup, timed profiling, and drain/export. Benchmark duration covers only profiling, so total wall time is longer.',
@@ -102,28 +102,28 @@ const CONTENT: Record<
 export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       },
       {
-        title: 'Can I run a short smoke test?',
+        title: 'Can I Run a Short Smoke Test?',
         paragraphs: [
           'A valid run cannot be shorter than 900 seconds. For a cheap but valid check, use low concurrency and keep the 900-second minimum. --num-dataset-entries reduces reconstruction work, but changes the workload and should not be used for a result you plan to compare or submit.',
           'For a minutes-long connectivity test, use --unsafe-override with a short duration and accept the invalid stamp. Keeping the full corpus and pinning the random seed lets the subsequent valid run reuse the reconstructed dataset cache.',
         ],
       },
       {
-        title: 'How do I know the load generator is not the bottleneck?',
+        title: 'How Do I Know the Load Generator Is Not the Bottleneck?',
         paragraphs: [
           'AIPerf distributes work across worker processes and reports worker health every two seconds. Treat the high-CPU warning as a saturation signal: add client cores or another load-generator host before trusting the result.',
           "For deeper diagnosis, --show-trace-timing separates time waiting for a free pooled client connection from time waiting on the server's first byte. Healthy worker CPU and little connection-pool blocking are strong evidence that the measured limit is server-side.",
         ],
       },
       {
-        title: 'Why do connection resets appear partway through a run?',
+        title: 'Why Do Connection Resets Appear Partway Through a Run?',
         paragraphs: [
           'Client and server keep-alive settings may disagree. If AIPerf retains an idle pooled connection longer than the server keeps it open, the client may reuse a closed socket. Set the client keep-alive below the server value. This often appears during paced profiling rather than warmup because warmup connections do not remain idle as long.',
         ],
         code: 'export AIPERF_HTTP_KEEPALIVE_TIMEOUT=4',
       },
       {
-        title: 'How should multi-replica routing work?',
+        title: 'How Should Multi-Replica Routing Work?',
         code: AGENTX_ROUTING,
         paragraphs: [
           AGENTX_QUICKSTART.en.routingHelp,
@@ -136,14 +136,14 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         ],
       },
       {
-        title: 'Which metrics should I inspect?',
+        title: 'Which Metrics Should I Inspect?',
         paragraphs: [
           'AgentX reports TTFT, ITL, end-to-end latency, output throughput, and error rates alongside prefix-cache behavior, context overflow, session and subagent execution, worker saturation, and scenario compliance.',
           'Always check submission_valid before comparing runs. Excessive context overflow, cancellation, unsafe overrides, or other scenario violations can invalidate an otherwise complete artifact.',
         ],
       },
       {
-        title: 'Practical rules of thumb',
+        title: 'Practical Rules of Thumb',
         bullets: [
           "Match the corpus to the server's context window; prefer the _256k corpus for a roughly 256K server.",
           'Use date-pinned corpora and a pinned random seed for comparisons.',
@@ -155,7 +155,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         ],
       },
     ],
-    creditsTitle: 'Credits and further reading',
+    creditsTitle: 'Credits and Further Reading',
     adapted:
       'Adapted from the AIPerf AgentX documentation. The upstream source is maintained by NVIDIA and licensed under Apache-2.0.',
     authority:

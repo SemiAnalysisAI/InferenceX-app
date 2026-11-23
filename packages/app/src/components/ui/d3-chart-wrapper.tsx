@@ -21,7 +21,7 @@ const DEFAULT_CHART_INSTRUCTIONS = {
 } as const;
 
 const SHEET_STRINGS = {
-  en: { title: 'Point details', close: 'Close point details' },
+  en: { title: 'Point Details', close: 'Close point details' },
   zh: { title: '数据点详情', close: '关闭数据点详情' },
 } as const;
 

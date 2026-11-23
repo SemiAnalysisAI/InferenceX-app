@@ -229,7 +229,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
       .and('have.attr', 'aria-modal', 'true')
-      .and('contain.text', 'TPUv7 preliminary results across multiple models')
+      .and('contain.text', 'TPUv7 Preliminary Results Across Multiple Models')
       .and('contain.text', 'AgentX Preview Submissions')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
