@@ -376,7 +376,7 @@ describe('history projection version', () => {
       // learned to take an early document-load response, data_query_failed stopped reporting failed
       // background refetches that keep their data, and dashboard-routes gained the default Inference
       // model slug. None of these change the rows recorded entries use.
-      sources: 'cdff22308fbadae01df695f585f49931d368f59d8ff98bc1aa0a9bad9095a434',
+      sources: '8ca413978adddf3abe528e828e1a2c3dc6123acd91df6f3d8d3e6ac14019ce04',
     });
   });
 });
