@@ -657,13 +657,20 @@ describe('Overview page', () => {
   it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
     cy.viewport(1280, 900);
 
-    for (const [href, attribute, key, sentence] of [
-      ['/overview?tier=50', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+    for (const [href, attribute, key, sentence, hideChip] of [
+      [
+        '/overview?tier=50',
+        'data-overview-row-scope',
+        'rows=changed',
+        'no 30-day change',
+        'Hide unchanged',
+      ],
       [
         '/overview?tier=50&compare=hardware',
         'data-overview-hardware-row-scope',
         'hwrows=priced',
         'no result on any platform',
+        'Hide blanks',
       ],
     ] as const) {
       cy.visit(href);
@@ -685,7 +692,11 @@ describe('Overview page', () => {
           cy.get(`a[${attribute}]`)
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
-            .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+            .and(
+              'have.attr',
+              'aria-label',
+              `Show all rows ${hidden}. Show ${hidden} rows with ${sentence}`,
+            );
           cy.window().then((win) => {
             win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
             win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
@@ -693,7 +704,7 @@ describe('Overview page', () => {
           cy.get(`a[${attribute}]`).should(
             'have.attr',
             'aria-label',
-            `Show ${hidden + 1} rows with ${sentence}`,
+            `Show all rows ${hidden + 1}. Show ${hidden + 1} rows with ${sentence}`,
           );
           cy.get('[data-testid="overview-desktop-model"]').should(
             'have.length',
@@ -704,13 +715,17 @@ describe('Overview page', () => {
             win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
           });
           cy.get(`a[${attribute}]`)
-            .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
+            .should(
+              'have.attr',
+              'aria-label',
+              `Show all rows ${hidden}. Show ${hidden} rows with ${sentence}`,
+            )
             .click();
           cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
           cy.get(`a[${attribute}]`).should(
             'have.attr',
             'aria-label',
-            `Hide ${hidden} rows with ${sentence}`,
+            `${hideChip} ${hidden}. Hide ${hidden} rows with ${sentence}`,
           );
         });
     }
