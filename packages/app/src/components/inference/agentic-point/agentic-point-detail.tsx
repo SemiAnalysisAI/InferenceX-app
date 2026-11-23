@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
 import { useRequestChartData } from '@/hooks/api/use-request-chart-data';
@@ -21,7 +22,9 @@ import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
-import { withChartState } from '@/lib/routing/url-state';
+import type { Model } from '@/lib/catalog/data-mappings';
+import { inferenceModelPath, inferenceModelSlugForModel } from '@/lib/routing/inference-model-slug';
+import { currentChartSearch, withChartState } from '@/lib/routing/url-state';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import { AggregatesGrid } from './aggregates-grid';
@@ -187,13 +190,6 @@ export function AgenticPointDetail({ id }: Props) {
   const t = AGENTIC_POINT_DETAIL_STRINGS[locale];
   const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
-  const inferenceBaseHref = isZh
-    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}`
-    : getDashboardRoute('inference').path;
-  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
-  useEffect(() => {
-    setInferenceHref(withChartState(inferenceBaseHref));
-  }, [inferenceBaseHref]);
   const featureGateUnlocked = useFeatureGate();
   const [view, setView] = useDetailView();
   const viewOptions = useMemo(
@@ -205,6 +201,26 @@ export function AgenticPointDetail({ id }: Props) {
 
   const metrics = metricsQuery.data;
   const siblingsData = siblingsQuery.data;
+  // Back and the chart link open the chart of this point's own model. The bare Inference path
+  // would redirect to the featured model whenever chart state leaves `g_model` out (it does for
+  // the default model), so the model goes in the path instead.
+  const pointModel = siblingsData ? DB_MODEL_TO_DISPLAY[siblingsData.sku.model] : undefined;
+  const pointModelSlug = pointModel ? inferenceModelSlugForModel(pointModel as Model) : null;
+  const chartPath = pointModelSlug
+    ? inferenceModelPath(pointModelSlug)
+    : getDashboardRoute('inference').path;
+  const inferenceBaseHref = isZh ? `${ZH_PREFIX}${chartPath}` : chartPath;
+  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
+  useEffect(() => {
+    if (!pointModelSlug) {
+      setInferenceHref(withChartState(inferenceBaseHref));
+      return;
+    }
+    const state = new URLSearchParams(currentChartSearch());
+    state.delete('g_model');
+    const search = state.toString();
+    setInferenceHref(search ? `${inferenceBaseHref}?${search}` : inferenceBaseHref);
+  }, [inferenceBaseHref, pointModelSlug]);
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
