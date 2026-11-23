@@ -957,8 +957,8 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
             ? {
                 status,
                 description: text(
-                  'The run does not exist on GitHub (RUN_NOT_FOUND), or it lists no telemetry artifacts or all of them expired or hold no series (NO_TELEMETRY). Not cached.',
-                  'GitHub 上不存在该运行（RUN_NOT_FOUND），或该运行没有遥测产物、遥测产物均已过期或不含任何序列（NO_TELEMETRY）。响应不缓存。',
+                  'The run does not exist on GitHub (RUN_NOT_FOUND), or it lists no telemetry artifacts or all of them are expired, unreadable or without series (NO_TELEMETRY). Do not retry. Not cached.',
+                  'GitHub 上不存在该运行（RUN_NOT_FOUND），或该运行没有遥测产物、遥测产物均已过期、无法读取或不含任何序列（NO_TELEMETRY）。无需重试。响应不缓存。',
                 ),
                 schema: object,
                 example: { error: 'No Chip metrics data found in artifacts', code: 'NO_TELEMETRY' },
