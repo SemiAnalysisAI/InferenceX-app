@@ -20,6 +20,11 @@ export interface FailedRequest {
   hash: string;
   /** Errors from requests that throw to an error boundary are already tracked as `error_page_shown`. */
   throwsToErrorBoundary: boolean;
+  /**
+   * The query still holds data from an earlier fetch, so this was a background refetch (for
+   * example the reconnect refetch after a laptop wakes) and readers keep seeing that data.
+   */
+  keepsData?: boolean;
 }
 
 export interface DataQueryFailure {
@@ -41,14 +46,22 @@ function isAbort(error: unknown): boolean {
   );
 }
 
-/** Builds `data_query_failed` properties, or null for cancellations and boundary-handled errors. */
+/**
+ * Builds `data_query_failed` properties, or null for cancellations, boundary-handled errors, and
+ * failed background refetches that left the previous data in place.
+ */
 export function describeDataQueryFailure(
   error: unknown,
   request: FailedRequest,
   kind: DataQueryFailure['kind'],
   pathname: string,
 ): DataQueryFailure | null {
-  if (request.throwsToErrorBoundary || isAbort(error) || error instanceof ExpectedQueryFailureError)
+  if (
+    request.throwsToErrorBoundary ||
+    request.keepsData ||
+    isAbort(error) ||
+    error instanceof ExpectedQueryFailureError
+  )
     return null;
   const first = request.key?.[0];
   return {
