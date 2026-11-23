@@ -354,9 +354,11 @@ export function InferenceProvider({
     availabilityError,
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
-  const { isUnofficialRun } = useUnofficialRun();
+  // The requested flag is known on the first render. Waiting for overlay data would start the
+  // page on official-only rules and flip them (resetting the GPU selection) when it lands.
+  const { isUnofficialRunRequested } = useUnofficialRun();
   const featureGateUnlocked = useFeatureGate();
-  const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
+  const engineGuardLifted = isEngineGuardLifted(isUnofficialRunRequested, featureGateUnlocked);
   const engineConsent = useEngineComparisonConsent(
     `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
   );
@@ -769,7 +771,7 @@ export function InferenceProvider({
     tcoBasis,
     activeTab === 'inference' &&
       !autoSelectAllGpus &&
-      !isUnofficialRun &&
+      !isUnofficialRunRequested &&
       !hasExplicitRunSelection &&
       selectedRunDateRev === 0,
     powerCompare,
@@ -942,7 +944,7 @@ export function InferenceProvider({
     [setSelectedYAxisMetric, clearPresetOnChange],
   );
   const setSelectedGPUsAndClear = useCallback(
-    (next: string[]) => {
+    (next: string[]): boolean => {
       gpuSelectionChosenRef.current = true;
       if (
         requestEngineComparison(next, () => {
@@ -950,11 +952,11 @@ export function InferenceProvider({
           clearScopedSelectionOnChange();
         })
       )
-        return;
+        return false;
       if (!exclusion) {
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
-        return;
+        return true;
       }
 
       const previous = new Set(selectedGPUs);
@@ -976,16 +978,16 @@ export function InferenceProvider({
             existing: decision.existing,
           });
           clearPresetOnChange();
-          return;
+          return false;
         }
         if (decision.kind === 'silent-resolve') {
           setSelectedGpuState([...decision.result]);
           clearScopedSelectionOnChange();
-          return;
+          return false;
         }
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
-        return;
+        return true;
       }
 
       const { result, droppedGroups } = resolveExclusionGroups(
@@ -1002,6 +1004,7 @@ export function InferenceProvider({
         });
       }
       clearScopedSelectionOnChange();
+      return result.size === proposed.size;
     },
     [
       selectedGPUs,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { pointTopologyKey, topologyLabel } from './topology-filter';
+import { pointTopologyKey, topologyLabel, topologyLabels } from './topology-filter';
 
 describe('topologyLabel', () => {
   it('spells out offload modes beside compact parallelism tokens', () => {
@@ -14,6 +14,40 @@ describe('topologyLabel', () => {
       'Single-node · GPU8 · TP8 · EP1 · offload off',
       'Single-node · GPU8 · TP8 · EP1 · offload on',
     ]);
+  });
+});
+
+describe('topologyLabels', () => {
+  it('drops the parts every key of a mode shares, judged within that mode only', () => {
+    const single = { physicalChips: 8, dp: 1, decode_tp: 8, decode_ep: 1, offload_mode: 'on' };
+    const pd = { ...single, disagg: true, num_decode_gpu: 8, offload_mode: 'off' };
+    const keys = [
+      single,
+      { ...single, decode_tp: 4, decode_ep: 4 },
+      { ...pd, num_prefill_gpu: 4, prefill_tp: 4 },
+      { ...pd, num_prefill_gpu: 8, prefill_tp: 8 },
+    ].map((point) => pointTopologyKey(point as InferenceData));
+    expect(topologyLabels(keys, 'en')).toEqual([
+      'Single-node · GPU8 · TP8 · EP1',
+      'Single-node · GPU8 · TP4 · EP4',
+      'Disaggregated · GPU8 · TP8 · EP1 · P-GPU4 · D-GPU8 · P-TP4 · P-EP?',
+      'Disaggregated · GPU8 · TP8 · EP1 · P-GPU8 · D-GPU8 · P-TP8 · P-EP?',
+    ]);
+  });
+
+  it('labels each key exactly as topologyLabel does against the same keys', () => {
+    const keys = [
+      { physicalChips: 8, decode_tp: 8, decode_ep: 1, decode_pp: 1, offload_mode: 'off' },
+      { physicalChips: 8, decode_tp: 8, decode_ep: 8, decode_pp: 1, offload_mode: 'off' },
+      { physicalChips: 16, is_multinode: true, decode_tp: 8, decode_pp: 2, offload_mode: 'on' },
+      { disagg: true, physicalChips: 12, num_prefill_gpu: 4, num_decode_gpu: 8, prefill_tp: 4 },
+      { disagg: true, physicalChips: 12, num_prefill_gpu: 4, num_decode_gpu: 8, prefill_tp: 2 },
+    ].map((point) => pointTopologyKey(point as InferenceData));
+    for (const locale of ['en', 'zh'] as const) {
+      expect(topologyLabels(keys, locale)).toEqual(
+        keys.map((key) => topologyLabel(key, locale, keys)),
+      );
+    }
   });
 });
 

@@ -875,7 +875,7 @@ function ProfitEstimatorInner({
   }, [costProvider, customCostBases, tcoBasis]);
   const handleCostProviderChange = useCallback(
     (next: string) => {
-      if (interceptLockedTier(next)) return;
+      if (interceptLockedTier(next)) return false;
       if (next === 'custom') enterCustomCosts();
       else setCostProvider(next as ProfitCostProvider);
       track('profit_cost_provider_changed', { provider: next });

@@ -874,7 +874,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                       onChange={(values) => {
                         const next = values[0];
                         if (!next) return;
-                        if (interceptLockedTier(next)) return;
+                        if (interceptLockedTier(next)) return false;
                         setCostProvider(next as CostProvider);
                         track('first_token_cost_provider_changed', { provider: next });
                       }}

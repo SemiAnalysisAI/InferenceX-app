@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
 import type { PowerTier } from '@/lib/power/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
-import { topologyLabel } from '@/components/inference/utils/topology-filter';
+import { topologyLabels } from '@/components/inference/utils/topology-filter';
 
 import {
   useInferenceActions,
@@ -192,6 +192,7 @@ export function QuickFiltersDialog({
   const topologyKeys = [
     ...new Set([...(availableQuickFilters.topologies ?? []), ...(quickFilters.topologies ?? [])]),
   ];
+  const topologyKeyLabels = topologyLabels(topologyKeys, locale);
 
   const groups: {
     key: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power' | 'topology';
@@ -259,9 +260,9 @@ export function QuickFiltersDialog({
     {
       key: 'topology',
       label: t.topology,
-      options: topologyKeys.map((value) => ({
+      options: topologyKeys.map((value, index) => ({
         value,
-        label: topologyLabel(value, locale, topologyKeys),
+        label: topologyKeyLabels[index],
         available: (availableQuickFilters.topologies ?? []).includes(value),
       })),
       selected: quickFilters.topologies ?? [],

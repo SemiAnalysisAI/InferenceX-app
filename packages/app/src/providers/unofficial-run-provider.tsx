@@ -83,7 +83,14 @@ export interface OverlayScopeInput {
 }
 
 export interface UnofficialRunContextType {
+  /** Overlay run data has loaded. Gate overlay rendering on this. */
   isUnofficialRun: boolean;
+  /**
+   * The URL asks for an overlay run that is loading or loaded. Known on the first render, so
+   * official-only behaviour can be held back before the overlay data arrives. Turns false when
+   * the run is dismissed, unavailable, or fails to load.
+   */
+  isUnofficialRunRequested: boolean;
   unofficialRunInfo: UnofficialRunInfo | null;
   unofficialRunInfos: UnofficialRunInfo[];
   runIndexByUrl: Record<string, number>;
@@ -553,6 +560,7 @@ export function UnofficialRunProvider({
   const contextValue = useMemo<UnofficialRunContextType>(
     () => ({
       isUnofficialRun: unofficialRunInfos.length > 0,
+      isUnofficialRunRequested: hasRunIds && (loading || unofficialRunInfos.length > 0),
       unofficialRunInfo,
       unofficialRunInfos,
       runIndexByUrl,
@@ -574,6 +582,7 @@ export function UnofficialRunProvider({
       resetOverlaySelection,
     }),
     [
+      hasRunIds,
       unofficialRunInfos,
       unofficialRunInfo,
       runIndexByUrl,

@@ -989,7 +989,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
             onChange={(values) => {
               const next = values[0];
               if (!next) return;
-              if (interceptLockedTier(next)) return;
+              if (interceptLockedTier(next)) return false;
               handleCostProviderChange(next);
             }}
             open={openDropdown === 'costProvider'}

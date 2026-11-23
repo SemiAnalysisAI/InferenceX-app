@@ -103,7 +103,7 @@ export function CostTierSelector({
   if (!selectedFamily || !selectedTier) return null;
 
   const handleChange = (value: string) => {
-    if (interceptLocked(value)) return;
+    if (interceptLocked(value)) return false;
     const tierKey = value.replace(/^y_/u, '');
     if (
       isMetricKey(tierKey) &&
