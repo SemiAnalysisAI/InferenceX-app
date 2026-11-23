@@ -1,4 +1,5 @@
-import { profitModelDefaults } from '@/components/calculator/profit-estimator';
+import { type CacheHitMode, profitModelDefaults } from '@/components/calculator/profit-estimator';
+import type { ProfitPowerBasis } from '@/components/calculator/profit-power';
 import {
   Model,
   MODEL_OPTIONS,
@@ -9,7 +10,20 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/catalog/data-mappings';
-import { profitRouteSearch } from '@/lib/routing/profit-estimator-routes';
+import { profitRouteParams, profitRouteSearch } from '@/lib/routing/profit-estimator-routes';
+
+/**
+ * Profit estimator controls a shared link can preset. They live in the seed, which the server
+ * reads from the route path, so a link with chips or dates renders those controls in its HTML
+ * instead of adding them after hydration and pushing the chart down.
+ */
+export interface ProfitUrlSeed {
+  historyGpus: string[];
+  historyDateRange: { startDate: string; endDate: string };
+  historyDates: string[];
+  cacheHitMode?: CacheHitMode;
+  powerBasis?: ProfitPowerBasis;
+}
 
 export interface CalculatorUrlSeed {
   model?: Model;
@@ -19,6 +33,8 @@ export interface CalculatorUrlSeed {
   runDate?: string;
   runId?: string;
   profitTarget?: number;
+  /** Present only on profit estimator routes. */
+  profit?: ProfitUrlSeed;
 }
 
 export function parseProfitTargetParam(value: string | null): number | undefined {
@@ -74,13 +90,31 @@ export function resolveCalculatorUrlSeed(params: URLSearchParams): CalculatorUrl
   return seed;
 }
 
+export function resolveProfitUrlSeed(params: URLSearchParams): ProfitUrlSeed {
+  const startDate = params.get('i_dstart') ?? '';
+  const endDate = params.get('i_dend') ?? '';
+  const cacheHitMode = params.get('c_chmode');
+  const powerBasis = params.get('c_power');
+  const seed: ProfitUrlSeed = {
+    historyGpus: params.get('i_gpus')?.split(',').filter(Boolean) ?? [],
+    historyDateRange:
+      startDate && endDate ? { startDate, endDate } : { startDate: '', endDate: '' },
+    historyDates: params.get('i_dates')?.split(',').filter(Boolean) ?? [],
+  };
+  if (cacheHitMode === 'actual') seed.cacheHitMode = cacheHitMode;
+  if (powerBasis === 'modeled' || powerBasis === 'compare') seed.powerBasis = powerBasis;
+  return seed;
+}
+
 export function calculatorUrlSeed(
   pathname: string,
   search: string,
   routeModel: Model | undefined,
 ): CalculatorUrlSeed {
-  const seed = resolveCalculatorUrlSeed(profitRouteSearch(pathname, search));
-  return { ...seed, model: seed.model ?? routeModel };
+  const params = profitRouteSearch(pathname, search);
+  const seed = resolveCalculatorUrlSeed(params);
+  const profit = profitRouteParams(pathname) === null ? undefined : resolveProfitUrlSeed(params);
+  return { ...seed, model: seed.model ?? routeModel, ...(profit && { profit }) };
 }
 
 export { Model, Percentile, Precision, Sequence };

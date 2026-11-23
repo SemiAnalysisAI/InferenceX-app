@@ -160,7 +160,7 @@ export async function renderSpecDecodePageZh(slug: string, { scenarioSegment }: 
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideAFull, sideBFull);
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
-  const imageUrl = `${SITE_URL}/compare-spec-decode/${canonical}/spec-decode-comparison.png?lang=zh`;
+  const imageUrl = `${SITE_URL}/zh/compare-spec-decode/${canonical}/spec-decode-comparison.png`;
 
   const jsonLd = buildVariantJsonLdZh(
     'spec-decode',
@@ -212,7 +212,7 @@ export async function renderSpecDecodePageZh(slug: string, { scenarioSegment }: 
         gpuVendor={gpuMeta?.vendor ?? ''}
         aLabel={aLabel}
         bLabel={bLabel}
-        heroImageSrc={`/compare-spec-decode/${canonical}/spec-decode-comparison.png?lang=zh`}
+        heroImageSrc={`/zh/compare-spec-decode/${canonical}/spec-decode-comparison.png`}
         locale="zh"
       />
     </>

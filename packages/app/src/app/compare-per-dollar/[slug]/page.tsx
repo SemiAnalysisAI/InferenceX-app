@@ -36,6 +36,7 @@ import {
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
 import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
+import { perDollarPngVersion } from '@/lib/compare/per-dollar-png';
 
 import ComparePerDollarPageClient from './page-client';
 
@@ -130,6 +131,8 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
     null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
+  // Reuses the cached pair read above (the scenario pages read the default scenario once more).
+  const heroImageVersion = await perDollarPngVersion(parsed);
 
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
@@ -199,6 +202,7 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
         heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png`}
+        heroImageVersion={heroImageVersion}
       />
     </>
   );

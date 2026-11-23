@@ -2,6 +2,7 @@
 import * as d3 from 'd3';
 import { describe, it, expect } from 'bun:test';
 
+import { LOGO_WATERMARK_HREF } from './logo-watermark';
 import { createLogoWatermark, createUnofficialWatermark } from './watermark';
 
 function makeSvg() {
@@ -62,7 +63,7 @@ describe('createLogoWatermark', () => {
 
     const image = defs.select('#logo-pattern-test image');
     expect(image.empty()).toBe(false);
-    expect(image.attr('href')).toBe('/brand/logo-color.webp');
+    expect(image.attr('href')).toBe(LOGO_WATERMARK_HREF);
     expect(image.attr('opacity')).toBe('0.1');
 
     const logoSize = Math.min(innerWidth, innerHeight) * 0.6;

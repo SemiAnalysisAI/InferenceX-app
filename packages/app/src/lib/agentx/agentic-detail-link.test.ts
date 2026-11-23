@@ -50,14 +50,20 @@ describe('agenticDetailHref', () => {
     setupWindow('', '/zh/infx/inference');
     const { agenticDetailHref } = await importAgenticDetailLink();
 
-    expect(agenticDetailHref(440106, 'zh')).toBe('/zh/infx/inference/agentic/440106');
-    expect(agenticDetailHref(440106, 'en')).toBe('/infx/inference/agentic/440106');
+    expect(agenticDetailHref(440106, 'Kimi-K3', 'zh')).toBe(
+      '/zh/infx/inference/agentic/440106?g_model=Kimi-K3',
+    );
+    expect(agenticDetailHref(440106, 'Kimi-K3', 'en')).toBe(
+      '/infx/inference/agentic/440106?g_model=Kimi-K3',
+    );
   });
 
   it('defaults to the English path when no locale is given', async () => {
     setupWindow('', '/infx/inference');
     const { agenticDetailHref } = await importAgenticDetailLink();
-    expect(agenticDetailHref(440106)).toBe('/infx/inference/agentic/440106');
+    expect(agenticDetailHref(440106, 'Kimi-K3')).toBe(
+      '/infx/inference/agentic/440106?g_model=Kimi-K3',
+    );
   });
 
   it('carries the chart state so the detail page can link back to it', async () => {
@@ -66,7 +72,7 @@ describe('agenticDetailHref', () => {
     const { writeUrlParams } = await importUrlState();
 
     writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm' });
-    const href = agenticDetailHref(440106, 'en');
+    const href = agenticDetailHref(440106, 'Kimi-K3', 'en');
     const params = new URLSearchParams(href.slice(href.indexOf('?')));
 
     expect(href.startsWith('/infx/inference/agentic/440106?')).toBe(true);
@@ -80,14 +86,14 @@ describe('agenticDetailHref', () => {
     const { writeUrlParams } = await importUrlState();
 
     writeUrlParams({ g_model: 'Kimi-K3' });
-    const href = agenticDetailHref(440106, 'zh');
+    const href = agenticDetailHref(440106, 'Kimi-K3', 'zh');
     const params = new URLSearchParams(href.slice(href.indexOf('?')));
 
     expect(href.startsWith('/zh/infx/inference/agentic/440106?')).toBe(true);
     expect(params.get('unofficialruns')).toBe('987654321');
   });
 
-  it('stays a bare path when the chart is on defaults', async () => {
+  it("names only the point's model when the chart is on defaults", async () => {
     setupWindow('', '/infx/inference');
     const { agenticDetailHref } = await importAgenticDetailLink();
     const { writeUrlParams } = await importUrlState();
@@ -95,6 +101,8 @@ describe('agenticDetailHref', () => {
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
     await advanceTimersByTimeAsync(200);
 
-    expect(agenticDetailHref(440106, 'en')).toBe('/infx/inference/agentic/440106');
+    expect(agenticDetailHref(440106, 'DeepSeek-V4-Pro', 'en')).toBe(
+      '/infx/inference/agentic/440106?g_model=DeepSeek-V4-Pro',
+    );
   });
 });
