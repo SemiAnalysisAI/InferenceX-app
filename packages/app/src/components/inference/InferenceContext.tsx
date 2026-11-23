@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { usePathname } from 'next/navigation';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -81,7 +82,11 @@ import {
 } from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_Y_AXIS_METRIC, hasExplicitUrlParam } from '@/lib/routing/url-state';
+import {
+  DEFAULT_Y_AXIS_METRIC,
+  hasExplicitUrlParam,
+  type UrlStateKey,
+} from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { datesOfLines, linesForModels } from '@/lib/benchmarks/availability-index';
 import {
@@ -197,6 +202,18 @@ export function requestedHwConflict(
     exclusion,
   );
   return families.dropped.length > 0 || families.partial.length > 0 ? families : null;
+}
+
+/**
+ * Whether the URL this page was opened with names `key`, read during render. A client navigation
+ * renders the new page before it updates `window.location`, so another path's URL is stale.
+ */
+export function openedUrlNamesParam(key: UrlStateKey, pathname: string | null): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.location.pathname === pathname &&
+    hasExplicitUrlParam(key)
+  );
 }
 
 function useStableInferenceActions(
@@ -347,6 +364,7 @@ export function InferenceProvider({
   const comparisonGuardLifted = engineGuardLifted || (consentSupported && engineConsent.accepted);
 
   const { getUrlParam, setUrlParams } = useUrlState();
+  const pathname = usePathname();
   const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
     Boolean(getUrlParam('g_rundate') || getUrlParam('g_runid')),
   );
@@ -418,9 +436,13 @@ export function InferenceProvider({
 
   const [selectedGpuState, setSelectedGpuState] = useState<string[]>([]);
   const [gpuUrlHydrated, setGpuUrlHydrated] = useState(false);
+  // The reader picked these GPUs, here or in a shared URL; remembered or automatic picks are not.
+  const gpuSelectionChosenRef = useRef(false);
   useEffect(() => {
     const urlGpus = getUrlParam('i_gpus');
     if (urlGpus) setSelectedGpuState(urlGpus.split(',').filter(Boolean));
+    // Effects run after the layout-effect URL refresh, so this reads the live URL.
+    gpuSelectionChosenRef.current = Boolean(urlGpus) && hasExplicitUrlParam('i_gpus');
     setGpuUrlHydrated(true);
   }, [getUrlParam]);
   const selectedGpuResolution = useMemo(() => {
@@ -454,10 +476,9 @@ export function InferenceProvider({
     const resolutionKey = `${selectedGpuResolution.selection.join(',')}|${selectedGpuResolution.dropped.join(',')}|${selectedGpuResolution.partial.join(',')}`;
     if (resolutionKey === notifiedGpuResolutionRef.current) return;
     notifiedGpuResolutionRef.current = resolutionKey;
-    // Effects run on the client, so this reads the live URL, never the empty server snapshot.
-    // GPUs remembered from an earlier page resolve silently; only a shared URL explains its drop.
+    // A selection the reader never made resolves silently; the reader's own is explained.
     if (
-      hasExplicitUrlParam('i_gpus') &&
+      gpuSelectionChosenRef.current &&
       (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0)
     ) {
       setEngineConflict({
@@ -665,7 +686,7 @@ export function InferenceProvider({
   // A page's own hardware outranks a value remembered from an earlier page, not a shared URL.
   const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
     const v =
-      hasExplicitUrlParam('i_active') || !initialActiveHwTypes?.length
+      openedUrlNamesParam('i_active', pathname) || !initialActiveHwTypes?.length
         ? getUrlParam('i_active')
         : undefined;
     if (v) {
@@ -922,6 +943,7 @@ export function InferenceProvider({
   );
   const setSelectedGPUsAndClear = useCallback(
     (next: string[]) => {
+      gpuSelectionChosenRef.current = true;
       if (
         requestEngineComparison(next, () => {
           setSelectedGpuState(next);
