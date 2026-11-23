@@ -39,7 +39,8 @@ export function SiteSearchButton() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const isModK = event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey);
+      // Autofill dispatches keydown events without a key.
+      const isModK = event.key?.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey);
       const isSlash =
         event.key === '/' &&
         !event.metaKey &&
