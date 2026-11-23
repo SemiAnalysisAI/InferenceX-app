@@ -2,7 +2,11 @@
 import 'next/dist/server/node-environment-baseline.js';
 import './setup-local-storage';
 
+import Module from 'node:module';
+
 import { afterAll, beforeEach, expect, vi, type Mock } from 'bun:test';
+
+import { leakedRequireHooks } from '../lib/testing/unit-test-runner';
 
 // Vitest cleared every mock's call history before each test (clearMocks), ahead of the file's own
 // beforeEach hooks; tests assume each one starts with zero calls. Implementations are kept.
@@ -10,22 +14,30 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Bun 1.4.5 keeps a require hook that a file installs (tsx/cjs installs one) and calls it for
-// later files in the same worker, against the discarded global of the file that installed it.
-// tsx's hook then blocks forever, so a file that leaves one installed has it removed and fails.
-const requireHooks = { ...require.extensions };
+// Bun 1.4 keeps a require.extensions hook that a file installs (tsx/cjs installs several) and calls
+// it for later files in the same worker, against the discarded global of the file that installed
+// it. tsx's hook then blocks forever, so a file that leaves one installed has the extensions
+// restored and fails. tsx also replaces Module._resolveFilename. Bun does not carry that into later
+// files, and Next's require hook replaces it legitimately, so it is only restored.
+const extensionHooks = Object.getOwnPropertyDescriptors(require.extensions);
+const moduleWithResolver = Module as unknown as { _resolveFilename: unknown };
+const resolveFilename = moduleWithResolver._resolveFilename;
 afterAll(() => {
-  const replaced = Object.keys({ ...requireHooks, ...require.extensions }).filter(
-    (extension) => require.extensions[extension] !== requireHooks[extension],
+  moduleWithResolver._resolveFilename = resolveFilename;
+  const leaked = leakedRequireHooks(
+    extensionHooks,
+    Object.getOwnPropertyDescriptors(require.extensions),
   );
-  if (replaced.length === 0) return;
-  for (const extension of replaced) {
-    if (requireHooks[extension]) require.extensions[extension] = requireHooks[extension];
-    else delete require.extensions[extension];
+  if (leaked.length === 0) return;
+  for (const key of leaked) {
+    const original = extensionHooks[key as string];
+    if (original) Object.defineProperty(require.extensions, key, original);
+    else Reflect.deleteProperty(require.extensions, key);
   }
   throw new Error(
-    `This file left require hooks installed for ${replaced.join(', ')}, which would run in later ` +
-      'test files. Mock the module that installs them, or restore require.extensions in afterAll.',
+    `This file left require hooks installed for ${leaked.map(String).join(', ')}, which would run ` +
+      'in later test files. Mock the module that installs them, or restore require.extensions in ' +
+      'afterAll.',
   );
 });
 
