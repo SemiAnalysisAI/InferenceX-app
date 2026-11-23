@@ -4,16 +4,21 @@ import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
+import { describeDataQueryFailure } from '@/lib/analytics/query-error-analytics';
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
 import './unofficial-chart-data';
 import {
   UnofficialRunProvider,
+  UnofficialRunUnavailableError,
   useUnofficialRun,
   type UnofficialRunContextType,
 } from './unofficial-run-provider';
 
-mock.module('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => null }));
+mock.module('@/components/ui/unofficial-banner', () => ({
+  UnofficialBanner: () => null,
+  UnofficialRunUnavailableNotice: () => null,
+}));
 
 interface PendingRequest {
   url: string;
@@ -185,6 +190,41 @@ describe('UnofficialRunProvider query lifecycle', () => {
     await flush();
     expect(window.location.search).toBe('');
     expect(latestRunIds).toEqual([]);
+    act(() => root.unmount());
+  });
+
+  it('reports an expired run as unavailable instead of a failed query', async () => {
+    installPendingFetch();
+    window.history.replaceState({}, '', '/infx/evaluation?unofficialRun=27968834654');
+    const root = mountProvider();
+    await flush();
+    requests[0].resolve({
+      ok: false,
+      status: 410,
+      json: () =>
+        Promise.resolve({
+          error: 'The result artifacts of run 27968834654 have expired',
+          code: 'ARTIFACTS_EXPIRED',
+          runId: '27968834654',
+        }),
+    } as Response);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (latestContextValue?.unavailable) break;
+      await flush();
+    }
+
+    expect(latestContextValue?.unavailable).toEqual({
+      code: 'ARTIFACTS_EXPIRED',
+      runId: '27968834654',
+    });
+    expect(
+      describeDataQueryFailure(
+        new UnofficialRunUnavailableError('ARTIFACTS_EXPIRED', '27968834654', ''),
+        { key: ['unofficial-runs'], hash: 'h', throwsToErrorBoundary: false },
+        'query',
+        '/infx/evaluation',
+      ),
+    ).toBeNull();
     act(() => root.unmount());
   });
 });

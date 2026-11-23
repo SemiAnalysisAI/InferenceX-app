@@ -81,7 +81,7 @@ import {
 } from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC, hasExplicitUrlParam } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { datesOfLines, linesForModels } from '@/lib/benchmarks/availability-index';
 import {
@@ -109,6 +109,7 @@ import {
   exclusionResolutionFamilies,
   resolveExclusionGroups,
   resolveExclusionToggle,
+  type Exclusion,
   type ExclusionConflictPolicy,
 } from '@/lib/benchmarks/exclusion';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
@@ -178,6 +179,24 @@ export function matchRequestedHw(
       (k) => request.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
     ),
   );
+}
+
+/**
+ * Engine families dropped from the keys a URL request named outright. Expanding a bare GPU or
+ * falling back to every selectable key is a default, which resolves without a notice.
+ */
+export function requestedHwConflict(
+  request: ReadonlySet<string>,
+  proposed: ReadonlySet<string>,
+  result: ReadonlySet<string>,
+  exclusion: Exclusion,
+): { kept: string[]; dropped: string[]; partial: string[] } | null {
+  const families = exclusionResolutionFamilies(
+    [...proposed].filter((key) => request.has(key)),
+    result,
+    exclusion,
+  );
+  return families.dropped.length > 0 || families.partial.length > 0 ? families : null;
 }
 
 function useStableInferenceActions(
@@ -399,6 +418,8 @@ export function InferenceProvider({
 
   const [selectedGpuState, setSelectedGpuState] = useState<string[]>([]);
   const [gpuUrlHydrated, setGpuUrlHydrated] = useState(false);
+  // GPUs remembered from an earlier page resolve silently; only a shared URL explains its drop.
+  const [gpuRequestExplicit] = useState(() => hasExplicitUrlParam('i_gpus'));
   useEffect(() => {
     const urlGpus = getUrlParam('i_gpus');
     if (urlGpus) setSelectedGpuState(urlGpus.split(',').filter(Boolean));
@@ -435,7 +456,10 @@ export function InferenceProvider({
     const resolutionKey = `${selectedGpuResolution.selection.join(',')}|${selectedGpuResolution.dropped.join(',')}|${selectedGpuResolution.partial.join(',')}`;
     if (resolutionKey === notifiedGpuResolutionRef.current) return;
     notifiedGpuResolutionRef.current = resolutionKey;
-    if (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0) {
+    if (
+      gpuRequestExplicit &&
+      (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0)
+    ) {
       setEngineConflict({
         kind: 'resolved',
         kept: selectedGpuResolution.kept,
@@ -443,7 +467,7 @@ export function InferenceProvider({
         partial: selectedGpuResolution.partial,
       });
     }
-  }, [selectedGpuResolution]);
+  }, [selectedGpuResolution, gpuRequestExplicit]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
@@ -638,8 +662,13 @@ export function InferenceProvider({
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const presetHwFilterRef = useRef<string[] | null>(null);
 
+  // A page's own hardware outranks a value remembered from an earlier page, not a shared URL.
+  const [activeHwRequestExplicit] = useState(() => hasExplicitUrlParam('i_active'));
   const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
-    const v = getUrlParam('i_active');
+    const v =
+      activeHwRequestExplicit || !initialActiveHwTypes?.length
+        ? getUrlParam('i_active')
+        : undefined;
     if (v) {
       const set = new Set(v.split(',').filter(Boolean));
       return set.size > 0 ? set : null;
@@ -649,8 +678,10 @@ export function InferenceProvider({
     }
     return null;
   });
-  const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState(() =>
-    Boolean(getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus),
+  // 'page': the page or URL picked the hardware; true: the reader did.
+  const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState<boolean | 'page'>(
+    () =>
+      getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false,
   );
   const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
   // The keys the page asked for, kept while that request is still the reader's selection.
@@ -850,7 +881,9 @@ export function InferenceProvider({
         setBestPerSku(activeTab === 'inference' ? null : false);
         setPendingActiveHwTypes(null);
         requestedHwKeysRef.current = null;
-        setHardwareDefaultsOverridden(Boolean(initialActiveHwTypes?.length || autoSelectAllGpus));
+        setHardwareDefaultsOverridden(
+          initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false,
+        );
       }
       setSelectedModel(v);
       clearScopedSelectionOnChange();
@@ -1350,12 +1383,11 @@ export function InferenceProvider({
       const proposed = restored;
       const resolved = resolveHwSelection(restored, new Set());
       restored = resolved.result;
-      if (resolved.droppedGroups.length > 0) {
-        setEngineConflict({
-          kind: 'resolved',
-          ...exclusionResolutionFamilies(proposed, resolved.result, exclusion),
-        });
-      }
+      const conflict =
+        activeHwRequestExplicit && matchedRequest
+          ? requestedHwConflict(pendingActiveHwTypes, proposed, resolved.result, exclusion)
+          : null;
+      if (conflict) setEngineConflict({ kind: 'resolved', ...conflict });
     }
     setActiveHwTypes(restored);
     setRequestedHwSelection(matchedRequest ? restored : null);
@@ -1364,6 +1396,7 @@ export function InferenceProvider({
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
+    activeHwRequestExplicit,
     selectableHwTypes,
     chartDataLoading,
     exclusion,
@@ -1420,7 +1453,7 @@ export function InferenceProvider({
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
-      if (droppedGroups.length > 0 && hardwareDefaultsOverridden) {
+      if (droppedGroups.length > 0 && hardwareDefaultsOverridden === true) {
         setEngineConflict({
           kind: 'resolved',
           ...exclusionResolutionFamilies(automaticSelection, result, exclusion),

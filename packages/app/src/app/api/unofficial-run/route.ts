@@ -20,6 +20,7 @@ import {
   readLocalArtifactPreview,
 } from '@/lib/github/local-artifact-preview';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
+import type { UnofficialRunUnavailableCode } from '@/lib/api/unofficial-run-unavailable';
 import { stitchAppendOnlyPreview } from '@/lib/benchmarks/append-only-preview';
 import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-query-cache.server';
 import { cachedJson } from '@/lib/cache/api-cache';
@@ -76,6 +77,45 @@ function errorJson(error: string, status: number, cacheControl: string, retryAft
       },
     },
   );
+}
+
+const UNAVAILABLE_MESSAGES: Record<UnofficialRunUnavailableCode, (runId: string) => string> = {
+  RUN_NOT_FOUND: (runId) => `Workflow run ${runId} was not found`,
+  ARTIFACTS_EXPIRED: (runId) => `The result artifacts of run ${runId} have expired`,
+  NO_RESULTS: (runId) => `Run ${runId} produced no benchmark or evaluation results`,
+  RUN_IN_PROGRESS: (runId) => `Run ${runId} has not uploaded results yet`,
+};
+
+function unavailableJson(
+  code: UnofficialRunUnavailableCode,
+  runId: string,
+  cacheControl: string,
+): NextResponse {
+  return NextResponse.json(
+    { error: UNAVAILABLE_MESSAGES[code](runId), code, runId },
+    {
+      status: code === 'ARTIFACTS_EXPIRED' ? 410 : 404,
+      headers: { 'Cache-Control': cacheControl },
+    },
+  );
+}
+
+/** GitHub keeps run artifacts this long; an older run with none listed has lost them. */
+const ARTIFACT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Why a run lists no result artifacts. `listed` includes expired artifacts. */
+export function missingResultsCode(
+  run: Pick<GithubWorkflowRun, 'created_at' | 'status'>,
+  listed: readonly GithubArtifact[],
+  now = Date.now(),
+): UnofficialRunUnavailableCode {
+  if (
+    listed.some((artifact) => artifact.expired) ||
+    (listed.length === 0 && now - Date.parse(run.created_at) > ARTIFACT_RETENTION_MS)
+  ) {
+    return 'ARTIFACTS_EXPIRED';
+  }
+  return run.status === 'completed' ? 'NO_RESULTS' : 'RUN_IN_PROGRESS';
 }
 
 /** Seconds until GitHub accepts requests again, or null when the failure is not a rate limit. */
@@ -328,12 +368,15 @@ function extractJsonFromZip(buffer: Buffer): Record<string, unknown>[] {
   });
 }
 
-async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
+async function downloadArtifactRows(archiveUrl: string, githubToken: string, runId: string) {
   const response = await downloadGithubArtifact(archiveUrl, githubToken);
   if (!response.ok) {
     return {
       rows: [] as Record<string, unknown>[],
-      errorResponse: githubFailure(response, `Artifact download failed: ${response.statusText}`),
+      errorResponse:
+        response.status === 410
+          ? unavailableJson('ARTIFACTS_EXPIRED', runId, MISSING_RUN_CACHE_CONTROL)
+          : githubFailure(response, `Artifact download failed: ${response.statusText}`),
     };
   }
 
@@ -404,6 +447,9 @@ async function processSingleRun(
   if (!githubToken)
     return { errorResponse: errorJson('GitHub token not configured', 500, UNCACHED) };
   const runResp = await fetchGithubWorkflowRun(runId, githubToken);
+  if (runResp.status === 404) {
+    return { errorResponse: unavailableJson('RUN_NOT_FOUND', runId, MISSING_RUN_CACHE_CONTROL) };
+  }
   if (!runResp.ok) {
     return {
       errorResponse: githubFailure(
@@ -414,7 +460,8 @@ async function processSingleRun(
   }
   const run = (await runResp.json()) as GithubWorkflowRun;
 
-  const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
+  const listed = await fetchGithubRunArtifacts(runId, githubToken);
+  const artifacts = listed.filter((artifact) => !artifact.expired);
   const bmkArtifact = artifacts
     .filter((a) => a.name === 'results_bmk')
     .toSorted((a, b) => b.id - a.id)[0];
@@ -447,13 +494,16 @@ async function processSingleRun(
       ];
 
   if (!bmkArtifact && perConfigBmkArtifacts.length === 0 && !evalArtifact) {
-    // A failed artifact listing also lands here, so even a completed run's
-    // 404 stays short-lived instead of taking the missing-run TTL.
+    const code = missingResultsCode(run, listed);
+    // A failed artifact listing also lands here, so an empty listing for a recent
+    // run stays short-lived instead of taking the missing-run TTL.
     return {
-      errorResponse: errorJson(
-        `No results_bmk, per-config bmk_*, or eval_results_all artifact found for runId ${runId}`,
-        404,
-        ACTIVE_RUN_CACHE_CONTROL,
+      errorResponse: unavailableJson(
+        code,
+        runId,
+        code === 'ARTIFACTS_EXPIRED' || (code === 'NO_RESULTS' && listed.length > 0)
+          ? MISSING_RUN_CACHE_CONTROL
+          : ACTIVE_RUN_CACHE_CONTROL,
       ),
     };
   }
@@ -469,6 +519,7 @@ async function processSingleRun(
     const { rows, errorResponse } = await downloadArtifactRows(
       bmkArtifact.archive_download_url,
       githubToken,
+      runId,
     );
     if (errorResponse) return { errorResponse };
     benchmarks = normalizeArtifactRows(rows, date, runUrl || null);
@@ -477,7 +528,7 @@ async function processSingleRun(
     for (let i = 0; i < perConfigBmkArtifacts.length; i += PER_CONFIG_DOWNLOAD_BATCH_SIZE) {
       const batch = perConfigBmkArtifacts.slice(i, i + PER_CONFIG_DOWNLOAD_BATCH_SIZE);
       const results = await Promise.all(
-        batch.map((a) => downloadArtifactRows(a.archive_download_url, githubToken)),
+        batch.map((a) => downloadArtifactRows(a.archive_download_url, githubToken, runId)),
       );
       for (const result of results) {
         if (result.errorResponse) return { errorResponse: result.errorResponse };
@@ -491,6 +542,7 @@ async function processSingleRun(
     const { rows, errorResponse } = await downloadArtifactRows(
       changelogArtifact.archive_download_url,
       githubToken,
+      runId,
     );
     if (errorResponse) return { errorResponse };
     if (hasAppendOnlyFlag(rows.map((row) => ({ entries: parseChangelogEntries(row.entries) })))) {
@@ -508,6 +560,7 @@ async function processSingleRun(
     const { rows, errorResponse } = await downloadArtifactRows(
       evalArtifact.archive_download_url,
       githubToken,
+      runId,
     );
     if (errorResponse) return { errorResponse };
     const normalized = normalizeEvalArtifactRows(rows, date, timestamp, runUrl, evalConfigIdOffset);

@@ -631,6 +631,9 @@ execution/publication times and coverage alongside exported values.
 `artifact` from `artifacts[]`: a plain artifact name, or `<artifact>/<file>` when
 one artifact contains several files. `downsample` only sets the renderer hint
 `maxInteractivePoints` to 2000 (default) or `null`; rows and statistics stay unsampled.
+A run GitHub does not have returns 404 with `code: "RUN_NOT_FOUND"`; a run without
+readable telemetry artifacts (none uploaded, or expired) returns 404 with
+`code: "NO_TELEMETRY"`. Both bodies carry `error`.
 
 Stored telemetry includes run-wide `coverage`, even when one host is selected:
 `complete` means the recorded artifact/file inventory is present, `partial` means
@@ -751,6 +754,10 @@ Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` / `unofficialruns` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
 duplicates. Preserve those indices when attributing results to a run.
+An `unofficialrun` / `unofficialruns` run that cannot be overlaid fails the view with
+`error` and `code`: 404 `RUN_NOT_FOUND` (no such run), 410 `ARTIFACTS_EXPIRED`
+(GitHub deleted its artifacts), 404 `NO_RESULTS` (finished without results) or
+404 `RUN_IN_PROGRESS` (no results uploaded yet).
 `runId` selects an exact logical snapshot, not necessarily
 newly measured producer rows. Comparison entries accept `YYYY-MM-DD` or
 `YYYY-MM-DD~rRUN_ID`; `start` and `end` add the endpoints, not every intervening

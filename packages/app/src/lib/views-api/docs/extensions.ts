@@ -935,16 +935,29 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
               } satisfies ApiResponse,
             ]
           : []),
-        ...(['404', '429', '503'] as const).map((status): ApiResponse => ({
-          status,
-          description: text(
-            'Source status is preserved; internal details are removed and failures are not cached.',
-            '保留上游状态码，移除内部详情，失败响应不缓存。',
-          ),
-          schema: object,
-          example: { error: 'Source data unavailable' },
-          mediaType: 'application/json',
-        })),
+        ...(['404', '429', '503'] as const).map((status): ApiResponse =>
+          view === 'gpu-metrics' && status === '404'
+            ? {
+                status,
+                description: text(
+                  'The run does not exist on GitHub (RUN_NOT_FOUND) or has no readable telemetry artifacts (NO_TELEMETRY). Not cached.',
+                  'GitHub 上不存在该运行（RUN_NOT_FOUND），或该运行没有可读的遥测产物（NO_TELEMETRY）。响应不缓存。',
+                ),
+                schema: object,
+                example: { error: 'No Chip metrics data found in artifacts', code: 'NO_TELEMETRY' },
+                mediaType: 'application/json',
+              }
+            : {
+                status,
+                description: text(
+                  'Source status is preserved; internal details are removed and failures are not cached.',
+                  '保留上游状态码，移除内部详情，失败响应不缓存。',
+                ),
+                schema: object,
+                example: { error: 'Source data unavailable' },
+                mediaType: 'application/json',
+              },
+        ),
         {
           status: '400',
           description: text('Invalid or unsupported query.', '查询无效或不受支持。'),

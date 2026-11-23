@@ -9,7 +9,7 @@ import {
   computeGpuStats,
   getAvailableMetrics,
 } from '@/components/gpu-power/types';
-import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
+import { runViewsRoute, ViewsApiParamError, ViewsUpstreamError } from '@/lib/views-api/errors';
 import {
   parseBoolParam,
   parseEnumParam,
@@ -31,12 +31,16 @@ export function GET(request: NextRequest) {
     const s = request.nextUrl.searchParams;
     if (!s.get('runId')) throw new ViewsApiParamError('runId', 'runId is required');
     const runId = parseNumberParam(s.get('runId'), 'runId', 0, { min: 1, integer: true });
-    const data = await readResponse<GpuMetricsRouteResponse>(
-      await metrics(
-        sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) }),
-        s.get('artifact'),
-      ),
+    const source = await metrics(
+      sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) }),
+      s.get('artifact'),
     );
+    // The reader answers 404 only for a run without telemetry; say why instead of masking it.
+    if (source.status === 404) {
+      const { error, code } = (await source.json()) as { error: string; code: string };
+      throw new ViewsUpstreamError(404, error, code);
+    }
+    const data = await readResponse<GpuMetricsRouteResponse>(source);
     const artifactNames = data.artifactNames ?? data.artifacts.map((a) => a.name);
     const artifact = s.get('artifact') ?? data.artifacts[0]?.name;
     const selected = data.artifacts.find((a) => a.name === artifact);

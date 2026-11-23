@@ -323,15 +323,22 @@ describe('Inference Chart', () => {
       .and('contain.text', 'all-in cost per chip-hour');
   });
 
-  it('surfaces the error instead of an endless skeleton when availability fails', () => {
-    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
+  it('shows an inline retryable error instead of the error page when availability fails', () => {
+    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 403, body: {} }).as(
       'availabilityFailure',
     );
-    fastForwardQueryRetry('h2:contains("Something went wrong")', () => {
+    fastForwardQueryRetry('[data-testid="inference-query-error"]', () => {
       cy.visit('/infx/inference');
     });
     cy.wait('@availabilityFailure');
-    cy.contains('h2', 'Something went wrong').should('be.visible');
+    cy.get('[data-testid="inference-query-error"]')
+      .should('be.visible')
+      .and('contain.text', 'Failed to load benchmark data');
+    cy.contains('h2', 'Something went wrong').should('not.exist');
+    cy.intercept('GET', '/api/v1/availability/compact').as('availabilityRetry');
+    cy.get('[data-testid="inference-query-error"]').contains('button', 'Retry').click();
+    cy.wait('@availabilityRetry');
+    cy.get('[data-testid="inference-query-error"]').should('not.exist');
   });
 });
 

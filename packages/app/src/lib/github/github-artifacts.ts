@@ -10,6 +10,8 @@ export interface GithubArtifact {
   id: number;
   name: string;
   archive_download_url: string;
+  /** GitHub keeps an expired artifact in the listing for a while, without its archive. */
+  expired?: boolean;
 }
 
 export interface GithubWorkflowRun {

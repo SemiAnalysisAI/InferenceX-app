@@ -55,6 +55,17 @@ type TelemetryResult =
   | { kind: 'csv'; parsed: GithubArtifactPayload }
   | { kind: 'bundle'; series: GpuPowerSeries[] };
 
+/** The run, or its telemetry, does not exist on GitHub; the route answers 404. */
+export class GpuTelemetryNotFoundError extends Error {
+  override name = 'GpuTelemetryNotFoundError';
+  readonly code: 'RUN_NOT_FOUND' | 'NO_TELEMETRY';
+
+  constructor(code: GpuTelemetryNotFoundError['code'], message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 /** Fetches one artifact zip, or `null` (with a warning) when it fails or exceeds `maxBytes`. */
 async function downloadZip(
   artifact: GithubArtifact,
@@ -193,6 +204,9 @@ export async function fetchGpuMetricsFromGithub(
   if (!githubToken) throw new Error('GitHub token not configured');
 
   const runResp = await fetchGithubWorkflowRun(runId, githubToken);
+  if (runResp.status === 404) {
+    throw new GpuTelemetryNotFoundError('RUN_NOT_FOUND', `Workflow run ${runId} was not found`);
+  }
   if (!runResp.ok) throw new Error(`Failed to fetch workflow run: ${runResp.status}`);
   const run = (await runResp.json()) as GithubWorkflowRun;
 
@@ -211,11 +225,16 @@ export async function fetchGpuMetricsFromGithub(
     jobs.push({ kind: includeBundles ? 'bundle' : 'native', artifact });
   }
   if (jobs.length === 0) {
-    throw new Error('No telemetry artifacts (gpu_metrics or power_audit) found for this run');
+    throw new GpuTelemetryNotFoundError(
+      'NO_TELEMETRY',
+      'No telemetry artifacts (gpu_metrics or power_audit) found for this run',
+    );
   }
 
   const results = await downloadTelemetry(jobs, githubToken);
-  if (results.length === 0) throw new Error('No Chip metrics data found in artifacts');
+  if (results.length === 0) {
+    throw new GpuTelemetryNotFoundError('NO_TELEMETRY', 'No Chip metrics data found in artifacts');
+  }
 
   const parsedArtifacts: GithubArtifactPayload[] = [];
   const bundleSeries: GpuPowerSeries[] = [];

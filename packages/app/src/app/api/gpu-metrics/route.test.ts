@@ -343,16 +343,18 @@ describe('GET /api/gpu-metrics', () => {
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
   });
 
-  it('returns 500 when workflow run fetch fails', async () => {
+  it('returns 404 when GitHub has no such workflow run', async () => {
     globalThis.fetch = vi.fn().mockResolvedValueOnce({
       ok: false,
       status: 404,
     });
 
     const res = await GET(req('/api/gpu-metrics?runId=99999'));
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toContain('Failed to fetch workflow run');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      error: 'Workflow run 99999 was not found',
+      code: 'RUN_NOT_FOUND',
+    });
   });
 
   it('returns 500 when GITHUB_TOKEN is not set', async () => {
@@ -364,7 +366,7 @@ describe('GET /api/gpu-metrics', () => {
     expect(body.error).toContain('GitHub token not configured');
   });
 
-  it('returns 500 when no gpu_metrics artifacts found', async () => {
+  it('returns 404 when the run has no telemetry artifacts', async () => {
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -396,8 +398,9 @@ describe('GET /api/gpu-metrics', () => {
       });
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
     const body = await res.json();
+    expect(body.code).toBe('NO_TELEMETRY');
     expect(body.error).toContain('No telemetry artifacts');
   });
 
