@@ -19,6 +19,7 @@ import chartDefinitions, {
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
+import { noteInferenceChartLeft } from '@/lib/routing/agentic-detail-origin';
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import {
@@ -317,6 +318,8 @@ export default function ChartDisplay({
   const t = STRINGS[locale];
   const chartRootRef = useRef<HTMLDivElement>(null);
   useFirstChartRenderTiming(chartRootRef);
+  // An agentic detail page opened from this chart can then return with history.
+  useEffect(() => noteInferenceChartLeft, []);
   const queryClient = useQueryClient();
   const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
   const {

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+import { noteAgenticSiblingStep } from '@/lib/routing/agentic-detail-origin';
 
 import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
 import {
@@ -298,6 +299,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
                 track('agentic_siblings_navigated', { direction: 'prev', target_id: prev.id });
                 // Stepping through siblings swaps the point in place so browser Back still
                 // returns to the page that opened the detail.
+                noteAgenticSiblingStep();
                 router.replace(hrefFor(prev.id));
               }
             }}
@@ -314,6 +316,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             onClick={() => {
               if (next) {
                 track('agentic_siblings_navigated', { direction: 'next', target_id: next.id });
+                noteAgenticSiblingStep();
                 router.replace(hrefFor(next.id));
               }
             }}
@@ -337,6 +340,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               onClick={() => {
                 if (!active) {
                   track('agentic_siblings_navigated', { direction: 'chip', target_id: s.id });
+                  noteAgenticSiblingStep();
                   router.replace(hrefFor(s.id));
                 }
               }}

@@ -271,35 +271,97 @@ function stepToSibling(): void {
   });
 }
 
+/** Notes the chart's pathname before the reader leaves it for a point's detail page. */
+function rememberChartPath(): void {
+  cy.location('pathname')
+    .should('not.match', /\/agentic\//u)
+    .as('chartPath');
+}
+
+/** The Inference tab a chart path belongs to, with or without its model segment. */
+const inferenceTab = (pathname: string) =>
+  pathname.replace(/^(?<tab>(?:\/zh)?\/infx\/inference)\/[^/]+$/u, '$<tab>');
+
+/**
+ * Back returns to the chart's own history entry. A chart opened on the bare Inference URL
+ * rewrites its address to the model route once it loads, so the bare and model forms are the same
+ * chart; which model it shows, and its legend, are asserted separately.
+ */
+function assertBackAtChart(): void {
+  cy.get<string>('@chartPath').then((chartPath) => {
+    cy.location('pathname').should((pathname) => {
+      expect(pathname).to.not.match(/\/agentic\//u);
+      expect(inferenceTab(pathname)).to.eq(inferenceTab(chartPath));
+    });
+  });
+}
+
+const SOLO_KIMI_POINT_ID = benchmarks.find(
+  (b) => b.model === TARGET_MODEL_DB_KEY && `${b.hardware}_${b.framework}` === SOLO_HW_KEY,
+)!.id;
+
 describe('Agentic point detail — returning to the chart', () => {
-  it("returns to the point's model chart and restores the legend when the reader clicks Back", () => {
+  it('returns to the chart it came from and restores the legend when the reader clicks Back', () => {
     visitChart('/infx/inference');
     interceptSiblings();
     selectTargetModel();
     soloLegendSeries();
+    rememberChartPath();
     openPointDetail();
 
     cy.location('pathname').should('match', /^\/infx\/inference\/agentic\/\d+$/u);
     backControl('en').click();
 
-    cy.location('pathname').should('eq', '/infx/inference/kimi-k3');
+    assertBackAtChart();
     assertRestoredChart();
   });
 
   it('returns to the default model chart, not the featured model, when the reader clicks Back', () => {
-    // The default model is left out of the chart state's `g_model`, so the bare Inference path
-    // would redirect to the featured model; Back has to name the point's model in the path.
     visitChart('/infx/inference');
     interceptSiblings(DEFAULT_MODEL_DB_KEY);
     cy.get('[data-testid="model-selector"]').should('contain.text', DEFAULT_MODEL_LABEL);
     soloLegendSeries();
+    rememberChartPath();
     openPointDetail();
 
     cy.location('pathname').should('match', /^\/infx\/inference\/agentic\/\d+$/u);
     backControl('en').click();
 
-    cy.location('pathname').should('eq', '/infx/inference/deepseek-v4');
+    assertBackAtChart();
     assertRestoredChart(DEFAULT_MODEL_LABEL);
+  });
+
+  it('leaves the detail page for good: browser back after Back does not reopen it', () => {
+    cy.visit('/about');
+    visitChart('/infx/inference');
+    interceptSiblings(DEFAULT_MODEL_DB_KEY);
+    soloLegendSeries();
+    rememberChartPath();
+    openPointDetail();
+
+    backControl('en').click();
+    assertBackAtChart();
+    cy.go('back');
+
+    cy.location('pathname').should('not.match', /\/agentic\//u);
+  });
+
+  it('replaces a deep-linked detail with its chart, so browser back leaves instead of reopening it', () => {
+    cy.visit('/about');
+    interceptChart();
+    interceptSiblings();
+    cy.visit(`/infx/inference/agentic/${SOLO_KIMI_POINT_ID}`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+
+    backControl('en').should('be.enabled').click();
+    cy.location('pathname').should('eq', '/infx/inference/kimi-k3');
+    cy.get('[data-testid="model-selector"]').should('contain.text', TARGET_MODEL_LABEL);
+    cy.go('back');
+
+    cy.location('pathname').should('eq', '/about');
   });
 
   for (const { name, select, gModel, label, path } of [
@@ -327,6 +389,7 @@ describe('Agentic point detail — returning to the chart', () => {
       if (select) selectTargetModel();
       else cy.get('[data-testid="model-selector"]').should('contain.text', label);
       soloLegendSeries();
+      rememberChartPath();
       openPointDetail();
 
       cy.location('search').should('include', `g_model=${gModel}`);
@@ -336,7 +399,7 @@ describe('Agentic point detail — returning to the chart', () => {
         .and('match', new RegExp(`^${path}(?:\\?|$)`, 'u'));
       backControl('en').should('be.enabled').click();
 
-      cy.location('pathname').should('eq', path);
+      assertBackAtChart();
       assertRestoredChart(label);
     });
   }
@@ -346,13 +409,14 @@ describe('Agentic point detail — returning to the chart', () => {
     interceptSiblings();
     selectTargetModel();
     soloLegendSeries();
+    rememberChartPath();
     openPointDetail();
 
     stepToSibling();
     stepToSibling();
     backControl('en').click();
 
-    cy.location('pathname').should('eq', '/infx/inference/kimi-k3');
+    assertBackAtChart();
     assertRestoredChart();
   });
 
@@ -392,6 +456,7 @@ describe('Agentic point detail — returning to the chart', () => {
     interceptSiblings();
     selectTargetModel();
     soloLegendSeries();
+    rememberChartPath();
     openPointDetail();
 
     cy.location('pathname').should('match', /^\/zh\/infx\/inference\/agentic\/\d+$/u);
@@ -400,7 +465,7 @@ describe('Agentic point detail — returning to the chart', () => {
       .and('match', /^\/zh\/infx\/inference\/kimi-k3(?:\?|$)/u);
     backControl('zh').click();
 
-    cy.location('pathname').should('eq', '/zh/infx/inference/kimi-k3');
+    assertBackAtChart();
     assertRestoredChart();
   });
 });

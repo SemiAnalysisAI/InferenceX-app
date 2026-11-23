@@ -25,6 +25,7 @@ import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import type { Model } from '@/lib/catalog/data-mappings';
 import { inferenceModelPath, inferenceModelSlugForModel } from '@/lib/routing/inference-model-slug';
 import { currentChartSearch } from '@/lib/routing/url-state';
+import { resolveAgenticDetailOrigin } from '@/lib/routing/agentic-detail-origin';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import { AggregatesGrid } from './aggregates-grid';
@@ -224,6 +225,12 @@ export function AgenticPointDetail({ id }: Props) {
     const search = state.toString();
     setInferenceHref(search ? `${chartPath}?${search}` : chartPath);
   }, [isZh, pointModelSlug]);
+  // Opened from a chart in this tab: Back returns to that entry, so browser Back afterwards does
+  // not reopen this page. Otherwise (deep link, new tab) Back replaces this entry with the chart.
+  const [openedFromChart, setOpenedFromChart] = useState(false);
+  useEffect(() => {
+    setOpenedFromChart(resolveAgenticDetailOrigin());
+  }, [id]);
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
@@ -298,13 +305,11 @@ export function AgenticPointDetail({ id }: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={!inferenceHref}
+          disabled={!openedFromChart && !inferenceHref}
           onClick={() => {
-            if (!inferenceHref) return;
             track('inference_agentic_detail_back_clicked', { id });
-            // History may hold sibling points or another site (a shared link), so Back always
-            // returns to the chart this point belongs to.
-            router.push(inferenceHref);
+            if (openedFromChart) router.back();
+            else if (inferenceHref) router.replace(inferenceHref);
           }}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
