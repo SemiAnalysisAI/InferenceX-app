@@ -372,9 +372,10 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after dashboard-routes gained the default Inference model slug (moved from the
-      // redirect config so the header can link to it). Route constants do not feed recorded entries.
-      sources: '3469bf243568d542d62305c78170fa6ce5baa9aef3b35dbdb69360f07f17dda5',
+      // Re-pinned after fetchJson learned to take an early document-load response, data_query_failed
+      // stopped reporting failed background refetches that keep their data, and dashboard-routes
+      // gained the default Inference model slug. None of these change the rows recorded entries use.
+      sources: '219d193bc9019f28c4bd7ba418e78b267fe9dca155c1f4e2cde548cadbfc7c2e',
     });
   });
 });

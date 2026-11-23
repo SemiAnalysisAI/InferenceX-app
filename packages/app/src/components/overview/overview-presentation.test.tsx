@@ -35,6 +35,7 @@ const strings = {
   presentEnterAria: 'Show the matrix full screen',
   presentExitAria: 'Leave full screen',
   presentShortcutHint: 'Arrow keys switch views · Esc exits',
+  withDetail: OVERVIEW_STRINGS.en.withDetail,
 } as unknown as OverviewStrings;
 
 describe('OVERVIEW_STRINGS.zh', () => {

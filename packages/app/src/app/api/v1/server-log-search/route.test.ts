@@ -70,6 +70,8 @@ describe('GET /api/v1/server-log-search', () => {
 
   it.each([
     '/api/v1/server-log-search?q=ready',
+    '/api/v1/server-log-search?id=1e21&q=ready',
+    '/api/v1/server-log-search?id=-5&q=ready',
     '/api/v1/server-log-search?id=42&q=',
     `/api/v1/server-log-search?id=42&q=${'x'.repeat(257)}`,
     '/api/v1/server-log-search?id=42&q=ready&limit=0',
