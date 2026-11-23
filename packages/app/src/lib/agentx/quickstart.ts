@@ -37,10 +37,12 @@ python -m infx.golden_al_distribution lookup qwen3.5 mtp 3   # <placeholder_valu
 # Force that AL in your engine:
 # vLLM, inside --speculative-config:
 #   "rejection_sample_method": "synthetic", "synthetic_acceptance_length": <placeholder_value>
+#   Golden AL curves: ${AGENTX_GOLDEN_AL_URL}
 # SGLang, server environment:
 #   SGLANG_SIMULATE_ACC_LEN=<placeholder_value>
 #   SGLANG_SIMULATE_ACC_METHOD=match-expected
 #   SGLANG_SIMULATE_ACC_TOKEN_MODE=real-draft-token
+#   Golden AL curves: ${AGENTX_GOLDEN_AL_URL}
 # ATOM:
 #   --spec-decode-acceptance-length <placeholder_value>
 # TensorRT-LLM counts draft tokens only, so use AL - 1:
