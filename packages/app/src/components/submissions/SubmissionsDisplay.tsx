@@ -52,7 +52,7 @@ const STRINGS = {
     subtitleTested: 'tested',
     subtitleLLMs: 'LLMs',
     subtitleSKUs: 'SKUs',
-    tableCaption: 'Submission records',
+    tableCaption: 'Submission Records',
     tableHint: 'Search, sort, or expand a row to inspect the exact benchmark configuration',
   },
   zh: {

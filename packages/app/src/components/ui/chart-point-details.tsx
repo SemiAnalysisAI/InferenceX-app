@@ -9,7 +9,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
-  en: { title: 'Point details', close: 'Close point details' },
+  en: { title: 'Point Details', close: 'Close point details' },
   zh: { title: '数据点详情', close: '关闭数据点详情' },
 } as const;
 

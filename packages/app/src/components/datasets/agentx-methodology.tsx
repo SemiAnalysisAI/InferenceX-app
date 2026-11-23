@@ -17,11 +17,11 @@ type Locale = 'en' | 'zh';
 
 const CONTENT = {
   en: {
-    eyebrow: 'AgentX v1.0 methodology',
+    eyebrow: 'AgentX v1.0 Methodology',
     title: 'AgentX Benchmark Datasets',
     intro:
       'AgentX derives replay workloads from opt-in Claude Code sessions. The published traces remove prompt, code, and tool payloads while retaining request lengths, prefix reuse, subagent branches, and timing.',
-    processTitle: 'How an AgentX run is built',
+    processTitle: 'How an AgentX Run Is Built',
     steps: [
       {
         title: 'Capture',
@@ -39,12 +39,12 @@ const CONTENT = {
           'AIPerf fills those blocks with deterministic synthetic coding and tool-use tokens, then rebuilds each session as a directed acyclic graph (DAG) of main-agent turns, parallel subagents, auxiliary requests, and inter-turn tool time.',
       },
       {
-        title: 'Replay and measure',
+        title: 'Replay and Measure',
         description:
           'A seeded warmup establishes cache state before each configuration is profiled for one hour across a sweep of concurrent clients. Per-replay cache-bust markers stop unrelated sessions from sharing prefixes.',
       },
     ],
-    datasetTitle: 'What is in the v1.0 dataset',
+    datasetTitle: 'What Is in the v1.0 Dataset',
     datasetIntro:
       'AgentX v1.0 uses 393 Claude Code sessions selected from an internal, opt-in trace corpus. Eligible sessions contain at least 20 requests, use Claude Code 2.1.139 or newer, and have no more than 10 concurrent subagents. Processing removes duplicate requests, client-specific security-monitor and title-generation calls, and reconstructed inputs above 990k tokens.',
     profileLabel: 'v1.0 trace profile',
@@ -54,30 +54,30 @@ const CONTENT = {
       { value: '444', label: 'median output tokens / request' },
       { value: '44%', label: 'sessions with subagents' },
     ],
-    controlsTitle: 'Replay controls',
+    controlsTitle: 'Replay Controls',
     controls: [
       {
-        title: 'Steady-state start',
+        title: 'Steady-State Start',
         description:
           'A fixed seed selects a point 25–75% through each conversation. Primer requests and 10 additional warmup requests per replay lane materialize KV cache before profiling begins.',
       },
       {
-        title: 'Deterministic replay',
+        title: 'Deterministic Replay',
         description:
           'The seed fixes conversation sampling, starting points, and synthetic content. Reported metrics cover only the one-hour profiling window, not warmup.',
       },
       {
-        title: 'Speculative decoding',
+        title: 'Speculative Decoding',
         description:
           'Because synthetic tokens can distort draft-token acceptance, AgentX forces an acceptance length measured with SPEED-Bench for each model, speculator, draft length, and thinking-mode combination.',
       },
       {
-        title: 'DRAM offload',
+        title: 'DRAM Offload',
         description:
           'Servers without standardized DRAM are capped at 3 TB. Standard GB200 NVL72, GB300 NVL72, and TPUv7 systems use installed capacity, and every configuration may access only the share proportional to its GPU allocation.',
       },
     ],
-    readingTitle: 'How to read AgentX results',
+    readingTitle: 'How to Read AgentX Results',
     reading:
       'Concurrency means concurrent agent clients, not a fixed request batch. AgentX is closed loop, so faster configurations complete more requests and can encounter a slightly different workload mix. This variation is most visible at low concurrency. Report throughput with time to first token (TTFT) and interactivity; a single latency statistic does not describe the full run.',
     qualityNote:
@@ -155,7 +155,7 @@ const CONTENT = {
           '合成 token 可能影响 draft token 的接受率，因此 AgentX 会按 model、speculator、draft length 和 thinking mode 的组合，采用 SPEED-Bench 的实测结果固定 acceptance length。',
       },
       {
-        title: 'DRAM offload',
+        title: 'DRAM Offload',
         description:
           '对于没有标准 DRAM 配置的服务器，可用 DRAM 上限为 3 TB。GB200 NVL72、GB300 NVL72 和 TPUv7 标准系统按实际装机容量计算；每种配置只能使用与其 GPU 分配比例相对应的 DRAM。',
       },

@@ -13,7 +13,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'Compare vLLM and SGLang on the same SKU?',
+    title: 'Compare vLLM and SGLang on the Same SKU?',
     description:
       'By continuing to display vLLM & SGLang on the same hardware SKU, I agree not to use this comparison to start vLLM vs SGLang drama on twitter or XHS or other forums',
     cancel: 'Cancel',

@@ -31,7 +31,7 @@ export const EVALUATION_TABLE_STRINGS = {
     benchmark: 'Benchmark',
     date: 'Date',
     unofficial: 'Unofficial',
-    unofficialTitle: 'Data from an unofficial / un-ingested workflow run',
+    unofficialTitle: 'Data from an Unofficial / Un-Ingested Workflow Run',
     prefill: 'Prefill',
     decode: 'Decode',
     aggregated: 'aggregated',

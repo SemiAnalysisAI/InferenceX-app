@@ -11,7 +11,7 @@ import { huaweiSkuConfigurations } from './huawei-sku-configurations';
 
 const STRINGS = {
   en: {
-    title: 'Huawei 950PR SKU configurations',
+    title: 'Huawei 950PR SKU Configurations',
     intro:
       '950PR variants differ in enabled core counts, clock rates, memory and cache capacity. These are configuration values from the supplied SKU table, not measured TPC or GPC groupings.',
     columns: [

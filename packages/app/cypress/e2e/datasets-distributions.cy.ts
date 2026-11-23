@@ -113,9 +113,9 @@ describe('Dataset distribution percentiles', () => {
 
   it('shows P50/P75/P90/P95 for ISL, OSL, and uncached input', () => {
     const expected = [
-      ['Input tokens per turn', ['p50 100', 'p75 200', 'p90 300', 'p95 400']],
-      ['Output tokens per turn', ['p50 10', 'p75 20', 'p90 30', 'p95 40']],
-      ['Uncached input tokens per request', ['p50 0', 'p75 64', 'p90 128', 'p95 256']],
+      ['Input Tokens per Turn', ['p50 100', 'p75 200', 'p90 300', 'p95 400']],
+      ['Output Tokens per Turn', ['p50 10', 'p75 20', 'p90 30', 'p95 40']],
+      ['Uncached Input Tokens per Request', ['p50 0', 'p75 64', 'p90 128', 'p95 256']],
     ] as const;
 
     for (const [title, percentiles] of expected) {
@@ -136,8 +136,8 @@ describe('Dataset distribution percentiles', () => {
 
   it('shows ISL and OSL distributions for inner subagent requests only', () => {
     const expected = [
-      ['Subagent request ISL', ['p50 1.0k', 'p75 2.0k', 'p90 3.0k', 'p95 4.0k']],
-      ['Subagent request OSL', ['p50 100', 'p75 200', 'p90 300', 'p95 400']],
+      ['Subagent Request ISL', ['p50 1.0k', 'p75 2.0k', 'p90 3.0k', 'p95 4.0k']],
+      ['Subagent Request OSL', ['p50 100', 'p75 200', 'p90 300', 'p95 400']],
     ] as const;
 
     for (const [title, percentiles] of expected) {

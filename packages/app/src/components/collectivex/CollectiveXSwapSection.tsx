@@ -205,7 +205,7 @@ const STRINGS = {
     rangeNote:
       'Each band spans the lowest to the highest value across block counts at that block size; the line is their median.',
     rangeMedian: 'Median',
-    rangeHeading: 'Range across block counts',
+    rangeHeading: 'Range Across Block Counts',
     roofline: 'Nominal hardware roofline',
     rooflineNote:
       'Host transfers use one-way link bandwidth per GPU. Same-GPU copies use HBM bandwidth ÷ 2 (read + write); warm-cache points can exceed that HBM reference. Actual throughput also depends on host memory and placement.',
