@@ -54,7 +54,8 @@ interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
   searchGroups?: SearchableSelectGroup[];
   value: string;
-  onValueChange: (value: string) => void;
+  /** Return `false` to reject the pick, e.g. a locked tier, so the trigger never shows it. */
+  onValueChange: (value: string) => void | false;
   placeholder?: string;
   initialLabel?: string;
   className?: string;
@@ -173,8 +174,7 @@ export function SearchableSelect({
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
     React.startTransition(() => {
-      setShownValue(optionValue);
-      onValueChange(optionValue);
+      if (onValueChange(optionValue) !== false) setShownValue(optionValue);
     });
     handleOpenChange(false);
   };

@@ -62,7 +62,8 @@ interface MultiSelectProps {
   options?: MultiSelectOption[];
   sections?: MultiSelectSection[];
   value?: string[];
-  onChange?: (value: string[]) => void;
+  /** Return `false` to reject the pick, e.g. a locked tier, so the trigger never shows it. */
+  onChange?: (value: string[]) => void | false;
   triggerId?: string;
   triggerTestId?: string;
   ariaLabel?: string;
@@ -137,8 +138,7 @@ function MultiSelect({
   const [value, setShownValue] = React.useOptimistic(committedValue);
   const choose = (next: string[]) =>
     React.startTransition(() => {
-      setShownValue(next);
-      onChange?.(next);
+      if (onChange?.(next) !== false) setShownValue(next);
     });
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();

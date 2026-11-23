@@ -53,6 +53,41 @@ function Page({ pending }: { pending: Promise<void> }) {
   );
 }
 
+function LockedDialog({ pending }: { pending: Promise<void> }) {
+  React.use(pending);
+  return <p data-testid="locked" />;
+}
+
+function CostPage({ pending }: { pending: Promise<void> }) {
+  const [provider, setProvider] = React.useState('hyperscaler');
+  const [locked, setLocked] = React.useState(false);
+  return (
+    <>
+      <MultiSelect
+        options={[
+          { value: 'hyperscaler', label: 'Hyperscaler' },
+          { value: 'locked-tier', label: 'Locked Tier' },
+        ]}
+        value={[provider]}
+        onChange={(values) => {
+          if (values[0] === 'locked-tier') {
+            setLocked(true);
+            return false;
+          }
+          setProvider(values[0]);
+        }}
+        triggerTestId="cost"
+        minSelections={1}
+        maxSelections={1}
+        plainSelectedText
+      />
+      <React.Suspense fallback={null}>
+        {locked && <LockedDialog pending={pending} />}
+      </React.Suspense>
+    </>
+  );
+}
+
 describe('MultiSelect', () => {
   it('shows the pick at once and leaves what it re-renders to a transition', async () => {
     const { promise: pending, resolve: release } = Promise.withResolvers<void>();
@@ -71,5 +106,23 @@ describe('MultiSelect', () => {
     release();
     await settle();
     expect(container.querySelector('[data-testid="chart"]')?.textContent).toBe('fp8,fp4');
+  });
+
+  it('never shows a pick the caller rejects, even while the rejection renders', async () => {
+    const { promise: pending, resolve: release } = Promise.withResolvers<void>();
+    act(() => root.render(<CostPage pending={pending} />));
+    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="cost"]')!;
+    act(() => trigger.click());
+    const option = [...container.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (item) => item.textContent === 'Locked Tier',
+    )!;
+    await act(() => option.click());
+    // The locked-tier dialog is still loading, so the transition that opens it is pending.
+    expect(container.querySelector('[data-testid="locked"]')).toBeNull();
+    expect(trigger.textContent).toBe('Hyperscaler');
+    release();
+    await settle();
+    expect(container.querySelector('[data-testid="locked"]')).not.toBeNull();
+    expect(trigger.textContent).toBe('Hyperscaler');
   });
 });

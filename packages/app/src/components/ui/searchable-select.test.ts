@@ -354,6 +354,54 @@ describe('SearchableSelect', () => {
     expect(container.querySelector('[data-testid="chart"]')?.textContent).toBe('y_costh');
   });
 
+  it('never shows a pick the caller rejects, even while the rejection renders', async () => {
+    const { promise: pending, resolve: release } = Promise.withResolvers<void>();
+    function LockedDialog() {
+      React.use(pending);
+      return React.createElement('p', { 'data-testid': 'locked' });
+    }
+    function Page() {
+      const [metric, setMetric] = React.useState('y_tpPerGpu');
+      const [locked, setLocked] = React.useState(false);
+      return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(SearchableSelect, {
+          groups: GROUPS,
+          value: metric,
+          onValueChange: (value: string) => {
+            if (value === 'y_costh') {
+              setLocked(true);
+              return false;
+            }
+            setMetric(value);
+          },
+          triggerTestId: 'yaxis',
+        }),
+        React.createElement(
+          React.Suspense,
+          { fallback: null },
+          locked && React.createElement(LockedDialog),
+        ),
+      );
+    }
+    act(() => root.render(React.createElement(Page)));
+    await openMenu();
+    const option = document.body.querySelector('[data-value="y_costh"]') as HTMLElement;
+    await act(() => option.click());
+    // The locked-tier dialog is still loading, so the transition that opens it is pending.
+    expect(container.querySelector('[data-testid="locked"]')).toBeNull();
+    expect(container.querySelector('[data-testid="yaxis"]')?.textContent).toContain(
+      'Token Throughput per GPU',
+    );
+    release();
+    await settle();
+    expect(container.querySelector('[data-testid="locked"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="yaxis"]')?.textContent).toContain(
+      'Token Throughput per GPU',
+    );
+  });
+
   it('moves through options and selects from the keyboard', async () => {
     const handle = vi.fn();
     render({ onValueChange: handle });
