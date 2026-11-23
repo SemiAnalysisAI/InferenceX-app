@@ -95,7 +95,7 @@ export default function GlossaryPage() {
         <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
             <Heading as="h1" level="reading">
-              AI inference glossary
+              AI Inference Glossary
             </Heading>
             <p className="mt-4 max-w-measure text-base leading-reading text-muted-foreground md:text-lg md:leading-8">
               Definitions for agentic inference, benchmark metrics, serving techniques, numerical
@@ -116,7 +116,7 @@ export default function GlossaryPage() {
 
         <section className="grid gap-10 border-t border-border/30 pt-10 md:grid-cols-2">
           <div>
-            <h2 className="text-xl font-semibold">The full curve tells the story</h2>
+            <h2 className="text-xl font-semibold">The Full Curve Tells the Story</h2>
             <p className="mt-3 max-w-measure leading-reading text-foreground">
               LLM serving balances per-user speed against aggregate throughput. InferenceX uses full
               Pareto curves and matched-interactivity comparisons to show that tradeoff across
@@ -139,7 +139,7 @@ export default function GlossaryPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Definitions connected to real recipes</h2>
+            <h2 className="text-xl font-semibold">Definitions Connected to Real Recipes</h2>
             <p className="mt-3 max-w-measure leading-reading text-foreground">
               Every term page links to InferenceX articles where the concept changes a measured
               result, including MTP acceptance behavior, NVL72 wide-EP scaling, and software-only

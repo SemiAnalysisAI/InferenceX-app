@@ -19,6 +19,7 @@ import type { ChangelogLinkRow } from '@semianalysisai/inferencex-db/collectivex
 import type { SubmissionsResponse } from '../submissions/submissions-types';
 
 import { ApiRequestError } from './api-request-error';
+import { takeEarlyResponse } from './early-response';
 
 export type { BenchmarkRow, EvalRow };
 
@@ -87,10 +88,32 @@ export interface ReliabilityRow {
 }
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(url, { signal });
+  const early = takeEarlyResponse(url, signal);
+  const res = (early && (await early)) ?? (await fetch(url, { signal }));
   if (!res.ok)
     throw new ApiRequestError(`API error: ${res.status} ${res.statusText}`, res.status, url);
   return res.json();
+}
+
+export function benchmarksUrl(
+  model: string,
+  date?: string,
+  exact?: boolean,
+  runId?: string,
+  /** When true with a runId, fetch exactly that run's results (GPU comparison). */
+  exactRun?: boolean,
+  view?: { type: 'calculator'; sequence: string },
+): string {
+  const params = new URLSearchParams({ model });
+  if (date) params.set('date', date);
+  if (exact) params.set('exact', 'true');
+  if (runId) params.set('runId', runId);
+  if (exactRun) params.set('exactRun', 'true');
+  if (view) {
+    params.set('view', view.type);
+    params.set('sequence', view.sequence);
+  }
+  return `/api/v1/benchmarks?${params}`;
 }
 
 export function fetchBenchmarks(
@@ -103,16 +126,10 @@ export function fetchBenchmarks(
   exactRun?: boolean,
   view?: { type: 'calculator'; sequence: string },
 ) {
-  const params = new URLSearchParams({ model });
-  if (date) params.set('date', date);
-  if (exact) params.set('exact', 'true');
-  if (runId) params.set('runId', runId);
-  if (exactRun) params.set('exactRun', 'true');
-  if (view) {
-    params.set('view', view.type);
-    params.set('sequence', view.sequence);
-  }
-  return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`, signal);
+  return fetchJson<BenchmarkRow[]>(
+    benchmarksUrl(model, date, exact, runId, exactRun, view),
+    signal,
+  );
 }
 
 export function fetchBenchmarkHistory(
@@ -194,8 +211,10 @@ export interface AvailabilityRow {
   date: string;
 }
 
+export const DASHBOARD_AVAILABILITY_URL = '/api/v1/availability/compact';
+
 export function fetchDashboardAvailability(signal?: AbortSignal) {
-  return fetchJson<CompactAvailability>('/api/v1/availability/compact', signal);
+  return fetchJson<CompactAvailability>(DASHBOARD_AVAILABILITY_URL, signal);
 }
 
 export function fetchReliability(signal?: AbortSignal) {

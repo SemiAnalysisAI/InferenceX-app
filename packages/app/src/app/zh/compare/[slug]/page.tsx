@@ -20,6 +20,7 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
+import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
@@ -36,8 +37,8 @@ import ComparePageClient from '../../../compare/[slug]/page-client';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedCompareParams();
 }
 
 export interface ScenarioOptions {

@@ -41,7 +41,7 @@ export function pointDetailHref(
 ): { href: string | null; isExternal: boolean } {
   if (isOverlay) return { href: null, isExternal: false };
   if (d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)) {
-    return { href: agenticDetailHref(d.id, locale), isExternal: false };
+    return { href: agenticDetailHref(d.id, d.model, locale), isExternal: false };
   }
   if (d.run_url) return { href: updateRepoUrl(d.run_url), isExternal: true };
   return { href: null, isExternal: false };

@@ -8,7 +8,12 @@ import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 const mocks = { track: vi.fn() };
 mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 mock.module('next/link', () => ({
-  default: ({ href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
+  default: ({
+    href,
+    prefetch: _prefetch,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean | null }) => (
     <a href={href} {...props} />
   ),
 }));
@@ -53,7 +58,7 @@ describe('PowerXTutorialCta', () => {
       act(() => root.unmount());
     }
     const { host } = mount('en');
-    expect(host.textContent).toContain('How we measure power');
+    expect(host.textContent).toContain('How We Measure Power');
   });
 
   it('tracks the header entry point on click', () => {

@@ -54,7 +54,7 @@ async function drain(chunks: AsyncIterable<Uint8Array>): Promise<string> {
 
 function uploadedBody(): Promise<string> {
   const body = mockPut.mock.calls[0]?.[1];
-  if (!(body instanceof ReadableStream)) throw new Error('no streamed upload');
+  if (!(body instanceof ReadableStream)) throw new TypeError('no streamed upload');
   return new Response(body).text();
 }
 

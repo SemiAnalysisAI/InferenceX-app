@@ -50,7 +50,7 @@ describe('CatalogLinkCard', () => {
 
     const link = container.querySelector('a');
     expect(link?.getAttribute('href')).toBe('/run/kimi-h100');
-    link?.focus();
+    act(() => link?.focus());
     expect(document.activeElement).toBe(link);
     expect(link?.textContent).toContain('Measured run');
     expect(link?.textContent).toContain('Measured throughput, latency & cost');

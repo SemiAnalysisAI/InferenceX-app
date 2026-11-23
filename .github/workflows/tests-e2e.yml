@@ -114,6 +114,23 @@ jobs:
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
           SPLIT_SUMMARY: 'false'
           CYPRESS_TIMING_OUTPUT: /tmp/cypress-timings/observation.json
+      # The action leaves its `start` server running, and the runner reaps it only after the post
+      # steps. next-server maps @next/swc from node_modules, so the node_modules sticky disk could
+      # not unmount and its post step retried ten times on every shard. Stop it before then.
+      - name: Stop app server
+        if: ${{ always() }}
+        # Match the next-server title and the `next start` command line, whichever the runtime exposes.
+        run: |
+          pattern='^next-server|[ /]next start'
+          if ! pkill -TERM -f "$pattern"; then
+            echo '::warning::No next-server process found; the node_modules sticky disk may retry its unmount'
+            exit 0
+          fi
+          for _ in $(seq 100); do
+            pgrep -f "$pattern" > /dev/null || exit 0
+            sleep 0.1
+          done
+          pkill -KILL -f "$pattern" || true
       - name: Upload integration timing observations
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -154,7 +171,7 @@ jobs:
           bun-version-file: package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Restore Bun package cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

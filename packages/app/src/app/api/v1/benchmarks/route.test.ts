@@ -50,11 +50,45 @@ describe('GET /api/v1/benchmarks', () => {
     expect(body.error).toBe('Unknown model');
   });
 
-  it('returns 400 for unknown model', async () => {
+  it('returns 400 for unknown model, naming the parameter and the accepted display names', async () => {
     const res = await GET(req('/api/v1/benchmarks?model=nonexistent'));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Unknown model');
+    expect(body).toEqual({
+      error: 'Unknown model',
+      param: 'model',
+      allowed: expect.arrayContaining(['DeepSeek-R1-0528', 'Kimi-K3.1-Pro']),
+    });
+    expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+  });
+
+  it.each(['deepseek', 'kimi', 'qwen', 'glm', 'minimax'])(
+    'returns 400 for the ambiguous family name %s instead of picking one model',
+    async (model) => {
+      const res = await GET(req(`/api/v1/benchmarks?model=${model}`));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('Unknown model');
+      expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['a DB model key', 'dsv4', ['dsv4']],
+    ['a dashboard slug', 'kimi-k31-pro', ['kimik3.1']],
+    ['a legacy name', 'Qwen3.5-397B-A17B', ['qwen3.5']],
+    ['a lowercase display name', 'deepseek-r1-0528', ['dsr1']],
+  ])('resolves %s (%s) to its display model', async (_form, model, dbKeys) => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+    const res = await GET(req(`/api/v1/benchmarks?model=${model}`));
+    expect(res.status).toBe(200);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      dbKeys,
+      undefined,
+      undefined,
+      undefined,
+    );
   });
 
   it('returns benchmark data for valid model', async () => {
@@ -271,12 +305,18 @@ describe('GET /api/v1/benchmarks', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetLatestBenchmarks.mockRejectedValueOnce(new Error('DB down'));
 
     const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching benchmarks:',
+      expect.objectContaining({ message: 'DB down' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns empty array when no benchmarks found', async () => {

@@ -45,6 +45,7 @@
     "db:promote-to-public": "bun --env-file=../../.env src/sync-public-db.ts --to-public",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:sync-public": "bun --env-file=../../.env src/sync-public-db.ts",
+    "db:check-migrations": "bun --env-file=../../.env src/check-migrations.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "db:verify-gpu-sample-blobs": "bun --env-file=../../.env src/verify-gpu-sample-blobs.ts",
     "test:unit": "bun scripts/test-unit.ts",
@@ -55,18 +56,18 @@
     "db:backfill:operatorx-comparisons": "bun --env-file=../../.env src/backfill-operatorx-comparisons.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.2.0",
+    "@neondatabase/serverless": "^1.2.1",
     "@noble/ciphers": "^2.4.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
-    "kysely": "^0.29.8",
+    "kysely": "^0.29.9",
     "kysely-neon": "^3.0.0",
     "pg": "^8.23.1",
     "postgres": "^3.4.9",
-    "stream-chain": "^4.4.1",
-    "stream-json": "^3.8.0"
+    "stream-chain": "^4.4.2",
+    "stream-json": "^3.9.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.14",
+    "@electric-sql/pglite": "^0.5.16",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",

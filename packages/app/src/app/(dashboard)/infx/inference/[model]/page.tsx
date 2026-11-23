@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { InferencePageIntro } from '@/components/inference/inference-page-intro';
+import { InferenceEarlyFetch } from '@/components/inference/inference-early-fetch';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { enAlternates } from '@/lib/i18n/i18n';
@@ -44,6 +45,7 @@ export default async function InferenceModelPage({ params }: Props) {
   if (!entry) notFound();
   return (
     <>
+      <InferenceEarlyFetch routeModel={entry.model} />
       <InferencePageIntro locale="en" />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay centerOnEnter />

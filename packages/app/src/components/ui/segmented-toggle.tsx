@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { startTransition, useOptimistic, type ReactNode } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/shared/utils';
@@ -81,6 +81,14 @@ export function SegmentedToggle<TValue extends string>({
   role = 'tablist',
   variant = 'segments',
 }: SegmentedToggleProps<TValue>) {
+  // The pressed segment paints at once; whatever the pick re-renders (often whole charts)
+  // runs as a transition so it cannot hold up that paint.
+  const [shownValue, setShownValue] = useOptimistic(value);
+  const choose = (next: TValue) =>
+    startTransition(() => {
+      setShownValue(next);
+      onValueChange(next);
+    });
   if (variant === 'select') {
     return (
       <div className={cn('relative min-w-0', className)}>
@@ -88,8 +96,8 @@ export function SegmentedToggle<TValue extends string>({
           id={id}
           aria-label={ariaLabel}
           data-testid={testId}
-          value={value}
-          onChange={(event) => onValueChange(event.target.value as TValue)}
+          value={shownValue}
+          onChange={(event) => choose(event.target.value as TValue)}
           className={cn(
             SELECT_TRIGGER_STYLE,
             size === 'sm' ? 'h-11 md:h-8' : 'h-11 md:h-9',
@@ -131,8 +139,8 @@ export function SegmentedToggle<TValue extends string>({
           key={option.value}
           type="button"
           role={role === 'tablist' ? 'tab' : undefined}
-          aria-selected={role === 'tablist' ? value === option.value : undefined}
-          aria-pressed={role === 'group' ? value === option.value : undefined}
+          aria-selected={role === 'tablist' ? shownValue === option.value : undefined}
+          aria-pressed={role === 'group' ? shownValue === option.value : undefined}
           aria-label={option.ariaLabel}
           title={option.title}
           disabled={option.disabled}
@@ -141,10 +149,10 @@ export function SegmentedToggle<TValue extends string>({
             SEGMENT_RADIUS_STYLE,
             size === 'sm' ? 'md:min-h-6' : 'md:min-h-7',
             buttonClassName,
-            value === option.value ? activeButtonClassName : inactiveButtonClassName,
+            shownValue === option.value ? activeButtonClassName : inactiveButtonClassName,
             option.className,
           )}
-          onClick={() => onValueChange(option.value)}
+          onClick={() => choose(option.value)}
           data-testid={option.testId}
         >
           {option.icon}

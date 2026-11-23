@@ -35,13 +35,15 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
+import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
+import { perDollarPngVersion } from '@/lib/compare/per-dollar-png';
 
 import ComparePerDollarPageClient from './page-client';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedCompareParams();
 }
 
 export interface ScenarioOptions {
@@ -129,10 +131,12 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
     null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
+  // Reuses the cached pair read above (the scenario pages read the default scenario once more).
+  const heroImageVersion = await perDollarPngVersion(parsed);
 
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const imageUrl = `${url}/performance-per-dollar.png`;
+  const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png`;
   const jsonLd = buildJsonLd(
     'per-dollar',
     parsed.model,
@@ -198,6 +202,7 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
         heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png`}
+        heroImageVersion={heroImageVersion}
       />
     </>
   );

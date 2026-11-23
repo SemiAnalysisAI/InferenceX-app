@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import { cachedJson } from '@/lib/cache/api-cache';
@@ -11,6 +11,8 @@ import {
 } from '@/lib/benchmarks/benchmark-query-cache.server';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 import { loadFixture } from '@/lib/testing/test-fixtures';
+import { resolveModelName } from '@/lib/catalog/model-name-resolver';
+import { UNKNOWN_MODEL_DETAIL } from '@/lib/benchmarks/benchmark-request-params';
 import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-metadata';
 
 export const dynamic = 'force-dynamic';
@@ -68,10 +70,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const modelKeys = DISPLAY_MODEL_TO_DB[model];
-    if (!modelKeys || modelKeys.length === 0) {
-      return publicApiError(PUBLIC_API_ERRORS.unknownModel, 400);
+    const resolved = resolveModelName(model);
+    if (!resolved) {
+      return publicApiError(PUBLIC_API_ERRORS.unknownModel, 400, UNKNOWN_MODEL_DETAIL);
     }
+    const modelKeys = [...resolved.dbModelKeys];
     const rows = isAgentic
       ? await getCachedAgenticBenchmarkHistory(modelKeys)
       : await getCachedBenchmarkHistory(modelKeys, isl!, osl!);

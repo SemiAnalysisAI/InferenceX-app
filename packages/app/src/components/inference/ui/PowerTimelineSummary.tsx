@@ -24,7 +24,7 @@ import {
 
 const STRINGS = {
   en: {
-    title: 'Validated-window summary',
+    title: 'Validated-Window Summary',
     trace: 'Hardware · config',
     run: 'Run · telemetry source',
     window: 'Window (s)',

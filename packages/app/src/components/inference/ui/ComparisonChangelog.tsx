@@ -333,7 +333,11 @@ export default function ComparisonChangelog({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="flex flex-col gap-3 pt-2 pl-6">
+          {/* Bounded and reserved while loading so the list never shoves the chart below it down. */}
+          <div
+            className={`flex max-h-72 flex-col gap-3 overflow-y-auto pt-2 pl-6 ${loading ? 'h-72' : ''}`}
+            data-testid="comparison-changelog-list"
+          >
             {filteredChangelogs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {loading || deferred ? t.loadingBody : t.empty}

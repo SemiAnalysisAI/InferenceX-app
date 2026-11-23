@@ -2,7 +2,7 @@
 
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useTheme } from 'next-themes';
@@ -16,7 +16,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import { profitTargetUrlValue } from '@/components/calculator/url-seed';
+import { profitTargetUrlValue, type ProfitUrlSeed } from '@/components/calculator/url-seed';
 import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
@@ -75,6 +75,7 @@ import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useDraftNumberInput } from '@/hooks/useDraftNumberInput';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
@@ -483,6 +484,11 @@ function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
+function parsePositiveTarget(raw: string): number | null {
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
@@ -504,7 +510,11 @@ export default function ProfitEstimatorDisplay({
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
         >
-          <ProfitEstimatorInner initialTarget={urlSeed.profitTarget} basis={basis} />
+          <ProfitEstimatorInner
+            initialTarget={urlSeed.profitTarget}
+            profitSeed={urlSeed.profit}
+            basis={basis}
+          />
         </GlobalFilterProvider>
       )}
     </CalculatorUrlSeedBoundary>
@@ -538,15 +548,17 @@ function usePercentField(defaultValue: number, eventName: string) {
 
 function ProfitEstimatorInner({
   initialTarget,
+  profitSeed,
   basis,
 }: {
   initialTarget?: number;
+  profitSeed?: ProfitUrlSeed;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
-  const { setUrlParam, getUrlParam } = useUrlState();
+  const { setUrlParam } = useUrlState();
   const router = useRouter();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
@@ -563,7 +575,7 @@ function ProfitEstimatorInner({
   const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availableModels, availability } = useGlobalFilterAvailability();
+  const { availableModels, availability, availabilitySettled } = useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(
     () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
@@ -594,23 +606,18 @@ function ProfitEstimatorInner({
   const [targetValue, setTargetValue] = useState<number>(
     () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
-  const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
   useEffect(() => {
     setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
   }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
-  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
+  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>(
+    profitSeed?.powerBasis ?? 'provisioned',
+  );
   const powerBasis = powerControlsEnabled ? requestedPowerBasis : 'provisioned';
-  useEffect(() => {
-    const value = getUrlParam('c_power');
-    setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
-  }, [getUrlParam]);
-  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
-  useEffect(() => {
-    const value = getUrlParam('c_chmode');
-    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
-  }, [getUrlParam]);
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(
+    profitSeed?.cacheHitMode ?? DEFAULT_CACHE_HIT_MODE,
+  );
   const isMobile = useIsMobileViewport();
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -624,7 +631,6 @@ function ProfitEstimatorInner({
     defaultsAppliedFor.current = selectedModel;
     const defaults = profitModelDefaults(selectedModel);
     setTargetValue(defaults.interactivity);
-    setTargetRaw(String(defaults.interactivity));
     setPriceSource(defaultPriceSource(selectedModel));
     resetLabCut(defaults.labCutPct);
   }, [selectedModel, resetLabCut]);
@@ -661,26 +667,19 @@ function ProfitEstimatorInner({
     includePower,
   );
 
-  const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
-  const [selectedDateRange, setSelectedDateRange] = useState({
-    startDate: '',
-    endDate: '',
-  });
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [historyHydrated, setHistoryHydrated] = useState(false);
+  // Seeded from the route so a shared link renders its history controls on the server.
+  const [selectedGPUs, setSelectedGPUs] = useState<string[]>(
+    () => profitSeed?.historyGpus.slice(0, PROFIT_HISTORY_MAX_GPUS) ?? [],
+  );
+  const [selectedDateRange, setSelectedDateRange] = useState(
+    () => profitSeed?.historyDateRange ?? { startDate: '', endDate: '' },
+  );
+  const [selectedDates, setSelectedDates] = useState<string[]>(
+    () => profitSeed?.historyDates ?? [],
+  );
   useEffect(() => {
-    const gpus = getUrlParam('i_gpus');
-    if (gpus) setSelectedGPUs(gpus.split(',').filter(Boolean).slice(0, PROFIT_HISTORY_MAX_GPUS));
-    const startDate = getUrlParam('i_dstart') || '';
-    const endDate = getUrlParam('i_dend') || '';
-    if (startDate && endDate) setSelectedDateRange({ startDate, endDate });
-    const dates = getUrlParam('i_dates');
-    if (dates) setSelectedDates(dates.split(',').filter(Boolean));
-    setHistoryHydrated(true);
-  }, [getUrlParam]);
-  useEffect(() => {
-    if (historyHydrated) setUrlParam('i_dates', selectedDates.join(','));
-  }, [historyHydrated, selectedDates, setUrlParam]);
+    setUrlParam('i_dates', selectedDates.join(','));
+  }, [selectedDates, setUrlParam]);
 
   const dbModelKeys = useMemo<string[]>(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -709,7 +708,7 @@ function ProfitEstimatorInner({
     [availability, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
   useEffect(() => {
-    if (!historyHydrated || !availability || selectedGPUs.length === 0) return;
+    if (!availability || selectedGPUs.length === 0) return;
     const { startDate, endDate } = selectedDateRange;
     if (!startDate || !endDate) return;
     const available = new Set(historyAvailableDates);
@@ -718,14 +717,7 @@ function ProfitEstimatorInner({
     setSelectedDates([]);
     setUrlParam('i_dstart', '');
     setUrlParam('i_dend', '');
-  }, [
-    historyHydrated,
-    availability,
-    selectedGPUs.length,
-    selectedDateRange,
-    historyAvailableDates,
-    setUrlParam,
-  ]);
+  }, [availability, selectedGPUs.length, selectedDateRange, historyAvailableDates, setUrlParam]);
 
   const handleHistoryGpuChange = useCallback(
     (next: string[]) => {
@@ -964,12 +956,14 @@ function ProfitEstimatorInner({
     }),
     [utilization.value, labCut.value, basis, powerBasis],
   );
+  // The slider and input repaint at once; the estimate and chart follow in the background.
+  const chartTarget = useDeferredValue(targetValue);
 
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
     const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
     const current = getResults(
-      targetValue,
+      chartTarget,
       mode,
       interpolationCostProvider,
       undefined,
@@ -983,7 +977,7 @@ function ProfitEstimatorInner({
             selectedGPUs,
             precisions: selectedPrecisions,
             percentile: selectedPercentile,
-            targetValue,
+            targetValue: chartTarget,
             mode,
             costProvider: interpolationCostProvider,
             powerBasis: curvePowerBasis,
@@ -1001,7 +995,7 @@ function ProfitEstimatorInner({
       pricing,
       assumptions,
       powerBasis,
-      targetValue,
+      chartTarget,
       t.powerBarLabels,
     );
     if (!historyActive) return estimated;
@@ -1019,7 +1013,7 @@ function ProfitEstimatorInner({
     cacheHitMode,
     powerBasis,
     t.powerBarLabels,
-    targetValue,
+    chartTarget,
     mode,
     interpolationCostProvider,
     costPerGpuHourFor,
@@ -1080,24 +1074,10 @@ function ProfitEstimatorInner({
     [fullEstimate, visibleHwKeys],
   );
 
-  const handleTargetChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setTargetRaw(e.target.value);
-    const parsed = Number.parseFloat(e.target.value);
-    if (Number.isFinite(parsed) && parsed > 0) setTargetValue(parsed);
-  }, []);
-
-  const handleTargetSlide = useCallback((value: number) => {
-    setTargetValue(value);
-    setTargetRaw(String(value));
-  }, []);
-
-  const handleTargetBlur = useCallback(() => {
-    const parsed = Number.parseFloat(targetRaw);
-    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : targetValue;
+  const targetInput = useDraftNumberInput(targetValue, parsePositiveTarget, (next, source) => {
     setTargetValue(next);
-    setTargetRaw(String(next));
-    track('profit_target_set', { mode, value: next });
-  }, [targetRaw, targetValue, mode]);
+    if (source === 'blur') track('profit_target_set', { mode, value: next });
+  });
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -1350,7 +1330,7 @@ function ProfitEstimatorInner({
             getSequenceLabel(Sequence.AgenticTraces, locale),
           )}
           <HeadingQualifier>
-            {profitChartQualifier(locale, percentileLabel, targetValue)}
+            {profitChartQualifier(locale, percentileLabel, chartTarget)}
           </HeadingQualifier>
         </Heading>
         {powerControlsEnabled && (
@@ -1375,7 +1355,7 @@ function ProfitEstimatorInner({
     selectedModel,
     locale,
     percentileLabel,
-    targetValue,
+    chartTarget,
     basis,
     t,
     historyActive,
@@ -1649,8 +1629,11 @@ function ProfitEstimatorInner({
                       label={t.targetAgenticLabel(percentileLabel)}
                       min={ranges.interactivity.min}
                       max={ranges.interactivity.max}
-                      value={targetValue}
-                      onSliderChange={handleTargetSlide}
+                      value={targetInput.sliderValue}
+                      onSliderChange={(next) => {
+                        targetInput.discardDraft();
+                        setTargetValue(next);
+                      }}
                       onSliderCommit={() =>
                         track('profit_target_set', { mode, value: targetValue })
                       }
@@ -1661,9 +1644,7 @@ function ProfitEstimatorInner({
                         onWheel: blurOnWheel,
                         inputMode: 'decimal',
                         min: 1,
-                        value: targetRaw,
-                        onChange: handleTargetChange,
-                        onBlur: handleTargetBlur,
+                        ...targetInput.input,
                       }}
                     />
                   </div>
@@ -1905,7 +1886,9 @@ function ProfitEstimatorInner({
                   selectedPrecisions={selectedPrecisions}
                   modelDbKeys={dbModelKeys}
                   selectedSequence={selectedSequence}
-                  loading={historyChangelogs.loading}
+                  // Reserve the loading height until availability says which dates to query, so
+                  // the list doesn't grow under the chart after hydration.
+                  loading={historyChangelogs.loading || !availabilitySettled}
                   totalDatesQueried={historyChangelogs.totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
@@ -1923,7 +1906,7 @@ function ProfitEstimatorInner({
 
       {loading && (
         <Card>
-          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-200 w-full" />
         </Card>
       )}
 

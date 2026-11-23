@@ -37,11 +37,17 @@ describe('GET /api/v1/availability', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAvailabilityData.mockRejectedValueOnce(new Error('Connection failed'));
 
     const res = await GET(new Request('https://example.test/api/v1/availability'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching availability:',
+      expect.objectContaining({ message: 'Connection failed' }),
+    );
+    logged.mockRestore();
   });
 });

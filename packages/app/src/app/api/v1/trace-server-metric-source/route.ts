@@ -26,7 +26,7 @@ const getCachedMetricSource = cachedQuery(
 export async function GET(request: NextRequest): Promise<Response> {
   const id = Number(request.nextUrl.searchParams.get('id'));
   const source = request.nextUrl.searchParams.get('source')?.trim();
-  if (!id || !Number.isFinite(id)) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json({ error: 'id is required (benchmark_result_id)' }, { status: 400 });
   }
   if (!source || source.length > 512) {

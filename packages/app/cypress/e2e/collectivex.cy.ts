@@ -178,7 +178,7 @@ describe('CollectiveX neutral run view', () => {
 
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
     cy.get('[data-testid="point-details-panel"]')
-      .should('contain.text', 'Range across libraries')
+      .should('contain.text', 'Range Across Libraries')
       .and('contain.text', 'Median')
       .and('contain.text', '1 library at this point');
     cy.get('@band')

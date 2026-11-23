@@ -1,37 +1,25 @@
 // @test-environment jsdom
 import { ThemeProvider } from 'next-themes';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { createElement } from 'react';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { APP_THEMES } from '@/lib/themes/themes';
+import { hydrate } from '@/test/dom';
 
 import EmbedFrame from './EmbedFrame';
 
-let container: HTMLDivElement;
-let root: Root;
-
+/** Hydrated like the embed page load, so the boot scripts are adopted rather than created. */
 function renderEmbed(theme: 'light' | 'dark'): void {
-  act(() =>
-    root.render(
-      createElement(
-        ThemeProvider,
-        { attribute: 'class', defaultTheme: 'light', themes: [...APP_THEMES] },
-        createElement(EmbedFrame, { theme, skin: undefined, children: 'chart' }),
-      ),
+  hydrate(
+    createElement(
+      ThemeProvider,
+      { attribute: 'class', defaultTheme: 'light', themes: [...APP_THEMES] },
+      createElement(EmbedFrame, { theme, skin: undefined, children: 'chart' }),
     ),
   );
 }
 
-beforeEach(() => {
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-});
-
 afterEach(() => {
-  act(() => root.unmount());
-  container.remove();
   localStorage.clear();
   document.documentElement.className = '';
 });

@@ -21,7 +21,7 @@ const DEFAULT_CHART_INSTRUCTIONS = {
 } as const;
 
 const SHEET_STRINGS = {
-  en: { title: 'Point details', close: 'Close point details' },
+  en: { title: 'Point Details', close: 'Close point details' },
   zh: { title: '数据点详情', close: '关闭数据点详情' },
 } as const;
 
@@ -328,6 +328,8 @@ export function D3ChartWrapper({
       <div ref={setContainerRef} className="relative flex-1 min-w-0">
         <div className="relative">
           <svg
+            translate="no"
+            className="notranslate"
             ref={svgRef}
             data-testid="d3-chart-svg"
             width="100%"

@@ -24,7 +24,7 @@ import { PowerBasisPill } from './PowerBasisPill';
 
 const STRINGS = {
   en: {
-    title: 'Headroom by interactivity',
+    title: 'Headroom by Interactivity',
     chip: 'GPU',
     perUser: (x: number) => `${x} tok/s/user`,
     avg: 'Avg W',

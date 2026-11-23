@@ -92,6 +92,8 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(tutorial?.content.centered).toBeUndefined();
     expect(tutorial?.storageKey).toBe(TELEMETRY_TUTORIAL_STORAGE_KEY);
     expect(TELEMETRY_TUTORIAL_STORAGE_KEY).toBe('inferencex-agentx-telemetry-tutorial-dismissed');
+    // A timer let the card paint before any input, making it the page's late LCP element.
+    expect(tutorial?.trigger).toMatchObject({ type: 'dom-event', event: 'scroll' });
   });
 
   it('keeps internal action destinations in the active Chinese route tree', () => {
@@ -152,7 +154,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     const location = { pathname: prefix || '/', href: '' };
     stubGlobal('window', { location });
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
-    expect(modal?.content.title).toBe('TPUv7 preliminary results across multiple models');
+    expect(modal?.content.title).toBe('TPUv7 Preliminary Results Across Multiple Models');
     expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
     expect(modal?.content.description).toBe('AgentX Preview Submissions');
     expect(modal?.content.descriptionZh).toBe('AgentX 预览版提交结果');

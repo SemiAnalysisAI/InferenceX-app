@@ -535,7 +535,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       });
     cy.get('[data-testid="calculator-lifecycle-section"]').should(
       'contain.text',
-      'Not measured at this interactivity',
+      'Not Measured at This Interactivity',
     );
     cy.get('[data-testid="calculator-lifecycle-unmeasured"]').should('contain.text', 'measured');
   });

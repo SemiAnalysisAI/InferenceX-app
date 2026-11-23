@@ -171,7 +171,7 @@ describe('landing model curation', () => {
           .and('contain.text', 'Google TPU')
           .and(
             'contain.text',
-            prefix ? 'Kimi K3 · 2.8 万亿参数 · AgentX' : 'Kimi K3 · 2.8T parameters · AgentX',
+            prefix ? 'Kimi K3 · 2.8 万亿参数 · AgentX' : 'Kimi K3 · 2.8T Parameters · AgentX',
           );
         cy.get('[data-testid="landing-tpu-kimi-k3-google-logo"] path').should('have.length', 4);
         cy.get('[data-new-badge="landing-tpu-kimi-k3"]')
@@ -184,7 +184,7 @@ describe('landing model curation', () => {
           .and('contain.text', 'Vera Rubin NVL72')
           .and(
             'contain.text',
-            prefix ? 'GLM 5.3 · 7440 亿参数 · AgentX' : 'GLM 5.3 · 744B parameters · AgentX',
+            prefix ? 'GLM 5.3 · 7440 亿参数 · AgentX' : 'GLM 5.3 · 744B Parameters · AgentX',
           );
         cy.get('[data-testid="landing-rubin-glm-5-3-nvidia-logo"] path').should(
           'have.attr',

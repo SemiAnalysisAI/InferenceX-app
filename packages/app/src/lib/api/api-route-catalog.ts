@@ -123,7 +123,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: 'b5f9de381bb588faafa7af9ca193030d73248394332e387a77f025a51c9f961c',
+    sourceSha256: '88576e5d5c7c1e9e04d1efcbbfed61956f1bc7436b34604e62f966ec490a021b',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '98c52e79b23dae047bf265ff400dd9770700776a09e9d3d131b9653c819bcdab',
+    sourceSha256: 'e380aaf9adbdbc76df05c1a3cbdf091bc2f175697c9ba1fab25df65c47f3bc06',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'e2952d2e29ea0703063528e3745184c9d4bf831a6d6e80ead1dbf2c6d3db2d96',
+    sourceSha256: 'c97a33f45144308cdd557589191492b9b2207c79cc92834b1f75f521bf8d518a',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -600,10 +600,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'PowerX raw/series=power read used by the UI and, in-process, by the public GPU metrics view: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. runId must be a positive safe integer. Stored raw reads report run-wide coverage as complete, partial or unknown inventory; missingArtifacts names wholly missing artifacts. Raw native bundles expose optional Celsius temperature when no CSV sibling exists. GET has no expected identities and reports sourceCoverage unknown. Live windows are unique by validation source, preferring CSV over bundle. Stored series=power reads serve the per-artifact output ingest precomputed when it matches the current series and linked point audits, and otherwise bucket the stored samples; both give the same response. DB failures return 503 DATABASE_UNAVAILABLE; known-incomplete stored telemetry returns 503 STORED_TELEMETRY_INCOMPLETE without trying GitHub. Responses use no-store. This is not a stable public API.',
-      zh: '供 PowerX 界面读取原始遥测或 series=power，公开 GPU 指标视图也在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。runId 必须为正安全整数。数据库原始读取的 coverage 标明整个 run 的清单完整、部分缺失或未知，missingArtifacts 列出整体缺失的产物。没有对应 CSV 时，原生 bundle 的原始数据包含可用的 GPU 温度（摄氏度）。GET 没有预期身份清单，sourceCoverage 为 unknown。实时窗口按 validation source 去重，优先 CSV，再用 bundle。已入库 run 的 series=power 读取在入库预计算结果与当前序列及关联数据点的功耗审计一致时直接使用该结果，否则按已存样本现场分桶，两者响应相同。数据库故障返回 503 DATABASE_UNAVAILABLE；若已入库的遥测已知不完整，则返回 503 STORED_TELEMETRY_INCOMPLETE，不会转而读取 GitHub。响应使用 no-store，不作为稳定公开 API。',
+      en: 'PowerX raw/series=power read used by the UI and, in-process, by the public GPU metrics view: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. runId must be a positive safe integer. Stored raw reads report run-wide coverage as complete, partial or unknown inventory; missingArtifacts names wholly missing artifacts. Raw native bundles expose optional Celsius temperature when no CSV sibling exists. GET has no expected identities and reports sourceCoverage unknown. Live windows are unique by validation source, preferring CSV over bundle. Stored series=power reads serve the per-artifact output ingest precomputed when it matches the current series and linked point audits, and otherwise bucket the stored samples; both give the same response. DB failures return 503 DATABASE_UNAVAILABLE; known-incomplete stored telemetry returns 503 STORED_TELEMETRY_INCOMPLETE without trying GitHub. A run GitHub does not have returns 404 RUN_NOT_FOUND. A run whose artifact list has no telemetry artifacts, or whose telemetry archives are all expired, unreadable (corrupt archive or undecodable contents) or without series, returns 404 NO_TELEMETRY; archives over the live download cap return 422 ARTIFACT_TOO_LARGE; a failed GitHub run, listing or download read (network error or non-410 HTTP status) returns a retryable 503 GITHUB_UNAVAILABLE. Responses use no-store. This is not a stable public API.',
+      zh: '供 PowerX 界面读取原始遥测或 series=power，公开 GPU 指标视图也在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。runId 必须为正安全整数。数据库原始读取的 coverage 标明整个 run 的清单完整、部分缺失或未知，missingArtifacts 列出整体缺失的产物。没有对应 CSV 时，原生 bundle 的原始数据包含可用的 GPU 温度（摄氏度）。GET 没有预期身份清单，sourceCoverage 为 unknown。实时窗口按 validation source 去重，优先 CSV，再用 bundle。已入库 run 的 series=power 读取在入库预计算结果与当前序列及关联数据点的功耗审计一致时直接使用该结果，否则按已存样本现场分桶，两者响应相同。数据库故障返回 503 DATABASE_UNAVAILABLE；若已入库的遥测已知不完整，则返回 503 STORED_TELEMETRY_INCOMPLETE，不会转而读取 GitHub。GitHub 上不存在的运行返回 404 RUN_NOT_FOUND。产物列表中没有遥测产物，或遥测压缩包均已过期、无法读取（压缩包损坏或内容无法解析）或不含任何序列时，返回 404 NO_TELEMETRY；压缩包超过实时下载上限时返回 422 ARTIFACT_TOO_LARGE；读取 GitHub 运行、产物列表或下载失败（网络错误或 410 以外的 HTTP 状态）时返回可重试的 503 GITHUB_UNAVAILABLE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '5d265085f9daeb20f03aa891e5ca3a0e4d45ef2e57d1345bc5c5ca69cdedd727',
+    sourceSha256: 'e575647c4926c23c1536557d086fbd86c9cad1574f05558533b2f48779ad7c80',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -614,7 +614,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. A requested window missing from an ingested run is not fetched from GitHub; the DB response lists it in missingSources with sourceCoverage incomplete. Coverage describes only requested identities, never whole-run/sample completeness. The GET source-selection, no-store and error guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。已入库 run 缺少的请求窗口不会从 GitHub 补齐，DB 响应会将其列入 missingSources，并把 sourceCoverage 标记为 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的单一来源选择、no-store 和错误约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: '5d265085f9daeb20f03aa891e5ca3a0e4d45ef2e57d1345bc5c5ca69cdedd727',
+    sourceSha256: 'e575647c4926c23c1536557d086fbd86c9cad1574f05558533b2f48779ad7c80',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -655,10 +655,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Rows whose model or hardware has no registry entry are kept, with the raw model prefix and the raw runner base as their model and hardware identities; official ingest still skips them. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
-      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。模型或硬件尚未注册的行也会保留，分别以原始模型前缀和原始 runner 名称作为模型和硬件标识；正式入库仍会跳过这些行。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
+      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Rows whose model or hardware has no registry entry are kept, with the raw model prefix and the raw runner base as their model and hardware identities; official ingest still skips them. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After. A run GitHub does not have returns 404 RUN_NOT_FOUND. Once the artifact list is read, result artifacts listed as expired, a 410 download, or an empty list for a run older than GitHub’s 90-day artifact retention return 410 ARTIFACTS_EXPIRED; a completed run without results returns 404 NO_RESULTS and an unfinished one 404 RUN_IN_PROGRESS. An artifact list GitHub fails to return is an uncached, retryable 503 GITHUB_UNAVAILABLE, never an expiry. These bodies carry error, code and runId.',
+      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。模型或硬件尚未注册的行也会保留，分别以原始模型前缀和原始 runner 名称作为模型和硬件标识；正式入库仍会跳过这些行。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。GitHub 上不存在的运行返回 404 RUN_NOT_FOUND。成功读取产物列表后，若结果产物标记为已过期、下载返回 410，或运行早于 GitHub 的 90 天产物保留期且列表为空，则返回 410 ARTIFACTS_EXPIRED；已完成但没有结果的运行返回 404 NO_RESULTS，尚未结束的运行返回 404 RUN_IN_PROGRESS。GitHub 未能返回产物列表时，返回不缓存、可重试的 503 GITHUB_UNAVAILABLE，不会报为已过期。这些响应体包含 error、code 和 runId。',
     },
-    sourceSha256: 'e062bb87a87a1e65189ca681d0fb582456d67ae5a869340f73c5173cab20a5bb',
+    sourceSha256: 'e4a5e19fcb610e5b0118611205860196261cc2a45c634e8e90c84cbef571f66f',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -720,7 +720,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'dcdda2fb8d266449de4f7a5e1b63dde13a628aa3ee52e44e7cc5a8ee5b28aa82',
+    sourceSha256: 'ec0725c55db090c1987f43f889dc01c8092c52c9bf4da25d9e3424aac050203a',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/trends/route.ts',
@@ -731,7 +731,7 @@ export const apiRouteCatalog = [
       en: 'Historical Trends BFF: the published benchmark history rows dictionary-encoded by config and run, with only the metric keys and power fields a trend reads.',
       zh: '历史趋势页面专用 BFF：按配置和运行字典编码的已发布基准历史行，只保留趋势读取的指标键和功耗字段。',
     },
-    sourceSha256: '1f9c3e9daec93de23deb917cdc9e8b86885ae75ed5b1a690690e75936d358551',
+    sourceSha256: '7b7dac6ee403971f1373d473c32d55064ae10f9ef3c3bf2b73fb0cae4e0384ea',
   },
   {
     source: 'src/app/api/v1/collectivex/changelog/route.ts',
@@ -904,6 +904,17 @@ export const apiRouteCatalog = [
     sourceSha256: '6aed139b34cef1ff8390de220c9bd12f6fcee2263c8e337946491cb7a4842570',
   },
   {
+    source: 'src/app/api/v1/openrouter-pricing/route.ts',
+    path: '/api/v1/openrouter-pricing',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Dashboard backend for the OpenRouter price source: a cached copy of third-party list prices for catalog models. The read-only views API already returns the prices it applies (priceSource=openrouter, in pricing).',
+      zh: 'OpenRouter 价格来源的仪表板后端：为目录中的模型缓存第三方公开价格。只读视图 API 已在 pricing 中返回其实际使用的价格（priceSource=openrouter）。',
+    },
+    sourceSha256: '3d6745d60110f72dc62ed3c2e50399fb05973a6840eed325b50eb903543c783a',
+  },
+  {
     source: 'src/app/api/v1/overview/route.ts',
     path: '/api/v1/overview',
     method: 'GET',
@@ -1004,7 +1015,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'search-server-logs',
-    sourceSha256: 'e4dd4f02ca57e261ce3549b81108f790f838009fb39883d0f428f6cd2b6f2855',
+    sourceSha256: 'e62c0dd3c357d1ef732764a7664eb3a477907c5b5af8a04483fa7c1aa2a567b0',
   },
   {
     source: 'src/app/api/v1/server-log/route.ts',
@@ -1012,7 +1023,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '965da04be9c3f9843f89bf181f0c0212e52a0a71c4b00b907027db6fb3edc580',
+    sourceSha256: '7ad66d056dad2b57d9280b78e69e591a2b5b69d2151378a55046384adac4b528',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -1055,7 +1066,7 @@ export const apiRouteCatalog = [
       en: 'Agentic point-detail BFF that lazily returns the full time-series arrays for one UI-selected metric source.',
       zh: '智能体数据点详情页专用 BFF；按界面选择按需返回单个指标来源的完整时间序列。',
     },
-    sourceSha256: 'a4348f8eb15ca6cfc7173132b45f91f0225e5d7af33f59408e5622cc1d7156a8',
+    sourceSha256: '90bdff4069eb95efc28697a5d162e10fcbf1e6fe47bee3a5e21b09bf7799a136',
   },
   {
     source: 'src/app/api/v1/trace-server-metrics/route.ts',
@@ -1260,7 +1271,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    sourceSha256: '2ef19d035a474778efaa90f74edafdd287b6aef39a2cdad3bed41bb9423be196',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1424,7 +1435,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/gpu-power-series.ts',
-    sourceSha256: '9054bc94179937e9c2cf3c9f0692f5a7ddfb053237a118dbf22d8e6fff5442dc',
+    sourceSha256: '39c55b49084d2c8a8414f62b6e0859f077e732d678ac726cde8adf5dc73a36d4',
     reviewArea: {
       en: 'Precomputed PowerX timeline series: per-artifact rows keyed by series identity, linked point audits and transform version; any mismatch or incomplete artifact falls back to the stored samples.',
       zh: '预计算 PowerX 时间线序列：按产物存储，键值包含序列身份、关联数据点的功耗审计和转换版本；任一不匹配或产物不完整时回退到已存样本。',
@@ -1440,7 +1451,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/app/api/gpu-metrics/github-telemetry.ts',
-    sourceSha256: 'dbb77691d07bf8fca2b2edceea63ec62cbfc329ae07542a557a2e3bd754bcfc5',
+    sourceSha256: 'b6e21b5a6e3b73d2a850516517cb3c47f922465fb034aea87a5895f1d8f99d8e',
     reviewArea: {
       en: 'Live PowerX artifact selection with ingest-matching CSV precedence for equal suffixes, download bounds, per-artifact failure isolation, CSV context normalization and bundle decoding.',
       zh: 'PowerX 实时产物选择沿用 ingest 的同后缀 CSV 优先规则、下载限制、单产物故障隔离、CSV context 规范化及 bundle 解码。',
@@ -1761,7 +1772,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/upstream-error.ts',
-    sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
+    sourceSha256: 'fca5b0de57254325f6185d60e8c800fdb7a12ef87593ff79c2c8c3de741007c6',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1842,7 +1853,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/errors.ts',
-    sourceSha256: '6253b908c4956286a657c9b42d590a0ad0eaedf4fa92b00acad2939135d66add',
+    sourceSha256: 'fd9cca3d312b128806c46cb4c220f5b69086a1784eebd4173b350a2004b9f653',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1851,7 +1862,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '8204200a643c6ed136ccc0f0b63937ccea1ccb9e09cc34198281f170795ff084',
+    sourceSha256: 'c3082fab095dbf821fd0c4ca9132770e7073e5e65d4517193fa856ca01759a06',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1860,7 +1871,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: 'fa797c3a1d3c2018eb4d7438e1ac36f8a655b2604ff95e2dffd585ab227cf8f4',
+    sourceSha256: '5fde3ac11e933e40c027a3e8d950039bf9ddf342ffbadfa5132eb1df5b9ac497',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1896,7 +1907,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '21f92834ef015f770573923da19085fdb92a4cff9115c5e106b8c7e632cfed46',
+    sourceSha256: 'ee14df85ab82d9e917545a1ba4ca297d89353b6f2acae5ef378553d1bdb8a8e3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1929,7 +1940,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-request-params.ts',
-    sourceSha256: '76ebf0e9a7827db72580944926b42fd6b0f933a1db642260b895b0eae07257b6',
+    sourceSha256: '876c31f250ec60274675f7adc05155b1e0e52771a6a0aea54ae1daa17ce1b3c2',
     reviewArea: {
       en: '/api/v1/benchmarks query validation and 400 messages.',
       zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
@@ -1945,7 +1956,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmarks-endpoint.server.ts',
-    sourceSha256: '4153e258a16e27e99f9ec596bd548c0df44cd0e324ba14d3d9a56c8ee58ba010',
+    sourceSha256: 'd967b586fff50b080c079409a99eacb25d2b8e8f39b93d6b4102ce4224d9957b',
     reviewArea: {
       en: 'Benchmarks endpoint parameter validation, date/run/view selection, calculator trimming, power validity filtering and cache keys shared by the route, views and pareto.',
       zh: '基准端点的参数校验、日期/运行/视图选择、计算器裁剪、功耗有效性过滤，以及路由、视图和 pareto 共用的缓存键。',
@@ -1969,10 +1980,26 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/public-api-errors.ts',
-    sourceSha256: '48301bb3567870921f5cae0e0a35240c9a687767b89f96141b36be41afbaa16a',
+    sourceSha256: '104141572445304cbe7d6d6532ae4e098d208e6ce90c7f155ddb2d68fdbbe59a',
     reviewArea: {
       en: 'Canonical public JSON error strings shared by handlers and OpenAPI examples.',
       zh: '处理程序与 OpenAPI 示例共享的规范公开 JSON 错误字符串。',
+    },
+  },
+  {
+    source: 'src/lib/catalog/model-name-resolver.ts',
+    sourceSha256: 'e1ff58681093cbe5ba4ee18fea43d96cade58c330dc28bbf942dd6e24ff33a88',
+    reviewArea: {
+      en: 'Accepted model= forms (display names, DB keys, slugs, legacy names) for the benchmark reads and the views API.',
+      zh: '基准读取接口与视图 API 接受的 model= 形式（展示名称、DB 键、slug、旧名称）。',
+    },
+  },
+  {
+    source: 'src/lib/calculator/openrouter-pricing.ts',
+    sourceSha256: '709bca15c5a89b1566a2a22db0e7bac6928baf106eb07e1f9e1d4ea7a2a3cec1',
+    reviewArea: {
+      en: 'OpenRouter price conversion shared by the dashboard and priceSource=openrouter in the views API.',
+      zh: '仪表板与视图 API 中 priceSource=openrouter 共用的 OpenRouter 价格换算。',
     },
   },
   {
@@ -2017,7 +2044,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '42e8361265365e715285d59b8a3db2964531c247fd9dd47b355b05c2ff0de128',
+    // Reviewed for the document early fetch: `benchmarksUrl` and `DASHBOARD_AVAILABILITY_URL`
+    // build the same URLs as before, and `fetchJson` can read an early response for one. No
+    // parameter, response, or caching contract changed, so the docs stand.
+    sourceSha256: '70d2b4a3e83e253c674d70fe845ae8ed5261256d3ba14f0a9b42c697f01de1b2',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',

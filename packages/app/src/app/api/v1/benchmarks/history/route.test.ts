@@ -61,11 +61,20 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(body.error).toBe('model, isl, and osl are required');
   });
 
-  it('returns 400 for unknown model', async () => {
+  it('returns 400 for unknown model with the accepted display names', async () => {
     const res = await GET(req('/api/v1/benchmarks/history?model=BadModel&isl=1024&osl=1024'));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Unknown model');
+    expect(body.param).toBe('model');
+    expect(body.allowed).toContain('DeepSeek-R1-0528');
+  });
+
+  it('accepts a DB model key for the model', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce([]);
+    const res = await GET(req('/api/v1/benchmarks/history?model=dsr1&isl=1024&osl=1024'));
+    expect(res.status).toBe(200);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
   });
 
   it('returns history data for valid params', async () => {
@@ -111,6 +120,7 @@ describe('GET /api/v1/benchmarks/history', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('DB error'));
 
     const res = await GET(
@@ -119,6 +129,11 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching benchmark history:',
+      expect.objectContaining({ message: 'DB error' }),
+    );
+    logged.mockRestore();
   });
 
   it('returns empty array when no history found', async () => {

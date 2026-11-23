@@ -77,11 +77,17 @@ describe('GET /api/v1/overview', () => {
   });
 
   it('returns 500 when overview assembly fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetOverviewPageData.mockRejectedValueOnce(new Error('database unavailable'));
 
     const response = await GET(request('/api/v1/overview?tier=100'));
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'Internal server error' });
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching overview:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

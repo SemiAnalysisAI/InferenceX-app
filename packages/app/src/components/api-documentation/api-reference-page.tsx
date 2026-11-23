@@ -18,19 +18,19 @@ const UI_COPY = {
       version: 'Specification',
       baseUrl: 'Base URL',
     },
-    openApiKicker: 'Machine-readable contract',
+    openApiKicker: 'Machine-Readable Contract',
     openApiTitle: 'OpenAPI 3.1 JSON',
     openApiDescription: 'Inspect the canonical schema or pass it directly to your tooling.',
     openApiAction: 'Open OpenAPI JSON',
     quickstart: 'Quickstart',
     quickstartDescription: 'Move from contract discovery to a real response in a few steps.',
-    agentSkill: 'Use the API with your agent',
+    agentSkill: 'Use the API with Your Agent',
     agentSkillDescription:
       'The inferencex-api skill helps your agent navigate the public API: benchmarks, provenance, datasets, CollectiveX, and diagnostics. Validated single-turn PowerX export is the first worked example.',
     agentVersion: `Skill version · ${PUBLISHED_SKILL.version}`,
     agentPrerequisites:
       'Requires Node 24 or later with npm and Codex or Claude Code. Installation and API queries require internet access.',
-    agentInstall: 'Install in your project',
+    agentInstall: 'Install in Your Project',
     agentInstallDescription:
       'Run the command for your agent from your project directory, then start an agent session in that project.',
     agentUpgrade:
@@ -40,7 +40,7 @@ const UI_COPY = {
     agentExamples: 'Usage examples',
     agentAccess:
       'Queries use the public API without database credentials. The separate MCP server has its own setup; this skill does not require or reconfigure it.',
-    agentPromptTitle: 'First example: measured PowerX',
+    agentPromptTitle: 'First Example: Measured PowerX',
     agentPrompt: `Use inferencex-api to export latest available measured PowerX data for DeepSeek-V4-Pro:
 - Select single-turn requests with exactly 8192 input and 1024 output tokens; require strictV2.
 - Use the installed CLI's powerx export command to create separate CSV and JSON evidence bundles outside the InferenceX repository. Keep each result.csv or result.json with its manifest.json and responses/, and verify each bundle before reporting.
@@ -59,9 +59,9 @@ const UI_COPY = {
       'avg_power_w is measured mean watts per GPU. Schema-v2 joules metrics without a role prefix describe whole-deployment GPU energy; prefill/decode-prefixed energy is role-local. These are existing observations, not new benchmark runs or facility-energy measurements.',
     conventions: 'Conventions',
     conventionsDescription: 'Shared request, error, and cache behavior for the supported surface.',
-    schemas: 'BenchmarkRow and metrics',
+    schemas: 'BenchmarkRow and Metrics',
     schemasDescription: 'Interpret the primary benchmark payload and its measured fields.',
-    endpoints: 'Endpoint reference',
+    endpoints: 'Endpoint Reference',
     endpointsDescription: 'Expand an operation for parameters, statuses, and complete examples.',
     operation: 'operation',
     operations: 'operations',

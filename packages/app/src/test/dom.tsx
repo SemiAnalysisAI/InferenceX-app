@@ -2,29 +2,14 @@
 // component specs did with cy.mount, cy.get, .click() and .type(). Importing this module registers
 // an afterEach that unmounts every tree it rendered.
 import { act, type ReactElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { afterEach } from 'bun:test';
 
-import { advanceTimersByTime } from './helpers';
+import { advanceTimersByTime, waitFor } from './helpers';
 
-// jsdom lacks these browser APIs. Radix calls the pointer-capture and scrolling methods while
-// handling input, and components construct observers on mount.
-const elementProto = Element.prototype as unknown as Record<string, unknown>;
-elementProto.hasPointerCapture ??= () => false;
-elementProto.setPointerCapture ??= () => {};
-elementProto.releasePointerCapture ??= () => {};
-elementProto.scrollIntoView ??= () => {};
-class InertObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-  takeRecords() {
-    return [];
-  }
-}
-const globals = globalThis as unknown as Record<string, unknown>;
-globals.ResizeObserver ??= InertObserver;
-globals.IntersectionObserver ??= InertObserver;
+// jsdom API gaps (pointer capture, scrollIntoView, scrollTo, observers) are stubbed in the
+// setup-dom.ts preload, so modules that probe for them at load time see them too.
 
 // jsdom keeps the inert attribute but still focuses inside it. Browsers refuse: an inert subtree
 // cannot take focus, which shells rendered while data streams rely on.
@@ -177,7 +162,7 @@ function mediaMatches(query: string): boolean {
   });
 }
 
-globals.matchMedia = (query: string): MediaQueryList => {
+(globalThis as unknown as Record<string, unknown>).matchMedia = (query: string): MediaQueryList => {
   const entry = { query, listeners: new Set<(event: MediaQueryListEvent) => void>() };
   mediaLists.add(entry);
   return {
@@ -222,11 +207,15 @@ setViewport(1280, 720);
 const mounted: { root: Root; container: HTMLElement }[] = [];
 const realGetBoundingClientRect = Element.prototype.getBoundingClientRect;
 
-afterEach(() => {
+function unmountAll() {
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount());
     container.remove();
   }
+}
+
+afterEach(() => {
+  unmountAll();
   document.body.innerHTML = '';
   Element.prototype.getBoundingClientRect = realGetBoundingClientRect;
   setViewport(1280, 720);
@@ -247,18 +236,16 @@ export interface Rendered {
   unmount: () => void;
 }
 
-/** Mounts `element` into a fresh container on document.body, replacing any earlier mount. */
-export function render(element: ReactElement): Rendered {
-  for (const { root, container } of mounted.splice(0)) {
-    act(() => root.unmount());
-    container.remove();
-  }
+function mountContainer(): HTMLElement {
+  unmountAll();
   const container = document.createElement('div');
   container.dataset.cyRoot = '';
   document.body.append(container);
-  const root = createRoot(container);
+  return container;
+}
+
+function rendered(root: Root, container: HTMLElement): Rendered {
   mounted.push({ root, container });
-  act(() => root.render(element));
   return {
     container,
     rerender: (next) => act(() => root.render(next)),
@@ -266,33 +253,38 @@ export function render(element: ReactElement): Rendered {
   };
 }
 
-// Captured before any test fakes timers, so settling waits in real time.
-const realSetTimeout = globalThis.setTimeout;
-const realNow = performance.now.bind(performance);
-
-/** Lets pending promises, effects and timers due within `ms` settle inside act. */
-export async function settle(ms = 0): Promise<void> {
-  await act(async () => {
-    const { promise, resolve } = Promise.withResolvers<void>();
-    realSetTimeout(resolve, ms);
-    await promise;
-  });
+/** Mounts `element` into a fresh container on document.body, replacing any earlier mount. */
+export function render(element: ReactElement): Rendered {
+  const container = mountContainer();
+  const root = createRoot(container);
+  const result = rendered(root, container);
+  act(() => root.render(element));
+  return result;
 }
 
 /**
- * Retries `assertion` until it passes, like a Cypress `should`. Waiting happens inside act, so
- * responses and timers that land between attempts update React without act warnings.
+ * Server-renders `element` and hydrates the markup in a fresh container, as a page load does.
+ * Use it for trees with inline boot scripts, such as the next-themes, embed and figure theme
+ * scripts. React hydrates a server-rendered <script> but warns when it has to create one.
  */
-export async function eventually<T>(assertion: () => T, timeout = 4000): Promise<T> {
-  const deadline = realNow() + timeout;
-  for (;;) {
-    try {
-      return assertion();
-    } catch (error) {
-      if (realNow() >= deadline) throw error;
-      await settle(10);
-    }
-  }
+export function hydrate(element: ReactElement): Rendered {
+  const container = mountContainer();
+  container.innerHTML = renderToString(element);
+  let root: Root | undefined;
+  act(() => {
+    root = hydrateRoot(container, element);
+  });
+  return rendered(root!, container);
+}
+
+export { settle } from './helpers';
+
+/**
+ * Retries `assertion` until it passes, like a Cypress `should`. Every attempt waits inside act
+ * first (see waitFor), so responses and timers update React without act warnings.
+ */
+export function eventually<T>(assertion: () => T, timeout = 4000): Promise<T> {
+  return waitFor(assertion, { timeout, interval: 10 });
 }
 
 export function $<E extends Element = HTMLElement>(

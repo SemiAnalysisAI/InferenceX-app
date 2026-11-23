@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { InferenceEarlyFetch } from '@/components/inference/inference-early-fetch';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { tabMetadata } from '@/lib/routing/tab-meta';
@@ -10,6 +11,7 @@ export const metadata: Metadata = tabMetadata('inference');
 export default function InferencePage() {
   return (
     <>
+      <InferenceEarlyFetch routeModel={null} />
       <InferencePageIntro locale="en" />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay centerOnEnter />

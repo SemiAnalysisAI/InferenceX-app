@@ -116,9 +116,12 @@ necessarily the output- or input-throughput Pareto knots.
 
 The revenue axis defaults to normalized cache-aware pricing: uncached input and
 output are `$1/M tok`, while cached input is `$0.10/M tok`, matching Fleet
-Lifecycle's default cache-read assumption. Its OpenRouter option fetches the
+Lifecycle's default cache-read assumption. Its OpenRouter option uses the
 selected model's current public prompt/completion/cache-read prices from
-`https://openrouter.ai/api/v1/models`; when the catalog omits a cache-read price,
+`https://openrouter.ai/api/v1/models`. The browser reads them from the
+same-origin `/api/v1/openrouter-pricing` route, which keeps only the catalog's
+models and is cached on the CDN and in Next's data cache for five minutes; the
+views API reads the same cached prices. When the catalog omits a cache-read price,
 the same 10%-of-input fallback is used and the resulting price is printed in the
 plot subtitle. Aggregate rows use their measured input/output split.
 Disaggregated rows cannot use the raw per-prefill/per-decode rates together, so

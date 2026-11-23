@@ -12,6 +12,6 @@ describe('shared Blog localization chrome', () => {
 
     expect(toc).toContain('aria-label="本页目录"');
     expect(toc).not.toContain('Table of contents');
-    expect(toc).not.toContain('On this page');
+    expect(toc).not.toContain('On This Page');
   });
 });

@@ -507,6 +507,7 @@ export function createMockUnofficialRunContext(
     unofficialEvalRows: null,
     loading: false,
     error: null,
+    unavailable: null,
     clearUnofficialRun: namedStub('clearUnofficialRun'),
     dismissRun: namedStub('dismissRun'),
     availableModelsAndSequences: [],

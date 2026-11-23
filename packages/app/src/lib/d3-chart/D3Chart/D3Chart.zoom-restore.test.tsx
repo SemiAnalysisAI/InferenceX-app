@@ -2,7 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
-import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
+import { settle, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { renderChartForExport } from '../export-renderer';
 import { D3Chart } from './D3Chart';
@@ -38,12 +38,15 @@ let frames: FrameRequestCallback[] = [];
 let container: HTMLDivElement;
 let root: Root;
 
+/** Runs the stubbed animation frames inside act, since they set React state (the zoom hint). */
 function flushFrames() {
-  while (frames.length > 0) {
-    const pending = frames;
-    frames = [];
-    for (const frame of pending) frame(0);
-  }
+  act(() => {
+    while (frames.length > 0) {
+      const pending = frames;
+      frames = [];
+      for (const frame of pending) frame(0);
+    }
+  });
 }
 
 beforeEach(() => {
@@ -78,7 +81,11 @@ function draw(props: D3ChartProps<Datum>) {
   flushFrames();
 }
 
-function zoomIn() {
+/**
+ * Zooms in with a shift+wheel. Async because the zoomed axes make the zoom hint re-measure from a
+ * MutationObserver, whose callback is a microtask that must also run inside act.
+ */
+async function zoomIn() {
   const svg = container.querySelector('svg')!;
   act(() => {
     svg.dispatchEvent(
@@ -92,6 +99,7 @@ function zoomIn() {
     );
   });
   flushFrames();
+  await settle();
 }
 
 function recordMutations(run: () => void): MutationRecord[] {
@@ -173,9 +181,9 @@ const proximityTooltip = {
 };
 
 describe('D3Chart data phase while zoomed', () => {
-  it('draws zoom-owned layers at the restored zoom so the replayed transform writes nothing', () => {
+  it('draws zoom-owned layers at the restored zoom so the replayed transform writes nothing', async () => {
     draw(barChart('red'));
-    zoomIn();
+    await zoomIn();
     const zoomedBars = [...container.querySelectorAll('.bar')].map((bar) => bar.outerHTML);
 
     const records = recordMutations(() => draw(barChart('red')));
@@ -186,19 +194,19 @@ describe('D3Chart data phase while zoomed', () => {
     expect([...container.querySelectorAll('.bar')].map((bar) => bar.outerHTML)).toEqual(zoomedBars);
   });
 
-  it('zooms point positions on both axes', () => {
+  it('zooms point positions on both axes', async () => {
     draw(lineChart(undefined));
     const point = container.querySelector('.point')!;
     const [cx, cy] = [point.getAttribute('cx'), point.getAttribute('cy')];
-    zoomIn();
+    await zoomIn();
     expect(point.getAttribute('cx')).not.toBe(cx);
     expect(point.getAttribute('cy')).not.toBe(cy);
   });
 
-  it('leaves roofline geometry to its zoom handler', () => {
+  it('leaves roofline geometry to its zoom handler', async () => {
     draw(lineChart(undefined, 'two words'));
     const basePath = container.querySelector('.roofline-path')!.getAttribute('d');
-    zoomIn();
+    await zoomIn();
     draw(lineChart(undefined, 'two words'));
     expect(container.querySelector('.roofline-path')!.getAttribute('d')).toBe(basePath);
   });
@@ -236,10 +244,10 @@ function exportedPointPosition() {
 }
 
 describe('D3Chart PNG export', () => {
-  it('draws the clone at the live zoom', () => {
+  it('draws the clone at the live zoom', async () => {
     draw(lineChart(undefined));
     const [cx, cy] = exportedPointPosition();
-    zoomIn();
+    await zoomIn();
     const [zoomedCx, zoomedCy] = exportedPointPosition();
     expect(zoomedCx).not.toBe(cx);
     expect(zoomedCy).not.toBe(cy);

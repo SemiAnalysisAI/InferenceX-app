@@ -372,12 +372,12 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after paretoFrontUpperLeft stopped placing NaN points on the front, reached only
-      // through a type import, and after the PowerX layout added the i_at URL key,
-      // the live address bar, a direct-labels flag on the shared scatter props, renamed the PowerX
-      // view ids and added the GPU role chart title; no video entry reads the PowerX changes.
-      // Recorded entries are unchanged.
-      sources: '266bd07e891ab7efec8ffc34c76d9af9432b866830c2562cd8d1e57a54abef22',
+      // Re-pinned after the PowerX GPU role and layout touched shared inference types, URL keys
+      // (i_role, i_at), the live address bar and the shared scatter props, fetchJson learned to take an
+      // early document-load response, data_query_failed stopped reporting failed background
+      // refetches that keep their data, and dashboard-routes gained the default Inference model
+      // slug. None of these change the rows recorded entries use.
+      sources: 'de1d6c4998e608b9f854520e372be354134a5cd4b1c41c6b44b3773f77d03fcf',
     });
   });
 });

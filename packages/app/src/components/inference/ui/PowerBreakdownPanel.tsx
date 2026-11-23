@@ -88,7 +88,7 @@ export type PowerBreakdownView = 'bars' | 'area';
 
 const STRINGS = {
   en: {
-    title: 'System power breakdown per GPU',
+    title: 'System Power Breakdown per GPU',
     subtitle: 'Each point’s whole-system power per GPU, split by what the meter counts',
     source: 'Hardware',
     view: 'Breakdown view',

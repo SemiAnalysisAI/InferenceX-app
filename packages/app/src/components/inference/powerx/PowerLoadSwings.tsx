@@ -22,7 +22,7 @@ import type { PowerXRole } from './powerx-role';
 
 const STRINGS = {
   en: {
-    title: 'Load swings',
+    title: 'Load Swings',
     trace: 'Trace',
     peak: 'Peak',
     min: 'Min',

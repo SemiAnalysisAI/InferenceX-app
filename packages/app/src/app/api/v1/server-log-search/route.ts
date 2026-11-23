@@ -24,7 +24,7 @@ function parseLimit(value: string | null): number | null {
 
 export async function GET(request: NextRequest) {
   const id = Number(request.nextUrl.searchParams.get('id'));
-  if (!id || !Number.isFinite(id)) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
     return NextResponse.json({ error: 'id is required (benchmark_result_id)' }, { status: 400 });
   }
 

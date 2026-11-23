@@ -27,7 +27,7 @@ export async function publishVideoResults({
   )
     throw new Error('Invalid H3_MERGE_RUN_ID');
   const data = await get(`?run=${runId}`);
-  if (!Array.isArray(at(data, 'artifacts'))) throw new Error('Invalid video artifact catalog');
+  if (!Array.isArray(at(data, 'artifacts'))) throw new TypeError('Invalid video artifact catalog');
   const seen = new Set<string>();
   const failures: unknown[] = [];
   for (const artifact of rows(at(data, 'artifacts'))) {
