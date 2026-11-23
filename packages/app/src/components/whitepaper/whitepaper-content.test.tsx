@@ -85,7 +85,7 @@ describe('WhitepaperDetailContent', () => {
     }
     expect(html).not.toContain(WHITEPAPER_COPY.en.keyNumbers);
     expect(html).not.toContain(WHITEPAPER_COPY.en.onThisPage);
-    expect(html).not.toContain('Key findings');
+    expect(html).not.toContain('Key Findings');
     expect(html).not.toContain('Download PDF');
   });
 });

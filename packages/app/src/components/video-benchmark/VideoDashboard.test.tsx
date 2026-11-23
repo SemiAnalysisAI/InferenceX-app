@@ -600,7 +600,7 @@ describe('VideoGenX Results', () => {
         if (observation.hardware.includes('H200')) observation.allocated = null;
       },
     });
-    expect(text('[data-testid="results-how-to-read"] h2')).toBe('How to read these results');
+    expect(text('[data-testid="results-how-to-read"] h2')).toBe('How to Read These Results');
     expect($('details[data-testid^="results-"] > summary h2')).toBeNull();
     expect(text('[data-testid="results-not-measured"]')).toContain('LoRA switch time');
     expect($('[data-testid="results-empty"][data-state="planned"]')).toBeNull();

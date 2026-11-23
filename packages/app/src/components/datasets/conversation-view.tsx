@@ -18,7 +18,7 @@ const STRINGS = {
     loadError: 'Failed to load conversation',
     notFound: 'Conversation not found',
     retry: 'Retry',
-    backToDataset: 'Back to AgentX dataset',
+    backToDataset: 'Back to AgentX Dataset',
     breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: 'conversation',
     mainTurns: 'Main turns',

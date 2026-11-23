@@ -11,7 +11,7 @@ import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
-    defaultLabel: 'On this page',
+    defaultLabel: 'On This Page',
     tableOfContents: 'Table of contents',
   },
   zh: {

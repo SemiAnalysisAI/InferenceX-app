@@ -78,7 +78,7 @@ const STRINGS = {
     keySecurity: 'Browser-only key handling · never persisted or sent to the server',
     encryptedState: 'Encrypted rows',
     processedState: 'Processed rows',
-    relock: 'Re-lock feature gate',
+    relock: 'Re-Lock Feature Gate',
     keyLabel: 'Decryption key (base64, 32 bytes)',
     keyPlaceholder: 'base64-encoded key',
     decrypt: 'Decrypt',

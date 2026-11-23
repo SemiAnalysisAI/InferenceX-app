@@ -87,7 +87,7 @@ const STRINGS = {
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor} (${chips}) only has ${precision} data for this model and scenario.`,
     include: (precision: string) => `Include ${precision}`,
-    regressionsTitle: 'Below their best',
+    regressionsTitle: 'Below Their Best',
     regression: ({ name, drop, bestDate, image }: RegressionText) =>
       `${name}: −${drop} vs. best (${bestDate})${image ? ` · ${image.from} → ${image.to}` : ''}`,
     unknown: 'unknown',

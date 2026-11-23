@@ -36,7 +36,7 @@ const STRINGS = {
     caveatPrecFallback: 'precision',
     emptyState:
       'No interpolated data available for the default workload on this configuration. Use the chart controls below to select a sequence and precision with benchmark data for both configurations.',
-    mtpCaveatTitle: 'MTP acceptance-rate comparability',
+    mtpCaveatTitle: 'MTP Acceptance-Rate Comparability',
     mtpCaveat:
       'MTP acceptance-rate implementations differ across inference engines. Points from different engines are not directly comparable on the same curve — throughput and cost at matched interactivity may reflect engine-level differences rather than pure speculative decoding gains. Interpret cross-engine comparisons with caution.',
   },

@@ -14,7 +14,7 @@ import { MethodologyFold } from './MethodologyFold';
 
 const STRINGS = {
   en: {
-    nvidia: 'NVIDIA measured TPC groupings',
+    nvidia: 'NVIDIA Measured TPC Groupings',
     product: 'Product',
     gpcs: 'Measured # of GPCs',
     sms: 'Measured # of SMs',
