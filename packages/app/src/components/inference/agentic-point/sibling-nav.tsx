@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
 import {
@@ -229,8 +230,14 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   const prev = currentIdx > 0 ? sorted[currentIdx - 1] : null;
   const next = currentIdx !== -1 && currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
 
-  const hrefFor = (id: number) =>
-    sortMode === 'default' ? `${agenticBase}/${id}` : `${agenticBase}/${id}?sort=${sortMode}`;
+  // Every sibling shares this SKU's model; naming it keeps Back pointed at the right chart even
+  // before the next point's data loads.
+  const chartModel = DB_MODEL_TO_DISPLAY[sku.model] ?? sku.model;
+  const hrefFor = (id: number, mode: SortMode = sortMode) => {
+    const params = new URLSearchParams({ g_model: chartModel });
+    if (mode !== 'default') params.set('sort', mode);
+    return `${agenticBase}/${id}?${params}`;
+  };
 
   const currentId = siblings.find((s) => s.is_current)?.id;
 
@@ -259,11 +266,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               setSortMode(mode);
               track('agentic_siblings_sorted', { mode });
               if (currentId !== undefined) {
-                const href =
-                  mode === 'default'
-                    ? `${agenticBase}/${currentId}`
-                    : `${agenticBase}/${currentId}?sort=${mode}`;
-                router.replace(href, { scroll: false });
+                router.replace(hrefFor(currentId, mode), { scroll: false });
               }
             }}
           >

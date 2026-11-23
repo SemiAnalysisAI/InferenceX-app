@@ -302,6 +302,45 @@ describe('Agentic point detail — returning to the chart', () => {
     assertRestoredChart(DEFAULT_MODEL_LABEL);
   });
 
+  for (const { name, select, gModel, label, path } of [
+    {
+      name: 'a chosen model',
+      select: true,
+      gModel: 'Kimi-K3',
+      label: TARGET_MODEL_LABEL,
+      path: '/infx/inference/kimi-k3',
+    },
+    {
+      name: 'the default model',
+      select: false,
+      gModel: 'DeepSeek-V4-Pro',
+      label: DEFAULT_MODEL_LABEL,
+      path: '/infx/inference/deepseek-v4',
+    },
+  ]) {
+    it(`returns to ${name}'s chart even when the point's SKU data fails to load`, () => {
+      visitChart('/infx/inference');
+      // Only the detail page's own URL can name the model: siblings fail, metrics are empty.
+      cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 500, body: {} }).as(
+        'siblings',
+      );
+      if (select) selectTargetModel();
+      else cy.get('[data-testid="model-selector"]').should('contain.text', label);
+      soloLegendSeries();
+      openPointDetail();
+
+      cy.location('search').should('include', `g_model=${gModel}`);
+      cy.wait('@siblings');
+      chartLink('en')
+        .should('have.attr', 'href')
+        .and('match', new RegExp(`^${path}(?:\\?|$)`, 'u'));
+      backControl('en').should('be.enabled').click();
+
+      cy.location('pathname').should('eq', path);
+      assertRestoredChart(label);
+    });
+  }
+
   it('returns to the chart in one Back click after stepping through sibling points', () => {
     visitChart('/infx/inference');
     interceptSiblings();

@@ -24,7 +24,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import type { Model } from '@/lib/catalog/data-mappings';
 import { inferenceModelPath, inferenceModelSlugForModel } from '@/lib/routing/inference-model-slug';
-import { currentChartSearch, withChartState } from '@/lib/routing/url-state';
+import { currentChartSearch } from '@/lib/routing/url-state';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import { AggregatesGrid } from './aggregates-grid';
@@ -51,7 +51,6 @@ import {
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
 import { useDetailView, type DetailView } from './use-detail-view';
-import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const AGENTIC_POINT_DETAIL_STRINGS = {
   en: {
@@ -201,26 +200,30 @@ export function AgenticPointDetail({ id }: Props) {
 
   const metrics = metricsQuery.data;
   const siblingsData = siblingsQuery.data;
-  // Back and the chart link open the chart of this point's own model. The bare Inference path
-  // would redirect to the featured model whenever chart state leaves `g_model` out (it does for
-  // the default model), so the model goes in the path instead.
-  const pointModel = siblingsData ? DB_MODEL_TO_DISPLAY[siblingsData.sku.model] : undefined;
+  // Back and the chart link open the chart of this point's own model, named in the path: the bare
+  // Inference path redirects to the featured model whenever chart state leaves `g_model` out (it
+  // does for the default model). The point's data names the model; until it loads (or if it
+  // fails), the `g_model` the chart wrote into this page's URL does. With neither, both controls
+  // wait rather than send the reader to the wrong chart.
+  const [urlModel, setUrlModel] = useState<string | null>(null);
+  useEffect(() => {
+    setUrlModel(new URLSearchParams(window.location.search).get('g_model'));
+  }, [pathname]);
+  const dataModel = siblingsData?.sku.model ?? metrics?.meta.model;
+  const pointModel = dataModel ? (DB_MODEL_TO_DISPLAY[dataModel] ?? dataModel) : urlModel;
   const pointModelSlug = pointModel ? inferenceModelSlugForModel(pointModel as Model) : null;
-  const chartPath = pointModelSlug
-    ? inferenceModelPath(pointModelSlug)
-    : getDashboardRoute('inference').path;
-  const inferenceBaseHref = isZh ? `${ZH_PREFIX}${chartPath}` : chartPath;
-  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
+  const [inferenceHref, setInferenceHref] = useState<string | null>(null);
   useEffect(() => {
     if (!pointModelSlug) {
-      setInferenceHref(withChartState(inferenceBaseHref));
+      setInferenceHref(null);
       return;
     }
+    const chartPath = `${isZh ? ZH_PREFIX : ''}${inferenceModelPath(pointModelSlug)}`;
     const state = new URLSearchParams(currentChartSearch());
     state.delete('g_model');
     const search = state.toString();
-    setInferenceHref(search ? `${inferenceBaseHref}?${search}` : inferenceBaseHref);
-  }, [inferenceBaseHref, pointModelSlug]);
+    setInferenceHref(search ? `${chartPath}?${search}` : chartPath);
+  }, [isZh, pointModelSlug]);
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
@@ -295,24 +298,30 @@ export function AgenticPointDetail({ id }: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={!inferenceHref}
           onClick={() => {
+            if (!inferenceHref) return;
             track('inference_agentic_detail_back_clicked', { id });
             // History may hold sibling points or another site (a shared link), so Back always
             // returns to the chart this point belongs to.
             router.push(inferenceHref);
           }}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ArrowLeft className="size-4" /> {t.back}
         </button>
-        <span className="text-sm text-muted-foreground">·</span>
-        <IntentPrefetchLink
-          href={inferenceHref}
-          onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          {t.inferenceChart}
-        </IntentPrefetchLink>
+        {inferenceHref && (
+          <>
+            <span className="text-sm text-muted-foreground">·</span>
+            <IntentPrefetchLink
+              href={inferenceHref}
+              onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t.inferenceChart}
+            </IntentPrefetchLink>
+          </>
+        )}
       </div>
 
       {siblingsQuery.isError ? (

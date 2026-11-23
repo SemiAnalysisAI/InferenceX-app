@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import type { KnownIssueAnnotation } from '@/components/inference/utils/knownIssueAnnotations';
 
@@ -56,26 +56,71 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
+/** How long a closed notice keeps its slot: long enough to absorb a second click on its ×. */
+export const CLOSED_NOTICE_SLOT_MS = 2000;
+
+/**
+ * Notices closed on this chart, valid only while the chart keeps drawing the stack they were
+ * closed in. Any change of stack ends them, even if the stack later changes back.
+ */
+interface ClosedSlots {
+  stackVersion: number;
+  keys: ReadonlySet<string>;
+}
+
+const NO_CLOSED_SLOTS: ClosedSlots = { stackVersion: -1, keys: EMPTY };
+
 /** Chart notices (official-preview and known-issue boxes) the reader has dismissed, shared across charts and tabs. */
 export function useDismissedChartNotices() {
   const dismissed = useSyncExternalStore(subscribe, readDismissed, () => EMPTY);
-  const [closedHere, setClosedHere] = useState<ReadonlySet<string>>(EMPTY);
+  const [closedHere, setClosedHere] = useState<ClosedSlots>(NO_CLOSED_SLOTS);
+  // The notice stack the chart last drew and a version bumped whenever it changes, so a close can
+  // record which stack its slot belongs to.
+  const stackRef = useRef({ stack: '', version: 0 });
+  const timersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, []);
   const dismiss = useCallback((annotation: KnownIssueAnnotation) => {
     const key = chartNoticeKey(annotation);
-    setClosedHere((current) => new Set([...current, key]));
+    const stackVersion = stackRef.current.version;
+    setClosedHere((current) => ({
+      stackVersion,
+      keys: new Set([...(current.stackVersion === stackVersion ? current.keys : []), key]),
+    }));
     dismissChartNotice(key);
+    const timer = setTimeout(() => {
+      timersRef.current.delete(timer);
+      setClosedHere((current) => {
+        if (!current.keys.has(key)) return current;
+        const keys = new Set(current.keys);
+        keys.delete(key);
+        return { stackVersion: current.stackVersion, keys };
+      });
+    }, CLOSED_NOTICE_SLOT_MS);
+    timersRef.current.add(timer);
   }, []);
   /**
-   * The notices to draw. Ones dismissed earlier are dropped; ones closed on this chart stay as
-   * empty slots, so closing a notice never moves the next one under the reader's pointer.
+   * The notices to draw. Ones dismissed earlier are dropped. One just closed on this chart stays
+   * an empty slot for a moment, so the next notice does not slide under the pointer that clicked
+   * ×; the slot goes once that moment passes or the chart's set of notices changes.
    */
   const visibleNotices = useCallback(
-    (annotations: KnownIssueAnnotation[]): KnownIssueAnnotation[] =>
-      annotations.flatMap((annotation) => {
+    (annotations: KnownIssueAnnotation[]): KnownIssueAnnotation[] => {
+      const stack = annotations.map(chartNoticeKey).join('|');
+      if (stack !== stackRef.current.stack) {
+        stackRef.current = { stack, version: stackRef.current.version + 1 };
+      }
+      const slots = closedHere.stackVersion === stackRef.current.version ? closedHere.keys : EMPTY;
+      return annotations.flatMap((annotation) => {
         const key = chartNoticeKey(annotation);
         if (!dismissed.has(key)) return [annotation];
-        return closedHere.has(key) ? [{ ...annotation, dismissed: true }] : [];
-      }),
+        return slots.has(key) ? [{ ...annotation, dismissed: true }] : [];
+      });
+    },
     [dismissed, closedHere],
   );
   return { dismissed, dismiss, visibleNotices };

@@ -11,8 +11,8 @@ interface AnnotationBase {
   color: string;
   points: { x: number; y: number }[];
   /**
-   * Closed while this chart is on screen. It still holds its slot in the stack, so the notice
-   * below does not slide up under the pointer that just clicked ×.
+   * Just closed on this chart. It holds its slot in the stack for a moment, so the notice below
+   * does not slide up under the pointer that clicked ×.
    */
   dismissed?: boolean;
 }
