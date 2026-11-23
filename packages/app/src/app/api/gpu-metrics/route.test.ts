@@ -552,6 +552,14 @@ describe('GET /api/gpu-metrics', () => {
   });
 
   describe('when no artifact yields telemetry', () => {
+    let warned: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      warned.mockRestore();
+    });
+
     it('asks for a retry when GitHub cannot list the artifacts', async () => {
       const { status, body } = await read(run, { ok: false, status: 503 });
       expect(status).toBe(503);
@@ -590,6 +598,10 @@ describe('GET /api/gpu-metrics', () => {
       const { status, body } = await read(run, listing(1, 2), corruptArchive, corruptArchive);
       expect(status).toBe(404);
       expect(body.code).toBe('NO_TELEMETRY');
+      expect(warned).toHaveBeenCalledWith(
+        'Failed to read artifact gpu_metrics_dsr1_1:',
+        expect.anything(),
+      );
     });
 
     it('asks for a retry when a corrupt archive sits beside a failed download', async () => {
