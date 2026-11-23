@@ -327,11 +327,11 @@ describe('Inference Chart', () => {
     cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
       'availabilityFailure',
     );
-    fastForwardQueryRetry('h2:contains("Something went wrong")', () => {
+    fastForwardQueryRetry('h2:contains("Something Went Wrong")', () => {
       cy.visit('/infx/inference');
     });
     cy.wait('@availabilityFailure');
-    cy.contains('h2', 'Something went wrong').should('be.visible');
+    cy.contains('h2', 'Something Went Wrong').should('be.visible');
   });
 });
 

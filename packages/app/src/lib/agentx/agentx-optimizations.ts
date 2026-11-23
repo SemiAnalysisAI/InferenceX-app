@@ -149,7 +149,7 @@ export interface OptimizationsOverview {
 }
 
 export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
-  eyebrow: 'AgentX industry impact',
+  eyebrow: 'AgentX Industry Impact',
   title: 'Optimizations for Agentic Workloads',
   lead: 'The most useful thing AgentX produced in its first months was not the open-source datasets. It was 50+ upstream pull requests from AgentX partners, optimizing real-world agentic workloads with AgentX as the north star.',
   intro: [
@@ -162,13 +162,13 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
     { value: '5', label: 'layers of the stack' },
     { value: 'AgentX', label: 'the north star trace' },
   ],
-  frameworksTitle: 'Optimizations by project',
+  frameworksTitle: 'Optimizations by Project',
   frameworksIntro:
     'Each page collects the AgentX-driven work in one project, grouped by the part of the stack it touches. Changes described as open are proposed but not merged, and are not shipped behavior.',
   sections: [
     {
       id: 'ecosystem',
-      heading: 'A brief introduction to the distributed inference ecosystem',
+      heading: 'A Brief Introduction to the Distributed Inference Ecosystem',
       paragraphs: [
         'Agentic inference is a system-wide problem rather than a chip or kernel problem. Once a distributed system handles hundreds of thousands of agentic requests, request scheduling and KV-cache management stop being bookkeeping and start having legitimate performance implications. Subagents, for example, produce bursty KV-cache patterns that will evict the main agent’s cache if nothing prevents it.',
         'At the top of the stack, routers — sometimes called frontends — send requests to workers. When a server runs data-parallel attention there is a separate KV cache per DP rank, so requests are routed under policies such as consistent hashing, where every request in the same session or subagent follows its unique ID to the same rank rather than thrashing all of them.',
@@ -204,7 +204,7 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
     },
     {
       id: 'other',
-      heading: 'Other optimizations: day-zero enablement and correctness',
+      heading: 'Other Optimizations: Day-Zero Enablement and Correctness',
       paragraphs: [
         'The work collected on the project pages addresses long-context cost: a prefix that has to survive, a hybrid cache that has to stay correct, a transfer that has to keep up. The changes here are different in kind. They are day-zero enablement and correctness bugs, and they break a request exactly as badly as a million-token session does.',
         'MiniMax-M3 tested whether the ROCm work compounds into day-zero readiness, and the Advancing AI writeup draws the comparison directly: AMD’s first public disaggregated recipe, MI355X FP4, reached InferenceX in January, months behind NVIDIA, while M3 FP4 disaggregation landed on day zero. That is a marked improvement on the DeepSeek-R1 period, when parity took months. Three vLLM fixes sat on the day-zero path, and each was a correctness failure rather than a performance one.',
@@ -226,7 +226,7 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
     },
     {
       id: 'what-activates-this',
-      heading: 'What the AgentX matrix activates',
+      heading: 'What the AgentX Matrix Activates',
       paragraphs: [
         'The local AgentX matrix combines session-aware or KV-aware routing, long and variable conversation histories, MTP, hybrid attention, aggregated and disaggregated serving, and concurrency sweeps that cross the HBM capacity cliff. It includes GPU-resident comparisons as well as CPU DRAM offload through vLLM SimpleCPU, Mooncake, LMCache, and SGLang HiCache. That combination is what activates the upstream work above.',
         'The old fixed-sequence matrix usually creates one prompt, performs one prefill, decodes one fixed continuation, and discards the request. It therefore does not measure cache survival across turns, repeated tokenization, session affinity, cache-event traffic, offload churn, transfer progress during scheduler stalls, or long-lived ownership bookkeeping.',
@@ -250,12 +250,12 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
   },
   ui: {
     backToAgentX: 'Back to AgentX',
-    backToOverview: 'All AgentX optimizations',
+    backToOverview: 'All AgentX Optimizations',
     prsLabel: 'Upstream pull requests',
     referencesLabel: 'References',
     readMore: 'Read the optimizations',
-    onThisPage: 'On this page',
-    allProjects: 'Other projects',
+    onThisPage: 'On This Page',
+    allProjects: 'Other Projects',
     figureCta: 'View full-resolution image',
     prSearch: 'Search every AgentX pull request',
   },
@@ -277,7 +277,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'hybrid-prefix-caching',
-        heading: 'Hybrid-attention prefix caching',
+        heading: 'Hybrid-Attention Prefix Caching',
         paragraphs: [
           'vLLM improved hybrid-attention prefix caching so short-lived sliding-window allocations do not evict useful long-context checkpoints. Selective retention preserves sparse replay boundaries and reported a prefix-cache hit rate above 95% with fourteen concurrent requests and contexts up to one million tokens.',
           'The same reachability policy was applied to Mooncake, and unreachable sliding-window lookups were removed. Earlier follow-up work also stopped offloading sliding-window blocks that could never be reused, and kept the speculative lookahead block inside the retained prefix.',
@@ -298,7 +298,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'cpu-offload',
-        heading: 'CPU KV offload for hybrid models',
+        heading: 'CPU KV Offload for Hybrid Models',
         paragraphs: [
           'Highly concurrent agentic workloads require offload, and AgentX drove the work that made CPU KV offload usable for hybrid models rather than only for uniform full-attention models. The distinction matters: a uniform model has one KV layout per token, so a connector can describe what to save with a single block geometry. A hybrid model carries several cache groups at once, each with a different shape and a different lifetime, and a connector that assumes one uniform layout cannot express which group a given block belongs to. Offload was therefore unavailable for exactly the models whose long sessions needed it most.',
           'The general SimpleCPU connector came first, was enabled on ROCm, and was then extended to DeepSeek-V4 hybrid attention, which reported 81.7% higher output throughput and 46.6% lower mean end-to-end latency against recomputing the prefix once it no longer fits in HBM. Mooncake gained the equivalent hybrid-memory allocation support.',
@@ -312,7 +312,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'store-path',
-        heading: 'Narrowing the store path',
+        heading: 'Narrowing the Store Path',
         paragraphs: [
           'Profiling realistic workloads showed that once offload worked at all, the cost moved to the store path, which was writing too much and too often. Three rules narrowed it.',
           'A store is now skipped while an identical transfer is already in flight, so concurrent sessions sharing a prefix pay for it once rather than once each. A store covers only newly generated KV ranges, so a session that extends its history writes the delta instead of rewriting the whole prefix every turn. And a store no longer depends on whether the same blocks still sit in HBM, so work already scheduled is not discarded when an eviction lands underneath it.',
@@ -331,7 +331,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'load-path',
-        heading: 'Keeping lookups off the critical path',
+        heading: 'Keeping Lookups Off the Critical Path',
         paragraphs: [
           'The load path was tuned separately, because lookups happen on every scheduling decision rather than only when data actually moves. Making lookups asynchronous in the scheduler path keeps the connector off the step’s critical path, so a step no longer waits on CPU-side cache queries before it can admit work.',
           'Compact zero-copy lookup keys, parallel receive-side loading, and prebuilt Mooncake key strings then removed the CPU and transport overhead that remained.',
@@ -345,7 +345,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'correctness',
-        heading: 'Correctness and accounting under long-lived hybrid state',
+        heading: 'Correctness and Accounting Under Long-Lived Hybrid State',
         paragraphs: [
           'Long-lived hybrid state forced correctness and accounting fixes that fixed-shape requests rarely reach. vLLM now emits cache events per hybrid cache group, strides distributed-context stores correctly, and computes lookup prefixes correctly under distributed context and prefill. A related context-parallel accounting change aligns cache ownership with sharded token ranges.',
           'Speculative state is now propagated across merged Mooncake groups and through the SimpleCPU coordinator, which prevents the repeated-turn cache from silently losing EAGLE state.',
@@ -361,7 +361,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'rocm-decode',
-        heading: 'ROCm: below the cache layer',
+        heading: 'ROCm: Below the Cache Layer',
         paragraphs: [
           'On the ROCm side the recent work continues below the cache layer, where the remaining cost is per-layer rather than per-request. Once the prefix survives and arrives on time, what is left is the decode step itself, and a decode step that runs thousands of times per session pays for every avoidable copy and every mismatched kernel. Three open changes attack that layer.',
           'A Kimi-K3 change writes KDA decode results directly into the layer output buffer, removing one device copy per KDA layer; the saving is small in isolation and repeated for every layer of every decoded token. A second change selects an AITER sparse-MLA decode kernel in place of the generic path, and reported 5.22% higher AgentX output throughput with substantially lower inter-token latency.',
@@ -390,7 +390,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'sliding-window',
-        heading: 'Sliding-window allocation',
+        heading: 'Sliding-Window Allocation',
         paragraphs: [
           'SGLang’s sliding-window work addresses the same conflict as vLLM’s retention policy, but from the allocator side. Window pages and prefix pages are drawn from one pool, and the window is the greedier consumer: it turns over constantly while the prefix sits still, so under pressure the transient allocation displaces the durable one.',
           'Three designs attack that from different angles. One proactively frees pages as they leave the window rather than waiting for eviction pressure to find them, so dead window state stops competing for pages it can no longer use. Another caps compute locks to a single window, bounding how much of the pool an in-flight request can hold pinned at once. A third removes stale full-KV entries that outlive their usefulness.',
@@ -405,7 +405,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'hicache',
-        heading: 'HiCache offload',
+        heading: 'HiCache Offload',
         paragraphs: [
           'HiCache is SGLang’s first-class in-tree offloading mechanism. It faced the same hybrid problem vLLM’s connectors did, and solved it with an asymmetry: offload the full-attention cache and reconstruct the short sliding-window tail on the way back. Only the expensive half is worth moving across the bus, and the cheap half can be rebuilt faster than it can be fetched. On AMD, staged write-back keeps that movement from blocking the engine while it happens.',
           'Recurrent state was the remaining gap, because it cannot be rebuilt from neighbouring tokens the way a window tail can. FlashInfer GDN checkpoints let it participate in prefix reuse at all, and raised throughput from 47,771 to 53,004 tok/s/GPU at a 92.4% cache-hit rate.',
@@ -424,7 +424,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'variable-length',
-        heading: 'What variable-length traffic does to a kernel pipeline',
+        heading: 'What Variable-Length Traffic Does to a Kernel Pipeline',
         paragraphs: [
           'Like production traffic, AgentX sessions arrive at continuously varying context lengths. A naive runtime that specializes on length will compile a fresh kernel for nearly every request it sees. SGLang maintainers solved this by passing context length as a runtime scalar, collapsing that into one compilation, and improved AgentX output throughput at concurrency 384 by 26.75% and mean TTFT by 36.25% — by removing compilation, not by computing anything faster.',
           'In the same spirit, removing a per-step device-to-host sequence-length synchronization eliminates a decode bubble that exists only because the host wanted to know a length the device already had.',
@@ -436,7 +436,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'routing',
-        heading: 'Cache-aware data-parallel routing',
+        heading: 'Cache-Aware Data-Parallel Routing',
         paragraphs: [
           'When a request carries no reusable history, such as the start of a subagent, any worker will do and load balancing is the only question worth asking. When it carries a megabyte of cached prefix, sending it to an idle worker that does not hold that prefix is the expensive choice, and the router needs to know where the state already lives.',
           'SGLang added DP cache affinity so a session is sticky to the rank holding its cache. The same work implements DP-aware prefill and decode routing so both halves of a disaggregated deployment make that decision consistently, and adds cache balance as a routing signal so affinity does not degenerate into one hot worker. A router can only act on what it is told, so hybrid cache events also became radix-cache aware and sliding-window aware.',
@@ -451,7 +451,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'speculative',
-        heading: 'Speculative decoding',
+        heading: 'Speculative Decoding',
         paragraphs: [
           'Speculative decoding receives special attention, because MTP adds a second, smaller piece of per-request state that has to survive everything the main cache survives. SGLang fixed draft-window transfer in disaggregated serving so that state crosses the prefill-to-decode boundary intact, added overlap scheduling for high-concurrency online decoding, removed a no-op EAGLE renormalization, and avoided host synchronizations during EAGLE prefill.',
           'The open resource-lease scheduling work and the data-parallel graph-metadata fix continue the same effort: making overlap safe when requests can be retracted and resumed rather than simply run to completion.',
@@ -467,7 +467,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'staging',
-        heading: 'Prefix-aware staging in heterogeneous disaggregation',
+        heading: 'Prefix-Aware Staging in Heterogeneous Disaggregation',
         paragraphs: [
           'Heterogeneous prefill and decode topologies need prefix-aware staging, and this is where prefix caching and disaggregation interact badly. When the two sides are not sharded identically, KV cannot be copied across as one contiguous stream; it has to be split on a transfer grid and reassembled at the offsets the decode side expects. A prefix hit makes that harder, not easier, because the prefill worker now sends only the uncached remainder while the decode side still expects a complete, correctly positioned cache. Radix-cache support in the staging buffer splits cached sends on that grid and scatters them at the correct decode offsets.',
           'The failure this fixes is a correctness failure. A 127,500-token shared-prefix test went from 2 correct needles out of 128 to 128 out of 128, meaning the cache had been silently landing in the wrong places — which a throughput benchmark would have scored as a fast, confident, wrong answer. The AgentX comparison additionally raised median per-user output throughput by 9.61% at nearly unchanged total throughput per GPU.',
@@ -503,7 +503,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'incremental-tokenization',
-        heading: 'Boundary-aware incremental tokenization',
+        heading: 'Boundary-Aware Incremental Tokenization',
         paragraphs: [
           'Every turn of a conversation re-sends the entire history plus a little more, and the naive implementation re-tokenizes all of it. Tokenization is cheap per kilobyte and ruinous when the same 100,000 tokens are tokenized again on every turn.',
           'The obvious fix — tokenize only the new suffix — is wrong in a way that is easy to miss, because byte-pair encoding is not position-independent. Tokens can merge across the join, so splitting the text at the boundary and concatenating the two token sequences can produce a different sequence than tokenizing the whole string, which quietly diverges from the sequence the prefix cache was built against.',
@@ -517,7 +517,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'disaggregated-kv',
-        heading: 'Disaggregated KV movement and descriptor granularity',
+        heading: 'Disaggregated KV Movement and Descriptor Granularity',
         paragraphs: [
           'The MiniMax-M3 work focuses on disaggregated KV movement, where the failure is one of granularity. When prefill and decode do not agree on head layout, the KV for one logical request stops being a few large contiguous regions and becomes thousands of small strided pieces, each of which turns into its own transfer descriptor. The bytes moved are unchanged; the per-descriptor overhead is what explodes, and it explodes worst on exactly the long prompts that matter.',
           'Corrected multi-pool mapping and a chunked NIXL bounce path coalesce those pieces through a bounded reusable arena, trading an extra staging copy for orders of magnitude fewer descriptors. The AgentX diagnostic reduced request-critical KV p99 from 26.74 seconds to 125 ms at concurrency five, and from 10.15 seconds to 288 ms at concurrency forty.',
@@ -530,7 +530,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'execution-paths',
-        heading: 'Execution paths for irregular long context',
+        heading: 'Execution Paths for Irregular Long Context',
         paragraphs: [
           'TensorRT-LLM also moved irregular long-context work onto more efficient execution paths. Context graph producers for MiniMax-M3 capture stable sparse producers while leaving request-dependent attention eager, and per-user output throughput improved by 12.58% in its AgentX test. An open native KV-event production change reduces allocation and conversion work on the KV-aware routing path.',
         ],
@@ -541,7 +541,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'kernel-selection',
-        heading: 'Kernel selection and scheduler lifetime',
+        heading: 'Kernel Selection and Scheduler Lifetime',
         paragraphs: [
           'AgentX also exposed kernel-selection and scheduler-lifetime failures that only appear at scale and duration. Two are about which kernel gets picked. MiniMax-M3 added CuTeDSL choices to MXFP8 autotuning, widening the candidate set and improving output throughput per GPU by roughly 7 to 10% at low-concurrency aggregated points. In the opposite direction, TensorRT-LLM disabled corrupt split-K MoE tactics after they crashed five of seven AgentX runs, with no crashes in seven matched runs afterwards. A tactic that is fast and wrong is worse than one that is merely slow, and an autotuner will select it enthusiastically unless it is removed from the pool.',
           'The other two are lifetime bugs, which are the characteristic failure of long runs rather than large ones. Sequence-slot headroom and consistent slot-indexed buffer sizing handle the transient overlap where a completing request and a newly admitted one both need a slot — a window that a steady stream of arrivals and departures hits constantly and a fixed batch never hits at all. A later attention-data-parallel dummy-request fix kept nine Qwen3.5 disaggregated cells alive where most earlier cells had failed within minutes: the difference between a configuration that benchmarks and one that survives a session.',
@@ -555,7 +555,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'pipelined-transfer',
-        heading: 'Pipelined KV transfer for very long prompts',
+        heading: 'Pipelined KV Transfer for Very Long Prompts',
         paragraphs: [
           'Two open transfer changes target very long disaggregated prompts, and together they show how a fix can create the next bottleneck. In the default arrangement a decode worker cannot start until the entire prompt has been prefilled and then transferred, so two expensive phases run back to back even though the first produces its output incrementally. Pipelined KV transfer begins sending each completed prefill chunk as it lands, so transfer overlaps prefill compute and only the final chunk is on the critical path.',
           'That change makes chunk handling frequent, which exposes work that used to happen once. Its follow-up retrieves only the block IDs belonging to the current chunk rather than the whole prompt’s block list each time. For a 128,000-token prompt split into 1,024-token chunks, that is the difference between building a 4,096-entry list once and rebuilding it 128 times for every layer group — a per-chunk cost that scales with total prompt length, which is exactly the shape that eats the gain the pipelining just bought.',
@@ -588,7 +588,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'sparse-checkpoints',
-        heading: 'Sparse checkpoint retention',
+        heading: 'Sparse Checkpoint Retention',
         paragraphs: [
           'ATOM implemented sparse checkpoint retention for DeepSeek-V4 paged sliding-window attention, which shows the problem is a property of the workload rather than of any one codebase. The merged implementation keeps selected window tails alive so branch and replay requests can resume at useful boundaries.',
           'Its measurements separate the two effects cleanly: on the same AgentX trace at concurrency 48, the actual prefix hit rate rose from 5.6% to 96.45%, and losses at the sliding-window gate fell from 91.35% to 0.16%. The second number is the mechanism behind the first. Nine out of ten prefix matches were being found and then discarded for want of a window tail, so the cache was not missing — it was being overruled.',
@@ -597,7 +597,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'cache-manager',
-        heading: 'Cache-manager fixes that had to land first',
+        heading: 'Cache-Manager Fixes That Had to Land First',
         paragraphs: [
           'Two earlier cache-manager fixes had to land before any of that could be measured, and both are worth noting as examples of a cache that reports itself healthy while doing nothing. One stopped free-pool hits from destroying shared cache entries. The other, a deferred-output fix, restored prefix hashing in the default scheduler mode and moved repeated long prompts from zero cached tokens to reuse of every complete prefix block.',
           'A separate change lets prefix-hit prefill stay on the optimized sink attention kernel rather than falling back to the generic path, so a cache hit does not quietly cost part of what it saves.',
@@ -610,7 +610,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'recurrent-state',
-        heading: 'Recurrent-state checkpoints',
+        heading: 'Recurrent-State Checkpoints',
         paragraphs: [
           'Hybrid models also carry a recurrent or compressor state, which differs from ordinary KV in one decisive way: it cannot be reconstructed from the tokens around it. A window tail can be recomputed from neighbouring context, but recurrent state is the accumulated result of everything that came before, so if it is dropped the only way back is to replay the sequence.',
           'ATOM gave this per-request state a content-addressed checkpoint lifecycle, letting generated turns leave reusable resume points without reserving a separate protected cache for them. In one test a request reused 512 generated tokens and computed only a two-token suffix.',
@@ -620,7 +620,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'cpu-path',
-        heading: 'The CPU offload path: ownership and index placement',
+        heading: 'The CPU Offload Path: Ownership and Index Placement',
         paragraphs: [
           'ATOM’s AgentX-relevant CPU path starts from the arithmetic that justifies offload at all. Standalone LMCache offload reloads a 32,000-token prefix from CPU in about 0.32 seconds against roughly 2.5 seconds to recompute it, an eight-fold margin. That makes crossing the bus worth doing at these context lengths, and it would not hold for a short prompt.',
           'The rest of the path is about ownership and index placement rather than bandwidth. ATOM copied vLLM’s multi-connector design, which lets a prefill worker send KV to a remote decode worker and save the same prefix to CPU at once, without freeing the blocks until both consumers are finished. Two independent readers of the same blocks is a situation single-turn traffic never produces.',
@@ -641,7 +641,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'routing',
-        heading: 'Cache-aware routing in ATOM Mesh',
+        heading: 'Cache-Aware Routing in ATOM Mesh',
         paragraphs: [
           'The distributed path repeats, in a different codebase, the pattern already visible in SGLang and Dynamo: routing has to know where state lives. ATOM’s router, ATOM Mesh, is a fork of SGLang’s router with most features removed — including SGLang’s cache-aware routing, which it turned out to need.',
           'ATOM gained KV lifecycle events for cache-aware routers so the router can know where state lives at all, multi-node prefill and decode routing, and session-sticky data-parallel routing. The sticky policy is a two-sided compromise worth stating explicitly: a conversation returns to the healthy worker that owns its state, but idle assignments expire so that stickiness does not permanently unbalance the cluster on behalf of sessions that have gone away.',
@@ -654,7 +654,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'disaggregation',
-        heading: 'Disaggregation has to move whatever the model keeps',
+        heading: 'Disaggregation Has to Move Whatever the Model Keeps',
         paragraphs: [
           'Disaggregation has to move whatever the model actually keeps, which is not always one uniform cache. DeepSeek-V4 transfers both buffers of its mixed FP8 and BF16 cache layout, and EAGLE disaggregation moves the draft model’s independent KV cache alongside the target cache — the same second-cache problem TensorRT-LLM and SGLang each had to solve.',
           'Remote-KV admission and backpressure closes the loop by stopping the decode side from accepting more parked transfers than it can safely resume, which is the disaggregated form of accepting work you cannot finish.',
@@ -667,7 +667,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'long-prefill',
-        heading: 'Parallelism for long prefill',
+        heading: 'Parallelism for Long Prefill',
         paragraphs: [
           'Long prefill receives parallelism that a fixed 8k prompt does not strongly exercise, because at 8k there is little to divide and TTFT is already short. Prefill context parallelism (PCP) splits DeepSeek-V4 query tokens across GPUs and reported 35 to 43% lower mean time to first token, with total throughput gains of up to about 49% at a 64,000-token input — a gain that grows with input length rather than with batch size.',
           'Making that usable in practice required it to compose with everything else a session relies on, so decode context parallelism was made compatible with prefix caching, chunked prefill, and FP8 KV, and then extended to MTP. Parallelism that cannot coexist with the prefix cache would trade one long-context win for another.',
@@ -697,7 +697,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'context-parallel',
-        heading: 'Context-parallel process groups',
+        heading: 'Context-Parallel Process Groups',
         paragraphs: [
           'Prefill context-parallel process groups provide the extra query-sharding dimension that prefill context parallelism needs, and also widen fused-kernel row indexing for prompts above 131,000 tokens. Decode context parallelism (DCP) shards KV across the tensor-parallel GPUs already present, so a longer sequence or a larger batch fits without replicating the whole cache on every rank.',
         ],
@@ -708,7 +708,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'address-width',
-        heading: 'Address width: a failure short requests never reach',
+        heading: 'Address Width: A Failure Short Requests Never Reach',
         paragraphs: [
           'Large caches exposed a class of failure that short fixed requests essentially never reach: address width. A 32-bit offset is entirely adequate until a single cache pool crosses the boundary, at which point the arithmetic wraps and the kernel addresses the wrong row without any error being raised.',
           'AITER added runtime 64-bit dispatch for batch prefill above 4 GB, 64-bit MLA offsets above 2 GB, and 64-bit addressing throughout DeepSeek-V4’s unified cache paths — the last preventing silent reads and writes to the wrong row in pools of roughly 150 million rows.',
@@ -727,7 +727,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'persistent-mla',
-        heading: 'Persistent MLA decode for common head packings',
+        heading: 'Persistent MLA Decode for Common Head Packings',
         paragraphs: [
           'DeepSeek-V4 decode also gained a persistent MLA kernel for 64-head and 128-head MTP packings. Those two head counts are what ordinary decoding and speculative verification actually produce, so this gives the engine a dedicated long-context path for its common shapes instead of treating them as incidental variants of a kernel written for short contexts. It is the same argument as the vLLM AITER sparse-MLA selection: at long context the generic path is not a modest compromise, it is the wrong kernel.',
         ],
@@ -750,7 +750,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'routing-cost',
-        heading: 'The cost of each routing decision',
+        heading: 'The Cost of Each Routing Decision',
         paragraphs: [
           'The first series of pull requests reduced the cost of each routing decision: less work on the lookup hot path, no redundant suffix invalidation, and finally batched KV matching, registration, ownership, and terminal dereferences, which reported a 22.2% median output-throughput gain at concurrency 512. Batching helps here for the same reason it helps in an engine: the per-item overhead was dominating the item.',
         ],
@@ -762,7 +762,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'ownership',
-        heading: 'How ownership is represented',
+        heading: 'How Ownership Is Represented',
         paragraphs: [
           'The second series changed how ownership is represented, which is the harder problem underneath. Every cached block needs to be attributed to the requests relying on it, so it is not freed while still in use and not pinned after everyone has finished. With thousands of concurrent sessions sharing overlapping prefixes, the bookkeeping itself becomes significant.',
           'Dynamo moved from shared block chains to arena-level ownership counts and finally to backend-specific request leases, each step coarsening the unit being tracked. The lease design reduced AgentX replay time by 23.71% for the vLLM backend and 22.02% for SGLang, and lowered peak memory at the same time — a sign that the previous representation was the problem rather than the traffic.',
@@ -781,7 +781,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'router-state',
-        heading: 'Router state that used to be small',
+        heading: 'Router State That Used to Be Small',
         paragraphs: [
           'Further router profiles removed costs with the same shape, where a periodic sweep or a full recomputation had been acceptable only because live state used to be small. Bucketed expiry pruning replaced a scan proportional to everything tracked and improved high-churn AgentX throughput by 13.7%. Delta-only suffix cleanup processes only what changed and absorbed about 28 times as many store and remove events in the same window. Compressed prompt paths cut frontend CPU by 35.3% and materially improved tail time to first token, which matters because prompts in this workload are long and largely repeated. Overload state is now tracked incrementally rather than recomputed.',
           'One routing change is a deliberate trade rather than a pure win. Dynamo can now charge active decode requests in its routing score, so a worker already committed to long-running decodes looks more expensive than its queue depth alone suggests. That improved median AgentX latency at a small throughput cost in the reported tuning point — the kind of choice that only becomes visible when requests occupy a worker for a long time.',
@@ -796,7 +796,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'request-plane',
-        heading: 'The request plane',
+        heading: 'The Request Plane',
         paragraphs: [
           'The request plane was optimized next, because an agentic trace does not send one request and one response. It sends many related requests carrying largely identical prompts, and streams every token back as its own frame, so serialization and copying are paid per turn and per token rather than once. Switching to MessagePack request payloads improved throughput by 8.1% and reduced average time to first token by 9.7% in its AgentX test, and direct Python transcoding removed an intermediate value tree from that path entirely.',
           'What followed is a sequence of changes that all remove a copy rather than speed one up: not copying MessagePack event payloads, not copying received ZeroMQ frames, and not paying full inter-token-latency metrics overhead on every token. The chat streaming hot path was shortened for the same reason. Individually these are unremarkable; multiplied by every streamed token of every concurrent session, they determine how many requests per second a frontend can sustain.',
@@ -812,7 +812,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'profiling',
-        heading: 'Costs that had nothing to do with moving data',
+        heading: 'Costs That Had Nothing to Do with Moving Data',
         paragraphs: [
           'High-concurrency profiling then found costs that had nothing to do with moving data. Static logging filters removed a shared span-matcher lock — a contention point rather than a volume problem — and raised reported frontend throughput from 932 to 1,133 requests per second. Simpler positional radix buckets reduced peak memory in the mocker by 5.51 GiB in a 32-worker run.',
           'An open change flushes detokenization metrics once per response rather than updating cumulative counters on every streamed chunk, approximately halving frontend CPU time in its matched diagnostic profile. That last one is the clearest example of the category: the instrumentation was cheap per call and ruinous at one call per token.',
@@ -840,7 +840,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'chunked-loading',
-        heading: 'Chunked external-cache loading',
+        heading: 'Chunked External-Cache Loading',
         paragraphs: [
           'LMCache’s multiprocess path was changed for the volume and shape of agentic cache movement, beginning with a failure that is not a slowdown but a stop. When each of many requests with contexts above 100,000 tokens reserves the blocks for its whole load before starting, the pool is exhausted by requests that are all waiting and none progressing.',
           'Chunked external-cache loading reserves per chunk instead, so loads interleave and drain. At concurrency 32 the validation completed 120 requests where the old path deadlocked after 28, and concurrency 48 kept running with the KV pool 98.5% full.',
@@ -855,7 +855,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'moving-less',
-        heading: 'Moving less, and getting out of the way',
+        heading: 'Moving Less, and Getting Out of the Way',
         paragraphs: [
           'The other changes reduce how much is moved and how often the runtime gets in the way. Storing only the useful portions of DeepSeek-V4’s hybrid groups cut storage per token by almost twenty times, and sliding-window prefetch now loads only the live window rather than window state that will never be read — the same reachability argument vLLM applied to offload, approached from the storage side.',
           'One native transfer call per object group then removes repeated Python lock handoffs across staging copies and kernel launches, which is overhead proportional to the number of pieces rather than to the bytes in them.',
@@ -868,7 +868,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'lock-accounting',
-        heading: 'Open: hybrid lock accounting',
+        heading: 'Open: Hybrid Lock Accounting',
         paragraphs: [
           'Two current LMCache changes are especially specific to AgentX but remain open. The hybrid lock-accounting fix stops one request from releasing another request’s read locks on shared sliding-window or recurrent-state chunks. Reproducing it requires three things at once: several requests must share the same chunks, the accounting must be per-chunk rather than per-holder, and eviction must actually start.',
           'Sustained Kimi-K3 runs with DRAM offload supplied all three and produced tens of thousands of warnings, corrupt generations, and eventually GPU crashes once eviction began. Anything short of a long, shared, memory-pressured run leaves the bug dormant.',
@@ -877,7 +877,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'amd-enablement',
-        heading: 'AMD Instinct enablement',
+        heading: 'AMD Instinct Enablement',
         paragraphs: [
           'A parallel line of work made all of the above reachable on AMD Instinct hardware. CacheBlend’s non-prefix reuse depended on FlashInfer, which is CUDA-only, so a Triton block-sparse attention backend reimplements the three kernels it needs: block-sparse attention with CSR indices and log-sum-exp output, causal prefill, and log-sum-exp output blending. It then routes to them automatically when ROCm is detected or FlashInfer is missing. ROCm Dockerfiles mirror the CUDA build and lightweight images. An AMD hipFile backend extends the GDS L1 slab-file tier, which reached storage only through NVIDIA cuFile, by binding ROCm’s hipFile through ctypes and dispatching on torch.version.hip; the cuFile path is unchanged.',
           'Distribution was the remaining gap. CUDA users installed a prebuilt wheel while AMD users built from source. We worked with AMD to publish a prebuilt gfx942 and gfx950 wheel that closes it: it installs into the upstream image and passes all 56 KV-transfer kernel tests on MI350X, and it publishes to a GitHub release rather than PyPI so a plain pip install lmcache stays the CUDA build. A one-line follow-up marks the bind-mounted repository as a git safe directory, which only fails in CI because the container runs as root over a runner-owned checkout and the version introspection in setup.py refuses to read it.',
@@ -892,7 +892,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'dcp-offload',
-        heading: 'DCP-aware CPU offload',
+        heading: 'DCP-Aware CPU Offload',
         paragraphs: [
           'DCP-aware CPU offload resolves a straightforward incompatibility between two features that long contexts make mandatory together. With decode context parallelism enabled, each rank holds only a stride of the KV, so what any one rank could save is not a usable prefix. The fix gathers the strided shards before saving and redistributes them after loading. Without it, enabling context parallelism silently disables CPU cache hits for exactly the long prefixes that motivated both features. Its validation recorded more than 30,000 CPU hit events, with single-request loads reaching hundreds of thousands of tokens.',
         ],
@@ -915,7 +915,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'rdma-registration',
-        heading: 'GPU-direct RDMA registration on ROCm',
+        heading: 'GPU-Direct RDMA Registration on ROCm',
         paragraphs: [
           'Registering GPU memory for RDMA on NVIDIA uses either the nvidia-peermem kernel module or an exported dmabuf file descriptor. AMD has no nvidia-peermem equivalent, so GPU-direct RDMA had no path at all and deployments fell back to staging KV through host DRAM.',
           'A HIP dmabuf registration branch adds the mirror of the existing CUDA dmabuf path, exporting through ROCm instead of the CUDA handle call, and resolving the true allocation base first because caching allocators pack tensors at an offset inside a larger allocation. Host memory still registers directly.',
@@ -924,7 +924,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'packaging',
-        heading: 'Support that cannot be installed is not support',
+        heading: 'Support That Cannot Be Installed Is Not Support',
         paragraphs: [
           'Mooncake published CUDA and MUSA wheels but no ROCm package, so AMD users built the engine from source inside every image. A ROCm wheel, CI, and release path publishes mooncake-transfer-engine-rocm to PyPI alongside them. This workstream came from Andy Luo, an AMD engineer, who noticed the pattern while dogfooding agentic workloads with AgentX: building Mooncake from source is not a first-class ROCm experience.',
           'The transfer engine has no device kernels and does not depend on torch, so one architecture-agnostic wheel covers gfx942 and gfx950, and the ROCm runtime is bound at load time rather than vendored — which means the same wheel works unmodified in both the upstream vLLM ROCm image and the SGLang ROCm image. That was verified as a full cross product: MI300X and MI355X, each under vllm/vllm-openai-rocm and lmsysorg/sglang, running the master binary and a HIP buffer transfer test with data verification. The pull request adds a tag-triggered publish across Python 3.10 through 3.13.',
@@ -958,7 +958,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     sections: [
       {
         id: 'agentic-cache',
-        heading: 'Why agentic serving needs more than a passive byte store',
+        heading: 'Why Agentic Serving Needs More than a Passive Byte Store',
         paragraphs: [
           'AgentX sessions run about 43 turns and push roughly 1M tokens of context traffic over their life, with a median of 142K input tokens against 444 output tokens per turn. More than 96% of prompt tokens repeat a prefix the server has already seen, so at agentic concurrency the cost of a token is set by where its KV lives rather than by how fast it can be recomputed.',
           'For DeepSeek-V4-Pro on MI355X that raises three problems. The KV cache does not fit in HBM once many long sessions and their subagents are live. It is not sharded across TP ranks, because the MLA latent and the DSA indexer KV are replicated in full on every rank. And a host cache that lives inside the engine process is lost on every restart and every rolling upgrade.',
@@ -974,7 +974,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'store-linker',
-        heading: 'The KVCache Store Linker: a direct path from HBM to the pool',
+        heading: 'The KVCache Store Linker: A Direct Path from HBM to the Pool',
         paragraphs: [
           'UMBP first reached SGLang as a HiCache L3 storage backend, sitting behind a separate L2 host cache on every GPU rank. Running it that way on AgentX exposed six problems, numbered on the left of the figure below. The right side shows, with the same numbers, how the redesign described next fixes each one.',
           'AMD proposed skipping the per-GPU host cache altogether, which matched where the SGLang community was already heading. The MoRI team and SGLang maintainers then built the KVCache Store Linker together, with UMBP supported as a first-class backend alongside HiCache. The linker lets SGLang read cached KV straight from a shared pool in CPU memory and load it into the GPU layer by layer, so the model can start computing before the whole prefix has arrived. The pool can also run as its own process on each machine, so it keeps its contents when the inference engine restarts or is upgraded, and several engine instances can share it.',
@@ -995,7 +995,7 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
       },
       {
         id: 'agentx-results',
-        heading: 'What it changed on AgentX',
+        heading: 'What It Changed on AgentX',
         paragraphs: [
           'The gain appears even when the DRAM tier is barely used. HBM already served about 95.6% of prompt tokens at concurrency 128–256 and DRAM less than 1%. Turning UMBP on still raised throughput per GPU by **8.3%** and cut P90 TTFT by **35%** at concurrency 256, and by 2.7% and 34% at concurrency 128. With UMBP off, the host KV pool filled to 72% and 100% while serving at most 0.1% of prompt tokens, so the improvement comes from the direct path rather than from offload.',
           'A large enough cache then changes the topology. Once deduplicated DRAM holds the KV, prefill no longer needs TP8 just for capacity: at concurrency 16–48 the recipe runs a TP4 prefill with a TP8 decode on **12 GPUs instead of 16**. UMBP served 34%, 71%, and 75% of prompt tokens at concurrency 16, 32, and 48 while fewer than 3% were recomputed, and throughput per GPU rose **26–34%** on 25% fewer GPUs.',

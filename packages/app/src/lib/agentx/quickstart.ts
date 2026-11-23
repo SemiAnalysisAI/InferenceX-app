@@ -52,7 +52,7 @@ python -m infx.golden_al_distribution lookup qwen3.5 mtp 3   # <placeholder_valu
 
 export const AGENTX_QUICKSTART = {
   en: {
-    title: 'Benchmark your own chips with AgentX',
+    title: 'Benchmark Your Own Chips with AgentX',
     description:
       'Install agentx-harness, point it at your inference server, and replay a public agentic workload on your own hardware.',
     run: 'Run AgentX',
@@ -62,10 +62,10 @@ export const AGENTX_QUICKSTART = {
       'Using a model alias? Change --model and keep --tokenizer set to the matching Hugging Face tokenizer.',
     trust:
       'Use --tokenizer-trust-remote-code only for trusted repositories. Omit it if custom tokenizer code is unnecessary.',
-    routing: 'Optional routing headers',
+    routing: 'Optional Routing Headers',
     routingHelp:
       'Export these before running AgentX if your router needs session headers. Only the Dynamo option sends the parent-session ID for subagents.',
-    goldenAl: 'Speculative decoding: golden acceptance length',
+    goldenAl: 'Speculative Decoding: Golden Acceptance Length',
     goldenAlHelp:
       'AgentX anonymizes trace tokens to protect user privacy, so we simulate acceptance lengths (ALs), a feature supported by all popular inference engines, including vLLM, SGLang, TensorRT-LLM, and ATOM. The AL distribution used for simulation is collected from the SPEED-Bench coding category to reflect real-world acceptance lengths. If your server runs MTP, EAGLE3, DSpark, or DFlash, force the committed golden AL for your model, method, thinking mode, and draft length. Every submission for the same model and mode uses the same curve, so results compare serving systems rather than draft heads.',
     goldenAlNote:
@@ -74,7 +74,7 @@ export const AGENTX_QUICKSTART = {
     resultsHelp:
       'Results go to output_dir_results. Check errors and submission_valid, and follow the methodology before comparing hardware. Runs are not automatically published.',
     guide: 'Open the full quickstart',
-    back: 'AgentX datasets',
+    back: 'AgentX Datasets',
     methodology: 'Benchmark methodology',
     repository: 'Harness documentation',
     summary:

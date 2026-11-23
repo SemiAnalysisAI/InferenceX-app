@@ -243,7 +243,7 @@ describe('Agentic point request metric time series', () => {
     cy.wait('@serverLogInitialChunk');
 
     cy.get('[data-testid="agentic-server-log-viewer"]')
-      .should('contain.text', 'Log files')
+      .should('contain.text', 'Log Files')
       .and('contain.text', longServerLogPath)
       .then(($viewer) => {
         cy.get('#agentic-log-file').then(($trigger) => {
@@ -371,7 +371,7 @@ describe('Agentic point request metric time series', () => {
 
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {
     cy.get('[data-testid="interactivity-over-time-chart"]').within(() => {
-      cy.contains('h2', 'Interactivity over time').should('be.visible');
+      cy.contains('h2', 'Interactivity over Time').should('be.visible');
       cy.get('[data-testid="interactivity-percentile-toggle"]')
         .find('[role="tab"][aria-selected="true"]')
         .should('have.text', 'P90');
@@ -383,7 +383,7 @@ describe('Agentic point request metric time series', () => {
     });
 
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
-      cy.contains('h2', 'TTFT over time').should('be.visible');
+      cy.contains('h2', 'TTFT over Time').should('be.visible');
       cy.get('[data-testid="ttft-point-count"]').should('have.text', '6 points');
       cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'TTFT (s)');
@@ -422,7 +422,7 @@ describe('Agentic point request metric time series', () => {
       cy.get('svg').should('contain.text', 'Cumulative P90 E2E latency');
 
       cy.get('[data-testid="latency-metric-ttft"]').click();
-      cy.contains('h2', 'TTFT over time').should('be.visible');
+      cy.contains('h2', 'TTFT over Time').should('be.visible');
     });
   });
 
@@ -459,13 +459,13 @@ describe('Agentic point request metric time series', () => {
 
   it('switches the request activity card from queue depth to cumulative completions', () => {
     cy.get('[data-testid="request-activity-chart"]').within(() => {
-      cy.contains('h2', 'Request queue depth').should('be.visible');
+      cy.contains('h2', 'Request Queue Depth').should('be.visible');
       cy.get('[data-testid="request-activity-completed"]').click();
-      cy.contains('h2', 'Cumulative completed requests').should('be.visible');
+      cy.contains('h2', 'Cumulative Completed Requests').should('be.visible');
       cy.get('svg').should('contain.text', 'Completed requests');
       cy.get('svg').should('contain.text', 'Requests');
       cy.get('[data-testid="request-activity-queue"]').click();
-      cy.contains('h2', 'Request queue depth').should('be.visible');
+      cy.contains('h2', 'Request Queue Depth').should('be.visible');
     });
   });
 

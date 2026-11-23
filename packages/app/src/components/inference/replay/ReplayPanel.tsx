@@ -65,7 +65,7 @@ const STAGE_LABELS: Record<Locale, Partial<Record<Mp4ExportStage, string>>> = {
 
 const REPLAY_STRINGS = {
   en: {
-    heading: 'Replay over time',
+    heading: 'Replay over Time',
     loading: 'Loading benchmark history…',
     loadError: 'Failed to load benchmark history',
     insufficient:

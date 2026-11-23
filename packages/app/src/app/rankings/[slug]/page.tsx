@@ -166,7 +166,7 @@ export default async function RankingPage({ params }: Props) {
   };
 
   const t: RankingsStrings = {
-    backLabel: 'GPU rankings',
+    backLabel: 'GPU Rankings',
     heading,
     scenarioNote: `Measured on ${scenarioLabel(data.scenario, 'en')} at a matched interactivity target of ${data.tier} tokens/s per user. Hardware without a measurement at this operating point is not ranked.`,
     tableCaption: `${heading}: live benchmark ranking`,
@@ -198,9 +198,9 @@ export default async function RankingPage({ params }: Props) {
       `Platforms are then read at the same operating point (${data.tier} tokens/s per user) so the comparison is iso-interactivity: a GPU cannot win by quoting throughput at an unusably slow per-user speed. Rankings default to ${RANKING_STANDARD_TIER} tokens/s per user, the speed current runs cover on the most hardware, and use another speed only when it ranks more GPUs for this model. Cost converts measured throughput to $ per million total tokens using $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model.`,
       `The derivation is shared with the InferenceX overview leaderboard, and results re-run continuously, so this ranking updates as new engine releases and configs land.`,
     ],
-    faqHeading: 'Frequently asked questions',
+    faqHeading: 'Frequently Asked Questions',
     faq,
-    exploreHeading: 'Explore the data',
+    exploreHeading: 'Explore the Data',
     exploreLinks: [
       {
         href: `/model/${entry.model.slug}`,

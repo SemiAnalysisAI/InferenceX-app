@@ -12,7 +12,7 @@ const STRINGS = {
     pause: 'Pause',
     play: 'Play',
     resetTitle: 'Reset',
-    cycleSpeed: 'Cycle speed',
+    cycleSpeed: 'Cycle Speed',
   },
   zh: {
     pause: '暂停',

@@ -19,7 +19,7 @@ function coverageColor(value: number | null): string {
 
 const STRINGS = {
   en: {
-    heading: 'Usage with a stored cost estimate',
+    heading: 'Usage with a Stored Cost Estimate',
     description: (days: number) =>
       `Latest ${days} days. Failed or otherwise zero-usage requests are excluded; missing estimates are grouped by the reported model ID below.`,
     requestCoverage: 'Request Coverage',

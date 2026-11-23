@@ -12,7 +12,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'Benchmark logs',
+    title: 'Benchmark Logs',
     description: 'Stored runtime logs for this fixed-sequence benchmark point.',
   },
   zh: {
