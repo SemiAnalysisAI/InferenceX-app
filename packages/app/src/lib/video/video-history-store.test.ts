@@ -374,10 +374,10 @@ describe('history projection version', () => {
       projection: 6,
       // Re-pinned after the lazy power model loader gained failure and retry states (reached only
       // through type imports), fetchJson learned to take an early document-load response,
-      // data_query_failed stopped reporting failed background refetches that keep their data, and
-      // dashboard-routes gained the default Inference model slug. None of these feed recorded
-      // entries, so they are unchanged.
-      sources: 'a8adb3c96d078fae1a1966420940e9442fc96acc1ffd89a5737c97ecf258e22e',
+      // data_query_failed stopped reporting failed background refetches that keep their data,
+      // dashboard-routes gained the default Inference model slug, and the unofficial run provider
+      // gained a requested-overlay flag. None of these feed recorded entries, so they are unchanged.
+      sources: 'e79ff1da9b66ba43ef05e118382fc9ce448928b83b8d49c1a409d32af44216e5',
     });
   });
 });

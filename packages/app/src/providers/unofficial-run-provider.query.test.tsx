@@ -193,6 +193,54 @@ describe('UnofficialRunProvider query lifecycle', () => {
     act(() => root.unmount());
   });
 
+  it('reports a requested overlay from the first render, before its data loads', async () => {
+    installPendingFetch();
+    window.history.replaceState({}, '', '/infx/inference?unofficialrun=1');
+    const root = mountProvider();
+    expect(latestContextValue?.isUnofficialRun).toBe(false);
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(true);
+
+    await flush();
+    requests[0].resolve({
+      ok: true,
+      json: () => Promise.resolve({ runInfos: [runInfo(1)], benchmarks: [], evaluations: [] }),
+    } as Response);
+    await waitForRunIds([1]);
+    expect(latestContextValue?.isUnofficialRun).toBe(true);
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(true);
+
+    act(() => dismissLatest?.('1'));
+    await flush();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('stops reporting a requested overlay when the run is unavailable', async () => {
+    installPendingFetch();
+    window.history.replaceState({}, '', '/infx/inference?unofficialrun=5');
+    const root = mountProvider();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(true);
+    await flush();
+    requests[0].resolve({
+      ok: false,
+      status: 410,
+      json: () => Promise.resolve({ error: 'expired', code: 'ARTIFACTS_EXPIRED', runId: '5' }),
+    } as Response);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (latestContextValue?.unavailable) break;
+      await flush();
+    }
+    expect(latestContextValue?.unavailable).not.toBeNull();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('does not report a requested overlay without a run id', () => {
+    const root = mountProvider();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(false);
+    act(() => root.unmount());
+  });
+
   it('reports an expired run as unavailable instead of a failed query', async () => {
     installPendingFetch();
     window.history.replaceState({}, '', '/infx/evaluation?unofficialRun=27968834654');
