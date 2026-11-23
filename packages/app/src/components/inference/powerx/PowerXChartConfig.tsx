@@ -67,9 +67,6 @@ import {
 
 type Statistic = 'average' | 'p75' | 'p90';
 
-/** The default drill-down chart style on Breakdown (`i_pbview`). */
-export const POWERX_BREAKDOWN_VIEW_DEFAULT: PowerBreakdownView = 'area';
-
 // A space only after a Latin ending: 已按解码 GPU 固定, 已按预填充 vs 解码固定.
 const zhSetBy = (by: string) => `已按${by}${/[A-Za-z0-9]$/u.test(by) ? ' ' : ''}固定`;
 
