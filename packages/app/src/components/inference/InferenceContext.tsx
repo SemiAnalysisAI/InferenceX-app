@@ -495,18 +495,20 @@ export function InferenceProvider({
       });
     }
   }, [selectedGpuResolution]);
-  // Old share links encoded a GPU role in i_metric or i_pcompare; read them onto i_role once.
-  const [initialRoleParams] = useState(() =>
-    rewriteLegacyPowerRoleParams({
+  const powerXSurface = usePowerXSurface();
+  // Old PowerX share links encoded a GPU role in i_metric or i_pcompare; read them onto i_role
+  // once. Outside PowerX the role metrics are still Scope choices, so their links stay as they are.
+  const [initialRoleParams] = useState(() => {
+    const params = {
       metric: getUrlParam('i_metric'),
       compare: getUrlParam('i_pcompare'),
       role: getUrlParam('i_role'),
-    }),
-  );
+    };
+    return powerXSurface ? rewriteLegacyPowerRoleParams(params) : params;
+  });
   const [storedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(initialRoleParams.metric, initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
-  const powerXSurface = usePowerXSurface();
   const [storedPowerCompare, setPowerCompare] = useState<PowerCompare>(() =>
     parsePowerCompare(initialRoleParams.compare),
   );
