@@ -654,5 +654,5 @@ export const CAROUSEL_LABELS: Record<string, string> = {
   'Meta Superintelligence Labs': 'Meta',
   'Moonshot AI': 'Moonshot Kimi',
   AMD: 'AMD Lisa Su',
-  NVIDIA: 'Ex-NVIDIA Jensen',
+  NVIDIA: 'NVIDIA Jensen',
 };
