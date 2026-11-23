@@ -372,9 +372,9 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the unofficial-run provider and banner gained unavailable-run states. They are
-      // reached only through a type import and React context, so recorded entries are unchanged.
-      sources: '79700f5f33940e35a9593b8bf79d3bdbd01f5ca468f66981dfa00ea88fe128b8',
+      // Re-pinned after inference topology labels moved to one pass. The graph reaches that file only
+      // for pointTopologyKey, which is unchanged, so recorded entries are unchanged.
+      sources: 'd15e35c58c3862ebf9d3ba040c4fd82b8bd6ce93d29df8e54349a798fcd5cf98',
     });
   });
 });

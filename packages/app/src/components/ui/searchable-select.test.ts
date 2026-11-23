@@ -315,6 +315,45 @@ describe('SearchableSelect', () => {
     expect(document.body.querySelectorAll('[data-slot="select-item"]')).toHaveLength(0);
   });
 
+  it('shows the pick at once and leaves what it re-renders to a transition', async () => {
+    const { promise: pending, resolve: release } = Promise.withResolvers<void>();
+    function Chart({ metric }: { metric: string }) {
+      if (metric === 'y_costh') React.use(pending);
+      return React.createElement('p', { 'data-testid': 'chart' }, metric);
+    }
+    function Page() {
+      const [metric, setMetric] = React.useState('y_tpPerGpu');
+      return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(SearchableSelect, {
+          groups: GROUPS,
+          value: metric,
+          onValueChange: setMetric,
+          triggerTestId: 'yaxis',
+        }),
+        React.createElement(
+          React.Suspense,
+          { fallback: React.createElement('p', { 'data-testid': 'fallback' }) },
+          React.createElement(Chart, { metric }),
+        ),
+      );
+    }
+    act(() => root.render(React.createElement(Page)));
+    await openMenu();
+    const option = document.body.querySelector('[data-value="y_costh"]') as HTMLElement;
+    await act(() => option.click());
+    // A synchronous update would swap the chart for its fallback while the new metric loads.
+    expect(container.querySelector('[data-testid="yaxis"]')?.textContent).toContain(
+      'Cost per Million Total Tokens (Hyperscaler)',
+    );
+    expect(container.querySelector('[data-testid="fallback"]')).toBeNull();
+    expect(container.querySelector('[data-testid="chart"]')?.textContent).toBe('y_tpPerGpu');
+    release();
+    await settle();
+    expect(container.querySelector('[data-testid="chart"]')?.textContent).toBe('y_costh');
+  });
+
   it('moves through options and selects from the keyboard', async () => {
     const handle = vi.fn();
     render({ onValueChange: handle });

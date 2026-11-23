@@ -38,27 +38,51 @@ export function pointTopologyKey(point: InferenceData): string {
   return `${key}|offload=${point.offload_mode ?? '?'}`;
 }
 
-export function topologyLabel(
+function sharedTopologyParts(keys: readonly string[]): Map<string, Set<string>> {
+  const shared = new Map<string, Set<string>>();
+  for (const key of keys) {
+    const [mode, ...parts] = key.split('|');
+    const common = shared.get(mode);
+    if (common) {
+      for (const part of common) if (!parts.includes(part)) common.delete(part);
+    } else shared.set(mode, new Set(parts));
+  }
+  return shared;
+}
+
+function formatTopologyLabel(
   key: string,
   locale: 'en' | 'zh',
-  availableKeys?: readonly string[],
+  shared: Map<string, Set<string>> | undefined,
 ): string {
   const [mode, ...parts] = key.split('|');
   const modes =
     locale === 'zh'
       ? { PD: '分离式', Multi: '多节点', Single: '单节点' }
       : { PD: 'Disaggregated', Multi: 'Multi-node', Single: 'Single-node' };
-  const peers = availableKeys?.filter((sibling) => sibling.split('|')[0] === mode);
+  const common = shared?.get(mode);
   const visible = parts.filter((part) => {
     const name = part.split('=')[0];
     return (
-      ['GPU', 'TP', 'EP', 'P-GPU', 'D-GPU', 'P-TP', 'P-EP'].includes(name) ||
-      !peers?.length ||
-      !peers.every((sibling) => sibling.split('|').includes(part))
+      ['GPU', 'TP', 'EP', 'P-GPU', 'D-GPU', 'P-TP', 'P-EP'].includes(name) || !common?.has(part)
     );
   });
   return [
     modes[mode as keyof typeof modes] ?? mode,
     ...visible.map((part) => part.replace(/=(?=\p{L})/u, ' ').replace('=', '')),
   ].join(' · ');
+}
+
+export function topologyLabel(
+  key: string,
+  locale: 'en' | 'zh',
+  availableKeys?: readonly string[],
+): string {
+  return formatTopologyLabel(key, locale, availableKeys && sharedTopologyParts(availableKeys));
+}
+
+/** Labels for every key against the others, in one pass rather than one per key. */
+export function topologyLabels(keys: readonly string[], locale: 'en' | 'zh'): string[] {
+  const shared = sharedTopologyParts(keys);
+  return keys.map((key) => formatTopologyLabel(key, locale, shared));
 }
