@@ -1,7 +1,6 @@
 'use client';
 
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
-import { getImageProps } from 'next/image';
 import { useEffect, useMemo } from 'react';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
@@ -22,6 +21,12 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import type { CompareChipPageLink } from '@/lib/compare/compare-chip-link';
+import {
+  HERO_IMAGE_HEIGHT,
+  HERO_IMAGE_SIZES,
+  HERO_IMAGE_WIDTH,
+  heroImageSrcSet,
+} from '@/lib/compare/hero-image';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
@@ -87,14 +92,11 @@ interface ComparePerDollarPageClientProps {
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
   heroImageSrc: string;
+  /** `perDollarPngVersion()` of the PNG, so the optimized srcSet URLs change with its data. */
+  heroImageVersion: string;
   chipPageLink?: CompareChipPageLink | null;
   locale?: 'en' | 'zh';
 }
-
-const HERO_IMAGE_WIDTH = 1200;
-const HERO_IMAGE_HEIGHT = 675;
-// The figure is `max-w-sm` (24rem) and full width below that.
-const HERO_IMAGE_SIZES = '(min-width: 24rem) 24rem, 100vw';
 
 export default function ComparePerDollarPageClient({
   a,
@@ -118,6 +120,7 @@ export default function ComparePerDollarPageClient({
   aCostPerGpuHr,
   bCostPerGpuHr,
   heroImageSrc,
+  heroImageVersion,
   chipPageLink = null,
   locale = 'en',
 }: ComparePerDollarPageClientProps) {
@@ -142,13 +145,7 @@ export default function ComparePerDollarPageClient({
     [defaultSequence, initialBenchmarkRows],
   );
   const t = STRINGS[locale];
-  const heroSrcSet = getImageProps({
-    src: heroImageSrc,
-    alt: '',
-    width: HERO_IMAGE_WIDTH,
-    height: HERO_IMAGE_HEIGHT,
-    sizes: HERO_IMAGE_SIZES,
-  }).props.srcSet;
+  const heroSrcSet = heroImageSrcSet(heroImageSrc, heroImageVersion);
   const isZh = locale === 'zh';
 
   return (

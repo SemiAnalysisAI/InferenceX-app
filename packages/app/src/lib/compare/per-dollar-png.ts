@@ -1,12 +1,61 @@
+import { createHash } from 'node:crypto';
+
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { trackServer } from '@/lib/analytics/analytics-server';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import { getComparePageDerivedData } from '@/lib/compare/compare-page-data.server';
-import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare/compare-slug';
+import {
+  canonicalCompareSlug,
+  type CompareSlug,
+  parseCompareSlug,
+} from '@/lib/compare/compare-slug';
 import { computeCompareImageRows } from '@/lib/compare/compare-ssr';
 import { getLogoSrc } from '@/lib/seo/og-assets';
 import { renderComparePngChart } from '@/lib/compare/png-chart';
+
+/** What the hero PNG draws for a pair, from the page's own cached pair data. */
+async function perDollarChartRows({ model, a, b }: CompareSlug) {
+  const { sequence, precision, ssrRows, interactivityRange, initialPairBenchmarkRows } =
+    await getComparePageDerivedData(
+      model.dbKeys,
+      a,
+      b,
+      null,
+      null,
+      comparisonScenarioForModel(model).sequence,
+    );
+  const plottedRows = ssrRows.filter((row) => row.a || row.b);
+  const imageRows = computeCompareImageRows(
+    initialPairBenchmarkRows,
+    a,
+    b,
+    sequence,
+    precision,
+    interactivityRange,
+    plottedRows.map((row) => row.target),
+  ).filter((row) => row.a || row.b);
+  return {
+    sequence,
+    precision,
+    plottedRows,
+    curveRows: imageRows.length > 0 ? imageRows : plottedRows,
+    workload: [sequence, precision?.toUpperCase()].filter(Boolean).join(' / '),
+  };
+}
+
+/**
+ * A short hash of the data the hero PNG draws. The page puts it on the PNG URL inside the
+ * `/_next/image` srcSet, whose responses browsers keep for `images.minimumCacheTTL`, so an ingest
+ * that changes the chart also changes the optimized image URL. The PNG route ignores the query.
+ */
+export async function perDollarPngVersion(pair: CompareSlug): Promise<string> {
+  const { workload, plottedRows, curveRows } = await perDollarChartRows(pair);
+  return createHash('sha256')
+    .update(JSON.stringify([workload, plottedRows, curveRows]))
+    .digest('hex')
+    .slice(0, 12);
+}
 
 /**
  * The compare-per-dollar hero PNG. It reads the page's own cached pair data, so the ingest purge
@@ -21,33 +70,12 @@ export async function perDollarPngResponse(slug: string, lang: 'en' | 'zh'): Pro
     return new Response('Not found', { status: 404 });
   }
 
-  const [{ sequence, precision, ssrRows, interactivityRange, initialPairBenchmarkRows }, logoSrc] =
-    await Promise.all([
-      getComparePageDerivedData(
-        parsed.model.dbKeys,
-        parsed.a,
-        parsed.b,
-        null,
-        null,
-        comparisonScenarioForModel(parsed.model).sequence,
-      ),
-      getLogoSrc(),
-    ]);
-  const plottedRows = ssrRows.filter((row) => row.a || row.b);
-  const imageRows = computeCompareImageRows(
-    initialPairBenchmarkRows,
-    parsed.a,
-    parsed.b,
-    sequence,
-    precision,
-    interactivityRange,
-    plottedRows.map((row) => row.target),
-  ).filter((row) => row.a || row.b);
-  const curveRows = imageRows.length > 0 ? imageRows : plottedRows;
-
+  const [{ sequence, precision, plottedRows, curveRows, workload }, logoSrc] = await Promise.all([
+    perDollarChartRows(parsed),
+    getLogoSrc(),
+  ]);
   const aLabel = HW_REGISTRY[parsed.a]?.label ?? parsed.a.toUpperCase();
   const bLabel = HW_REGISTRY[parsed.b]?.label ?? parsed.b.toUpperCase();
-  const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
 
   try {
     return await renderComparePngChart({

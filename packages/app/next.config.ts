@@ -152,6 +152,14 @@ const nextConfig: NextConfig = {
     formats: ['image/webp'],
     minimumCacheTTL: 86400,
     qualities: [75, 100],
+    // Next's default when unset: local images, no query string. The per-dollar hero srcSet adds
+    // `?v=<data version>` to its PNG so a refreshed chart gets a new optimized-image URL. `search`
+    // is an exact match, so those two paths leave it out to accept any version.
+    localPatterns: [
+      { pathname: '**', search: '' },
+      { pathname: '/compare-per-dollar/*/performance-per-dollar.png' },
+      { pathname: '/zh/compare-per-dollar/*/performance-per-dollar.png' },
+    ],
     remotePatterns: [
       { hostname: 'placehold.co' },
       { hostname: 'substack-post-media.s3.amazonaws.com' },
