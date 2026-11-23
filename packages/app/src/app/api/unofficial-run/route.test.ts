@@ -25,6 +25,7 @@ mock.module('@/lib/benchmarks/benchmark-query-cache.server', () => ({
 const {
   GET,
   githubRateLimitRetryAfter,
+  missingResultsCode,
   normalizeArtifactRows,
   normalizeEvalArtifactRows,
   unofficialRunCacheControl,
@@ -605,6 +606,33 @@ describe('githubRateLimitRetryAfter', () => {
   });
 });
 
+describe('missingResultsCode', () => {
+  const now = Date.parse('2026-11-22T00:00:00Z');
+  const expiredArtifact = {
+    id: 1,
+    name: 'results_bmk',
+    archive_download_url: 'http://dl',
+    expired: true,
+  };
+
+  it('reports expiry when GitHub still lists the expired artifacts', () => {
+    const run = { created_at: '2026-11-01T00:00:00Z', status: 'completed' };
+    expect(missingResultsCode(run, [expiredArtifact], now)).toBe('ARTIFACTS_EXPIRED');
+  });
+
+  it('reports expiry for a run past artifact retention that lists nothing', () => {
+    const run = { created_at: '2026-06-22T16:44:01Z', status: 'completed' };
+    expect(missingResultsCode(run, [], now)).toBe('ARTIFACTS_EXPIRED');
+  });
+
+  it('separates a finished run without results from one still running', () => {
+    const finished = { created_at: '2026-11-16T10:34:30Z', status: 'completed' };
+    const running = { created_at: '2026-11-21T00:00:00Z', status: 'in_progress' };
+    expect(missingResultsCode(finished, [], now)).toBe('NO_RESULTS');
+    expect(missingResultsCode(running, [], now)).toBe('RUN_IN_PROGRESS');
+  });
+});
+
 describe('GET /api/unofficial-run', () => {
   beforeEach(() => {
     // The remembered run owners are the only state a route request leaves behind.
@@ -642,7 +670,7 @@ describe('GET /api/unofficial-run', () => {
     expect(body.error).toContain('token');
   });
 
-  it('returns GitHub error status when run fetch fails', async () => {
+  it('reports a run GitHub does not have as not found', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 404,
@@ -650,22 +678,42 @@ describe('GET /api/unofficial-run', () => {
     });
     const res = await GET(makeRequest('runId=999'));
     expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: 'RUN_NOT_FOUND', runId: '999' });
   });
 
-  it('returns 404 when neither benchmark nor eval artifact exists', async () => {
+  it('reports a finished run without result artifacts as having no results', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
+      json: () =>
+        Promise.resolve({ id: 123, created_at: '2026-11-16T00:00:00Z', status: 'completed' }),
     });
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ artifacts: [{ name: 'other_artifact', id: 1 }] }),
+      json: () => Promise.resolve({ artifacts: [{ name: 'job_events', id: 1 }] }),
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toContain('results_bmk');
-    expect(body.error).toContain('eval_results_all');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
+    expect(await res.json()).toMatchObject({ code: 'NO_RESULTS', runId: '123' });
+  });
+
+  it('reports a listed but expired results artifact as expired', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({ id: 123, created_at: '2026-08-01T00:00:00Z', status: 'completed' }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: '', expired: true }],
+        }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ code: 'ARTIFACTS_EXPIRED' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('returns error when artifact download fails', async () => {
@@ -687,6 +735,7 @@ describe('GET /api/unofficial-run', () => {
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ code: 'ARTIFACTS_EXPIRED', runId: '123' });
   });
 
   it('returns benchmarks on success', async () => {
@@ -1103,7 +1152,7 @@ describe('GET /api/unofficial-run', () => {
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
   });
 
-  it('keeps a no-artifact 404 short-lived because the listing may have failed', async () => {
+  it('reports a finished run whose listing succeeded empty as having no results', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 123, status: 'completed' }),
@@ -1114,7 +1163,41 @@ describe('GET /api/unofficial-run', () => {
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(404);
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=30');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
+    expect(await res.json()).toMatchObject({ code: 'NO_RESULTS' });
+  });
+
+  it.each([
+    ['an old run', '2026-06-22T16:44:01Z'],
+    ['a recent run', new Date().toISOString()],
+  ])('asks for a retry when the artifact list of %s cannot be read', async (_, createdAt) => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 123, status: 'completed', created_at: createdAt }),
+    });
+    mockFetch.mockResolvedValue({ ok: false, status: 502, statusText: 'Bad Gateway' });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.json()).toMatchObject({ code: 'GITHUB_UNAVAILABLE', runId: '123' });
+  });
+
+  it('reports an old run whose listing marks the results expired as expired', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({ id: 123, status: 'completed', created_at: '2026-06-22T16:44:01Z' }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: '', expired: true }],
+        }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ code: 'ARTIFACTS_EXPIRED' });
   });
 
   it('turns a GitHub rate limit into an uncached 503 with Retry-After', async () => {

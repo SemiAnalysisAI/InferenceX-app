@@ -92,6 +92,8 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(tutorial?.content.centered).toBeUndefined();
     expect(tutorial?.storageKey).toBe(TELEMETRY_TUTORIAL_STORAGE_KEY);
     expect(TELEMETRY_TUTORIAL_STORAGE_KEY).toBe('inferencex-agentx-telemetry-tutorial-dismissed');
+    // A timer let the card paint before any input, making it the page's late LCP element.
+    expect(tutorial?.trigger).toMatchObject({ type: 'dom-event', event: 'scroll' });
   });
 
   it('keeps internal action destinations in the active Chinese route tree', () => {

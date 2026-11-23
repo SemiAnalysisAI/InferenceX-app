@@ -13,7 +13,7 @@ mock.module('@/lib/github/github-artifacts', () => ({
   ...actual,
   downloadGithubArtifact: download,
   fetchGithubWorkflowRun: readRun,
-  fetchGithubRunArtifacts: listArtifacts,
+  listGithubRunArtifacts: listArtifacts,
 }));
 
 import { fetchGpuMetricsFromGithub } from './github-telemetry';

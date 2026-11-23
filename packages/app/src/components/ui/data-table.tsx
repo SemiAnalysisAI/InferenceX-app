@@ -415,7 +415,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={() => {
-                setPage((p) => Math.max(0, p - 1));
+                setPage(Math.max(0, safePage - 1));
                 track(`${analyticsPrefix}_page_changed`, { direction: 'prev' });
               }}
               disabled={safePage === 0}
@@ -430,7 +430,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={() => {
-                setPage((p) => Math.min(totalPages - 1, p + 1));
+                setPage(Math.min(totalPages - 1, safePage + 1));
                 track(`${analyticsPrefix}_page_changed`, { direction: 'next' });
               }}
               disabled={safePage >= totalPages - 1}

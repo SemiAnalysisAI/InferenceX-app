@@ -5,12 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import {
   InferenceContextsProvider,
+  matchRequestedHw,
+  openedUrlNamesParam,
+  requestedHwConflict,
   resolveE2eXAxisMetric,
   resolveEffectiveXAxisMode,
   useInferenceActions,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { comparisonExclusion } from '@/components/inference/utils/comparison-exclusion';
+import { resolveExclusionGroups } from '@/lib/benchmarks/exclusion';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { refreshUrlParams } from '@/lib/routing/url-state';
 import type {
   InferenceActionsContextType,
   InferenceDataContextType,
@@ -143,5 +149,46 @@ describe('inference domain providers', () => {
 
     seenSetters[0](true);
     expect(invokedRevisions).toEqual([1]);
+  });
+});
+
+describe('requested hardware engine conflicts', () => {
+  const exclusion = comparisonExclusion(Model.Kimi_K3_1_Pro, Sequence.AgenticTraces, false)!;
+  const selectable = new Set(['b300_vllm', 'b300_sglang', 'gb300_vllm', 'gb300_dynamo-sglang']);
+  const resolve = (request: Set<string>) => {
+    const proposed = matchRequestedHw(request, selectable);
+    const { result } = resolveExclusionGroups(
+      proposed,
+      new Set(),
+      exclusion,
+      'keep-sticky',
+      'vllm',
+    );
+    return { result, conflict: requestedHwConflict(request, proposed, result, exclusion) };
+  };
+
+  it('opens a compare page on one engine family per SKU without a notice', () => {
+    const { result, conflict } = resolve(new Set(['b300', 'gb300']));
+    expect([...result].toSorted()).toEqual(['b300_vllm', 'gb300_vllm']);
+    expect(conflict).toBeNull();
+  });
+
+  it('explains the drop when a shared URL names both engines on one SKU', () => {
+    expect(resolve(new Set(['b300_vllm', 'b300_sglang'])).conflict).toEqual({
+      kept: ['vllm'],
+      dropped: ['sglang'],
+      partial: [],
+    });
+  });
+});
+
+describe('openedUrlNamesParam', () => {
+  it('ignores the previous page URL while a client navigation renders the next page', () => {
+    window.history.replaceState(null, '', '/infx/inference?i_active=b200_sglang,b200_vllm');
+    refreshUrlParams();
+    expect(openedUrlNamesParam('i_active', '/infx/inference')).toBe(true);
+    expect(openedUrlNamesParam('i_active', '/compare/b200-vs-b300')).toBe(false);
+    window.history.replaceState(null, '', '/');
+    refreshUrlParams();
   });
 });

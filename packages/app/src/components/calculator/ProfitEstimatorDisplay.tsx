@@ -2,7 +2,7 @@
 
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useTheme } from 'next-themes';
@@ -75,6 +75,7 @@ import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useDraftNumberInput } from '@/hooks/useDraftNumberInput';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
@@ -483,6 +484,11 @@ function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
+function parsePositiveTarget(raw: string): number | null {
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
@@ -594,7 +600,6 @@ function ProfitEstimatorInner({
   const [targetValue, setTargetValue] = useState<number>(
     () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
-  const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
   useEffect(() => {
     setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
   }, [selectedModel, targetValue, setUrlParam]);
@@ -624,7 +629,6 @@ function ProfitEstimatorInner({
     defaultsAppliedFor.current = selectedModel;
     const defaults = profitModelDefaults(selectedModel);
     setTargetValue(defaults.interactivity);
-    setTargetRaw(String(defaults.interactivity));
     setPriceSource(defaultPriceSource(selectedModel));
     resetLabCut(defaults.labCutPct);
   }, [selectedModel, resetLabCut]);
@@ -964,12 +968,14 @@ function ProfitEstimatorInner({
     }),
     [utilization.value, labCut.value, basis, powerBasis],
   );
+  // The slider and input repaint at once; the estimate and chart follow in the background.
+  const chartTarget = useDeferredValue(targetValue);
 
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
     const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
     const current = getResults(
-      targetValue,
+      chartTarget,
       mode,
       interpolationCostProvider,
       undefined,
@@ -983,7 +989,7 @@ function ProfitEstimatorInner({
             selectedGPUs,
             precisions: selectedPrecisions,
             percentile: selectedPercentile,
-            targetValue,
+            targetValue: chartTarget,
             mode,
             costProvider: interpolationCostProvider,
             powerBasis: curvePowerBasis,
@@ -1001,7 +1007,7 @@ function ProfitEstimatorInner({
       pricing,
       assumptions,
       powerBasis,
-      targetValue,
+      chartTarget,
       t.powerBarLabels,
     );
     if (!historyActive) return estimated;
@@ -1019,7 +1025,7 @@ function ProfitEstimatorInner({
     cacheHitMode,
     powerBasis,
     t.powerBarLabels,
-    targetValue,
+    chartTarget,
     mode,
     interpolationCostProvider,
     costPerGpuHourFor,
@@ -1080,24 +1086,10 @@ function ProfitEstimatorInner({
     [fullEstimate, visibleHwKeys],
   );
 
-  const handleTargetChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setTargetRaw(e.target.value);
-    const parsed = Number.parseFloat(e.target.value);
-    if (Number.isFinite(parsed) && parsed > 0) setTargetValue(parsed);
-  }, []);
-
-  const handleTargetSlide = useCallback((value: number) => {
-    setTargetValue(value);
-    setTargetRaw(String(value));
-  }, []);
-
-  const handleTargetBlur = useCallback(() => {
-    const parsed = Number.parseFloat(targetRaw);
-    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : targetValue;
+  const targetInput = useDraftNumberInput(targetValue, parsePositiveTarget, (next, source) => {
     setTargetValue(next);
-    setTargetRaw(String(next));
-    track('profit_target_set', { mode, value: next });
-  }, [targetRaw, targetValue, mode]);
+    if (source === 'blur') track('profit_target_set', { mode, value: next });
+  });
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -1350,7 +1342,7 @@ function ProfitEstimatorInner({
             getSequenceLabel(Sequence.AgenticTraces, locale),
           )}
           <HeadingQualifier>
-            {profitChartQualifier(locale, percentileLabel, targetValue)}
+            {profitChartQualifier(locale, percentileLabel, chartTarget)}
           </HeadingQualifier>
         </Heading>
         {powerControlsEnabled && (
@@ -1375,7 +1367,7 @@ function ProfitEstimatorInner({
     selectedModel,
     locale,
     percentileLabel,
-    targetValue,
+    chartTarget,
     basis,
     t,
     historyActive,
@@ -1649,8 +1641,11 @@ function ProfitEstimatorInner({
                       label={t.targetAgenticLabel(percentileLabel)}
                       min={ranges.interactivity.min}
                       max={ranges.interactivity.max}
-                      value={targetValue}
-                      onSliderChange={handleTargetSlide}
+                      value={targetInput.sliderValue}
+                      onSliderChange={(next) => {
+                        targetInput.discardDraft();
+                        setTargetValue(next);
+                      }}
                       onSliderCommit={() =>
                         track('profit_target_set', { mode, value: targetValue })
                       }
@@ -1661,9 +1656,7 @@ function ProfitEstimatorInner({
                         onWheel: blurOnWheel,
                         inputMode: 'decimal',
                         min: 1,
-                        value: targetRaw,
-                        onChange: handleTargetChange,
-                        onBlur: handleTargetBlur,
+                        ...targetInput.input,
                       }}
                     />
                   </div>
@@ -1923,7 +1916,7 @@ function ProfitEstimatorInner({
 
       {loading && (
         <Card>
-          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-200 w-full" />
         </Card>
       )}
 

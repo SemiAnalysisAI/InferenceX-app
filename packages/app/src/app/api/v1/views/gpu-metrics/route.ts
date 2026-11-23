@@ -2,6 +2,7 @@ import {
   readGpuMetricsForView as metrics,
   type GpuMetricsRouteResponse,
 } from '@/app/api/gpu-metrics/route';
+import { isGpuTelemetryErrorCode } from '@/app/api/gpu-metrics/github-telemetry';
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
 import { storedGpuStatsForMetric } from '@/components/gpu-power/stored-gpu-stats';
 import {
@@ -9,7 +10,7 @@ import {
   computeGpuStats,
   getAvailableMetrics,
 } from '@/components/gpu-power/types';
-import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
+import { runViewsRoute, ViewsApiParamError, ViewsUpstreamError } from '@/lib/views-api/errors';
 import {
   parseBoolParam,
   parseEnumParam,
@@ -31,12 +32,16 @@ export function GET(request: NextRequest) {
     const s = request.nextUrl.searchParams;
     if (!s.get('runId')) throw new ViewsApiParamError('runId', 'runId is required');
     const runId = parseNumberParam(s.get('runId'), 'runId', 0, { min: 1, integer: true });
-    const data = await readResponse<GpuMetricsRouteResponse>(
-      await metrics(
-        sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) }),
-        s.get('artifact'),
-      ),
+    const source = await metrics(
+      sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) }),
+      s.get('artifact'),
     );
+    // Say why a live read has no data (missing run or telemetry, size cap, GitHub retry).
+    if (!source.ok) {
+      const { error, code } = (await source.json()) as { error?: string; code?: unknown };
+      if (isGpuTelemetryErrorCode(code)) throw new ViewsUpstreamError(source.status, error, code);
+    }
+    const data = await readResponse<GpuMetricsRouteResponse>(source);
     const artifactNames = data.artifactNames ?? data.artifacts.map((a) => a.name);
     const artifact = s.get('artifact') ?? data.artifacts[0]?.name;
     const selected = data.artifacts.find((a) => a.name === artifact);

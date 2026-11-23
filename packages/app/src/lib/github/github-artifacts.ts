@@ -10,6 +10,8 @@ export interface GithubArtifact {
   id: number;
   name: string;
   archive_download_url: string;
+  /** GitHub keeps an expired artifact in the listing for a while, without its archive. */
+  expired?: boolean;
 }
 
 export interface GithubWorkflowRun {
@@ -147,11 +149,14 @@ async function fetchRepoRunArtifacts(
   return artifacts;
 }
 
-/** Lists a run's artifacts from the first source repository whose listing succeeds. */
-export async function fetchGithubRunArtifacts(
+/**
+ * Lists a run's artifacts from the first source repository whose listing succeeds, or null
+ * when none does (no such run, a rate limit or a GitHub outage).
+ */
+export async function listGithubRunArtifacts(
   runId: string,
   token: string,
-): Promise<GithubArtifact[]> {
+): Promise<GithubArtifact[] | null> {
   for (const repo of sourceReposForRun(runId)) {
     const artifacts = await fetchRepoRunArtifacts(repo, runId, token);
     if (artifacts) {
@@ -159,7 +164,15 @@ export async function fetchGithubRunArtifacts(
       return artifacts;
     }
   }
-  return [];
+  return null;
+}
+
+/** Like `listGithubRunArtifacts`, with a failed listing read as no artifacts. */
+export async function fetchGithubRunArtifacts(
+  runId: string,
+  token: string,
+): Promise<GithubArtifact[]> {
+  return (await listGithubRunArtifacts(runId, token)) ?? [];
 }
 
 export function downloadGithubArtifact(url: string, token: string): Promise<Response> {

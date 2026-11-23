@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -15,6 +15,7 @@ import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { scenarioLabel } from '@/lib/live-seo/rankings';
 import {
+  canonicalRunPageSlug,
   getRunPageEntry,
   runPageDescription,
   runPageFaqQuestions,
@@ -23,13 +24,17 @@ import {
   runPageTitle,
   type RunPageEntry,
 } from '@/lib/live-seo/run-pages';
-import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
+import {
+  getPrerenderedRunParams,
+  getRunPageData,
+  type RunPageData,
+} from '@/lib/live-seo/run-rankings-data.server';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedRunParams();
 }
 
 interface Props {
@@ -112,7 +117,11 @@ function buildFaq(entry: RunPageEntry, data: RunPageData): { question: string; a
 export default async function RunPage({ params }: Props) {
   const { slug } = await params;
   const entry = getRunPageEntry(slug);
-  if (!entry) notFound();
+  if (!entry) {
+    const current = canonicalRunPageSlug(slug);
+    if (current) permanentRedirect(`/run/${current}`);
+    notFound();
+  }
   const data = await getRunPageData(entry.slug);
   if (!data) notFound();
 

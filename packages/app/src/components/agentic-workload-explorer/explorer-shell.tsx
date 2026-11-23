@@ -50,7 +50,8 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
         </div>
         <SectionNav />
       </Card>
-      <div className="min-w-0">{children}</div>
+      {/* Views render client-side only (search params), so hold the footer below the fold. */}
+      <div className="min-h-svh min-w-0">{children}</div>
     </section>
   );
 }

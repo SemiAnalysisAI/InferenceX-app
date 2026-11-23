@@ -201,11 +201,19 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.visit('/ubx/core-memory-profiles', dismiss);
   const panel = '[data-testid="profile-scalar_128MiB_cube_isolated"]';
   const value = '[data-testid="profile-scalar_128MiB_cube_isolated-value"]';
-  cy.get(`${panel} svg rect`).eq(1).click();
+  // The cells are one image, so click a cell by its spot in the 420-unit viewBox
+  // (matrix from x 54 / y 22, 320 units across 28 cores).
+  const clickCell = (i: number, j: number) =>
+    cy.get(`${panel} svg`).then(($svg) => {
+      const scale = $svg[0].getBoundingClientRect().width / 420;
+      const step = 320 / 28;
+      cy.wrap($svg).click((54 + (j + 0.5) * step) * scale, (22 + (i + 0.5) * step) * scale);
+    });
+  clickCell(0, 1);
   cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 1: 19.03');
-  cy.get(`${panel} svg rect`).eq(2).click();
+  clickCell(0, 2);
   cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 2: 15.30');
-  cy.get(`${panel} svg rect`).eq(2).click();
+  clickCell(0, 2);
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg`)
     .trigger('keydown', { key: 'ArrowRight' })
@@ -213,10 +221,10 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(value).should('contain', 'Pinned core pair:');
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
-  cy.get(`${panel} svg rect`).eq(1).click();
+  clickCell(0, 1);
   cy.contains('h1', 'uBenchX Microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
-  cy.get(`${panel} svg rect`).eq(1).click();
+  clickCell(0, 1);
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
   cy.get(value).should('be.empty').and('not.be.visible');
 });

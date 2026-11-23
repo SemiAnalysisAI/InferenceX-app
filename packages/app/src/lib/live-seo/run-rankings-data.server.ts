@@ -6,6 +6,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { cachedDerivedData } from '@/lib/cache/api-cache';
 import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-data.server';
 import { getChipHw } from '@/lib/catalog/chip-pages';
+import { isModelVisible } from '@/lib/catalog/data-mappings';
 import { buildDbKeyToSlugMap, getCachedAvailability } from '@/lib/compare/compare-availability';
 import {
   OVERVIEW_TIERS,
@@ -53,6 +54,14 @@ const getCachedAvailableRunEntries = cachedDerivedData(
 
 export function getAvailableRunEntries(): Promise<RunPageEntry[]> {
   return getCachedAvailableRunEntries();
+}
+
+/** Public pairings with results, built at deploy time instead of on the first visit after it. */
+export async function getPrerenderedRunParams(): Promise<{ slug: string }[]> {
+  const entries = await getAvailableRunEntries();
+  return entries
+    .filter((entry) => isModelVisible(entry.model.model))
+    .map((entry) => ({ slug: entry.slug }));
 }
 
 export interface RunTierRead {

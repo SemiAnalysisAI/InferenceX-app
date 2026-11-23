@@ -4,7 +4,9 @@ import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { whiteTextFill } from '@/lib/charts/dynamic-colors';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-point-registry';
+import { childPointLabel } from '@/lib/d3-chart/layers/scatter-points';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
+import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
 export interface CartesianPoint {
@@ -685,7 +687,7 @@ export function renderLineLabels(
   selection.each(function (label) {
     const labelGroup = d3.select<SVGGElement, LineLabelPlacement>(this);
     options.configureGroup?.(labelGroup, label);
-    const text = labelGroup.select<SVGTextElement>('.ll-text');
+    const text = labelGroup.select<SVGTextElement>(':scope > text.ll-text');
     const space = iconSpace(options.iconFor?.(label));
     if (space > 0) text.attr('x', space);
     else text.attr('x', null);
@@ -695,8 +697,8 @@ export function renderLineLabels(
 
   const measured: { node: SVGGElement; label: LineLabelPlacement; bbox: DOMRect }[] = [];
   selection.each(function (label) {
-    const text = this.querySelector<SVGTextElement>('.ll-text');
-    if (text) measured.push({ node: this, label, bbox: text.getBBox() });
+    const bbox = svgBBox(this.querySelector(':scope > text.ll-text'));
+    if (bbox) measured.push({ node: this, label, bbox });
   });
   for (const { node, label, bbox } of measured) {
     const labelGroup = d3.select(node);
@@ -804,7 +806,7 @@ export function placePointLabels(
   const padding = 2;
 
   zoomGroup.selectAll<SVGGElement, unknown>(POINT_LABEL_HOSTS).each(function () {
-    const label = this.querySelector<SVGTextElement>('.point-label');
+    const label = childPointLabel(this);
     if (!label) return;
     const placementHidden = label.hasAttribute(PLACEMENT_HIDDEN_ATTR);
     const release = () => {
@@ -843,10 +845,11 @@ export function placePointLabels(
     });
   });
 
-  const labels: LabelInfo[] = pending.map((label) => ({
-    ...label,
-    width: label.element.getBBox().width,
-  }));
+  const labels: LabelInfo[] = [];
+  for (const label of pending) {
+    const bbox = svgBBox(label.element);
+    if (bbox) labels.push({ ...label, width: bbox.width });
+  }
   labels.sort((a, b) => a.centerX - b.centerX);
   const placed: RectBounds[] = avoidCollisions ? pillObstacles(zoomGroup) : [];
 

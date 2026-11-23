@@ -13,7 +13,10 @@ import {
 } from 'react';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import { UnofficialBanner } from '@/components/ui/unofficial-banner';
+import {
+  UnofficialBanner,
+  UnofficialRunUnavailableNotice,
+} from '@/components/ui/unofficial-banner';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
@@ -23,6 +26,11 @@ import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-rou
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { type Model, Sequence } from '@/lib/catalog/data-mappings';
 import { ApiRequestError } from '@/lib/api/api-request-error';
+import {
+  isUnofficialRunUnavailableCode,
+  type UnofficialRunUnavailableCode,
+} from '@/lib/api/unofficial-run-unavailable';
+import { ExpectedQueryFailureError } from '@/lib/analytics/query-error-analytics';
 
 import type * as UnofficialChartDataModule from './unofficial-chart-data';
 import type { UnofficialChartData } from './unofficial-chart-data';
@@ -84,6 +92,8 @@ export interface UnofficialRunContextType {
   unofficialEvalRows: EvalRow[] | null;
   loading: boolean;
   error: string | null;
+  /** The run that has no data to show, and why. */
+  unavailable: { code: UnofficialRunUnavailableCode; runId: string } | null;
   clearUnofficialRun: () => void;
   dismissRun: (runId: string) => void;
   availableModelsAndSequences: AvailableModelSequence[];
@@ -326,6 +336,19 @@ function selectUnofficialRunResponse(
   };
 }
 
+/** A run without data to show; the banner explains it, so it is not a failed query. */
+export class UnofficialRunUnavailableError extends ExpectedQueryFailureError {
+  override name = 'UnofficialRunUnavailableError';
+  readonly code: UnofficialRunUnavailableCode;
+  readonly runId: string;
+
+  constructor(code: UnofficialRunUnavailableCode, runId: string, message: string) {
+    super(message);
+    this.code = code;
+    this.runId = runId;
+  }
+}
+
 async function fetchUnofficialRuns(
   ids: string[],
   signal: AbortSignal,
@@ -336,8 +359,13 @@ async function fetchUnofficialRuns(
   const response = await fetch(url, { signal });
   const data = (await response.json()) as Partial<UnofficialRunResponse> & {
     error?: string;
+    code?: unknown;
+    runId?: string;
   };
   if (!response.ok) {
+    if (isUnofficialRunUnavailableCode(data.code)) {
+      throw new UnofficialRunUnavailableError(data.code, data.runId ?? ids[0], data.error ?? '');
+    }
     throw new ApiRequestError(data.error || 'Failed to fetch unofficial run', response.status, url);
   }
   return selectUnofficialRunResponse(
@@ -444,8 +472,7 @@ export function UnofficialRunProvider({
 
   const dismissRun = useCallback(
     (runId: string) => {
-      const target = unofficialRunInfos.find((run) => String(run.id) === runId);
-      if (!target) return;
+      if (!runIds.includes(runId)) return;
       const remainingIds = runIds.filter((id) => id !== runId);
       if (remainingIds.length > 0 && query.data) {
         queryClient.setQueryData<UnofficialRunResponse>(
@@ -460,7 +487,7 @@ export function UnofficialRunProvider({
       window.history.pushState({}, '', url);
       notifyClientSearchChange(url.href);
     },
-    [runIds, unofficialRunInfos, query.data, queryClient],
+    [runIds, query.data, queryClient],
   );
 
   const runIndexByUrl = useMemo(() => {
@@ -515,6 +542,13 @@ export function UnofficialRunProvider({
 
   const loading = hasRunIds && (query.isFetching || !chartDataModule);
   const error = query.error instanceof Error ? query.error.message : null;
+  const unavailable = useMemo(
+    () =>
+      query.error instanceof UnofficialRunUnavailableError
+        ? { code: query.error.code, runId: query.error.runId }
+        : null,
+    [query.error],
+  );
 
   const contextValue = useMemo<UnofficialRunContextType>(
     () => ({
@@ -527,6 +561,7 @@ export function UnofficialRunProvider({
       unofficialEvalRows,
       loading,
       error,
+      unavailable,
       clearUnofficialRun,
       dismissRun,
       availableModelsAndSequences,
@@ -547,6 +582,7 @@ export function UnofficialRunProvider({
       unofficialEvalRows,
       loading,
       error,
+      unavailable,
       clearUnofficialRun,
       dismissRun,
       availableModelsAndSequences,
@@ -569,13 +605,23 @@ export function UnofficialRunProvider({
 }
 
 export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
-  const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
+  const { unofficialRunInfos, unavailable, dismissRun, clearUnofficialRun } = useUnofficialRun();
   return (
-    <UnofficialBanner
-      runs={unofficialRunInfos}
-      attached={attached}
-      onDismissRun={dismissRun}
-      onDismissAll={clearUnofficialRun}
-    />
+    <>
+      {unavailable && (
+        <UnofficialRunUnavailableNotice
+          code={unavailable.code}
+          runId={unavailable.runId}
+          attached={attached}
+          onDismiss={() => dismissRun(unavailable.runId)}
+        />
+      )}
+      <UnofficialBanner
+        runs={unofficialRunInfos}
+        attached={attached}
+        onDismissRun={dismissRun}
+        onDismissAll={clearUnofficialRun}
+      />
+    </>
   );
 }

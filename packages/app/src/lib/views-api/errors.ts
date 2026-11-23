@@ -34,7 +34,7 @@ export async function runViewsRoute(
   } catch (error) {
     if (error instanceof ViewsUpstreamError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: error.message, ...(error.code ? { code: error.code } : {}) },
         { status: error.status, headers: { 'Cache-Control': 'private, no-store' } },
       );
     }

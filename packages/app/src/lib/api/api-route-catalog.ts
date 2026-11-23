@@ -123,7 +123,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: 'b5f9de381bb588faafa7af9ca193030d73248394332e387a77f025a51c9f961c',
+    sourceSha256: '88576e5d5c7c1e9e04d1efcbbfed61956f1bc7436b34604e62f966ec490a021b',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -600,10 +600,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'PowerX raw/series=power read used by the UI and, in-process, by the public GPU metrics view: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. runId must be a positive safe integer. Stored raw reads report run-wide coverage as complete, partial or unknown inventory; missingArtifacts names wholly missing artifacts. Raw native bundles expose optional Celsius temperature when no CSV sibling exists. GET has no expected identities and reports sourceCoverage unknown. Live windows are unique by validation source, preferring CSV over bundle. Stored series=power reads serve the per-artifact output ingest precomputed when it matches the current series and linked point audits, and otherwise bucket the stored samples; both give the same response. DB failures return 503 DATABASE_UNAVAILABLE; known-incomplete stored telemetry returns 503 STORED_TELEMETRY_INCOMPLETE without trying GitHub. Responses use no-store. This is not a stable public API.',
-      zh: '供 PowerX 界面读取原始遥测或 series=power，公开 GPU 指标视图也在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。runId 必须为正安全整数。数据库原始读取的 coverage 标明整个 run 的清单完整、部分缺失或未知，missingArtifacts 列出整体缺失的产物。没有对应 CSV 时，原生 bundle 的原始数据包含可用的 GPU 温度（摄氏度）。GET 没有预期身份清单，sourceCoverage 为 unknown。实时窗口按 validation source 去重，优先 CSV，再用 bundle。已入库 run 的 series=power 读取在入库预计算结果与当前序列及关联数据点的功耗审计一致时直接使用该结果，否则按已存样本现场分桶，两者响应相同。数据库故障返回 503 DATABASE_UNAVAILABLE；若已入库的遥测已知不完整，则返回 503 STORED_TELEMETRY_INCOMPLETE，不会转而读取 GitHub。响应使用 no-store，不作为稳定公开 API。',
+      en: 'PowerX raw/series=power read used by the UI and, in-process, by the public GPU metrics view: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. runId must be a positive safe integer. Stored raw reads report run-wide coverage as complete, partial or unknown inventory; missingArtifacts names wholly missing artifacts. Raw native bundles expose optional Celsius temperature when no CSV sibling exists. GET has no expected identities and reports sourceCoverage unknown. Live windows are unique by validation source, preferring CSV over bundle. Stored series=power reads serve the per-artifact output ingest precomputed when it matches the current series and linked point audits, and otherwise bucket the stored samples; both give the same response. DB failures return 503 DATABASE_UNAVAILABLE; known-incomplete stored telemetry returns 503 STORED_TELEMETRY_INCOMPLETE without trying GitHub. A run GitHub does not have returns 404 RUN_NOT_FOUND. A run whose artifact list has no telemetry artifacts, or whose telemetry archives are all expired, unreadable (corrupt archive or undecodable contents) or without series, returns 404 NO_TELEMETRY; archives over the live download cap return 422 ARTIFACT_TOO_LARGE; a failed GitHub run, listing or download read (network error or non-410 HTTP status) returns a retryable 503 GITHUB_UNAVAILABLE. Responses use no-store. This is not a stable public API.',
+      zh: '供 PowerX 界面读取原始遥测或 series=power，公开 GPU 指标视图也在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。runId 必须为正安全整数。数据库原始读取的 coverage 标明整个 run 的清单完整、部分缺失或未知，missingArtifacts 列出整体缺失的产物。没有对应 CSV 时，原生 bundle 的原始数据包含可用的 GPU 温度（摄氏度）。GET 没有预期身份清单，sourceCoverage 为 unknown。实时窗口按 validation source 去重，优先 CSV，再用 bundle。已入库 run 的 series=power 读取在入库预计算结果与当前序列及关联数据点的功耗审计一致时直接使用该结果，否则按已存样本现场分桶，两者响应相同。数据库故障返回 503 DATABASE_UNAVAILABLE；若已入库的遥测已知不完整，则返回 503 STORED_TELEMETRY_INCOMPLETE，不会转而读取 GitHub。GitHub 上不存在的运行返回 404 RUN_NOT_FOUND。产物列表中没有遥测产物，或遥测压缩包均已过期、无法读取（压缩包损坏或内容无法解析）或不含任何序列时，返回 404 NO_TELEMETRY；压缩包超过实时下载上限时返回 422 ARTIFACT_TOO_LARGE；读取 GitHub 运行、产物列表或下载失败（网络错误或 410 以外的 HTTP 状态）时返回可重试的 503 GITHUB_UNAVAILABLE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '5d265085f9daeb20f03aa891e5ca3a0e4d45ef2e57d1345bc5c5ca69cdedd727',
+    sourceSha256: 'e575647c4926c23c1536557d086fbd86c9cad1574f05558533b2f48779ad7c80',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -614,7 +614,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. A requested window missing from an ingested run is not fetched from GitHub; the DB response lists it in missingSources with sourceCoverage incomplete. Coverage describes only requested identities, never whole-run/sample completeness. The GET source-selection, no-store and error guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。已入库 run 缺少的请求窗口不会从 GitHub 补齐，DB 响应会将其列入 missingSources，并把 sourceCoverage 标记为 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的单一来源选择、no-store 和错误约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: '5d265085f9daeb20f03aa891e5ca3a0e4d45ef2e57d1345bc5c5ca69cdedd727',
+    sourceSha256: 'e575647c4926c23c1536557d086fbd86c9cad1574f05558533b2f48779ad7c80',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -655,10 +655,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Rows whose model or hardware has no registry entry are kept, with the raw model prefix and the raw runner base as their model and hardware identities; official ingest still skips them. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
-      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。模型或硬件尚未注册的行也会保留，分别以原始模型前缀和原始 runner 名称作为模型和硬件标识；正式入库仍会跳过这些行。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
+      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Rows whose model or hardware has no registry entry are kept, with the raw model prefix and the raw runner base as their model and hardware identities; official ingest still skips them. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After. A run GitHub does not have returns 404 RUN_NOT_FOUND. Once the artifact list is read, result artifacts listed as expired, a 410 download, or an empty list for a run older than GitHub’s 90-day artifact retention return 410 ARTIFACTS_EXPIRED; a completed run without results returns 404 NO_RESULTS and an unfinished one 404 RUN_IN_PROGRESS. An artifact list GitHub fails to return is an uncached, retryable 503 GITHUB_UNAVAILABLE, never an expiry. These bodies carry error, code and runId.',
+      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。模型或硬件尚未注册的行也会保留，分别以原始模型前缀和原始 runner 名称作为模型和硬件标识；正式入库仍会跳过这些行。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。GitHub 上不存在的运行返回 404 RUN_NOT_FOUND。成功读取产物列表后，若结果产物标记为已过期、下载返回 410，或运行早于 GitHub 的 90 天产物保留期且列表为空，则返回 410 ARTIFACTS_EXPIRED；已完成但没有结果的运行返回 404 NO_RESULTS，尚未结束的运行返回 404 RUN_IN_PROGRESS。GitHub 未能返回产物列表时，返回不缓存、可重试的 503 GITHUB_UNAVAILABLE，不会报为已过期。这些响应体包含 error、code 和 runId。',
     },
-    sourceSha256: 'e062bb87a87a1e65189ca681d0fb582456d67ae5a869340f73c5173cab20a5bb',
+    sourceSha256: 'ff2a78e033164c6d8a47b011218819a994089380623f337c7edad95a548528f6',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -1440,7 +1440,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/app/api/gpu-metrics/github-telemetry.ts',
-    sourceSha256: 'dbb77691d07bf8fca2b2edceea63ec62cbfc329ae07542a557a2e3bd754bcfc5',
+    sourceSha256: 'b6e21b5a6e3b73d2a850516517cb3c47f922465fb034aea87a5895f1d8f99d8e',
     reviewArea: {
       en: 'Live PowerX artifact selection with ingest-matching CSV precedence for equal suffixes, download bounds, per-artifact failure isolation, CSV context normalization and bundle decoding.',
       zh: 'PowerX 实时产物选择沿用 ingest 的同后缀 CSV 优先规则、下载限制、单产物故障隔离、CSV context 规范化及 bundle 解码。',
@@ -1761,7 +1761,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/upstream-error.ts',
-    sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
+    sourceSha256: 'fca5b0de57254325f6185d60e8c800fdb7a12ef87593ff79c2c8c3de741007c6',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1842,7 +1842,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/errors.ts',
-    sourceSha256: '6253b908c4956286a657c9b42d590a0ad0eaedf4fa92b00acad2939135d66add',
+    sourceSha256: 'fd9cca3d312b128806c46cb4c220f5b69086a1784eebd4173b350a2004b9f653',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1860,7 +1860,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: 'fa797c3a1d3c2018eb4d7438e1ac36f8a655b2604ff95e2dffd585ab227cf8f4',
+    sourceSha256: '5fde3ac11e933e40c027a3e8d950039bf9ddf342ffbadfa5132eb1df5b9ac497',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

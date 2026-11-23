@@ -283,6 +283,8 @@ export default function ComparePerDollarPageClient({
             data-testid="compare-per-dollar-indexed-image"
           >
             <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              {/* Often the page's LCP image, so it loads eagerly. The PNG URL stays the src
+                  so search engines index the image itself. */}
               <img
                 src={heroImageSrc}
                 alt={
@@ -292,7 +294,7 @@ export default function ComparePerDollarPageClient({
                 }
                 width={1200}
                 height={675}
-                loading="lazy"
+                decoding="async"
                 className="w-full rounded-lg"
               />
             </a>

@@ -79,6 +79,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
+import { useDraftNumberInput } from '@/hooks/useDraftNumberInput';
 
 import { exportToCsv } from '@/lib/export/csv-export';
 import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
@@ -161,6 +162,11 @@ export function resolveCalculatorTargetInputValue(
   isEditing: boolean,
 ): string {
   return isEditing ? editingValue : String(effectiveTarget);
+}
+
+function parseCalculatorTarget(raw: string): number | null {
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 export function resolveCalculatorBarSelection(
@@ -412,15 +418,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [chipBasisControl],
   );
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels } =
+  const { availablePrecisions, availableSequences, availableModels, availabilitySettled } =
     useGlobalFilterAvailability();
   const { availableRuns } = useGlobalFilterWorkflow();
   const mode = 'interactivity_to_throughput' as const;
   const [costProvider, setCostProvider] = useState<CostProvider>('costh');
   const [costType, setCostType] = useState<CostType>('total');
   const [requestedTargetValue, setRequestedTargetValue] = useState<number>(35);
-  const [inputValue, setInputValue] = useState<string>('35');
-  const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
@@ -467,7 +471,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     ranges,
     getResults,
     getOverlayResults,
-    loading,
+    loading: throughputLoading,
     error: throughputError,
     hasData,
     hasOverlayData,
@@ -488,6 +492,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     chipBasis,
   );
   const error = throughputError;
+  // Until availability settles the precision/sequence may still change, so rows that match the
+  // provisional selection would flash an empty chart and collapse the cost panel for a frame.
+  const loading = throughputLoading || !availabilitySettled;
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
@@ -612,37 +619,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const currentRange = ranges.interactivity;
 
-  const handleSliderChange = useCallback((value: number) => {
-    setRequestedTargetValue(value);
-    setInputValue(String(value));
-  }, []);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    const parsed = parseFloat(e.target.value);
-    if (!isNaN(parsed) && parsed >= 0) {
-      setRequestedTargetValue(parsed);
-    }
-  }, []);
-
-  const handleInputFocus = useCallback(() => {
-    setInputValue(String(targetValue));
-    setIsTargetInputFocused(true);
-  }, [targetValue]);
-
-  const handleInputBlur = useCallback(() => {
-    const parsed = parseFloat(inputValue);
-    if (isNaN(parsed) || parsed < 0) {
-      setInputValue(String(targetValue));
-    } else {
-      const { min, max } = ranges.interactivity;
-      const clamped = Math.max(min, Math.min(max, parsed));
-      setRequestedTargetValue(clamped);
-      setInputValue(String(clamped));
-    }
-    setIsTargetInputFocused(false);
-    track('calculator_target_set', { mode, value: targetValue });
-  }, [inputValue, targetValue, mode, ranges.interactivity]);
+  const targetInput = useDraftNumberInput(targetValue, parseCalculatorTarget, (next, source) => {
+    const clamped = Math.max(currentRange.min, Math.min(currentRange.max, next));
+    setRequestedTargetValue(clamped);
+    if (source === 'blur') track('calculator_target_set', { mode, value: clamped });
+  });
 
   const handleCostProviderChange = useCallback((value: string) => {
     setCostProvider(value as CostProvider);
@@ -1178,21 +1159,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           }
                           min={currentRange.min}
                           max={currentRange.max}
-                          value={targetValue}
-                          onSliderChange={handleSliderChange}
+                          value={targetInput.sliderValue}
+                          onSliderChange={(next) => {
+                            targetInput.discardDraft();
+                            setRequestedTargetValue(next);
+                          }}
                           onSliderCommit={() =>
                             track('calculator_target_slider_set', { mode, value: targetValue })
                           }
                           input={{
                             id: 'calc-target',
-                            value: resolveCalculatorTargetInputValue(
-                              inputValue,
-                              targetValue,
-                              isTargetInputFocused,
-                            ),
-                            onFocus: handleInputFocus,
-                            onChange: handleInputChange,
-                            onBlur: handleInputBlur,
+                            ...targetInput.input,
                           }}
                         />
                       </div>
@@ -1207,7 +1184,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
       {loading && (
         <section aria-hidden="true">
-          <Card className="h-56 lg:h-55">
+          <Card className="h-51.5 md:h-48.5 lg:h-43.5">
             <Skeleton className="size-full" />
           </Card>
         </section>
