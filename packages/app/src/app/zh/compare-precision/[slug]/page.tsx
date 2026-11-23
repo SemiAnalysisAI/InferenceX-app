@@ -153,7 +153,7 @@ export async function renderPrecisionPageZh(slug: string, { scenarioSegment }: S
   const bLabel = precisionDisplayLabel(parsed.precB);
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
-  const imageUrl = `${SITE_URL}/compare-precision/${canonical}/precision-comparison.png?lang=zh`;
+  const imageUrl = `${SITE_URL}/zh/compare-precision/${canonical}/precision-comparison.png`;
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideA, sideB);
   const jsonLd = buildVariantJsonLdZh(
     'precision',
@@ -201,7 +201,7 @@ export async function renderPrecisionPageZh(slug: string, { scenarioSegment }: S
         gpuArch={gpuMeta?.arch ?? ''}
         aLabel={aLabel}
         bLabel={bLabel}
-        heroImageSrc={`/compare-precision/${canonical}/precision-comparison.png?lang=zh`}
+        heroImageSrc={`/zh/compare-precision/${canonical}/precision-comparison.png`}
         locale="zh"
       />
     </>

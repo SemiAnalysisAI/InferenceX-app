@@ -78,16 +78,22 @@ async function main(): Promise<void> {
         return 'skipped';
       }
 
+      const warnings: string[] = [];
       const profileStats = await computeProfileAggregateStatsFromCompressedChunks(
         readTraceProfileChunks(sql, id),
+        warnings,
       );
 
       // A stats-version upgrade may change server metric interpretation as well as
       // profile calculations. Re-read both before marking the bundle current.
-      const serverStats = await computeAggregateStats({
-        profileBlob: null,
-        serverBlob: await readServerMetricsGz(sql, id),
-      });
+      const serverStats = await computeAggregateStats(
+        {
+          profileBlob: null,
+          serverBlob: await readServerMetricsGz(sql, id),
+        },
+        warnings,
+      );
+      for (const warning of warnings) console.warn(`  id=${id}: ${warning}`);
       const stats = mergeProfileStatsUpgrade(serverStats, profileStats);
 
       retainPopulatedFields(row.aggregate_stats, stats, [

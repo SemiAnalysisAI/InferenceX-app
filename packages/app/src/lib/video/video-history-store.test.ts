@@ -372,9 +372,12 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the unofficial-run provider and banner gained unavailable-run states. They are
-      // reached only through a type import and React context, so recorded entries are unchanged.
-      sources: '79700f5f33940e35a9593b8bf79d3bdbd01f5ca468f66981dfa00ea88fe128b8',
+      // Re-pinned after the lazy power model loader gained failure and retry states (reached only
+      // through type imports), fetchJson learned to take an early document-load response,
+      // data_query_failed stopped reporting failed background refetches that keep their data, and
+      // dashboard-routes gained the default Inference model slug. None of these feed recorded
+      // entries, so they are unchanged.
+      sources: 'a8adb3c96d078fae1a1966420940e9442fc96acc1ffd89a5737c97ecf258e22e',
     });
   });
 });
