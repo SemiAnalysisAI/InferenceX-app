@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 
 import { ChartHover, type HoverItem } from './chart-hover';
-import { ChartEmpty, PERCENTILE_COLORS } from './chart-shared';
+import { ChartEmpty, PERCENTILE_COLORS, chartPadForYTicks } from './chart-shared';
 import { niceAxis } from './time-series-math';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -24,7 +24,7 @@ const PERCENTILE_LINES: PercentileLine[] = [
   { key: 'p99', label: 'P99', color: PERCENTILE_COLORS.p99 },
 ];
 
-const PAD = { top: 16, right: 16, bottom: 90, left: 64 };
+const BASE_PAD = { top: 16, right: 16, bottom: 90, left: 64 };
 
 export interface AggregatePoint {
   label: string;
@@ -78,15 +78,16 @@ export function AggregateChart({
     const axis = yMax
       ? { top: yMax, ticks: Array.from({ length: 5 }, (_, i) => (yMax * i) / 4) }
       : niceAxis(yMaxComputed);
-    const innerW = W - PAD.left - PAD.right;
-    const innerH = H - PAD.top - PAD.bottom;
-    return { yTop: axis.top, yTicks: axis.ticks, innerW, innerH };
-  }, [points, W, H, yMax, percentileLines]);
+    return { yTop: axis.top, yTicks: axis.ticks };
+  }, [points, yMax, percentileLines]);
 
   if (!computed) {
     return <ChartEmpty width={W} height={H} />;
   }
-  const { yTop, yTicks, innerW, innerH } = computed;
+  const { yTop, yTicks } = computed;
+  const PAD = chartPadForYTicks(yTicks.map(fmt), false, BASE_PAD);
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
 
   const xOf = (i: number) =>
     points.length === 1 ? PAD.left + innerW / 2 : PAD.left + (i / (points.length - 1)) * innerW;

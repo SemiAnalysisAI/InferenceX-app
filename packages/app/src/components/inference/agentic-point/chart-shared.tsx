@@ -2,6 +2,8 @@
 
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
+import { chartFont, computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
+import type { ChartMargin } from '@/lib/d3-chart/types';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -15,6 +17,26 @@ import {
 } from './chart-legend';
 
 export const CHART_PAD = { top: 12, right: 16, bottom: 56, left: 60 } as const;
+
+/** Tick labels end 8px left of the plot; a rotated axis title sits centred at x=10. */
+const TICK_LABEL_GAP = 8;
+const AXIS_TITLE_SPACE = 18;
+
+/** `base` with a left edge wide enough for the widest 10px Y tick label and the axis title. */
+export function chartPadForYTicks(
+  labels: readonly string[],
+  hasAxisTitle: boolean,
+  base: ChartMargin,
+): ChartMargin {
+  if (typeof document === 'undefined') return base;
+  const left = computeLeftMargin([...labels], {
+    split: 'newline',
+    primaryFont: chartFont(10),
+    minMargin: base.left,
+    padding: TICK_LABEL_GAP + (hasAxisTitle ? AXIS_TITLE_SPACE : 4),
+  });
+  return left === base.left ? base : { ...base, left };
+}
 
 export const CHART_SIZES = {
   inline: { width: 720, height: 260 },

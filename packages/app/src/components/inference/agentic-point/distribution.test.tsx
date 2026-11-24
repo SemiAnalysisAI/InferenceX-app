@@ -1,10 +1,24 @@
 // @test-environment jsdom
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
-import { describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { $, $$, contains, isVisible, render } from '@/test/dom';
 
 import { Distribution } from './distribution';
+
+// jsdom has no 2D canvas, and the chart measures its Y tick labels to size the left pad.
+class FakeOffscreenCanvas {
+  getContext() {
+    return { font: '', measureText: (text: string) => ({ width: text.length * 6 }) };
+  }
+}
+const originalCanvas = globalThis.OffscreenCanvas;
+beforeAll(() => {
+  globalThis.OffscreenCanvas = FakeOffscreenCanvas as unknown as typeof OffscreenCanvas;
+});
+afterAll(() => {
+  globalThis.OffscreenCanvas = originalCanvas;
+});
 
 function lognormalSample(count: number, mu: number, sigma: number): number[] {
   let seed = 987_654;
