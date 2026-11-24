@@ -654,10 +654,13 @@ connections at 16 and above. Each connection holds up to about 1 GB while it com
 Ingest and `sync-public-db` sanitize server-log text with `etl/log-redaction.ts`, and
 `sync-public-db` also sanitizes runs from repositories that are not public. The rules replace
 access tokens (`hf_`, GitHub, AWS access key IDs, Slack, `sk-` API keys and JWTs), URL passwords,
-public IPv4 and IPv6 addresses and `*.oraclevcn.com` host suffixes with `***REDACTED***`. Private,
-loopback, link-local and CGNAT addresses, internal node names, package versions such as
-`==9.19.0.56` and pip's `(9.19.0.56)` stay. The InferenceX uploader applies the same rules, and
-both sides test against `etl/log-redaction.vectors.json`, so change the two together.
+email addresses, public IPv4 and IPv6 addresses and `*.oraclevcn.com` host suffixes with
+`***REDACTED***`. Private, loopback, link-local and CGNAT addresses, internal node names, short
+usernames such as `/home/cam`, `user@host` without a TLD, scp-style remotes
+(`git@github.com:org/repo`), URL userinfo without a password, `pkg@1.2.3`, image digests, package
+versions such as `==9.19.0.56` and pip's `(9.19.0.56)` stay. The InferenceX uploader applies the
+same rules, and both sides test against `etl/log-redaction.vectors.json`, so change the two
+together.
 
 The log routes serve stored text as is and do not sanitize at read time. Rows stored before
 this change stay exposed until the backfill runs.

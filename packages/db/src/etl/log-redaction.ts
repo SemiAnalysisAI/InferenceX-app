@@ -18,6 +18,13 @@ const SECRET_PATTERNS = [
   /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gu,
 ];
 const URL_PASSWORD = /(?<userinfo>\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@"',;<>]*:)[^\s@/"',;<>]+@/gu;
+/**
+ * An email address with a letters-only TLD, so `pkg@1.2.3`, `root@node-12` and `img@sha256:…`
+ * stay. Userinfo right after `://` and scp-style remotes (`git@github.com:org/repo`) stay, and the
+ * domain must end where the match does, so a remote's host is never cut short to look like one.
+ */
+const EMAIL =
+  /(?<![A-Za-z0-9._%+-])(?<!:\/\/)[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}(?![A-Za-z0-9_-]|\.[A-Za-z0-9]|:\S)/gu;
 const ORACLE_VCN =
   /\b(?<host>[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)(?:\.[A-Za-z0-9-]+)*\.oraclevcn\.com\b/giu;
 const ORACLE_VCN_HINT = /oraclevcn\.com/iu;
@@ -91,6 +98,7 @@ export function redactText(text: string): string {
   let out = text;
   for (const pattern of SECRET_PATTERNS) out = out.replaceAll(pattern, REDACTED);
   out = out.replaceAll(URL_PASSWORD, `$<userinfo>${REDACTED}@`);
+  if (out.includes('@')) out = out.replaceAll(EMAIL, REDACTED);
   if (ORACLE_VCN_HINT.test(out)) out = out.replaceAll(ORACLE_VCN, `$<host>.${REDACTED}`);
   out = out.replaceAll(IPV6, sanitizeIpv6);
   return out.replaceAll(IPV4, (match: string, start: number, whole: string) =>

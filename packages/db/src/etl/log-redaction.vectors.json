@@ -136,9 +136,9 @@
       "output": "redis://:***REDACTED***@10.1.2.4:6379"
     },
     {
-      "name": "compact json url next to an email kept",
+      "name": "compact json url next to an email",
       "input": "{\"url\":\"http://10.0.0.5:8000\",\"owner\":\"a@example.com\"}",
-      "output": "{\"url\":\"http://10.0.0.5:8000\",\"owner\":\"a@example.com\"}"
+      "output": "{\"url\":\"http://10.0.0.5:8000\",\"owner\":\"***REDACTED***\"}"
     },
     {
       "name": "jwt access token",
@@ -164,6 +164,46 @@
       "name": "public mq_connect_ip",
       "input": "master_addr=127.0.0.1, mq_connect_ip=203.0.113.20 (local), world_size=8",
       "output": "master_addr=127.0.0.1, mq_connect_ip=***REDACTED*** (local), world_size=8"
+    },
+    {
+      "name": "email in a home path",
+      "input": "Using cache directory: /home/jane.doe@example.com/.cache/torch_compile_cache/rank_1",
+      "output": "Using cache directory: /home/***REDACTED***/.cache/torch_compile_cache/rank_1"
+    },
+    {
+      "name": "email with subdomains and sentence period",
+      "input": "contact ops+ci@mail.example.co.uk.",
+      "output": "contact ***REDACTED***."
+    },
+    {
+      "name": "short home username kept",
+      "input": "/home/cam/.cache/huggingface",
+      "output": "/home/cam/.cache/huggingface"
+    },
+    {
+      "name": "scp-style git remote kept",
+      "input": "git clone git@gitlab.example.com:example-org/repo.git",
+      "output": "git clone git@gitlab.example.com:example-org/repo.git"
+    },
+    {
+      "name": "url userinfo without password kept",
+      "input": "fetch https://deploy@git.example.com/org/repo.git",
+      "output": "fetch https://deploy@git.example.com/org/repo.git"
+    },
+    {
+      "name": "user at host without tld kept",
+      "input": "ssh root@node-12 hostname",
+      "output": "ssh root@node-12 hostname"
+    },
+    {
+      "name": "version specifiers and image digests kept",
+      "input": "dynamo-llm@1.3.0 npm i @scope/pkg@2.0.0 image:cu130@sha256:0123abcd",
+      "output": "dynamo-llm@1.3.0 npm i @scope/pkg@2.0.0 image:cu130@sha256:0123abcd"
+    },
+    {
+      "name": "decorator kept",
+      "input": "@torch.compile(dynamic=True) and @functools.lru_cache",
+      "output": "@torch.compile(dynamic=True) and @functools.lru_cache"
     }
   ]
 }
