@@ -1,30 +1,13 @@
 import * as d3 from 'd3';
 
+import { splitLabel, type LabelSplitMode } from './label-split';
 import { CHART_TYPE, px } from './typography';
-
-export type LabelSplitMode = 'last-space' | 'newline' | 'parens';
 
 export interface TwoRowLabelOptions {
   split?: LabelSplitMode;
   yOffset?: number;
   primarySize?: string;
   secondarySize?: string;
-}
-
-export function splitLabel(label: string, mode: LabelSplitMode): [string, string | null] {
-  if (mode === 'newline') {
-    const idx = label.indexOf('\n');
-    if (idx === -1) return [label, null];
-    return [label.slice(0, idx), label.slice(idx + 1).replaceAll('\n', ' ')];
-  }
-  if (mode === 'parens') {
-    const match = label.match(/^(?<base>.+?)(?<suffix>\s*\(.+\))$/u);
-    if (!match) return [label, null];
-    return [match[1], match[2].trim()];
-  }
-  const lastSpace = label.lastIndexOf(' ');
-  if (lastSpace <= 0) return [label, null];
-  return [label.slice(0, lastSpace), label.slice(lastSpace + 1)];
 }
 
 export function twoRowYAxisLabels(options: TwoRowLabelOptions | number = {}) {

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import { splitLabel, type LabelSplitMode } from './axis-labels';
+import { splitLabel, type LabelSplitMode } from './label-split';
 import type { ChartMargin } from './types';
 
 export interface TextMeasureOptions {

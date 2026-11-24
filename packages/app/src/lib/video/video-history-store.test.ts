@@ -378,9 +378,10 @@ describe('history projection version', () => {
       // dashboard-routes gained the default Inference model slug, inference topology labels
       // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
       // the inference setSelectedGPUs action type now returns whether picks applied, the
-      // unofficial run provider gained a requested-overlay flag, and buildShareUrl now carries
-      // the overview search params. None of these feed recorded entries, so they are unchanged.
-      sources: 'e57058918010b9da08e5e6e63f4137bd5cd9e780329534cf52a314975b31d9bf',
+      // unofficial run provider gained a requested-overlay flag, buildShareUrl now carries
+      // the overview search params, and url-state reads those keys from an import-free
+      // overview-search-keys module. None of these feed recorded entries, so they are unchanged.
+      sources: '3c52be3fed6522f7eaa036a29ca5728077c060f425a19abc5e9c24553b77eeee',
     });
   });
 });

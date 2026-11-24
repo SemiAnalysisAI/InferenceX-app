@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { splitLabel } from '@/lib/d3-chart/axis-labels';
+import { splitLabel } from '@/lib/d3-chart/label-split';
 
 import type { InterpolatedResult } from './types';
 import {
