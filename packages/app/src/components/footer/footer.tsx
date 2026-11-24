@@ -213,11 +213,11 @@ export const Footer = () => {
               data-testid="footer-brand-link"
               target="_blank"
               href="https://semianalysis.com/"
-              className="inline-block w-35 h-14.5"
+              className="inline-block w-45 h-13.5"
             >
               <Image
-                width={140}
-                height={42}
+                width={180}
+                height={54}
                 src="/brand/logo-color.webp"
                 alt={t.logoAlt}
                 className="h-auto"
