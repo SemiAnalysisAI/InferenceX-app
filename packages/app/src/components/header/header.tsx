@@ -191,9 +191,9 @@ export const Header = () => {
               <Image
                 src="/brand/logo-color.webp"
                 alt={isZh ? 'SemiAnalysis 标志' : 'SemiAnalysis logo'}
-                width={64}
+                width={90}
                 height={27}
-                className="inline h-auto lg:w-20"
+                className="inline h-auto lg:w-28"
               />
             </span>
           </Link>
