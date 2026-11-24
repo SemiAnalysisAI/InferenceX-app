@@ -6,7 +6,7 @@ import {
   type ServerMetricsContext,
 } from './server-metrics-adapters';
 
-export const CHART_SERIES_VERSION = 21;
+export const CHART_SERIES_VERSION = 22;
 
 export interface TimeSeriesPoint {
   t: number;
@@ -123,6 +123,7 @@ export const CHART_METRIC_KEYS = new Set([
   'trtllm_num_requests_waiting',
   'trtllm_request_type',
   'trtllm_request_type_total',
+  'trtllm_openengine_rpc_outcomes',
 ]);
 
 function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMap {
@@ -145,6 +146,8 @@ export interface PromptTokenTotals {
   prompt: number;
   prefixCacheHits: number;
   bySource: Record<string, number>;
+  /** Disaggregated TRT-LLM run whose endpoints carry no role, so the totals count every endpoint. */
+  rolesUnidentified?: true;
 }
 
 export interface ChartData {
@@ -626,29 +629,68 @@ const TRTLLM_PROMPT_METRICS = [
   'trtllm_kv_cache_hit_rate',
 ];
 
+const OPENENGINE_METRIC_PREFIX = 'trtllm_openengine_';
+
+/**
+ * A Dynamo sidecar serves TRT-LLM's own OpenEngine endpoint, whose series carry
+ * no Dynamo role label; the phase on its RPC series names the role the engine
+ * serves. Returns a `disaggregation_mode` value per endpoint.
+ */
+function openEngineEndpointRoles(metrics: MetricsMap): Map<string, string> {
+  const phases = new Map<string, Set<string>>();
+  for (const [name, metric] of Object.entries(metrics)) {
+    if (!name.startsWith(OPENENGINE_METRIC_PREFIX)) continue;
+    for (const s of metric.series ?? []) {
+      const phase = s.labels?.['phase'];
+      if (!s.endpoint_url || (phase !== 'prefill' && phase !== 'decode')) continue;
+      let seen = phases.get(s.endpoint_url);
+      if (!seen) {
+        seen = new Set();
+        phases.set(s.endpoint_url, seen);
+      }
+      seen.add(phase);
+    }
+  }
+  const roles = new Map<string, string>();
+  for (const [endpoint, seen] of phases) {
+    roles.set(endpoint, seen.size === 1 ? [...seen][0]! : 'aggregated');
+  }
+  return roles;
+}
+
+function withRoleHint(series: RawSeries, roleHint: string | undefined): RawSeries {
+  const labels = series.labels ?? {};
+  if (!roleHint || labels['disaggregation_mode'] || labels['dynamo_component']) return series;
+  return { ...series, labels: { ...labels, disaggregation_mode: roleHint } };
+}
+
 /**
  * A disaggregated TRT-LLM decode worker re-reports every prompt it receives
  * and counts the KV transferred from prefill as cached (or, on some builds, as
  * not cached at all), so the prompt and cache counters would count each prompt
  * twice. Prefer identified prefill endpoints, otherwise exclude identified decode endpoints.
+ * `rolesUnidentified` marks a disaggregated run where no endpoint has a role.
  */
 function scopeTrtllmDisaggToPrefill(
   metrics: MetricsMap,
   context: ServerMetricsContext,
-): MetricsMap {
+): { metrics: MetricsMap; rolesUnidentified: boolean } {
   const adapter = selectServerMetricsAdapter(context);
-  if (!context.disagg || adapter.id !== 'trtllm') return metrics;
+  if (!context.disagg || adapter.id !== 'trtllm') return { metrics, rolesUnidentified: false };
+  const openEngineRoles = openEngineEndpointRoles(metrics);
   const decode = new Set<string>();
   const prefill = new Set<string>();
   for (const metric of Object.values(metrics)) {
     for (const s of metric.series ?? []) {
       if (!s.endpoint_url) continue;
-      const role = adapter.identifySource(s).role;
+      const role = adapter.identifySource(
+        withRoleHint(s, openEngineRoles.get(s.endpoint_url)),
+      ).role;
       if (role === 'decode') decode.add(s.endpoint_url);
       if (role === 'prefill') prefill.add(s.endpoint_url);
     }
   }
-  if (decode.size === 0 && prefill.size === 0) return metrics;
+  if (decode.size === 0 && prefill.size === 0) return { metrics, rolesUnidentified: true };
   const scoped = { ...metrics };
   for (const name of TRTLLM_PROMPT_METRICS) {
     const series = metrics[name]?.series;
@@ -662,7 +704,7 @@ function scopeTrtllmDisaggToPrefill(
     }
   }
   // A decode worker's own source breakdown keeps its counters.
-  return scoped;
+  return { metrics: scoped, rolesUnidentified: false };
 }
 
 function buildChartData(
@@ -672,9 +714,9 @@ function buildChartData(
   originStartNs?: number,
 ): ChartData {
   const { metrics: sourceMetrics, pd: atomPd } = scopeAtomPdToPrefill(rawMetrics);
-  const metrics = includeMetricSources
+  const { metrics, rolesUnidentified } = includeMetricSources
     ? scopeTrtllmDisaggToPrefill(sourceMetrics, context)
-    : sourceMetrics;
+    : { metrics: sourceMetrics, rolesUnidentified: false };
   let startNs = Number.POSITIVE_INFINITY;
   let endNs = 0;
   let timeslicesCount = 0;
@@ -908,6 +950,7 @@ function buildChartData(
     prefixCacheHits: prefixCacheHitsTotal,
     bySource: {},
   };
+  if (rolesUnidentified) promptTokenTotals.rolesUnidentified = true;
   for (const source of Object.keys(promptTokensBySource)) {
     promptTokenTotals.bySource[source] = countTotal(promptBySrc.get(source));
   }
@@ -950,6 +993,9 @@ function buildChartData(
         const role = series.labels?.['disaggregation_mode'] ?? series.labels?.['dynamo_component'];
         if (endpointUrl && role) endpointRoles.set(endpointUrl, role);
       }
+    }
+    for (const [endpointUrl, role] of openEngineEndpointRoles(sourceMetrics)) {
+      if (!endpointRoles.has(endpointUrl)) endpointRoles.set(endpointUrl, role);
     }
     const grouped = new Map<string, { source: MetricSource; metrics: MetricsMap }>();
     for (const [metricName, metric] of Object.entries(sourceMetrics)) {

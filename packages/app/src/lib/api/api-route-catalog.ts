@@ -2143,10 +2143,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-chart-series.ts',
-    // Reviewed for log-style sanitization of served source ids, endpoint URLs and engine labels
-    // (documented on /api/v1/trace-server-metrics). Same CHART_SERIES_VERSION: every stored
-    // endpoint is private, so stored rows would not change.
-    sourceSha256: '17dd1c8cbfb966240fcc53aef43e34fc1df489dc634007fb9f898a87ebb52c58',
+    // Reviewed for version 22: disaggregated TRT-LLM roles also come from OpenEngine phase labels,
+    // and unidentified roles keep the run's reported hit rate. Served source ids, endpoint URLs and
+    // engine labels stay log-style sanitized (documented on /api/v1/trace-server-metrics); the
+    // response fields and their semantics are unchanged.
+    sourceSha256: 'fb802620e12cae10aff6b4c062a558cd83ba671390a911417946b1bc1c22207e',
     reviewArea: {
       en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
       zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',

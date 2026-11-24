@@ -186,6 +186,12 @@ describe('cacheHitRatesFromPromptTokenTotals sanity', () => {
     }
   });
 
+  it('keeps the run rate when disaggregated endpoint roles are unidentified', () => {
+    const totals = { prompt: 2000, prefixCacheHits: 970, bySource: { 'cache hit (HBM)': 970 } };
+    expect(cacheHitRatesFromPromptTokenTotals(totals)?.gpu).toBeCloseTo(0.485, 12);
+    expect(cacheHitRatesFromPromptTokenTotals({ ...totals, rolesUnidentified: true })).toBeNull();
+  });
+
   it('refuses rates above 100% instead of writing them', () => {
     const totals = { prompt: 100, prefixCacheHits: 0, bySource: {} };
     expect(

@@ -1158,6 +1158,15 @@ const trtllmCounter = (
   })),
 });
 
+function unlabelled(metrics: MetricsMap): MetricsMap {
+  return Object.fromEntries(
+    Object.entries(metrics).map(([name, metric]) => [
+      name,
+      { series: metric.series!.map(({ labels: _labels, ...series }) => series) },
+    ]),
+  );
+}
+
 describe('TRT-LLM disaggregated prompt-token totals', () => {
   const prefillUrl = 'http://prefill:7500/metrics';
   const decodeUrls = ['http://decode-a:7501/metrics', 'http://decode-b:7502/metrics'];
@@ -1255,6 +1264,52 @@ describe('TRT-LLM disaggregated prompt-token totals', () => {
     expect(series.prefixCacheHitRate).toEqual([]);
     expect(series.prefillTps).toEqual([]);
     expect(series.metricSources[0]?.promptTps).toEqual([{ t: 0, value: 500 }]);
+  });
+
+  it('reads roles from OpenEngine phase labels when counters have no Dynamo role', () => {
+    // Dynamo sidecar mode scrapes TRT-LLM's own OpenEngine endpoint, which names no
+    // Dynamo component; its RPC outcomes carry the phase the engine serves.
+    const metrics: MetricsMap = {
+      ...unlabelled(disaggMetrics(0)),
+      trtllm_openengine_rpc_outcomes: {
+        series: [
+          { endpoint_url: prefillUrl, labels: { phase: 'prefill', outcome: 'completed' } },
+          ...decodeUrls.map((url) => ({
+            endpoint_url: url,
+            labels: { phase: 'decode', outcome: 'completed' },
+          })),
+        ],
+      },
+    };
+    const { promptTokenTotals, series } = computeChartDataFromMetricPhases(
+      metrics,
+      {},
+      { framework: 'dynamo-trt', disagg: true },
+    );
+    expect(promptTokenTotals.prompt).toBe(1000);
+    expect(promptTokenTotals.prefixCacheHits).toBe(970);
+    expect(promptTokenTotals.rolesUnidentified).toBeUndefined();
+    expect(series.metricSources.map(({ source }) => source.role).toSorted()).toEqual([
+      'decode',
+      'decode',
+      'prefill',
+    ]);
+  });
+
+  it('flags disaggregated totals when no endpoint has a role', () => {
+    const metrics = unlabelled(disaggMetrics(0));
+    const disagg = computeChartDataFromMetricPhases(
+      metrics,
+      {},
+      { framework: 'dynamo-trt', disagg: true },
+    );
+    const aggregated = computeChartDataFromMetricPhases(
+      metrics,
+      {},
+      { framework: 'dynamo-trt', disagg: false },
+    );
+    expect(disagg.promptTokenTotals.rolesUnidentified).toBe(true);
+    expect(aggregated.promptTokenTotals.rolesUnidentified).toBeUndefined();
   });
 
   it('still sums every endpoint of an aggregated deployment', () => {

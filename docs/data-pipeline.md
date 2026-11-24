@@ -466,8 +466,14 @@ towards `(h + 1) / 2` or `h / 2`, where `h` is the prefill prefix hit rate.
 For disaggregated TRT-LLM, aggregate prompt, cached-prompt, prefill-batch and
 hit-rate metrics prefer identified prefill endpoints; without those, they exclude endpoints labelled decode (`disaggregation_mode=decode`
 or `dynamo_component=backend`). Role labels can come from another metric on the
-same endpoint. Per-worker sources retain their own counters, including decode
+same endpoint. Dynamo's sidecar mode scrapes TRT-LLM's own OpenEngine endpoint,
+which carries neither label; there the `phase` label on `trtllm_openengine_*`
+series names the endpoint's role (both phases on one endpoint mean an aggregated
+engine). Per-worker sources retain their own counters, including decode
 measurements. Decode-only scrapes do not supply aggregate prefill measurements.
+When a disaggregated run's endpoints carry no role at all, the totals still
+count every endpoint, so ingest keeps the run's reported hit rate and records a
+warning instead of writing the doubled-denominator rate.
 
 The same scoped token totals produce chart data and the ingested
 `server_gpu_cache_hit_rate`. `db:backfill-chart-series` refreshes stored chart

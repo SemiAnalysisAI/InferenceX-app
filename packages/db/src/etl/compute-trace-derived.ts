@@ -93,6 +93,12 @@ export async function computeTraceDerivedPayloads(
       const data = computeChartDataFromMetricPhases(profiling, warmup, metricsContext);
       chartSeries = data.series;
       promptTokenTotals = data.promptTokenTotals;
+      if (promptTokenTotals.rolesUnidentified) {
+        warnings.push(
+          'disaggregated TRT-LLM server metrics name no prefill or decode endpoint, so the ' +
+            "prefix cache hit rate keeps the run's reported value",
+        );
+      }
     } catch (error) {
       warnings.push(`chart series failed (${errorMessage(error)}), so it is empty`);
     }
